@@ -94,7 +94,8 @@ Loading bzl_module.rs (module declaration only), new bzl_module/rust_toolchain_h
 and tests, new rust_toolchain_auth.rs/runtime proxy/tests, evaluator_roots.rs,
 provider.rs, subrule_invocation.rs, lib.rs; Analysis analysis_value.rs/new tests,
 dice.rs, starlark_rule.rs and focused rustc_map_each integration modules;
-shared fixture toolchain.bzl/rust_allocator_libraries.bzl, sources.rs/sources.json/
+shared fixture toolchain.bzl/rust_allocator_libraries.bzl plus existing pinned
+triple.bzl/semver.bzl/incompatible.bzl leaf relocation, sources.rs/sources.json/
 fixture.toml and Loading host_package_load_tests.rs include_str/source tests;
 manifest/canonical/Stage6/Stage9 contracts. No CLI/executor/engine changes or
 third-party body edits. Large existing files get local hooks/signatures only; new
@@ -118,7 +119,7 @@ Core resource_set execution refusal remain named unsupported action boundaries;
 if a required construction gate hits one, resolve it before coupled activation.
 
 Reuse existing CC callable lifecycle/source fixtures and original full source.
-Source-asset growth is two moved files with old bodies removed; review provenance
+Source-asset growth is five moved files with old bodies removed; review provenance
 and hashes. Serial pinned no-run Cargo JSON prep60s, exact nonignored preflight,
 focused executable groups20s; direct Core/CLI compile and rebuilt authentic query
 with unchanged workspace hashes/supervised cleanup. Authentic >30s is justified:
@@ -172,3 +173,30 @@ transitive import A/B/A. Synthetic authority metadata and direct-helper authored
 probe restoration are complementary evidence only. Reuse the existing Analysis
 integration workspace/epoch fixture for the remaining focused proof. Stage6/9
 activation claims remain unadmitted until these gates pass.
+
+Independent DESIGN accepts three additional byte-exact leaf relocations from
+Loading constants (triple172 lines, semver51, incompatible27), removing old raw
+bodies and retaining existing hash/line-count proofs. Existing common_settings
+and helper imports are reused. This completes caller loading in the shared
+fixture for genuine original rust_toolchain/stdlib production and both-route
+retained consumer invocation. The separate same-DICE paths.bzl proof obtains
+caller metadata from normal package loading and helper manifests from normal
+preparation; it explicitly checks reachable membership, stale Retained(A)
+refusal under B and byte-exact authority restoration under A. No handcrafted
+recipe or metadata replaces either gate.
+
+## Closing proof checkpoint (not acceptance)
+
+Three relocated caller leaves pass their protected Loading selectors3/3 in
+0.008s after no-run preparation53.802s. Actual normal-preparation transitive
+paths.bzl import A/B/A passes both routes1/1 in0.565s. Coupled test source is
+preserved with genuine original rust_toolchain/stdlib production, registered
+C++ toolchain, native platform constraints and fresh retained consumers. Its
+first three runtime failures exposed authored-fixture mandatory attr, duplicate
+target and canonical platforms-route gaps; corrected inputs are awaiting rerun.
+No production fallback or callback gate is waived.
+
+WP878 selected-BCR relative leaf-file symlink prerequisite is independently
+accepted on main at d9c1de64a (16 focused tests/full pinned archive/CLI pass).
+Preserve this follow-on candidate, integrate that prerequisite, reconcile
+scheduling and rebuild before the unchanged authentic producer replay.

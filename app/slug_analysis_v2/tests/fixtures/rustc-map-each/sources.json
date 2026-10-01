@@ -341,6 +341,21 @@
       "path": "rules_rust/rust/private/utils.bzl",
       "bytes": 38613,
       "sha256": "8aa49b9312d4ae5c4aed033aba65392a039a681b3ee21ca83da0f05acac28ace"
+    },
+    {
+      "path": "rules_rust/rust/platform/triple.bzl",
+      "bytes": 5310,
+      "sha256": "19fd04c62b3a50057ffc8ab9b831f5182bc531e4307f6065065ce214de4129e6"
+    },
+    {
+      "path": "rules_rust/rust/private/semver.bzl",
+      "bytes": 1916,
+      "sha256": "966fe4b90082dd92bac60398b2801824f41906eea71364b64f630f0c175250ab"
+    },
+    {
+      "path": "rules_rust/rust/settings/incompatible.bzl",
+      "bytes": 867,
+      "sha256": "534d5103680dc47634b93ed160f639a88495707fe2c27b551defbb3c6765f040"
     }
   ],
   "generated_source": {

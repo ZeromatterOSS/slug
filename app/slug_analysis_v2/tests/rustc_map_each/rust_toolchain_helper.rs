@@ -304,3 +304,214 @@ async fn actual_allocator_helper_dynamic_and_self_contained_use_consumer_actions
         fs::remove_dir_all(root).unwrap();
     }
 }
+
+async fn prepare_actual_helper(
+    dice: &Arc<Dice>,
+    root: &std::path::Path,
+    observed: bool,
+    retained: Option<Arc<slug_build_api_v2::RustToolchainCallableSourceAuthority>>,
+) -> Result<
+    slug_loading_v2::PreparedRustToolchainHelperBinding,
+    slug_loading_v2::RustToolchainHelperError,
+> {
+    use slug_bzlmod_v2::SourcePreparationOutcome;
+    use slug_loading_v2::RustToolchainHelperMode;
+    use slug_loading_v2::RustToolchainHelperRequest;
+
+    // Reuse the real fixture's snapshot, path epoch and selected repository
+    // injection before entering the public Loading owner on the same Dice.
+    let result = super::request_configured(
+        dice,
+        root,
+        root_epoch(root),
+        observed,
+        "subject",
+        config(&[]),
+    )
+    .await
+    .unwrap();
+    assert!(result.actions().is_empty());
+    let mut transaction = dice
+        .updater_with_data(UserComputationData {
+            cycle_detector: Some(analysis_cycle_detector()),
+            ..Default::default()
+        })
+        .commit()
+        .await;
+    let workspace = NormalizedAbsolutePath::new(root.to_path_buf()).unwrap();
+    let route = match transaction
+        .compute(&slug_loading_v2::HostCanonicalRepositoryLoadRouteKey::new(
+            workspace.clone(),
+            CanonicalRepoName::new("rules_rust+").unwrap(),
+        ))
+        .await
+        .unwrap()
+    {
+        SourcePreparationOutcome::Complete(result) => result.as_ref().as_ref().unwrap().clone(),
+        other => panic!("actual caller route requires inputs: {other:?}"),
+    };
+    let package = match transaction
+        .compute(&slug_loading_v2::RepositoryPackageLoadKey::new_canonical(
+            route.input().clone(),
+            PackagePath::root(),
+        ))
+        .await
+        .unwrap()
+    {
+        SourcePreparationOutcome::Complete(result) => result,
+        other => panic!("actual caller package requires inputs: {other:?}"),
+    };
+    let package = package.as_ref().as_ref().unwrap();
+    let slug_loading_v2::PackageTargetKind::StarlarkRule(rule) = &package.targets[0].kind else {
+        panic!("genuine Starlark rule attachment");
+    };
+    let caller = rule
+        .source_identities_by_filename()
+        .iter()
+        .find(|(_, source)| {
+            source.identity.label.to_string() == "@@rules_rust+//rust/private:toolchain.bzl"
+        })
+        .unwrap()
+        .1
+        .clone();
+    let request = retained
+        .map(RustToolchainHelperRequest::Retained)
+        .unwrap_or(RustToolchainHelperRequest::Producer(caller));
+    let mode = if observed {
+        RustToolchainHelperMode::Observed
+    } else {
+        RustToolchainHelperMode::Legacy
+    };
+    match slug_loading_v2::prepare_rust_toolchain_helper(&mut transaction, workspace, request, mode)
+        .await
+    {
+        SourcePreparationOutcome::Complete(Ok((result, _))) => result,
+        other => panic!("actual helper preparation requires inputs/frontier: {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn actual_prepared_helper_tracks_transitive_import_and_restores_authority() {
+    for observed in [false, true] {
+        let root = workspace();
+        fs::write(root.join("rules_rust/proof.bzl"),
+            "load('//rust/private:toolchain.bzl','rust_toolchain')\ndef _impl(ctx):\n    return []\nsubject = rule(implementation=_impl)\n",
+        ).unwrap();
+        fs::write(
+            root.join("rules_rust/BUILD.bazel"),
+            "load(':proof.bzl','subject')\nsubject(name='subject',visibility=['//visibility:public'])\n",
+        )
+        .unwrap();
+        let caller_path = root.join("rules_rust/rust/private/toolchain.bzl");
+        let helper_path = root.join("rules_rust/rust/private/rust_allocator_libraries.bzl");
+        let caller_bytes = fs::read(&caller_path).unwrap();
+        let helper_bytes = fs::read(&helper_path).unwrap();
+        let import_path = root.join("bazel_skylib/lib/paths.bzl");
+        let original = fs::read(&import_path).unwrap();
+        let leaf = CanonicalLabel::parse("@@bazel_skylib+//lib:paths.bzl").unwrap();
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let a = prepare_actual_helper(&dice, &root, observed, None)
+            .await
+            .unwrap();
+        let authority_a = a.authority().clone();
+        assert!(
+            !authority_a
+                .helper
+                .direct_children
+                .iter()
+                .any(|child| child.label == leaf)
+        );
+        let leaf_a = authority_a
+            .helper
+            .reachable
+            .iter()
+            .find(|source| source.identity.label == leaf)
+            .unwrap();
+        let helper_a = authority_a
+            .helper
+            .reachable
+            .iter()
+            .find(|source| source.identity == authority_a.helper.root)
+            .unwrap();
+        let mut edited = original.clone();
+        edited.extend_from_slice(b"\n# WP877 transitive import B\n");
+        fs::write(&import_path, edited).unwrap();
+        assert!(matches!(
+            prepare_actual_helper(&dice, &root, observed, Some(authority_a.clone())).await,
+            Err(slug_loading_v2::RustToolchainHelperError::Authentication(message))
+                if message.as_ref() == "retained helper authority changed"
+        ));
+        let b = prepare_actual_helper(&dice, &root, observed, None)
+            .await
+            .unwrap();
+        let authority_b = b.authority();
+        assert_eq!(authority_a.caller, authority_b.caller);
+        assert_eq!(
+            authority_b
+                .caller
+                .digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            "c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e"
+        );
+        assert_eq!(
+            helper_a
+                .digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            "ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e"
+        );
+        assert_eq!(authority_a.helper.root, authority_b.helper.root);
+        assert_eq!(
+            authority_a.helper.direct_children,
+            authority_b.helper.direct_children
+        );
+        assert_ne!(
+            authority_a.helper.fingerprint,
+            authority_b.helper.fingerprint
+        );
+        let leaf_b = authority_b
+            .helper
+            .reachable
+            .iter()
+            .find(|source| source.identity.label == leaf)
+            .unwrap();
+        assert_eq!(leaf_a.identity, leaf_b.identity);
+        assert_ne!(leaf_a.digest, leaf_b.digest);
+        assert_eq!(
+            helper_a,
+            authority_b
+                .helper
+                .reachable
+                .iter()
+                .find(|source| source.identity == authority_b.helper.root)
+                .unwrap()
+        );
+        assert_eq!(
+            authority_a.helper.reachable.len(),
+            authority_b.helper.reachable.len()
+        );
+        for (a, b) in authority_a
+            .helper
+            .reachable
+            .iter()
+            .zip(authority_b.helper.reachable.iter())
+        {
+            assert_eq!(a.identity, b.identity);
+            if a.identity.label != leaf {
+                assert_eq!(a.digest, b.digest);
+            }
+        }
+        assert_eq!(fs::read(&caller_path).unwrap(), caller_bytes);
+        assert_eq!(fs::read(&helper_path).unwrap(), helper_bytes);
+        fs::write(&import_path, &original).unwrap();
+        let restored = prepare_actual_helper(&dice, &root, observed, Some(authority_a.clone()))
+            .await
+            .unwrap();
+        assert_eq!(restored.authority(), &authority_a);
+        assert_ne!(restored.authority(), authority_b);
+        assert_eq!(fs::read(&import_path).unwrap(), original);
+    }
+}

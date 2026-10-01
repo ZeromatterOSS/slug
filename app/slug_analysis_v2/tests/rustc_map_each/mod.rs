@@ -11,6 +11,7 @@ mod cc_toolchain;
 mod compile_context;
 mod compile_outputs;
 mod resource_set;
+mod rust_toolchain_callback;
 mod rust_toolchain_helper;
 
 const REPOSITORIES: &[(&str, &str)] = &[
@@ -152,6 +153,8 @@ async fn request_configured(
             .iter()
             .map(|(canonical, name)| (canonical.as_str(), *name)),
     );
+    // The built-in host-platform route retains the canonical alias without '+'.
+    repositories.push(("platforms", "platforms"));
     inject_root_target_inputs_with_policy(&mut updater, workspace, epoch, &repositories, false);
     slug_bzlmod_v2::inject_registry_request_inputs(
         &mut updater,

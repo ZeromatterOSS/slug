@@ -320,4 +320,16 @@ const RUSTC_MAP_EACH_SOURCES: &[(&str, &str)] = &[
         "rules_rust/rust/private/utils.bzl",
         include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/utils.bzl"),
     ),
+    (
+        "rules_rust/rust/platform/triple.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_rust/rust/platform/triple.bzl"),
+    ),
+    (
+        "rules_rust/rust/private/semver.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/semver.bzl"),
+    ),
+    (
+        "rules_rust/rust/settings/incompatible.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_rust/rust/settings/incompatible.bzl"),
+    ),
 ];
