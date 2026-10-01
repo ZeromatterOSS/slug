@@ -31,6 +31,7 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
+use crate::dependency_cycle::compute_guarded;
 use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionError;
 use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionErrorKind;
 use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionKey;
@@ -273,12 +274,12 @@ async fn compute_canonical_repository_route(
         Err(error) => return complete_route_driver(Err(HostCanonicalRepositoryRouteError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryRouteErrorKind::Selected(error.clone()) }), selected_observations),
     };
     let (generated, generated_observations) = match mode {
-        CanonicalRepositoryRouteMode::Legacy => match ctx.compute(&HostGeneratedRepositoryDefinitionKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+        CanonicalRepositoryRouteMode::Legacy => match compute_guarded(ctx, &HostGeneratedRepositoryDefinitionKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
             Err(error) => return complete_route_driver(Err(HostCanonicalRepositoryRouteError { canonical_repo: key.canonical_repo.clone(), kind: HostCanonicalRepositoryRouteErrorKind::GeneratedCompute { selected_missing, message: error.to_string().into() } }), selected_observations),
         },
-        CanonicalRepositoryRouteMode::Observed => match ctx.compute(&HostGeneratedRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
+        CanonicalRepositoryRouteMode::Observed => match compute_guarded(ctx, &HostGeneratedRepositoryDefinitionObservationKey::new(key.workspace.clone(), key.canonical_repo.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(CanonicalRepositoryRouteObservationError::Generated { selected_missing, error })),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),

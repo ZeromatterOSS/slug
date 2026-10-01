@@ -34,6 +34,7 @@ use crate::HostSelectedRepositoryFileEffectError;
 use crate::HostSelectedRepositoryFileEffectKey;
 use crate::HostSelectedRepositoryFileEffectObservationError;
 use crate::HostSelectedRepositoryFileEffectObservationKey;
+use crate::dependency_cycle::compute_guarded;
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -236,12 +237,14 @@ async fn compute_route_predecessor(
     >,
 > {
     let (result, observations) = match mode {
-        CanonicalLoadRouteMode::Legacy => match ctx
-            .compute(&HostCanonicalRepositoryRouteKey::new(
+        CanonicalLoadRouteMode::Legacy => match compute_guarded(
+            ctx,
+            &HostCanonicalRepositoryRouteKey::new(
                 key.workspace.clone(),
                 key.canonical_repo.clone(),
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
@@ -261,12 +264,14 @@ async fn compute_route_predecessor(
                 ))));
             }
         },
-        CanonicalLoadRouteMode::Observed => match ctx
-            .compute(&HostCanonicalRepositoryRouteObservationKey::new(
+        CanonicalLoadRouteMode::Observed => match compute_guarded(
+            ctx,
+            &HostCanonicalRepositoryRouteObservationKey::new(
                 key.workspace.clone(),
                 key.canonical_repo.clone(),
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
@@ -332,13 +337,15 @@ async fn compute_generated_effect(
         ))));
     };
     let (result, effect_observations) = match mode {
-        CanonicalLoadRouteMode::Legacy => match ctx
-            .compute(&HostSelectedRepositoryFileEffectKey::new(
+        CanonicalLoadRouteMode::Legacy => match compute_guarded(
+            ctx,
+            &HostSelectedRepositoryFileEffectKey::new(
                 key.workspace.clone(),
                 seed.owner().clone(),
                 seed.ordinal(),
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
@@ -358,13 +365,15 @@ async fn compute_generated_effect(
                 ))));
             }
         },
-        CanonicalLoadRouteMode::Observed => match ctx
-            .compute(&HostSelectedRepositoryFileEffectObservationKey::new(
+        CanonicalLoadRouteMode::Observed => match compute_guarded(
+            ctx,
+            &HostSelectedRepositoryFileEffectObservationKey::new(
                 key.workspace.clone(),
                 seed.owner().clone(),
                 seed.ordinal(),
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);

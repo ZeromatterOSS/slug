@@ -39,13 +39,15 @@ use crate::bzl_module::ExternalBzlModuleObservationKey;
 use crate::bzl_module::HostBzlCycleIdentity;
 use crate::bzl_module::HostBzlModuleEvalKey;
 use crate::bzl_module::HostBzlModuleObservationKey;
+use crate::dependency_cycle::DependencyCycleGraph;
+use crate::dependency_cycle::DependencyCycleGuard;
 use crate::keys::BzlModuleEvalKey;
 
 /// Create the detector that must be installed in one loading-capable DICE
 /// request's `UserComputationData`.
 ///
-/// Construct it inside an active Tokio runtime and never reuse it across
-/// requests.
+/// Construct it inside its retained Tokio runtime. Transactions may share it
+/// only when their actual DiceLiveContextId is equal.
 pub fn bzl_load_cycle_detector() -> Arc<dyn UserCycleDetector> {
     Arc::new(BzlLoadCycleDetector::new())
 }
@@ -207,9 +209,14 @@ pub(crate) struct BzlLoadCycleGuard {
     key: BzlModuleEvalKey,
     sender: mpsc::UnboundedSender<Event>,
     receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
+    dependency: DependencyCycleGuard,
 }
 
 impl BzlLoadCycleGuard {
+    pub(crate) fn dependency(&self) -> &DependencyCycleGuard {
+        &self.dependency
+    }
+
     /// Race a single child-module wait against a detected cycle. A module
     /// evaluates its direct loads sequentially, so each guard has at most one
     /// outstanding call at a time.
@@ -227,6 +234,7 @@ impl BzlLoadCycleGuard {
 
 impl UserCycleDetectorGuard for BzlLoadCycleGuard {
     fn add_edge(&self, key: &DynKey) {
+        self.dependency.add_edge(key);
         if let Some(key) = key.downcast_ref::<BzlModuleEvalKey>() {
             let _ignored = self.sender.send(Event::Edge(
                 BzlLoadCycleNode::Legacy(self.key.clone()),
@@ -244,9 +252,14 @@ pub(crate) struct HostBzlLoadCycleGuard {
     key: BzlLoadCycleNode,
     sender: mpsc::UnboundedSender<Event>,
     receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
+    dependency: DependencyCycleGuard,
 }
 
 impl HostBzlLoadCycleGuard {
+    pub(crate) fn dependency(&self) -> &DependencyCycleGuard {
+        &self.dependency
+    }
+
     /// Host modules visit direct loads sequentially. This receiver mutex covers
     /// only that one child wait and is never re-entered by the same guard.
     pub(crate) async fn guard_this<R, F>(&self, future: F) -> Result<R, HostBzlLoadCycle>
@@ -263,6 +276,7 @@ impl HostBzlLoadCycleGuard {
 
 impl UserCycleDetectorGuard for HostBzlLoadCycleGuard {
     fn add_edge(&self, key: &DynKey) {
+        self.dependency.add_edge(key);
         let child = match &self.key {
             BzlLoadCycleNode::HostLegacy(_) => {
                 assert!(
@@ -303,9 +317,14 @@ pub(crate) struct ExternalBzlLoadCycleGuard {
     key: BzlLoadCycleNode,
     sender: mpsc::UnboundedSender<Event>,
     receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
+    dependency: DependencyCycleGuard,
 }
 
 impl ExternalBzlLoadCycleGuard {
+    pub(crate) fn dependency(&self) -> &DependencyCycleGuard {
+        &self.dependency
+    }
+
     pub(crate) async fn guard_this<R, F>(&self, future: F) -> Result<R, ExternalBzlLoadCycle>
     where
         F: Future<Output = R>,
@@ -320,6 +339,7 @@ impl ExternalBzlLoadCycleGuard {
 
 impl UserCycleDetectorGuard for ExternalBzlLoadCycleGuard {
     fn add_edge(&self, key: &DynKey) {
+        self.dependency.add_edge(key);
         let child = match &self.key {
             BzlLoadCycleNode::ExternalLegacy(_) => {
                 assert!(
@@ -360,6 +380,7 @@ pub(crate) struct BzlLoadCycleDetector {
     sender: mpsc::UnboundedSender<Event>,
     #[allow(dead_code)]
     task: JoinHandle<()>,
+    dependency: Arc<DependencyCycleGraph>,
 }
 
 impl fmt::Debug for BzlLoadCycleDetector {
@@ -400,10 +421,18 @@ impl BzlLoadCycleDetector {
                 }
             }
         });
-        Self { sender, task }
+        Self {
+            sender,
+            task,
+            dependency: Arc::new(DependencyCycleGraph::default()),
+        }
     }
 
     fn start_legacy(&self, key: BzlModuleEvalKey) -> Arc<BzlLoadCycleGuard> {
+        let dependency = self
+            .dependency
+            .start(&DynKey::from_key(key.clone()))
+            .expect("legacy bzl is tracked");
         let (sender, receiver) = oneshot::channel();
         // The receiver lives for as long as DICE holds the computation guard.
         let _ignored = self.sender.send(Event::Started(
@@ -414,26 +443,37 @@ impl BzlLoadCycleDetector {
             key,
             sender: self.sender.clone(),
             receiver: Mutex::new(receiver),
+            dependency,
         })
     }
 
-    fn start_host(&self, key: BzlLoadCycleNode) -> Arc<HostBzlLoadCycleGuard> {
+    fn start_host(
+        &self,
+        key: BzlLoadCycleNode,
+        dependency: DependencyCycleGuard,
+    ) -> Arc<HostBzlLoadCycleGuard> {
         let (sender, receiver) = oneshot::channel();
         let _ignored = self.sender.send(Event::Started(key.clone(), sender));
         Arc::new(HostBzlLoadCycleGuard {
             key,
             sender: self.sender.clone(),
             receiver: Mutex::new(receiver),
+            dependency,
         })
     }
 
-    fn start_external(&self, key: BzlLoadCycleNode) -> Arc<ExternalBzlLoadCycleGuard> {
+    fn start_external(
+        &self,
+        key: BzlLoadCycleNode,
+        dependency: DependencyCycleGuard,
+    ) -> Arc<ExternalBzlLoadCycleGuard> {
         let (sender, receiver) = oneshot::channel();
         let _ignored = self.sender.send(Event::Started(key.clone(), sender));
         Arc::new(ExternalBzlLoadCycleGuard {
             key,
             sender: self.sender.clone(),
             receiver: Mutex::new(receiver),
+            dependency,
         })
     }
 
@@ -449,30 +489,51 @@ impl UserCycleDetector for BzlLoadCycleDetector {
         }
         if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
             return Some(
-                self.start_host(BzlLoadCycleNode::HostLegacy(key.cycle_identity()))
-                    as Arc<dyn UserCycleDetectorGuard>,
+                self.start_host(
+                    BzlLoadCycleNode::HostLegacy(key.cycle_identity()),
+                    self.dependency
+                        .start(&DynKey::from_key(key.clone()))
+                        .expect("bzl key is tracked"),
+                ) as Arc<dyn UserCycleDetectorGuard>,
             );
         }
         if let Some(key) = key.downcast_ref::<HostBzlModuleObservationKey>() {
             return Some(
-                self.start_host(BzlLoadCycleNode::HostObserved(key.cycle_identity()))
-                    as Arc<dyn UserCycleDetectorGuard>,
+                self.start_host(
+                    BzlLoadCycleNode::HostObserved(key.cycle_identity()),
+                    self.dependency
+                        .start(&DynKey::from_key(key.clone()))
+                        .expect("bzl key is tracked"),
+                ) as Arc<dyn UserCycleDetectorGuard>,
             );
         }
         if let Some(key) = key.downcast_ref::<ExternalBzlModuleEvalKey>() {
             return Some(
-                self.start_external(BzlLoadCycleNode::ExternalLegacy(key.cycle_identity()))
-                    as Arc<dyn UserCycleDetectorGuard>,
+                self.start_external(
+                    BzlLoadCycleNode::ExternalLegacy(key.cycle_identity()),
+                    self.dependency
+                        .start(&DynKey::from_key(key.clone()))
+                        .expect("bzl key is tracked"),
+                ) as Arc<dyn UserCycleDetectorGuard>,
             );
         }
-        key.downcast_ref::<ExternalBzlModuleObservationKey>()
-            .map(|key| {
-                self.start_external(BzlLoadCycleNode::ExternalObserved(key.cycle_identity()))
-                    as Arc<dyn UserCycleDetectorGuard>
-            })
+        if let Some(key) = key.downcast_ref::<ExternalBzlModuleObservationKey>() {
+            return Some(
+                self.start_external(
+                    BzlLoadCycleNode::ExternalObserved(key.cycle_identity()),
+                    self.dependency
+                        .start(&DynKey::from_key(key.clone()))
+                        .expect("bzl key is tracked"),
+                ) as Arc<dyn UserCycleDetectorGuard>,
+            );
+        }
+        self.dependency
+            .start(key)
+            .map(|guard| Arc::new(guard) as Arc<dyn UserCycleDetectorGuard>)
     }
 
     fn finished_computing_key(&self, key: &DynKey) {
+        self.dependency.finish(key);
         if let Some(key) = key.downcast_ref::<BzlModuleEvalKey>() {
             self.finish(BzlLoadCycleNode::Legacy(key.clone()));
         } else if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
@@ -484,6 +545,12 @@ impl UserCycleDetector for BzlLoadCycleDetector {
         } else if let Some(key) = key.downcast_ref::<ExternalBzlModuleObservationKey>() {
             self.finish(BzlLoadCycleNode::ExternalObserved(key.cycle_identity()));
         }
+    }
+}
+
+impl Drop for BzlLoadCycleDetector {
+    fn drop(&mut self) {
+        self.task.abort();
     }
 }
 
@@ -547,6 +614,7 @@ impl CycleDetectorState {
             Event::Finished(key) => {
                 let id = self.node_id(&key);
                 self.nodes[id as usize].1 = NodeState::Finished;
+                self.prune_finished();
             }
             Event::Edge(from, to) => {
                 let from = self.node_id(&from);
@@ -557,6 +625,56 @@ impl CycleDetectorState {
                 }
             }
         }
+    }
+
+    // Keep only live computations and placeholders referenced by their edges.
+    // Reindex on every finish so continuous overlap cannot retain historical keys.
+    fn prune_finished(&mut self) {
+        let mut referenced = SmallSet::new();
+        for (_, state) in &self.nodes {
+            if let NodeState::Working { edges, .. } = state {
+                for target in edges {
+                    referenced.insert(*target);
+                }
+            }
+        }
+        let mut remap = SmallMap::new();
+        let mut retained = Vec::new();
+        for (old, (key, mut state)) in std::mem::take(&mut self.nodes).into_iter().enumerate() {
+            if matches!(state, NodeState::Finished) && referenced.contains(&(old as u32)) {
+                // A live parent's edge may already wait for this key's replacement.
+                // Retain only the logical target, not the retired outgoing edges.
+                state = NodeState::Known;
+            }
+            let keep = match &state {
+                NodeState::Working { .. } | NodeState::CycleDetected(_) => true,
+                NodeState::Known => referenced.contains(&(old as u32)),
+                NodeState::Finished => false,
+            };
+            if keep {
+                remap.insert(old as u32, retained.len() as u32);
+                retained.push((key, state));
+            }
+        }
+        for (_, state) in &mut retained {
+            if let NodeState::Working { edges, .. } = state {
+                *edges = edges
+                    .iter()
+                    .filter_map(|id| remap.get(id).copied())
+                    .collect();
+            }
+        }
+        self.dirtied = self
+            .dirtied
+            .iter()
+            .filter_map(|id| remap.get(id).copied())
+            .collect();
+        self.node_ids = retained
+            .iter()
+            .enumerate()
+            .map(|(id, (key, _))| (key.clone(), id as u32))
+            .collect();
+        self.nodes = retained;
     }
 
     fn is_working(&self, id: u32) -> bool {
@@ -636,5 +754,128 @@ impl CycleDetectorState {
                 let _ignored = sender.send(cycle.clone());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+
+    fn key(name: &str) -> BzlLoadCycleNode {
+        BzlLoadCycleNode::Legacy(BzlModuleEvalKey {
+            workspace: "/legacy-cycle-pruning".into(),
+            path: format!("/legacy-cycle-pruning/{name}.bzl").into(),
+        })
+    }
+
+    fn started(state: &mut CycleDetectorState, key: BzlLoadCycleNode) {
+        let (sender, _receiver) = oneshot::channel();
+        state.handle_event(Event::Started(key, sender));
+    }
+
+    #[test]
+    fn finished_actor_nodes_are_pruned_during_continuous_overlap() {
+        let mut state = CycleDetectorState::new();
+        let root = key("root");
+        started(&mut state, root.clone());
+        for index in 0..128 {
+            let child = key(&format!("child{index}"));
+            started(&mut state, child.clone());
+            state.handle_event(Event::Edge(child.clone(), key("pending")));
+            state.handle_event(Event::Finished(child));
+            assert_eq!(state.nodes.len(), 1);
+            assert_eq!(state.node_ids.len(), 1);
+            assert!(state.edges(0).is_empty());
+            state.check_for_cycles(); // Reindexed dirtied IDs remain valid.
+        }
+        state.handle_event(Event::Edge(root.clone(), key("still_pending")));
+        assert_eq!(state.nodes.len(), 2);
+        state.handle_event(Event::Finished(root));
+        assert!(state.nodes.is_empty());
+        assert!(state.node_ids.is_empty());
+        assert!(state.dirtied.is_empty());
+    }
+
+    #[test]
+    fn finished_referenced_target_keeps_pending_edge_for_replacement_cycle() {
+        let mut state = CycleDetectorState::new();
+        let parent = key("parent");
+        let child = key("child");
+        started(&mut state, parent.clone());
+        started(&mut state, child.clone());
+        state.handle_event(Event::Edge(parent.clone(), child.clone()));
+        state.handle_event(Event::Edge(child.clone(), key("retired_outgoing")));
+        state.handle_event(Event::Finished(child.clone()));
+        assert_eq!(state.nodes.len(), 2);
+        let child_id = *state.node_ids.get(&child).unwrap();
+        assert!(matches!(state.nodes[child_id as usize].1, NodeState::Known));
+        assert!(state.edges(child_id).is_empty());
+        state.check_for_cycles();
+        assert!(
+            state
+                .nodes
+                .iter()
+                .all(|(_, node)| !matches!(node, NodeState::CycleDetected(_)))
+        );
+        started(&mut state, child.clone());
+        state.handle_event(Event::Edge(child.clone(), parent.clone()));
+        state.check_for_cycles();
+        assert!(
+            state
+                .nodes
+                .iter()
+                .all(|(_, node)| matches!(node, NodeState::CycleDetected(_)))
+        );
+        state.handle_event(Event::Finished(parent));
+        state.handle_event(Event::Finished(child));
+        assert!(state.nodes.is_empty());
+    }
+
+    #[test]
+    fn retired_actor_outgoing_edge_is_not_reused_by_replacement() {
+        let mut state = CycleDetectorState::new();
+        let parent = key("parent");
+        let child = key("child");
+        started(&mut state, parent.clone());
+        started(&mut state, child.clone());
+        state.handle_event(Event::Edge(child.clone(), parent.clone()));
+        state.handle_event(Event::Finished(child.clone()));
+        state.handle_event(Event::Edge(parent.clone(), child.clone()));
+        state.check_for_cycles();
+        started(&mut state, child.clone());
+        state.check_for_cycles();
+        assert!(
+            state
+                .nodes
+                .iter()
+                .all(|(_, node)| !matches!(node, NodeState::CycleDetected(_)))
+        );
+        assert!(state.edges(*state.node_ids.get(&child).unwrap()).is_empty());
+        state.handle_event(Event::Finished(parent));
+        state.handle_event(Event::Finished(child));
+        assert!(state.nodes.is_empty());
+    }
+
+    #[test]
+    fn actor_cycle_notifications_retire_only_when_each_key_finishes() {
+        let mut state = CycleDetectorState::new();
+        let a = key("a");
+        let b = key("b");
+        started(&mut state, a.clone());
+        started(&mut state, b.clone());
+        state.handle_event(Event::Edge(a.clone(), b.clone()));
+        state.handle_event(Event::Edge(b.clone(), a.clone()));
+        state.check_for_cycles();
+        assert!(
+            state
+                .nodes
+                .iter()
+                .all(|(_, node)| matches!(node, NodeState::CycleDetected(_)))
+        );
+        state.handle_event(Event::Finished(a));
+        assert_eq!(state.nodes.len(), 1);
+        assert!(matches!(state.nodes[0].1, NodeState::CycleDetected(_)));
+        state.handle_event(Event::Finished(b));
+        assert!(state.nodes.is_empty());
     }
 }

@@ -51,6 +51,8 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::CanonicalLabel;
+
+use crate::dependency_cycle::compute_guarded;
 #[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, ObservedPathFrontierError, PathNodeKind, PathObservationEpoch, PathObservationNamespace, PathOutcome, PathResolutionError, ResolvedPath, ResolvedPathKey, ResolvedPathObservationKey, ResolvedPathState};
 use starlark::PrintHandler;
 use starlark::PrintLocation;
@@ -647,12 +649,12 @@ async fn load_definition_module(
         )
     };
     match (label, mode) {
-        (RepositoryDefinitionLabel::Root(label), EffectMode::Legacy) => match ctx.compute(&HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), label)).await {
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Legacy) => match compute_guarded(ctx, &HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
             Err(error) => Err(complete_compute_error(error.to_string(), observations)),
         },
-        (RepositoryDefinitionLabel::Root(label), EffectMode::Observed) => match ctx.compute(&HostBzlModuleObservationKey::new_bzlmod(key.workspace.dupe(), label)).await {
+        (RepositoryDefinitionLabel::Root(label), EffectMode::Observed) => match compute_guarded(ctx, &HostBzlModuleObservationKey::new_bzlmod(key.workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
@@ -662,20 +664,20 @@ async fn load_definition_module(
             Err(error) => Err(complete_compute_error(error.to_string(), observations)),
         },
         (RepositoryDefinitionLabel::Canonical { repo, label }, EffectMode::Legacy) => {
-            let input = match ctx.compute(&HostCanonicalRepositoryLoadRouteKey::new(key.workspace.dupe(), repo)).await {
+            let input = match compute_guarded(ctx, &HostCanonicalRepositoryLoadRouteKey::new(key.workspace.dupe(), repo)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(route)) => route.as_ref().as_ref().map(|route| route.input().clone()).map_err(HostSelectedRepositoryFileEffectHostBzlError::new),
                 Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
             };
             let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
-            match ctx.compute(&ExternalBzlModuleEvalKey::new_canonical_bzlmod(input, label)).await {
+            match compute_guarded(ctx, &ExternalBzlModuleEvalKey::new_canonical_bzlmod(input, label)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(value)) => Ok((value.as_ref().clone().map_err(HostSelectedRepositoryFileEffectHostBzlError::new), observations)),
                 Err(error) => Err(complete_compute_error(error.to_string(), observations)),
             }
         }
         (RepositoryDefinitionLabel::Canonical { repo, label }, EffectMode::Observed) => {
-            let input = match ctx.compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(key.workspace.dupe(), repo)).await {
+            let input = match compute_guarded(ctx, &HostCanonicalRepositoryLoadRouteObservationKey::new(key.workspace.dupe(), repo)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(Err(error))) => return Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::CanonicalRoute { certificate: certificate.clone(), ordinal: key.ordinal, error: Arc::new(error) }))),
                 Ok(SourcePreparationOutcome::Complete(Ok(route))) => {
@@ -685,7 +687,7 @@ async fn load_definition_module(
                 Err(error) => return Err(complete_compute_error(error.to_string(), observations)),
             };
             let input = match input { Ok(input) => input, Err(error) => return Ok((Err(error), observations)) };
-            match ctx.compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(input, label)).await {
+            match compute_guarded(ctx, &ExternalBzlModuleObservationKey::new_canonical_bzlmod(input, label)).await {
                 Ok(SourcePreparationOutcome::Need(need)) => Err(SourcePreparationOutcome::Need(need)),
                 Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(SourcePreparationOutcome::Complete(Err(HostSelectedRepositoryFileEffectObservationError::HostBzl { certificate: certificate.clone(), ordinal: key.ordinal, error }))),
                 Ok(SourcePreparationOutcome::Complete(Ok(value))) => {
@@ -747,12 +749,11 @@ async fn legacy_repository_label_path_route(
     address: &RepositoryLabelPathAddress,
     observations: PathObservationEpoch,
 ) -> Result<HostRepositorySourceRoute, EffectDriver> {
-    let route = match ctx
-        .compute(&HostCanonicalRepositoryLoadRouteKey::new(
-            key.workspace.dupe(),
-            address.repo().clone(),
-        ))
-        .await
+    let route = match compute_guarded(
+        ctx,
+        &HostCanonicalRepositoryLoadRouteKey::new(key.workspace.dupe(), address.repo().clone()),
+    )
+    .await
     {
         Ok(SourcePreparationOutcome::Need(need)) => {
             return Err(SourcePreparationOutcome::Need(need));
@@ -786,12 +787,14 @@ async fn observed_repository_label_path_route(
     address: &RepositoryLabelPathAddress,
     mut observations: PathObservationEpoch,
 ) -> Result<(HostRepositorySourceRoute, PathObservationEpoch), EffectDriver> {
-    let route = match ctx
-        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+    let route = match compute_guarded(
+        ctx,
+        &HostCanonicalRepositoryLoadRouteObservationKey::new(
             key.workspace.dupe(),
             address.repo().clone(),
-        ))
-        .await
+        ),
+    )
+    .await
     {
         Ok(SourcePreparationOutcome::Need(need)) => {
             return Err(SourcePreparationOutcome::Need(need));
@@ -1713,12 +1716,11 @@ async fn compute_effect(
     mode: EffectMode,
 ) -> EffectDriver {
     let (certificate, observations) = match mode {
-        EffectMode::Legacy => match ctx
-            .compute(&HostSelectedExtensionOwnerCertificateKey::new(
-                key.workspace.dupe(),
-                key.owner.clone(),
-            ))
-            .await
+        EffectMode::Legacy => match compute_guarded(
+            ctx,
+            &HostSelectedExtensionOwnerCertificateKey::new(key.workspace.dupe(), key.owner.clone()),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);
@@ -1731,12 +1733,14 @@ async fn compute_effect(
                 );
             }
         },
-        EffectMode::Observed => match ctx
-            .compute(&HostSelectedExtensionOwnerCertificateObservationKey::new(
+        EffectMode::Observed => match compute_guarded(
+            ctx,
+            &HostSelectedExtensionOwnerCertificateObservationKey::new(
                 key.workspace.dupe(),
                 key.owner.clone(),
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return SourcePreparationOutcome::Need(need);

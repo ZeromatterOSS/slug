@@ -21,6 +21,17 @@ agreement between this observed digest, the evaluated caller span and the pinned
 source SHA. Imported helper authentication can consume the same carrier when
 its callback family is separately admitted.
 
+## Generated-owner cycle boundary
+
+WP885's synchronous short-lock graph bridges complete concrete owner, certificate,
+route, file-effect and defining-.bzl key identities in legacy/observed modes.
+Immediate dependency edges, exact attempt retirement and parent-owned pending
+targets prevent cancellation handoff gaps; completed history does not accumulate.
+Pure .bzl projections remain isolated. Mixed cycle terminals record the existing
+transient poison and preserve current source observations. Bounded streamed
+diagnostics avoid full key formatting scratch. The accepted manifest supplies
+public-DICE replacement/historical-checking and native source-cycle evidence.
+
 ## Goal
 
 Load and evaluate Bazel `BUILD.bazel` and `.bzl` files with starlark-rust,

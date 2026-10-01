@@ -48,6 +48,7 @@ mod root_apparent_repository_source_input;
 mod root_apparent_repository_source_observation;
 mod root_apparent_repository_source_path_input;
 mod root_bootstrap;
+mod scoped_cycle_detector;
 mod source_input;
 pub mod starlark;
 

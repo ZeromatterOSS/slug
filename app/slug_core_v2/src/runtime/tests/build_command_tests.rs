@@ -4101,6 +4101,7 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
             .changed_to(vec![(PathObservationEpochKey, epoch)])
             .unwrap();
         let mut transaction = updater.commit().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         transaction.compute(key).await.unwrap()
     }
     let tracker = Arc::new(ObservedBuildTracker::default());

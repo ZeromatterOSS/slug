@@ -29,6 +29,7 @@ use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::dependency_cycle::compute_guarded;
 use crate::module_extension::HostSelectedExtensionOwnerPureError;
 use crate::module_extension::HostSelectedExtensionOwnerPureKey;
 use crate::module_extension::HostSelectedExtensionOwnerPureObservationError;
@@ -247,12 +248,12 @@ type OwnerCertificateDriver = SourcePreparationOutcome<
 #[rustfmt::skip]
 async fn compute_module_extension_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
     let child = match mode {
-        OwnerCertificateMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerPureKey::new(key.workspace.clone(), key.owner.clone())).await {
+        OwnerCertificateMode::Legacy => match compute_guarded(ctx, &HostSelectedExtensionOwnerPureKey::new(key.workspace.clone(), key.owner.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
             Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
         },
-        OwnerCertificateMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerPureObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
+        OwnerCertificateMode::Observed => match compute_guarded(ctx, &HostSelectedExtensionOwnerPureObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(PrivateOwnerCertificateObservationError::ModuleExtension(error)))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),
@@ -280,12 +281,12 @@ async fn compute_module_extension_certificate(ctx: &mut DiceComputations<'_>, ke
 #[rustfmt::skip]
 async fn compute_innate_certificate(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerCertificateKey, mode: OwnerCertificateMode) -> OwnerCertificateDriver {
     let child = match mode {
-        OwnerCertificateMode::Legacy => match ctx.compute(&HostPureInnateRepositoryOwnerKey::new(key.workspace.clone(), key.owner.clone())).await {
+        OwnerCertificateMode::Legacy => match compute_guarded(ctx, &HostPureInnateRepositoryOwnerKey::new(key.workspace.clone(), key.owner.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
             Err(error) => return SourcePreparationOutcome::Complete(Ok((Arc::new(Err(HostSelectedExtensionOwnerCertificateError(PrivateOwnerCertificateError::Compute(error.to_string().into())))), PathObservationEpoch::empty()))),
         },
-        OwnerCertificateMode::Observed => match ctx.compute(&HostPureInnateRepositoryOwnerObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
+        OwnerCertificateMode::Observed => match compute_guarded(ctx, &HostPureInnateRepositoryOwnerObservationKey::new(key.workspace.clone(), key.owner.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerCertificateObservationError(PrivateOwnerCertificateObservationError::InnateRepositoryRule(error)))),
             Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),

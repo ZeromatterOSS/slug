@@ -46,6 +46,7 @@ use crate::bzl_module::HostBzlModuleEvalKey;
 use crate::bzl_module::HostBzlModuleObservationKey;
 use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::RepositoryBzlLabel;
+use crate::dependency_cycle::compute_guarded;
 use crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition;
 use crate::module_extension_repository_rule::RepositoryRuleCallFrame;
 use crate::module_extension_repository_rule::RepositoryRuleCallKey;
@@ -159,12 +160,11 @@ async fn load_bzl(
     if label.package().repo().is_root() {
         let root = HostRootBzlLabel::new(label.package().package().clone(), target);
         let (result, incoming) = match mode {
-            Mode::Legacy => match ctx
-                .compute(&HostBzlModuleEvalKey::new_bzlmod(
-                    key.workspace.dupe(),
-                    root,
-                ))
-                .await
+            Mode::Legacy => match compute_guarded(
+                ctx,
+                &HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), root),
+            )
+            .await
             {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return Err(SourcePreparationOutcome::Need(need));
@@ -181,12 +181,11 @@ async fn load_bzl(
                     ));
                 }
             },
-            Mode::Observed => match ctx
-                .compute(&HostBzlModuleObservationKey::new_bzlmod(
-                    key.workspace.dupe(),
-                    root,
-                ))
-                .await
+            Mode::Observed => match compute_guarded(
+                ctx,
+                &HostBzlModuleObservationKey::new_bzlmod(key.workspace.dupe(), root),
+            )
+            .await
             {
                 Ok(SourcePreparationOutcome::Need(need)) => {
                     return Err(SourcePreparationOutcome::Need(need));
@@ -222,12 +221,11 @@ async fn load_bzl(
     }
     let canonical_repo = label.package().repo().clone();
     let (route, incoming) = match mode {
-        Mode::Legacy => match ctx
-            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
-                key.workspace.dupe(),
-                canonical_repo,
-            ))
-            .await
+        Mode::Legacy => match compute_guarded(
+            ctx,
+            &HostCanonicalRepositoryLoadRouteKey::new(key.workspace.dupe(), canonical_repo),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return Err(SourcePreparationOutcome::Need(need));
@@ -242,12 +240,14 @@ async fn load_bzl(
                 ));
             }
         },
-        Mode::Observed => match ctx
-            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+        Mode::Observed => match compute_guarded(
+            ctx,
+            &HostCanonicalRepositoryLoadRouteObservationKey::new(
                 key.workspace.dupe(),
                 canonical_repo,
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return Err(SourcePreparationOutcome::Need(need));
@@ -296,12 +296,14 @@ async fn load_bzl(
         }
     };
     let (result, incoming) = match mode {
-        Mode::Legacy => match ctx
-            .compute(&ExternalBzlModuleEvalKey::new_canonical_bzlmod(
+        Mode::Legacy => match compute_guarded(
+            ctx,
+            &ExternalBzlModuleEvalKey::new_canonical_bzlmod(
                 route.input().clone(),
                 repository_label,
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return Err(SourcePreparationOutcome::Need(need));
@@ -318,12 +320,14 @@ async fn load_bzl(
                 ));
             }
         },
-        Mode::Observed => match ctx
-            .compute(&ExternalBzlModuleObservationKey::new_canonical_bzlmod(
+        Mode::Observed => match compute_guarded(
+            ctx,
+            &ExternalBzlModuleObservationKey::new_canonical_bzlmod(
                 route.input().clone(),
                 repository_label,
-            ))
-            .await
+            ),
+        )
+        .await
         {
             Ok(SourcePreparationOutcome::Need(need)) => {
                 return Err(SourcePreparationOutcome::Need(need));

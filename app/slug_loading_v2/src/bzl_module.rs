@@ -117,6 +117,8 @@ use crate::cycle_detector::ExternalBzlLoadCycle;
 use crate::cycle_detector::ExternalBzlLoadCycleGuard;
 use crate::cycle_detector::HostBzlLoadCycle;
 use crate::cycle_detector::HostBzlLoadCycleGuard;
+use crate::dependency_cycle::DependencyComputeError;
+use crate::dependency_cycle::DependencyCycle;
 use crate::glob::PackageListing;
 use crate::host_glob::HostGlobBoundaryScope;
 use crate::host_glob::HostGlobLoadingRequest;
@@ -373,7 +375,7 @@ fn render_bzl_cycle(origin: &str, path: &[String], cycle: &[String]) -> String {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct BzlLoadCyclePoisonKey;
+pub(crate) struct BzlLoadCyclePoisonKey;
 
 impl fmt::Display for BzlLoadCyclePoisonKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1900,6 +1902,7 @@ pub(crate) enum ExternalBzlModuleError {
         message: Arc<str>,
     },
     Cycle(ExternalBzlLoadCycle),
+    DependencyCycle(DependencyCycle),
     Evaluation {
         label: CanonicalLabel,
         message: Arc<str>,
@@ -1962,6 +1965,7 @@ impl fmt::Display for ExternalBzlModuleError {
                 )
             }
             Self::Cycle(_) => f.write_str("cycle detected in extension files"),
+            Self::DependencyCycle(cycle) => cycle.fmt(f),
             Self::Evaluation { label, message } => write!(f, "evaluating {label}: {message}"),
             Self::Freeze { label, message } => write!(f, "freezing {label}: {message}"),
         }
@@ -1975,7 +1979,8 @@ impl ExternalBzlModuleError {
         match self {
             Self::Cycle(cycle) => Some(cycle),
             Self::Child { error, .. } => error.cycle(),
-            Self::SourceCompute { .. }
+            Self::DependencyCycle(_)
+            | Self::SourceCompute { .. }
             | Self::Source { .. }
             | Self::SourceObservation { .. }
             | Self::Route { .. }
@@ -1993,7 +1998,8 @@ impl ExternalBzlModuleError {
         match self {
             Self::Absent { label } => Some(label),
             Self::Child { error, .. } => error.missing_label(),
-            Self::SourceCompute { .. }
+            Self::DependencyCycle(_)
+            | Self::SourceCompute { .. }
             | Self::Source { .. }
             | Self::SourceObservation { .. }
             | Self::Route { .. }
@@ -4323,6 +4329,7 @@ enum ExternalBzlSourceChild {
         PathObservationEpoch,
     ),
     Compute(Arc<str>),
+    DependencyCycle(DependencyCycle),
 }
 
 fn external_bzl_observed_child<T>(
@@ -4394,6 +4401,10 @@ fn finish_external_bzl_source(
                 )),
             }
         }
+        ExternalBzlSourceChild::DependencyCycle(cycle) => Err(external_bzl_complete(
+            Err(ExternalBzlModuleError::DependencyCycle(cycle)),
+            PathObservationEpoch::empty(),
+        )),
         ExternalBzlSourceChild::Compute(message) => Err(external_bzl_complete(
             Err(ExternalBzlModuleError::SourceCompute { label, message }),
             PathObservationEpoch::empty(),
@@ -4433,6 +4444,21 @@ fn finish_root_external_bzl_source(
     }
 }
 
+async fn compute_external_guarded<K: Key>(
+    ctx: &mut DiceComputations<'_>,
+    key: &K,
+) -> Result<K::Value, DependencyComputeError> {
+    let guard = ctx
+        .cycle_guard::<ExternalBzlLoadCycleGuard>()
+        .map_err(|error| DependencyComputeError::Dice(anyhow::Error::new(error)))?;
+    crate::dependency_cycle::compute_with_guard(
+        ctx,
+        key,
+        guard.as_deref().map(ExternalBzlLoadCycleGuard::dependency),
+    )
+    .await
+}
+
 async fn compute_external_bzl_source(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
@@ -4444,7 +4470,7 @@ async fn compute_external_bzl_source(
     match mode {
         ExternalBzlModuleMode::Legacy => match key.route.source_read_key(relative) {
             HostRepositorySourceReadKey::RootRequest(source_key) => {
-                match ctx.compute(&source_key).await {
+                match compute_external_guarded(ctx, &source_key).await {
                     Ok(SourcePreparationOutcome::Need(need)) => {
                         SourcePreparationOutcome::Need(need)
                     }
@@ -4454,13 +4480,18 @@ async fn compute_external_bzl_source(
                             PathObservationEpoch::empty(),
                         )))
                     }
+                    Err(DependencyComputeError::Cycle(cycle)) => {
+                        SourcePreparationOutcome::Complete(Ok(
+                            ExternalBzlSourceChild::DependencyCycle(cycle),
+                        ))
+                    }
                     Err(error) => SourcePreparationOutcome::Complete(Ok(
                         ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
                     )),
                 }
             }
             HostRepositorySourceReadKey::Observation(source_key) => {
-                match ctx.compute(&source_key).await {
+                match compute_external_guarded(ctx, &source_key).await {
                     Ok(SourcePreparationOutcome::Need(need)) => {
                         SourcePreparationOutcome::Need(need)
                     }
@@ -4470,6 +4501,11 @@ async fn compute_external_bzl_source(
                             PathObservationEpoch::empty(),
                         )))
                     }
+                    Err(DependencyComputeError::Cycle(cycle)) => {
+                        SourcePreparationOutcome::Complete(Ok(
+                            ExternalBzlSourceChild::DependencyCycle(cycle),
+                        ))
+                    }
                     Err(error) => SourcePreparationOutcome::Complete(Ok(
                         ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
                     )),
@@ -4478,7 +4514,7 @@ async fn compute_external_bzl_source(
         },
         ExternalBzlModuleMode::Observed => match key.route.source_read_observation_key(relative) {
             HostRepositorySourceReadObservationKey::RootRequest(source_key) => {
-                match ctx.compute(&source_key).await {
+                match compute_external_guarded(ctx, &source_key).await {
                     Ok(outcome) => match external_bzl_observed_child(outcome) {
                         ControlFlow::Continue(source) => {
                             SourcePreparationOutcome::Complete(Ok(ExternalBzlSourceChild::Root(
@@ -4490,13 +4526,18 @@ async fn compute_external_bzl_source(
                             outcome.map(|result| result.map(|()| unreachable!()))
                         }
                     },
+                    Err(DependencyComputeError::Cycle(cycle)) => {
+                        SourcePreparationOutcome::Complete(Ok(
+                            ExternalBzlSourceChild::DependencyCycle(cycle),
+                        ))
+                    }
                     Err(error) => SourcePreparationOutcome::Complete(Ok(
                         ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
                     )),
                 }
             }
             HostRepositorySourceReadObservationKey::Observation(source_key) => {
-                match ctx.compute(&source_key).await {
+                match compute_external_guarded(ctx, &source_key).await {
                     Ok(outcome) => match external_bzl_observed_child(outcome) {
                         ControlFlow::Continue(source) => SourcePreparationOutcome::Complete(Ok(
                             ExternalBzlSourceChild::Observation(
@@ -4508,6 +4549,11 @@ async fn compute_external_bzl_source(
                             outcome.map(|result| result.map(|()| unreachable!()))
                         }
                     },
+                    Err(DependencyComputeError::Cycle(cycle)) => {
+                        SourcePreparationOutcome::Complete(Ok(
+                            ExternalBzlSourceChild::DependencyCycle(cycle),
+                        ))
+                    }
                     Err(error) => SourcePreparationOutcome::Complete(Ok(
                         ExternalBzlSourceChild::Compute(Arc::from(error.to_string())),
                     )),
@@ -4572,6 +4618,7 @@ enum ExternalBzlRecursiveChild {
     Value(ExternalBzlModuleCarrier, PathObservationEpoch),
     Compute(Arc<str>),
     Cycle(ExternalBzlLoadCycle),
+    DependencyCycle(DependencyCycle),
 }
 
 async fn compute_external_bzl_child(
@@ -4586,7 +4633,20 @@ async fn compute_external_bzl_child(
     match mode {
         ExternalBzlModuleMode::Legacy => {
             let child = ExternalBzlModuleEvalKey::from_source_route(route.clone(), label, context);
-            match guard.guard_this(ctx.compute(&child)).await {
+            let result = match guard
+                .dependency()
+                .guard_this(guard.guard_this(ctx.compute(&child)))
+                .await
+            {
+                Ok(result) => result,
+                Err(cycle) => {
+                    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                    return SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlRecursiveChild::DependencyCycle(cycle),
+                    ));
+                }
+            };
+            match result {
                 Ok(Ok(SourcePreparationOutcome::Need(need))) => {
                     SourcePreparationOutcome::Need(need)
                 }
@@ -4607,7 +4667,20 @@ async fn compute_external_bzl_child(
         ExternalBzlModuleMode::Observed => {
             let child =
                 ExternalBzlModuleObservationKey::from_source_route(route.clone(), label, context);
-            match guard.guard_this(ctx.compute(&child)).await {
+            let result = match guard
+                .dependency()
+                .guard_this(guard.guard_this(ctx.compute(&child)))
+                .await
+            {
+                Ok(result) => result,
+                Err(cycle) => {
+                    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                    return SourcePreparationOutcome::Complete(Ok(
+                        ExternalBzlRecursiveChild::DependencyCycle(cycle),
+                    ));
+                }
+            };
+            match result {
                 Ok(Ok(outcome)) => match external_bzl_observed_child(outcome) {
                     ControlFlow::Continue(value) => {
                         SourcePreparationOutcome::Complete(Ok(ExternalBzlRecursiveChild::Value(
@@ -4729,12 +4802,16 @@ async fn compute_canonical_external_child_input(
     ),
 > {
     match mode {
-        ExternalBzlModuleMode::Legacy => match ctx
-            .compute(&HostCanonicalRepositoryLoadRouteKey::new(
-                workspace, child_repo,
-            ))
-            .await
+        ExternalBzlModuleMode::Legacy => match compute_external_guarded(
+            ctx,
+            &HostCanonicalRepositoryLoadRouteKey::new(workspace, child_repo),
+        )
+        .await
         {
+            Err(DependencyComputeError::Cycle(cycle)) => ControlFlow::Break(external_bzl_complete(
+                Err(ExternalBzlModuleError::DependencyCycle(cycle)),
+                observations,
+            )),
             Err(error) => ControlFlow::Break(external_load_resolution_error(
                 source,
                 load,
@@ -4754,12 +4831,16 @@ async fn compute_canonical_external_child_input(
                 )),
             },
         },
-        ExternalBzlModuleMode::Observed => match ctx
-            .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
-                workspace, child_repo,
-            ))
-            .await
+        ExternalBzlModuleMode::Observed => match compute_external_guarded(
+            ctx,
+            &HostCanonicalRepositoryLoadRouteObservationKey::new(workspace, child_repo),
+        )
+        .await
         {
+            Err(DependencyComputeError::Cycle(cycle)) => ControlFlow::Break(external_bzl_complete(
+                Err(ExternalBzlModuleError::DependencyCycle(cycle)),
+                observations,
+            )),
             Err(error) => ControlFlow::Break(external_load_resolution_error(
                 source,
                 load,
@@ -5065,6 +5146,12 @@ async fn compute_external_bzl_children(
                     needs,
                     first_failure,
                     failure,
+                ));
+            }
+            ExternalBzlRecursiveChild::DependencyCycle(cycle) => {
+                return ControlFlow::Break(external_bzl_complete(
+                    Err(ExternalBzlModuleError::DependencyCycle(cycle)),
+                    observations,
                 ));
             }
             ExternalBzlRecursiveChild::Cycle(cycle) => match mode {

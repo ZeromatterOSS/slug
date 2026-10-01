@@ -353,6 +353,10 @@ fn native_requested_selection_retains_runfiles_tree_and_distinguishes_empty_from
             .updater_with_data(workspace.runtime.user_computation_data(None).unwrap())
             .existing_state()
             .await;
+        workspace
+            .runtime
+            .request_revision
+            .bind_cycle_detector(&transaction);
         transaction.compute(&key).await.unwrap()
     });
     let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(observed)) = observed else {

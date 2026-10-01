@@ -112,6 +112,10 @@ fn source_bytes_certificate_survives_authoritative_metadata_failure() {
             .changed_to(vec![(PathObservationEpochKey, epoch)])
             .unwrap();
         let mut transaction = updater.commit().await;
+        workspace
+            .runtime
+            .request_revision
+            .bind_cycle_detector(&transaction);
         let outcome = transaction.compute(&key).await.unwrap();
         let PreparationOutcome::Complete(Ok(terminal)) = outcome else {
             panic!("expected completed metadata failure: {outcome:?}");

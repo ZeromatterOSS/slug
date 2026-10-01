@@ -82,6 +82,7 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+#[cfg(test)]
 use slug_analysis_v2::analysis_cycle_detector;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_analysis_v2::prepare_configured_node_analysis_observed;
@@ -6075,6 +6076,7 @@ impl WorkspaceRuntime {
             dice.dupe(),
             NormalizedAbsolutePath::new(workspace.clone())
                 .expect("canonical workspace remains normalized"),
+            runtime.handle().clone(),
         );
         Ok(Self {
             workspace,
@@ -6129,10 +6131,8 @@ impl WorkspaceRuntime {
         &self,
         effects: Option<Arc<AttemptEffectTracker>>,
     ) -> Result<UserComputationData, CommandEffectError> {
-        let mut data = UserComputationData {
-            cycle_detector: Some(analysis_cycle_detector()),
-            ..Default::default()
-        };
+        let mut data = UserComputationData::default();
+        self.request_revision.install_cycle_detector(&mut data);
         #[cfg(feature = "native-probe-observer")]
         if let Some(observer) = self.probe_observer.as_ref() {
             data.tracker = observer.clone();
@@ -6474,6 +6474,10 @@ impl WorkspaceRuntime {
                     }
                 }
             });
+            // The block_on future has dropped every attempt transaction on
+            // success or error. Retire cancellation workers before progressing,
+            // restoring, accepting, or opening the next attempt.
+            self.runtime.block_on(self.dice.wait_for_idle());
             let attempt = match attempt {
                 Ok(attempt) => attempt,
                 Err(error) => {
@@ -7371,6 +7375,7 @@ impl WorkspaceRuntime {
                     .context("installing passive workspace activation tracking")?,
             );
             let mut transaction = updater.existing_state().await;
+            self.request_revision.bind_cycle_detector(&transaction);
             let graph = transaction
                 .compute(&RootModuleGraphKey {
                     workspace: self.workspace.clone(),
@@ -7823,6 +7828,9 @@ impl NativeDemandCommand<'_> {
     }
 
     fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
+        self.runtime
+            .runtime
+            .block_on(self.runtime.dice.wait_for_idle());
         #[cfg(test)]
         if self
             .runtime
@@ -7891,6 +7899,7 @@ impl NativeDemandCommand<'_> {
                 );
             }
             drop(transaction);
+            self.runtime.dice.wait_for_idle().await;
             Ok::<_, NativeDemandSessionError>(())
         })?;
         self.runtime
@@ -10870,6 +10879,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(without_tools.graph_stdout(), full.graph_stdout());
     }
 
+    mod generated_owner_path_tests {
+        include!("tests/generated_owner_path_tests.rs");
+    }
+
     mod cquery_command_tests {
         include!("tests/cquery_command_tests.rs");
     }
@@ -10907,6 +10920,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .dice
                 .updater_with_data(runtime.user_computation_data(None).unwrap());
             let mut transaction = updater.existing_state().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let workspace = runtime.workspace.clone();
             assert_eq!(
                 transaction
@@ -11318,6 +11332,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .dice
                 .updater_with_data(runtime.user_computation_data(None).unwrap());
             let mut transaction = updater.existing_state().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert_eq!(
                 transaction
                     .compute(&NativeDemandWorkspaceRevisionKey {
@@ -11693,6 +11708,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let first_outcome = transaction.compute(&key).await.unwrap();
             let first_need = match first_outcome {
                 slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => need,
@@ -11725,6 +11741,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let second_outcome = transaction.compute(&key).await.unwrap();
             let second_need = match second_outcome {
                 slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => need,
@@ -11769,6 +11786,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let terminal_outcome = transaction.compute(&key).await.unwrap();
             assert!(matches!(
                 terminal_outcome,
@@ -11829,6 +11847,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(accepted.attempt_user_computation_data().unwrap());
             accepted.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert!(matches!(
                 transaction.compute(&next_key).await.unwrap(),
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
@@ -12022,6 +12041,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let outcome = transaction.compute(&key).await.unwrap();
             let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
                 panic!("cold selected download unexpectedly completed")
@@ -12050,6 +12070,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert!(matches!(
                 transaction.compute(&key).await.unwrap(),
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref result)
@@ -12090,6 +12111,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .updater_with_data(command.attempt_user_computation_data().unwrap());
                 command.inject_attempt(&mut updater).unwrap();
                 let mut transaction = updater.commit().await;
+                runtime.request_revision.bind_cycle_detector(&transaction);
                 let outcome = transaction.compute(&key).await.unwrap();
                 let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
                     panic!("changed download request reused stale bytes")
@@ -12109,6 +12131,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .updater_with_data(command.attempt_user_computation_data().unwrap());
                 command.inject_attempt(&mut updater).unwrap();
                 let mut transaction = updater.commit().await;
+                runtime.request_revision.bind_cycle_detector(&transaction);
                 assert!(matches!(
                     transaction.compute(&key).await.unwrap(),
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
@@ -12177,6 +12200,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(warm.attempt_user_computation_data().unwrap());
             warm.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert!(matches!(
                 transaction.compute(&key).await.unwrap(),
                 slug_bzlmod_v2::SourcePreparationOutcome::Complete(_)
@@ -12199,6 +12223,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(deselect.attempt_user_computation_data().unwrap());
             deselect.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
             let sealed = deselect.seal_terminal().unwrap();
             let selection = sealed.select(&transaction).await.unwrap();
@@ -12239,6 +12264,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(reselected.attempt_user_computation_data().unwrap());
             reselected.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let outcome = transaction.compute(&key).await.unwrap();
             let slug_bzlmod_v2::SourcePreparationOutcome::Need(need) = outcome else {
                 panic!("deselected download leaked into a warm DICE owner")
@@ -12409,6 +12435,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(command.attempt_user_computation_data().unwrap());
             command.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
             let sealed = command.seal_terminal().unwrap();
 
@@ -12445,6 +12472,9 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .updater_with_data(foreign.attempt_user_computation_data().unwrap());
             foreign.inject_attempt(&mut updater).unwrap();
             let mut transaction = updater.commit().await;
+            foreign_runtime
+                .request_revision
+                .bind_cycle_detector(&transaction);
             assert!(transaction.compute(&NativeTerminalProbeKey).await.unwrap());
             let sealed = foreign.seal_terminal().unwrap();
             let selected = sealed.select(&transaction).await.unwrap();
@@ -12517,6 +12547,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .expect("install passive workspace activation tracking"),
             );
             let mut transaction = updater.existing_state().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let urls = transaction
                 .compute(&slug_bzlmod_v2::RootModuleRegistryUrlsKey {
                     workspace: runtime.workspace.clone(),
@@ -12544,6 +12575,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .expect("install passive workspace activation tracking"),
             );
             let mut transaction = updater.existing_state().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             transaction
                 .compute(&slug_bzlmod_v2::RegistryFileKey {
                     workspace: runtime.workspace.clone(),

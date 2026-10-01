@@ -21,6 +21,17 @@ workspace file payloads. The legacy explicit Core snapshot helper remains for
 its bounded callers/tests. WP880 covers sparse payloads and genuine DICE content
 A/B/A even when advisory reporting says zero; its manifest owns validation.
 
+## Live-context cycle ownership
+
+WP885 binds each fresh userdata proxy after transaction commit to one weakly
+registered coordinator for the exact DiceLiveContextId. Different engines,
+versions and reopened cache epochs isolate; environment/effects remain local.
+Only nonsemantic service state is shared. Active attempts have exact retirement
+tokens; parent-owned pending dependencies survive child replacement, and legacy
+actors compact completed history. The retained workspace runtime owns/polls
+actors; native retries, restoration and acceptance drain cancellation workers.
+See docs/developers/dice.md and the accepted WP885 manifest for lifecycle gates.
+
 ## Goal
 
 Create the minimal Slug V2 Rust binary/server skeleton while reusing Buck2

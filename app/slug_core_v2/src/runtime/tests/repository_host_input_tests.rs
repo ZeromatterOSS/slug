@@ -195,6 +195,7 @@ fn repository_environment_cells_cut_off_unrelated_changes_and_track_all_states()
             )
             .unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let value = transaction.compute(&probe).await.unwrap();
             let platform = transaction
                 .compute(&RepositoryPlatformKey::new(normalized.clone()))
@@ -289,6 +290,7 @@ fn repository_environment_snapshot_tracks_full_a_b_a_and_empty_revisions() {
             )
             .unwrap();
             let mut transaction = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&transaction);
             let observed = transaction.compute(&probe).await.unwrap();
             assert_eq!(observed, snapshot);
             observed
@@ -405,6 +407,7 @@ fn repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot
         let mut updater = runtime.dice.updater_with_data(data);
         guard.inject_attempt(&mut updater).unwrap();
         let mut transaction = updater.commit().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         assert_eq!(
             transaction
                 .compute(&RepositoryEnvironmentCellKey::new(normalized.clone(), "A",))
@@ -436,6 +439,7 @@ fn repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot
     runtime.runtime.block_on(async {
         let data = runtime.user_computation_data(None).unwrap();
         let mut transaction = runtime.dice.updater_with_data(data).existing_state().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         let carrier = transaction
             .compute(&RepositoryHostTransactionProbeKey(1))
             .await
@@ -503,6 +507,7 @@ fn cancelled_command_revokes_a_current_only_present_name() {
     runtime.runtime.block_on(async {
         let data = runtime.user_computation_data(None).unwrap();
         let mut transaction = runtime.dice.updater_with_data(data).existing_state().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         assert_eq!(
             transaction
                 .compute(&RepositoryEnvironmentCellKey::new(normalized.clone(), "X"))

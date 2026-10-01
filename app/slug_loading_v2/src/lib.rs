@@ -86,6 +86,7 @@ pub use cc_features::cc_feature_configuration_value;
 #[doc(hidden)]
 pub use cc_features::cc_toolchain_features_value;
 mod cycle_detector;
+mod dependency_cycle;
 mod external_subtree_package_set;
 pub mod file_discovery;
 mod generated_repository_definition;

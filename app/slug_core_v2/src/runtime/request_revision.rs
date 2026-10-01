@@ -24,7 +24,6 @@ use dice::DiceComputations;
 use dice::DiceTransaction;
 use dice::InjectedKey;
 use dice::Key;
-#[cfg(test)]
 use dice::UserComputationData;
 use dupe::Dupe;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -303,15 +302,23 @@ pub(super) struct RequestRevisionRuntime {
     dice: Arc<Dice>,
     workspace: NormalizedAbsolutePath,
     owner: tokio::sync::Mutex<RevisionOwner>,
+    cycle_detectors: super::scoped_cycle_detector::ScopedCycleDetectorRegistry,
     #[cfg(test)]
     test_data: Arc<RequestTestData>,
 }
 
 impl RequestRevisionRuntime {
-    pub(super) fn new(dice: Arc<Dice>, workspace: NormalizedAbsolutePath) -> Arc<Self> {
+    pub(super) fn new(
+        dice: Arc<Dice>,
+        workspace: NormalizedAbsolutePath,
+        cycle_runtime: tokio::runtime::Handle,
+    ) -> Arc<Self> {
         Arc::new(Self {
             dice,
             workspace,
+            cycle_detectors: super::scoped_cycle_detector::ScopedCycleDetectorRegistry::new(
+                cycle_runtime,
+            ),
             owner: tokio::sync::Mutex::new(RevisionOwner {
                 initialized: false,
                 next_revision: 1,
@@ -328,17 +335,22 @@ impl RequestRevisionRuntime {
         })
     }
 
+    pub(super) fn install_cycle_detector(&self, data: &mut UserComputationData) {
+        self.cycle_detectors.install(data);
+    }
+
+    pub(super) fn bind_cycle_detector(&self, transaction: &DiceTransaction) {
+        self.cycle_detectors.bind(transaction);
+    }
+
     fn updater(&self) -> dice::DiceTransactionUpdater {
+        let mut data = UserComputationData::default();
+        self.install_cycle_detector(&mut data);
         #[cfg(test)]
         {
-            let mut data = UserComputationData::default();
             data.data.set(self.test_data.dupe());
-            self.dice.updater_with_data(data)
         }
-        #[cfg(not(test))]
-        {
-            self.dice.updater()
-        }
+        self.dice.updater_with_data(data)
     }
 
     /// A leaf used by every legacy production publisher sharing this DICE.
@@ -347,6 +359,7 @@ impl RequestRevisionRuntime {
         let owner = self.owner.lock().await;
         let transaction = updater.commit().await;
         drop(owner);
+        self.bind_cycle_detector(&transaction);
         transaction
     }
 
@@ -414,10 +427,12 @@ impl RequestRevisionRuntime {
                 .commits
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             drop(owner);
+            self.bind_cycle_detector(&transaction);
             Ok(transaction)
         } else {
             let transaction = updater.commit().await;
             drop(owner);
+            self.bind_cycle_detector(&transaction);
             Ok(transaction)
         }
     }
@@ -666,6 +681,7 @@ impl RequestRevisionRuntime {
             transaction
         };
         drop(owner);
+        self.bind_cycle_detector(&transaction);
         Ok(transaction)
     }
 
@@ -1096,7 +1112,7 @@ mod tests {
         let workspace =
             NormalizedAbsolutePath::new(directory.path().canonicalize().unwrap()).unwrap();
         let dice = Dice::builder().build(DetectCycles::Enabled);
-        RequestRevisionRuntime::new(dice, workspace)
+        RequestRevisionRuntime::new(dice, workspace, tokio::runtime::Handle::current())
     }
 
     fn overlay(semantic: &str, presentation: &str) -> RequestOverlay {
@@ -1560,6 +1576,7 @@ mod tests {
             .await
             .unwrap();
         let mut terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&terminal);
         let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
         let before = audit(&runtime).commits;
         let mut called = false;
@@ -1615,6 +1632,7 @@ mod tests {
             .await
             .unwrap();
         let mut terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&terminal);
         let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
         std::fs::write(directory.path().join("defs.bzl"), b"V2").unwrap();
         let outcome = runtime
@@ -1656,6 +1674,7 @@ mod tests {
             .unwrap();
 
         let mut terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&terminal);
         let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
         let mut selected = runtime.updater();
         selected
@@ -1677,6 +1696,7 @@ mod tests {
         drop(terminal);
 
         let mut terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&terminal);
         let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
         std::fs::write(directory.path().join("defs.bzl"), b"V2").unwrap();
         let mut selected = runtime.updater();
@@ -1803,6 +1823,7 @@ mod tests {
         ));
 
         let mut current = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&current);
         let retained = current.compute(&PathObservationEpochKey).await.unwrap();
         for (demand, result) in full_epoch.observations() {
             assert!(Arc::ptr_eq(result, retained.get(demand).unwrap()));
@@ -1846,6 +1867,7 @@ mod tests {
             .unwrap();
 
         let mut stale_terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&stale_terminal);
         let stale_epoch = stale_terminal
             .compute(&PathObservationEpochKey)
             .await
@@ -1926,6 +1948,7 @@ mod tests {
             .await
             .unwrap();
         let mut terminal = runtime.updater().existing_state().await;
+        runtime.bind_cycle_detector(&terminal);
         let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
         let commits = audit(&runtime).commits;
         runtime

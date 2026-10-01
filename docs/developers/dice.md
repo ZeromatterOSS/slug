@@ -40,6 +40,31 @@ persisted materialization namespaces keep their existing owners. Detector
 binding must use the committed transaction's live identity rather than version
 number alone. This getter does not install a detector or admit repository cycles.
 
+### Request-scoped detector binding
+
+`RequestRevisionRuntime` installs a fresh deferred detector in each request's
+userdata, then binds it to the committed transaction before any computation.
+Its weak registry shares one actual detector for an equal `DiceLiveContextId`.
+Different engines, semantic versions and reopened live-cache epochs stay
+isolated; request environment, effect tracking and observations remain in their
+own userdata. A bound proxy cannot migrate to another live context. Equality-only
+updaters need no binding until they become compute-capable transactions.
+
+The generated-repository graph retains full concrete key identities and active
+attempts. A finishing child releases its outgoing edges and notification state.
+Incoming logical dependencies belong to active parents: DICE can request a
+replacement child before the cancelled predecessor's finish callback. Preserve
+that pending edge until its parent finishes, traverse it only while the target
+is active, and compare exact attempt IDs when old guards drop. The legacy `.bzl`
+and configured-analysis actors similarly retain referenced targets as empty
+placeholders and compact unreferenced completed nodes. No lock spans a compute.
+
+Native synchronous attempts drop transactions and drain cancellation workers
+before retry, acceptance or restoration. Legacy detector actors belong to the
+retained workspace Tokio runtime; request callers do not own detached cleanup
+tasks. Mixed cycle errors record the existing transient poison dependency, so
+an interrupted wait cannot turn a cycle diagnostic into a permanent cache hit.
+
 ## Don't hold a shared mutex across a DICE computation
 
 The precise hazard is a lock held across a `.await` that re-enters DICE where

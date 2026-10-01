@@ -1,5 +1,17 @@
 # Stage 5: Bzlmod and Repository Graph
 
+## Independent generated Label path boundary
+
+WP885 admits module_ctx.path(Label) for an independent generated owner only
+through its completed source-owned certificate, guarded canonical load route
+and actual immutable materialization. Metadata rejects the same owner before
+evaluation; selected seed owner must match. Existing BUILD/package lookup,
+path namespace and writer/content contracts remain exact. Reciprocal, three-
+owner and generated defining-.bzl cycles fail without partial effects/events.
+The accepted manifest records45 focused gates and the default CLI's next
+unsupported scratch_path.get_child frontier; no scratch I/O or full bootstrap
+is inferred.
+
 ## Goal
 
 Implement bzlmod as DICE-owned semantic state: module parsing, resolution,

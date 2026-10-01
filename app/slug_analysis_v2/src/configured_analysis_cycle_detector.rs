@@ -264,8 +264,10 @@ impl DetectorState {
                 }
             }
             Event::Finished(key) => {
-                let id = self.id(&key);
-                self.nodes[id as usize].1 = NodeState::Finished;
+                if let Some(id) = self.ids.get(&key).copied() {
+                    self.nodes[id as usize].1 = NodeState::Finished;
+                    self.prune_finished();
+                }
             }
             Event::Edge(from, to) => {
                 let from = self.id(&from);
@@ -276,6 +278,54 @@ impl DetectorState {
                 }
             }
         }
+    }
+
+    // A live-cache coordinator can serve continuously overlapping requests.
+    // Keep only active computations and their unresolved immediate targets;
+    // compaction also bounds storage when the graph never becomes fully idle.
+    fn prune_finished(&mut self) {
+        let mut referenced = SmallSet::new();
+        for (_, state) in &self.nodes {
+            if let NodeState::Working { edges, .. } = state {
+                referenced.extend(edges.iter().copied());
+            }
+        }
+        let mut remap = SmallMap::new();
+        for (old, (_, state)) in self.nodes.iter().enumerate() {
+            let retain = match state {
+                NodeState::Working { .. } | NodeState::Cycle(_) => true,
+                NodeState::Known => referenced.contains(&(old as u32)),
+                NodeState::Finished => referenced.contains(&(old as u32)),
+            };
+            if retain {
+                remap.insert(old as u32, remap.len() as u32);
+            }
+        }
+        let old_nodes = std::mem::take(&mut self.nodes);
+        self.ids.clear();
+        for (old, (key, mut state)) in old_nodes.into_iter().enumerate() {
+            let Some(new) = remap.get(&(old as u32)).copied() else {
+                continue;
+            };
+            if matches!(state, NodeState::Finished) {
+                // This placeholder belongs to a still-active parent's logical
+                // dependency, which may already await a cancelled replacement.
+                state = NodeState::Known;
+            }
+            if let NodeState::Working { edges, .. } = &mut state {
+                *edges = edges
+                    .iter()
+                    .filter_map(|id| remap.get(id).copied())
+                    .collect();
+            }
+            self.ids.insert(key.clone(), new);
+            self.nodes.push((key, state));
+        }
+        self.dirty = self
+            .dirty
+            .iter()
+            .filter_map(|id| remap.get(id).copied())
+            .collect();
     }
 
     fn working(&self, id: u32) -> bool {
@@ -344,5 +394,115 @@ impl DetectorState {
                 let _ignored = sender.send(cycle.clone());
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use slug_identity_v2::CanonicalLabel;
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use super::*;
+    use crate::key::ConfiguredNodeKey;
+
+    fn node(name: &str) -> CycleNode {
+        CycleNode::Legacy(
+            ConfiguredNodeAnalysisKey::new(
+                NormalizedAbsolutePath::new("/configured-cycle-test").unwrap(),
+                ConfiguredNodeKey::null(CanonicalLabel::parse(&format!("@@//:{name}")).unwrap()),
+            )
+            .unwrap(),
+        )
+    }
+
+    #[test]
+    fn overlapping_completed_requests_do_not_retain_history() {
+        let mut state = DetectorState::default();
+        let anchor = node("anchor");
+        let (sender, _anchor_receiver) = oneshot::channel();
+        state.handle(Event::Started(anchor.clone(), sender));
+        for index in 0..1000 {
+            let current = node(&format!("request{index}"));
+            let missing = node(&format!("target{index}"));
+            let (sender, _receiver) = oneshot::channel();
+            state.handle(Event::Started(current.clone(), sender));
+            state.handle(Event::Edge(current.clone(), missing));
+            state.handle(Event::Finished(current));
+            assert_eq!(state.nodes.len(), 1);
+            assert_eq!(state.ids.len(), 1);
+            assert!(state.dirty.len() <= 1);
+        }
+        state.handle(Event::Finished(anchor));
+        assert!(state.nodes.is_empty());
+        assert!(state.ids.is_empty());
+        assert!(state.dirty.is_empty());
+    }
+
+    #[tokio::test]
+    async fn pending_replacement_keeps_incoming_dependency_but_retires_old_outgoing_edges() {
+        let mut state = DetectorState::default();
+        let parent = node("parent");
+        let target = node("target");
+        let retired_dependency = node("retired_dependency");
+        let (sender, mut parent_receiver) = oneshot::channel();
+        state.handle(Event::Started(parent.clone(), sender));
+        let (sender, _old_receiver) = oneshot::channel();
+        state.handle(Event::Started(target.clone(), sender));
+        state.handle(Event::Edge(parent.clone(), target.clone()));
+        state.handle(Event::Edge(target.clone(), retired_dependency));
+        state.handle(Event::Finished(target.clone()));
+        assert_eq!(state.nodes.len(), 2);
+        state.check();
+        assert!(matches!(
+            parent_receiver.try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        let (sender, replacement_receiver) = oneshot::channel();
+        state.handle(Event::Started(target.clone(), sender));
+        state.handle(Event::Edge(target.clone(), parent.clone()));
+        state.check();
+        for receiver in [parent_receiver, replacement_receiver] {
+            let cycle = receiver.await.unwrap();
+            assert_eq!(cycle.keys.len(), 2);
+            assert!(cycle.keys.contains(&parent) && cycle.keys.contains(&target));
+        }
+        state.handle(Event::Finished(target));
+        state.handle(Event::Finished(parent));
+        assert!(state.nodes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn compaction_preserves_live_cycles_and_replacement_is_not_poisoned() {
+        let mut state = DetectorState::default();
+        let a = node("a");
+        let b = node("b");
+        let removed = node("removed");
+        let (sender, _receiver) = oneshot::channel();
+        state.handle(Event::Started(removed.clone(), sender));
+        let (sender, receiver_a) = oneshot::channel();
+        state.handle(Event::Started(a.clone(), sender));
+        state.handle(Event::Edge(a.clone(), b.clone()));
+        let (sender, receiver_b) = oneshot::channel();
+        state.handle(Event::Started(b.clone(), sender));
+        state.handle(Event::Edge(b.clone(), a.clone()));
+        state.handle(Event::Finished(removed));
+        state.check();
+        for receiver in [receiver_a, receiver_b] {
+            let cycle = receiver.await.unwrap();
+            assert_eq!(cycle.keys.len(), 2);
+            assert!(cycle.keys.contains(&a) && cycle.keys.contains(&b));
+        }
+        state.handle(Event::Finished(a.clone()));
+        state.handle(Event::Finished(b));
+        assert!(state.nodes.is_empty());
+        let (sender, mut replacement) = oneshot::channel();
+        state.handle(Event::Started(a.clone(), sender));
+        state.check();
+        assert!(matches!(
+            replacement.try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        state.handle(Event::Finished(a));
+        assert!(state.nodes.is_empty());
     }
 }

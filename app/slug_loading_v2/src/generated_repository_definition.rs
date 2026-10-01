@@ -32,6 +32,7 @@ use crate::HostSelectedExtensionOwnerCertificateError;
 use crate::HostSelectedExtensionOwnerCertificateKey;
 use crate::HostSelectedExtensionOwnerCertificateObservationError;
 use crate::HostSelectedExtensionOwnerCertificateObservationKey;
+use crate::dependency_cycle::compute_guarded;
 
 type HostGeneratedRepositoryDefinition = HostCanonicalRepositoryRoute;
 
@@ -254,12 +255,12 @@ async fn compute_generated_repository_definition(
         Err(error) => return complete_generated_driver(Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::Demand(error.clone()) }), observations),
     };
     let (result, owner_observations) = match mode {
-        GeneratedRepositoryDefinitionMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerCertificateKey::new(key.workspace.clone(), demand.owner().clone())).await {
+        GeneratedRepositoryDefinitionMode::Legacy => match compute_guarded(ctx, &HostSelectedExtensionOwnerCertificateKey::new(key.workspace.clone(), demand.owner().clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(result)) => (result, PathObservationEpoch::empty()),
             Err(error) => return complete_generated_driver(Err(HostGeneratedRepositoryDefinitionError { requested: key.canonical_repo.clone(), kind: HostGeneratedRepositoryDefinitionErrorKind::LoadingCompute(error.to_string().into()) }), observations),
         },
-        GeneratedRepositoryDefinitionMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerCertificateObservationKey::new(key.workspace.clone(), demand.owner().clone())).await {
+        GeneratedRepositoryDefinitionMode::Observed => match compute_guarded(ctx, &HostSelectedExtensionOwnerCertificateObservationKey::new(key.workspace.clone(), demand.owner().clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
             Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostGeneratedRepositoryDefinitionObservationError::Validation { demand, error })),
             Ok(SourcePreparationOutcome::Complete(Ok(observed))) => (observed.result().clone(), observed.observations().clone()),

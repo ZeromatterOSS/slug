@@ -344,6 +344,7 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     E::Absent { label } => { out.write_str("Absent ")?; return out.label(label); }
                     E::Encoding { label } => { out.write_str("Encoding ")?; return out.label(label); }
                     E::Cycle(_) => return out.write_str("Cycle"),
+                    E::DependencyCycle(cycle) => return write!(out, "DependencyCycle: {cycle}"),
                     E::Source { .. } => return out.incomplete("Source"),
                     E::SourceObservation { label, error } => {
                         out.write_str("SourceObservation ")?;

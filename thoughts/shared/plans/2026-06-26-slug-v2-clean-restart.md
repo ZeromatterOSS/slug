@@ -34,16 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-184-m7a-dice-live-context-identity-r1
-Status: accepted live-context prerequisite; atomic owner-cycle integration next; M7A remains partial
+Packet: WP-7-185-m7a-generated-owner-cycle-path-r1
+Status: accepted after independent FINAL review; M7A remains partial
 
-WP884's readonly DiceLiveContextId exposes existing engine/version/cache epoch
-without allocation, ownership or semantic changes. Six focused public lifecycle/
-cancellation controls and Loading/Analysis/Core/CLI checks pass; independent final
-ACCEPT. WP883 at ec7e75983 owns the complete mixed-cycle contract; now integrate
-exact-context proxy/graph/path admission atomically with warm/shared/cancellation
-and real immutable-root gates. Full configuration, deeper memory and bootstrap
-remain unproved. See `slug-v2-subplans/current-packet.md`.
+WP885 accepts WP883's complete mixed-cycle/owner contract with WP884's live
+context token. Loading path admission/graph, Core binding and actor retirement
+land atomically after independent FINAL ACCEPT and45 focused source-valid
+gates. Default CLI root replay advances beyond host-tools generated Label into
+crate_universe scratch_path.get_child, exit2 naturally, peak1090.074MiB/zero
+swap and unchanged hashes/scoped cleanup. WP880 reporting-memory fix remains
+protected. Full configuration/deeper memory/bootstrap remain unproved. Next
+ready work is a bounded source/ownership audit of that scratch consumer closure.
+See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
