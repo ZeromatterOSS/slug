@@ -57,6 +57,14 @@ interning, type conflicts, active-token guards and write/symlink registration re
 authoritative; declaration itself creates no action. Directory sibling declarations,
 Windows sibling behavior and alternate repository layout remain deferred.
 
+Repeated ordinary artifact-symlink registrations within one CtxActions reuse the
+first action/index only for full typed input/output and execution-flag equality
+with the same default execution envelope. Progress is presentation and the first
+message remains retained. Generic registry/batch conflicts and cross-target closure
+eligibility stay authoritative; absolute-path/general symlink sharing is deferred.
+Eligibility is the exact bounded slice; first-action vector canonicalization is
+Slug-native, with Bazel raw duplicate-row/progress inspection remaining deferred.
+
 WP846 admits one Bazel 9.2 package-default legacy license case in configured
 native filegroup analysis: a Default-provenance singleton `licenses=["notice"]`
 is retained by Loading/query and ignored only by the filegroup's provider/

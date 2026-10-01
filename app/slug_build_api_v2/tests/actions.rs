@@ -1534,6 +1534,212 @@ fn typed_symlink_variants_are_structurally_distinct_and_fail_reapi_projection() 
 }
 
 #[test]
+fn artifact_symlink_repeats_preserve_original_index_progress_and_action_order() {
+    let mut actions = CtxActions::new(root_support::root());
+    for (number, input) in [
+        source_artifact("source"),
+        derived_artifact("pkg/input", ActionOutputKind::File),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let unrelated = actions
+            .declare_file(format!("pkg/unrelated{number}"))
+            .unwrap();
+        assert_eq!(
+            actions.write(unrelated, "unrelated", false).unwrap(),
+            number * 2
+        );
+        let output = actions.declare_file(format!("pkg/link{number}")).unwrap();
+        let target = SymlinkTarget::Artifact {
+            input,
+            require_executable: false,
+            use_exec_root_for_source: false,
+        };
+        let progress = if number == 0 {
+            None
+        } else {
+            Some("first progress")
+        };
+        let first = SymlinkSpec::new(output.clone(), target.clone(), progress);
+        assert_eq!(
+            actions.register_symlink(first.clone()).unwrap(),
+            number * 2 + 1
+        );
+        let original = actions.registry().clone();
+        for progress in [Some("first progress"), Some("second progress"), None] {
+            assert_eq!(
+                actions
+                    .register_symlink(SymlinkSpec::new(output.clone(), target.clone(), progress))
+                    .unwrap(),
+                number * 2 + 1,
+            );
+            assert_eq!(actions.registry(), &original);
+            assert_eq!(
+                actions.registry().actions()[number * 2 + 1].symlink_spec(),
+                Some(&first)
+            );
+        }
+    }
+    let other_root = root_support::root_for(b"other");
+    let independent = SymlinkSpec::new(
+        ActionOutput::new(other_root, "pkg/link0", ActionOutputKind::File),
+        SymlinkTarget::Artifact {
+            input: source_artifact("source"),
+            require_executable: false,
+            use_exec_root_for_source: false,
+        },
+        None::<&str>,
+    );
+    assert_eq!(actions.register_symlink(independent.clone()).unwrap(), 4);
+    let original = actions.registry().clone();
+    assert_eq!(actions.register_symlink(independent).unwrap(), 4);
+    assert_eq!(actions.registry(), &original);
+    assert_eq!(
+        actions
+            .registry()
+            .output_owner(&root_support::exec_path("pkg/link0")),
+        Some(1)
+    );
+}
+
+#[test]
+fn artifact_symlink_conflicts_and_deferred_targets_preserve_complete_registry_state() {
+    let derived = derived_artifact("pkg/input", ActionOutputKind::File);
+    let AnalysisArtifact::Derived { owner, output } = &derived else {
+        unreachable!()
+    };
+    let alternatives = [
+        source_artifact("other"),
+        AnalysisArtifact::Source(CanonicalLabel::parse("@@other//pkg:source").unwrap()),
+        AnalysisArtifact::Derived {
+            owner: AnalysisConfiguredTargetKey::new(
+                CanonicalLabel::parse("@@//pkg:other").unwrap(),
+                b"cfg".as_slice(),
+            ),
+            output: output.clone(),
+        },
+        AnalysisArtifact::Derived {
+            owner: AnalysisConfiguredTargetKey::new(owner.label().clone(), b"other-cfg".as_slice()),
+            output: output.clone(),
+        },
+        AnalysisArtifact::Derived {
+            owner: owner.clone(),
+            output: ActionOutput::new(
+                root_support::root_for(b"other"),
+                "pkg/input",
+                ActionOutputKind::File,
+            ),
+        },
+        derived_artifact("pkg/input", ActionOutputKind::Directory),
+    ];
+    for input in [source_artifact("source"), derived] {
+        let mut actions = CtxActions::new(root_support::root());
+        let output = actions.declare_file("pkg/link").unwrap();
+        let target = SymlinkTarget::Artifact {
+            input: input.clone(),
+            require_executable: false,
+            use_exec_root_for_source: false,
+        };
+        let link = |input| {
+            SymlinkSpec::new(
+                output.clone(),
+                SymlinkTarget::Artifact {
+                    input,
+                    require_executable: false,
+                    use_exec_root_for_source: false,
+                },
+                None::<&str>,
+            )
+        };
+        actions.register_symlink(link(input.clone())).unwrap();
+        let original = actions.registry().clone();
+        let mut refused = alternatives.iter().cloned().map(link).collect::<Vec<_>>();
+        for (require_executable, use_exec_root_for_source) in [(true, false), (false, true)] {
+            refused.push(SymlinkSpec::new(
+                output.clone(),
+                SymlinkTarget::Artifact {
+                    input: input.clone(),
+                    require_executable,
+                    use_exec_root_for_source,
+                },
+                None::<&str>,
+            ));
+        }
+        for kind in [ActionOutputKind::Directory, ActionOutputKind::Symlink] {
+            refused.push(SymlinkSpec::new(
+                ActionOutput::new(root_support::root(), "pkg/link", kind),
+                target.clone(),
+                None::<&str>,
+            ));
+        }
+        refused.push(SymlinkSpec::new(
+            ActionOutput::new_constant(root_support::root(), "pkg/link"),
+            target.clone(),
+            None::<&str>,
+        ));
+        refused.push(SymlinkSpec::new(
+            ActionOutput::new(root_support::root(), "pkg//invalid", ActionOutputKind::File),
+            target.clone(),
+            None::<&str>,
+        ));
+        refused.push(SymlinkSpec::new(
+            output,
+            SymlinkTarget::AbsolutePath {
+                target: NormalizedAbsoluteBazelPath::new(HostPathFlavor::Unix, "/pkg/input")
+                    .unwrap(),
+            },
+            None::<&str>,
+        ));
+        for spec in refused {
+            assert!(actions.register_symlink(spec).is_err());
+            assert_eq!(actions.registry(), &original);
+        }
+    }
+    let mut actions = CtxActions::new(root_support::root());
+    let output = actions.declare_file("pkg/link").unwrap();
+    let absolute = SymlinkSpec::new(
+        output.clone(),
+        SymlinkTarget::AbsolutePath {
+            target: NormalizedAbsoluteBazelPath::new(HostPathFlavor::Unix, "/pkg/input").unwrap(),
+        },
+        None::<&str>,
+    );
+    actions.register_symlink(absolute.clone()).unwrap();
+    let original = actions.registry().clone();
+    assert!(actions.register_symlink(absolute).is_err());
+    assert_eq!(actions.registry(), &original);
+    let spec = SymlinkSpec::new(
+        output.clone(),
+        SymlinkTarget::Artifact {
+            input: source_artifact("source"),
+            require_executable: false,
+            use_exec_root_for_source: false,
+        },
+        None::<&str>,
+    );
+    for candidate in [
+        ActionSpec::symlink(spec.clone())
+            .with_exec_properties(BTreeMap::from([("key".to_owned(), "value".to_owned())])),
+        ActionSpec::symlink(spec.clone()).with_exec_group("other"),
+        ActionSpec::new(
+            ActionKind::Write {
+                content: "other family".into(),
+                is_executable: false,
+            },
+            "FileWrite",
+            vec![output],
+        ),
+    ] {
+        let mut actions = CtxActions::new(root_support::root());
+        actions.register_batch([candidate]).unwrap();
+        let original = actions.registry().clone();
+        assert!(actions.register_symlink(spec.clone()).is_err());
+        assert_eq!(actions.registry(), &original);
+    }
+}
+
+#[test]
 fn run_shell_pads_empty_dollar_zero_when_arguments_are_present() {
     let mut actions = CtxActions::new(root_support::root());
     let out = actions.declare_file("pkg/out.txt").unwrap();

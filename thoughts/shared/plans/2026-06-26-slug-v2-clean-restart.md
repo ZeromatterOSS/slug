@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-173-m7a-target-files-default-projection-r1
-Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
+Packet: WP-7-174-m7a-identical-artifact-symlink-registration-r1
+Status: accepted; independent corrected DESIGN/FINAL accepted; M7A remains partial
 
-WP873 accepts legacy Target.files for default-bearing immutable Targets by reusing
-their existing frozen DefaultInfo.files projection. Identity/storage/lifetime stay
-with existing owners; the unmodeled legacy-field flag and missing-default boundary
-remain refused/deferred. Independent reviews, 28 focused tests in1.433s and Core/CLI
-pass. Unchanged authentic79.222s clears Target.files and reaches duplicate sysroot
-symlink output; original hashes and actual cleanup pass. The successor must review
-duplicate action eligibility without weakening structural output conflicts.
-Full bootstrap and Windows remain deferred.
+WP874 accepts equivalent ordinary artifact-symlink registration within one native
+analysis context. Full typed input/output, flags and default execution envelope
+must agree; first action/progress and structural conflicts stay authoritative.
+Eligibility is source-exact; first-row canonicalization is Slug-native. Independent
+corrected DESIGN/FINAL, 12 tests in0.479s and Core/CLI pass. Unchanged replay78.763s
+clears duplicate sysroot symlink and reaches a ToolchainInfo function-publication
+refusal; original hashes and actual cleanup pass. Retained callable identity/source/
+lifetime needs successor review. Full bootstrap and Windows remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

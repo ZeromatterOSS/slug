@@ -15144,6 +15144,8 @@ plain = rule(implementation = _plain)
 
 /// Pinned ActionFactory141-162 and StarlarkRuleContextTest1144-1189: sibling
 /// location is independent of current output ownership; symlink remains native.
+/// Actions191-220 and SymlinkAction429-448: equivalent registrations retain the
+/// first action despite progress differences; input/executable differences conflict.
 #[tokio::test]
 async fn declared_file_siblings_feed_native_symlinks_and_restore_source_configuration() {
     use slug_build_api_v2::AnalysisArtifact;
@@ -15168,8 +15170,10 @@ def _probe(ctx):
     same = ctx.actions.declare_file(filename='./source.link', sibling=ctx.file.src)
     if src != same: fail('sibling declaration identity changed')
     dep = ctx.actions.declare_file(filename='dependency.link', sibling=ctx.file.dep)
-    ctx.actions.symlink(output=src, target_file=ctx.file.src)
-    ctx.actions.symlink(output=dep, target_file=ctx.file.dep)
+    ctx.actions.symlink(output=src, target_file=ctx.file.src, progress_message='first source')
+    ctx.actions.symlink(output=src, target_file=ctx.file.src, progress_message='repeat source')
+    ctx.actions.symlink(output=dep, target_file=ctx.file.dep, progress_message='first dependency')
+    ctx.actions.symlink(output=dep, target_file=ctx.file.dep, progress_message='repeat dependency')
     return [DefaultInfo(files=depset([src, dep]))]
 probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=True), 'dep':attr.label(allow_single_file=True, cfg='exec')})
 "#;
@@ -15258,6 +15262,10 @@ probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=Tr
                     assert_eq!(output.root_relative_path(), format!("{prefix}{relative}"));
                     let link = first.actions()[index].symlink_spec().unwrap();
                     assert_eq!(link.output(), output);
+                    assert_eq!(
+                        link.progress_message(),
+                        Some(["first source", "first dependency"][index])
+                    );
                     let SymlinkTarget::Artifact { input, .. } = link.target() else {
                         panic!("artifact symlink")
                     };
@@ -15299,6 +15307,26 @@ probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=Tr
                     fs::write(&path, changed).unwrap();
                     assert_ne!(request(config.clone()).await.unwrap(), first);
                     fs::write(path, original).unwrap();
+                    assert_eq!(request(config.clone()).await.unwrap(), first);
+                }
+                for replacement in [
+                    "target_file=ctx.file.dep, progress_message='repeat source'",
+                    "target_file=ctx.file.src, is_executable=True, progress_message='repeat source'",
+                ] {
+                    fs::write(
+                        package.join("defs.bzl"),
+                        source.replace(
+                            "target_file=ctx.file.src, progress_message='repeat source'",
+                            replacement,
+                        ),
+                    )
+                    .unwrap();
+                    let error = request(config.clone()).await.unwrap_err();
+                    assert!(
+                        error.contains("action output declared more than once:"),
+                        "observed={observed} execution={execution} {label}: {error}"
+                    );
+                    fs::write(package.join("defs.bzl"), source).unwrap();
                     assert_eq!(request(config.clone()).await.unwrap(), first);
                 }
                 let changed = cc_configure_features::config(&[(

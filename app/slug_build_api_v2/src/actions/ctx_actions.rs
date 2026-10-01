@@ -23,6 +23,7 @@ use crate::actions::spec::ActionSpec;
 use crate::actions::spec::ArgsWriteSpec;
 use crate::actions::spec::SpawnSpec;
 use crate::actions::spec::SymlinkSpec;
+use crate::actions::spec::SymlinkTarget;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct CtxActions {
@@ -179,6 +180,20 @@ impl CtxActions {
     }
 
     pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {
+        if matches!(spec.target(), SymlinkTarget::Artifact { .. })
+            && let Some(index) = self.registry.output_owner(spec.output().path())
+        {
+            let candidate = &self.registry.actions()[index];
+            if candidate.exec_properties().is_empty()
+                && candidate.exec_group().is_none()
+                && let Some(existing) = candidate.symlink_spec()
+                && existing.output() == spec.output()
+                && existing.target() == spec.target()
+            {
+                // Bazel SymlinkAction keys exclude progress; retain the first action.
+                return Ok(index);
+            }
+        }
         self.registry.register(ActionSpec::symlink(spec))
     }
 
