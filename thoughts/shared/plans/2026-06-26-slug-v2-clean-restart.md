@@ -34,20 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-181-m7a-crate-generated-label-owner-audit-r1
-Status: accepted audit; diagnostic-only successor selected; M7A remains partial
+Packet: WP-7-182-m7a-generated-label-discriminator-r1
+Status: accepted discriminator; owner-cycle design prerequisite selected; M7A remains partial
 
-WP880 is accepted at d95f2bda6: reporting-only workspace payload retention is
-removed; the ordinary actual-root cquery now reaches a concrete terminal in
-10.507s at301.56MiB daemon high-water/zero sampled swap. Reuse that evidence.
-The audit infers @rust_host_tools at rules_rust crate_universe/extensions.bzl:877;
-retained output proves mapping/refusal, not the actual argument or refusal site.
-Existing source/materialization owners can supply an independent repository,
-but general extension-owner cycle safety is missing. The selected successor is
-a reviewed canonical-Label/refusal-site diagnostic that preserves current
-fail-closed behavior. No generated-Label semantics are admitted; no identical
-root retry, owner bypass or old F3 reopening. Full root configuration, deeper
-graph memory and bootstrap remain unproved.
+WP882's accepted diagnostic and rebuilt query prove
+@@rules_rust++rust_host_tools+rust_host_tools//:rust_host_tools at the generated-owner
+preflight. Three focused checks/default CLI build pass; genuine exit2 at10.257s,
+301.76MiB high-water/zero sampled swap, unchanged inputs and scoped cleanup.
+No generated-owner path behavior is admitted. Next resolve DICE owner-cycle
+safety including warm dependency validation, mixed .bzl edges and attempt lifecycle
+before admitting the independent producer. WP880 atd95f2bda6 memory repair remains
+accepted; full root configuration, deeper memory and bootstrap remain unproved.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

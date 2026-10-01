@@ -1199,6 +1199,12 @@ async fn observe_selected_watches(
     Ok(observations)
 }
 
+fn generated_repository_label_refusal(label: &CanonicalLabel, site: &str) -> String {
+    format!(
+        "module_ctx.path does not support generated repository Labels (label={label}, site={site})"
+    )
+}
+
 async fn observe_selected_path_label(
     ctx: &mut DiceComputations<'_>,
     key: &HostSelectedExtensionOwnerPureKey,
@@ -1262,7 +1268,10 @@ async fn observe_selected_path_label(
         };
         merge!(demand.observations());
         match demand.result().as_ref() {
-            Ok(_) => fail!("module_ctx.path does not support generated repository Labels"),
+            Ok(_) => fail!(generated_repository_label_refusal(
+                label,
+                "generated-owner-preflight"
+            )),
             Err(error)
                 if error.disposition() == HostSelectedExtensionDemandErrorDisposition::Missing => {}
             Err(error) => fail!(format!(
@@ -1297,7 +1306,10 @@ async fn observe_selected_path_label(
             Err(error) => fail!(format!("module_ctx.path canonical route failed: {error:?}")),
         };
         if route.route().view().generated_effect_seed().is_some() {
-            fail!("module_ctx.path does not support generated repository Labels");
+            fail!(generated_repository_label_refusal(
+                label,
+                "generated-effect-route"
+            ));
         }
         Some(HostRepositorySourceRoute::canonical(route.input().clone()))
     };
@@ -6718,9 +6730,32 @@ other = module_extension(implementation=other_impl)
                 panic!("generated Label must fail closed without a Need: {outcome:?}");
             };
             let error = observed.result().as_ref().as_ref().unwrap_err();
-            assert!(
-                format!("{error:?}").contains("does not support generated repository Labels"),
-                "{second_owner}: {error:?}"
+            let mut cause = error;
+            while let HostSelectedExtensionOwnerPureError::Factored { error, .. } = cause {
+                cause = error.as_ref();
+            }
+            let HostSelectedExtensionOwnerPureError::AfterInputs {
+                current_calls,
+                message,
+                ..
+            } = cause
+            else {
+                panic!("generated Label must preserve its source-owned refusal: {error:?}");
+            };
+            assert_eq!(
+                current_calls
+                    .iter()
+                    .map(|call| call.name.as_str())
+                    .collect::<Vec<_>>(),
+                ["prefix"],
+                "{second_owner}: {current_calls:?}"
+            );
+            assert_eq!(
+                message.as_str(),
+                format!(
+                    "module_ctx.path does not support generated repository Labels (label=@@{}//:missing, site=generated-owner-preflight)",
+                    generated.as_str()
+                )
             );
             let rows = tracker.take();
             assert!(
@@ -6752,6 +6787,19 @@ other = module_extension(implementation=other_impl)
                     )))
             );
         }
+    }
+
+    #[test]
+    fn generated_repository_label_refusal_distinguishes_defensive_route_site() {
+        let label = CanonicalLabel::parse("@@dep++ext+tools//pkg:marker").unwrap();
+        assert_eq!(
+            generated_repository_label_refusal(&label, "generated-effect-route"),
+            "module_ctx.path does not support generated repository Labels (label=@@dep++ext+tools//pkg:marker, site=generated-effect-route)"
+        );
+        assert_ne!(
+            generated_repository_label_refusal(&label, "generated-owner-preflight"),
+            generated_repository_label_refusal(&label, "generated-effect-route")
+        );
     }
 
     #[tokio::test]
