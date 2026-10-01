@@ -42,8 +42,11 @@ and full source-owned helper invocation. Existing Loading DICE owners prepare
 complete manifest authority/code lifetime; Analysis rematerializes captures and
 uses genuine current consumer actions. Source/private authority and all branch/
 lifecycle gates precede activation. WP876 `64f52f1c4` supplied source-library/all-flag
-Solib construction with17 tests/reviews/Core/CLI passing. Full bootstrap and Windows
-remain deferred.
+Solib construction with17 tests/reviews/Core/CLI passing. Accepted WP878
+`d9c1de64a` supplies bounded selected-BCR relative-file symlinks (16 focused
+checks/full pinned archive probe/CLI pass); it is integrated here as the base
+prerequisite. The callback remains on the review branch until genuine invocation
+and rebuilt authentic replay pass. Full bootstrap and Windows remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

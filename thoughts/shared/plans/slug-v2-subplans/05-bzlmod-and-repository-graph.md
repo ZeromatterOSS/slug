@@ -667,3 +667,22 @@ inventories and real configured source forwarding pass. The installed selector
 is preserved; default Linux target/exec returns no_op.bat, while Windows parser
 source/prebuilt execution remains deferred. The rebuilt unchanged authentic
 cquery clears the missing package and reaches cpp.grte_top in rules_cc.
+
+### Selected BCR relative leaf-file symlinks accepted (WP878, 2026-09-30)
+
+The existing bounded tar extractor now preserves relative symlink text and
+installs links after ordinary files, matching pinned Bazel 9.2 source behavior
+for the demanded rules_jvm_external 6.7 archive. Symlink mode0777/zero payload,
+normalized paths, leading dot/parent components contained within the stripped
+root, and a final extracted ordinary-file target are Slug-native admission
+guards. Namespace collisions in either archive order, interior dot cancellation,
+absolute/escaping/dangling/chained/directory targets and linked transforms fail
+closed. Session cancellation and provisional-root disposal remain authoritative;
+existing archive/transform hashes own the link bytes without a new DICE key or
+source-association domain. Windows retains the unsupported stub.
+
+Independent DESIGN/FINAL accepted the implementation and evidence:16 exact
+focused/protective tests, an explicitly selected full559-entry hash-verified
+archive probe, and the direct CLI build pass. This fixes an authentic callback
+replay's extraction prerequisite; callback activation and full bootstrap remain
+unadmitted until their separate gates pass.

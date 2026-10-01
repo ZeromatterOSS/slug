@@ -5,7 +5,7 @@ Status: implementing on local review branch; independent DESIGN accepted; FINAL 
 
 ## Outcome and evidence
 
-Baseline `64f52f1c4` (WP876). Implement WP875's finite four-capture Rust callback
+Accepted baseline `d9c1de64a` (WP878), including WP876 `64f52f1c4`. Implement WP875's finite four-capture Rust callback
 through publication AND complete source-owned helper invocation; activation is
 coupled. The authentic ToolchainInfo publication currently refuses nested
 make_ccinfo. Consumer arguments remain label/actions/allocator_library/std.
@@ -200,3 +200,13 @@ WP878 selected-BCR relative leaf-file symlink prerequisite is independently
 accepted on main at d9c1de64a (16 focused tests/full pinned archive/CLI pass).
 Preserve this follow-on candidate, integrate that prerequisite, reconcile
 scheduling and rebuild before the unchanged authentic producer replay.
+
+## Reconciled prerequisite
+
+Accepted WP878 d9c1de64a is merged into the preserved WP877 review branch.
+Both source-owned callback implementation and the Core symlink extractor are
+present; only the prerequisite is admitted on main. Earlier typed repository
+refusal was diagnosed as the exact rules_jvm_external6.7 relative .bazelversion
+link and resolved by WP878. Genuine coupled proof corrections and rebuilt
+unchanged authentic producer/consumer replays remain pending. This merge does
+not admit callback activation or waive any prior gate.

@@ -129,6 +129,7 @@ fn extract(
     let decoder = MultiGzDecoder::new(capture);
     let mut tar = BoundedTarReader::new(decoder, active);
     let mut namespace = HashMap::<String, EntryKind>::new();
+    let mut symlinks = Vec::new();
     let mut pending_longname: Option<String> = None;
     let mut headers = 0usize;
     let mut logical = 0usize;
@@ -205,6 +206,8 @@ fn extract(
             EntryKind::Regular
         } else if entry_type.is_dir() {
             EntryKind::Directory
+        } else if entry_type.is_symlink() {
+            EntryKind::Symlink
         } else {
             return Err(materialization(
                 "selected BCR tar contains an unsupported entry type",
@@ -216,8 +219,12 @@ fn extract(
         if (kind == EntryKind::Directory && !matches!(mode, 0o750 | 0o755 | 0o775))
             || (kind == EntryKind::Regular
                 && !matches!(mode, 0o444 | 0o555 | 0o640 | 0o644 | 0o664 | 0o755 | 0o775))
+            || (kind == EntryKind::Symlink && mode != 0o777)
         {
             return Err(materialization("selected BCR unsupported entry mode"));
+        }
+        if kind == EntryKind::Symlink && size != 0 {
+            return Err(materialization("selected BCR symbolic link has a payload"));
         }
         logical = logical
             .checked_add(1)
@@ -316,19 +323,122 @@ fn extract(
                         materialization(format!("setting selected BCR mtime for {path}: {error}"))
                     })?;
             }
+            EntryKind::Symlink => {
+                let target = validate_path_text(&header.link_name_bytes().unwrap_or_default())?;
+                let resolved = relative_link_destination(&path, &target)?;
+                if let Some(parent) = destination.parent() {
+                    std::fs::create_dir_all(parent).map_err(|error| {
+                        materialization(format!(
+                            "creating selected BCR link parent {path}: {error}"
+                        ))
+                    })?;
+                }
+                symlinks.push((path, target, resolved));
+            }
         }
         tar.padding(size)?;
     }
     if !prefix_found {
         return Err(materialization("selected BCR strip_prefix was not found"));
     }
-    Ok(())
+    install_symlinks(root, &namespace, &symlinks, active)
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum EntryKind {
     Regular,
     Directory,
+    Symlink,
+}
+
+// A preserved relative target may begin with dot/parent components, but its
+// ordinary tail must be normalized. Interior cancellation could traverse an
+// absent directory or a regular file despite a valid normalized endpoint.
+fn relative_link_destination(
+    path: &str,
+    target: &str,
+) -> Result<String, ArchiveMaterializationError> {
+    if target.starts_with('/') {
+        return Err(materialization(
+            "selected BCR symbolic link target is absolute",
+        ));
+    }
+    let mut components = path.rsplit_once('/').map_or_else(Vec::new, |(parent, _)| {
+        parent.split('/').collect::<Vec<_>>()
+    });
+    let mut ordinary_tail = false;
+    for component in target.split('/') {
+        match component {
+            "" => {
+                return Err(materialization(
+                    "selected BCR symbolic link target is not normalized",
+                ));
+            }
+            "." | ".." if ordinary_tail => {
+                return Err(materialization(
+                    "selected BCR symbolic link has interior dot components",
+                ));
+            }
+            "." => {}
+            ".." => {
+                if components.pop().is_none() {
+                    return Err(materialization(
+                        "selected BCR symbolic link escapes stripped root",
+                    ));
+                }
+            }
+            _ => {
+                ordinary_tail = true;
+                components.push(component);
+            }
+        }
+    }
+    if !ordinary_tail || components.len() > COMPONENT_LIMIT {
+        return Err(materialization(
+            "selected BCR symbolic link target has no bounded file tail",
+        ));
+    }
+    let resolved = components.join("/");
+    if resolved.len() > PATH_LIMIT {
+        return Err(materialization(
+            "selected BCR symbolic link target exceeds resolved path limit",
+        ));
+    }
+    Ok(resolved)
+}
+
+fn install_symlinks(
+    root: &Path,
+    namespace: &HashMap<String, EntryKind>,
+    symlinks: &[(String, String, String)],
+    active: &dyn Fn() -> bool,
+) -> Result<(), ArchiveMaterializationError> {
+    for (_, _, resolved) in symlinks {
+        if namespace.get(resolved) != Some(&EntryKind::Regular) {
+            return Err(materialization(
+                "selected BCR symbolic link target is not an extracted regular file",
+            ));
+        }
+    }
+    for (path, target, _) in symlinks {
+        if !active() {
+            return Err(materialization("repository session is no longer active"));
+        }
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(target, root.join(path)).map_err(|error| {
+            materialization(format!(
+                "creating selected BCR symbolic link {path}: {error}"
+            ))
+        })?;
+        #[cfg(not(unix))]
+        {
+            let _ = (root, path, target);
+            return Err(materialization(
+                "selected BCR symbolic links are unsupported on this platform",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_path_text(bytes: &[u8]) -> Result<String, ArchiveMaterializationError> {
@@ -389,23 +499,33 @@ fn admit_namespace(
     }
     let mut ancestor = path;
     while let Some((parent, _)) = ancestor.rsplit_once('/') {
-        if namespace.get(parent) == Some(&EntryKind::Regular) {
-            return Err(materialization(
-                "selected BCR tar has a regular-file ancestor collision",
-            ));
+        match namespace.get(parent) {
+            Some(EntryKind::Regular) => {
+                return Err(materialization(
+                    "selected BCR tar has a regular-file ancestor collision",
+                ));
+            }
+            Some(EntryKind::Symlink) => {
+                return Err(materialization(
+                    "selected BCR tar has a symbolic-link ancestor collision",
+                ));
+            }
+            _ => {}
         }
         ancestor = parent;
     }
-    if kind == EntryKind::Regular
+    if kind != EntryKind::Directory
         && namespace.keys().any(|entry| {
             entry
                 .strip_prefix(path)
                 .is_some_and(|suffix| suffix.starts_with('/'))
         })
     {
-        return Err(materialization(
-            "selected BCR tar has a regular-file descendant collision",
-        ));
+        return Err(materialization(if kind == EntryKind::Regular {
+            "selected BCR tar has a regular-file descendant collision"
+        } else {
+            "selected BCR tar has a symbolic-link descendant collision"
+        }));
     }
     Ok(())
 }
