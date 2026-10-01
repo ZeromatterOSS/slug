@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-187-m7a-selected-extension-process-design-r1
-Status: owner/budget design accepted after independent FINAL review; native prerequisites open; M7A remains partial
+Packet: WP-7-188-m7a-observed-input-image-capture-r1
+Status: accepted after independent FINAL ACCEPT; no process activation; M7A remains partial
 
-WP887 resolves selected-extension scratch/process producer, replay and distinct
-semantic/physical memory budgets. Complete closed input/runtime image plus a
-quota-backed scratch/capture lease remain exact native prerequisites before
-cohesive query + locked-generate activation. No runnable process profile, root
-replay or Rust behavior admitted. WP886 source audit at e763853ce is reused;
-WP880 memory repair and WP885 root peak1090.074MiB/zero swap remain accepted.
-Actual bootstrap/tool closure/cap-fit memory remain unproved. See
-`slug-v2-subplans/current-packet.md` and Stage5/9 owner decisions.
+WP888 accepts the declared observed source-image/native streaming capture
+prerequisite from WP887 at6c4558824. Workspace36/36 and Core22/22 new/native
+capture gates pass, plus39 protected controls; two extra unchanged socket tests
+are EPERM-blocked. Affected-owner all-target and default CLI checks pass; optional
+CLI integration-test compilation retains an unchanged baseline type mismatch.
+Normal DICE Needs, authorized source roots, bounded copy/frontier validation and
+last-Drop credits/leases are accepted. Complete runtime asset catalog/unknown-access,
+quota-backed scratch and cohesive module process activation remain required.
+No root replay/process/bootstrap or whole-daemon RSS claim. WP880 memory repair
+and WP885 peak1090.074MiB/zero swap remain latest proof. See manifest and Stage5/9.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

@@ -61,6 +61,7 @@ pub(super) enum PathObservationKernelError {
     ZeroDemandInstance(PathObservationDemand),
     UnknownDemandInstance(PathObservationDemand),
     UnsupportedLstat,
+    UnauthorizedInputImage(PathObservationDemand),
     Epoch(PathObservationEpochError),
 }
 
@@ -163,6 +164,11 @@ fn observe_with(
     }
 
     for demand in &demands {
+        if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
+            return Err(PathObservationKernelError::UnauthorizedInputImage(
+                demand.clone(),
+            ));
+        }
         if let PathObservationNamespace::Materialization(instance) = demand.namespace() {
             if instance.value() == 0 {
                 return Err(PathObservationKernelError::ZeroDemandInstance(
@@ -197,6 +203,9 @@ fn observe_one(
     operations: &mut impl ObservationOperations,
 ) -> PathObservationResult {
     match demand.operation() {
+        PathObservationOperation::InputImage(_) => unreachable!(
+            "scoped images require a validated live source capability before observation"
+        ),
         PathObservationOperation::Lstat => {
             PathObservationResult::Lstat(operations.lstat(demand.path()))
         }
@@ -3549,7 +3558,7 @@ mod tests {
             let demand = demand(
                 PathObservationNamespace::Host,
                 path(temp.path(), &format!("{operation:?}")),
-                operation,
+                operation.clone(),
             );
             let original = io(PathIoErrorKind::PermissionDenied, Some(13));
             let mut operations = ScriptedOperations::supported();
@@ -3566,7 +3575,8 @@ mod tests {
                 PathObservationOperation::DirectoryEntries => operations
                     .directory_entries
                     .push_back(Err(PrimaryFailure::Final(original))),
-                PathObservationOperation::Lstat
+                PathObservationOperation::InputImage(_)
+                | PathObservationOperation::Lstat
                 | PathObservationOperation::WindowsLongPath
                 | PathObservationOperation::WindowsOptionPathLongName => {
                     unreachable!()

@@ -5311,6 +5311,22 @@ fn root_repository_materialization_request(
     }
 }
 
+/// Compute the existing source-owned result and its request dependency. Native
+/// consumers use this boundary instead of reconstructing an epoch result.
+#[doc(hidden)]
+pub async fn compute_repository_materialization_result(
+    ctx: &mut DiceComputations<'_>,
+    request: Arc<RepositoryMaterializationRequest>,
+) -> anyhow::Result<
+    SourcePreparationOutcome<
+        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
+    >,
+> {
+    Ok(ctx
+        .compute(&RepositoryMaterializationResultKey { request })
+        .await?)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) struct RepositoryMaterializationResultKey {
     pub(crate) request: Arc<RepositoryMaterializationRequest>,
@@ -6190,7 +6206,8 @@ async fn drive_host_repository_source_from_resolved(
                 error: *error,
             })
         }
-        PathObservationResult::Lstat(_)
+        PathObservationResult::InputImage(_)
+        | PathObservationResult::Lstat(_)
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)
@@ -7430,7 +7447,8 @@ fn finish_module_source_patch_file(
                 observations,
             ))
         }
-        PathObservationResult::Lstat(_)
+        PathObservationResult::InputImage(_)
+        | PathObservationResult::Lstat(_)
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::DirectoryEntries(_)
         | PathObservationResult::WindowsLongPath(_)

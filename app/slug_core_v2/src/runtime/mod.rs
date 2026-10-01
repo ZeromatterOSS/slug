@@ -26,6 +26,7 @@ mod events;
 mod file_write_aquery_text;
 mod file_write_identity;
 mod generated_repository_definition;
+mod input_image;
 mod path_observation;
 #[cfg(feature = "native-probe-observer")]
 pub mod probe_observer;

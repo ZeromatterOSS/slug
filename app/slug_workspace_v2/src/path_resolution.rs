@@ -1121,7 +1121,8 @@ impl Key for PathFileBytesKey {
                         error: *error,
                     }))
                 }
-                PathObservationResult::Lstat(_)
+                PathObservationResult::InputImage(_)
+                | PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
                 | PathObservationResult::DirectoryEntries(_)
                 | PathObservationResult::WindowsLongPath(_)
@@ -1477,7 +1478,8 @@ async fn compute_directory_listing(
                 error: *error,
             })
         }
-        PathObservationResult::Lstat(_)
+        PathObservationResult::InputImage(_)
+        | PathObservationResult::Lstat(_)
         | PathObservationResult::ReadLink(_)
         | PathObservationResult::FileBytes(_)
         | PathObservationResult::WindowsLongPath(_)

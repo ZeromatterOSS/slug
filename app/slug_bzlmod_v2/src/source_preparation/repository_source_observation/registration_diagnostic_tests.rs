@@ -314,7 +314,7 @@ fn registration_diagnostic_nested_discriminators_are_exhaustive() {
         (O::WindowsLongPath, "WindowsLongPath"),
         (O::WindowsOptionPathLongName, "WindowsOptionPathLongName"),
     ] {
-        assert_eq!(operation_name(operation), expected);
+        assert_eq!(operation_name(&operation), expected);
     }
 
     use PathNodeKind as K;

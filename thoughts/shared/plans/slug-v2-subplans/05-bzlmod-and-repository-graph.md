@@ -164,6 +164,37 @@ sharing affects physical cost but never semantic occurrence caps. Normal portabl
 pinned-source oracle provenance and direct Bzlmod/Loading/Core/CLI checks are
 future implementation gates. WP887 design/source review activates none of them.
 
+## Observed source-image prerequisite
+
+WP888 implements the declared source-tree part of prerequisite1 below. An
+ordinary Workspace DICE key produces a namespace/anchor/subtree/policy-bound
+certificate from charged scoped Needs; Core authorizes the actual workspace or
+exact current immutable request/result/root/session before first observation.
+The private normal-compute bridge selects current reachable evidence, drops and
+drains transactions, streams64KiB buffers into a private image, revalidates the
+complete source frontier, then restores/discards its transient command. It
+publishes no process state and admits no get_child/file/execute methods.
+
+Workspace-owned64MiB descriptor credit survives paths, Needs, results and old
+DICE history until actual last Drop. Separate2GiB live-image credit covers staged
+regular-file logical bytes through last image Drop, not physical disk allocation
+or total RSS. Exact content/mode/path/namespace equality excludes credit and
+private staging identity; wrapper equality conservatively includes freshness.
+Linux descriptor-relative nofollow access bounds allocation before directory/
+link reads, and bounded same-root aliases refuse literal parent components.
+Sequential POSIX parent-after-link expansion remains unsupported.
+
+The60s deadline bounds DICE attempts and image callbacks; materialization progress,
+blocking syscalls, idle drain and restore cleanup retain their existing owners.
+Complete ELF/loader/assets catalog and unknown-access attribution, quota-backed
+scratch and cohesive query/locked-generate activation remain required. This
+declared source image is not complete ToolRuntimeClosure or bootstrap/RSS proof.
+Independent FINAL ACCEPT:36 Workspace and22 Core image gates pass, plus39
+protected controls. Two unchanged socket-fixture controls are EPERM-blocked;
+affected-owner all-target/default CLI compile passes. Optional CLI integration
+compilation retains an unchanged baseline type mismatch. Packet receipt owns
+exact selectors and measured preparation/runtime evidence.
+
 ## Goal
 
 Implement bzlmod as DICE-owned semantic state: module parsing, resolution,

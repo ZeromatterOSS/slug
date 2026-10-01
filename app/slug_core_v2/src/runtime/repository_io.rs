@@ -135,6 +135,7 @@ pub(super) enum RepositorySessionError {
     ValidationIncomplete,
     InvalidRetainedRoot(PathBuf),
     NativeObservation(super::path_observation::PathObservationKernelError),
+    InvalidImageAuthority,
 }
 
 #[allow(dead_code)]
@@ -265,7 +266,6 @@ impl RepositoryMaterializer {
         }
     }
 
-    #[cfg(test)]
     pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
         &self.workspace
     }
@@ -773,6 +773,91 @@ impl RepositoryMaterializer {
         complete_epoch(&self.workspace, &entries)
     }
 
+    // Authority is minted from the exact validated session/request/result and
+    // retained source owner, before the first scoped observation performs IO.
+    pub(super) fn image_source(
+        &self,
+        token: RepositorySessionToken,
+        namespace: PathObservationNamespace,
+        anchor: &NormalizedAbsolutePath,
+        selected: Option<(
+            &Arc<RepositoryMaterializationRequest>,
+            &slug_bzlmod_v2::RepositoryMaterialization,
+        )>,
+    ) -> Result<super::input_image::ScopedImageSource, RepositorySessionError> {
+        let pin = {
+            let state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            let active = matching_validated_active(&state, token)?;
+            match (namespace, selected) {
+                (PathObservationNamespace::Host, None) if anchor == &self.workspace => None,
+                (
+                    PathObservationNamespace::Materialization(instance),
+                    Some((request, expected)),
+                ) => {
+                    let entry = active
+                        .entries
+                        .iter()
+                        .find(|entry| entry.request == *request)
+                        .ok_or(RepositorySessionError::InvalidImageAuthority)?;
+                    let (
+                        RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Immutable {
+                                source_identity,
+                                generation_root,
+                                observation_instance,
+                            },
+                        ),
+                        slug_bzlmod_v2::RepositoryMaterialization::Immutable {
+                            source_identity: expected_identity,
+                            generation_root: expected_root,
+                            observation_instance: expected_instance,
+                            canonical_repo,
+                            repo_spec,
+                        },
+                    ) = (&entry.result, expected)
+                    else {
+                        return Err(RepositorySessionError::InvalidImageAuthority);
+                    };
+                    if source_identity != expected_identity
+                        || generation_root != expected_root
+                        || observation_instance != expected_instance
+                        || *observation_instance != instance
+                        || canonical_repo != &request.id.canonical_repo
+                        || repo_spec != &request.repo_spec
+                        || anchor.as_path() != generation_root
+                    {
+                        return Err(RepositorySessionError::InvalidImageAuthority);
+                    }
+                    let root = state
+                        .accepted_roots
+                        .iter()
+                        .chain(active.provisional_roots.iter())
+                        .find(|root| {
+                            root.observation_instance == instance
+                                && root.root.path() == generation_root
+                        })
+                        .ok_or(RepositorySessionError::InvalidImageAuthority)?;
+                    Some(root.root.clone())
+                }
+                _ => return Err(RepositorySessionError::InvalidImageAuthority),
+            }
+        };
+        let root = super::input_image::open_image_anchor(anchor)
+            .map_err(|_| RepositorySessionError::InvalidImageAuthority)?;
+        let source =
+            super::input_image::ScopedImageSource::new(namespace, anchor.clone(), root, pin)
+                .map_err(|_| RepositorySessionError::InvalidImageAuthority)?;
+        let state = self
+            .state
+            .lock()
+            .expect("repository materializer mutex poisoned");
+        matching_validated_active(&state, token)?;
+        Ok(source)
+    }
+
     pub(super) fn observe_native(
         &self,
         token: RepositorySessionToken,
@@ -1223,6 +1308,7 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
         PathObservationResult::DirectoryEntries(result) => {
             matches!(result, PathOperationResult::Error(_))
         }
+        PathObservationResult::InputImage(_) => true,
         PathObservationResult::WindowsLongPath(_) => false,
         PathObservationResult::WindowsOptionPathLongName(_) => false,
     }

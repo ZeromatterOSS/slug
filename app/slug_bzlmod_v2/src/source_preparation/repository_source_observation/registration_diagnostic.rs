@@ -135,7 +135,7 @@ fn request(out: &mut dyn fmt::Write, error: &RepositorySourceFileError) -> fmt::
         } => {
             out.write_str("Request.Observation path=")?;
             path(out, repo_relative_path)?;
-            write!(out, " operation={} error=", operation_name(*operation))?;
+            write!(out, " operation={} error=", operation_name(operation))?;
             observation_error(out, error)
         }
         E::InconsistentState {
@@ -146,7 +146,7 @@ fn request(out: &mut dyn fmt::Write, error: &RepositorySourceFileError) -> fmt::
         } => {
             out.write_str("Request.InconsistentState path=")?;
             path(out, repo_relative_path)?;
-            write!(out, " operation={} before=", operation_name(*operation))?;
+            write!(out, " operation={} before=", operation_name(operation))?;
             state(out, *before)?;
             out.write_str(" after=")?;
             state(out, *after)
@@ -202,8 +202,9 @@ fn materialization(error: &RepositoryMaterializationError) -> (&'static str, &st
     }
 }
 
-fn operation_name(operation: PathObservationOperation) -> &'static str {
+fn operation_name(operation: &PathObservationOperation) -> &'static str {
     match operation {
+        PathObservationOperation::InputImage(_) => "InputImage",
         PathObservationOperation::Lstat => "Lstat",
         PathObservationOperation::ReadLink => "ReadLink",
         PathObservationOperation::FileBytes => "FileBytes",

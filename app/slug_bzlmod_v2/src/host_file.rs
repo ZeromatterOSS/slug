@@ -200,7 +200,8 @@ impl Key for HostFileBytesKey {
                         error: *error,
                     }))
                 }
-                PathObservationResult::Lstat(_)
+                PathObservationResult::InputImage(_)
+                | PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
                 | PathObservationResult::DirectoryEntries(_)
                 | PathObservationResult::WindowsLongPath(_)

@@ -21,10 +21,12 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use starlark_map::sorted_map::SortedMap;
 
+pub mod input_image;
 mod path_file_digest;
 mod path_observation;
 mod path_resolution;
 
+pub use input_image::*;
 pub use path_file_digest::FileContentDigest;
 pub use path_file_digest::ObservedPathFileDigest;
 pub use path_file_digest::PathFileDigest;

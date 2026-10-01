@@ -1,163 +1,211 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-187-m7a-selected-extension-process-design-r1
-Status: owner/budget design accepted after independent FINAL review; native prerequisites open; M7A remains partial
+Packet: WP-7-188-m7a-observed-input-image-capture-r1
+Status: accepted after independent FINAL ACCEPT; no process activation; M7A remains partial
 
 ## Outcome and authority
 
-At clean main e763853ce, settle the unresolved input/environment/output-capture
-contract from WP886 into an independently reviewed implementable selected-
-extension scratch/process closure, or name a precise required prerequisite.
-The finite target remains //app/slug_cli_v2:slug. Audit authority and branch-aware
-consumer mapping are [Stage5's selected scratch/process decision](./05-bzlmod-and-repository-graph.md#selected-extension-scratchprocess-decision)
-and WP886 at e763853ce: authentic get_child frontier → config/splicing writes →
-query + locked generate → dynamic output reads/watches → repository declarations.
-Lexical methods alone, canned tool results or rendered-file substitutions do
-not satisfy this outcome. Explicit repin/splice/resolution/network/workspace
-writes and later repository materialization are separate deferred owners.
-Actual environment/query success and root downstream branch remain unproved.
+At baseline main6c4558824, implemented WP887's required observed input-image/native
+capture capability: a real DICE producer creates a complete bounded source tree
+certificate, then native fulfillment copies exactly that observed content/mode/
+namespace into a private image with fixed-size buffers and validates its source
+frontier. Exercise natural Need → observations → certificate → native capture,
+source invalidation/restoration and image lease cleanup. This is a required
+native building block for the complete query + locked-generate consumer, not an
+alternative get_child-only endpoint or a bootstrap success claim.
 
-Reuse authenticated rules_rust0.73.0 SHA256
-2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2 and
-Bazel9.2 revision8220c6198837d5c13d53fea211cf3282aa12408a source evidence;
-target/wp886 holds acquisition/source/consumer/worker/acceptance receipts.
-No new network acquisition, source extraction, Cargo/Bazel/native runtime or
-unchanged root replay. Source reads/hashes and static binary-format inspection
-of already-owned producer files may be used only when they discriminate the
-unresolved runtime-input contract; do not inspect environment values/home config.
-No Java/JVM semantics enter Slug.
+[Stage5 selected scratch/process decision](./05-bzlmod-and-repository-graph.md#selected-extension-scratchprocess-decision)
+at6c4558824 owns the full admitted/deferred profile. Closed ELF/loader/assets
+catalog and unknown-access attribution, quota-backed writable scratch retained
+through join/capture, selected module process epoch/replay/activation and real
+root execution remain separate required work. A captured declared source tree
+cannot claim complete actual ToolRuntimeClosure without those gates.
 
-## Decisions and semantic owners
+Reuse WP886 authenticated Bazel9.2/rules_rust source and WP887 design receipts.
+Bazel9.2 StarlarkBaseExternalContext.java path/file/read/execute contracts and
+ModuleExtensionContext.java cleanup remain authority; no process parity is
+introduced here. DICE docs/path observation/digest tests own Need/epoch,
+equality/invalidation/frontier behavior. Compatibility is Slug-native captured
+image namespace, streaming, resource/confinement and Rust Host facts; exact
+file bytes/SHA/mode facts preserve existing content contracts. No JVM/Java.
 
-Decide a complete Rust-native selected-extension process profile with:
+## Proposed ownership and design checkpoint
 
-- Full extension definition/usage owner, ordered call identity, overwrite-capable
-  scratch prefix state and verified-download binding; no repository ordinal
-  impersonation, physical-path identity or command semantic cache.
-- Source/tool/runtime content and mode certificates for outer generator and
-  cargo/rustc --version children, manifests/config/lock and bundled tool bytes;
-  admit only files whose producer or Host observations explain invalidation.
-  Choose containment and a complete discoverable input closure, not unobserved
-  shared libraries, string argv Host reads or a broad untracked filesystem bind.
-- Effective immutable inherited environment + explicit set/remove/absence;
-  child HOME/HOMEDRIVE/PATHEXT/NIX_LD/NIX_LD_LIBRARY_PATH handling and isolated
-  CARGO_HOME must be owned or explicitly refused. Select path spelling semantics
-  for serialized config/argv/output and cwd, not assumed inert string rewriting.
-- Bounded complete generated output tree/file bytes/modes/missing/error facts,
-  stdout/stderr, prefix mutation/deletion/overwrite and output containment.
-  All subsequent dynamic reads and source string watches use certificates,
-  never a later raw temporary Host read. Diagnostic progress is request-local.
-- Typed Need → drop heap/transaction → native fulfillment → immutable authorized
-  epoch → exact replay; cancellation/drain, restore, independent/concurrent
-  owners, accepted-closure pruning and atomic repository/event publication.
-  No mutex spans DICE compute or manual graph repair.
+Workspace observed input-image key binds namespace/root and keyed limits;
+compute derives file/directory/alias/absence facts only from normal observed
+resolution/Lstat/FileDigest/ReadLink/directory Needs. Retained certificate is
+structural tree/kind/mode/digest/namespace plus observation frontier, no tool
+contents or native handle/path side store. A closed bounded directory operation
+must stop collection before allocation limits; existing unbounded directory
+observation cannot be called and checked afterward. Source membership, content,
+mode, alias targets/ancestors and missing/error facts explain invalidation.
 
-Compatibility: source-derived admitted lexical/content behavior can be exact
-only with named planned portable discriminators; invocation namespace, physical
-spelling, Host observations/confinement/limits stay Slug-native. General paths,
-symlinks, non-ASCII byte parity and process variants remain unsupported until
-explicitly owned. Query nonzero must remain its real out-of-date failure;
-repin request is unsupported rather than silently forced into locked rendering.
+Core capture consumes only a producer-issued certificate plus authorized live
+source/materialization/session capability, snapshots through descriptor-relative
+no-follow access and64KiB streaming copy, verifies actual digest/size/mode and
+complete membership, validates source frontier before promotion, and creates
+an immutable image lease. Cancellation/stale/error discards incomplete images;
+last lease Drop releases image storage. Session revocation/foreign namespace/
+materialization cannot produce a usable image. Native stage spelling/handles
+are transfer capabilities, never semantic identity or evaluator state. No lock
+spans DICE compute, no direct Host filesystem reads inside the key, no fabricated
+manifest or command semantic cache. Resolve precise backend/API/normal native
+Need routing and alias completeness before implementation at independent design
+checkpoint; this contract does not authorize an unreviewed fallback.
 
-## Memory, scope and routing
+Descriptor storage uses the accepted workspace-owned64MiB last-Drop reservation
+contract, including old DICE history. Source/tool contents remain streamed disk
+native leases, not Arc payloads. Reserve owned record/string/header/capacity
+memory before allocation, not just after tree creation. Transient allocation
+exhaustion is invalid/incomplete, not reusable Complete error; deterministic
+keyed image limits can produce typed source-owned errors with observations.
+Define semantic equality independent of physical credit/cache warmth and exact
+retirement/cancellation/shutdown owner.
 
-This packet introduces no retained production memory. Design must classify
-future certificate bytes as DICE-retained semantic, lease/epochs/accepted
-transcripts command-retained and evaluator/staging/capture transfer buffers
-bounded scratch. Quantify limits, payload sharing/prefix descriptor growth,
-equality cutoff, invalidation, deselection, cancellation/drain and shutdown.
-Preserve WP880 metadata-only reporting and WP885 cycle/current materials.
-Read Stage9's selected-download/Arc/compact-utility disposition before proposing
-retained representations; donor lifecycle concepts do not authorize imports.
+## Scope and staffing
 
-Only root edits current/canonical scheduling and compact current-topic owner
-contracts in04/05/09 stage plans when architecture changes. Source-only receipts
-in target/wp887 are disjoint worker writes. No Rust/dependency/lockfile/source/
-fixture changes. Expected net documentation growth<200 lines, no new fixture.
-Record future production/test responsibilities after physical-size review:
-module_extension.rs and runtime/dice.rs are already large, so another unrelated
-builtin/transport implementation must not be appended without a cohesive split.
+Root edits scheduling, compact Stage5/9 decisions, Workspace shared path-demand/
+result bounded-directory integration and narrow exports/registrations as needed.
+Input worker owns new Workspace input_image.rs (plus focused tests/submodules)
+and descriptor-budget capability after reviewed API. Supervisor worker owns new
+Core runtime/input_image.rs (plus cohesive native capture/tests modules). Parent
+runtime/mod.rs, NativeDemand/SourcePreparation routing and existing path observer
+receive small registration/dispatch deltas owned by root. Root also owns a
+cohesive private input_image_bridge.rs child of dice.rs, the source-owned
+materialization compute helper and affected exhaustive diagnostic adapters/tests. No workers overlap
+files; root may amend allowlist before implementation when reviewed ownership
+requires it. New production modules3121 lines plus narrow parent deltas, tests2000;
+review physical size/module boundaries rather than appending to huge parents.
+No new dependency/lockfile/general cleanup or external messages. No new oracle
+fixture unless review finds an exact new surface needing a portable case;
+current upstream process/module runtime tests are skipped because phase remains
+unsupported. Root replay, child execution, network/acquisition/new extraction,
+home/env-value inspection are excluded.
 
-Root integrates the complete profile and unresolved choices. Input worker
-proposes semantic scratch/certificate/replay and lifetime design from Slug owners.
-Supervisor worker proposes confined process/tool/runtime/environment ownership
-from current transport and authenticated tool source. Independent reviewer checks
-implementability, full consumer fidelity, source and proposed validation; after
-design ACCEPT reviews the final compact contract delta. Research is read-only.
+Input and native workers first produce concrete read-only API/design receipts
+in target/wp888. Independent reviewer accepts the complete consequential owner/
+authority/memory/capture design before code, then reviews actual final diff and
+gates. Root integrates, formats and owns all Cargo/runtime validation; workers
+run no Cargo/native freshness tests. Source-only research may run concurrently;
+Native tests sharing observed ancestor paths remain serial.
 
-## Gates and recovery
+## Required gates and acceptance
 
-Acceptance requires concrete producer/key/value/observation/Need mapping for
-all demanded facts, complete process/input/output/environment/path policy and
-limits, source-derived exact/Slug-native/deferred classes, and an implementation
-allowlist/gate map or precise prerequisite. A gate count/source hash alone cannot
-prove the design complete. Use existing lifecycle evidence without promoting
-GCC policy into generator policy. No implementation until independent design
-accepts the consequential owner/transport decisions.
+Require observed producer and actual native wrapper evidence: full membership/
+mode/content/digest/order; namespace/owner and materialization authority refusal;
+file/directory/alias create/edit/delete/recreate and warm A/B/A; missing/wrongkind/
+symlink escape/special/size/count/depth/namebyte violations; no partial image
+promotion or unobserved reads; stale content/mode/membership race; cancellation,
+revocation, duplicate/foreign certificate, sharing/last-Drop cleanup and parallel
+isolated image owners. Alias support must own its bounded target/ancestor graph;
+an unresolved arbitrary alias remains typed unsupported, never silently followed.
 
-Future gates must discriminate genuine tool consumes config/manifest inputs
-and writes demanded dynamic outputs; query mismatch/unsupported repin; warm
-A/B/A source/tool/mode/environment/order/cwd; foreign owner/epoch/prefix;
-missing/oversize/nonzero/error results; create/edit/delete/recreate/watch; Need,
-timeout/cancel/restore/concurrent isolation and no partial publication. Name a
-portable source-based fixture with normal provenance for the absent scratch/
-process slice; fresh Bazel/runtime proof belongs to later implementation.
-Source-audit tests remain skipped because this phase activates no behavior.
+Resource gates: large streamed input uses fixed buffers rather than file-size
+retained payloads; oversized directory stops before unbounded collection; held
+historical empty-file descriptors consume workspace reservation through actual
+last Drop and overflow yields invalid transient error. Semantic size/equality
+results are unaffected by shared allocation/cache warmth. Reuse source/digest
+and immutable materialization gates where unchanged; add only demonstrated gaps.
 
-Validate source/provenance/structure, independent design/FINAL verdict,
-python3 scripts/v2_plan_status.py, bash scripts/v2_archive_status.sh and
-git diff --check. Record observable decision, elapsed/review where available,
-and remaining exact missing evidence. REPLAN only for a contradiction or new
-required prerequisite; resolve authorized architecture choices without asking
-permission. Invocation errors do not invalidate unchanged accepted source facts.
+Resolve pinned nightly2025-09-14 Cargo/rustc/rustdoc/rustfmt before Rust validation.
+Compile separately under60s preparation caps, select focused tests via Cargo JSON
+and one preflight per unchanged executable, then serial bounded test groups.
+Direct Workspace/Core and affected Bzlmod/Loading/default CLI compile coverage
+must match actual public changes. New native filesystem gates execute ordinarily
+without process/JVM/Bazel/bootstrap replay; source/namespace capability is checked
+in actual environment. No identical failed runtime retry without new hypothesis.
+
+Final independent ACCEPT, source/structure checks, python3 scripts/v2_plan_status.py,
+bash scripts/v2_archive_status.sh and git diff --check required before accepted
+commit. Record selected/pass/elapsed/base/toolchain evidence and remaining exact
+prerequisites. REPLAN only if source contradicts accepted ownership or complete
+capture needs a genuinely new required decision; compiler/selector/capability
+corrections stay here. Preserve unfinished substantive candidates on review branch
+with receipt rather than restoring/reconstructing them. No process/bootstrap or
+whole-daemon RSS claim from input-image tests.
 
 ## Immediate predecessor
 
-WP886 at e763853ce independently accepted the authenticated branch-aware
-consumer/owner audit, verifying100 release members,18 Bazel files and9 Slug
-sources. No Rust/runtime/test activation. It selected this separate design
-because inherited env, tool runtime/child inputs and complete bounded output
-capture prevent an implementable contract. WP885's root peak1090.074MiB/zero
-swap and WP880's original~49GiB→302MiB reproduction remain the latest memory
-proofs; full bootstrap/deeper graph memory remain unverified.
+WP887 at6c4558824 independently accepted selected producer/process identity,
+exact replay/path/env, deterministic occurrence and workspace live payload/
+descriptor budgets plus two native prerequisites. No runtime/code activation.
+Original memory repair d95f2bda6 and WP885's deeper peak1090.074MiB/zero swap
+remain protected; full bootstrap/deeper-memory and actual tool asset closure
+are unproved.
 
-## Resolved design and prerequisite disposition
+## Design corrections to freeze before code
 
-Root choice target/wp887/root-decision.md plus frozen scratch-certificate and
-process-profile worker receipts map the existing selected Pure producer to
-new distinct process epoch/verifier/footprint and typed Need/replay. Root-final
-policy supersedes the scratch worker's initial64MiB occurrence proposal:128MiB
-perowner deterministic ordered byte-occurrence admission, separately256MiB
-workspace process-owned live payload and64MiB owned descriptor reservations
-through actual last allocation Drop, including historical DICE state. No separate
-128MiB commandaggregate cap. See Stage5/9 for exact scope and lifetimes; existing
-engine/download/tool baseline is outside this process-memory claim.
+Use one dedicated composite PathObservationOperation::InputImage with semantic
+namespace/anchor scope and bounded Lstat/digest/directory/readlink request. Its
+result owns exact request/data in a credited shared block. Existing generic
+operations retain their accepted behavior. Image compute uses only these scoped
+operations within namespace+anchor_root+subtree_root+policy; it never falls back
+to naked pathname observers. Selected real source/session/root FD authority is
+minted before first Need fulfillment, and descriptor-relative no-follow ancestry
+checks precede any name/content/link I/O. Capture completion adds normal current
+key/used-footprint/frontier proof; constructing a key/scope cannot grant authority.
 
-This design freezes owner/budget/profile-boundary decisions, not a runnable
-executable profile. Two precise native prerequisites are required: closed
-streamed input/runtime image with explicit loader/assets catalog and fail-closed
-unknown-access attribution; quota-backed scratch lease retaining its mount/root
-capability through process join/capture/release. At most2 active128MiB writable
-volumes per workspace. Sparse mounts alone do not establish missing-input
-correctness, ELF dependencies alone do not explain dynamic assets, and current
-GCC /usr mounts/tempdir/streams cannot supply these owners.
+Image-created paths are ImageChargedPath shared owners. Reserve before join/
+copy; dedicated demand construction retains the charged path guard in Demand/
+Key/Need, result and final entry/frontier blocks. Credit is nonsemantic in
+Eq/Hash/Ord, while source/path/scope/request limits and result data are semantic.
+Failed builders/final certificate drop must not release independently retained
+key/result/path charges. No raw image-created path/owned row escape in production.
+Bounded intermediate observations remain charged through historical DICE values;
+foreign workspace budget is rejected on cold/warm consumption and capture.
 
-The next bounded implementation outcome is an actual certified input-image/
-native lease capability under normal observed producers/typed Need with narrow
-parent registration, cohesive modules and direct lifecycle/source gates. Resolve
-its platform/backend details at an independent design checkpoint inside that
-implementation. Actual root tool paths/ELF assets/environment/outcome and cap fit
-remain unproved. Preserve the complete query + locked-generate activation gate;
-never count the prerequisite or one lexical method as process/bootstrap success.
+Observed wrapper equality includes the complete frontier conservatively; its
+content/mode projection excludes operational freshness/credit/staging identity.
+Initial alias policy is deny or same-root RuntimeContained with complete acyclic
+catalog/ancestor targets; cross-root composition remains deferred. Native FD
+frontier is DFS depth plus fixed handles, not one retained FD per tree directory.
+Preserve exact source modes; final directory chmod is delayed until descendants
+are complete. New2GiB workspace live-image credit covers staged regular-file
+logical bytes through actual last image Drop, not filesystem metadata/physical
+allocation. Empty image metadata remains descriptor-budgeted. This is reviewed
+new service policy before measurements, not an increase to any user ceiling.
 
-Initial requested timeout must be default600s; nondefault overrides are refused
-before launch. Separate30s native safety stop is invalid operational failure,
-never synthetic code256/after-tree. Requested-timeout ABI is deferred. Worker
-alternatives are superseded by this root choice and Stage5's exact limits.
+These corrections supersede worker draft naked PathObservationKey/generic-bound
+operation alternatives. Add raced ancestor redirect before first bounded digest
+(no outside reads) and failed-builder/demand/history-only path retention gates.
+No ordinary native observations may bypass selected authority to manufacture
+an image. Complete runtime asset catalog/access attribution and quota-backed
+writable scratch/process activation remain unproved after this prerequisite.
 
-Acceptance: independent design/FINAL ACCEPT scoped to owner/budget and precise
-native prerequisites. Plan/archive/source-structure/diff checks PASS; no Rust,
-compile, runtime or tests. Three frozen receipt hashes checked by reviewer;
-root-final choices override candidate alternatives. Exact design/review elapsed
-was not retained. This advances the implementation contract without process,
-bootstrap or additional measured-memory activation.
+Independent DESIGN ACCEPT freezes these corrections over the older drafts. The
+Core-private declared-source bridge computes the ordinary image/materialization
+keys, checks selected reachable demands/current results, drops transactions and
+drains DICE before capture. It restores/discards its transient native attempt
+after capture; this primitive publishes no process state and does not persist
+image demands into generic accepted preflight. See target/wp888/bridge-review.md.
+
+RuntimeContained in this initial Slug-native substrate rejects any parent (`..`)
+component in a link literal before lexical normalization, then resolves only
+closed same-root catalog nodes with exact keyed hop/path limits and acyclic
+directory/alias edges. Sequential POSIX parent-after-symlink expansion is
+unsupported; preserving a literal cannot certify lexical containment alone.
+The workspace64MiB claim covers new image-owned descriptor blocks/paths and
+producer Need arrays; existing generic DICE/Need bookkeeping remains baseline.
+The60s image deadline covers DICE attempts and scoped observer/copy callbacks;
+existing materialization progress, blocking syscall time, idle drain and restore
+cleanup keep their own owners and are not a hard total wrapper-time guarantee.
+
+Growth review accepts cohesive certificate/budget/scoped observation/native copy
+modules rather than appending logic to giant parents. Additional owned path
+credits, batching/discovery checks, alias graph proofs and FD/cancel/resource
+cleanup account for expansion beyond the initial estimate; no donor/runtime
+cache, dependency or unrelated cleanup added. Acceptance: independent FINAL ACCEPT in target/wp888/bridge-review.md.
+Workspace36/36 (16 image +20 legacy), Core22/22 (15 native +7 actual wrapper),
+and39 protected lifecycle/observer/materializer gates pass; two unchanged extra
+UnixListener fixture controls are EPERM-blocked before observation. No ignored
+test is counted. Affected Bzlmod/Loading/Core all-target check passes14.35s and
+default CLI binary check passes0.62s. Optional CLI integration-test compile fails
+at unchanged cli.rs5466/configured_output.rs241 type mismatch; both match baseline.
+Pinned compile-only preparation remains capped60s per operation; Core tests use
+command-only opt0 for Loading/Analysis/Core after capped dependency preparation.
+Final Core preparation12.24s, Workspace8.58s; selected image tests0.107s and
+Workspace0.016s. New source modules3121 production/2000 test lines preserve
+cohesive ownership. target/wp888/acceptance.json records exact selectors/hashes,
+base/toolchain/profile, attributable limits and elapsed receipt lower bound.
+No complete runtime asset closure, scratch quota, process activation, root replay
+or full-bootstrap memory gate is inferred. Next prerequisite is not yet selected.

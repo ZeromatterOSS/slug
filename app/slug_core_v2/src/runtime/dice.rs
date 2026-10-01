@@ -484,9 +484,13 @@ fn read_file_observations(
     )
 }
 
+#[path = "input_image_bridge.rs"]
+mod input_image_bridge;
+
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
+    image_resources: super::input_image::WorkspaceImageResources,
     // Retained now so the request-projection packet cannot accidentally create
     // a second process owner at observation time.
     #[allow(dead_code)]
@@ -845,6 +849,7 @@ enum NativeDemandSessionError {
         actual: NormalizedAbsolutePath,
     },
     DownloadCapture(String),
+    InputImage(super::input_image::InputImageCaptureError),
     MissingSelectedDownload(slug_identity_v2::CanonicalRepoName),
     ForeignEnvironmentWorkspace {
         expected: NormalizedAbsolutePath,
@@ -901,6 +906,7 @@ impl fmt::Display for NativeDemandSessionError {
                 f,
                 "selected extension download need belongs to {actual}, expected {expected}"
             ),
+            Self::InputImage(error) => write!(f, "input image failed: {error:?}"),
             Self::DownloadCapture(category) => {
                 write!(f, "selected extension download capture failed: {category}")
             }
@@ -986,6 +992,7 @@ struct NativeDemandCommand<'a> {
         SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>,
     issued_requests:
         SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>,
+    image_request: Option<input_image_bridge::DeclaredImageRequest>,
     repository_results: RepositoryMaterializationResultEpoch,
     execute_transcript: RepositoryExecuteTranscript,
     path_observations: PathObservationEpoch,
@@ -6079,6 +6086,10 @@ impl WorkspaceRuntime {
             runtime.handle().clone(),
         );
         Ok(Self {
+            image_resources: super::input_image::WorkspaceImageResources::new(
+                slug_workspace_v2::ImageDescriptorBudget::new(64 * 1024 * 1024),
+                2 * 1024 * 1024 * 1024,
+            ),
             workspace,
             process_host,
             configured_output,
@@ -6133,6 +6144,8 @@ impl WorkspaceRuntime {
     ) -> Result<UserComputationData, CommandEffectError> {
         let mut data = UserComputationData::default();
         self.request_revision.install_cycle_detector(&mut data);
+        data.data
+            .set(self.image_resources.descriptor_budget().clone());
         #[cfg(feature = "native-probe-observer")]
         if let Some(observer) = self.probe_observer.as_ref() {
             data.tracker = observer.clone();
@@ -6259,6 +6272,7 @@ impl WorkspaceRuntime {
                     .map(|request| (request.id.clone(), request.clone()))
                     .collect(),
                 issued_requests: SmallMap::new(),
+                image_request: None,
                 repository_results: preflight.repository_results().clone(),
                 execute_transcript: RepositoryExecuteTranscript::empty(),
                 path_observations,
@@ -7723,11 +7737,7 @@ impl NativeDemandCommand<'_> {
                 .cloned()
                 .collect::<Vec<_>>();
             if !new_demands.is_empty() {
-                let observed = self
-                    .runtime
-                    .repository_materializer
-                    .observe_native(self.repository_session, new_demands)
-                    .map_err(NativeDemandSessionError::Repository)?;
+                let observed = input_image_bridge::observe_command_paths(self, new_demands)?;
                 let merged = self
                     .path_observations
                     .observations()

@@ -214,6 +214,24 @@ impl NormalizedAbsolutePath {
         })
     }
 
+    // Image joins already own a validated normalized parent and one valid
+    // directory component. Move that credited buffer without normalizing into
+    // an additional, uncharged allocation.
+    pub(crate) fn from_normalized_owned(path: PathBuf) -> Self {
+        assert!(path.is_absolute());
+        assert!(path.components().all(|part| matches!(
+            part,
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+        )));
+        Self {
+            path: Arc::new(path),
+        }
+    }
+
+    pub(crate) fn retained_capacity_bytes(&self) -> usize {
+        self.path.capacity()
+    }
+
     pub fn as_path(&self) -> &Path {
         self.path.as_path()
     }
@@ -252,10 +270,9 @@ pub enum PathObservationNamespace {
     Materialization(PathObservationInstanceId),
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe
-)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
 pub enum PathObservationOperation {
+    InputImage(crate::ImageObservationRequest),
     Lstat,
     ReadLink,
     FileBytes,
@@ -273,6 +290,8 @@ pub struct PathObservationDemand {
     operation: PathObservationOperation,
     // Both Windows long-name operations share one lossless input allocation.
     windows_long_path_input: Option<Arc<[u16]>>,
+    // Independent Demand/Key/Need retention must retain the path reservation.
+    image_path: Option<crate::ImageChargedPath>,
 }
 
 impl PathObservationDemand {
@@ -283,7 +302,8 @@ impl PathObservationDemand {
     ) -> Self {
         assert!(
             operation != PathObservationOperation::WindowsLongPath
-                && operation != PathObservationOperation::WindowsOptionPathLongName,
+                && operation != PathObservationOperation::WindowsOptionPathLongName
+                && !matches!(operation, PathObservationOperation::InputImage(_)),
             "Windows UTF-16 operations require their dedicated Host demand constructors"
         );
         Self {
@@ -291,6 +311,7 @@ impl PathObservationDemand {
             path,
             operation,
             windows_long_path_input: None,
+            image_path: None,
         }
     }
 
@@ -305,6 +326,7 @@ impl PathObservationDemand {
             path,
             operation: PathObservationOperation::WindowsLongPath,
             windows_long_path_input: Some(windows_long_path_input),
+            image_path: None,
         }
     }
 
@@ -320,7 +342,32 @@ impl PathObservationDemand {
             path,
             operation: PathObservationOperation::WindowsOptionPathLongName,
             windows_long_path_input: Some(windows_long_path_input),
+            image_path: None,
         }
+    }
+
+    pub fn input_image(
+        namespace: PathObservationNamespace,
+        path: crate::ImageChargedPath,
+        request: crate::ImageObservationRequest,
+    ) -> Result<Self, crate::ImageDescriptorBudgetError> {
+        if !path
+            .as_path()
+            .starts_with(request.scope_anchor_root().as_path())
+        {
+            return Err(crate::ImageDescriptorBudgetError::ForeignBudget);
+        }
+        Ok(Self {
+            namespace,
+            path: path.normalized(),
+            operation: PathObservationOperation::InputImage(request),
+            windows_long_path_input: None,
+            image_path: Some(path),
+        })
+    }
+
+    pub fn image_path(&self) -> Option<&crate::ImageChargedPath> {
+        self.image_path.as_ref()
     }
 
     pub const fn namespace(&self) -> PathObservationNamespace {
@@ -331,8 +378,8 @@ impl PathObservationDemand {
         &self.path
     }
 
-    pub const fn operation(&self) -> PathObservationOperation {
-        self.operation
+    pub fn operation(&self) -> PathObservationOperation {
+        self.operation.dupe()
     }
 
     pub fn windows_long_path_input(&self) -> Option<&[u16]> {
@@ -649,6 +696,7 @@ impl PathDirectoryEntries {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum PathObservationResult {
+    InputImage(crate::ImageObservationResult),
     Lstat(PathOperationResult<PathLstat>),
     ReadLink(PathOperationResult<Arc<PathBuf>>),
     FileBytes(PathOperationResult<Arc<[u8]>>),
@@ -659,8 +707,11 @@ pub enum PathObservationResult {
 }
 
 impl PathObservationResult {
-    pub const fn operation(&self) -> PathObservationOperation {
+    pub fn operation(&self) -> PathObservationOperation {
         match self {
+            Self::InputImage(result) => {
+                PathObservationOperation::InputImage(result.request().dupe())
+            }
             Self::Lstat(_) => PathObservationOperation::Lstat,
             Self::ReadLink(_) => PathObservationOperation::ReadLink,
             Self::FileBytes(_) => PathObservationOperation::FileBytes,
@@ -678,6 +729,7 @@ impl PathObservationResult {
 pub enum PathObservationEpochError {
     DuplicateDemand(PathObservationDemand),
     ConflictingDemand(PathObservationDemand),
+    InputImagePathMismatch(PathObservationDemand),
     OperationMismatch {
         demand: PathObservationDemand,
         result_operation: PathObservationOperation,
@@ -698,6 +750,11 @@ impl fmt::Display for PathObservationEpochError {
                 "conflicting path observations for {:?} ({:?})",
                 demand.path(),
                 demand.operation()
+            ),
+            Self::InputImagePathMismatch(demand) => write!(
+                f,
+                "image result path does not match demanded {:?}",
+                demand.path()
             ),
             Self::OperationMismatch {
                 demand,
@@ -739,6 +796,13 @@ impl PathObservationEpoch {
             }
         }
         for (demand, result) in &observations {
+            if let PathObservationResult::InputImage(image) = result {
+                if image.issued_path().as_path() != demand.path().as_path() {
+                    return Err(PathObservationEpochError::InputImagePathMismatch(
+                        demand.dupe(),
+                    ));
+                }
+            }
             if demand.operation() != result.operation() {
                 return Err(PathObservationEpochError::OperationMismatch {
                     demand: demand.dupe(),
@@ -765,6 +829,13 @@ impl PathObservationEpoch {
         let mut unique: Vec<(PathObservationDemand, Arc<PathObservationResult>)> =
             Vec::with_capacity(observations.len());
         for (demand, result) in observations {
+            if let PathObservationResult::InputImage(image) = result.as_ref() {
+                if image.issued_path().as_path() != demand.path().as_path() {
+                    return Err(PathObservationEpochError::InputImagePathMismatch(
+                        demand.dupe(),
+                    ));
+                }
+            }
             if demand.operation() != result.operation() {
                 return Err(PathObservationEpochError::OperationMismatch {
                     demand,
@@ -904,6 +975,18 @@ impl Key for PathObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if let Some(path) = self.demand.image_path() {
+            let Ok(budget) = ctx
+                .per_transaction_data()
+                .data
+                .get::<crate::ImageDescriptorBudget>()
+            else {
+                return PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe()));
+            };
+            if !path.same_budget(budget) {
+                return PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe()));
+            }
+        }
         if let Ok(shard) = ctx
             .compute(&PathObservationShardKey::for_demand(&self.demand))
             .await
