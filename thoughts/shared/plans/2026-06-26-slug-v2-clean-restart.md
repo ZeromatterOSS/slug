@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-176-m7a-rust-stdlib-solib-construction-r1
-Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
+Packet: WP-5-178-m7a-selected-bcr-relative-file-symlink-r1
+Status: accepted; independent DESIGN/FINAL accepted; return to WP877; M7A remains partial
 
-WP876 admits the existing native Solib constructor's four naming flag pairs and
-source-library inputs, required by the complete Rust callback's dynamic-stdlib
-branch. Current consumer owner/root, full artifact identity and action tokens
-remain authoritative; names remain Slug-native and execution stays deferred.
-Independent DESIGN/FINAL,17 focused tests/Core/CLI and hygiene checks pass.
-WP875 `8c427a879` accepted finite callback ownership with full helper behavior;
-source-owned DICE preparation/private authority remains its implementation gate.
-Full bootstrap and Windows remain deferred.
+WP878 supplies the demanded selected-BCR relative leaf-file symlink extraction
+prerequisite for rules_jvm_external6.7. Its exact archive/link bytes remain owned
+by existing capture integrity and source association, with bounded namespace and
+containment guards. WP877's substantial callback candidate is preserved on local
+review branch at `d318df353`; its genuine invocation/restoration proofs remain
+unadmitted. The16 focused tests, full559-entry pinned archive probe and direct CLI build pass.
+Reconcile and resume WP877 after this prerequisite lands.
+Windows and full bootstrap remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

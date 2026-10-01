@@ -117,6 +117,252 @@ fn finish(raw: &mut Vec<u8>) {
     raw.extend_from_slice(&[0; BLOCK * 2]);
 }
 
+fn append_symlink(raw: &mut Vec<u8>, name: &str, target: &[u8], mode: u32, payload: &[u8]) {
+    assert!(target.len() <= 100);
+    let mut block = header(name.as_bytes(), b'2', mode, payload.len() as u64, 999);
+    block[157..157 + target.len()].copy_from_slice(target);
+    block[148..156].fill(b' ');
+    let checksum = block.iter().map(|byte| u64::from(*byte)).sum();
+    octal(&mut block[148..156], checksum);
+    raw.extend_from_slice(&block);
+    raw.extend_from_slice(payload);
+    raw.resize(raw.len().next_multiple_of(BLOCK), 0);
+}
+
+#[cfg(unix)]
+#[test]
+fn selected_bcr_preserves_relative_file_symlink_text_after_prefix_and_file_order() {
+    for link_first in [false, true] {
+        let mut raw = Vec::new();
+        let link = "pkg/tests/integration/bzlmod_lock_files/.bazelversion";
+        let target = b"../../../.bazelversion";
+        if link_first {
+            append_symlink(&mut raw, link, target, 0o777, b"");
+        }
+        append(
+            &mut raw,
+            b"pkg/.bazelversion",
+            b'0',
+            0o644,
+            123,
+            b"version\n",
+        );
+        if !link_first {
+            append_symlink(&mut raw, link, target, 0o777, b"");
+        }
+        finish(&mut raw);
+        for prefix in [None, Some("pkg")] {
+            let root = tempfile::tempdir().unwrap();
+            extract(capture(&gzip(&raw)).as_file(), root.path(), prefix, &|| {
+                true
+            })
+            .unwrap();
+            let link = root
+                .path()
+                .join(if prefix.is_some() { &link[4..] } else { link });
+            assert!(
+                std::fs::symlink_metadata(&link)
+                    .unwrap()
+                    .file_type()
+                    .is_symlink()
+            );
+            assert_eq!(
+                std::fs::read_link(&link).unwrap(),
+                Path::new("../../../.bazelversion")
+            );
+            assert_eq!(std::fs::read(&link).unwrap(), b"version\n");
+            let metadata = std::fs::metadata(&link).unwrap();
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(metadata.permissions().mode() & 0o7777, 0o644);
+            assert_eq!(
+                metadata
+                    .modified()
+                    .unwrap()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                123
+            );
+        }
+    }
+}
+
+#[test]
+fn selected_bcr_symlinks_refuse_unsupported_targets_modes_and_payloads() {
+    for (target, expected) in [
+        (b"/absolute".as_slice(), "absolute"),
+        (b"../../escape", "escapes stripped root"),
+        (b"../missing", "not an extracted regular file"),
+        (b"../dir", "not an extracted regular file"),
+        (b"../nested/link", "not an extracted regular file"),
+        (b"../missing/../target", "interior dot components"),
+        (b"../target/../target", "interior dot components"),
+        (b"../dir/./target", "interior dot components"),
+        (b"../dir//target", "not normalized"),
+        (b"..", "no bounded file tail"),
+        (b"../target\\name", "invalid path"),
+        (b"\xff", "not valid Unicode"),
+    ] {
+        let mut raw = Vec::new();
+        append(&mut raw, b"target", b'0', 0o644, 0, b"ordinary");
+        append(&mut raw, b"dir/", b'5', 0o755, 0, b"");
+        append_symlink(&mut raw, "nested/link", target, 0o777, b"");
+        finish(&mut raw);
+        assert!(
+            extraction_error(&raw).contains(expected),
+            "target={target:?}"
+        );
+    }
+    for (mode, payload, expected) in [
+        (0o644, b"".as_slice(), "unsupported entry mode"),
+        (0o4777, b"", "unsupported entry mode"),
+        (0o777, b"payload", "symbolic link has a payload"),
+    ] {
+        let mut raw = Vec::new();
+        append_symlink(&mut raw, "link", b"target", mode, payload);
+        finish(&mut raw);
+        assert!(extraction_error(&raw).contains(expected));
+    }
+    let mut chain = Vec::new();
+    append(&mut chain, b"target", b'0', 0o644, 0, b"ordinary");
+    append_symlink(&mut chain, "one", b"target", 0o777, b"");
+    append_symlink(&mut chain, "two", b"one", 0o777, b"");
+    finish(&mut chain);
+    assert!(extraction_error(&chain).contains("not an extracted regular file"));
+}
+
+#[test]
+fn selected_bcr_symlink_namespace_collisions_refuse_both_archive_orders() {
+    for link_first in [false, true] {
+        for (child, kind) in [("link/child", b'0'), ("link/child/", b'5'), ("link", b'0')] {
+            let mut raw = Vec::new();
+            append(&mut raw, b"target", b'0', 0o644, 0, b"ordinary");
+            if link_first {
+                append_symlink(&mut raw, "link", b"target", 0o777, b"");
+            }
+            append(
+                &mut raw,
+                child.as_bytes(),
+                kind,
+                if kind == b'5' { 0o755 } else { 0o644 },
+                0,
+                b"",
+            );
+            if !link_first {
+                append_symlink(&mut raw, "link", b"target", 0o777, b"");
+            }
+            finish(&mut raw);
+            let error = extraction_error(&raw);
+            assert!(
+                error.contains("collision") || error.contains("duplicate"),
+                "{error}"
+            );
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_transforms() {
+    let mut raw = Vec::new();
+    append(&mut raw, b"target", b'0', 0o644, 0, b"ordinary\n");
+    append_symlink(&mut raw, "link", b"./target", 0o777, b"");
+    finish(&mut raw);
+    let calls = Cell::new(0);
+    let root = tempfile::tempdir().unwrap();
+    extract(capture(&gzip(&raw)).as_file(), root.path(), None, &|| {
+        calls.set(calls.get() + 1);
+        true
+    })
+    .unwrap();
+    let final_call = calls.get();
+    let cutoff = Cell::new(0);
+    let cancelled = tempfile::tempdir().unwrap();
+    assert!(
+        extract(
+            capture(&gzip(&raw)).as_file(),
+            cancelled.path(),
+            None,
+            &|| {
+                cutoff.set(cutoff.get() + 1);
+                cutoff.get() < final_call
+            }
+        )
+        .unwrap_err()
+        .message
+        .contains("no longer active")
+    );
+    assert_eq!(
+        std::fs::read(cancelled.path().join("target")).unwrap(),
+        b"ordinary\n"
+    );
+    assert!(std::fs::symlink_metadata(cancelled.path().join("link")).is_err());
+    let overlay = place_overlay(capture(b"overlay"), root.path(), "link", &|| true).unwrap_err();
+    assert!(overlay.message.contains("not a regular file"));
+    let patch = b"--- a/link\n+++ b/link\n@@ -1,1 +1,1 @@\n-ordinary\n+changed\n";
+    assert!(
+        super::super::repository_archive_patch::apply_selected_bcr_patch(
+            root.path(),
+            patch,
+            1,
+            &|| true
+        )
+        .is_err()
+    );
+    let mut module_raw = Vec::new();
+    append(&mut module_raw, b"target", b'0', 0o644, 0, b"ordinary");
+    append_symlink(&mut module_raw, "MODULE.bazel", b"target", 0o777, b"");
+    finish(&mut module_raw);
+    let archive = capture(&gzip(&module_raw));
+    let archive_path = archive.path().to_path_buf();
+    let module = capture(b"registry module");
+    let module_path = module.path().to_path_buf();
+    let error = realize_selected_bcr(
+        &plan([1; 32], [2; 32]),
+        archive,
+        vec![],
+        vec![],
+        module,
+        &|| true,
+    )
+    .err()
+    .unwrap();
+    assert!(
+        error
+            .message
+            .contains("MODULE target is not a regular file")
+    );
+    assert!(!archive_path.exists() && !module_path.exists());
+}
+
+#[cfg(unix)]
+#[test]
+#[ignore = "root-supervised hash-verified local rules_jvm_external6.7 archive probe"]
+fn selected_bcr_realizes_complete_rules_jvm_external_archive() {
+    let path = std::env::var_os("SLUG_BCR_ARCHIVE_PROBE").expect("explicit pinned archive path");
+    let archive = File::open(path).unwrap();
+    let root = tempfile::tempdir().unwrap();
+    extract(
+        &archive,
+        root.path(),
+        Some("rules_jvm_external-6.7"),
+        &|| true,
+    )
+    .unwrap();
+    let link = root
+        .path()
+        .join("tests/integration/bzlmod_lock_files/.bazelversion");
+    assert_eq!(
+        std::fs::read_link(&link).unwrap(),
+        Path::new("../../../.bazelversion")
+    );
+    assert_eq!(
+        std::fs::read(link).unwrap(),
+        std::fs::read(root.path().join(".bazelversion")).unwrap()
+    );
+    assert!(root.path().join("extensions.bzl").is_file());
+}
+
 fn extraction_error(raw: &[u8]) -> String {
     let root = tempfile::tempdir().unwrap();
     extract(capture(&gzip(raw)).as_file(), root.path(), None, &|| true)
