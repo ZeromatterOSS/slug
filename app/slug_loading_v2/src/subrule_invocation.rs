@@ -163,6 +163,8 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
         &self,
         _library: Value<'_>,
         _solib_directory: &str,
+        _preserve_name: bool,
+        _prefix_consumer: bool,
     ) -> anyhow::Result<AnalysisArtifactValue> {
         anyhow::bail!("native Solib construction is unavailable in this analysis context")
     }
@@ -1378,11 +1380,17 @@ impl AnalysisActions {
         &self,
         library: Value<'_>,
         solib_directory: &str,
+        preserve_name: bool,
+        prefix_consumer: bool,
     ) -> anyhow::Result<AnalysisArtifactValue> {
         self.token
             .require_active("dynamic_library_symlink", self.context_name)?;
-        self.action_sink
-            .dynamic_library_symlink(library, solib_directory)
+        self.action_sink.dynamic_library_symlink(
+            library,
+            solib_directory,
+            preserve_name,
+            prefix_consumer,
+        )
     }
 
     pub fn new(
@@ -1493,31 +1501,42 @@ mod native_solib_token_tests {
 
     #[test]
     fn inactive_native_solib_actions_never_reach_sink() {
-        let sink = Arc::new(crate::cc_common::solib_tests::RecordingSink::default());
-        let context = AnalysisEvaluationContext::new(
-            Arc::from([]),
-            [],
-            CanonicalLabel::parse("@@//:consumer").unwrap(),
-            sink.clone(),
-            FrozenValue::new_none(),
-            Arc::from([]),
-        );
-        let actions = AnalysisActions::new(
-            sink.clone(),
-            context.root_token(),
-            "rule context",
-            AnalysisActionCallScope::Root,
-        );
-        context.stack.lock().unwrap().frames.clear();
-        let error = actions
-            .register_dynamic_library_symlink(Value::new_none(), "_solib_k8")
-            .unwrap_err();
-        assert!(
-            error
-                .to_string()
-                .contains("outside of its own implementation function")
-        );
-        assert!(sink.0.lock().unwrap().is_empty());
+        for suspended in [false, true] {
+            let sink = Arc::new(crate::cc_common::solib_tests::RecordingSink::default());
+            let context = AnalysisEvaluationContext::new(
+                Arc::from([]),
+                [],
+                CanonicalLabel::parse("@@//:consumer").unwrap(),
+                sink.clone(),
+                FrozenValue::new_none(),
+                Arc::from([]),
+            );
+            let actions = AnalysisActions::new(
+                sink.clone(),
+                context.root_token(),
+                "rule context",
+                AnalysisActionCallScope::Root,
+            );
+            {
+                let mut stack = context.stack.lock().unwrap();
+                if suspended {
+                    let mut child = stack.frames[0].clone();
+                    child.token = 1;
+                    stack.frames.push(child);
+                } else {
+                    stack.frames.clear();
+                }
+            }
+            let error = actions
+                .register_dynamic_library_symlink(Value::new_none(), "_solib_k8", true, true)
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("outside of its own implementation function")
+            );
+            assert!(sink.0.lock().unwrap().is_empty());
+        }
     }
 }
 

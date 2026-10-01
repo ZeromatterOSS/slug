@@ -5,6 +5,7 @@ use std::fmt;
 use allocative::Allocative;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_identity_v2::CanonicalLabel;
 
 use crate::ActionOutput;
 use crate::ActionOutputKind;
@@ -29,32 +30,51 @@ pub struct SolibSymlinkSpec {
 }
 
 impl SolibSymlinkSpec {
-    /// The admitted `preserve_name=False, prefix_consumer=False` constructor.
-    /// Naming uses Slug's ordinary derived paths, without Bazel ST mnemonic bytes.
+    /// Naming uses Slug's source/derived paths and canonical consumer spelling,
+    /// without Bazel ST mnemonic bytes.
     /// The unchanged artifact, including its complete configured owner, is identity.
     pub fn new(
         input: AnalysisArtifact,
         output_root: crate::DerivedArtifactRoot,
         solib_directory: &str,
+        consumer: &CanonicalLabel,
+        preserve_name: bool,
+        prefix_consumer: bool,
     ) -> Result<Self, SolibSymlinkError> {
-        let AnalysisArtifact::Derived { output, .. } = &input else {
-            return Err(SolibSymlinkError("requires a generated regular File input"));
+        let path = match &input {
+            AnalysisArtifact::Source(_) => input.path(),
+            AnalysisArtifact::Derived { output, .. } if output.kind() == ActionOutputKind::File => {
+                std::borrow::Cow::Borrowed(output.root_relative_path())
+            }
+            _ => return Err(SolibSymlinkError("requires a regular File input")),
         };
-        if output.kind() != ActionOutputKind::File {
-            return Err(SolibSymlinkError("requires a generated regular File input"));
-        }
-        validate_relative(output.root_relative_path())?;
+        validate_relative(&path)?;
         validate_relative(solib_directory)?;
-        if output.root_relative_path().starts_with("_solib_") {
+        if path.starts_with("_solib_") {
             return Err(SolibSymlinkError("does not accept Solib-derived inputs"));
         }
-        let basename = output.path().rsplit('/').next().unwrap();
+        let (parent, basename) = path.rsplit_once('/').unwrap_or(("", &path));
         if !shared_library_name(basename) {
             return Err(SolibSymlinkError(
                 "input does not match the native shared-library filetypes",
             ));
         }
-        let filename = shorten(&Self::slug_native_soname(output.root_relative_path()));
+        let component = if preserve_name {
+            escape(&format!("_{parent}"))
+        } else {
+            Self::slug_native_soname(&path)
+        };
+        let component = if prefix_consumer {
+            format!("{}__{component}", escape(&format!("_{consumer}")))
+        } else {
+            component
+        };
+        let component = shorten(&component);
+        let filename = if preserve_name {
+            format!("{component}/{basename}")
+        } else {
+            component
+        };
         let output = ActionOutput::new(
             output_root,
             format!("{solib_directory}/{filename}"),
@@ -149,7 +169,14 @@ mod tests {
         input: AnalysisArtifact,
         directory: &str,
     ) -> Result<SolibSymlinkSpec, SolibSymlinkError> {
-        SolibSymlinkSpec::new(input, root_support::root(), directory)
+        SolibSymlinkSpec::new(
+            input,
+            root_support::root(),
+            directory,
+            &CanonicalLabel::parse("@@//:consumer").unwrap(),
+            false,
+            false,
+        )
     }
     use crate::ActionError;
     use crate::ActionKind;
@@ -175,6 +202,195 @@ mod tests {
                 ActionOutputKind::File,
             ),
         }
+    }
+
+    #[test]
+    fn all_flag_branches_preserve_source_generated_and_consumer_coordinates() {
+        let consumer = CanonicalLabel::parse("@@//consumer:use").unwrap();
+        let other = CanonicalLabel::parse("@@other+//consumer:use").unwrap();
+        for (label, parent, soname) in [
+            ("@@//pkg:lib_a@b.so", "_Upkg", "libpkg_Slib_Ua_Ab.so"),
+            (
+                "@@repo+//pkg:lib_a@b.so",
+                "_Uexternal_Srepo+_Spkg",
+                "libexternal_Srepo+_Spkg_Slib_Ua_Ab.so",
+            ),
+        ] {
+            let source = AnalysisArtifact::Source(CanonicalLabel::parse(label).unwrap());
+            let generated = library(label, b"target", "pkg/lib_a@b.so");
+            for input in [source.clone(), generated.clone()] {
+                let mut actions = CtxActions::new(root_support::root());
+                for (preserve, prefix, expected) in [
+                    (false, false, format!("_solib_k8/{soname}")),
+                    (
+                        false,
+                        true,
+                        format!("_solib_k8/_U_A_A_S_Sconsumer_Cuse__{soname}"),
+                    ),
+                    (true, false, format!("_solib_k8/{parent}/lib_a@b.so")),
+                    (
+                        true,
+                        true,
+                        format!("_solib_k8/_U_A_A_S_Sconsumer_Cuse__{parent}/lib_a@b.so"),
+                    ),
+                ] {
+                    let spec = SolibSymlinkSpec::new(
+                        input.clone(),
+                        root_support::root(),
+                        "_solib_k8",
+                        &consumer,
+                        preserve,
+                        prefix,
+                    )
+                    .unwrap();
+                    assert_eq!(spec.input(), &input);
+                    assert_eq!(spec.output().root_relative_path(), expected);
+                    let index = actions.registry().actions().len();
+                    assert_eq!(actions.register_solib_symlink(spec.clone()).unwrap(), index);
+                    let original = actions.registry().clone();
+                    assert_eq!(actions.register_solib_symlink(spec.clone()).unwrap(), index);
+                    assert_eq!(actions.registry(), &original);
+                    let changed_consumer = SolibSymlinkSpec::new(
+                        input.clone(),
+                        root_support::root(),
+                        "_solib_k8",
+                        &other,
+                        preserve,
+                        prefix,
+                    )
+                    .unwrap();
+                    assert_eq!(spec == changed_consumer, !prefix);
+                    let counterpart = if input == source {
+                        generated.clone()
+                    } else {
+                        source.clone()
+                    };
+                    let collision = SolibSymlinkSpec::new(
+                        counterpart,
+                        root_support::root(),
+                        "_solib_k8",
+                        &consumer,
+                        preserve,
+                        prefix,
+                    )
+                    .unwrap();
+                    assert_eq!(collision.output(), spec.output());
+                    assert_ne!(collision, spec);
+                    assert!(matches!(
+                        actions.register_solib_symlink(collision),
+                        Err(ActionError::ConflictingOutput { .. })
+                    ));
+                    assert_eq!(actions.registry(), &original);
+                    let identity_changed = match &input {
+                        AnalysisArtifact::Source(_) => AnalysisArtifact::Source(
+                            CanonicalLabel::parse(&label.replace("//pkg:", "//:pkg/")).unwrap(),
+                        ),
+                        AnalysisArtifact::Derived { output, .. } => AnalysisArtifact::Derived {
+                            owner: AnalysisConfiguredTargetKey::new(
+                                CanonicalLabel::parse("@@//pkg:other").unwrap(),
+                                b"other-config".as_slice(),
+                            ),
+                            output: output.clone(),
+                        },
+                        _ => unreachable!(),
+                    };
+                    let collision = SolibSymlinkSpec::new(
+                        identity_changed,
+                        root_support::root(),
+                        "_solib_k8",
+                        &consumer,
+                        preserve,
+                        prefix,
+                    )
+                    .unwrap();
+                    assert_eq!(collision.output(), spec.output());
+                    assert!(actions.register_solib_symlink(collision).is_err());
+                    assert_eq!(actions.registry(), &original);
+                }
+            }
+        }
+        let root_source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:lib.so").unwrap());
+        let spec = SolibSymlinkSpec::new(
+            root_source,
+            root_support::root(),
+            "_solib_k8",
+            &consumer,
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(spec.output().root_relative_path(), "_solib_k8/_U/lib.so");
+    }
+
+    #[test]
+    fn preserved_name_hashes_only_parent_and_consumer_components() {
+        let consumer = CanonicalLabel::parse("@@//consumer:use").unwrap();
+        for (parent, prefix, expected) in [
+            (
+                "a".repeat(254),
+                false,
+                "a51bb45cb9c10bcb8687a2ad686ba64f00708301cd310dce2c4b4435c3a16c49",
+            ),
+            (
+                "a".repeat(254),
+                true,
+                "3f527409d2b54509d1ff45c0cf14ea8233010cd462fbcdfc0e90f530736d24b7",
+            ),
+            (
+                format!("{}.dir", "a".repeat(251)),
+                false,
+                "d82f41afd19135bd4d8663c62765c940c1e5d01285fe1f8468ca23badd90b949.dir",
+            ),
+            (
+                "😀".repeat(127),
+                false,
+                "30a83c1339b8dbf085e4f539d95f48d1b7c91558af04c529957051d82c5bc987",
+            ),
+        ] {
+            let spec = SolibSymlinkSpec::new(
+                library("@@//:lib", b"target", &format!("{parent}/lib_a.so.12")),
+                root_support::root(),
+                "_solib_k8",
+                &consumer,
+                true,
+                prefix,
+            )
+            .unwrap();
+            assert_eq!(
+                spec.output().root_relative_path(),
+                format!("_solib_k8/{expected}/lib_a.so.12")
+            );
+        }
+        let parent = format!("{}a", "😀".repeat(126));
+        assert_eq!(format!("_U{parent}").encode_utf16().count(), 255);
+        let spec = SolibSymlinkSpec::new(
+            library("@@//:lib", b"target", &format!("{parent}/lib.so")),
+            root_support::root(),
+            "_solib_k8",
+            &consumer,
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            spec.output().root_relative_path(),
+            format!("_solib_k8/_U{parent}/lib.so")
+        );
+        // Basename preservation does not run the long-name hash on the library itself.
+        let basename = format!("{}.so", "a".repeat(256));
+        let spec = SolibSymlinkSpec::new(
+            library("@@//:lib", b"target", &format!("pkg/{basename}")),
+            root_support::root(),
+            "_solib_k8",
+            &consumer,
+            true,
+            false,
+        )
+        .unwrap();
+        assert_eq!(
+            spec.output().root_relative_path(),
+            format!("_solib_k8/_Upkg/{basename}")
+        );
     }
 
     #[test]
@@ -344,8 +560,27 @@ mod tests {
                 AnalysisArtifact::Source(CanonicalLabel::parse("@@//:lib.so").unwrap()),
                 "_solib_k8"
             )
+            .is_ok()
+        );
+        let status = crate::WorkspaceStatusArtifacts::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new("/workspace").unwrap(),
+        );
+        assert!(
+            solib(
+                AnalysisArtifact::WorkspaceStatus(status.stable().clone()),
+                "_solib_k8"
+            )
             .is_err()
         );
+        for label in ["@@//:lib.a", "@@//:_solib_k8/lib.so"] {
+            assert!(
+                solib(
+                    AnalysisArtifact::Source(CanonicalLabel::parse(label).unwrap()),
+                    "_solib_k8"
+                )
+                .is_err()
+            );
+        }
         for kind in [
             ActionOutputKind::Directory,
             ActionOutputKind::Symlink,
@@ -375,11 +610,24 @@ mod tests {
         assert_eq!(actions.register_solib_symlink(spec.clone()).unwrap(), 0);
         assert_eq!(actions.register_solib_symlink(spec.clone()).unwrap(), 0);
         assert_eq!(actions.registry().actions().len(), 1);
+        let original = actions.registry().clone();
         let changed = solib(library("@@//pkg:lib", b"exec", "pkg/lib.so"), "_solib_k8").unwrap();
         assert!(matches!(
             actions.register_solib_symlink(changed),
             Err(ActionError::ConflictingOutput { .. })
         ));
+        assert_eq!(actions.registry(), &original);
+        let AnalysisArtifact::Derived { owner, output } = input.clone() else {
+            unreachable!()
+        };
+        let constant_input = AnalysisArtifact::Derived {
+            owner,
+            output: ActionOutput::new_constant(output.root().clone(), output.root_relative_path()),
+        };
+        let changed = solib(constant_input, "_solib_k8").unwrap();
+        assert_eq!(changed.output(), spec.output());
+        assert!(actions.register_solib_symlink(changed).is_err());
+        assert_eq!(actions.registry(), &original);
         let ordinary = SymlinkSpec::new(
             spec.output().clone(),
             SymlinkTarget::Artifact {
@@ -390,9 +638,12 @@ mod tests {
             None::<String>,
         );
         assert!(actions.register_symlink(ordinary.clone()).is_err());
+        assert_eq!(actions.registry(), &original);
         let mut ordinary_first = CtxActions::new(root_support::root());
         ordinary_first.register_symlink(ordinary).unwrap();
+        let ordinary_original = ordinary_first.registry().clone();
         assert!(ordinary_first.register_solib_symlink(spec.clone()).is_err());
+        assert_eq!(ordinary_first.registry(), &ordinary_original);
         let native = &actions.registry().actions()[0];
         assert_eq!(native.kind(), &ActionKind::SolibSymlink);
         assert_eq!(native.mnemonic(), "SolibSymlink");
@@ -410,6 +661,19 @@ mod tests {
         decorated
             .register_batch([ActionSpec::solib_symlink(spec.clone()).with_exec_group("group")])
             .unwrap();
+        let decorated_original = decorated.registry().clone();
+        assert!(decorated.register_solib_symlink(spec.clone()).is_err());
+        assert_eq!(decorated.registry(), &decorated_original);
+        let mut decorated = CtxActions::new(root_support::root());
+        decorated
+            .register_batch([
+                ActionSpec::solib_symlink(spec.clone()).with_exec_properties(
+                    std::collections::BTreeMap::from([("key".to_owned(), "value".to_owned())]),
+                ),
+            ])
+            .unwrap();
+        let decorated_original = decorated.registry().clone();
         assert!(decorated.register_solib_symlink(spec).is_err());
+        assert_eq!(decorated.registry(), &decorated_original);
     }
 }

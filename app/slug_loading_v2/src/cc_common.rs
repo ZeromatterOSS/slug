@@ -357,16 +357,16 @@ fn cc_internal_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] prefix_consumer: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        if preserve_name || prefix_consumer {
-            anyhow::bail!(
-                "dynamic_library_symlink supports only preserve_name=False and prefix_consumer=False"
-            );
-        }
         let actions = AnalysisActions::from_starlark(actions)
             .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink requires ctx.actions"))?;
         Ok(eval
             .heap()
-            .alloc_simple(actions.register_dynamic_library_symlink(library, solib_directory)?))
+            .alloc_simple(actions.register_dynamic_library_symlink(
+                library,
+                solib_directory,
+                preserve_name,
+                prefix_consumer,
+            )?))
     }
 
     fn absolute_symlink<'v>(

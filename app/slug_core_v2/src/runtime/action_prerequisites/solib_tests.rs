@@ -14,6 +14,9 @@ fn solib(input: AnalysisArtifact) -> ActionSpec {
             input,
             crate::runtime::configured_output::test_root(),
             "_solib_k8",
+            key("consumer", false).label(),
+            false,
+            false,
         )
         .unwrap(),
     )
@@ -91,6 +94,9 @@ fn solib_sharing_preserves_owners_and_ignores_native_owner_platform_facts() {
                     )
                     .unwrap(),
                     "_solib_k8",
+                    key("exec", true).label(),
+                    false,
+                    false,
                 )
                 .unwrap(),
             )],

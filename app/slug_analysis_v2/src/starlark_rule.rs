@@ -1442,6 +1442,8 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         &self,
         library: Value<'_>,
         solib_directory: &str,
+        preserve_name: bool,
+        prefix_consumer: bool,
     ) -> anyhow::Result<AnalysisArtifactValue> {
         let input = AnalysisArtifactValue::from_starlark(library)
             .ok_or_else(|| anyhow::anyhow!("dynamic_library_symlink library must be a File"))?;
@@ -1449,6 +1451,9 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
             input.artifact().clone(),
             self.root.clone(),
             solib_directory,
+            self.owner.label(),
+            preserve_name,
+            prefix_consumer,
         )?;
         let output = self.declare_bin_relative_output(
             spec.output().root_relative_path().to_owned(),

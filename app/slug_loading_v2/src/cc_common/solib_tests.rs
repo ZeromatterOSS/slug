@@ -29,7 +29,7 @@ const SOURCE: &str = include_str!(
 );
 
 #[derive(Debug, Default)]
-pub(crate) struct RecordingSink(pub(crate) Mutex<Vec<(AnalysisArtifact, String)>>);
+pub(crate) struct RecordingSink(pub(crate) Mutex<Vec<(AnalysisArtifact, String, bool, bool)>>);
 pub(crate) fn artifact() -> AnalysisArtifact {
     AnalysisArtifact::Derived {
         owner: AnalysisConfiguredTargetKey::new(
@@ -62,13 +62,17 @@ impl AnalysisActionSink for RecordingSink {
         &self,
         library: Value<'_>,
         directory: &str,
+        preserve_name: bool,
+        prefix_consumer: bool,
     ) -> anyhow::Result<AnalysisArtifactValue> {
         let library = AnalysisArtifactValue::from_starlark(library)
             .ok_or_else(|| anyhow::anyhow!("library must be a File"))?;
-        self.0
-            .lock()
-            .unwrap()
-            .push((library.artifact().clone(), directory.to_owned()));
+        self.0.lock().unwrap().push((
+            library.artifact().clone(),
+            directory.to_owned(),
+            preserve_name,
+            prefix_consumer,
+        ));
         Ok(AnalysisArtifactValue::new(returned_artifact()))
     }
     fn declare_file(
@@ -210,16 +214,136 @@ asserted = result['dynamic_library'] == returned and result['resolved_symlink_dy
     assert_eq!(module.get("asserted").unwrap().unpack_bool(), Some(true));
     assert_eq!(
         *sink.0.lock().unwrap(),
-        vec![(artifact(), "_solib_k8".to_owned())]
+        vec![(artifact(), "_solib_k8".to_owned(), false, false)]
     );
 }
 
 #[test]
-fn native_solib_binder_rejects_flags_and_types_before_delegation() {
+fn unchanged_library_builder_delegates_true_true_native_constructor() {
+    use sha2::Digest;
+    use sha2::Sha256;
+    const BUILDER: &str = include_str!(
+        "../../../slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/create_library_to_link.bzl"
+    );
+    assert_eq!(
+        format!("{:x}", Sha256::digest(BUILDER)),
+        "5f57423312f24392f106aeb5959485c4f30c54ee2d8e926a45934de51a2455d1"
+    );
+    let imports = Module::new();
+    imports.set("cc_internal", imports.heap().alloc_simple(CcInternalModule));
+    evaluate(
+        &imports,
+        include_str!(
+            "../../../slug_analysis_v2/tests/fixtures/rustc-map-each/bazel_skylib/lib/paths.bzl"
+        ),
+    )
+    .unwrap();
+    evaluate(
+        &imports,
+        r#"
+def unused(*args, **kwargs): fail('unused library-builder dependency executed')
+is_versioned_shared_library = unused
+path_contains_up_level_references = unused
+create_shared_non_lto_artifacts = unused
+EMPTY_LTO_COMPILATION_CONTEXT = struct(lto_bitcode_inputs={})
+"#,
+    )
+    .unwrap();
+    let loader = Imports(imports.freeze().unwrap());
+    let definition = Module::new();
+    let context = crate::provider::BzlEvaluationContext::new(
+        "@@rules_cc+//cc/private/link:create_library_to_link.bzl",
+    );
+    let mut eval = Evaluator::new(&definition);
+    eval.extra = Some(&context);
+    eval.set_loader(&loader);
+    eval.eval_module(
+        AstModule::parse(
+            "create_library_to_link.bzl",
+            BUILDER.to_owned(),
+            &Dialect::Bazel,
+        )
+        .unwrap(),
+        &crate::package::loading_globals(),
+    )
+    .unwrap();
+    drop(eval);
+    let definition = definition.freeze().unwrap();
+    for library in [
+        artifact(),
+        AnalysisArtifact::Source(CanonicalLabel::parse("@@rust_std+//lib:libstd.so").unwrap()),
+    ] {
+        let module = Module::new();
+        let sink = Arc::new(RecordingSink::default());
+        module.set(
+            "construct",
+            definition.get("create_library_to_link").unwrap().value(),
+        );
+        module.set("actions", module.heap().alloc_simple(actions(sink.clone())));
+        module.set(
+            "library",
+            module
+                .heap()
+                .alloc_simple(AnalysisArtifactValue::new(library.clone())),
+        );
+        module.set(
+            "returned",
+            module
+                .heap()
+                .alloc_simple(AnalysisArtifactValue::new(returned_artifact())),
+        );
+        evaluate(
+            &module,
+            r#"
+def disabled(_): return False
+result = construct(actions=actions, dynamic_library=library,
+    feature_configuration=struct(is_enabled=disabled), cc_toolchain=struct(_solib_dir='_solib_k8'))
+asserted = result.dynamic_library == returned and result.resolved_symlink_dynamic_library == library
+"#,
+        )
+        .unwrap();
+        assert_eq!(module.get("asserted").unwrap().unpack_bool(), Some(true));
+        assert_eq!(
+            *sink.0.lock().unwrap(),
+            [(library, "_solib_k8".to_owned(), true, true)]
+        );
+    }
+}
+
+#[test]
+fn native_solib_binder_forwards_flags_and_rejects_types_before_delegation() {
+    for preserve in [false, true] {
+        for prefix in [false, true] {
+            let module = Module::new();
+            let sink = Arc::new(RecordingSink::default());
+            module.set("native", module.heap().alloc_simple(CcInternalModule));
+            module.set("actions", module.heap().alloc_simple(actions(sink.clone())));
+            module.set(
+                "library",
+                module
+                    .heap()
+                    .alloc_simple(AnalysisArtifactValue::new(artifact())),
+            );
+            evaluate(
+                &module,
+                &format!(
+                    "native.dynamic_library_symlink(actions, library, '_solib_k8', {}, {})",
+                    if preserve { "True" } else { "False" },
+                    if prefix { "True" } else { "False" },
+                ),
+            )
+            .unwrap();
+            assert_eq!(
+                *sink.0.lock().unwrap(),
+                [(artifact(), "_solib_k8".to_owned(), preserve, prefix)]
+            );
+        }
+    }
     for call in [
-        "native.dynamic_library_symlink(actions, library, '_solib_k8', True, False)",
-        "native.dynamic_library_symlink(actions, library, '_solib_k8', False, True)",
         "native.dynamic_library_symlink(actions, library, '_solib_k8', 1, False)",
+        "native.dynamic_library_symlink(actions, library, '_solib_k8', False, 1)",
+        "native.dynamic_library_symlink(actions, library, '_solib_k8', False)",
+        "native.dynamic_library_symlink(actions, library, '_solib_k8', False, False, False)",
         "native.dynamic_library_symlink(None, library, '_solib_k8', False, False)",
         "native.dynamic_library_symlink(actions, library, None, False, False)",
         "native.dynamic_library_symlink(actions=actions, library=library, solib_directory='_solib_k8', preserve_name=False, prefix_consumer=False)",

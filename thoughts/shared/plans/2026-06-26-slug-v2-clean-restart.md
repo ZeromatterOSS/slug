@@ -34,18 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-175-m7a-rust-toolchain-captured-callable-design-r1
-Status: accepted design; independent DESIGN/FINAL accepted; M7A remains partial
+Packet: WP-7-176-m7a-rust-stdlib-solib-construction-r1
+Status: accepted; independent DESIGN/FINAL accepted; M7A remains partial
 
-WP875 resolves the real nested Rust-toolchain callback's four captured values,
-source authority and lifetime owners. A distinct finite source-authenticated
-recipe is selected over generic frozen-code retention, with complete helper and
-consumer-action semantics required. Independent DESIGN/FINAL and source/docs
-checks pass. The concrete builder/dispatcher seam still needs an implementation
-contract; publication-only success is insufficient.
-WP874 `da449cbbb` passed12 tests/reviews/Core/CLI and unchanged78.763s replay clears
-sysroot overlap, reaching captured function publication. Full bootstrap and Windows
-remain deferred.
+WP876 admits the existing native Solib constructor's four naming flag pairs and
+source-library inputs, required by the complete Rust callback's dynamic-stdlib
+branch. Current consumer owner/root, full artifact identity and action tokens
+remain authoritative; names remain Slug-native and execution stays deferred.
+Independent DESIGN/FINAL,17 focused tests/Core/CLI and hygiene checks pass.
+WP875 `8c427a879` accepted finite callback ownership with full helper behavior;
+source-owned DICE preparation/private authority remains its implementation gate.
+Full bootstrap and Windows remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
