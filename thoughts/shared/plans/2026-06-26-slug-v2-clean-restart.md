@@ -46,7 +46,12 @@ Solib construction with17 tests/reviews/Core/CLI passing. Accepted WP878
 `d9c1de64a` supplies bounded selected-BCR relative-file symlinks (16 focused
 checks/full pinned archive probe/CLI pass); it is integrated here as the base
 prerequisite. The callback remains on the review branch until genuine invocation
-and rebuilt authentic replay pass. Full bootstrap and Windows remain deferred.
+and rebuilt authentic replay pass. The authentic query now reaches final effect
+selection but fails on an unavailable analysis root after terminal Ok. The
+reviewed Core coupled proof now passes both routes, fresh consumers and complete
+configuration/source/import restoration; its normal registry/materialization
+source closure is complete. Production activation and full bootstrap remain
+held for the authentic replay. Windows execution remains deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's

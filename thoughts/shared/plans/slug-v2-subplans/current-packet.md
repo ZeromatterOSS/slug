@@ -97,7 +97,11 @@ dice.rs, starlark_rule.rs and focused rustc_map_each integration modules;
 shared fixture toolchain.bzl/rust_allocator_libraries.bzl plus existing pinned
 triple.bzl/semver.bzl/incompatible.bzl leaf relocation, sources.rs/sources.json/
 fixture.toml and Loading host_package_load_tests.rs include_str/source tests;
-manifest/canonical/Stage6/Stage9 contracts. No CLI/executor/engine changes or
+Core runtime/tests/cquery_command_tests.rs for two genuine terminal-policy
+discriminators, new runtime/tests/rust_toolchain_callback_tests.rs,
+rust_toolchain_callback_fixture.rs and compact rust_toolchain_callback_sources.json,
+and one
+#[cfg(test)] child hook in runtime/dice.rs for the coupled proof migration; manifest/canonical/Stage6/Stage9 contracts. No CLI/executor/engine changes or
 third-party body edits. Large existing files get local hooks/signatures only; new
 source/preparation/runtime/tests live in cohesive owner modules. Estimates production
 under900 lines, proof under800 plus byte-exact source relocation; review triggers.
@@ -156,57 +160,109 @@ record25 distinct passing checks: BuildAPI4, Loading preparation/source6,
 Analysis ownership4, Loading authentication/runtime/lifecycle9, actual helper
 branches2. The lifetime check passed after correcting its public-export probe;
 retain earlier failure receipts. Core/CLI compile passes, including rebuild after
-removing the temporary diagnostic (4.475s). These focused checks do not establish
+removing the temporary diagnostic (12.697s). These focused checks do not establish
 the genuine coupled publication/invocation gate.
 
-Authentic isolated replay still fails. Temporary typed-error diagnostic identified
-`NonSuccessSelection(CanonicalRepoName("rules_jvm_external+"))` at repository
-acceptance:81.932s, exit2. Original BUILD/MODULE/lockfile hashes unchanged and actual
-pre/post Slug process checks empty. The diagnostic is removed from source and
-binary. This selected transitive immutable repository is not a Java execution
-requirement. Its underlying materialization result remains to be diagnosed; do
-not infer a transport cause or relax selected repository integrity.
+## Remaining coupled integration gates
+
+Accepted WP878 d9c1de64a is merged into this review branch at13a854000.
+Its archive correction resolves the exact rules_jvm_external6.7 relative
+.bazelversion link refusal. The rebuilt unchanged authentic producer query now
+fails final effect selection: unavailable ConfiguredNodeAnalysisObservationKey
+root DiceNodeId(engine1,node1094),142.717s/exit2. Temporary root-lifecycle
+instrumentation observed transient completion during retries, but reached the
+180s operation cap before terminal selection. A reviewed terminal-only replay
+then completed144.837s/exit2: actual cquery terminal Ok, unchanged strict policy,
+and the same unavailable analysis root at selection. This rules out a hidden
+terminal query error but does not identify the invalid dependency/persistence
+cause. Both diagnostics were restored byte-exact; clean CLI rebuilt12.697s.
+Workspace BUILD/MODULE/lock hashes remain unchanged.
+Receipts: target/wp877/authentic-activation-closure-failure.* and
+activation-diagnostic-summary.json and authentic-terminal-only-diagnostic.*.
+Strict selection policy is unchanged; DICE propagates child transience even when
+a parent returns a successful value, so swallowing an invalid child is a current
+source-investigation hypothesis, not an established cause.
+
+Five original body relocations are byte-exact with old constants removed;
+three additional leaves pass protected Loading checks3/3 in0.008s. The actual
+normal-preparation paths.bzl transitive import A/B/A passes both routes1/1
+in0.565s, with genuine caller provenance, manifest membership, stale Retained(A)
+refusal under B and exact authority restoration. Original direct-helper/source
+branch checks remain complementary to genuine coupled invocation.
+
+The Core coupled test has genuine original rust_toolchain/stdlib,
+registered C++ toolchain, native platforms host and fresh consumer assertions,
+including current-owner/configuration Solib paths. Original built-in registration
+expansion uses the complete rules_shell/shell and C++ compatibility proxy
+load closure. The authored inputs use the required linker_inputs parameter,
+producer-package .rlib siblings and the genuine libstd-*.so classification
+(libstd-fixture.so); no third-party source implementation changes.
+No original third-party bodies, built-in registrations or required gates may
+be trimmed. Independent DESIGN accepts the private Core-owned relocation in
+target/wp877/core-coupled-proof-design.md with observations=None in both routes,
+strict ClosureOnly/default acceptance, and explicitly authored minimal module/
+registry metadata whose mappings/extensions are derived by the normal owners. Core owns production generated
+repository writer/session association; no new public API or Analysis->Core
+dependency is allowed. A closed archive-member/mapping inventory must precede
+asset work; tracked full archives are reused, without duplicate source bulk in Git.
+Root independently validates all6tracked archives/103member hashes. The frozen
+47additional members total418603bytes/9954lines in scratch; no new archive blobs
+or duplicated third-party implementation bodies enter Git. Required apparent
+label mappings (including shell platforms) are normal MODULE dependencies.
+The single coupled test/assertions now live in Core; its old Analysis Rust file
+and hook are removed after the Core gate passed. The shared authored .bzl probe
+remains the single source. No duplicated passing gate
+or partial coupled activation. Runtime20s and preparation60s remain fixed. Its observed adapter must use the existing strict DICE closure;
+Analysis does not expose a path epoch, so none may be reconstructed.
+
+Two test-only Core cquery discriminators exercise genuine transient Analysis
+failure with the existing permitted policy versus late Evaluation failure with
+a verified nontransient strict closure. Independent FINAL accepts2/2 exact nonignored checks in0.016s after serial
+no-run51.219s (first60s preparation cap preserved separately). These cannot classify
+the authentic final terminal. The independently reviewed terminal-only diagnostic ran once under180s,
+identified Ok before strict selection refusal, and was removed/rebuilt byte-exact. No engine, key validity or acceptance relaxation is allowed.
 
 FINAL remains held for genuine producer -> retained model -> fresh prepared
-helper -> actual consumer invocation in both routes, and actual same-DICE helper
-transitive import A/B/A. Synthetic authority metadata and direct-helper authored
-probe restoration are complementary evidence only. Reuse the existing Analysis
-integration workspace/epoch fixture for the remaining focused proof. Stage6/9
-activation claims remain unadmitted until these gates pass.
+helper -> actual consumer invocation in both routes, unchanged authentic producer
+success and the subsequent actual consumer replay. Current main admits only
+WP878, not callback activation. Windows execution remains deferred. Inherited
+oracle growth was reviewed read-only; reset only at an accepted checkpoint.
 
-Independent DESIGN accepts three additional byte-exact leaf relocations from
-Loading constants (triple172 lines, semver51, incompatible27), removing old raw
-bodies and retaining existing hash/line-count proofs. Existing common_settings
-and helper imports are reused. This completes caller loading in the shared
-fixture for genuine original rust_toolchain/stdlib production and both-route
-retained consumer invocation. The separate same-DICE paths.bzl proof obtains
-caller metadata from normal package loading and helper manifests from normal
-preparation; it explicitly checks reachable membership, stale Retained(A)
-refusal under B and byte-exact authority restoration under A. No handcrafted
-recipe or metadata replaces either gate.
+## Core coupled proof checkpoint (test acceptance; production held)
 
-## Closing proof checkpoint (not acceptance)
+Independent DESIGN/FINAL accepts the private Core adapter, closed assembler,
+source initialization and preserved semantic assertions. Actual text/raw/directory
+observations refresh through the existing request revision owner before each
+request, without evaluating unrelated semantic roots. CC/features/platforms are
+real selected registry sources: deterministic scratch tar.gz archives contain
+validated original bodies plus authored minimal MODULE/BUILD metadata, actual
+SRI/file URLs and ordinary source associations. Rust and other supported mutable
+body sources retain local overrides for actual import A/B/A. Archive TempDir
+guards live across the whole request matrix and clean scratch archives afterward.
+No new production owner/API/validity policy, generated output, mapping, recipe,
+receipt or source certificate is fabricated.
 
-Three relocated caller leaves pass their protected Loading selectors3/3 in
-0.008s after no-run preparation53.802s. Actual normal-preparation transitive
-paths.bzl import A/B/A passes both routes1/1 in0.565s. Coupled test source is
-preserved with genuine original rust_toolchain/stdlib production, registered
-C++ toolchain, native platform constraints and fresh retained consumers. Its
-first three runtime failures exposed authored-fixture mandatory attr, duplicate
-target and canonical platforms-route gaps; corrected inputs are awaiting rerun.
-No production fallback or callback gate is waived.
+The cold/fresh comparison exposed a real operational input change: only /tmp
+Lstat changed in Host and seven materialization namespaces as native writers
+created immutable repository roots. The same observed CC module key reevaluated;
+only its module-global needs_pic_for_dynamic_libraries occurrence changed among
+62 provider fields. Registration/lowering/rematerialization preserved identity.
+No semantic equality weakening was justified. A reviewed single genuine request
+with complete static assertions establishes the warm-source baseline; first/fresh
+requests then require nonempty shared observation coverage, the implicated Host
+/tmp Lstat and equality of every shared path value before publication equality.
+This proves stable-input reuse, not cold/warm global function identity.
 
-WP878 selected-BCR relative leaf-file symlink prerequisite is independently
-accepted on main at d9c1de64a (16 focused tests/full pinned archive/CLI pass).
-Preserve this follow-on candidate, integrate that prerequisite, reconcile
-scheduling and rebuild before the unchanged authentic producer replay.
-
-## Reconciled prerequisite
-
-Accepted WP878 d9c1de64a is merged into the preserved WP877 review branch.
-Both source-owned callback implementation and the Core symlink extractor are
-present; only the prerequisite is admitted on main. Earlier typed repository
-refusal was diagnosed as the exact rules_jvm_external6.7 relative .bazelversion
-link and resolved by WP878. Genuine coupled proof corrections and rebuilt
-unchanged authentic producer/consumer replays remain pending. This merge does
-not admit callback activation or waive any prior gate.
+The complete exact nonignored Core gate passes both routes, six aliases, original
+helper invocation after producer disposal, fresh static/dynamic consumers,
+current-owner/configuration Solib and complete configuration/probe/import A/B/A.
+Warm baseline receipt: compile6.076s/exit0,1selected/1passed4.571s.
+Temporary module activation audit is removed; strict ClosureOnly/default terminal
+selection is unchanged. Final cleaned source compiles6.326s/exit0 and exact
+nonignored coupled/policy group passes3/3 in4.321s; the Analysis direct integration
+dependent compiles9.286s/exit0 after duplicate removal. Receipts are in
+target/wp877/core-callback-relocated-owned-archives-* and
+analysis-callback-relocation-dependent-*; earlier attributed failed
+receipts remain under core-callback-* (including observation-discriminator).
+Authentic producer/consumer replay gates remain required before production
+activation. No main merge is authorized by this test checkpoint.

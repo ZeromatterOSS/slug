@@ -6,7 +6,7 @@ Proof = provider(fields = ['callback', 'aliases', 'libraries', 'marker'])
 
 def _allocator(ctx):
     return [CcInfo(compilation_context = cc_common.create_compilation_context(),
-        linking_context = cc_common.create_linking_context())]
+        linking_context = cc_common.create_linking_context(linker_inputs = depset()))]
 allocator = rule(implementation = _allocator)
 
 def _relay(ctx):

@@ -8907,6 +8907,10 @@ mod tests {
         include!("tests/registration_error_tests.rs");
     }
 
+    mod rust_toolchain_callback_tests {
+        include!("tests/rust_toolchain_callback_tests.rs");
+    }
+
     #[cfg(feature = "native-probe-observer")]
     mod probe_observer_tests {
         include!("tests/probe_observer_tests.rs");

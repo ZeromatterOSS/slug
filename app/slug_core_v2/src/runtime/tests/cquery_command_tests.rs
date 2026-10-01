@@ -1224,3 +1224,156 @@ async fn cquery_observed_compute_cancellation_discards_child_events_and_recovers
     ));
     assert!(take_texts().is_empty());
 }
+
+struct CqueryCompletionAudit {
+    runtime: Arc<dyn ActivationTracker>,
+    completed: Mutex<Vec<(RootActivation, bool, Option<CanonicalLabel>)>>,
+}
+
+impl ActivationTracker for CqueryCompletionAudit {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        activation: ActivationData,
+    ) {
+        self.runtime.key_activated(key, deps, activation);
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        self.runtime.tracks_rich_activations()
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        self.runtime.key_activated_rich(key, activation);
+    }
+
+    fn root_activated(&self, key: &DynKey, activation: RootActivation) {
+        self.runtime.root_activated(key, activation);
+    }
+
+    fn root_completed(&self, key: &DynKey, activation: RootActivation, is_transient: bool) {
+        self.runtime.root_completed(key, activation, is_transient);
+        let analysis_label = key
+            .downcast_ref::<ConfiguredNodeAnalysisObservationKey>()
+            .map(|key| key.node().label().clone());
+        self.completed
+            .lock()
+            .unwrap()
+            .push((activation, is_transient, analysis_label));
+    }
+}
+
+async fn cquery_terminal_policy_case(failing_analysis: bool, expression: &str) {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let root_label = CanonicalLabel::parse("@@//:root").unwrap();
+    let mut epoch = BuildRootEpoch::base(82);
+    let body = if failing_analysis {
+        "    fail('CQUERY_ANALYSIS_FAILURE')\n"
+    } else {
+        "    return [DefaultInfo(files = depset([]))]\n"
+    };
+    epoch.file(
+        "/workspace/defs.bzl",
+        &format!("def _impl(ctx):\n{body}probe = rule(implementation = _impl)\n"),
+        82,
+    );
+    epoch.package("", "load(':defs.bzl', 'probe')\nprobe(name = 'root')\n", 82);
+    let owner = CommandEffectOwner::new();
+    let attempt = owner.begin_attempt().unwrap();
+    let demands = WorkspaceDemandOwner::new(&dice, workspace.dupe());
+    let mut data = UserComputationData::default();
+    demands
+        .install(&dice, &mut data, Some(attempt.dupe()))
+        .unwrap();
+    // Observe genuine callbacks without replacing the runtime's bookkeeping.
+    let audit = Arc::new(CqueryCompletionAudit {
+        runtime: data.activation_tracker.take().unwrap(),
+        completed: Mutex::new(Vec::new()),
+    });
+    data.activation_tracker = Some(audit.dupe());
+    let mut transaction = build_root_transaction_with_data(&dice, epoch.build(), data).await;
+    let root = CqueryCommandRoot {
+        expression: QueryExpression::parse(expression).unwrap(),
+        workspace,
+        base_configuration: build_test_configuration("target"),
+        configuration_overlay: CommandConfigurationOverlay::default(),
+        roots: Arc::from([CqueryRootTarget {
+            requested: Arc::from("//:root"),
+            canonical: root_label.clone(),
+        }]),
+        literal_roots: Arc::from([(Arc::from("//:root"), 0)]),
+        include_implicit: true,
+        include_tool: true,
+    };
+    let terminal = match root.compute(&mut transaction).await.unwrap() {
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => terminal,
+        slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+            panic!("authored observed fixture unexpectedly needs preparation: {need:?}")
+        }
+    };
+    match (failing_analysis, terminal.as_ref()) {
+        (true, Err(CqueryCommandError::Analysis(error))) => {
+            assert!(error.to_string().contains("CQUERY_ANALYSIS_FAILURE"));
+        }
+        (false, Err(CqueryCommandError::Evaluation(error))) => {
+            assert!(error.contains("siblings() not supported for post analysis queries"));
+        }
+        (_, other) => panic!("unexpected cquery terminal: {other:?}"),
+    }
+    let completed = audit.completed.lock().unwrap().clone();
+    assert!(!completed.is_empty());
+    assert!(
+        completed
+            .iter()
+            .all(|(activation, _, _)| activation.version() == transaction.version())
+    );
+    let analysis_roots = completed
+        .iter()
+        .filter(|(_, _, label)| label.as_ref() == Some(&root_label))
+        .collect::<Vec<_>>();
+    assert_eq!(analysis_roots.len(), 1);
+    assert_eq!(analysis_roots[0].1, failing_analysis);
+    let completed_nodes = completed
+        .iter()
+        .map(|(activation, _, _)| activation.node())
+        .collect::<std::collections::HashSet<_>>();
+    if !failing_analysis {
+        assert!(completed.iter().all(|(_, transient, _)| !transient));
+        // Strict closure lookup independently verifies the late failure's
+        // actual observed-analysis root at this transaction's exact version.
+        let closure = transaction
+            .activation_closure(completed_nodes.iter().copied())
+            .await
+            .unwrap();
+        assert_eq!(closure.version(), transaction.version());
+        assert_eq!(closure.roots().len(), completed_nodes.len());
+        assert!(
+            closure
+                .nodes()
+                .iter()
+                .any(|node| node.node() == analysis_roots[0].0.node())
+        );
+    }
+    let permits_unavailable = root.allows_unavailable_terminal_roots(&terminal);
+    assert_eq!(permits_unavailable, failing_analysis);
+    let sealed = if permits_unavailable {
+        attempt.seal_terminal_allowing_unavailable_roots().unwrap()
+    } else {
+        attempt.seal_terminal().unwrap()
+    };
+    assert_eq!(sealed.root_count(), completed_nodes.len());
+    let selected = sealed.select(&transaction).await.unwrap();
+    selected.into_parts().2.reset_to_idle().unwrap();
+}
+
+#[tokio::test]
+async fn cquery_analysis_failure_attests_transient_root_and_allows_terminal_selection() {
+    cquery_terminal_policy_case(true, "//:root").await;
+}
+
+#[tokio::test]
+async fn cquery_late_evaluation_failure_uses_verified_nontransient_strict_closure() {
+    cquery_terminal_policy_case(false, "siblings('//:root')").await;
+}
