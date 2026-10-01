@@ -10,13 +10,13 @@
 //! Same-daemon workspace runtime requests.
 //!
 //! The daemon owns one [`WorkspaceRuntime`]. A filesystem observation adapter
-//! retains compatibility invalidation metrics and failure behavior; typed
+//! retains advisory metadata-change counts; typed
 //! build/query commands discover their semantic path inputs through DICE.
 
-use std::collections::BTreeMap;
 use std::path::Path;
 use std::path::PathBuf;
 
+mod workspace_metrics;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -24,17 +24,15 @@ use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::WorkspaceObservation;
 use slug_core_v2::runtime::WorkspaceRuntime;
-use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
-use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
+use workspace_metrics::FilesystemObservationAdapter;
 
 /// The retained daemon state: one workspace runtime and a non-semantic
 /// observation adapter. The adapter's previous values are used only to report
@@ -206,7 +204,7 @@ impl Daemon {
         configuration_overlay: CommandConfigurationOverlay,
         run: bool,
     ) -> (BuildResult, Option<PathBuf>) {
-        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return (
@@ -506,7 +504,7 @@ impl Daemon {
                 );
             }
         };
-        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
                 return QueryResult::error(7, &error.to_string());
@@ -605,7 +603,7 @@ impl Daemon {
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> QueryResult {
-        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return cquery_error_result(&error.to_string(), 0),
         };
@@ -707,7 +705,7 @@ impl Daemon {
         registry_urls: Vec<String>,
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
     ) -> QueryResult {
-        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+        let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return aquery_error_result(2, &error.to_string(), 0),
         };
@@ -929,34 +927,6 @@ impl QueryResult {
             stderr: query_error_json(error, invalidated_files),
             invalidated_files,
         }
-    }
-}
-
-#[derive(Default)]
-struct FilesystemObservationAdapter {
-    previous: Option<BTreeMap<PathBuf, WorkspaceFileValue>>,
-}
-
-impl FilesystemObservationAdapter {
-    fn observe(&mut self, workspace: &Path) -> anyhow::Result<(WorkspaceObservation, usize)> {
-        let observations = observe_workspace(workspace)?;
-        let current = observations
-            .files
-            .iter()
-            .map(|observation| (observation.path.clone(), observation.value.clone()))
-            .collect::<BTreeMap<_, _>>();
-        let invalidated = self.previous.as_ref().map_or(0, |previous| {
-            previous
-                .iter()
-                .filter(|(path, value)| current.get(*path) != Some(*value))
-                .count()
-                + current
-                    .keys()
-                    .filter(|path| !previous.contains_key(*path))
-                    .count()
-        });
-        self.previous = Some(current);
-        Ok((observations, invalidated))
     }
 }
 

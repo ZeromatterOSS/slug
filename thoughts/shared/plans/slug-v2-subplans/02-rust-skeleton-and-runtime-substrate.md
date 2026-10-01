@@ -10,6 +10,17 @@ current/next/stop language in the detailed owner record below describes its
 historical packet; it cannot override the live contract or current user request.
 Read a particular retained decision as needed, not this complete chronology.
 
+## Daemon advisory reporting boundary
+
+Typed daemon commands discover and validate semantic inputs through the shared
+content-backed DICE/source-certificate owners. The private workspace_metrics
+adapter retains only file metadata for invalidated_files reporting; that
+Slug-native count is advisory, may count metadata touches or miss indistinguishable
+content changes, and never drives semantic invalidation. It must not read/retain
+workspace file payloads. The legacy explicit Core snapshot helper remains for
+its bounded callers/tests. WP880 covers sparse payloads and genuine DICE content
+A/B/A even when advisory reporting says zero; its manifest owns validation.
+
 ## Goal
 
 Create the minimal Slug V2 Rust binary/server skeleton while reusing Buck2

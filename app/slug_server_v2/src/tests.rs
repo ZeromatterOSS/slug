@@ -3433,3 +3433,6 @@ fn every_active_daemon_decoder_carries_command_module_overrides() {
 
 #[path = "requested_build_tests.rs"]
 mod requested_build_tests;
+
+#[path = "metric_semantics_tests.rs"]
+mod metric_semantics_tests;

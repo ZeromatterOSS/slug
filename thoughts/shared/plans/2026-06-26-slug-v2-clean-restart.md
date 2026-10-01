@@ -34,19 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-179-m7a-production-configured-root-frontier-r1
-Status: resource stop recorded; independent FINAL accepted evidence only; configured-root terminal unproved
+Packet: WP-7-180-m7a-daemon-metadata-metrics-memory-r1
+Status: accepted; independent DESIGN/FINAL accepts memory repair and concrete frontier; M7A remains partial
 
-WP877 remains accepted at `8541e15dc`. The ordinary actual-root cquery was
-stopped for host memory pressure after76.597s, with a49.3GiB RSS high-water
-and9.5GiB swap at shutdown. Input/CLI hashes stayed unchanged and owned cleanup
-completed; no configured terminal or M7A/M8 closure is proved. Independent FINAL
-accepts the resource disposition. The user selects memory identification and
-repair: static source trace finds the daemon's nonsemantic invalidation-metrics
-adapter retains a whole-workspace byte snapshot, including507.42GiB of logical
-target files. Select its bounded metadata-only advisory-metrics replacement;
-content-backed semantic DICE observations remain authoritative. No identical
-query retry/cap increase, graph leak claim, or reopening of the old F3 chain.
+WP880 eliminates the daemon's pre-semantic invalidation-metrics workspace byte
+snapshot, replacing it with compact Slug-native advisory metadata records.
+Content-backed DICE remains authoritative; all12 focused scanner/daemon gates
+and direct CLI build pass. Actual checkout cold/warm scanner peaks250.53MiB;
+the genuine rebuilt root query now reaches an exit2 terminal at10.507s with
+301.56MiB daemon high-water and zero sampled swap, versus WP87949.3GiB.
+Source/CLI hashes and isolated cleanup pass; independent FINAL accepts the
+footprint fix. The terminal is module_ctx.path refusing generated repository
+Labels below @slug_crates. Select its bounded source-grounded demand/owner audit.
+Broader-suite completion, deeper graph memory, configured success and bootstrap
+remain unproved; no identical query retry or old F3 reopening is selected.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
