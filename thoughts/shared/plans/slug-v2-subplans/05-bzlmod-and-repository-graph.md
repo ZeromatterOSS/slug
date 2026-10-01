@@ -12,6 +12,85 @@ The accepted manifest records45 focused gates and the default CLI's next
 unsupported scratch_path.get_child frontier; no scratch I/O or full bootstrap
 is inferred.
 
+## Selected extension scratch/process decision
+
+WP886 audits the next consumer rather than admitting only its lexical method.
+Rules_rust0.73.0 release SHA256
+`2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2`
+matches the requested descriptor retained by WP885. An exact existing cached
+archive was streamed/verified after the single16MiB network acquisition hit
+its cap; no retry or cap increase. Selected51 MODULE/.bzl files697959bytes
+and49 Rust source files757305bytes were hashed independently. These are
+authenticated static branches, not execution beyond the observed get_child.
+
+The demanded closure in extensions.bzl576–766 is scratch config/splicing
+writes, branch selection, query/generate execution, sidecar reads/string watches,
+hub/subpackage/per-crate reads and repository declarations. Root MODULE.bazel
+provides both lockfiles, but environment can force repin. generate_utils.bzl
+363–436 queries a present lock unless repin was requested; a nonzero query
+errors rather than implicitly repinning. query.rs39–91/lockfile.rs60–110 read
+lock/config/manifest bytes and run cargo/rustc --version. lockfile.rs174–205
+forwards HOME/HOMEDRIVE/PATHEXT/NIX_LD/NIX_LD_LIBRARY_PATH to those children.
+generate.rs133–167 renders directly from a present lock when repin is false;
+its generated files and three JSON sidecars are real process outputs. Repin
+adds Cargo resolution/network and possible workspace lockfile writes. The
+actual root branch/query result remains unproved.
+
+The authenticated executable must own compiled package-version, serialization
+and bundled template bytes. Authenticating Rust control flow alone does not
+prove that downloaded binary's build identity; a native algorithm/rendering
+port would need those version/template/serialization inputs pinned separately.
+
+Bazel9.2 at8220c6198837d5c13d53fea211cf3282aa12408a is the authority:
+StarlarkPath.java139–155 joins multiple child strings before normalization;
+BaseExternalContext.file1443–1501 overwrites scratch files with explicit bytes
+and executable mode; read's auto-watch skips self-watch while explicit yes
+rejects it (1580–1644); execute1938–2077 merges
+inherited environment with set/remove overrides and captures code/streams.
+ModuleExtensionContext99–103 deletes scratch on completion/restart/error after
+BaseExternalContext226–245 drains async work. Public PathTest49–55 and
+RepositoryContextTest259–308/354–361 supply lexical/file/read themes; the named
+module-extension tests do not establish process/output-capture lifecycle.
+
+Current ScratchPath relative spelling plus opaque Arc validates invocation
+ownership only. Selected download owns verified shared bytes, not a staged
+scratch file. Label paths own observed namespace/location, not implicit file
+content. The separate repository execute owner includes a repository ordinal,
+admits only confined GCC probes and returns no generated output tree; a module
+invocation must never impersonate that owner. Duplicate-path rejection in a
+repository file plan must not replace scratch overwrite semantics.
+
+The faithful candidate is a distinct selected-extension scratch/content and
+execution certificate under its full semantic extension owner, with ordered
+calls, input/tool bytes and modes, path provenance, cwd and effective environment.
+Pure ordered writes/download bindings and reads of produced bytes precede typed
+Need → heap/transaction drop → native fulfillment → immutable epoch → replay.
+Captured dynamic output bytes/modes must explain every subsequent read;
+temporary Host paths/display tokens cannot serve as semantic identity. Reuse
+existing source observations, lease/revocation, accepted-closure pruning and
+cancel/drain mechanics without a command cache or global registry. No lock spans
+DICE compute; failed/cancelled attempts publish no repos/events/current outputs.
+
+Implementation is not yet bounded: tool runtime libraries/child inputs,
+inherited environment and complete bounded output capture remain unresolved.
+The next separate design packet must choose a confined query + locked-generate
+profile or another complete Rust-native contract, including containment,
+dynamic string-watch source resolution, byte/path spelling policy, input mutation
+refusal, stream/tree limits and resource-limit errors. Repin/splice/workspace
+writes and later imported repository materialization stay deferred unless their
+owners are separately resolved. Do not claim full get_child or I/O parity from
+a normalized one-string subset; namespace/physical identity stays Slug-native.
+
+Design must classify shared certificate bytes as DICE-retained semantic state,
+authorized epochs as command-retained and evaluator/staging/capture buffers as
+bounded phase/transfer scratch. Account for descriptor-prefix growth, sharing,
+equality cutoff, deselection, abort/restore and shutdown; preserve WP880 reporting.
+Use Stage9's selected-download/Arc/compact-utility policy before any retained
+representation is implemented. Required later proof is genuine input-consuming
+execution/output reads, warm A/B/A content/tool/env/order changes, foreign-owner
+refusal, dynamic output/missing/oversize/nonzero cases and cleanup on Need,
+timeout/cancel/restore/concurrent requests before another actual-root replay.
+
 ## Goal
 
 Implement bzlmod as DICE-owned semantic state: module parsing, resolution,

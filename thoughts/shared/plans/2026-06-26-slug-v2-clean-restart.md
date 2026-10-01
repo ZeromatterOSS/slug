@@ -34,18 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-185-m7a-generated-owner-cycle-path-r1
-Status: accepted after independent FINAL review; M7A remains partial
+Packet: WP-7-186-m7a-scratch-path-consumer-audit-r1
+Status: source/ownership audit accepted after independent FINAL review; M7A remains partial
 
-WP885 accepts WP883's complete mixed-cycle/owner contract with WP884's live
-context token. Loading path admission/graph, Core binding and actor retirement
-land atomically after independent FINAL ACCEPT and45 focused source-valid
-gates. Default CLI root replay advances beyond host-tools generated Label into
-crate_universe scratch_path.get_child, exit2 naturally, peak1090.074MiB/zero
-swap and unchanged hashes/scoped cleanup. WP880 reporting-memory fix remains
-protected. Full configuration/deeper memory/bootstrap remain unproved. Next
-ready work is a bounded source/ownership audit of that scratch consumer closure.
-See `slug-v2-subplans/current-packet.md`.
+Authenticated scratch/file/read/execute consumer and Bazel source audit selects
+an explicit selected-extension scratch/process certificate candidate. Complete
+inherited environment, tool runtime/child inputs and bounded dynamic output
+capture still require a separate WP887 design decision before implementation.
+No Rust behavior or root replay activated. WP885 at e2e1c5723 actual root
+exit2/1090.074MiB/zero swap protects WP880 reporting memory; full configuration,
+deeper memory/bootstrap remain unproved. See `slug-v2-subplans/current-packet.md`
+and Stage5's selected scratch/process owner decision.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
