@@ -34,19 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-188-m7a-observed-input-image-capture-r1
-Status: accepted after independent FINAL ACCEPT; no process activation; M7A remains partial
+Packet: WP-7-189-m7a-native-process-backend-readiness-r1
+Status: accepted conditional backend source-design and exact capability prerequisites; no process activation; M7A remains partial
 
-WP888 accepts the declared observed source-image/native streaming capture
-prerequisite from WP887 at6c4558824. Workspace36/36 and Core22/22 new/native
-capture gates pass, plus39 protected controls; two extra unchanged socket tests
-are EPERM-blocked. Affected-owner all-target and default CLI checks pass; optional
-CLI integration-test compilation retains an unchanged baseline type mismatch.
-Normal DICE Needs, authorized source roots, bounded copy/frontier validation and
-last-Drop credits/leases are accepted. Complete runtime asset catalog/unknown-access,
-quota-backed scratch and cohesive module process activation remain required.
-No root replay/process/bootstrap or whole-daemon RSS claim. WP880 memory repair
-and WP885 peak1090.074MiB/zero swap remain latest proof. See manifest and Stage5/9.
+WP889 selects a conditional Rust-native namespace keeper/private tmpfs and finite
+ptrace mediator, with sealed RO certified code through the full run. Actual private
+mount/root-FD retention succeeds; both tracing routes return EPERM, and unmapped
+seed creation EOVERFLOW prevents quota/data proof. Mapped identity, permitted
+complete tracing and actual runtime catalog remain required. Next useful owner is
+bounded normal-DICE ELF metadata after shared API/proof review. Stage5/9 retain
+full query/locked-generate and lifecycle gates; no process/bootstrap/RSS claim.
+Memory fixd95f2bda6 and WP885 peak1090.074MiB/zero swap remain latest proof.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

@@ -166,7 +166,7 @@ future implementation gates. WP887 design/source review activates none of them.
 
 ## Observed source-image prerequisite
 
-WP888 implements the declared source-tree part of prerequisite1 below. An
+WP888 implements the declared source-tree part of prerequisite1 above. An
 ordinary Workspace DICE key produces a namespace/anchor/subtree/policy-bound
 certificate from charged scoped Needs; Core authorizes the actual workspace or
 exact current immutable request/result/root/session before first observation.
@@ -194,6 +194,49 @@ protected controls. Two unchanged socket-fixture controls are EPERM-blocked;
 affected-owner all-target/default CLI compile passes. Optional CLI integration
 compilation retains an unchanged baseline type mismatch. Packet receipt owns
 exact selectors and measured preparation/runtime evidence.
+
+## Conditional native backend and runtime fact ownership
+
+WP889 accepts source-design only: a Rust-native namespace keeper, private tmpfs
+and retained root FD, closed certified RO images, and parent ptrace mediation
+of a finite Linux x86_64 ABI. Runtime execution remains unsupported here.
+Both actual TRACEME and own-child SEIZE return EPERM. NEWUSER/NEWNS, private
+propagation and a64KiB/32-inode tmpfs mount succeed; cross-process SCM_RIGHTS
+retains its root FD after helper exit. Seed creation returns EOVERFLOW without
+identity mappings, so neither quota loop runs and retained file data is unproved.
+Upstream v6.12 credential checks support a mapping-related inference, not exact
+vendor7.2.7 attribution. No mapping writes or privilege retries occurred.
+
+The required execution context must supply mapped uid/gid and permitted tracing.
+Future implementation must prove the complete sharing-task/writer barrier through
+kernel argument consumption, descendant-before-access tracking, finite syscall/
+FD/ABI coverage and irreversible denial attribution. Seccomp inspect+CONTINUE
+cannot authorize mutable pathnames; PT_INTERP also requires preowned loader facts.
+Declared missing observations retain their real errno; unowned access invalidates
+an attempt even if the child handles denial. Namespace/API support alone is not
+mediation, quota or process correctness evidence.
+
+Select max2 workspace128MiB scratch leases with4096 inodes including root. Retain
+keeper/root capability and slot through all writer/descendant drain, complete
+capture, teardown and actual reap. Failed3s cleanup retains a runtime-owned
+quarantined lease; it cannot release authority early or promise a D-state reap.
+Tmpfs data pages/inodes are separate resources, not total RSS or descriptor credit.
+Select a certified sealed RO generator overlay at its original scratch spelling
+and ordered prefix, immutable throughout the full child/descendant run with no
+writable aliases/FDs/maps. This supersedes admission-only writable execution.
+Overlay/prefix consistency and visible post-tree capture remain mandatory gates.
+
+The next useful bounded owner is normal-DICE ELF metadata, not a complete runtime
+catalog. Workspace scoped Needs bind checked, bounded ELF facts to the exact same
+whole-file SHA256 byte image as the producer certificate; precharged proof ranges
+must match every consumed byte during streaming. Pure normal keys project facts;
+no ldd, whole-tool payload retention or native completed-catalog injection.
+Bzlmod must separately select actual generator/host-tools capabilities, loader
+revision/search/negative facts, assets and inherited/child env consequences.
+Those actual selected roots are not currently retained; unrelated binaries or
+ambient host paths cannot replace them. Detailed ELF API/bounds review precedes
+implementation; full query/locked-generate, quota/capture and runtime catalog
+proof remain required. No process activation, M7A/bootstrap or new RSS claim.
 
 ## Goal
 
