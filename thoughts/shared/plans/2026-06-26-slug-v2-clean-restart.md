@@ -34,20 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-180-m7a-daemon-metadata-metrics-memory-r1
-Status: accepted; independent DESIGN/FINAL accepts memory repair and concrete frontier; M7A remains partial
+Packet: WP-7-181-m7a-crate-generated-label-owner-audit-r1
+Status: accepted audit; diagnostic-only successor selected; M7A remains partial
 
-WP880 eliminates the daemon's pre-semantic invalidation-metrics workspace byte
-snapshot, replacing it with compact Slug-native advisory metadata records.
-Content-backed DICE remains authoritative; all12 focused scanner/daemon gates
-and direct CLI build pass. Actual checkout cold/warm scanner peaks250.53MiB;
-the genuine rebuilt root query now reaches an exit2 terminal at10.507s with
-301.56MiB daemon high-water and zero sampled swap, versus WP87949.3GiB.
-Source/CLI hashes and isolated cleanup pass; independent FINAL accepts the
-footprint fix. The terminal is module_ctx.path refusing generated repository
-Labels below @slug_crates. Select its bounded source-grounded demand/owner audit.
-Broader-suite completion, deeper graph memory, configured success and bootstrap
-remain unproved; no identical query retry or old F3 reopening is selected.
+WP880 is accepted at d95f2bda6: reporting-only workspace payload retention is
+removed; the ordinary actual-root cquery now reaches a concrete terminal in
+10.507s at301.56MiB daemon high-water/zero sampled swap. Reuse that evidence.
+The audit infers @rust_host_tools at rules_rust crate_universe/extensions.bzl:877;
+retained output proves mapping/refusal, not the actual argument or refusal site.
+Existing source/materialization owners can supply an independent repository,
+but general extension-owner cycle safety is missing. The selected successor is
+a reviewed canonical-Label/refusal-site diagnostic that preserves current
+fail-closed behavior. No generated-Label semantics are admitted; no identical
+root retry, owner bypass or old F3 reopening. Full root configuration, deeper
+graph memory and bootstrap remain unproved.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
