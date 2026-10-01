@@ -269,6 +269,30 @@ the current evaluator's provenance. Unchanged configure_features and Rust linker
 queries consume the actual complete provider. Generic callable serialization,
 full toolchain/FDO production and compile/link actions remain deferred.
 
+The captured Rust-toolchain callback has a separate finite recipe design; runtime
+publication/invocation is not yet admitted. The pinned rules_rust toolchain source
+(`c4b613ce…c4d468e`) publishes nested make_ccinfo, capturing complete cc_toolchain,
+feature_configuration, the link-stdlib Boolean and the genuine rust_std Target.
+The consumer supplies label/actions/allocator/std; producer ctx/actions never
+enter that recipe. Loading authenticates caller/source/callsite and imported
+allocator-helper (`ae4acb50…1e536e`) provenance, reads the directly calling frame
+through the existing native_call_local_value capability, and traces registrations
+until owned lowering. BuildAPI remains Starlark-free and owns source/capture/alias
+semantics with occurrence equality and complete publication comparison; Loading
+runtime and Analysis rematerialization own invocation against the consumer's
+current token, configured root and native sink.
+
+Implementation must deliver the complete original helper's validation order,
+allocator forms, self-contained compilation/link pipeline, ordered topological
+library/panic layers, static/dynamic std, both std modes and CcInfo merge/None cases.
+The concrete native-builder or source-owned helper execution seam and private
+access authority remain an open implementation decision. Same-named export lookup,
+unmodeled frozen helper code and publication-only proxies are not approved bridges.
+Generic closure/code retention remains deferred; activation must be atomic with
+lossless producer-teardown/GC/freeze, equality/hash/alias, capture/source/helper/
+configuration restoration and consumer-action invocation proof. See the selected
+manifest for the current implementation gate, not this design as runtime evidence.
+
 WP764 adds exact public copts/conlyopts/cxxopts and private dotd/save-temps/header
 policy getters over that same complete configuration. Eight command admissions
 reuse typed converters; both exec paths map host compile options, append -g0

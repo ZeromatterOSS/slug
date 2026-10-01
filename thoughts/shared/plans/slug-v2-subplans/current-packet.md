@@ -1,122 +1,120 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-174-m7a-identical-artifact-symlink-registration-r1
-Status: accepted; independent corrected DESIGN/FINAL accepted; M7A remains partial
+Packet: WP-7-175-m7a-rust-toolchain-captured-callable-design-r1
+Status: accepted design; independent DESIGN/FINAL accepted; M7A remains partial
 
-## Outcome and compatibility
+## Outcome and evidence
 
-Baseline `0361ef2a4` (WP873). Let repeated equivalent ordinary artifact-symlink
-registrations within one CtxActions return the first registered index/action,
-using the existing output-owner candidate index. Advance unchanged authentic
-Rust-toolchain query past its sysroot libLLVM duplicate output at toolchain.bzl:156
-if and only if the actions prove equivalent. The first authentic input is not
-retained after one-shot cleanup; overlap is a hypothesis, not accepted evidence.
-Exact bounded same-context/same-structural-output and ownerful-identical-artifact
-registration eligibility; Slug-native structural identity remains unchanged.
-First-action/index registry canonicalization and action-vector cardinality are
-Slug-native: Bazel assigns the first generating key but retains original action
-rows (Actions.java:233–282; RuleConfiguredTargetBuilder.java:278–294). This does
-not admit exact raw duplicate-row/progress inspection or ordinary-symlink aquery.
-Cross-target ordinary-symlink sharing, ownerless artifact aliases, absolute-path
-symlink deduplication, general action sharing and Windows remain deferred.
+Baseline `da449cbbb` (WP874). Resolve the actual captured Rust-toolchain callback's
+semantic/source/lifetime owners before activating publication. This is a design
+packet because generic frozen closures versus finite native recipes is a new
+retained-value/code ownership choice; an implementation-only getter cannot satisfy
+it. No runtime activation, callable placeholder, precomputed CcInfo substitution,
+producer ctx retention or generic raw Def serialization is authorized here.
+Select a distinct finite source-authenticated Rust-toolchain recipe with complete
+invocation behavior, following accepted Stage 6 WP763 ownership. Generic frozen
+code/module carriers remain deferred. This decision is bootstrap-aligned only if
+the full imported helper semantics execute against the consumer's live actions.
 
-Pinned clean Bazel 9.2 `8220c6198837d5c13d53fea211cf3282aa12408a`:
-RuleConfiguredTargetBuilder.java:277–280 uses Actions' shared-action conflict gate;
-Actions.java:85–115 compares mnemonic/key and ordered mandatory inputs/outputs,
-:191–220 permits equivalent registrations in one target. AbstractAction.java:
-352–353 is shareable. SymlinkAction.java:429–448 keys optional inputPath and changes
-mnemonic for executable symlinks; progress text is not a key input. We admit only
-same typed Artifact input/output identity plus require_executable and
-use_exec_root_for_source flags; differing presentation progress may reuse the
-first action. No Bazel ActionKey-byte or ownerless/full-sharing claim. Existing
-Stage 6 configured-action closure eligibility remains unchanged. Upstream Java
-instance/reference assertions are not used; genuine Starlark regression exercises
-the public sink and retained typed actions instead.
+Authentic unchanged WP87478.763s exit2 stops at recursive ToolchainInfo publication:
+`$[0].make_libstd_and_allocator_ccinfo: unsupported analysis value of type function`.
+Preserved verbatim Loading host_package_load_tests.rs:5568+ toolchain source
+43,390 bytes SHA c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e
+(test31042–31050); source560–570 defines nested make_ccinfo, source606 publishes it.
+This is NOT the imported/global helper itself. Four captures are cc_toolchain,
+feature_configuration, experimental_link_std_dylib and rust_std. Producer ctx/actions
+occur only in separate make_local_ccinfo; consumer supplies label/actions/allocator/
+std to the published closure. No capture mutation follows the constructor.
+Allocator helper source at host_package_load_tests.rs:6572–6875 is11,932 bytes
+SHA ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e (test30580–30586).
+Root independently extracted/hashes these constants; target/wp875/source-research.json.
 
-## Owners, invariants and scope
+Pinned Bazel9.2 `8220c619`: ToolchainInfo.java:58–99 admits arbitrary Starlark values;
+CcToolchainProviderTest.java:199–226 publishes a loaded global function through a
+provider and invokes it in a new thread. That lower-bound lifetime evidence does
+not prove nested captures. Actual rules_rust source and new genuine captured-producer/
+consumer discriminators will own that gate. Source-exact named recipe behavior,
+Slug-native structural configuration/artifact and occurrence/publication identity;
+generic closure and full callable/inspection parity remain unsupported/deferred.
 
-BuildAPI actions/ctx_actions.rs::register_symlink owns the decision. SymlinkSpec
-already owns output, typed target and optional progress; ActionRegistry already
-owns ordered actions and an output-path candidate index. Resolve that candidate,
-require its typed symlink spec, require both targets to be Artifact, compare full
-output and target equality, then return its original index. Progress differs only
-in presentation and first-action retention; do not mutate the accepted action.
-The candidate ActionSpec execution properties must be empty and exec_group None,
-matching register_symlink's default envelope. Generic batch-supplied nondefault
-properties/groups must conflict; they cannot be erased by comparing payload only.
-Non-equivalent candidates continue through existing registry validation/conflict
-paths, including projected-path collisions, output kinds/metadata, other action
-families and malformed output paths. Generic register/register_batch and atomic
-replace_actions publication remain unchanged. Preserve first-seen ordering and
-all unrelated outputs; no filesystem/path-only inference or registration bypass.
+## Chosen owners and implementation obligations
 
-Loading active-token and native Sink current-output ownership/regular File/input
-checks run before registration and remain unchanged. Sink locks remain synchronous;
-no new DICE key, lock/await, retained fact, cache or memory owner. Candidate/spec
-comparison is call scratch borrowing existing phase registry; no new representation,
-collection or donor utility. Existing DICE source/configuration/provider ownership
-publishes the deduplicated ordinary action vector, invalidates and restores it.
-No replay postprocessing, command repair or fresh graph bypass. Buck2 utility skill
-requires no donor change for unchanged storage/representation. ctx_actions.rs is
-small/cohesive; existing large starlark_rule test fixture is reused without new
-monolithic production responsibilities. Independent DESIGN/FINAL required.
+Loading authenticates canonical caller/source, observed AND evaluated SHA, exact
+ToolchainInfo callsite and _rust_toolchain_impl frame, imported allocator-helper
+source and load provenance. Existing evaluator.native_call_local_value at
+runtime/evaluator.rs:532–558 reads/unwraps one directly calling Def local; it neither
+searches outer/module frames nor grants provenance. After authentication it can
+read all four captures without exposing private DefGen captures/code. Register the
+genuine function's occurrence/name-hash and captures in a traced evaluator/module
+root, freeze/GC safely, and snapshot only after evaluation stops. Missing/malformed
+captures or changed caller/helper/import provenance fail closed. Source aliases,
+shadowed/imported wrappers and native-call-context confusion must not authenticate.
 
-Allowlist: app/slug_build_api_v2/src/actions/ctx_actions.rs; existing
-app/slug_build_api_v2/tests/actions.rs; existing Analysis tests/starlark_rule.rs
-sibling/symlink fixture and regression only; canonical/manifest and Stage 6 current
-action-registration paragraph. No Loading, generic registry/spec/identity, Core
-closure, executor, CLI, dependencies or copied fixture assets. Estimate production
-<20/proof <150 net Rust lines. WP873 fixture hygiene checkpoint passed; no file growth.
+BuildAPI owns a distinct immutable Rust-toolchain callable model/source authority
+and all structurally lowered captures, with existing Arc/Dupe/Allocative patterns.
+Keep BuildAPI Starlark-free; don't repurpose CcToolchainCallable's four kinds. Public
+function equality/hash preserve original occurrence/name hashing; publication
+compares every capture/source and complete alias partition, preserving A/B/A cutoff
+without a heap address as semantic identity. No evaluator/frame/module Value or
+producer sink/token enters retained semantic data. New representation must use the
+Buck2 utility skill and relevant Stage9 existing callable disposition.
 
-## Proof, validation and stops
+Loading runtime and Analysis lower/materialize bridge rematerialize capture graphs
+and the callable. Implement the complete original four-argument binding, validation
+order and helper behavior via existing Cc/provider/depset/native action owners:
+allocator struct/field/provider validation; self-contained compilation outputs and
+linking pipeline/additional toolchain inputs; allocator archive variants; ordered
+alloc/between/core/panic/memchr/std/test topological library layers and panic filters;
+static/dynamic std, std/no_std_with_alloc modes; CcInfo merging or original None case.
+Consumer label/actions, active-token checks, current configured root and output owner
+remain authoritative. Never replace this with publication-only success or None.
 
-BuildAPI proof must retain original action/index/progress/order for repeats and
-progress-only differences; distinguish source/derived ownerful inputs, execution
-flags, structural output roots/kinds/metadata and other action kinds. Each rejected
-registration preserves full registry state; generic duplicate/batch atomicity stay
-protected, including batch candidates with execution properties/group differences.
-Absolute-path deduplication remains refused. Genuine sibling fixture
-repeats source and exec-derived symlinks with different progress, keeps two actions,
-and proves root/nested/external, Target/Exec, both Analysis routes and source/declared
-output/configuration A/B/A. Add a real public different-input/executable conflict
-mutation and restoration; preserve active/lifetime downstream evidence.
+Implementation must resolve the concrete builder/dispatcher seam and source/private
+access authority before activation. Existing public builders mostly live in
+rules_cc Starlark bodies, so neither blindly looking up a same-named export in the
+consumer nor retaining unmodeled frozen helper code is an approved shortcut. A
+source-owned existing helper execution seam or full native operation composition
+needs its own reviewed implementation contract; this packet chooses the finite
+semantic owner, not an unverified invocation adapter. Any discovered unadmitted
+self-contained/dynamic action prerequisite stays named/open rather than replaced
+with a generic Spawn or swallowed error. Coupled publication/invocation activation
+must land atomically after those gates; preparatory data models alone are not parity.
 
-Root serial pinned Cargo JSON BuildAPI --test actions and Analysis --test
-starlark_rule no-run60s; exact ordinary nonignored preflight/runtime20s. Analysis
-lib downstream/lifecycle compile/focused proof, Core check and CLI rebuild before
-unchanged authentic supervised180s replay. Its ~79s setup is required to prove real
-toolchain overlap; authored equivalence checks cannot establish bootstrap progress.
-Actual process pre/post cleanup, three original hashes, scoped fmt/diff/archive/plan
-and fixture hygiene gates. Caps are operation bounds, not user limits. REPLAN if
-actual overlap needs different Artifact identity, a new action-key/ownerless rule,
-cross-target sharing or broader action family. A later query refusal is successor
-evidence, not full query/execution/bootstrap closure. Windows stays minimal.
+## Scope, acceptance and next gate
+
+Docs only: manifest/canonical and Stage6 callable owner contract; Stage9 only if a
+new reuse disposition is actually selected. No Rust, dependencies, Starlark engine,
+fixture/source bodies, CLI, query/executor or platform changes. Windows minimal.
+Independent DESIGN/FINAL review of the actual chosen contract; source hashes,
+source/owner cross-checks, diff/archive/plan checks. No Cargo/oracle required for
+this ownership decision; WP874 replay is retained evidence, not callback execution.
+Implementation's required discriminators: genuine producer disposal/heap release,
+GC/freeze, original/proxy equality/hash and nested/aliased republication; all captures/
+source/helper/configuration ABA; four-argument binding and invalids; both allocator
+forms/std modes, nonempty ordered libraries/panic filters, dynamic/self-contained
+branches; consumer-owned native actions and expired/suspended refusal. Reuse existing
+cc_toolchain_tests/rustc_map_each lifecycle fixtures and full-source authentic rules
+instead of new copied archives. Unchanged authentic replay and eventual allocator/
+link execution remain required; cquery advancement alone proves no invocation.
+
+REPLAN implementation for raw frozen-code lifetime ownership, unmodeled globals/
+defaults/cycles/captures, new action prerequisites or a publication-only adapter.
+Root may resolve authorized architecture choices without user confirmation. This
+design is complete only when the owners and remaining implementation seam are
+explicitly reviewed; full M7A/bootstrap stays unproved.
+
+Independent DESIGN/FINAL accepted the docs-only ownership decision. Source hashes,
+owner checks and diff/archive/plan checks pass; no Cargo or new oracle was needed.
+The feasible next seam uses Loading's existing DICE-owned FrozenBzlModule and load
+manifest, prepared before synchronous Analysis evaluation and passed to both
+materializers as phase code bindings. Its finite API, source/private authority and
+invocation lifetime still require implementation review. No runtime gate advanced.
+Packet elapsed about20 minutes (03:37–03:57 UTC); target/wp875/source-research.json
+retains source evidence. No workflow speedup claim.
 
 ## Predecessor
 
-WP873 `0361ef2a4`: independent DESIGN/FINAL and fixture hygiene, 28 focused tests
-in1.433s, Core/CLI pass. Target.files reuses frozen DefaultInfo.files; flag and
-missing-default boundaries deferred/refused. Unchanged authentic79.222s exit2
-clears files projection and reaches duplicate sysroot symlink registration.
-Original hashes and actual cleanup pass. Receipts target/wp873; full M7A remains partial.
-
-## Acceptance
-
-Corrected DESIGN and FINAL independently ACCEPT. The execution-envelope correction
-prevents generic batch metadata from disappearing. Production +15 Rust lines;
-proof +234 exceeds the +150 estimate because source/derived owner/config/root/kind,
-execution flags, output kinds/constant metadata, progress/order and batch envelopes
-each discriminate separate retained invariants. No new fixtures, copied assets or
-representation/helper growth; the existing genuine Analysis matrix is preserved.
-
-Pinned serial preparation BuildAPI3.78s, Analysis lib1.34s, starlark_rule11.15s;
-exact ordinary nonignored preflights pass. BuildAPI6/6 in0.032s, Analysis4/4 in0.033s,
-integration2/2 in0.414s: 12 focused tests in0.479s. Core check3.31s and CLI rebuild
-5.62s pass. Unchanged authentic78.763s exit2 clears duplicate sysroot symlink and
-reaches ToolchainInfo.make_libstd_and_allocator_ccinfo function publication refusal.
-This verifies actual overlap under the strict ownerful/default-envelope predicate;
-different-input/flag/envelope conflicts remain protected. Three original hashes,
-supervised and actual process cleanup, scoped fmt/diff/archive/status and fixture
-hygiene pass. Receipts target/wp874. Packet window03:23–03:36UTC (~13m), no speedup
-claim. Broader sharing/raw duplicate-row inspection, Windows and full bootstrap stay
-deferred; a retained callable requires its own source/lifetime/identity review.
+WP874 `da449cbbb`: independent corrected DESIGN/FINAL,12 tests in0.479s, Core/CLI
+pass. Source-exact artifact-symlink eligibility with Slug-native first-row
+canonicalization clears sysroot overlap; three hashes and actual cleanup pass.
+Unchanged query78.763s reaches this captured-function boundary; target/wp874 receipts.

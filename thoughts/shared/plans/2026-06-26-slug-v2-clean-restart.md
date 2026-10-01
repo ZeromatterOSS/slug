@@ -34,17 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-174-m7a-identical-artifact-symlink-registration-r1
-Status: accepted; independent corrected DESIGN/FINAL accepted; M7A remains partial
+Packet: WP-7-175-m7a-rust-toolchain-captured-callable-design-r1
+Status: accepted design; independent DESIGN/FINAL accepted; M7A remains partial
 
-WP874 accepts equivalent ordinary artifact-symlink registration within one native
-analysis context. Full typed input/output, flags and default execution envelope
-must agree; first action/progress and structural conflicts stay authoritative.
-Eligibility is source-exact; first-row canonicalization is Slug-native. Independent
-corrected DESIGN/FINAL, 12 tests in0.479s and Core/CLI pass. Unchanged replay78.763s
-clears duplicate sysroot symlink and reaches a ToolchainInfo function-publication
-refusal; original hashes and actual cleanup pass. Retained callable identity/source/
-lifetime needs successor review. Full bootstrap and Windows remain deferred.
+WP875 resolves the real nested Rust-toolchain callback's four captured values,
+source authority and lifetime owners. A distinct finite source-authenticated
+recipe is selected over generic frozen-code retention, with complete helper and
+consumer-action semantics required. Independent DESIGN/FINAL and source/docs
+checks pass. The concrete builder/dispatcher seam still needs an implementation
+contract; publication-only success is insufficient.
+WP874 `da449cbbb` passed12 tests/reviews/Core/CLI and unchanged78.763s replay clears
+sysroot overlap, reaching captured function publication. Full bootstrap and Windows
+remain deferred.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
