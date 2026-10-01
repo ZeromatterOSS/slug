@@ -168,6 +168,8 @@ mod output_group_info;
 mod package_specification;
 mod rustc_map_each;
 mod template_variable;
+#[path = "starlark_rule/toolchain_frontier_tests.rs"]
+mod toolchain_frontier_tests;
 mod workspace_name;
 mod workspace_status;
 

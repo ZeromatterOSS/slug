@@ -1567,3 +1567,17 @@ positive registration-pattern queries do not enforce their recorded output;
 their owning future packets must add focused shape assertions before citing
 those rows for topology or expansion. Other accepted evidence is unchanged.
 This checkpoint resets the fixture-growth trigger after WP834 acceptance.
+
+### Fixture-growth review at WP877 acceptance
+
+The inherited WP834 reset ac3710b76 to WP877 fixture-root review records40
+added files,1157 newline bytes and18 command declarations across seven named
+fixtures (target/wp877/growth-review-root-counts.json). Review is accepted;
+no new oracle asset is added by the import-frontier correction. WP877's five
+existing full-source relocations are byte-exact with old bodies removed. Its
+private Core assembler reuses six tracked archives/103 verified member hashes,
+extracting47 additional original members only into scratch; no copied archive
+blob or duplicate third-party implementation enters Git. Coupled original-source
+and unchanged authentic producer/consumer gates pass. No prunable asset or
+checkpoint-induced oracle replay is selected. Accepted WP877 resets the growth
+trigger; inherited message-shape validation debt above remains unchanged.

@@ -6678,6 +6678,16 @@ over route and repository Bzl label, and the canonical-manifest regression
 proves duplicate direct loads and warm transactions reuse completed child
 values while preserving first-seen direct/reachable order.
 
+The later sibling-Need batching at0a2615582a preserves that source order.
+Observed preparation now settles accumulated earlier import Needs before
+publishing a later semantic failure: an unresolved earlier import can itself
+fail first. Stop visiting later imports at the same failure position, preserve
+outer/incompatible-frontier failures and Legacy behavior, and retry through
+the normal injected path owner. This Slug-native staging correction prevents
+speculative toolchain inventories from hiding transient reads beneath a
+successful resolution. Same-DICE fulfillment proves the actual first error
+and a nontransient strict closure; no validity or selection policy is relaxed.
+
 That live contract authenticates the source route after `4aed2438`:
 `rust/private/toolchain.bzl` returns through alias-only
 `rust/rust_toolchain.bzl`; `rust/toolchain.bzl` finishes its source-ordered

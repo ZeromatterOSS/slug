@@ -1,13 +1,13 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-177-m7a-rust-toolchain-captured-helper-implementation-r1
-Status: implementing on local review branch; independent DESIGN accepted; FINAL held; M7A remains partial
+Status: accepted for atomic local integration; independent DESIGN/FINAL accepted; M7A remains partial
 
 ## Outcome and evidence
 
 Accepted baseline `d9c1de64a` (WP878), including WP876 `64f52f1c4`. Implement WP875's finite four-capture Rust callback
 through publication AND complete source-owned helper invocation; activation is
-coupled. The authentic ToolchainInfo publication currently refuses nested
+coupled. Before this packet the authentic ToolchainInfo publication refused nested
 make_ccinfo. Consumer arguments remain label/actions/allocator_library/std.
 Execute original make_libstd_and_allocator_ccinfo, not a None/precomputed CcInfo
 adapter, generic closure serializer or consumer export lookup. WP876 supplies
@@ -101,7 +101,7 @@ Core runtime/tests/cquery_command_tests.rs for two genuine terminal-policy
 discriminators, new runtime/tests/rust_toolchain_callback_tests.rs,
 rust_toolchain_callback_fixture.rs and compact rust_toolchain_callback_sources.json,
 and one
-#[cfg(test)] child hook in runtime/dice.rs for the coupled proof migration; manifest/canonical/Stage6/Stage9 contracts. No CLI/executor/engine changes or
+#[cfg(test)] child hook in runtime/dice.rs for the coupled proof migration; manifest/canonical/Stage6/Stage9 contracts and Stage1 accepted-growth reset. No CLI/executor/engine changes or
 third-party body edits. Large existing files get local hooks/signatures only; new
 source/preparation/runtime/tests live in cohesive owner modules. Estimates production
 under900 lines, proof under800 plus byte-exact source relocation; review triggers.
@@ -163,7 +163,7 @@ retain earlier failure receipts. Core/CLI compile passes, including rebuild afte
 removing the temporary diagnostic (12.697s). These focused checks do not establish
 the genuine coupled publication/invocation gate.
 
-## Remaining coupled integration gates
+## Pre-acceptance coupled integration evidence
 
 Accepted WP878 d9c1de64a is merged into this review branch at13a854000.
 Its archive correction resolves the exact rules_jvm_external6.7 relative
@@ -222,13 +222,13 @@ no-run51.219s (first60s preparation cap preserved separately). These cannot clas
 the authentic final terminal. The independently reviewed terminal-only diagnostic ran once under180s,
 identified Ok before strict selection refusal, and was removed/rebuilt byte-exact. No engine, key validity or acceptance relaxation is allowed.
 
-FINAL remains held for genuine producer -> retained model -> fresh prepared
+Acceptance requires genuine producer -> retained model -> fresh prepared
 helper -> actual consumer invocation in both routes, unchanged authentic producer
-success and the subsequent actual consumer replay. Current main admits only
-WP878, not callback activation. Windows execution remains deferred. Inherited
+success and the subsequent actual consumer replay. The acceptance receipt below
+closes those gates together. Windows execution remains deferred. Inherited
 oracle growth was reviewed read-only; reset only at an accepted checkpoint.
 
-## Core coupled proof checkpoint (test acceptance; production held)
+## Core coupled proof checkpoint (test prerequisite)
 
 Independent DESIGN/FINAL accepts the private Core adapter, closed assembler,
 source initialization and preserved semantic assertions. Actual text/raw/directory
@@ -264,5 +264,91 @@ dependent compiles9.286s/exit0 after duplicate removal. Receipts are in
 target/wp877/core-callback-relocated-owned-archives-* and
 analysis-callback-relocation-dependent-*; earlier attributed failed
 receipts remain under core-callback-* (including observation-discriminator).
-Authentic producer/consumer replay gates remain required before production
-activation. No main merge is authorized by this test checkpoint.
+This test checkpoint alone did not authorize production activation; the
+acceptance receipt below adds the required authentic producer/consumer gates.
+
+## Observed import frontier prerequisite
+
+The bounded final dependency replay completed139.394s/exit2 at version1199:
+3824 captured nodes,16928 edges,941 closure probes, no capture drops, missing
+rows, conflicts or traversal truncation. Both deepest unavailable nodes are
+PathObservationKey with available recorded child closures. This narrows the
+transient boundary to missing path demands below external module loading; it
+does not identify their path names or prove an intermediate returned value.
+All temporary Core diagnostics were restored byte-exact and CLI rebuilt18.096s.
+Evidence: target/wp877/authentic-final-dependency-diagnostic-network.*.
+
+Independent DESIGN accepts a bounded Slug-native correction to observed import
+preparation. The historical batching contract at0a2615582a collects sibling
+Needs but lets a later semantic error hide them. An unresolved earlier import
+can itself fail, so that later error is not yet source-order decisive. Stop at
+the same semantic-error position, but return accumulated earlier Needs first
+in Observed mode; after normal input fulfillment publish the first actual
+source-order error. Preserve Legacy, AST/load-label prevalidation, outer
+frontier and incompatible-Needs failures, identity, complete-only validity and
+strict terminal selection. Toolchain discovery can retain but never select an
+implementation package's embedded loading error; it must not thereby hide
+outstanding path dependencies beneath a successful root.
+
+Additional bounded allowlist: bzl_module.rs external-child finalization only;
+host_package_load_tests.rs one child hook and new
+host_package_load_tests/external_bzl_frontier_tests.rs; starlark_rule.rs one
+child hook and starlark_rule/toolchain_frontier_tests.rs for the genuine consumer.
+Reuse injected epoch/shard and existing local-source fixtures, no copied
+third-party bodies or new runtime keys. Estimate under80 production/250 test
+lines; the large existing driver gets only local finalization calls. Require
+baseline discriminator, earlier-Need/later-error/unused-child order, earlier
+error after repair, error-first nonexecution, same-DICE strict closure after
+repair, sibling-Need batching and existing decisive-prefix gates. Root serial
+pinned no-run60s/exact ordinary groups20s and direct Analysis/Core/CLI compile;
+one unchanged authentic producer replay180s only after focused tests pass.
+FINAL review is required before preserving the correction. Another transient
+owner in the authentic replay selects its smallest proven prerequisite; never
+relax effect selection or claim this source hypothesis is already causal.
+
+Independent FINAL accepts the43-net-line production correction and380-line
+proof in two cohesive owner modules (growth beyond the250-line estimate reviewed
+for distinct source-order and real speculative-consumer obligations). Baseline
+exact group1/2 passed in0.016s; the mixed case returned the later Child(Parse)
+instead of the earlier byte Need. Corrected Loading8/8 passes0.064s after
+15.389s no-run; genuine Analysis consumer plus recovery2/2 passes0.064s after
+16.089s no-run. The actual resolution root is transient before fulfillment,
+then nontransient with a strict exact-version closure while the unused
+implementation package retains its real malformed source. Core coupled/policy
+3/3 passes3.919s after13.988s no-run; rebuilt CLI8.778s/exit0. Receipts:
+target/wp877/{loading-observed-frontier-*,analysis-observed-frontier-consumer-*,
+core-observed-frontier-dependent-*,cli-observed-frontier-candidate-*}.
+
+## Acceptance receipt
+
+The unchanged authentic producer passes76.870s/exit0 and strict effect
+selection. The genuine consumer passes78.475s/exit0, invokes the retained
+original helper and publishes26 concrete std libraries. All producer/consumer
+input hashes are unchanged. Two private-supervisor cleanup races are preserved
+as unproved command exits; the corrected supervisor records status before
+asynchronous isolated-daemon settlement and verifies its exact process group.
+Post-run host process checks find no Slug process. Production cleanup policy
+and daemon code are unchanged. Source hypothesis is now supported by the
+unchanged producer result after the observed import-frontier correction.
+
+Milestone integration: Loading825 selected,797passed/28failed in8.676s;
+Analysis244 selected,242passed/2failed in13.181s. Every failure reproduces on
+clean accepted main d9c1de64a: exact Loading28/28 fail0.165s, exact Analysis2/2
+fail0.032s, matching failure names and causes. Loading debt is omitted
+observation-shard/download inputs plus stale shape/visibility/diagnostic
+assertions; Analysis debt is two obsolete basename assertions against existing
+configured full paths. No broad green claim or regression waiver. Baseline
+dependency preparations hit the fixed60s cap and are retained as exit124;
+separate completed owner preparations pass36.686s and10.231s respectively.
+The temporary clean control checkout is removed after attribution.
+
+Independent FINAL accepts the whole coupled packet with these baseline
+dispositions. Stage6/Stage9 record actual immutable model versus phase-code
+ownership. Formatting, diff, plan and archive checks pass. Earlier failed
+focused groups remain recorded as8/9 and1/2, with their separate successful
+lifetime1/1 and membership2/2 corrections; only the distinct25 focused gates
+are cited. Aggregate receipt: target/wp877/wp877-acceptance.json.
+Activate the complete review candidate together; M7A/bootstrap and deferred
+action/platform boundaries remain open. The next priority is one reviewed
+ordinary configured production-root frontier for //app/slug_cli_v2:slug,
+not reopening the closed F3 diagnostic chain.

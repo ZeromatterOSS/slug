@@ -39114,6 +39114,9 @@ mod artifact_root_helper_tests;
 #[path = "filegroup_data_tests.rs"]
 mod filegroup_data_tests;
 
+#[path = "host_package_load_tests/external_bzl_frontier_tests.rs"]
+mod external_bzl_frontier_tests;
+
 fn package_relative_materialized_epoch(
     build: &str,
     defs: &str,

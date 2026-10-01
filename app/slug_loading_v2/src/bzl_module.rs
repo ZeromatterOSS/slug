@@ -4948,6 +4948,27 @@ async fn resolve_external_bzl_child_route(
     ))
 }
 
+fn finish_external_bzl_child_failure(
+    mode: ExternalBzlModuleMode,
+    needs: Option<SourcePreparationNeeds>,
+    first_failure: Option<ExternalBzlDriverOutcome>,
+    failure: ExternalBzlDriverOutcome,
+) -> ExternalBzlDriverOutcome {
+    if matches!(mode, ExternalBzlModuleMode::Observed)
+        && matches!(&failure, SourcePreparationOutcome::Complete(Ok((result, _))) if result.is_err())
+    {
+        // An unresolved earlier import may itself fail. A later semantic
+        // error is not source-order decisive until those inputs are settled.
+        if let Some(failure) = first_failure {
+            return failure;
+        }
+        if let Some(need) = needs {
+            return SourcePreparationOutcome::Need(need);
+        }
+    }
+    failure
+}
+
 async fn compute_external_bzl_children(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
@@ -4988,7 +5009,12 @@ async fn compute_external_bzl_children(
                         continue;
                     }
                     ControlFlow::Break(outcome) => {
-                        return ControlFlow::Break(outcome);
+                        return ControlFlow::Break(finish_external_bzl_child_failure(
+                            mode,
+                            needs,
+                            first_failure,
+                            outcome,
+                        ));
                     }
                 };
                 (raw_load, resolved, incoming)
@@ -5023,7 +5049,7 @@ async fn compute_external_bzl_children(
         let (value, incoming) = match child {
             ExternalBzlRecursiveChild::Value(value, incoming) => (value, incoming),
             ExternalBzlRecursiveChild::Compute(message) => {
-                return ControlFlow::Break(external_bzl_complete(
+                let failure = external_bzl_complete(
                     Err(ExternalBzlModuleError::Child {
                         raw_load: Arc::from(raw_load.as_str()),
                         canonical_label: child_label.clone(),
@@ -5033,6 +5059,12 @@ async fn compute_external_bzl_children(
                         }),
                     }),
                     observations,
+                );
+                return ControlFlow::Break(finish_external_bzl_child_failure(
+                    mode,
+                    needs,
+                    first_failure,
+                    failure,
                 ));
             }
             ExternalBzlRecursiveChild::Cycle(cycle) => match mode {
@@ -5063,7 +5095,12 @@ async fn compute_external_bzl_children(
                             continue;
                         }
                         outcome => {
-                            return ControlFlow::Break(outcome);
+                            return ControlFlow::Break(finish_external_bzl_child_failure(
+                                mode,
+                                needs,
+                                first_failure,
+                                outcome,
+                            ));
                         }
                     }
                 }
@@ -5086,13 +5123,19 @@ async fn compute_external_bzl_children(
         match value.as_ref() {
             Ok(module) => loaded_modules.push((raw_load, module.clone())),
             Err(error) => {
-                return ControlFlow::Break(external_bzl_complete(
+                let failure = external_bzl_complete(
                     Err(ExternalBzlModuleError::Child {
                         raw_load: Arc::from(raw_load.as_str()),
                         canonical_label: child_label,
                         error: Arc::new(error.clone()),
                     }),
                     observations,
+                );
+                return ControlFlow::Break(finish_external_bzl_child_failure(
+                    mode,
+                    needs,
+                    first_failure,
+                    failure,
                 ));
             }
         }

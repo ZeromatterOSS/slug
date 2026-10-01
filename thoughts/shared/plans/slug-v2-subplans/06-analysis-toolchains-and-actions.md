@@ -269,8 +269,8 @@ the current evaluator's provenance. Unchanged configure_features and Rust linker
 queries consume the actual complete provider. Generic callable serialization,
 full toolchain/FDO production and compile/link actions remain deferred.
 
-The captured Rust-toolchain callback has a separate finite recipe design; runtime
-publication/invocation is not yet admitted. The pinned rules_rust toolchain source
+WP877 implements the captured Rust-toolchain callback as one finite retained
+model, with coupled publication/invocation activation. The pinned toolchain source
 (`c4b613ce…c4d468e`) publishes nested make_ccinfo, capturing complete cc_toolchain,
 feature_configuration, the link-stdlib Boolean and the genuine rust_std Target.
 The consumer supplies label/actions/allocator/std; producer ctx/actions never
@@ -282,16 +282,20 @@ semantics with occurrence equality and complete publication comparison; Loading
 runtime and Analysis rematerialization own invocation against the consumer's
 current token, configured root and native sink.
 
-Implementation must deliver the complete original helper's validation order,
-allocator forms, self-contained compilation/link pipeline, ordered topological
-library/panic layers, static/dynamic std, both std modes and CcInfo merge/None cases.
-The concrete native-builder or source-owned helper execution seam and private
-access authority remain an open implementation decision. Same-named export lookup,
-unmodeled frozen helper code and publication-only proxies are not approved bridges.
-Generic closure/code retention remains deferred; activation must be atomic with
-lossless producer-teardown/GC/freeze, equality/hash/alias, capture/source/helper/
-configuration restoration and consumer-action invocation proof. See the selected
-manifest for the current implementation gate, not this design as runtime evidence.
+Loading prepares the original helper through its existing Legacy/Observed source
+owners and authenticates complete transitive authority before either Analysis
+materializer runs. Frozen code and defining heaps are phase-owned bindings;
+BuildAPI's RustToolchainCallable retains only immutable authority, occurrence and
+four owned captures. Genuine current/live consumer actions are required before
+original helper validation. Private calls retain actual helper source frames.
+The Core coupled gate proves both routes, producer disposal, fresh consumers,
+static/dynamic Solib construction and complete configuration/source/import
+restoration. Complementary original-helper checks cover allocator forms, ordered
+library/panic layers, both std modes, validation order, self-contained action
+construction and merge/None branches. Runtime Solib/link execution, resource_set,
+conditional interface/LTO/stamp prerequisites and generic closure/code retention
+remain deferred. Exact helper behavior and Slug-native identity remain distinct;
+the manifest records genuine authentic replay evidence before activation.
 
 WP764 adds exact public copts/conlyopts/cxxopts and private dotd/save-temps/header
 policy getters over that same complete configuration. Eight command admissions

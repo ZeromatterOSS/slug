@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-177-m7a-rust-toolchain-captured-helper-implementation-r1
-Status: implementing on local review branch; independent DESIGN accepted; FINAL held; M7A remains partial
+Status: accepted for atomic local integration; independent DESIGN/FINAL accepted; M7A remains partial
 
 WP877 implements the finite four-capture Rust callback through coupled publication
 and full source-owned helper invocation. Existing Loading DICE owners prepare
@@ -45,13 +45,21 @@ lifecycle gates precede activation. WP876 `64f52f1c4` supplied source-library/al
 Solib construction with17 tests/reviews/Core/CLI passing. Accepted WP878
 `d9c1de64a` supplies bounded selected-BCR relative-file symlinks (16 focused
 checks/full pinned archive probe/CLI pass); it is integrated here as the base
-prerequisite. The callback remains on the review branch until genuine invocation
-and rebuilt authentic replay pass. The authentic query now reaches final effect
-selection but fails on an unavailable analysis root after terminal Ok. The
+prerequisite. The coupled callback passes genuine invocation and both rebuilt
+authentic replays. The unchanged authentic producer now passes
+strict effect selection after settling earlier observed import Needs. The
 reviewed Core coupled proof now passes both routes, fresh consumers and complete
 configuration/source/import restoration; its normal registry/materialization
-source closure is complete. Production activation and full bootstrap remain
-held for the authentic replay. Windows execution remains deferred.
+source closure is complete. The authentic retained helper produces26 std
+libraries with unchanged inputs and verified cleanup. Integrate the candidate
+atomically; full bootstrap remains unproved. Windows execution remains deferred.
+The bounded final dependency trace isolates two missing path observations below
+external imports. A reviewed observed-route correction settles earlier import
+Needs before a later semantic error; focused Loading and Core gates pass.
+Its real speculative-toolchain consumer proves Need fulfillment followed by a
+successful strict closure. Broader Loading/Analysis failures reproduce exactly
+on accepted main; preserve those baseline dispositions. Next select the ordinary
+//app/slug_cli_v2:slug configured frontier; the old F3 chain remains closed.
 See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
