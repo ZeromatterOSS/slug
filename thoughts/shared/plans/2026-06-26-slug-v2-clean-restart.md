@@ -34,18 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-182-m7a-generated-label-discriminator-r1
-Status: accepted discriminator; owner-cycle design prerequisite selected; M7A remains partial
+Packet: WP-7-183-m7a-generated-owner-cycle-contract-r1
+Status: accepted design; live-context API prerequisite selected; M7A remains partial
 
-WP882's accepted diagnostic and rebuilt query prove
-@@rules_rust++rust_host_tools+rust_host_tools//:rust_host_tools at the generated-owner
-preflight. Three focused checks/default CLI build pass; genuine exit2 at10.257s,
-301.76MiB high-water/zero sampled swap, unchanged inputs and scoped cleanup.
-No generated-owner path behavior is admitted. Next resolve DICE owner-cycle
-safety including warm dependency validation, mixed .bzl edges and attempt lifecycle
-before admitting the independent producer. WP880 atd95f2bda6 memory repair remains
-accepted; full root configuration, deeper memory and bootstrap remain unproved.
-See `slug-v2-subplans/current-packet.md`.
+WP882 accepted at09aaf477f proves the host-tools generated Label and preflight
+refusal. Resolve complete owner/.bzl graph coverage, typed cycle-error propagation,
+exact-attempt retirement and actual runtime sharing before admitting this producer.
+Public DICE hooks and existing owners remain authoritative; no stack/preflight-only
+guard, inequality bypass, partial publication or physical-root discovery. This
+source-only design must yield an implementation allowlist/gates, with independent
+review. WP880 memory fix remains accepted; full configuration, deeper memory and
+bootstrap remain unproved. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
