@@ -18,6 +18,7 @@ use dupe::Dupe;
 
 use crate::ActivationClosure;
 use crate::ActivationClosureError;
+use crate::DiceLiveContextId;
 use crate::DiceNodeId;
 use crate::api::computations::DiceComputations;
 use crate::api::key::Key;
@@ -108,6 +109,12 @@ impl DiceTransaction {
 
     pub fn version(&self) -> VersionNumber {
         self.0.get_version()
+    }
+
+    /// Identifies this transaction's live cache within its DICE engine.
+    /// The copied token does not retain the transaction or cache and is not semantic equality.
+    pub fn live_context_id(&self) -> DiceLiveContextId {
+        self.0.live_context_id()
     }
 
     /// Reads the dependency-first activation closure for ordered roots at this transaction's

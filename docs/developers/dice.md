@@ -27,6 +27,19 @@ every agent's context.
   producers and dependencies rather than being bundled into an opaque session
   object.
 
+## Live computation identity
+
+`DiceTransaction::live_context_id()` returns an opaque, process-local
+`DiceLiveContextId` for the existing engine, semantic version and live-cache
+epoch. Simultaneous transactions sharing that cache have equal tokens. Dropping
+the last transaction and reopening the same semantic version creates a different
+token, even while old workers finish cancellation. Copying a token retains no
+transaction or cache. Use it only to scope runtime plumbing such as cycle
+detectors; semantic key/value equality, content identity, `DiceEquality`, and
+persisted materialization namespaces keep their existing owners. Detector
+binding must use the committed transaction's live identity rather than version
+number alone. This getter does not install a detector or admit repository cycles.
+
 ## Don't hold a shared mutex across a DICE computation
 
 The precise hazard is a lock held across a `.await` that re-enters DICE where

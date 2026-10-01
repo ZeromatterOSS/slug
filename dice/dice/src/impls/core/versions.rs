@@ -46,7 +46,7 @@ impl VersionEpochTracker {
     }
 }
 
-#[derive(Copy, Clone, Eq, Debug, Display, Dupe, PartialEq, Allocative)]
+#[derive(Copy, Clone, Eq, Debug, Display, Dupe, PartialEq, Hash, Allocative)]
 #[display("v{}", _0)]
 pub(crate) struct VersionEpoch(usize);
 

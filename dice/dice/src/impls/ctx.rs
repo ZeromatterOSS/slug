@@ -34,6 +34,7 @@ use typed_arena::Arena;
 use crate::ActivationClosure;
 use crate::ActivationClosureError;
 use crate::ActivationKind;
+use crate::DiceLiveContextId;
 use crate::DiceNodeId;
 use crate::DiceTransactionUpdater;
 use crate::DynKey;
@@ -141,6 +142,13 @@ impl BaseComputeCtx {
 
     pub(crate) fn get_version(&self) -> VersionNumber {
         self.data.0.get_version()
+    }
+
+    pub(crate) fn live_context_id(&self) -> DiceLiveContextId {
+        let evaluator = &self.data.0.0.ctx_data().async_evaluator;
+        evaluator
+            .per_live_version_ctx
+            .live_context_id(evaluator.dice.state_handle.engine_id())
     }
 
     pub(crate) fn into_updater(self) -> DiceTransactionUpdater {
@@ -1088,6 +1096,10 @@ impl SharedLiveTransactionCtx {
 
     pub(crate) fn get_version(&self) -> VersionNumber {
         self.version
+    }
+
+    fn live_context_id(&self, engine: u64) -> DiceLiveContextId {
+        DiceLiveContextId::new(engine, self.version, self.version_epoch)
     }
 }
 

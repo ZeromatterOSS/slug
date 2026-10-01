@@ -34,17 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-183-m7a-generated-owner-cycle-contract-r1
-Status: accepted design; live-context API prerequisite selected; M7A remains partial
+Packet: WP-7-184-m7a-dice-live-context-identity-r1
+Status: accepted live-context prerequisite; atomic owner-cycle integration next; M7A remains partial
 
-WP882 accepted at09aaf477f proves the host-tools generated Label and preflight
-refusal. Resolve complete owner/.bzl graph coverage, typed cycle-error propagation,
-exact-attempt retirement and actual runtime sharing before admitting this producer.
-Public DICE hooks and existing owners remain authoritative; no stack/preflight-only
-guard, inequality bypass, partial publication or physical-root discovery. This
-source-only design must yield an implementation allowlist/gates, with independent
-review. WP880 memory fix remains accepted; full configuration, deeper memory and
-bootstrap remain unproved. See `slug-v2-subplans/current-packet.md`.
+WP884's readonly DiceLiveContextId exposes existing engine/version/cache epoch
+without allocation, ownership or semantic changes. Six focused public lifecycle/
+cancellation controls and Loading/Analysis/Core/CLI checks pass; independent final
+ACCEPT. WP883 at ec7e75983 owns the complete mixed-cycle contract; now integrate
+exact-context proxy/graph/path admission atomically with warm/shared/cancellation
+and real immutable-root gates. Full configuration, deeper memory and bootstrap
+remain unproved. See `slug-v2-subplans/current-packet.md`.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

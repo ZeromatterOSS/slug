@@ -14,6 +14,7 @@ use dupe::Dupe;
 use crate::ActivationClosure;
 use crate::ActivationClosureError;
 use crate::DiceComputations;
+use crate::DiceLiveContextId;
 use crate::DiceNodeId;
 use crate::DiceTransactionUpdater;
 use crate::impls::ctx::BaseComputeCtx;
@@ -33,6 +34,10 @@ impl Dupe for DiceTransactionImpl {}
 impl DiceTransactionImpl {
     pub(crate) fn get_version(&self) -> VersionNumber {
         self.0.get_version()
+    }
+
+    pub(crate) fn live_context_id(&self) -> DiceLiveContextId {
+        self.0.live_context_id()
     }
 
     pub(crate) fn into_updater(self) -> DiceTransactionUpdater {

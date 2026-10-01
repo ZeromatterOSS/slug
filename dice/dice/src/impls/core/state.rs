@@ -62,6 +62,10 @@ impl CoreStateHandle {
         DiceNodeId::new(self.engine, key.index)
     }
 
+    pub(crate) fn engine_id(&self) -> u64 {
+        self.engine
+    }
+
     fn request(&self, message: StateRequest) {
         self.tx.send(message).expect("dice runner died");
     }

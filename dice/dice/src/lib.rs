@@ -220,6 +220,7 @@ pub use crate::api::invalidation_tracking::DiceTrackedInvalidationPath;
 pub use crate::api::invalidation_tracking::InvalidationPathEntry;
 pub use crate::api::key::InvalidationSourcePriority;
 pub use crate::api::key::Key;
+pub use crate::api::live_context::DiceLiveContextId;
 pub use crate::api::opaque::OpaqueValue;
 pub use crate::api::projection::DiceProjectionComputations;
 pub use crate::api::projection::ProjectionKey;

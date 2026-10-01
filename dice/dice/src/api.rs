@@ -21,6 +21,7 @@ pub(crate) mod events;
 pub(crate) mod injected;
 pub(crate) mod invalidation_tracking;
 pub mod key;
+pub(crate) mod live_context;
 pub(crate) mod opaque;
 pub(crate) mod projection;
 pub(crate) mod storage_type;
