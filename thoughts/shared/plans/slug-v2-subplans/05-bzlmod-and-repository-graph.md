@@ -60,36 +60,109 @@ admits only confined GCC probes and returns no generated output tree; a module
 invocation must never impersonate that owner. Duplicate-path rejection in a
 repository file plan must not replace scratch overwrite semantics.
 
-The faithful candidate is a distinct selected-extension scratch/content and
-execution certificate under its full semantic extension owner, with ordered
-calls, input/tool bytes and modes, path provenance, cwd and effective environment.
-Pure ordered writes/download bindings and reads of produced bytes precede typed
-Need → heap/transaction drop → native fulfillment → immutable epoch → replay.
-Captured dynamic output bytes/modes must explain every subsequent read;
-temporary Host paths/display tokens cannot serve as semantic identity. Reuse
-existing source observations, lease/revocation, accepted-closure pruning and
-cancel/drain mechanics without a command cache or global registry. No lock spans
-DICE compute; failed/cancelled attempts publish no repos/events/current outputs.
+The selected extension Pure(Observation)Key remains scratch/certificate producer.
+A distinct SelectedExtensionProcess epoch/verifier/used-footprint family binds
+full extension definition/usage, contiguous outer call index, ordered prior
+scratch ops/tree, typed source/tool/runtime certificates, exact argv/cwd and
+immutable inherited environment plus set/remove/absence. Source-order file and
+verified-download writes overwrite; restart reconstructs from empty scratch.
+Normal Need drops heap/transaction, native fulfillment injects an authorized
+immutable record and replay matches the complete descriptor. Ordinary nonzero
+captures its real code/streams/full post-tree; missing/error reads are facts of
+that tree. Timeout/cancel/capture/oversize failures yield no reusable record.
+Initial finite timeout policy admits only the default requested600s; reject
+nondefault/env-derived timeout overrides before launch. A separate30s native
+safety stop yields an invalid operational resource/profile failure, no code256
+or reusable after-tree. Requested-timeout ABI remains deferred; cleanup proof
+for the safety stop cannot prove Bazel timeout-result parity.
+No lock spans compute, fake repo ordinal, command cache or global semantic store.
 
-Implementation is not yet bounded: tool runtime libraries/child inputs,
-inherited environment and complete bounded output capture remain unresolved.
-The next separate design packet must choose a confined query + locked-generate
-profile or another complete Rust-native contract, including containment,
-dynamic string-watch source resolution, byte/path spelling policy, input mutation
-refusal, stream/tree limits and resource-limit errors. Repin/splice/workspace
-writes and later imported repository materialization stay deferred unless their
-owners are separately resolved. Do not claim full get_child or I/O parity from
-a normalized one-string subset; namespace/physical identity stays Slug-native.
+The closed sandbox uses owned stable /__slug_module scratch/cwd as an explicit
+Slug-native profile fact. All observable config/argv/env/path strings bind that
+spelling structurally; source Label absolute spellings retain their namespace.
+Private staging roots cannot become identity. Complete post-tree covers dynamic
+files, empty dirs, mode changes/deletions; descriptor-relative no-follow capture
+occurs only after children/writers drain. Dynamic source string watches use
+normal namespace-aware resolution/digest Needs. Progress/quiet messages remain
+request-local with retry suppression; no failed attempt publishes repos/events.
 
-Design must classify shared certificate bytes as DICE-retained semantic state,
-authorized epochs as command-retained and evaluator/staging/capture buffers as
-bounded phase/transfer scratch. Account for descriptor-prefix growth, sharing,
-equality cutoff, deselection, abort/restore and shutdown; preserve WP880 reporting.
-Use Stage9's selected-download/Arc/compact-utility policy before any retained
-representation is implemented. Required later proof is genuine input-consuming
-execution/output reads, warm A/B/A content/tool/env/order changes, foreign-owner
-refusal, dynamic output/missing/oversize/nonzero cases and cleanup on Need,
-timeout/cancel/restore/concurrent requests before another actual-root replay.
+Two native prerequisites remain before this profile can execute:
+
+1. Streamed closed input/runtime image certificate with exact producer/observed
+   content/modes, source/tool trees, ELF interpreter/dependency/search metadata,
+   explicit loader/asset catalog and fail-closed unknown-access attribution.
+   Materialization source identity/root alone is insufficient; ELF DT_NEEDED
+   cannot certify dlopen/constructor/HOME/loader assets. No untracked /usr bind,
+   silent env clearing or empty HOME substitute. A bounded certified runtime-only
+   alias graph needs all link/ancestor/target facts and containment; it does not
+   admit general Starlark source/output symlink methods. Full inherited env identity
+   does not itself certify env-selected files. External HOME/NIX/nonisolated
+   CARGO_HOME paths need certificates or explicit refusal. Any CARGO_BAZEL_DEBUG
+   presence enables clocked logging (authenticated cli.rs68/87/97); initial
+   finite profile refuses it rather than caching nondeterministic logs.
+2. Quota-backed scratch lease with mount/root-directory capability retained
+   before execution through child join → complete capture → release. Writable
+   aggregate128MiB/volume and at most2 active volumes/workspace are distinct
+   service resource limits. Ordinary tempfile, post-exit checks, per-file
+   RLIMIT_FSIZE or child tmpfs lost at exit cannot establish these guarantees.
+
+These prerequisites have separate native ownership from semantic certificates;
+no executable profile/root branch/bootstrap success is accepted by the design.
+Query + locked generate remains the required cohesive consumer. Query mismatch
+is real failure; repin/splice/network/resolution/workspace writes and later
+imported repository materialization stay deferred. General scratch/source symlink methods and
+non-ASCII byte parity stay deferred; one normalized child is not full get_child.
+
+The selected proposed policy is keyed and Slug-native:4 outer calls,8192
+semantic ops,4096 tree entries,depth32,path4096bytes,32MiB/file,1MiB/stream and
+4MiB cumulative ordered descriptor-string bytes per owner. Deterministic128MiB
+owner byte admission sums every write/download occurrence, complete post-tree
+and stream, even identical/shared bytes. This supersedes64MiB before acceptance:
+three possible32MiB generator occurrences alone need96MiB. It is not a user
+ceiling increase or measured root-fit claim. Warm reuse cannot alter admission.
+Input/runtime image ceilings are32768 entries,depth32,2GiB streamed data,
+512MiB/file,4MiB descriptor/path data; env1024 entries/256KiB and argv4096
+entries/256KiB. Separate preparation60s/native30s/owned cleanup3s budgets are
+proposed policy limits, not measured runtime readiness or user ceilings.
+
+Separately, workspace process-owned live payloads have256MiB credit and owned
+shared descriptors/strings/fixed records/header/capacity/zero-length-blob overhead
+have64MiB credit. RAII reservations survive with actual shared allocations,
+including historical DICE values, previous accepted/restore and provisional
+states. Lease/epoch drop never proves retirement. Held history may refuse new
+admission; physical ResourceLimit propagates through invalid/incomplete state,
+never a cached Complete semantic error. No raw payload/descriptor escape can
+return credit early. Borrowed download pins are conservatively charged for
+process lifetime; raw existing download/tool/other DICE-engine storage is outside
+this claim. Neither these credits nor scratch quotas prove total daemon RSS.
+
+Use Arc/Dupe/Allocative and compact deterministic utilities; share unchanged
+payloads/tree blocks, retain no evaluator heap and introduce no donor runtime.
+Tool/runtime images use streamed disk capture with64KiB buffers and bounded
+manifest descriptors, not full toolchain bytes in RAM. Equality compares full
+semantic bytes/modes/order; credit/lease/allocation identity never replaces it.
+[Stage9](./09-v1-extraction-ledger.md) owns this proposed reuse disposition.
+
+Implementation must use cohesive new Bzlmod selected-extension scratch/process
+and input-certificate modules, Loading module_extension scratch context/driver,
+Core runtime input-image/scratch-lease/process/capture modules and focused owner
++ lifecycle tests; large existing module_extension.rs/runtime/dice.rs/
+source_preparation.rs receive only registration/Need/dispatch/injection deltas.
+The next bounded prerequisite outcome is an actual certified input-image/native
+lease capability, with independent design review inside implementation; never
+activate get_child/file/execute without the complete consumer/lifecycle gates.
+
+Required proof before actual-root replay: genuine input-consuming execution and
+dynamic output reads, A/B/A source/tool/runtime/env/mode/order/cwd/spelling,
+foreign owner/epoch/prefix refusal, real query mismatch/unsupported repin,
+complete overwrite/delete/missing/nonzero/error tree, watched source transitions,
+Need/timeout/cancel/restore/concurrent isolation and atomic publication. Native
+prerequisites need unknown-access attribution, hard many-file quota, retained-FD
+capture after join and streamed large-input bounded RAM gates. Payload history
+and empty-payload/large-descriptor history must hold credit until actual Drop;
+sharing affects physical cost but never semantic occurrence caps. Normal portable
+pinned-source oracle provenance and direct Bzlmod/Loading/Core/CLI checks are
+future implementation gates. WP887 design/source review activates none of them.
 
 ## Goal
 

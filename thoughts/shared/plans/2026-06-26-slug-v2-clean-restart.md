@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-186-m7a-scratch-path-consumer-audit-r1
-Status: source/ownership audit accepted after independent FINAL review; M7A remains partial
+Packet: WP-7-187-m7a-selected-extension-process-design-r1
+Status: owner/budget design accepted after independent FINAL review; native prerequisites open; M7A remains partial
 
-Authenticated scratch/file/read/execute consumer and Bazel source audit selects
-an explicit selected-extension scratch/process certificate candidate. Complete
-inherited environment, tool runtime/child inputs and bounded dynamic output
-capture still require a separate WP887 design decision before implementation.
-No Rust behavior or root replay activated. WP885 at e2e1c5723 actual root
-exit2/1090.074MiB/zero swap protects WP880 reporting memory; full configuration,
-deeper memory/bootstrap remain unproved. See `slug-v2-subplans/current-packet.md`
-and Stage5's selected scratch/process owner decision.
+WP887 resolves selected-extension scratch/process producer, replay and distinct
+semantic/physical memory budgets. Complete closed input/runtime image plus a
+quota-backed scratch/capture lease remain exact native prerequisites before
+cohesive query + locked-generate activation. No runnable process profile, root
+replay or Rust behavior admitted. WP886 source audit at e763853ce is reused;
+WP880 memory repair and WP885 root peak1090.074MiB/zero swap remain accepted.
+Actual bootstrap/tool closure/cap-fit memory remain unproved. See
+`slug-v2-subplans/current-packet.md` and Stage5/9 owner decisions.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
