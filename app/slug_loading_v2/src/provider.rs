@@ -1996,6 +1996,7 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                     .map(|(name, value)| (CompactString::new(name.as_str()), *value))
                     .collect::<SmallMap<_, _>>();
                 fields.sort_keys();
+                crate::rust_toolchain_auth::register(&fields, eval)?;
                 let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
                 Ok(eval.heap().alloc_complex(StarlarkToolchainInfo {
                     names: names.into(),

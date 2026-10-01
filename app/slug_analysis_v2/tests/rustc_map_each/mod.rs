@@ -11,6 +11,7 @@ mod cc_toolchain;
 mod compile_context;
 mod compile_outputs;
 mod resource_set;
+mod rust_toolchain_helper;
 
 const REPOSITORIES: &[(&str, &str)] = &[
     ("rules_rust+", "rules_rust"),

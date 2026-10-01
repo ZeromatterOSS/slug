@@ -295,6 +295,12 @@ const RUSTC_MAP_EACH_SOURCES: &[(&str, &str)] = &[
         include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/providers.bzl"),
     ),
     (
+        "rules_rust/rust/private/rust_allocator_libraries.bzl",
+        include_str!(
+            "../fixtures/rustc-map-each/rules_rust/rust/private/rust_allocator_libraries.bzl"
+        ),
+    ),
+    (
         "rules_rust/rust/private/rustc.bzl",
         include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/rustc.bzl"),
     ),
@@ -305,6 +311,10 @@ const RUSTC_MAP_EACH_SOURCES: &[(&str, &str)] = &[
     (
         "rules_rust/rust/private/stamp.bzl",
         include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/stamp.bzl"),
+    ),
+    (
+        "rules_rust/rust/private/toolchain.bzl",
+        include_str!("../fixtures/rustc-map-each/rules_rust/rust/private/toolchain.bzl"),
     ),
     (
         "rules_rust/rust/private/utils.bzl",

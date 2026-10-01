@@ -1058,6 +1058,7 @@ pub struct AnalysisEvaluationContext {
     stack: Arc<Mutex<AnalysisCallStack>>,
     payload: Arc<AnalysisEvaluationPayload>,
     host_os: Option<slug_configuration_v2::native::host::ActionEnvironmentHostOs>,
+    rust_toolchain_helpers: Arc<[crate::PreparedRustToolchainHelperBinding]>,
 }
 
 #[derive(Debug)]
@@ -1140,6 +1141,7 @@ impl AnalysisEvaluationContext {
         Self {
             stack,
             host_os: None,
+            rust_toolchain_helpers: Arc::from([]),
             payload: Arc::new(AnalysisEvaluationPayload {
                 prepared: prepared
                     .into_iter()
@@ -1162,6 +1164,18 @@ impl AnalysisEvaluationContext {
     ) -> Self {
         self.host_os = os;
         self
+    }
+
+    pub fn with_rust_toolchain_helpers(
+        mut self,
+        bindings: Arc<[crate::PreparedRustToolchainHelperBinding]>,
+    ) -> Self {
+        self.rust_toolchain_helpers = bindings;
+        self
+    }
+
+    pub(crate) fn rust_toolchain_helpers(&self) -> &[crate::PreparedRustToolchainHelperBinding] {
+        &self.rust_toolchain_helpers
     }
 
     pub(crate) fn header_info_windows_host(&self) -> anyhow::Result<bool> {
@@ -1374,6 +1388,10 @@ pub(crate) mod link_actions;
 impl AnalysisActions {
     pub(crate) fn from_starlark(value: Value<'_>) -> Option<&Self> {
         Self::from_value(value).or_else(|| link_actions::unpack(value))
+    }
+
+    pub(crate) fn require_active_rust_callback(&self) -> anyhow::Result<()> {
+        self.token.require_active("make_ccinfo", self.context_name)
     }
 
     pub fn register_dynamic_library_symlink(

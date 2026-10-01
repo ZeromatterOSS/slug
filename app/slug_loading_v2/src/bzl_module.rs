@@ -156,6 +156,8 @@ use crate::provider::BzlEvaluationContext;
 use crate::subrule::ConfiguredDependencyDefault;
 use crate::visibility::RuleVisibility;
 
+pub(crate) mod rust_toolchain_helper;
+
 /// Local-root loading operations over a caller-owned DICE transaction.
 ///
 /// This intentionally owns no DICE instance or asynchronous runtime. The

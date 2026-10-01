@@ -2350,6 +2350,7 @@ pub(crate) fn evaluate_loaded_rule(
     dependencies: Vec<PreparedDependency>,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
     configured_attributes: Vec<PreparedConfiguredAttribute>,
+    rust_helpers: Arc<[slug_loading_v2::PreparedRustToolchainHelperBinding]>,
     exec_groups: ConfiguredExecGroupCollection,
     runfiles_packages: RunfilesPackageDepset,
     print_handler: Option<&dyn PrintHandler>,
@@ -2547,7 +2548,8 @@ pub(crate) fn evaluate_loaded_rule(
         toolchain,
         prepared_exec_groups,
     ) = {
-        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        let mut materializer =
+            AnalysisValueMaterializer::new(module.frozen_heap()).with_rust_helpers(&rust_helpers);
         let (attribute_file, attribute_files) = attribute_files::materialize(
             implementation.schema(),
             &dependencies,
@@ -2606,7 +2608,8 @@ pub(crate) fn evaluate_loaded_rule(
         )
     };
     let prepared_subrules = {
-        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
+        let mut materializer =
+            AnalysisValueMaterializer::new(module.frozen_heap()).with_rust_helpers(&rust_helpers);
         implementation
             .subrule_invocations()
             .map(|(identity, _, _, fragments)| {
@@ -2635,8 +2638,12 @@ pub(crate) fn evaluate_loaded_rule(
             action_sink.clone(),
             cpp_fragment,
             coverage_fragment,
-            implementation.source_identities_by_filename().clone(),
+            crate::analysis_value::rust_toolchain::merge_helper_sources(
+                implementation.source_identities_by_filename(),
+                &rust_helpers,
+            )?,
         )
+        .with_rust_toolchain_helpers(rust_helpers.clone())
         .with_host_os(
             key.configuration()
                 .slug_configuration()

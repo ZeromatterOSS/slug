@@ -42,6 +42,7 @@ pub enum AnalysisValueType {
     TemplateVariableInfo,
     PackageSpecificationInfo,
     CcToolchainCallable,
+    RustToolchainCallable,
     CppFragment,
     CcHeaderInfo,
     CcToolchainFeatures,
@@ -71,6 +72,7 @@ impl AnalysisValueType {
             Self::PackageSpecificationInfo => "PackageSpecificationInfo",
             Self::TemplateVariableInfo => "TemplateVariableInfo",
             Self::CcToolchainCallable => "function",
+            Self::RustToolchainCallable => "function",
             Self::CppFragment => "cpp",
             Self::CcHeaderInfo => "HeaderInfo",
             Self::CcToolchainFeatures => "CcToolchainFeatures",
@@ -1147,6 +1149,7 @@ enum AnalysisValueData {
     TemplateVariableInfo(crate::TemplateVariableInfo),
     PackageSpecificationInfo(crate::PackageSpecificationInfo),
     CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
+    RustToolchainCallable(crate::rust_toolchain_callable::RustToolchainCallable),
     CppFragment(crate::RetainedCppFragment),
     CcHeaderInfo(crate::CcHeaderInfo),
     CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
@@ -1173,6 +1176,7 @@ pub enum AnalysisValueKind<'a> {
     TemplateVariableInfo(&'a crate::TemplateVariableInfo),
     PackageSpecificationInfo(&'a crate::PackageSpecificationInfo),
     CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
+    RustToolchainCallable(&'a crate::rust_toolchain_callable::RustToolchainCallable),
     CppFragment(&'a crate::RetainedCppFragment),
     CcHeaderInfo(&'a crate::CcHeaderInfo),
     CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
@@ -1213,6 +1217,12 @@ impl AnalysisValue {
 
     pub fn cc_toolchain_callable(value: crate::cc_toolchain_callable::CcToolchainCallable) -> Self {
         Self::new(AnalysisValueData::CcToolchainCallable(value))
+    }
+
+    pub fn rust_toolchain_callable(
+        value: crate::rust_toolchain_callable::RustToolchainCallable,
+    ) -> Self {
+        Self::new(AnalysisValueData::RustToolchainCallable(value))
     }
 
     pub fn cpp_fragment(value: crate::RetainedCppFragment) -> Self {
@@ -1330,6 +1340,9 @@ impl AnalysisValue {
             AnalysisValueData::CcToolchainCallable(value) => {
                 AnalysisValueKind::CcToolchainCallable(value)
             }
+            AnalysisValueData::RustToolchainCallable(value) => {
+                AnalysisValueKind::RustToolchainCallable(value)
+            }
             AnalysisValueData::CppFragment(value) => AnalysisValueKind::CppFragment(value),
             AnalysisValueData::CcHeaderInfo(value) => AnalysisValueKind::CcHeaderInfo(value),
             AnalysisValueData::CcToolchainFeatures(value) => {
@@ -1367,6 +1380,7 @@ impl AnalysisValue {
                 AnalysisValueType::PackageSpecificationInfo
             }
             AnalysisValueData::CcToolchainCallable(_) => AnalysisValueType::CcToolchainCallable,
+            AnalysisValueData::RustToolchainCallable(_) => AnalysisValueType::RustToolchainCallable,
             AnalysisValueData::CppFragment(_) => AnalysisValueType::CppFragment,
             AnalysisValueData::CcHeaderInfo(_) => AnalysisValueType::CcHeaderInfo,
             AnalysisValueData::CcToolchainFeatures(_) => AnalysisValueType::CcToolchainFeatures,
@@ -1466,6 +1480,10 @@ impl AnalysisValue {
             (
                 AnalysisValueData::CcToolchainCallable(left),
                 AnalysisValueData::CcToolchainCallable(right),
+            ) => left.publication_eq_with(right, state),
+            (
+                AnalysisValueData::RustToolchainCallable(left),
+                AnalysisValueData::RustToolchainCallable(right),
             ) => left.publication_eq_with(right, state),
             (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
                 left.publication_eq_with(right, state)
@@ -1587,6 +1605,10 @@ impl PartialEq for AnalysisValue {
                 AnalysisValueData::CcToolchainCallable(left),
                 AnalysisValueData::CcToolchainCallable(right),
             ) => left == right,
+            (
+                AnalysisValueData::RustToolchainCallable(left),
+                AnalysisValueData::RustToolchainCallable(right),
+            ) => left == right,
             (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
                 left == right
             }
@@ -1653,6 +1675,10 @@ impl Hash for AnalysisValue {
             AnalysisValueData::PackageSpecificationInfo(_) => 20u8.hash(state),
             AnalysisValueData::CcToolchainCallable(value) => {
                 17u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::RustToolchainCallable(value) => {
+                22u8.hash(state);
                 value.hash(state);
             }
             AnalysisValueData::ArtifactRoot(value) => {
@@ -1756,6 +1782,8 @@ pub(crate) struct PublicationEqState {
     right_template_variables: FxHashMap<usize, usize>,
     left_cc_callables: FxHashMap<usize, usize>,
     right_cc_callables: FxHashMap<usize, usize>,
+    left_rust_callables: FxHashMap<usize, usize>,
+    right_rust_callables: FxHashMap<usize, usize>,
     left_cpp_fragments: FxHashMap<usize, usize>,
     right_cpp_fragments: FxHashMap<usize, usize>,
     left_cc_variables: FxHashMap<usize, usize>,
@@ -1784,6 +1812,15 @@ impl PublicationEqState {
         Self::enter_occurrence_pair(
             &mut self.left_cc_callables,
             &mut self.right_cc_callables,
+            left,
+            right,
+        )
+    }
+
+    pub(crate) fn enter_rust_callable_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_rust_callables,
+            &mut self.right_rust_callables,
             left,
             right,
         )

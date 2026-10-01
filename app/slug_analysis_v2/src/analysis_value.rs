@@ -119,6 +119,8 @@ pub(crate) fn test_artifact_root() -> slug_build_api_v2::DerivedArtifactRoot {
 #[path = "analysis_value/artifact_root_tests.rs"]
 mod artifact_root_tests;
 
+pub(crate) mod rust_toolchain;
+
 mod empty_instrumented_files;
 use empty_instrumented_files::EmptyInstrumentedFiles;
 
@@ -520,6 +522,7 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
 
 pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
+    rust_helpers: &'a [slug_loading_v2::PreparedRustToolchainHelperBinding],
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
     file_depsets: HashMap<(usize, u32), FrozenValue>,
@@ -530,11 +533,20 @@ impl<'a> AnalysisValueMaterializer<'a> {
     pub(crate) fn new(heap: &'a FrozenHeap) -> Self {
         Self {
             heap,
+            rust_helpers: &[],
             cc_variables: SmallMap::new(),
             depsets: HashMap::default(),
             file_depsets: HashMap::default(),
             symlink_depsets: HashMap::default(),
         }
+    }
+
+    pub(crate) fn with_rust_helpers(
+        mut self,
+        bindings: &'a [slug_loading_v2::PreparedRustToolchainHelperBinding],
+    ) -> Self {
+        self.rust_helpers = bindings;
+        self
     }
 
     fn output_group_info(&mut self, info: &OutputGroupInfo) -> Result<FrozenValue, String> {
@@ -835,6 +847,28 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
+            AnalysisValueKind::RustToolchainCallable(callable) => {
+                let model = callable.model();
+                let binding = self
+                    .rust_helpers
+                    .iter()
+                    .find(|binding| binding.authority().as_ref() == model.source.as_ref())
+                    .ok_or_else(|| {
+                        "Rust callable lacks a freshly prepared helper binding".to_owned()
+                    })?;
+                let captures = [
+                    self.value(&model.cc_toolchain)?,
+                    self.value(&model.feature_configuration)?,
+                    self.value(&model.experimental_link_std_dylib)?,
+                    self.value(&model.rust_std)?,
+                ];
+                slug_loading_v2::alloc_frozen_rust_toolchain_callable(
+                    self.heap,
+                    callable.clone(),
+                    captures,
+                    binding,
+                )?
+            }
             AnalysisValueKind::CcToolchainCallable(callable) => {
                 let capture = self.value(&callable.model().capture)?;
                 slug_loading_v2::alloc_frozen_cc_toolchain_callable(
@@ -936,6 +970,8 @@ impl<'a> AnalysisValueMaterializer<'a> {
 #[derive(Default)]
 pub(crate) struct AnalysisValueLowerer<'v> {
     callables: SmallMap<ValueIdentity<'v>, (slug_loading_v2::CallableRegistration, Value<'v>)>,
+    rust_callables:
+        SmallMap<ValueIdentity<'v>, (slug_loading_v2::RustCallableRegistration, Value<'v>)>,
     visiting: HashSet<ValueIdentity<'v>>,
     memo: HashMap<ValueIdentity<'v>, AnalysisValue>,
     lower_depth: usize,
@@ -944,6 +980,12 @@ pub(crate) struct AnalysisValueLowerer<'v> {
 impl<'v> AnalysisValueLowerer<'v> {
     pub(crate) fn from_module(module: &'v starlark::environment::Module) -> Self {
         Self {
+            rust_callables: slug_loading_v2::rust_callable_registrations(module)
+                .into_iter()
+                .map(|(function, descriptor, captures)| {
+                    (function.identity(), (descriptor, captures))
+                })
+                .collect(),
             callables: slug_loading_v2::callable_registrations(module)
                 .into_iter()
                 .map(|(function, descriptor, capture)| (function.identity(), (descriptor, capture)))
@@ -1024,6 +1066,10 @@ impl<'v> AnalysisValueLowerer<'v> {
         let mut stack = vec![root];
         while let Some(value) = stack.pop() {
             if !seen.insert(value.identity()) {
+                continue;
+            }
+            if let Some((_, captures)) = self.rust_callables.get(&value.identity()) {
+                stack.push(*captures);
                 continue;
             }
             if let Some((_, capture)) = self.callables.get(&value.identity()) {
@@ -1177,6 +1223,32 @@ impl<'v> AnalysisValueLowerer<'v> {
         }
         if let Some(info) = crate::package_specification::from_value(value) {
             return Ok(AnalysisValue::package_specification_info(info));
+        }
+        if let Some((model, _)) = slug_loading_v2::rust_toolchain_callable(value) {
+            return Ok(AnalysisValue::rust_toolchain_callable(model));
+        }
+        if let Some((registration, captures)) = self.rust_callables.get(&value.identity()).cloned()
+        {
+            let captures = TupleRef::from_value(captures)
+                .ok_or_else(|| format!("{path}: malformed Rust callable captures"))?
+                .content();
+            let [cc, feature, dynamic, std] = captures else {
+                return Err(format!("{path}: Rust callable requires four captures"));
+            };
+            let callable = slug_build_api_v2::RustToolchainCallable::new(
+                slug_build_api_v2::RustToolchainCallableModel {
+                    source: registration.source,
+                    identity: registration.identity,
+                    name_hash: registration.name_hash,
+                    cc_toolchain: self.lower(*cc, &format!("{path}.cc_toolchain"))?,
+                    feature_configuration: self
+                        .lower(*feature, &format!("{path}.feature_configuration"))?,
+                    experimental_link_std_dylib: self
+                        .lower(*dynamic, &format!("{path}.experimental_link_std_dylib"))?,
+                    rust_std: self.lower(*std, &format!("{path}.rust_std"))?,
+                },
+            )?;
+            return Ok(AnalysisValue::rust_toolchain_callable(callable));
         }
         if let Some((model, _)) = slug_loading_v2::cc_toolchain_callable(value) {
             return Ok(AnalysisValue::cc_toolchain_callable(model));

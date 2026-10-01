@@ -313,6 +313,11 @@
       "sha256": "57a59ec9a60b9709df197333c94bac464b572af63bc78f560ce32570b6d84ac6"
     },
     {
+      "path": "rules_rust/rust/private/rust_allocator_libraries.bzl",
+      "bytes": 11932,
+      "sha256": "ae4acb50ac6a1b922254a07346d97b4649810d33836f2be4824fd0b7a81e536e"
+    },
+    {
       "path": "rules_rust/rust/private/rustc.bzl",
       "bytes": 145040,
       "sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4"
@@ -326,6 +331,11 @@
       "path": "rules_rust/rust/private/stamp.bzl",
       "bytes": 646,
       "sha256": "9cbbe7df505e043a83f97ab55d3a4f8c8b46c8342f51a7b1f4ca71b985195d7b"
+    },
+    {
+      "path": "rules_rust/rust/private/toolchain.bzl",
+      "bytes": 43390,
+      "sha256": "c4b613cee96540a94fbdf4fbdca7b8dc4ef6d3082024c4d3636afc2e9c4d468e"
     },
     {
       "path": "rules_rust/rust/private/utils.bzl",

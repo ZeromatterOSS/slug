@@ -40,6 +40,26 @@ mod cc_features;
 mod cc_header_info;
 mod cc_toolchain_auth;
 mod cc_toolchain_callable;
+mod rust_toolchain_auth;
+mod rust_toolchain_callable;
+#[doc(hidden)]
+pub use bzl_module::rust_toolchain_helper::PreparedRustToolchainHelperBinding;
+#[doc(hidden)]
+pub use bzl_module::rust_toolchain_helper::RustToolchainHelperError;
+#[doc(hidden)]
+pub use bzl_module::rust_toolchain_helper::RustToolchainHelperMode;
+#[doc(hidden)]
+pub use bzl_module::rust_toolchain_helper::RustToolchainHelperRequest;
+#[doc(hidden)]
+pub use bzl_module::rust_toolchain_helper::prepare_rust_toolchain_helper;
+#[doc(hidden)]
+pub use rust_toolchain_auth::RustCallableRegistration;
+#[doc(hidden)]
+pub use rust_toolchain_auth::rust_callable_registrations;
+#[doc(hidden)]
+pub use rust_toolchain_callable::alloc_frozen_rust_toolchain_callable;
+#[doc(hidden)]
+pub use rust_toolchain_callable::rust_toolchain_callable;
 mod evaluator_roots;
 #[doc(hidden)]
 pub use cc_toolchain_auth::CallableRegistration;
