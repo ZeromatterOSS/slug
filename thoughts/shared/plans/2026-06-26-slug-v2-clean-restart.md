@@ -34,17 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-189-m7a-native-process-backend-readiness-r1
-Status: accepted conditional backend source-design and exact capability prerequisites; no process activation; M7A remains partial
+Packet: WP-7-190-m7a-observed-elf-metadata-r1
+Status: ACCEPTED; bounded ELF metadata prerequisite; no process activation
 
-WP889 selects a conditional Rust-native namespace keeper/private tmpfs and finite
-ptrace mediator, with sealed RO certified code through the full run. Actual private
-mount/root-FD retention succeeds; both tracing routes return EPERM, and unmapped
-seed creation EOVERFLOW prevents quota/data proof. Mapped identity, permitted
-complete tracing and actual runtime catalog remain required. Next useful owner is
-bounded normal-DICE ELF metadata after shared API/proof review. Stage5/9 retain
-full query/locked-generate and lifecycle gates; no process/bootstrap/RSS claim.
-Memory fixd95f2bda6 and WP885 peak1090.074MiB/zero swap remain latest proof.
+WP890 implements normal-DICE bounded ELF metadata from actual declared source
+images. Every parser-read byte is proved against the same complete streamed
+SHA256 image; exact member/digest/policy allowances precede native I/O. Rejected
+partial buffers retire before publication; shared facts/Needs/history retain
+workspace descriptor credit until actual last Drop. Workspace48/48, Core
+image/ELF39/39 and protected39/39 pass. Required owner all-target checks pass;
+default CLI and independent FINAL review pass; compact evidence records acceptance. Stage5/9 own
+bounds and retained prerequisites. Actual selected runtime catalog, mapped
+identity, permitted complete tracing, quota/capture and full query/locked-generate
+remain open. No process/bootstrap/RSS claim. Memory fix d95f2bda6 and WP885
+peak1090.074MiB/zero swap remain the latest whole-process evidence.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

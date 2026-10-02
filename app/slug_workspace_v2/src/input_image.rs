@@ -26,6 +26,8 @@ use crate::PathOperationResult;
 use crate::PathOutcome;
 
 pub mod budget;
+mod elf_metadata;
+pub use elf_metadata::*;
 mod observation;
 pub use budget::BudgetedImageBlock;
 pub use budget::ImageChargedPath;
@@ -418,7 +420,8 @@ impl ImageBuilder<'_, '_, '_> {
                 ImageObservationOperation::BoundedDigest { .. } => InputImageLimit::FileBytes,
                 ImageObservationOperation::BoundedDirectory(_) => InputImageLimit::Entries,
                 ImageObservationOperation::BoundedReadLink { .. } => InputImageLimit::PathBytes,
-                ImageObservationOperation::Lstat => {
+                ImageObservationOperation::Lstat
+                | ImageObservationOperation::BoundedElfMetadata { .. } => {
                     return Err(failed(InputImageError::ObservationMismatch));
                 }
             };

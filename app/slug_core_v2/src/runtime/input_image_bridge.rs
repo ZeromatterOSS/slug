@@ -1,8 +1,12 @@
 //! The private, declared normal-compute bridge for input-image preparation.
 //! Image observations are transient here; process owners are not activated.
+use slug_workspace_v2::ElfMetadataPolicy;
+use slug_workspace_v2::ElfSourceDigestBinding;
 use slug_workspace_v2::ImageChargedPath;
 use slug_workspace_v2::ImageObservationOperation;
 use slug_workspace_v2::InputImagePolicy;
+use slug_workspace_v2::ObservedElfMetadata;
+use slug_workspace_v2::ObservedElfMetadataKey;
 use slug_workspace_v2::ObservedInputImage;
 use slug_workspace_v2::ObservedInputImageKey;
 use slug_workspace_v2::PathDirectoryName;
@@ -25,11 +29,50 @@ pub(super) enum DeclaredImageSource {
 #[derive(Clone)]
 pub(super) struct DeclaredImageRequest {
     key: ObservedInputImageKey,
+    elf: Option<DeclaredElfRequest>,
     deadline: std::time::Instant,
     repository: Option<(
         Arc<RepositoryMaterializationRequest>,
         slug_bzlmod_v2::RepositoryMaterialization,
     )>,
+}
+
+#[derive(Clone)]
+struct DeclaredElfRequest {
+    certificate: ObservedInputImage,
+    file: ImageChargedPath,
+    policy: ElfMetadataPolicy,
+}
+
+impl DeclaredElfRequest {
+    fn allows(&self, demand: &PathObservationDemand) -> bool {
+        let PathObservationOperation::InputImage(request) = demand.operation() else {
+            return false;
+        };
+        let ImageObservationOperation::BoundedElfMetadata {
+            expected_digest,
+            policy,
+        } = request.operation()
+        else {
+            return false;
+        };
+        self.file.as_path() == demand.path().as_path()
+            && self.certificate.namespace() == demand.namespace()
+            && self.certificate.anchor_root() == request.scope_anchor_root()
+            && policy == self.policy
+            && self
+                .certificate
+                .entries()
+                .iter()
+                .find(|entry| entry.path().as_path() == self.file.as_path())
+                .and_then(|entry| entry.file_digest())
+                .map(ElfSourceDigestBinding::from_digest)
+                == Some(expected_digest)
+    }
+
+    fn same_budget(&self, budget: &slug_workspace_v2::ImageDescriptorBudget) -> bool {
+        self.certificate.same_budget(budget) && self.file.same_budget(budget)
+    }
 }
 
 impl DeclaredImageRequest {
@@ -72,6 +115,9 @@ impl DeclaredImageRequest {
             return false;
         }
         match request.operation() {
+            ImageObservationOperation::BoundedElfMetadata { .. } => {
+                self.elf.as_ref().is_some_and(|elf| elf.allows(demand))
+            }
             ImageObservationOperation::Lstat => true,
             ImageObservationOperation::BoundedDigest { max_bytes } => {
                 max_bytes == limits.max_file_bytes
@@ -106,6 +152,10 @@ pub(super) fn observe_command_paths(
                 unreachable!()
             };
             if !request.allows(demand)
+                || request
+                    .elf
+                    .as_ref()
+                    .is_some_and(|elf| !elf.same_budget(budget))
                 || !scope.same_budget(budget)
                 || !demand
                     .image_path()
@@ -138,11 +188,21 @@ pub(super) fn observe_command_paths(
     };
     for demand in demands {
         if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
-            let result = source
-                .as_ref()
-                .expect("authorized image source")
-                .observe(&demand, budget, &active)
-                .map_err(NativeDemandSessionError::InputImage)?;
+            let PathObservationOperation::InputImage(scope) = demand.operation() else {
+                unreachable!()
+            };
+            let result = if matches!(
+                scope.operation(),
+                ImageObservationOperation::BoundedElfMetadata { .. }
+            ) {
+                observe_declared_elf(command, &demand, &active)?
+            } else {
+                source
+                    .as_ref()
+                    .expect("authorized image source")
+                    .observe(&demand, budget, &active)
+                    .map_err(NativeDemandSessionError::InputImage)?
+            };
             observations.push((demand, Arc::new(result)));
         } else {
             legacy.push(demand);
@@ -168,177 +228,53 @@ fn image_error(message: &'static str) -> NativeDemandSessionError {
     NativeDemandSessionError::Computation(anyhow::anyhow!(message))
 }
 
-enum ImageAttempt {
-    Need(slug_bzlmod_v2::SourcePreparationNeeds),
-    Complete(ObservedInputImage, NativeDemandTerminalSelection),
-}
-
-impl WorkspaceRuntime {
-    /// Only a declared source enters this primitive; the caller cannot supply
-    /// a certificate. Compute, used-closure selection and capture are one route.
-    #[allow(dead_code)]
-    pub(super) fn capture_declared_input_image(
-        &self,
-        source: DeclaredImageSource,
-        policy: InputImagePolicy,
-    ) -> Result<CapturedInputImageLease, NativeDemandSessionError> {
-        let mut guard =
-            NativeDemandAbortGuard::new(self.begin_native_demand_command()?.into_command());
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
-        let result = (|| {
-            let source_prefix_depth = match &source {
-                DeclaredImageSource::WorkspaceSubtree(subtree)
-                | DeclaredImageSource::ImmutableRepository { subtree, .. } => {
-                    subtree.components().count()
-                }
-            };
-            let maximum_attempts = policy
-                .limits()
-                .max_entries
-                .saturating_mul(4)
-                .saturating_add(source_prefix_depth)
-                .saturating_add(policy.limits().max_depth)
-                .saturating_add(4);
-            for _ in 0..maximum_attempts {
-                if std::time::Instant::now() >= deadline {
-                    return Err(image_error("image preparation deadline"));
-                }
-                guard.begin_attempt()?;
-                let attempt = self.runtime.block_on(async {
-                    tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), async {
-                    let mut updater = self.dice.updater_with_data(guard.attempt_user_computation_data()?);
-                    guard.inject_attempt(&mut updater)?;
-                    let mut transaction = self.request_revision.commit(updater).await;
-                    let (namespace, anchor, subtree, repository) = match &source {
-                        DeclaredImageSource::WorkspaceSubtree(subtree) => (
-                            PathObservationNamespace::Host,
-                            ImageChargedPath::pin_existing(self.repository_materializer.workspace().clone(), self.image_resources.descriptor_budget())
-                                .map_err(|_| image_error("image root descriptor admission failed"))?,
-                            subtree, None,
-                        ),
-                        DeclaredImageSource::ImmutableRepository { request, subtree } => {
-                            if request.id.workspace.as_path() != self.workspace { return Err(image_error("foreign image repository")); }
-                            let observed = slug_bzlmod_v2::source_preparation::compute_repository_materialization_result(&mut transaction, request.clone())
-                                .await.map_err(NativeDemandSessionError::Computation)?;
-                            let materialized = match observed {
-                                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
-                                    guard.seal_retry()?;
-                                    return Ok(ImageAttempt::Need(need));
-                                }
-                                slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => result.as_ref().clone().map_err(|_| image_error("image repository materialization failed"))?,
-                            };
-                            let slug_bzlmod_v2::RepositoryMaterialization::Immutable { generation_root, observation_instance, .. } = &materialized else {
-                                return Err(image_error("image source is not immutable"));
-                            };
-                            let _normalization_credit = self.image_resources.descriptor_budget()
-                                .try_reserve(generation_root.as_os_str().len().saturating_mul(2).saturating_add(128))
-                                .map_err(|_| image_error("image root descriptor admission failed"))?;
-                            let normalized = NormalizedAbsolutePath::new(generation_root.clone()).map_err(|_| image_error("invalid materialization root"))?;
-                            let anchor = ImageChargedPath::pin_existing(normalized, self.image_resources.descriptor_budget())
-                                .map_err(|_| image_error("image root descriptor admission failed"))?;
-                            (PathObservationNamespace::Materialization(*observation_instance), anchor,
-                                subtree, Some((request.clone(), materialized)))
-                        }
-                    };
-                    if subtree.is_absolute() || subtree.as_os_str().len() > policy.limits().max_path_bytes
-                        || subtree.components().any(|component| !matches!(component, std::path::Component::Normal(_) | std::path::Component::CurDir)) {
-                        return Err(image_error("invalid image subtree"));
-                    }
-                    let mut selected_root = anchor.clone();
-                    for component in subtree.components() {
-                        if let std::path::Component::Normal(name) = component {
-                            let _name_credit = self.image_resources.descriptor_budget().try_reserve(name.len().saturating_add(64))
-                                .map_err(|_| image_error("image component descriptor admission failed"))?;
-                            let name = PathDirectoryName::new(name.to_owned()).map_err(|_| image_error("invalid image component"))?;
-                            selected_root = selected_root.try_join_component(&name).map_err(|_| image_error("image path descriptor admission failed"))?;
-                        }
-                    }
-                    let key = ObservedInputImageKey::from_charged(namespace, anchor, selected_root, policy).map_err(|_| image_error("invalid image policy"))?;
-                    guard.command.as_mut().expect("active image command").image_request = Some(DeclaredImageRequest { key: key.clone(), deadline, repository });
-                    let outcome = transaction.compute(&key).await.map_err(|error| NativeDemandSessionError::Computation(error.into()))?;
-                    match outcome {
-                        PathOutcome::Need(need) => {
-                            guard.seal_retry()?;
-                            Ok(ImageAttempt::Need(slug_bzlmod_v2::SourcePreparationNeeds::path(need)))
-                        }
-                        PathOutcome::Complete(result) => {
-                            let certificate = result.map_err(|_| image_error("image producer refused source"))?;
-                            if !certificate.same_budget(self.image_resources.descriptor_budget()) {
-                                return Err(image_error("foreign cached image budget"));
-                            }
-                            let selected = guard.seal_terminal()?.select(&transaction).await?;
-                            let reachable = selected.sidecars().demands();
-                            for (demand, observed) in certificate.observations().observations() {
-                                if !reachable.unscoped_paths().contains(demand)
-                                    || guard.command().path_observations.get(demand) != Some(observed) {
-                                    return Err(image_error("image frontier is not current reachable evidence"));
-                                }
-                            }
-                            if let Some((request, _)) = &guard.command().image_request.as_ref().expect("image request").repository {
-                                if !reachable.repository_requests().contains(request) { return Err(image_error("image repository is not reachable")); }
-                            }
-                            Ok(ImageAttempt::Complete(certificate, selected))
-                        }
-                    }
-                    }).await.map_err(|_| image_error("image preparation deadline"))?
-                });
-                // All transactions/compute futures have dropped; drain their
-                // cancelled workers before native observations or copying.
-                self.runtime.block_on(self.dice.wait_for_idle());
-                match attempt? {
-                    ImageAttempt::Need(need) => {
-                        guard.progress(&need)?;
-                    }
-                    ImageAttempt::Complete(certificate, selected) => {
-                        let command = guard.command();
-                        let request = command
-                            .image_request
-                            .as_ref()
-                            .expect("current image request");
-                        let source = request.source(command)?;
-                        let authorized =
-                            input_image::AuthorizedObservedInputImage::new(source, certificate);
-                        let active = || {
-                            std::time::Instant::now() < deadline
-                                && self
-                                    .repository_materializer
-                                    .session_is_active(command.repository_session)
-                        };
-                        let captured = input_image::capture_input_image(
-                            authorized,
-                            &self.image_resources,
-                            &active,
-                        )
-                        .map_err(NativeDemandSessionError::InputImage);
-                        // This prerequisite does not publish process epochs or
-                        // put image demands in accepted generic preflight.
-                        drop(selected);
-                        return captured;
-                    }
-                }
-            }
-            Err(image_error("image preparation made no bounded progress"))
-        })();
-        guard.suppress_attempt()?;
-        let cleanup = guard
-            .command
-            .as_mut()
-            .expect("image guard owns command")
-            .discard_in_place();
-        match cleanup {
-            Ok(()) => {
-                guard.phase = NativeDemandAbortPhase::Closed;
-                guard.command = None;
-                result
-            }
-            Err(error) => {
-                guard.phase = NativeDemandAbortPhase::FailClosed;
-                Err(error)
-            }
-        }
+fn observe_declared_elf(
+    command: &NativeDemandCommand<'_>,
+    demand: &PathObservationDemand,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationResult, NativeDemandSessionError> {
+    let request = command
+        .image_request
+        .as_ref()
+        .ok_or_else(|| image_error("missing ELF declaration"))?;
+    let elf = request
+        .elf
+        .as_ref()
+        .ok_or_else(|| image_error("missing ELF declaration"))?;
+    #[cfg(target_os = "linux")]
+    {
+        let authorized = input_image::elf_metadata::AuthorizedElfObservation::new(
+            request.source(command)?,
+            elf.certificate.clone(),
+            elf.file.clone(),
+            elf.policy,
+            &command.runtime.image_resources,
+        )
+        .map_err(NativeDemandSessionError::InputImage)?;
+        input_image::elf_metadata::observe_elf_metadata(
+            &authorized,
+            demand,
+            &command.runtime.image_resources,
+            active,
+        )
+        .map_err(NativeDemandSessionError::InputImage)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (elf, demand, active);
+        Err(NativeDemandSessionError::InputImage(
+            input_image::InputImageCaptureError::UnsupportedPlatform,
+        ))
     }
 }
+
+#[path = "input_image_bridge/prepare.rs"]
+mod prepare;
 
 #[cfg(all(test, target_os = "linux"))]
 #[path = "input_image_bridge/tests.rs"]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "input_image_bridge/elf_tests.rs"]
+mod elf_tests;

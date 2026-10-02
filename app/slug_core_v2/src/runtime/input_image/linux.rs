@@ -172,6 +172,11 @@ pub(super) fn observe(
         ImageObservationOperation::BoundedDirectory(limits) => {
             directory(&source.root, relative, limits, &mut credit, active)?
         }
+        // ELF requires the separately declared exact member/certificate;
+        // generic image authority cannot fulfill this operation.
+        ImageObservationOperation::BoundedElfMetadata { .. } => {
+            return Err(InputImageCaptureError::Unauthorized);
+        }
     };
     reject_interrupted(&data)?;
     active_check(active)?;

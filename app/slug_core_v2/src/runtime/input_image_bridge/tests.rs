@@ -207,7 +207,7 @@ fn declared_image_materialization_uses_normal_request_and_actual_writer() {
     );
 }
 
-fn generated_request(
+pub(super) fn generated_request(
     runtime: &WorkspaceRuntime,
 ) -> (
     Arc<RepositoryMaterializationRequest>,

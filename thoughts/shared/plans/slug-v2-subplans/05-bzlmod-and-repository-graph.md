@@ -226,17 +226,44 @@ and ordered prefix, immutable throughout the full child/descendant run with no
 writable aliases/FDs/maps. This supersedes admission-only writable execution.
 Overlay/prefix consistency and visible post-tree capture remain mandatory gates.
 
-The next useful bounded owner is normal-DICE ELF metadata, not a complete runtime
-catalog. Workspace scoped Needs bind checked, bounded ELF facts to the exact same
-whole-file SHA256 byte image as the producer certificate; precharged proof ranges
-must match every consumed byte during streaming. Pure normal keys project facts;
-no ldd, whole-tool payload retention or native completed-catalog injection.
-Bzlmod must separately select actual generator/host-tools capabilities, loader
-revision/search/negative facts, assets and inherited/child env consequences.
-Those actual selected roots are not currently retained; unrelated binaries or
-ambient host paths cannot replace them. Detailed ELF API/bounds review precedes
-implementation; full query/locked-generate, quota/capture and runtime catalog
-proof remain required. No process activation, M7A/bootstrap or new RSS claim.
+### Bounded observed ELF metadata prerequisite
+
+WP890 adds normal Workspace ObservedElfMetadataKey over a directory image key,
+charged exact regular-file member and semantic ELF policy. It derives digest
+from the normal image producer, emits a scoped metadata Need and validates raw
+facts in normal DICE. Core's actual workspace/immutable request/result/root/
+session factory and separately image-derived exact allowance authorize I/O.
+Generic image/source capability cannot authorize ELF metadata. Full current
+reachable image+ELF frontier and repository request are checked; transactions
+are dropped/drained before final source verification and transient discard/restore.
+
+The Slug-native finite syntax is ELF64 little-endian x86_64 ET_EXEC/ET_DYN,
+SystemV0/Linux3 OSABI version0/current ELF versions. Checked program headers,
+PT_INTERP/PT_DYNAMIC and ordered raw dynamic controls plus exact NEEDED/SONAME/
+RPATH/RUNPATH literals are facts, not loader/closure admission. Ambiguous load
+mapping, including partial overlap, is refused. Limits are 1024 program headers,
+8192 dynamic entries/proof spans, 4096 bytes/string including NUL, 1MiB original
+proof occurrences and 1MiB deterministic decoded fact/record bytes. Physical
+allocation capacities/headers/replacement peaks use existing 64MiB workspace
+image descriptor credit, independent of semantic admission.
+
+Every parser read saves bounded proof bytes, including read-ahead and NUL.
+Overlap-consistent normalized union is compared during the same opened file's
+complete 64KiB-stream SHA256 pass; wrong proof fails even if final digest matches.
+Expected size/digest and full source frontier must authenticate success and
+malformed/unsupported/keyed-limit refusals alike. Race, foreign authority,
+I/O/EINTR, cancel and workspace exhaustion produce no reusable facts. Shared
+Arc/Dupe/Allocative facts/Need/current-demand guards and DICE history retain
+credits through actual last Drop; authenticated rejection retires discarded
+partial-fact scratch and retains only the small enum block. No tool payload is
+retained or staged by metadata observation. No lock spans compute/new dependency.
+
+Actual selected generator/host-tools and loader/runtime source authority still
+need normal producers; same bytes under another Host path cannot replace them.
+Loader search/aliases/assets/negative facts/env/child consequences, complete
+unknown-access attribution, mapped/tracing context, hard quota/visible capture
+and cohesive query/locked-generate remain required. No process/backend activation,
+complete runtime catalog, selected-tool fit, bootstrap or new RSS claim.
 
 ## Goal
 

@@ -89,7 +89,7 @@ impl CapturedInputImageLease {
     }
 }
 
-fn verify_frontier(
+pub(in crate::runtime) fn verify_frontier(
     source: &ScopedImageSource,
     certificate: &ObservedInputImage,
     resources: &WorkspaceImageResources,

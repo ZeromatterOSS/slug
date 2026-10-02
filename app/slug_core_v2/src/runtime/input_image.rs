@@ -18,12 +18,15 @@ use tempfile::TempDir;
 
 mod capture;
 #[cfg(target_os = "linux")]
+pub(super) mod elf_metadata;
+#[cfg(target_os = "linux")]
 mod linux;
 #[cfg(all(test, target_os = "linux"))]
 mod tests;
 pub(super) use capture::AuthorizedObservedInputImage;
 pub(super) use capture::CapturedInputImageLease;
 pub(super) use capture::capture_input_image;
+pub(super) use capture::verify_frontier;
 
 #[derive(Debug)]
 pub(super) enum InputImageCaptureError {
@@ -177,6 +180,14 @@ impl ScopedImageSource {
         else {
             return Err(InputImageCaptureError::Unauthorized);
         };
+        // ELF metadata requires current certified-file membership, not the
+        // generic scoped source capability. Reject before anchor I/O.
+        if matches!(
+            request.operation(),
+            slug_workspace_v2::ImageObservationOperation::BoundedElfMetadata { .. }
+        ) {
+            return Err(InputImageCaptureError::Unauthorized);
+        }
         if demand.namespace() != self.namespace
             || request.scope_anchor_root() != &self.anchor
             || !request.same_budget(budget)

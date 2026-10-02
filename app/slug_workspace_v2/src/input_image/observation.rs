@@ -6,6 +6,9 @@ use std::sync::Arc;
 use allocative::Allocative;
 use dupe::Dupe;
 
+use super::ElfMetadataPolicy;
+use super::ElfSourceDigestBinding;
+use super::VerifiedElfMetadata;
 use super::budget::BudgetedImageBlock;
 use super::budget::ImageChargedPath;
 use super::budget::ImageDescriptorBudget;
@@ -30,10 +33,18 @@ pub struct DirectoryObservationLimits {
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe
 )]
 pub enum ImageObservationOperation {
+    BoundedElfMetadata {
+        expected_digest: ElfSourceDigestBinding,
+        policy: ElfMetadataPolicy,
+    },
     Lstat,
-    BoundedDigest { max_bytes: u64 },
+    BoundedDigest {
+        max_bytes: u64,
+    },
     BoundedDirectory(DirectoryObservationLimits),
-    BoundedReadLink { max_target_bytes: usize },
+    BoundedReadLink {
+        max_target_bytes: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
@@ -62,6 +73,7 @@ impl ImageObservationRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum ImageObservationData {
+    ElfMetadata(PathOperationResult<VerifiedElfMetadata>),
     Lstat(PathOperationResult<PathLstat>),
     Digest(PathOperationResult<FileContentDigest>),
     Directory(PathOperationResult<PathDirectoryEntries>),
@@ -105,6 +117,9 @@ impl ImageObservationResult {
             ) | (
                 ImageObservationOperation::BoundedReadLink { .. },
                 ImageObservationData::ReadLink(_)
+            ) | (
+                ImageObservationOperation::BoundedElfMetadata { .. },
+                ImageObservationData::ElfMetadata(_)
             ) | (_, ImageObservationData::LimitExceeded)
         );
         if !matches
@@ -115,6 +130,22 @@ impl ImageObservationResult {
             return Err(ImageDescriptorBudgetError::ForeignBudget);
         }
         let within_bounds = match (request.operation(), &data) {
+            (
+                ImageObservationOperation::BoundedElfMetadata {
+                    expected_digest,
+                    policy,
+                },
+                ImageObservationData::ElfMetadata(PathOperationResult::Present(value)),
+            ) => {
+                if !value.same_budget(reservation.budget()) {
+                    return Err(ImageDescriptorBudgetError::ForeignBudget);
+                }
+                value.digest() == expected_digest && value.policy() == policy
+            }
+            (
+                ImageObservationOperation::BoundedElfMetadata { .. },
+                ImageObservationData::LimitExceeded,
+            ) => false,
             (
                 ImageObservationOperation::BoundedDigest { max_bytes },
                 ImageObservationData::Digest(PathOperationResult::Present(digest)),
@@ -167,5 +198,11 @@ impl ImageObservationResult {
         self.issued_path().same_budget(budget)
             && self.request().same_budget(budget)
             && self.0.same_budget(budget)
+            && match self.data() {
+                ImageObservationData::ElfMetadata(PathOperationResult::Present(value)) => {
+                    value.same_budget(budget)
+                }
+                _ => true,
+            }
     }
 }
