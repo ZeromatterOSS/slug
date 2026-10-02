@@ -258,12 +258,64 @@ credits through actual last Drop; authenticated rejection retires discarded
 partial-fact scratch and retains only the small enum block. No tool payload is
 retained or staged by metadata observation. No lock spans compute/new dependency.
 
-Actual selected generator/host-tools and loader/runtime source authority still
-need normal producers; same bytes under another Host path cannot replace them.
-Loader search/aliases/assets/negative facts/env/child consequences, complete
-unknown-access attribution, mapped/tracing context, hard quota/visible capture
-and cohesive query/locked-generate remain required. No process/backend activation,
-complete runtime catalog, selected-tool fit, bootstrap or new RSS claim.
+### Selected tool and runtime source authority
+
+Source-design WP891 selects internal prepared Label provenance, ordered scratch
+prefix/tool-source checkpoints and explicit raw request runtime declarations.
+Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
+generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
+or musl name cannot prove the selected bytes/interpreter. Host-tools come from the
+independent generated marker Label's dirname/bin/{cargo,rustc}, never ambient
+PATH or Slug's compilation toolchain. Their actual materialization remains needed.
+
+PreparedSelectedLabelPath retains CanonicalLabel, normal Root/External source
+route and bounded literal Parent/Child transformations. Ready maps and evaluator
+path/string-origin records preserve this lineage; generic public normalized-path
+values grant no authority. A normal selected scratch prefix includes definition/
+usage/env/owner/call index, ordered writes/downloads/overwrites and exact tree.
+SelectedExtensionToolSourcesKey consumes actual operands/checkpoint, not duplicated
+rules_rust selection or physical-path reverse lookup. Source Label and verified
+ScratchPrefix have distinct declared factories; no repository ordinal or namespace
+impersonation. Factories validate the full current request/origin/prefix/session/
+root/budget before I/O; private staging is nonsemantic. All new generated-source
+wait families join exact-live-context structural mixed graph/guarded waits; no
+checkpoint computes its own waiting outer PureOwner. Need/replay, generated-cycle
+and source/history last-Drop gates are mandatory before activation.
+
+RuntimeSourceDeclarationPolicyKey is a bounded immutable raw request configuration
+input: explicit source scopes/original spellings/alias/outcome/platform policy,
+never observed bytes/manifests/digests/FDs or completed catalog. Normal
+RuntimeSourceProfileKey depends on that policy and actual selected source request,
+emits scoped Needs and computes observed namespace/catalog facts. Native factory
+matches current request-selected policy/source/whole batch before access. Absence
+is a source prerequisite; no implicit /usr, root '/', empty HOME or env clearing.
+Initial proposed 64 scopes/4MiB descriptor bytes inherit 32768 entries/depth32/
+2GiB aggregate/512MiB file ceilings. No actual configured roots or fit are proved.
+
+Select execution of the actual sealed opaque loader in a source-certified
+preserved namespace rather than Rust glibc search emulation. This replaces the
+WP889 proposed known-loader-search-model prerequisite; it preserves complete
+source/access ownership. Actual ELF controls, loader/tool bytes, cache/preload/
+assets/aliases/ancestors, effective parent/derived child env and platform/auxv/
+hardware inputs are owned or explicitly refused. Every exposed successful or
+missing lookup/stat/access/listing/readlink/open/mmap/exec outcome must match
+certified namespace facts. WP888 bytes/modes/tree alone cannot certify UID/GID,
+ACL/xattr/capabilities, dev/ino/times or synthetic mount-parent outcomes. Preserve/
+emulate source facts or select an explicit keyed guest metadata policy; staging
+identity/ENOENT is not source evidence. Bounded sequential runtime-only alias
+traversal includes every link/ancestor/target across declared roots, including
+parent-after-link; general Starlark symlink methods stay deferred.
+
+All unowned access invalidates even if swallowed. Restart may request only
+policy-authorized facts, never widen roots or certify live inputs after startup.
+Normal source facts precede installation; current reachable frontier is rechecked
+after transaction drop/drain. Tool images stream 64KiB; shared credited origins/
+Needs/recipes/facts/history survive actual last Drop. Complete namespace facets,
+finite all-writer/descendant mediation, hard quota/retained capture and actual
+source-consuming query plus locked generate remain required. No smaller method
+endpoint activates early. This is an accepted producer/authority design only;
+actual source configuration/roots, full runtime catalog, selected-tool fit,
+process/backend activation, bootstrap and new RSS remain unproved.
 
 ## Goal
 

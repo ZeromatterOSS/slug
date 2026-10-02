@@ -34,20 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-190-m7a-observed-elf-metadata-r1
-Status: ACCEPTED; bounded ELF metadata prerequisite; no process activation
+Packet: WP-7-191-m7a-selected-tool-source-authority-r1
+Status: ACCEPTED conditional source-owner design; no process activation
 
-WP890 implements normal-DICE bounded ELF metadata from actual declared source
-images. Every parser-read byte is proved against the same complete streamed
-SHA256 image; exact member/digest/policy allowances precede native I/O. Rejected
-partial buffers retire before publication; shared facts/Needs/history retain
-workspace descriptor credit until actual last Drop. Workspace48/48, Core
-image/ELF39/39 and protected39/39 pass. Required owner all-target checks pass;
-default CLI and independent FINAL review pass; compact evidence records acceptance. Stage5/9 own
-bounds and retained prerequisites. Actual selected runtime catalog, mapped
-identity, permitted complete tracing, quota/capture and full query/locked-generate
-remain open. No process/bootstrap/RSS claim. Memory fix d95f2bda6 and WP885
-peak1090.074MiB/zero swap remain the latest whole-process evidence.
+WP891 chooses typed normal Label provenance and ordered scratch/tool checkpoints,
+raw immutable request runtime source declarations, and normal scoped namespace
+facts. The actual sealed loader performs search; every exposed outcome must be
+source-owned and unowned access invalidates even if swallowed. Source confirms
+Linux musl default generator; neither release names nor ELF facts prove closure.
+Stage5/9 own the conditional contract. Actual roots/profile integration, complete
+namespace/mediator/quota/capture and query/locked-generate remain open. WP890
+c019778a1 metadata prerequisite remains accepted. No activation/bootstrap/RSS claim.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
