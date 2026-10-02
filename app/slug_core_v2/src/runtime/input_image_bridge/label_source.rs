@@ -119,7 +119,7 @@ pub(super) fn check_key(
     Ok(())
 }
 
-fn check_selection(
+pub(super) fn check_selection(
     runtime: &WorkspaceRuntime,
     selected: &ObservedSelectedLabelSource,
 ) -> Result<(), NativeDemandSessionError> {

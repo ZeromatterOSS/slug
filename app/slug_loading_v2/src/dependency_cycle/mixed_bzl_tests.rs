@@ -23,6 +23,15 @@ mod mixed_bzl_tests {
 
     #[tokio::test]
     async fn generated_path_and_producer_defining_bzl_cycle_has_fresh_bzl_listener() {
+        generated_definition_cycle(false).await;
+    }
+
+    #[tokio::test]
+    async fn selected_tools_generated_definition_cycle_terminates_without_certificate() {
+        generated_definition_cycle(true).await;
+    }
+
+    async fn generated_definition_cycle(with_tools: bool) {
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
         const SAFE: &str = "repo=repository_rule(lambda ctx:None)\ndef impl(ctx):\n    repo(name='proof')\next=module_extension(implementation=impl,environ=['FACTOR','MISSING','FACTOR'])\n";
         let mut builder = Dice::builder();
@@ -137,13 +146,43 @@ mod mixed_bzl_tests {
         )
         .unwrap();
         tx = selected_watch_observations(tx, epoch).await;
+        let resources = scratch_test_resources();
+        let tool_key = super::super::selected_tools::SelectedExtensionToolSourcesKey::new(
+            super::super::selected_scratch::HostSelectedExtensionScratchPrefixKey::new(
+                workspace.dupe(),
+                key.0.owner.clone(),
+                slug_bzlmod_v2::SelectedScratchPolicy::plain(),
+            ),
+            tool_test_policy(),
+        );
+        if with_tools {
+            tx = scratch_test_inputs(
+                tx,
+                tracker.clone(),
+                &resources,
+                RepositoryEnvironmentSnapshot::empty(),
+                None,
+            )
+            .await;
+        }
         tracker.take();
         tracker.take_dependencies();
         // A separate ordinary request retains the defining .bzl waiter until its
         // own mixed notification records poison, even if the owner finishes first.
         let mut bzl_tx = tx.dupe();
-        let (owner, bzl) = tokio::time::timeout(Duration::from_secs(2), async {
-            tokio::join!(tx.compute(&key), bzl_tx.compute(&bzl_key))
+        let mut tool_tx = tx.dupe();
+        let (owner, bzl, tools) = tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(tx.compute(&key), bzl_tx.compute(&bzl_key), async {
+                if with_tools {
+                    Some(
+                        crate::compute_selected_tool_sources(&mut tool_tx, &tool_key)
+                            .await
+                            .unwrap(),
+                    )
+                } else {
+                    None
+                }
+            })
         })
         .await
         .expect("mixed generated-source cycle must terminate");
@@ -198,9 +237,38 @@ mod mixed_bzl_tests {
             "defining bzl observations: {:?}",
             bzl.observations()
         );
-        drop((tx, bzl_tx));
+        if let Some(tools) = tools {
+            assert!(
+                matches!(
+                    tools,
+                    SourcePreparationOutcome::Complete(Err(
+                        super::super::selected_tools::SelectedToolSourcesError::Prefix(_)
+                    ))
+                ),
+                "mixed cycle must refuse the actual normal certificate: {tools:?}"
+            );
+        }
+        drop((tx, bzl_tx, tool_tx));
         dice.wait_for_idle().await;
         let dependencies = tracker.take_dependencies();
+        if with_tools {
+            let (_, tool_dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &tool_key.to_string())
+                .expect("new Sources consumer must activate genuinely");
+            assert!(
+                tool_dependencies.contains(&tool_key.requests_key().to_string()),
+                "{tool_dependencies:?}"
+            );
+            let (_, request_dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &tool_key.requests_key().to_string())
+                .expect("new Requests consumer must activate genuinely");
+            assert!(
+                request_dependencies.contains(&tool_key.checkpoint().to_string()),
+                "{request_dependencies:?}"
+            );
+        }
         let (_, fresh_bzl_dependencies) = dependencies
             .iter()
             .find(|(name, _)| name == &bzl_key.to_string())

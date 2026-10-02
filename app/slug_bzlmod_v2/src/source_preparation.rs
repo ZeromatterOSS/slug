@@ -172,6 +172,7 @@ impl<T> SourcePreparationOutcome<T> {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct SourcePreparationNeeds {
+    scratch_elf_metadata: Option<crate::SelectedScratchElfMetadataNeeds>,
     root_module_bootstrap: Option<RootModuleBootstrapRequest>,
     repository_environment: Option<crate::NeedRepositoryEnvironmentNames>,
     path_observations: Option<NeedPathObservations>,
@@ -189,6 +190,7 @@ pub struct SourcePreparationNeeds {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum SourcePreparationNeedsError {
+    ScratchElfMetadata(crate::SelectedToolSourceError),
     ConflictingRootModuleBootstrap,
     RepositoryEnvironment(crate::RepositoryEnvironmentCanonicalError),
     ConflictingRepositoryRequest {
@@ -203,8 +205,25 @@ pub enum SourcePreparationNeedsError {
 }
 
 impl SourcePreparationNeeds {
+    pub fn scratch_elf_metadata(need: crate::SelectedScratchElfMetadataNeeds) -> Self {
+        Self {
+            scratch_elf_metadata: Some(need),
+            root_module_bootstrap: None,
+            repository_environment: None,
+            path_observations: None,
+            repository_materializations: Arc::new(SmallMap::new()),
+            selected_extension_downloads: Arc::new(SmallMap::new()),
+            repository_executes: Arc::new(SmallMap::new()),
+        }
+    }
+
+    pub fn scratch_elf_metadata_requests(&self) -> Option<&crate::SelectedScratchElfMetadataNeeds> {
+        self.scratch_elf_metadata.as_ref()
+    }
+
     pub fn root_module_bootstrap(request: RootModuleBootstrapRequest) -> Self {
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: Some(request),
             repository_environment: None,
             path_observations: None,
@@ -216,6 +235,7 @@ impl SourcePreparationNeeds {
 
     pub fn path(need: NeedPathObservations) -> Self {
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: None,
             repository_environment: None,
             path_observations: Some(need),
@@ -229,6 +249,7 @@ impl SourcePreparationNeeds {
         let mut repository_materializations = SmallMap::new();
         repository_materializations.insert(request.id.clone(), Arc::new(request));
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: None,
             repository_environment: None,
             path_observations: None,
@@ -243,6 +264,7 @@ impl SourcePreparationNeeds {
         let mut selected_extension_downloads = SmallMap::new();
         selected_extension_downloads.insert(owner, Arc::new(request));
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: None,
             repository_environment: None,
             path_observations: None,
@@ -256,6 +278,7 @@ impl SourcePreparationNeeds {
         let mut repository_executes = SmallMap::new();
         repository_executes.insert(request.id().clone(), Arc::new(request));
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: None,
             repository_environment: None,
             path_observations: None,
@@ -275,6 +298,7 @@ impl SourcePreparationNeeds {
 
     pub fn environment(request: crate::NeedRepositoryEnvironmentNames) -> Self {
         Self {
+            scratch_elf_metadata: None,
             root_module_bootstrap: None,
             repository_environment: Some(request),
             path_observations: None,
@@ -310,6 +334,15 @@ impl SourcePreparationNeeds {
     }
 
     pub fn try_union(&self, other: &Self) -> Result<Self, SourcePreparationNeedsError> {
+        // Validate and reserve the new bounded family before any legacy map clone.
+        let scratch_elf_metadata = match (&self.scratch_elf_metadata, &other.scratch_elf_metadata) {
+            (Some(left), Some(right)) => Some(
+                left.try_union(right)
+                    .map_err(SourcePreparationNeedsError::ScratchElfMetadata)?,
+            ),
+            (Some(need), None) | (None, Some(need)) => Some(need.dupe()),
+            (None, None) => None,
+        };
         let repository_environment =
             match (&self.repository_environment, &other.repository_environment) {
                 (Some(left), Some(right)) => Some(
@@ -378,7 +411,8 @@ impl SourcePreparationNeeds {
                 (None, None) => None,
             };
         debug_assert!(
-            root_module_bootstrap.is_some()
+            scratch_elf_metadata.is_some()
+                || root_module_bootstrap.is_some()
                 || repository_environment.is_some()
                 || path_observations.is_some()
                 || !requests.is_empty()
@@ -386,6 +420,7 @@ impl SourcePreparationNeeds {
                 || !repository_executes.is_empty()
         );
         Ok(Self {
+            scratch_elf_metadata,
             root_module_bootstrap,
             repository_environment,
             path_observations,
@@ -393,6 +428,12 @@ impl SourcePreparationNeeds {
             selected_extension_downloads: Arc::new(selected_extension_downloads),
             repository_executes: Arc::new(repository_executes),
         })
+    }
+}
+
+impl SourcePreparationNeedsError {
+    pub fn is_transient(&self) -> bool {
+        matches!(self, Self::ScratchElfMetadata(error) if error.is_transient())
     }
 }
 

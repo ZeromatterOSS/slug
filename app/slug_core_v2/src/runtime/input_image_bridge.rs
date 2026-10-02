@@ -155,73 +155,193 @@ impl DeclaredImageRequest {
     }
 }
 
+/// The baseline driver supplies its one current declaration unchanged.
 pub(super) fn observe_command_paths(
     command: &NativeDemandCommand<'_>,
     demands: Vec<PathObservationDemand>,
 ) -> Result<PathObservationEpoch, NativeDemandSessionError> {
-    let mut observations = Vec::with_capacity(demands.len());
-    let mut legacy = Vec::new();
+    let declarations = command.image_request.as_slice();
     let budget = command.runtime.image_resources.descriptor_budget();
-    // Validate the entire image batch before doing even the first read.
+    // Preserve the legacy admission order and error: even an expired source
+    // declaration cannot hide a foreign later row in the same incoming batch.
     for demand in &demands {
-        if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
-            let request = command
-                .image_request
-                .as_ref()
-                .ok_or_else(|| image_error("undeclared image observation"))?;
-            let PathObservationOperation::InputImage(scope) = demand.operation() else {
-                unreachable!()
-            };
-            if !request.allows(demand)
-                || request
-                    .elf
-                    .as_ref()
-                    .is_some_and(|elf| !elf.same_budget(budget))
-                || !scope.same_budget(budget)
-                || !demand
-                    .image_path()
-                    .is_some_and(|path| path.same_budget(budget))
-            {
-                return Err(image_error("foreign image observation"));
-            }
-        }
-    }
-    let source = demands
-        .iter()
-        .any(|demand| demand.image_path().is_some())
-        .then(|| {
-            command
-                .image_request
-                .as_ref()
-                .expect("validated image request")
-                .source(command)
-        })
-        .transpose()?;
-    let active = || {
-        command
+        let PathObservationOperation::InputImage(scope) = demand.operation() else {
+            continue;
+        };
+        let request = command
             .image_request
             .as_ref()
-            .is_none_or(|request| std::time::Instant::now() < request.deadline)
+            .ok_or_else(|| image_error("undeclared image observation"))?;
+        if !request.allows(demand)
+            || request
+                .elf
+                .as_ref()
+                .is_some_and(|elf| !elf.same_budget(budget))
+            || !scope.same_budget(budget)
+            || !demand
+                .image_path()
+                .is_some_and(|path| path.same_budget(budget))
+        {
+            return Err(image_error("foreign image observation"));
+        }
+    }
+    let credit = image_batch_credit(command, &demands)?;
+    // The legacy source() deadline check follows whole-batch admission, before
+    // the observer's cancellation callback. Open one retained source per batch.
+    let sources = retain_image_sources(command, declarations, &demands, None)?;
+    observe_authorized_image_paths(command, declarations, &sources, demands, credit, &|| {
+        declarations
+            .iter()
+            .all(|request| std::time::Instant::now() < request.deadline)
             && command
                 .runtime
                 .repository_materializer
                 .session_is_active(command.repository_session)
-    };
+    })
+}
+
+/// Only private, normally selected declarations authorize image reads. Validate
+/// every row before any source factory opens an FD, including mixed legacy rows.
+pub(super) fn observe_declared_image_paths(
+    command: &NativeDemandCommand<'_>,
+    declarations: &[DeclaredImageRequest],
+    demands: Vec<PathObservationDemand>,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationEpoch, NativeDemandSessionError> {
+    preflight_declared_image_paths(command, declarations, &demands)?;
+    if !active() {
+        return Err(image_error("image preparation cancelled"));
+    }
+    let credit = image_batch_credit(command, &demands)?;
+    let sources = retain_image_sources(command, declarations, &demands, Some(active))?;
+    observe_authorized_image_paths(command, declarations, &sources, demands, credit, active)
+}
+
+fn image_batch_credit(
+    command: &NativeDemandCommand<'_>,
+    demands: &[PathObservationDemand],
+) -> Result<slug_workspace_v2::ImageDescriptorReservation, NativeDemandSessionError> {
+    let budget = command.runtime.image_resources.descriptor_budget();
+    let row = std::mem::size_of::<(PathObservationDemand, Arc<PathObservationResult>)>();
+    let charge = demands.iter().try_fold(
+        512 + std::mem::size_of::<[Option<RetainedImageSource>; 3]>(),
+        |total, demand| {
+            demand
+                .path()
+                .as_path()
+                .as_os_str()
+                .len()
+                .checked_add(row)
+                .and_then(|n| n.checked_mul(16))
+                .and_then(|n| total.checked_add(n))
+                .ok_or_else(|| image_error("image batch descriptor overflow"))
+        },
+    )?;
+    budget
+        .try_reserve(charge)
+        .map_err(|error| NativeDemandSessionError::InputImage(error.into()))
+}
+
+enum RetainedImageSource {
+    Plain(input_image::ScopedImageSource),
+    #[cfg(target_os = "linux")]
+    Elf(input_image::elf_metadata::AuthorizedElfObservation),
+}
+
+impl RetainedImageSource {
+    fn scoped(&self) -> &input_image::ScopedImageSource {
+        match self {
+            Self::Plain(source) => source,
+            #[cfg(target_os = "linux")]
+            Self::Elf(authorized) => authorized.source(),
+        }
+    }
+}
+
+fn retain_image_sources(
+    command: &NativeDemandCommand<'_>,
+    declarations: &[DeclaredImageRequest],
+    demands: &[PathObservationDemand],
+    active: Option<&dyn Fn() -> bool>,
+) -> Result<[Option<RetainedImageSource>; 3], NativeDemandSessionError> {
+    let mut sources = std::array::from_fn(|_| None);
+    for (index, request) in declarations.iter().enumerate() {
+        let selected = |demand: &&PathObservationDemand| {
+            declarations
+                .iter()
+                .position(|candidate| candidate.allows(demand))
+                == Some(index)
+        };
+        if demands.iter().find(selected).is_none() {
+            continue;
+        }
+        if active.is_some_and(|active| !active()) {
+            return Err(image_error("image preparation cancelled"));
+        }
+        let source = request.source(command)?;
+        let has_elf = demands.iter().filter(selected).any(|demand| {
+            matches!(demand.operation(), PathObservationOperation::InputImage(scope)
+                if matches!(scope.operation(), ImageObservationOperation::BoundedElfMetadata { .. }))
+        });
+        sources[index] = Some(if has_elf {
+            let elf = request.elf.as_ref().expect("authorized ELF declaration");
+            #[cfg(target_os = "linux")]
+            {
+                RetainedImageSource::Elf(
+                    input_image::elf_metadata::AuthorizedElfObservation::new(
+                        source,
+                        elf.certificate.clone(),
+                        elf.file.clone(),
+                        elf.policy,
+                        &command.runtime.image_resources,
+                    )
+                    .map_err(NativeDemandSessionError::InputImage)?,
+                )
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                let _ = (source, elf);
+                return Err(NativeDemandSessionError::InputImage(
+                    input_image::InputImageCaptureError::UnsupportedPlatform,
+                ));
+            }
+        } else {
+            RetainedImageSource::Plain(source)
+        });
+    }
+    Ok(sources)
+}
+
+fn observe_authorized_image_paths(
+    command: &NativeDemandCommand<'_>,
+    declarations: &[DeclaredImageRequest],
+    sources: &[Option<RetainedImageSource>; 3],
+    demands: Vec<PathObservationDemand>,
+    _credit: slug_workspace_v2::ImageDescriptorReservation,
+    active: &dyn Fn() -> bool,
+) -> Result<PathObservationEpoch, NativeDemandSessionError> {
+    let budget = command.runtime.image_resources.descriptor_budget();
+    let mut observations = Vec::with_capacity(demands.len());
+    let mut legacy = Vec::new();
     for demand in demands {
-        if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
-            let PathObservationOperation::InputImage(scope) = demand.operation() else {
-                unreachable!()
-            };
+        if !active() {
+            return Err(image_error("image preparation cancelled"));
+        }
+        if let PathObservationOperation::InputImage(scope) = demand.operation() {
+            let index = declarations
+                .iter()
+                .position(|request| request.allows(&demand))
+                .expect("whole batch authorized");
+            let source = sources[index].as_ref().expect("retained authorized source");
             let result = if matches!(
                 scope.operation(),
                 ImageObservationOperation::BoundedElfMetadata { .. }
             ) {
-                observe_declared_elf(command, &demand, &active)?
+                observe_declared_elf(command, source, &demand, active)?
             } else {
                 source
-                    .as_ref()
-                    .expect("authorized image source")
-                    .observe(&demand, budget, &active)
+                    .scoped()
+                    .observe(&demand, budget, active)
                     .map_err(NativeDemandSessionError::InputImage)?
             };
             observations.push((demand, Arc::new(result)));
@@ -242,7 +362,120 @@ pub(super) fn observe_command_paths(
                 .map(|(demand, result)| (demand.clone(), result.dupe())),
         );
     }
+    if !active() {
+        return Err(image_error("image preparation cancelled"));
+    }
     PathObservationEpoch::from_shared(observations).map_err(NativeDemandSessionError::PathEpoch)
+}
+
+pub(super) fn preflight_declared_image_paths(
+    command: &NativeDemandCommand<'_>,
+    declarations: &[DeclaredImageRequest],
+    demands: &[PathObservationDemand],
+) -> Result<(), NativeDemandSessionError> {
+    if declarations.len() > 3 {
+        return Err(image_error("invalid image declaration batch"));
+    }
+    let budget = command.runtime.image_resources.descriptor_budget();
+    for declaration in declarations {
+        if declaration
+            .elf
+            .as_ref()
+            .is_some_and(|elf| !elf.same_budget(budget))
+        {
+            return Err(image_error("foreign image declaration"));
+        }
+        if let Some(DeclaredImageRepository::Selected(selected)) = &declaration.repository {
+            label_source::check_declaration(command.runtime, declaration, selected)?;
+        }
+    }
+    for demand in demands {
+        let PathObservationOperation::InputImage(scope) = demand.operation() else {
+            continue;
+        };
+        if !scope.same_budget(budget)
+            || !demand
+                .image_path()
+                .is_some_and(|path| path.same_budget(budget))
+        {
+            return Err(image_error("foreign image observation"));
+        }
+        let mut matching = declarations.iter().filter(|request| request.allows(demand));
+        let first = matching
+            .next()
+            .ok_or_else(|| image_error("undeclared image observation"))?;
+        if matching.any(|other| {
+            other.key != first.key
+                || other
+                    .repository
+                    .as_ref()
+                    .map(DeclaredImageRepository::selection)
+                    != first
+                        .repository
+                        .as_ref()
+                        .map(DeclaredImageRepository::selection)
+        }) {
+            return Err(image_error("ambiguous image observation"));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn declared_selected_image(
+    runtime: &WorkspaceRuntime,
+    selected: slug_bzlmod_v2::ObservedSelectedLabelSource,
+    deadline: std::time::Instant,
+) -> Result<DeclaredImageRequest, NativeDemandSessionError> {
+    label_source::check_selection(runtime, &selected)?;
+    let repository = selected
+        .repository()
+        .map(|_| DeclaredImageRepository::Selected(selected.clone()));
+    Ok(DeclaredImageRequest {
+        key: selected.image_key().clone(),
+        elf: None,
+        deadline,
+        repository,
+    })
+}
+
+pub(super) fn declare_selected_elf(
+    runtime: &WorkspaceRuntime,
+    declaration: &mut DeclaredImageRequest,
+    selected: &slug_bzlmod_v2::ObservedSelectedLabelSource,
+    certificate: ObservedInputImage,
+    policy: ElfMetadataPolicy,
+) -> Result<(), NativeDemandSessionError> {
+    label_source::check_declaration(runtime, declaration, selected)?;
+    label_source::check_member(runtime, selected, &certificate)?;
+    declaration.elf = Some(DeclaredElfRequest {
+        certificate,
+        file: selected.selected_file().clone(),
+        policy,
+    });
+    Ok(())
+}
+
+pub(super) fn capture_selected_image(
+    command: &NativeDemandCommand<'_>,
+    declaration: &DeclaredImageRequest,
+    certificate: ObservedInputImage,
+    stage: input_image::PreparedInputImageStage,
+    active: &dyn Fn() -> bool,
+) -> Result<CapturedInputImageLease, NativeDemandSessionError> {
+    if certificate.namespace() != declaration.key.namespace()
+        || certificate.anchor_root() != declaration.key.anchor_root()
+        || certificate.source_root() != declaration.key.source_root()
+        || certificate.policy() != declaration.key.policy()
+    {
+        return Err(image_error("selected capture certificate changed"));
+    }
+    input_image::capture_prepared_input_image(
+        input_image::AuthorizedObservedInputImage::new(declaration.source(command)?, certificate),
+        &command.runtime.image_resources,
+        active,
+        stage,
+    )
+    .map_err(NativeDemandSessionError::InputImage)
 }
 
 fn image_error(message: &'static str) -> NativeDemandSessionError {
@@ -251,29 +484,17 @@ fn image_error(message: &'static str) -> NativeDemandSessionError {
 
 fn observe_declared_elf(
     command: &NativeDemandCommand<'_>,
+    source: &RetainedImageSource,
     demand: &PathObservationDemand,
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationResult, NativeDemandSessionError> {
-    let request = command
-        .image_request
-        .as_ref()
-        .ok_or_else(|| image_error("missing ELF declaration"))?;
-    let elf = request
-        .elf
-        .as_ref()
-        .ok_or_else(|| image_error("missing ELF declaration"))?;
     #[cfg(target_os = "linux")]
     {
-        let authorized = input_image::elf_metadata::AuthorizedElfObservation::new(
-            request.source(command)?,
-            elf.certificate.clone(),
-            elf.file.clone(),
-            elf.policy,
-            &command.runtime.image_resources,
-        )
-        .map_err(NativeDemandSessionError::InputImage)?;
+        let RetainedImageSource::Elf(authorized) = source else {
+            return Err(image_error("missing ELF declaration"));
+        };
         input_image::elf_metadata::observe_elf_metadata(
-            &authorized,
+            authorized,
             demand,
             &command.runtime.image_resources,
             active,
@@ -282,7 +503,7 @@ fn observe_declared_elf(
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (elf, demand, active);
+        let _ = (command, source, demand, active);
         Err(NativeDemandSessionError::InputImage(
             input_image::InputImageCaptureError::UnsupportedPlatform,
         ))

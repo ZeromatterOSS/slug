@@ -37,6 +37,12 @@ pub(in crate::runtime) struct AuthorizedElfObservation {
 }
 
 impl AuthorizedElfObservation {
+    // The declared batch retains this same source for both ELF and ordinary
+    // image rows; borrowing never creates another scope or source factory call.
+    pub(in crate::runtime) fn source(&self) -> &ScopedImageSource {
+        &self.source
+    }
+
     pub(in crate::runtime) fn new(
         source: ScopedImageSource,
         certificate: ObservedInputImage,
@@ -138,22 +144,13 @@ pub(in crate::runtime) fn observe_elf_metadata(
         {
             return Err(InputImageCaptureError::StaleSource);
         }
-        let mut credit = resources.descriptor_budget().try_reserve(512)?;
-        let mut reader = proof::ProofReader::new(
+        let verified = authenticate_reader(
             &file,
-            expected_digest.size_bytes(),
+            expected_digest,
             policy,
             resources.descriptor_budget(),
             active,
         )?;
-        let tentative = parser::parse(&mut reader, policy, &mut credit)?;
-        reader.verify(expected_digest)?;
-        if matches!(&tentative, ElfMetadataOutcome::Rejected(_)) {
-            // Partial decoded facts have already dropped. History retains only
-            // the authenticated small enum, not their abandoned capacity peak.
-            drop(credit);
-            credit = resources.descriptor_budget().try_reserve(512)?;
-        }
         let after = super::linux::fd_stat(&file)?;
         let named = super::linux::fs::lstat(&authorized.source.root, relative)?;
         if !same_stat(&before, &after) || !same_stat(&after, &named) {
@@ -168,7 +165,6 @@ pub(in crate::runtime) fn observe_elf_metadata(
         if !active() {
             return Err(InputImageCaptureError::Cancelled);
         }
-        let verified = VerifiedElfMetadata::new(expected_digest, policy, tentative, credit)?;
         let result_credit = resources.descriptor_budget().try_reserve(256)?;
         let result = ImageObservationResult::new(
             demand.image_path().expect("validated charged path").clone(),
@@ -198,4 +194,80 @@ fn same_stat(left: &libc::stat, right: &libc::stat) -> bool {
         && left.st_mtime_nsec == right.st_mtime_nsec
         && left.st_ctime == right.st_ctime
         && left.st_ctime_nsec == right.st_ctime_nsec
+}
+
+/// Private validated scratch fulfillment borrows immutable producer bytes. This
+/// helper grants no path, namespace, repository or process authority.
+pub(in crate::runtime) fn authenticate_elf_bytes(
+    bytes: &[u8],
+    expected: ElfSourceDigestBinding,
+    policy: ElfMetadataPolicy,
+    budget: &slug_workspace_v2::ImageDescriptorBudget,
+    active: &dyn Fn() -> bool,
+) -> Result<VerifiedElfMetadata, InputImageCaptureError> {
+    #[cfg(target_os = "linux")]
+    {
+        struct Slice<'a>(&'a [u8]);
+        impl proof::ReadAt for Slice<'_> {
+            fn read_at(&self, destination: &mut [u8], offset: u64) -> std::io::Result<usize> {
+                #[cfg(test)]
+                BORROWED_ELF_READS.with(|reads| reads.set(reads.get().saturating_add(1)));
+                let offset = usize::try_from(offset)
+                    .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+                let source = self
+                    .0
+                    .get(offset..)
+                    .ok_or_else(|| std::io::Error::from(std::io::ErrorKind::UnexpectedEof))?;
+                let count = destination.len().min(source.len());
+                destination[..count].copy_from_slice(&source[..count]);
+                Ok(count)
+            }
+        }
+        if bytes.len() as u64 != expected.size_bytes() {
+            return Err(InputImageCaptureError::StaleSource);
+        }
+        authenticate_reader(&Slice(bytes), expected, policy, budget, active)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (bytes, expected, policy, budget, active);
+        Err(InputImageCaptureError::UnsupportedPlatform)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn authenticate_reader(
+    reader: &dyn proof::ReadAt,
+    expected: ElfSourceDigestBinding,
+    policy: ElfMetadataPolicy,
+    budget: &slug_workspace_v2::ImageDescriptorBudget,
+    active: &dyn Fn() -> bool,
+) -> Result<VerifiedElfMetadata, InputImageCaptureError> {
+    let mut credit = budget.try_reserve(512)?;
+    let mut proof = proof::ProofReader::new(reader, expected.size_bytes(), policy, budget, active)?;
+    let tentative = parser::parse(&mut proof, policy, &mut credit)?;
+    proof.verify(expected)?;
+    if matches!(&tentative, ElfMetadataOutcome::Rejected(_)) {
+        drop(credit);
+        credit = budget.try_reserve(512)?;
+    }
+    if !active() {
+        return Err(InputImageCaptureError::Cancelled);
+    }
+    Ok(VerifiedElfMetadata::new(
+        expected, policy, tentative, credit,
+    )?)
+}
+
+#[cfg(test)]
+thread_local! {
+    static BORROWED_ELF_READS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(in crate::runtime) fn test_reset_borrowed_read_count() {
+    BORROWED_ELF_READS.with(|reads| reads.set(0));
+}
+#[cfg(test)]
+pub(in crate::runtime) fn test_borrowed_read_count() -> usize {
+    BORROWED_ELF_READS.with(std::cell::Cell::get)
 }

@@ -1,164 +1,186 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-193-m7a-scratch-prefix-source-producer-r1
-Status: accepted; normal scratch-prefix source prerequisite, no process activation
+Packet: WP-7-194-m7a-selected-tool-source-producer-r1
+Status: accepted; normal tool sources and private native lease; runtime prerequisites remain open
 
 ## Outcome and authority
 
-From clean914357c6b, implement the normal pre-execution scratch-prefix producer
-and its private native source staging. Evaluate the actual selected extension's
-normal definition/usage/Host/getenv/Label/download dependencies until the first
-process call, retaining full origin, ordered writes/downloads/overwrites, exact
-argv/cwd/spelling and source frontier. Compute through a separate guarded normal
-key with lower definition/input dependencies, never its waiting outer PureOwner.
-Native staging recomputes that normal key and validates current whole source
-request/owner/prefix/budget before copying producer-owned bytes; arbitrary
-verified blobs or paths cannot grant scratch source authority.
+From clean96fc6562a, implement the normal first-checkpoint selected tool-source
+producer and one private retained native source lease. Consume the actual typed
+prefix operands; normally derive source selection, source image/ELF observations
+and a full current certificate. Native fulfills only exact normal raw Needs,
+retains exact scratch staging and selected Label captures, and restores command
+state before export. Types/helpers alone do not satisfy this packet.
 
-This supplies WP891's scratch-source prerequisite for the actual query/generate
-consumer, rather than duplicating rules_rust selection. The first process boundary
-is the initial checkpoint because no prior process-result certificate exists yet.
-Later checkpoints require genuine prior results; full query+locked-generate and
-process activation remain required. Existing ordinary PureOwner methods remain
-closed; private preparation evaluation may describe writes and the execute
-boundary, but launches no child or publishes repositories/events. No claim of
-complete namespace/backend/quota/root fit, bootstrap or total RSS.
+Stage5 selected tool/runtime source authority and WP893 prefix/WP892 normal Label/
+WP890 ELF contracts are inherited. Compatibility: preserve exact admitted Label,
+download and ordinary Pure behavior; new bounded tool-source production is
+Slug-native. Runtime catalog/request-root policy, complete namespace facets,
+mediator/quota/backend and actual query plus locked-generate remain required later.
+This is source preparation, with no method/process activation or total RSS claim.
 
-Compatibility: preserve existing exact admitted Label/download/Pure behavior.
-New bounded prefix evaluation/staging is Slug-native. WP886/WP887 authenticated
-rules_rust0.73.0 and pinned Bazel9.2 StarlarkPath.java139–155,
-BaseExternalContext.file1443–1501/read1580–1644/execute1938–2077 and
-ModuleExtensionContext99–103/async drain226–245 remain source authority.
-Stage5 selected scratch/process + source-authority sections and WP892 normal
-Label source contracts are inherited; no new semantic oracle or acquisition.
+Research: target/wp894/{input-design,native-design,prerequisite-review}.md;
+authenticated rules_rust0.73.0 target/wp886/source-authentication.json and local
+crate_universe/private/common_utils.bzl new_cargo_bazel_fn, generate_utils.bzl query,
+extensions.bzl selected generator and marker-derived Cargo/rustc. Its actual query
+has12 operands, typed tools at0/9/11; CARGO/RUSTC string env grants no authority.
+Pinned Bazel9.2 StarlarkPath/BaseExternalContext source anchors inherited WP893.
+DICE ownership/cancellation/normal dependency rules: docs/developers/dice.md and
+accepted guarded structural mixed graph/actual history last-Drop tests.
 
-## Shared design to freeze
+## Design and semantic ownership
 
-Research actual source and normal graph first. Freeze cohesive Bzlmod prefix/
-blob/policy/error representations, Loading private checkpoint evaluator/key,
-normal Core Need/retry/abort factory and staging lifetime. Exact definition/usage,
-immutable selected Host/dynamic env, current normal Label recipes and ordered
-scratch transcript identify the prefix; native lease/root/credit identity does
-not replace semantic spelling/bytes/modes/order. Stable proposed guest scratch
-spelling is /__slug_module. No fake repository ordinal or namespace impersonation,
-completed native source/catalog injection, reverse lookup or ambient tool fallback.
+A keyed finite declaration policy selects at most3 unique executable roles/argv
+indices, primary index0. Actual query profile declares0/9/11; generic code does
+not interpret flags/basenames/URLs/env or reproduce rules_rust selection. Actual
+typed Scratch/ExternalPath must exist; literals/missing/data-only paths refuse.
+A separate guarded normal Loading request-plan key depends on the lower prefix,
+retains its complete definition/usage/Host/env/Label/download origin and derives
+exact role sources. A guarded normal tool certificate key consumes that plan,
+normal images/ELF and dedicated scratch byte-proof observations. Neither computes
+the waiting outer PureOwner. Every new family joins full structural live-context
+mixed-graph registration; no native completed certificate injection.
 
-Inherit keyed limits:8192 semantic operations,4096 entries/depth32/path4096,
-32MiB/file,4MiB cumulative ordered descriptors and128MiB owner occurrence bytes.
-Sharing must not alter occurrence admission. New shared owned/borrow-pinned blobs
-hold workspace256MiB payload credit; descriptors/capacities/headers/replacement
-peaks use actual64MiB service credit, with credit through last Drop/history/Need.
-Existing download/DICE storage retains baseline owners outside new totals.
-Budget/race/cancel/operational failures are invalid/incomplete; stable keyed
-unsupported outcomes retain actual dependencies. No mutex spans compute, detached
-worker or global semantic cache. Stage copies stream64KiB and retain exact data/
-modes; ordinary private input staging does not establish process scratch quota.
+Scratch ELF raw request binds full shared prefix Eq, exact final regular member/
+typed operand/index/mode and digest/ELF policy. Its compact injected cell identity
+contains full checkpoint selector and role policy; readiness VALUE retains full
+request and credited existing VerifiedElfMetadata. No digest-only identity,
+caller blob/path/FD authority or fake Host/Materialization namespace. Core first
+independently computes current lower normal plan within the SAME command, checks
+full origin/request/env/platform/services/frontier, then reuses existing ProofReader
+and parser over immutable borrowed Blob ReadAt. Stream/proof authentication precedes
+publishing even Rejected syntax. Normal certificate refuses rejected ELF and
+non-executable modes; source facts grant no runnable runtime closure.
 
-Need/replay drops evaluator heap, partial operations, events and transaction;
-restarts reconstruct prefix from empty scratch. Unknown operations or swallowed
-operational errors refuse promotion. Actual current source frontier and reachable
-requests are checked, then transaction drops/drains before native staging/final
-revalidation and discard/restore. Output staging is private source storage only;
-future selected ELF/image and quota-backed process scratch use distinct factories.
+Label operands use actual prefix event→normal SelectedLabelSourceKey→normal
+ObservedInputImageKey→ObservedElfMetadataKey. New command-local finite declaration
+catalog preflights the complete requested batch and explicitly passes its exact
+borrowed declaration to existing scoped observer leaf; baseline singular image
+bridge behavior remains. Group exact equal image scopes, preserve role identity,
+and allow distinct exact ELF members. No nested standalone staging/image command.
 
-## Scope and staffing
+One existing NativeDemand command owns all attempts/retry/abort/restoration.
+Precreate ≤3 image capture stages and scratch stage before source ancestor facts.
+Lower source-plan phase seals/selects actual dependencies; tx drops/drains,
+validates whole closure then explicitly resets its unpublished terminal token to
+idle before a fresh final-consumer attempt. Each attempt has fresh userdata/tracker.
+All incoming Needs are fully authorized before first source IO. Fulfillment never
+recursively computes waiting consumer. Mutating progress refreshes COMPLETE raw
+workset then recomputes plan/requests/declarations; terminal facts are never patched.
+Final consumer selects full aggregate source closure, drops/drains, validates
+current source/requests/env/platform/resource batch, stages exact bytes/modes and
+captures Label images, really reobserves complete frontier before/after. Suppress/
+discard/restoration drains before lease export. Scratch raw cells revoke in the
+existing restoration updater, including error/cancel/deselect. No lock spans compute,
+detached cleanup or semantic side cache.
 
-Input worker audits and then owns new Bzlmod selected_extension_scratch.rs +
-child types/tests and narrow lib exports. Root owns new Loading module_extension/
-selected_scratch.rs + tests, checkpoint evaluator/key and narrow parent/normal
-mixed graph/public helper registrations. Native worker audits and then owns new
-Core runtime selected_scratch_source.rs + tests and narrow native driver/resource
-registration. Independent reviewer owns target/wp893 design/final receipts,
-read-only to source. During research workers write only their target/wp893 receipt;
-root authorizes source after actual APIs/lifecycle/design freeze. Exact source
-allowlist may be refined at that checkpoint; no overlapping writer ownership.
-Estimate1500 production/1000 test lines plus extraction/narrow forwarding; growth
-is a review trigger. Large parents receive registration/extracted cohesive logic.
+## Memory and lifetime
 
-No Cargo/dependency/lockfile edits, runtime tool/root replay, daemon/Bazel/process
-execution, mount/ptrace/mapping probes, new downloads/extraction, home/env contents
-or network. Reuse unchanged backend EPERM/EOVERFLOW diagnostics. Private staging
-is not executable scratch; no conditional shortcut to process activation.
+Reuse workspace256MiB payload/64MiB descriptor and2GiB logical staged-image services,
+with WP893 semantic occurrence limits independent of sharing. All new role arrays,
+plan/certificate/request/epoch/catalog storage, headers/capacities and replacement/
+merge peaks are precharged; fixed max3 inline arrays preferred. Cheap shared prefix/
+blob/recipe/ELF handles retain guards through Need/Ready/cache history and actual
+last Drop; parser reads borrow source bytes and stream64KiB. No full executable
+clone or uncredited owned extraction. DICE/evaluator/raw baseline observations and
+download memory keep their existing separate owners outside these service claims.
+Lease deletion failure retains logical credit. No physical process scratch quota
+or fixed total RSS ceiling follows. Stage9 matching source-authority utility rows
+apply; no new dependency/interner or representation shortcut.
 
-## Frozen implementation checkpoint
+## Scope and staff
 
-Independent DESIGN ACCEPT: target/wp893/design-review.md, concrete shared/native/
-Loading designs alongside it. Exact allowlist: Bzlmod selected_extension_scratch.rs
-and selected_extension_scratch/{types,budget,builder,tests}.rs + lib exports;
-Loading module_extension/{owner_invocation,selected_scratch}.rs and selected_scratch/
-{context,tests,provenance_tests}.rs + narrow module_extension receiver/path/download/extraction,
-selected_path borrowed getters/derive visibility, dependency_cycle registration/
-helper/tests and lib hidden exports; Core dice.rs child/resources/userdata root-only,
-new runtime/selected_scratch_source.rs + child tests native-only and input_image.rs
-service-only logical reservation visibility. Shared public API is frozen in drafts;
-implementation corrections within that contract are permitted, new ownership changes
-require review. Worker Cargo waits for root's serial compile slot.
+Input worker: new Bzlmod selected_extension_tool_sources.rs and children request,
+observation,tests; narrow source_preparation.rs Needs field/constructors/merge and
+lib exports. Root: new Loading module_extension/selected_tools.rs and children,
+narrow module/dependency_cycle/lib registrations, reused dependency_cycle/mixed_bzl_tests.rs fixture, and Core dice.rs registration/
+userdata/restoration snippets supplied by native worker. Native worker: new Core
+runtime/selected_tool_source.rs and children; command-internal selected_scratch_source
+stage/validation seams; input_image_bridge observer borrowed declaration seam;
+input_image/elf_metadata private verified ReadAt helper; runtime/demands.rs compact
+scratch epoch-cell collection; tests in named children.
+Reviewer: target/wp894 design/final receipts only. Disjoint writes mandatory.
+Concrete APIs in target/wp894/{shared-api,loading-api,native-api}.md require
+independent DESIGN ACCEPT before source edits. Baseline large parents get only
+narrow registration/forwarding; cohesive logic lives in children. Estimate shared
+500/400, Loading500/400, native1000/800 production/test lines plus narrow seams;
+growth triggers review of owner cohesion, not automatic REPLAN.
 
-Full inherited raw snapshot normal dependency and current command binding; pinned
-None removes / empty string sets empty. Ordered external path event tokens bind
-actual issued Label recipes and normal selectors; strings grant no IO. Distinct
-private method table, read explicitly unsupported before this initial query,
-unknown/swallowed failures sticky, first execute own sentinel/no fake result.
-Private prints discarded without EventBatch allocation/store; pre-boundary repo
-calls refuse. Warm helper validates current resource instance even on cache hits.
+No Cargo/dependency/lockfile changes, acquisition/download/extraction/network,
+home/env contents, real daemon/root/Bazel/tool/process replay or backend/mount/
+ptrace/mapping probes. Genuine bounded file:// fixtures use accepted normal
+transport/writer. Existing EPERM/EOVERFLOW backend evidence remains unchanged.
+New source authority or unresolved runtime scope requires review, not guessed
+ambient fallback. Invocation/implementation corrections remain within this packet.
 
-One cumulative native60s cooperative preparation deadline, checked attemptbound
-max_operations*4 + workspace componentcount + max_depth +6, invalid timeout/cancel.
-Loading uses public set_check_cancelled and DICE CancellationContext at VM checks
-plus entry/exit; no hard preemption inside an arbitrary builtin. Existing Starlark
-heap/runtime/DICE/download memory and builtin latency remain outside new256+64MiB
-source service claims. No new process/backend/acquisition probes.
+## Required gates and acceptance
 
-Reviewed Need-replay correction: normal repository/download fulfillment can
-change observed Host ancestors through its temporary storage. After successful
-mutating progress and dropped/drained attempt, reobserve the COMPLETE existing
-command path workset through its normal observation owner and inject that fresh
-epoch into the NEXT guarded compute. Preserve keys/namespaces and issued-request
-conflicts; recompute the complete certificate rather than patching a completed
-prefix. Precharge temporary cloning/row/replacement scratch; raw injected epochs
-and results retain their existing baseline Core observation owner outside the
-new prefix service/history claims. Final pre/post-copy full freshness remains
-unchanged. Independent design delta ACCEPT; genuine immutable/download positives
-and the stale BUILD negative are required execution proof.
+Genuine normal definition/usage checkpoint→typed roles→Needs→scratch parser/Label
+normal image+ELF→completed normal certificate→single retained native source lease.
+Real file/download overwrite and actual independent generated Label writer bytes;
+original modes/spellings/origins and policy transitions A/B/A. Literal/foreign
+origin/index/member/workspace/owner/request/resources/rawReady refusal, data paths
+not inferred as tools, whole invalid second request before first IO. Missing/
+nonregular/nonexec/malformed ELF stable refusal; raced/foreign/resource/cancel
+invalid, conservative equality and warm resource guard. Normal generated/mixed
+cycles, source mutation outside subtree and missing/restoration recovery. Bounded
+proof/capture/final source races, credit exhaustion/repair, error/cancel/revoke/
+deselect restoration and actual cache-history last Drop of payload/descriptors/
+logical storage. Exact stage membership, bytes and modes match certified source.
+Existing WP893/WP892/WP890 protected gates retained; they do not substitute for
+new composite consumer evidence.
 
-## Required gates
-
-Normal genuine definition/usage first-checkpoint producer, existing Label/getenv/
-download Need replay and full origin/current source identity; ordered overwrite,
-byte/mode/path/argv/env transitions A/B/A, stable missing/unsupported refusal,
-physical/semantic limits and last-Drop/history/borrow-pinned download credit.
-No published repo/events on checkpoint/retry/failure; existing Pure/getenv/watch/
-Label/download/generated/mixed/historical cycle behavior remains covered.
-Native normal key→Needs→exact prefix staging, genuine download facts, foreign
-workspace/owner/prefix/budget/current source refusal before source IO, fresh full
-frontier after drain, error/cancel/discard restoration and retained lease cleanup.
-
-Pinned nightly resolved via rustup which; root serial Cargo preparation60s,
-focused tests30s with --no-run JSON/exact renewed preflight; serial native ancestor
-freshness. Changed owner gates and named direct Bzlmod/Loading/Core all-target /
-default CLI compile, format/plan/archive/diff and independent FINAL ACCEPT.
-Do not waive missing semantic proof with a count or previous unavailable backend.
+Resolve pinned nightly via rustup which; root serial Cargo no-run JSON preparation
+60s and focused tests30s, renewed exact preflight on new executables. Native
+ancestor freshness tests serialized with no compiler overlap. Changed owner gates,
+Bzlmod/Loading/Core all-target and default CLI compile, scoped rustfmt skip_children,
+plan/archive/diff checks and independent FINAL ACCEPT required. Preserve unfinished
+candidate on review/wp894-tool-sources with validation receipt, no partial acceptance.
 
 ## Immediate predecessor
 
-WP892914357c6b implements shared credited normal Label lineage/selection and exact
-current private native image/ELF consumption. Bzlmod14/Loading40/Core84 pass with
-all-target/default CLI compile and independent FINAL ACCEPT. Opaque capture stage
-precreation preserves full ancestor freshness; exact-request scoped reachability
-and foreign-stage cleanup are proved. Process/runtime/full-bootstrap remain open.
+WP89396fc6562a accepts genuine first-process prefix and private staging with
+complete mutating-Need frontier refresh and current source/credit/history checks.
+Shared23/Loading69/Core92 focused gates and owner all-target/default CLI compile
+pass; target/wp893/acceptance.json and final-review.md. No process activation.
 
-## Acceptance and next readiness
+## Frozen implementation checkpoint
 
-Independent FINAL ACCEPT in target/wp893/final-review.md; all19 source hashes
-match the frozen candidate. Shared23/Loading69/Core92 exact selected gates pass
-with renewed preflight, including the mutating-Need ancestor refresh, genuine
-immutable/download lineage, stale BUILD rejection, whole-batch authorization,
-cancellation/error restoration, budget repair and actual history last Drop.
-Owner all-target/default CLI checks, scoped format/plan/archive/diff pass.
-Required compile preparation is separately capped60s and tests30s; initial
-fixture/compiler/history failures and their corrections remain in receipts.
+Independent DESIGN ACCEPT: target/wp894/design-review.md. Concrete shared/native/
+Loading APIs alongside it. Corrected retention: lookup directly computes compact
+raw EpochKey INSIDE normal LoadingSourcesKey; full request/Ready/certificate Eq
+and exact current transaction service/allowance checks remain. EpochKey uses the public normal-storage Key plus supported changed_to raw
+supply so it can provide compact cell identity to the activation owner. Its
+compute fallback is valid raw Unauthorized absence; lookup maps it to a
+transient invalid consumer error, so changed_to restoration can revoke cells; no private DICE API/export is added. No full-prefix normal observation key or Used-fullrequest
+marker: engine interning/catalogue must not pin every historical tool blob.
+Native final selected-cell matching plus full state/result/current plan equality
+binds the actual source. Warm final helper checks EACH full scratch request/result,
+including userdata-only authorization changes; all-Label fullselector check stays.
+Source edits are authorized within the exact disjoint ownership above.
 
-Next readiness: selected tool/runtime source authority from actual normal
-prefix/Label operands and immutable raw request runtime policy. Complete
-namespace/backend/mediator/quota and genuine query/locked-generate activation
-remain required; no method activation, full bootstrap or total RSS claim.
+## Acceptance
+
+Independent DESIGN, observer-correction and FINAL ACCEPT: target/wp894/design-review.md
+and final-review.md. Fresh shared31/31, Loading75/75
+and corrected Core100/100 focused/protected gates pass (206 distinct tests).
+The new consumer enters a genuine Sources→Requests→Prefix generated defining-.bzl
+cycle; native execution includes genuine12-operand tool roles0/9/11 and invalid
+second mixed Need refusal before first proof/source IO, with a live borrowed-read
+control. The protected observer-order regression is corrected with unchanged
+assertions. Default Bzlmod/Loading/Core all-target checks and default CLI
+`cargo check -p slug_cli_v2` pass. Scoped rustfmt, source/executable integrity,
+plan/archive/diff checks pass. Compact acceptance.json records exact commands,
+profiles/features, sources, timings and material invariant evidence.
+
+Preparation retains each60s cap. Core's default dependency preparation capped;
+command-only test-package opt-level0 for Bzlmod/Loading/Core and Core debug0 reduce
+preparation cost without source/manifest/dependency edits. Record the exact final
+profile/executable/preflight and use its tests for correctness only. Default CLI
+check matches the inherited WP893 compile gate and live contract (independent
+reconciliation ACCEPT); no CLI binary is invoked. Extra dev builds capped during
+dependency codegen remain incomplete, with no linked executable claim. Current
+receipts and source hashes are under target/wp894. M7A and the overall goal remain
+partial; runtime policy/profile/catalog, namespace/loader/access facets, mediator/
+quota/backend, actual query plus locked generate, root fit and full bootstrap
+remain required. No process or total RSS claim follows.

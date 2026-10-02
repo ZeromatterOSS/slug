@@ -488,6 +488,8 @@ fn read_file_observations(
 mod input_image_bridge;
 #[path = "selected_scratch_source.rs"]
 mod selected_scratch_source;
+#[path = "selected_tool_source.rs"]
+mod selected_tool_source;
 
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
@@ -996,6 +998,7 @@ struct NativeDemandCommand<'a> {
     issued_requests:
         SmallMap<RepositoryMaterializationRequestId, Arc<RepositoryMaterializationRequest>>,
     image_request: Option<input_image_bridge::DeclaredImageRequest>,
+    scratch_metadata: Option<selected_tool_source::ScratchMetadataState>,
     repository_results: RepositoryMaterializationResultEpoch,
     execute_transcript: RepositoryExecuteTranscript,
     path_observations: PathObservationEpoch,
@@ -6283,6 +6286,7 @@ impl WorkspaceRuntime {
                     .collect(),
                 issued_requests: SmallMap::new(),
                 image_request: None,
+                scratch_metadata: None,
                 repository_results: preflight.repository_results().clone(),
                 execute_transcript: RepositoryExecuteTranscript::empty(),
                 path_observations,
@@ -7544,6 +7548,9 @@ impl NativeDemandCommand<'_> {
             &self.download_results,
         )
         .map_err(NativeDemandSessionError::Injection)?;
+        if let Some(state) = &self.scratch_metadata {
+            state.install(&mut data)?;
+        }
         // Loading uses this only to reject surplus prepared records on a
         // replay branch that no longer calls execute. A no-execute graph does
         // not acquire the transient DICE observation dependency.
@@ -7575,6 +7582,9 @@ impl NativeDemandCommand<'_> {
             &self.prior.download_results,
         )
         .map_err(NativeDemandSessionError::Injection)?;
+        if let Some(state) = &self.scratch_metadata {
+            state.inject(updater, false)?;
+        }
         inject_repository_execute_epoch(
             updater,
             &self.runtime.workspace,
@@ -7897,6 +7907,9 @@ impl NativeDemandCommand<'_> {
                 &self.download_results,
             )
             .map_err(NativeDemandSessionError::Restoration)?;
+            if let Some(state) = &self.scratch_metadata {
+                state.inject(&mut updater, true)?;
+            }
             inject_repository_execute_epoch(
                 &mut updater,
                 &self.runtime.workspace,

@@ -135,6 +135,7 @@ use crate::starlark_label::StarlarkLabel;
 mod owner_invocation;
 mod selected_path;
 pub(crate) mod selected_scratch;
+pub(crate) mod selected_tools;
 use selected_path::SelectedModuleLabelPath;
 use selected_path::SelectedPathInvocation;
 use selected_path::SelectedPathReady;
@@ -8015,6 +8016,7 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
         assert!(preparation.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
     }
     include!("module_extension/selected_scratch/tests.rs");
+    include!("module_extension/selected_tools/tests.rs");
     include!("module_extension/selected_scratch/provenance_tests.rs");
     include!("module_extension/selected_path_owner_tests.rs");
     include!("module_extension_generated_path_tests.rs");

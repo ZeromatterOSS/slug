@@ -338,27 +338,74 @@ namespace, backend, executable scratch quota, full query/generate or total RSS.
 
 ### Selected tool and runtime source authority
 
-Source-design WP891 selects internal prepared Label provenance, ordered scratch
-prefix/tool-source checkpoints and explicit raw request runtime declarations.
+WP894 implements a Slug-native normal selected tool-source producer and one
+private retained native source lease, preserving admitted exact Label/download
+and ordinary Pure behavior. Independent DESIGN and FINAL ACCEPT, default owner
+all-target and CLI compilation pass. Focused/protected gates pass Shared31/31,
+Loading75/75 and Core100/100; these establish source preparation,
+not runtime execution, actual-root fit or total RSS/performance.
+
 Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
 generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
 or musl name cannot prove the selected bytes/interpreter. Host-tools come from the
 independent generated marker Label's dirname/bin/{cargo,rustc}, never ambient
-PATH or Slug's compilation toolchain. Their actual materialization remains needed.
+PATH or Slug's compilation toolchain. The actual query has12 operands with typed
+tools at0/9/11. A finite keyed policy selects at most3 unique roles/indices,
+including program index0; code does not interpret flags, basenames, URLs or env
+strings, or duplicate rules_rust selection.
 
 PreparedSelectedLabelPath retains CanonicalLabel, normal Root/External source
 route and bounded literal Parent/Child transformations. Ready maps and evaluator
 path/string-origin records preserve this lineage; generic public normalized-path
-values grant no authority. A normal selected scratch prefix includes definition/
-usage/env/owner/call index, ordered writes/downloads/overwrites and exact tree.
-SelectedExtensionToolSourcesKey consumes actual operands/checkpoint, not duplicated
-rules_rust selection or physical-path reverse lookup. Source Label and verified
-ScratchPrefix have distinct declared factories; no repository ordinal or namespace
-impersonation. Factories validate the full current request/origin/prefix/session/
-root/budget before I/O; private staging is nonsemantic. All new generated-source
-wait families join exact-live-context structural mixed graph/guarded waits; no
-checkpoint computes its own waiting outer PureOwner. Need/replay, generated-cycle
-and source/history last-Drop gates are mandatory before activation.
+values and CARGO/RUSTC string env grant no authority. The guarded normal
+SelectedExtensionToolSourceRequestsKey consumes the genuine lower scratch
+checkpoint and derives typed operands from its final overwrite tree and complete
+ordered definition/usage/Host/env/Label/download origin. The guarded normal
+SelectedExtensionToolSourcesKey depends on that plan, normal Label selection,
+image/ELF facts and dedicated scratch ELF observations. New families join the
+full structural live-context mixed graph; neither key computes its waiting outer
+PureOwner. Literal, missing, data-only, non-executable and rejected ELF sources
+fail closed. No caller blob, completed prefix, physical reverse lookup or fake
+Host/materialization namespace can authorize native access.
+
+Scratch ELF readiness retains full request/prefix/bytes/download-lineage equality.
+Its normal raw EpochKey and provided demand identity retain only a compact full
+selector/role-policy cell, never a Blob-bearing request or catalogue marker.
+Lookup occurs inside the normal Loading consumer; full current allowed request,
+Ready value and actual resource identity are checked independently of the compact
+reachability ID. Raw Unauthorized is valid absence data for same-updater
+revocation; consumption returns a transient invalid source error. Cold and warm
+consumer authorization checks the complete selector/profile even for all-Label
+plans with no scratch cells. Full structural equality is never replaced by digest
+or compact-cell equality.
+
+One NativeDemand command computes the lower normal plan and final consumer,
+fulfills only whole-batch-authorized current Needs and restores before lease
+export. Fresh attempt trackers, transaction drop/drain and explicit unpublished
+terminal reset separate the phases. Mutating progress refreshes the complete raw
+workset before normal recomputation. Precreated scratch/image stages precede Label
+ancestor facts. Label event recipes feed normal selected source/image/ELF keys;
+finite command-local declarations retain exact current source/session/root and
+member identity. The existing ProofReader/parser authenticates whole-file SHA256
+and saved metadata ranges over borrowed scratch Blob ReadAt or a retained opened
+Label source handle. Scope/source authority is retained once rather than reopened
+for proof parsing; no full tool byte copy or injected completed certificate is
+needed. Complete source/frontier/env/platform/request/resource freshness is checked
+before and after staging/capture and after drop/drain. Scratch raw cells revoke in
+the same restoration updater on success, error, cancellation and deselection.
+The private opaque lease retains the normal certificate, exact scratch bytes/modes
+and selected Label images, without exposing process authority.
+
+Fixed at-most3 role/declaration storage, new headers/capacities and merge/replacement
+peaks are precharged against existing256MiB payload/64MiB descriptor services;
+2GiB logical image storage uses existing leases. Cheap shared prefix/blob/recipe/
+ELF handles retain credits through Need/Ready/certificate and DICE history until
+actual last Drop. Compact interned keys/demand IDs do not pin Blob payloads;
+remaining raw values and certificates do, with observable engine-retirement gates.
+Borrowed proof reads and64KiB transfers avoid duplicate retained executable bytes.
+Existing evaluator/download/raw-observation/DICE bookkeeping remain baseline
+owners outside this bounded-service claim. These limits do not establish full
+workspace RSS or performance.
 
 RuntimeSourceDeclarationPolicyKey is a bounded immutable raw request configuration
 input: explicit source scopes/original spellings/alias/outcome/platform policy,
@@ -391,9 +438,11 @@ after transaction drop/drain. Tool images stream 64KiB; shared credited origins/
 Needs/recipes/facts/history survive actual last Drop. Complete namespace facets,
 finite all-writer/descendant mediation, hard quota/retained capture and actual
 source-consuming query plus locked generate remain required. No smaller method
-endpoint activates early. This is an accepted producer/authority design only;
-actual source configuration/roots, full runtime catalog, selected-tool fit,
-process/backend activation, bootstrap and new RSS remain unproved.
+endpoint activates early. Runtime source policy/catalog remains accepted design
+only, separate from the accepted WP894 selected-tool producer. Actual runtime
+source configuration/roots, full namespace facts/catalog, selected-tool fit,
+process/backend activation, source-consuming query plus locked generate, bootstrap
+and new RSS remain unproved.
 
 ## Goal
 

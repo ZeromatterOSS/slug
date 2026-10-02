@@ -211,6 +211,10 @@ pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
 pub use dependency_cycle::compute_selected_scratch_prefix;
 #[doc(hidden)]
+pub use dependency_cycle::compute_selected_tool_source_requests;
+#[doc(hidden)]
+pub use dependency_cycle::compute_selected_tool_sources;
+#[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSet;
 #[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSetError;
@@ -243,6 +247,20 @@ pub use module_extension::selected_scratch::SelectedScratchLabelSource;
 pub use module_extension::selected_scratch::SelectedScratchPrefixError;
 #[doc(hidden)]
 pub use module_extension::selected_scratch::SelectedScratchPreparationDeadline;
+#[doc(hidden)]
+pub use module_extension::selected_tools::ObservedSelectedExtensionToolSourceRequests;
+#[doc(hidden)]
+pub use module_extension::selected_tools::ObservedSelectedExtensionToolSources;
+#[doc(hidden)]
+pub use module_extension::selected_tools::ObservedSelectedToolSource;
+#[doc(hidden)]
+pub use module_extension::selected_tools::SelectedExtensionToolSourceRequestsKey;
+#[doc(hidden)]
+pub use module_extension::selected_tools::SelectedExtensionToolSourcesKey;
+#[doc(hidden)]
+pub use module_extension::selected_tools::SelectedToolSourceRequest;
+#[doc(hidden)]
+pub use module_extension::selected_tools::SelectedToolSourcesError;
 #[doc(hidden)]
 pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffect;
 #[doc(hidden)]

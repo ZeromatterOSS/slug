@@ -30,6 +30,7 @@ use dupe::Dupe;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
 use slug_bzlmod_v2::SelectedExtensionDownloadRequest;
+use slug_bzlmod_v2::SelectedScratchElfMetadataEpochKey;
 use slug_bzlmod_v2::source_preparation::RepositorySourceScope;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_identity_v2::CanonicalRepoName;
@@ -47,6 +48,7 @@ enum DemandNodeMetadata {
     Repository(Arc<RepositoryMaterializationRequest>),
     Source(RepositorySourceScope),
     Download(Arc<SelectedExtensionDownloadRequest>),
+    ScratchElf(SelectedScratchElfMetadataEpochKey),
 }
 
 #[derive(Debug)]
@@ -70,6 +72,7 @@ struct RuntimeActivationTracker {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum DemandProvenanceError {
+    TooManyScratchElfCells,
     MultipleKeyMetadata {
         node: DiceNodeId,
     },
@@ -109,6 +112,9 @@ pub(super) enum DemandProvenanceError {
 impl fmt::Display for DemandProvenanceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::TooManyScratchElfCells => {
+                f.write_str("selected closure has too many scratch ELF cells")
+            }
             Self::MultipleKeyMetadata { node } => {
                 write!(f, "DICE node {node:?} provided multiple demand descriptors")
             }
@@ -192,6 +198,8 @@ pub(super) struct SelectedWorkspaceDemands {
     repository_validations: Arc<[SelectedRepositoryValidation]>,
     unscoped_paths: Arc<[PathObservationDemand]>,
     download_requests: Arc<[Arc<SelectedExtensionDownloadRequest>]>,
+    scratch_elf_cells: [Option<SelectedScratchElfMetadataEpochKey>; 3],
+    scratch_elf_cell_count: usize,
 }
 
 impl SelectedWorkspaceDemands {
@@ -201,6 +209,8 @@ impl SelectedWorkspaceDemands {
             repository_validations: Arc::from([]),
             unscoped_paths: Arc::from([]),
             download_requests: Arc::from([]),
+            scratch_elf_cells: std::array::from_fn(|_| None),
+            scratch_elf_cell_count: 0,
         }
     }
 
@@ -226,6 +236,8 @@ impl SelectedWorkspaceDemands {
             repository_validations: Arc::from([]),
             unscoped_paths: unscoped_paths.into(),
             download_requests: Arc::from([]),
+            scratch_elf_cells: std::array::from_fn(|_| None),
+            scratch_elf_cell_count: 0,
         }
     }
 
@@ -247,6 +259,8 @@ impl SelectedWorkspaceDemands {
             }]),
             unscoped_paths: Arc::from([]),
             download_requests: Arc::from([]),
+            scratch_elf_cells: std::array::from_fn(|_| None),
+            scratch_elf_cell_count: 0,
         }
     }
 
@@ -260,6 +274,14 @@ impl SelectedWorkspaceDemands {
 
     pub(super) fn unscoped_paths(&self) -> &[PathObservationDemand] {
         &self.unscoped_paths
+    }
+
+    pub(super) fn scratch_elf_cells(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &SelectedScratchElfMetadataEpochKey> {
+        self.scratch_elf_cells[..self.scratch_elf_cell_count]
+            .iter()
+            .map(|cell| cell.as_ref().expect("filled cell"))
     }
 
     pub(super) fn download_requests(&self) -> &[Arc<SelectedExtensionDownloadRequest>] {
@@ -331,7 +353,9 @@ impl WorkspaceDemandOwner {
         let repository = key.request_value::<Arc<RepositoryMaterializationRequest>>();
         let source = key.request_value::<RepositorySourceScope>();
         let download = key.request_value::<Arc<SelectedExtensionDownloadRequest>>();
-        let supplied = usize::from(path.is_some())
+        let scratch = key.request_value::<SelectedScratchElfMetadataEpochKey>();
+        let supplied = usize::from(scratch.is_some())
+            + usize::from(path.is_some())
             + usize::from(repository.is_some())
             + usize::from(source.is_some())
             + usize::from(download.is_some());
@@ -342,8 +366,14 @@ impl WorkspaceDemandOwner {
             .map(DemandNodeMetadata::Path)
             .or_else(|| repository.map(DemandNodeMetadata::Repository))
             .or_else(|| source.map(DemandNodeMetadata::Source))
-            .or_else(|| download.map(DemandNodeMetadata::Download));
+            .or_else(|| download.map(DemandNodeMetadata::Download))
+            .or_else(|| scratch.map(DemandNodeMetadata::ScratchElf));
         match &metadata {
+            Some(DemandNodeMetadata::ScratchElf(cell))
+                if cell.selector().workspace().as_path() != self.workspace.as_path() =>
+            {
+                Err(DemandProvenanceError::MetadataWorkspaceMismatch { node })
+            }
             Some(DemandNodeMetadata::Repository(request))
                 if request.id.workspace != self.workspace =>
             {
@@ -473,7 +503,22 @@ fn select_demands(
         SmallMap::with_capacity(closure.nodes().len());
     let mut requests = SmallMap::new();
     let mut downloads = SmallMap::<CanonicalRepoName, Arc<SelectedExtensionDownloadRequest>>::new();
+    let mut scratch_elf_cells: [Option<SelectedScratchElfMetadataEpochKey>; 3] =
+        std::array::from_fn(|_| None);
+    let mut scratch_elf_cell_count = 0;
     for node in closure.nodes() {
+        if let Some(DemandNodeMetadata::ScratchElf(cell)) = catalogue.get(&node.node()) {
+            if !scratch_elf_cells[..scratch_elf_cell_count]
+                .iter()
+                .any(|existing| existing.as_ref() == Some(cell))
+            {
+                if scratch_elf_cell_count == 3 {
+                    return Err(DemandProvenanceError::TooManyScratchElfCells);
+                }
+                scratch_elf_cells[scratch_elf_cell_count] = Some(cell.dupe());
+                scratch_elf_cell_count += 1;
+            }
+        }
         nodes.insert(node.node(), node);
         if let Some(DemandNodeMetadata::Repository(request)) = catalogue.get(&node.node()) {
             match requests.get(&request.id) {
@@ -555,7 +600,10 @@ fn select_demands(
                     anchor.requests.insert(request.id.clone(), request.dupe());
                 }
             }
-            Some(DemandNodeMetadata::Source(_)) | Some(DemandNodeMetadata::Download(_)) | None => {}
+            Some(DemandNodeMetadata::Source(_))
+            | Some(DemandNodeMetadata::Download(_))
+            | Some(DemandNodeMetadata::ScratchElf(_))
+            | None => {}
         }
         let closure_node = nodes
             .get(&node)
@@ -649,6 +697,8 @@ fn select_demands(
         repository_validations: repository_validations.into(),
         unscoped_paths: unscoped_paths.into(),
         download_requests: download_requests.into(),
+        scratch_elf_cells,
+        scratch_elf_cell_count,
     })
 }
 

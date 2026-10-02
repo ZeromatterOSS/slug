@@ -95,18 +95,18 @@ impl SelectedScratchSourceLease {
         self.0.get().observed.as_ref().expect("promoted prefix")
     }
     #[cfg(test)]
-    fn test_path(&self) -> &Path {
+    pub(super) fn test_path(&self) -> &Path {
         self.0.get().stage.as_ref().expect("live stage").path()
     }
 }
 
-struct PreparedStage {
+pub(super) struct PreparedStage {
     // Owner drops before credit, including early errors and panic unwinding.
     owner: StageOwner,
     reservation: ImageDescriptorReservation,
 }
 impl PreparedStage {
-    fn new(runtime: &WorkspaceRuntime) -> Result<Self, NativeDemandSessionError> {
+    pub(super) fn new(runtime: &WorkspaceRuntime) -> Result<Self, NativeDemandSessionError> {
         #[cfg(target_os = "linux")]
         {
             let reservation = runtime
@@ -142,9 +142,50 @@ impl PreparedStage {
             Err(failure(ScratchSourceFailure::UnsupportedPlatform))
         }
     }
+    pub(super) fn capture(
+        mut self,
+        command: &NativeDemandCommand<'_>,
+        key: &HostSelectedExtensionScratchPrefixKey,
+        observed: ObservedSelectedExtensionScratchPrefix,
+        reachable: &SelectedWorkspaceDemands,
+        deadline: Instant,
+    ) -> Result<SelectedScratchSourceLease, NativeDemandSessionError> {
+        if !self
+            .reservation
+            .same_budget(command.runtime.scratch_resources.descriptor_budget())
+        {
+            return Err(failure(ScratchSourceFailure::Unauthorized));
+        }
+        verify_current(command, key, &observed, reachable, deadline)?;
+        pin_sources(command, &observed, &mut self, deadline)?;
+        self.owner.logical = Some(
+            command
+                .runtime
+                .image_resources
+                .reserve_logical(
+                    u64::try_from(observed.prefix().occurrence_bytes())
+                        .map_err(|_| failure(ScratchSourceFailure::InvalidPrefix))?,
+                )
+                .map_err(NativeDemandSessionError::InputImage)?,
+        );
+        write_prefix(
+            &self.owner.root,
+            observed.prefix(),
+            command.runtime,
+            &|| active(command, deadline),
+            #[cfg(test)]
+            None,
+        )?;
+        verify_current(command, key, &observed, reachable, deadline)?;
+        self.owner.observed = Some(observed);
+        self.reservation
+            .freeze(self.owner)
+            .map(SelectedScratchSourceLease)
+            .map_err(|error| NativeDemandSessionError::InputImage(error.into()))
+    }
 }
 
-enum PrefixAttempt {
+pub(super) enum PrefixAttempt {
     Need(slug_bzlmod_v2::SourcePreparationNeeds),
     Complete(
         ObservedSelectedExtensionScratchPrefix,
@@ -304,7 +345,7 @@ impl WorkspaceRuntime {
     }
 }
 
-fn active(
+pub(super) fn active(
     command: &NativeDemandCommand<'_>,
     deadline: Instant,
 ) -> Result<(), NativeDemandSessionError> {
@@ -319,7 +360,7 @@ fn active(
     Ok(())
 }
 
-fn refresh_after_progress(
+pub(super) fn refresh_after_progress(
     command: &mut NativeDemandCommand<'_>,
     deadline: Instant,
     #[cfg(test)] hook: Option<&dyn Fn(StagePhase) -> Result<(), NativeDemandSessionError>>,
@@ -384,7 +425,7 @@ fn refresh_after_progress(
     Ok(())
 }
 
-async fn prefix_attempt(
+pub(super) async fn prefix_attempt(
     runtime: &WorkspaceRuntime,
     guard: &mut NativeDemandAbortGuard<'_>,
     key: &HostSelectedExtensionScratchPrefixKey,
@@ -419,7 +460,7 @@ async fn prefix_attempt(
     Ok(PrefixAttempt::Complete(observed, selected))
 }
 
-fn validate(
+pub(super) fn validate(
     command: &NativeDemandCommand<'_>,
     key: &HostSelectedExtensionScratchPrefixKey,
     observed: &ObservedSelectedExtensionScratchPrefix,
@@ -608,7 +649,7 @@ fn validate(
     Ok(())
 }
 
-fn pin_sources(
+pub(super) fn pin_sources(
     command: &NativeDemandCommand<'_>,
     observed: &ObservedSelectedExtensionScratchPrefix,
     stage: &mut PreparedStage,
@@ -664,7 +705,7 @@ fn pin_sources(
     Ok(())
 }
 
-fn verify_current(
+pub(super) fn verify_current(
     command: &NativeDemandCommand<'_>,
     key: &HostSelectedExtensionScratchPrefixKey,
     observed: &ObservedSelectedExtensionScratchPrefix,
@@ -722,7 +763,7 @@ fn verify_current(
 
 #[cfg(test)]
 #[derive(Clone, Copy)]
-enum StagePhase<'a> {
+pub(super) enum StagePhase<'a> {
     Prepared(&'a Path),
     BeforeCopy,
     Chunk,

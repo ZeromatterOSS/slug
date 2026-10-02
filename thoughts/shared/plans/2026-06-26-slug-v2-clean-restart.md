@@ -34,20 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-193-m7a-scratch-prefix-source-producer-r1
-Status: accepted; normal scratch-prefix source prerequisite, no process activation
+Packet: WP-7-194-m7a-selected-tool-source-producer-r1
+Status: accepted; normal tool sources and private native lease; runtime prerequisites remain open
 
-WP893 accepts the normal first-process scratch-prefix producer and private native
-source staging. Actual definition/usage/env/Label/download dependencies, ordered
-writes and exact bytes/modes/spellings retain bounded credits through last Drop;
-normal mutating Needs refresh complete raw observations before recomputation.
-Shared23/Loading69/Core92 selected gates and owner all-target/default CLI checks
-pass with independent FINAL ACCEPT. No process activation or total RSS claim.
+WP894 accepts actual typed first-checkpoint tools through normal source/image/ELF
+facts and one private retained native source lease. Shared31/Loading75/Core100
+focused/protected gates, default owner all-target/CLI compile and independent FINAL
+ACCEPT pass; target/wp894/acceptance.json records the evidence. Full current
+structural origin/request and credited history/last-Drop ownership remain mandatory.
+The bounded implementation contract is in
+[current-packet.md](slug-v2-subplans/current-packet.md).
 
-Next readiness is the selected tool/runtime source producer: connect actual
-normal prefix/Label operands to observed ELF/runtime source authority and raw
-request policy. Complete namespace/mediator/quota and cohesive query plus locked
-generate remain the bootstrap pipeline; M7A stays partial and the goal active.
+WP89396fc6562a supplies the accepted first-process scratch-prefix producer.
+Runtime raw policy/profile/catalog, complete namespace/loader/access facets,
+mediator/quota/backend and genuine query plus locked generate remain required;
+M7A stays partial, with no activation, linked CLI or total RSS claim.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
