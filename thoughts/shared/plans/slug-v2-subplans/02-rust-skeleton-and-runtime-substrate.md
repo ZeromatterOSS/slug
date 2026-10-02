@@ -21,6 +21,37 @@ workspace file payloads. The legacy explicit Core snapshot helper remains for
 its bounded callers/tests. WP880 covers sparse payloads and genuine DICE content
 A/B/A even when advisory reporting says zero; its manifest owns validation.
 
+## Native path-input history boundary
+
+Accepted source 3afc49f95b15a698a78bc8a84047302864ba4816 replaces ordinary command injection of cumulative
+PathObservationEpoch/shard maps with exact-demand optional raw DICE inputs.
+Epochs remain source certificates and command-owned merge scratch. Full result,
+operation, path and namespace equality remain semantic; None means unknown or
+revoked scheduling input and yields Need, distinct from observed Missing.
+An explicit mode and private normal mode projection prevent cached legacy values
+from surviving transport installation. Legacy epoch/shard fixtures are isolated
+by mode. Missing injected keys reject before the never-compute callback; normal
+key computation and historical injected values retain their existing contracts.
+
+A command-owned SmallSet ledger retains the union of all staged demand identities,
+seeded from prior accepted observations. It survives discarded/failing updaters;
+attempt, selected acceptance and abort restoration inject desired Some plus removed
+None atomically. Its synchronous Mutex never spans await, compute or commit.
+Source-change finalization uses the same per-demand keyset. No DICE GC, engine
+reset, semantic cache, interner, donor or dependency is added. Actual changed
+payload/revocation history retains its existing engine lifetime.
+
+The [acceptance receipt](memory-repair-2026-10-02.json) records independent FINAL,
+DICE 17/Workspace 81/Core 140 passes, default production compile and supervised RSS
+A/B/B/A: aggregate 378860/378952 KiB versus per-demand 10392/10348 KiB for 2,048 inputs.
+This is a path-history control, excluding aggregate shards and full-build costs.
+Validation used a frozen combined candidate; independent staged dependency review
+confirmed this memory-only patch uses baseline APIs. WP897 remains unaccepted.
+Owner all-target preparation hit 60s and an unchanged CLI integration-test mismatch
+is recorded separately; no ceiling was raised. Reported 40 GB PID attribution and
+runtime installation remain unproved. The prior metadata-only advisory scanner
+contract stays intact.
+
 ## Live-context cycle ownership
 
 WP885 binds each fresh userdata proxy after transaction commit to one weakly

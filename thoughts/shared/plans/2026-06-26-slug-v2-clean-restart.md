@@ -34,23 +34,33 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-196-m7a-keyed-guest-namespace-view-r1
-Status: accepted; next packet ready
+Packet: WP-7-197-m7a-issued-label-file-sources-r1
+Status: implementation in progress
 
-WP896 accepts normal guest namespace facts from FULL selected tool/runtime source
-profile and scratch prefix, with explicit keyed Slug-native metadata and finite
-AliasDeny lookup outcomes. One private retained-FD view consumes genuine captured
-sources in the same restored command; no second binary tree or process activation.
-Shared46/Loading94/Core116 (256 distinct, all231 protected) focused gates pass;
-default owner all-target/CLI checks and independent FINAL ACCEPT pass;
-target/wp896/acceptance.json. The bounded contract is in
+User-prioritized memory repair is accepted in 3afc49f95. Exact per-demand
+inputs replace cumulative path-map DICE history while preserving full semantic
+identity, historical transactions and explicit revocation. DICE 17/Workspace 81/
+Core 140 gates and default owner libraries plus production CLI compile pass;
+independent FINAL ACCEPT. Controlled 2,048-input RSS falls from about 370 MiB to
+10 MiB; actual reported 40 GB PID/full-build attribution remains unproved. See
+[memory receipt](slug-v2-subplans/memory-repair-2026-10-02.json) for scope and broader
+check limits. The existing CLI binary predates this repair. WP897 candidate work
+is preserved and remains unaccepted; new native data tests remain unproved.
+
+WP897 selects normal ordered issued Label data sources and exact regular-file
+capture into the same restored guest view at original spellings. Explicit opt-in
+policy, no whole-parent imaging, honest sparse-parent Unowned semantics and
+retained current source/credit ownership are required. Independent DESIGN/API
+freeze ACCEPT; candidate preserved pending new native gates, contract in
 [current-packet.md](slug-v2-subplans/current-packet.md).
 
-WP895 c44ea8c68 accepts configured TreeOnly sources; Shared40/Loading84/Core107
-(231 distinct), default owner all-target/CLI checks and independent FINAL ACCEPT
-pass. Complete runtime roots/fit, aliases/loader/asset facets, kernel installation,
-all-access mediation/hard quota/backend and actual query plus locked generate/full
-bootstrap remain required. M7A stays partial, with no total RSS claim.
+WP896 c151cec23 accepts initial AliasDeny namespace facts/view;256 distinct focused
+gates and default owner/CLI checks plus independent FINAL ACCEPT pass;
+target/wp896/acceptance.json. Complete runtime roots/fit, data discovered beyond
+issued Labels, union aliases, loader/assets/platform, sealed kernel namespace,
+all-access mediation/quota/backend, query+locked generate and bootstrap remain.
+M7A stays partial; no total RSS claim. The daemon metadata scanner memory repair
+d95f2bda6 remains intact; fresh scanner-only RSS evidence is under target/memory-followup.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

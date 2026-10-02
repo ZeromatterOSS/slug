@@ -1,0 +1,128 @@
+{
+  "request": "Identify and reduce reported roughly40GB memory footprint",
+  "compatibility": "Slug-native input transport; no semantic equality or Bazel compatibility change",
+  "baseline": "c151cec23f5f4628ca647c18b891546641c2975c",
+  "memory_only_patch_sha256": "a84e00d4f7234a5b5c30f27c7fae0f7350515531777d469d3ef4434fde8f82b0",
+  "source_files": [
+    "app/slug_core_v2/src/runtime/dice.rs",
+    "app/slug_core_v2/src/runtime/path_inputs.rs",
+    "app/slug_core_v2/src/runtime/path_inputs/tests.rs",
+    "app/slug_core_v2/src/runtime/request_revision.rs",
+    "app/slug_workspace_v2/src/lib.rs",
+    "app/slug_workspace_v2/src/path_observation.rs",
+    "app/slug_workspace_v2/src/path_observation/memory_tests.rs",
+    "dice/dice/src/impls/tests.rs",
+    "dice/dice/src/impls/tests/injected_absence.rs",
+    "dice/dice/src/impls/worker.rs"
+  ],
+  "cause": "DICE injected history retains unequal aggregate path maps; sequential discovery retains quadratic descriptor/map-row copies. Unchanged payload bytes already shared.",
+  "repair": "Per-demand exact injected optional result; explicit mode projection; conservative command staged-demand ledger; atomic selected/abort revocation and source-change retry. Missing injected key rejects before never-compute callback.",
+  "validation_context": "Frozen combined working candidate including unaccepted WP897. Independent staged source/dependency review verified the memory-only patch uses baseline APIs. No isolated memory-only runtime claim.",
+  "tests": {
+    "dice": {
+      "selected": 17,
+      "summary": [
+        "test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 97 filtered out; finished in 0.00s"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 0.005237324017798528,
+      "artifact_sha256": "b67887185eaf68176349a6cc8446513b8889490b4fc1ccadb0e663b7f0ad0a41"
+    },
+    "workspace": {
+      "selected": 81,
+      "summary": [
+        "test result: ok. 81 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.10s"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 0.10306588301318698,
+      "artifact_sha256": "d972af0567993e1fe20f20c6ac4c023eb0a44076fafbac3edf44802fb74f667d",
+      "held_packet_controls": 3,
+      "note": "Three held WP897 regular-root controls passed in the combined candidate; they do not establish WP897 acceptance."
+    },
+    "core": {
+      "selected": 140,
+      "protected": 116,
+      "summary": [
+        "test result: ok. 140 passed; 0 failed; 0 ignored; 0 measured; 517 filtered out; finished in 4.34s"
+      ],
+      "exit": 0,
+      "elapsed_seconds": 4.343314508994808,
+      "artifact_sha256": "b291c0a9ca6cbd4a64b9f4db8f1437f58c58230ab059ead94a8ebb46030a7275"
+    }
+  },
+  "default_compile": {
+    "default-owner-libs": {
+      "exit": 0,
+      "elapsed_seconds": 8.62,
+      "peak_rss_kib": 790060
+    },
+    "default-production": {
+      "exit": 0,
+      "elapsed_seconds": 0.6,
+      "peak_rss_kib": 216768
+    }
+  },
+  "rss": {
+    "artifact_sha256": "d972af0567993e1fe20f20c6ac4c023eb0a44076fafbac3edf44802fb74f667d",
+    "additions": 2048,
+    "scope": "Real DICE injected path history; aggregate control excludes 64 shards; not full-build RSS or reported 40 GB PID.",
+    "measurements": [
+      {
+        "exit": 0,
+        "elapsed_seconds": 0.63,
+        "peak_rss_kib": 378860,
+        "label": "A1",
+        "mode": "aggregate"
+      },
+      {
+        "exit": 0,
+        "elapsed_seconds": 1.32,
+        "peak_rss_kib": 10392,
+        "label": "B1",
+        "mode": "per-demand"
+      },
+      {
+        "exit": 0,
+        "elapsed_seconds": 1.34,
+        "peak_rss_kib": 10348,
+        "label": "B2",
+        "mode": "per-demand"
+      },
+      {
+        "exit": 0,
+        "elapsed_seconds": 0.61,
+        "peak_rss_kib": 378952,
+        "label": "A2",
+        "mode": "aggregate"
+      }
+    ]
+  },
+  "limitations": [
+    "Reported40GB PID not attributed or reproduced.",
+    "Full-build RSS not measured; aggregate RSS control excludes 64 shards.",
+    "Actual changed input payload history and repeated revocations retain existing DICE lifetime.",
+    "Default owner all-target preparation exceeded 60s; no cap increase.",
+    "CLI all-target integration test mismatch proven identical to baseline; production CLI/Core default lib/bin checks pass.",
+    "Existing target/debug/slug binary predates this repair. WP897 remains unaccepted and held."
+  ],
+  "source_commit": "3afc49f95b15a698a78bc8a84047302864ba4816",
+  "independent_review": {
+    "phase": "FINAL",
+    "decision": "ACCEPT",
+    "reviewer": "frontier_review",
+    "receipt_sha256": "01b288bed63617b3d3272d92e39d39b2b6b53f3d87d307e69b1df07cee03cc0c",
+    "dependency_review": "Ten-file staged patch uses baseline APIs and excludes WP897; no isolated runtime claim."
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/dice.rs": "cd594a218d1e2a1bd17a95290942e0fa6030519ccb316829db3b09af1bdb09a6",
+    "app/slug_core_v2/src/runtime/path_inputs.rs": "b076d5ddedcb965a6dcde72579e8ebe5e554ebdd3ba116efd5ff284bf709a61d",
+    "app/slug_core_v2/src/runtime/path_inputs/tests.rs": "4e37ab50dcc40f3837b7de0f701fb1dbba00aaffdad757149afd385973d4fd9a",
+    "app/slug_core_v2/src/runtime/request_revision.rs": "38624d3645e352e0a7a35e5bbf737bd2d84dc7e91e3ebff406da83cef226ba28",
+    "app/slug_workspace_v2/src/lib.rs": "884834f670442f248412d0cb74b79c82cd8532a7c63b0053111ee282c9b57b02",
+    "app/slug_workspace_v2/src/path_observation.rs": "7332fd68c0b62664451932d7f2a23c7efd1339028e3209db362d48ec332c6390",
+    "app/slug_workspace_v2/src/path_observation/memory_tests.rs": "bad0db047266a230c6365928c0b5102b0c1dfd3cfcaae2b7e48fcf64ab34a1e9",
+    "dice/dice/src/impls/tests.rs": "d8acfbd4b486abce67f5f41b2b4f9c1e6d4b3327b16b6b8f32c1516ec7417131",
+    "dice/dice/src/impls/tests/injected_absence.rs": "102224c945ba8a32fb76199993a5e0cfecd4f01ad20634040fbe931f8bd79d4b",
+    "dice/dice/src/impls/worker.rs": "bb9fdbbc231e8b2e6ea8389679af94dcde374e09e67d4e8733db1a4249e5c04e"
+  }
+}
