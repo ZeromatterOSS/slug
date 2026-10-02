@@ -439,6 +439,55 @@ accepts a bounded source/view prerequisite; actual runtime roots/fit, later data
 discovery, union aliases, loader/search/assets/platform/kernel, sealing/mediation/
 quota/backend, query+locked generate/bootstrap and total RSS remain unproved.
 
+### Request-selected source configuration decision
+
+WP898 selects a bounded borrowed Core-private request containing an apparent
+imported generated-repository name, complete caller Bzlmod command/environment/
+lockfile/registry/repository-environment inputs, explicit scratch/tool policies and
+optional runtime/guest configuration. The current private driver still seeds
+normalized defaults; replacing that substitution is required implementation,
+not proved by this decision. A compact normal owner-selector key must compute
+guarded root mapping and selected demand, retaining their full frontier/current
+identity and joining the existing mixed graph. Resolve and revalidate that owner
+in the SAME existing precreated-stage command through Need/progress and final
+capture, full prior-input/raw Some-None restoration and worker drain. A preliminary
+owner command, forged owner/catalog or published private getter cannot substitute.
+
+Runtime None remains missing configuration. Explicit Some(empty) will authorize
+zero EXTRA roots, preserving full policy/service identity without dummy stages or
+implicit loader/HOME/PATH access; it does not prove a complete actual runtime.
+Raw OriginalSource versus ExplicitPrefix mapping will remain structural input.
+Normal Requests resolves OriginalSource from the genuine current namespace/anchor/
+source root before whole mapping/overlap admission, never from a guessed physical
+materialization path. Already-complete tool images own their captured library
+regions. Additional covered-original runtime declarations may reuse only exact
+current role-origin/request/result/provenance and every certified member kind/
+mode/digest, retaining their full normal image/additional Label frontier and FULL
+semantic occurrences before physical sharing. Reuse actual FD/member bindings;
+same bytes, foreign Host claims, relocated/differing origins or unrelated overlaps
+stay refused. Equal complete cargo/rustc images may share physical capture without
+erasing either role occurrence. No new payload copy/cache/interner/dependency.
+
+Seven further named sources77,916bytes from the existing exact authenticated
+rules_rust archive prove default independent host-tools Rust1.97.1 with Linux GNU,
+rustfmt nightly2026-07-16 and component URL/layout recipes. Generator default
+remains musl; root nightly build settings do not select those host tools. The
+4,749,878byte component hash table exceeded1MiB copy admission and was not copied.
+Actual normal materialization requests/results must establish component integrity,
+current binaries/aliases/ELF. Recipe membership is not runtime-root fit evidence.
+
+The next implementation requires genuine normal root owner/query checkpoint and
+selected-source/admission evidence alongside vertical full-caller request-to-view
+reads. Original/equal-spelling Explicit and None/Some(empty), source/mapping/caller
+knobs/current-service A/B/A, zero-open foreign batch, full restore, cancellation,
+history/credit/FD lastDrop and covered reuse must discriminate the contract.
+A rewritten fixture cannot replace the real-source gate. Source-required aliases,
+loader/child-env assets or unavailable actual artifacts stay explicit prerequisites;
+AliasDeny/TreeOnly does not silently flatten them. Preserve actual opaque-loader
+strategy, existing budgets and full query+locked-generate/backend/bootstrap gates.
+No CLI/wire decoder or process activation is selected; new source authority and
+complete runtime fit still require implementation and executed proof.
+
 Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
 generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
 or musl name cannot prove the selected bytes/interpreter. Host-tools come from the

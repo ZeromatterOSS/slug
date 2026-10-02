@@ -1,0 +1,130 @@
+{
+  "packet": "WP-7-198-m7a-runtime-profile-configuration-decision-r1",
+  "status": "accepted source-only decision",
+  "baseline": "993fdc0342129dede2c070369149a9e0d1dd3f14",
+  "classification_previous_goal_turn": "progress: accepted WP897 and rebuilt local memory-fixed CLI",
+  "compatibility": "Slug-native source/configuration design; inherited exact Label/download/Pure behavior unchanged",
+  "observable_gate_advanced": "Resolved immutable full-caller configuration and normal imported-owner/same-driver source-view integration decisions; authenticated missing host-tools numeric/layout recipes",
+  "decisions": {
+    "frontend": "Bounded borrowed Core-private full-caller request; no CLI/wire decoder",
+    "owner": "Compact normal apparent imported-repository owner key via guarded root mapping/demand; same command and merged full current frontier",
+    "request_inputs": "Preserve full caller command/environment/lockfile/registry/repository environment in every attempt and restore entire prior bundle; no normalized defaults substitution",
+    "runtime_presence": "None prerequisite refusal distinct from explicit Some(empty) authorizing zero EXTRA roots; never a complete loader-closure claim",
+    "mapping": "Raw OriginalSource versus ExplicitPrefix remains structural; normal resolution after actual namespace/anchor/source-root selection before whole overlap/IO admission",
+    "sharing": "Only exact current provenance and all certified member kind/mode/digest permits covered original Tool capture reuse; count full runtime/role occurrences before sharing",
+    "mandatory_actual_gate": "Genuine normal root first-query configuration/source/admission audit, exact actual request/binary pins and measured admission; typed prerequisite terminal documents incompleteness and cannot prove full runtime closure or be replaced by a rewritten fixture"
+  },
+  "source_authentication": {
+    "archive": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2/file",
+    "archive_bytes": 67196890,
+    "sha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2",
+    "files": {
+      "rust/defs.bzl": {
+        "archive_member": "./rust/defs.bzl",
+        "bytes": 6092,
+        "sha256": "5b71e4344a6c6ee04ade488c741784479f392b71d42f2102eedc5e4993654512"
+      },
+      "rust/private/repository_utils.bzl": {
+        "archive_member": "./rust/private/repository_utils.bzl",
+        "bytes": 41175,
+        "sha256": "1fead25a1ef03f25802d0277addd6857b0abf4115c339b87ee4c5e5c7f476b23"
+      },
+      "rust/private/semver.bzl": {
+        "archive_member": "./rust/private/semver.bzl",
+        "bytes": 1916,
+        "sha256": "966fe4b90082dd92bac60398b2801824f41906eea71364b64f630f0c175250ab"
+      },
+      "rust/private/common.bzl": {
+        "archive_member": "./rust/private/common.bzl",
+        "bytes": 3201,
+        "sha256": "cee50122624c7fd9c9a6545a647062f350dd25bc8cf6dda873944290463d4db6"
+      },
+      "rust/private/nightly_versions.bzl": {
+        "archive_member": "./rust/private/nightly_versions.bzl",
+        "bytes": 1033,
+        "sha256": "2a6a17ea96d50535fc1315556c2c48fd0adebecc4b5d6d20cbfafe1f9fc03f8a"
+      },
+      "rust/platform/triple.bzl": {
+        "archive_member": "./rust/platform/triple.bzl",
+        "bytes": 5310,
+        "sha256": "19fd04c62b3a50057ffc8ab9b831f5182bc531e4307f6065065ce214de4129e6"
+      },
+      "rust/platform/triple_mappings.bzl": {
+        "archive_member": "./rust/platform/triple_mappings.bzl",
+        "bytes": 19189,
+        "sha256": "2e870b79faea6239b98ec870de99763e2a963396d53cd63b045915ee9485901d"
+      }
+    },
+    "proof": "Full cached archive streamed SHA256 verified before named regular source members copied; no binaries/general extraction/network.",
+    "selected_bytes": 77916,
+    "member_count": 4493,
+    "last_operation_seconds": 0.5620074309990741,
+    "new_network_bytes": 0,
+    "limits": {
+      "named_members": 20,
+      "each_bytes": 1048576,
+      "total_bytes": 2097152,
+      "hash_buffer_bytes": 1048576,
+      "operation_seconds": 60
+    }
+  },
+  "known_shas_resource_refusal": {
+    "member": "./rust/private/known_shas.bzl",
+    "member_bytes": 4749878,
+    "copy_limit_bytes": 1048576,
+    "result": "Named member exceeds1MiB source-copy cap; no member copied and no limit increased. Component digest literals remain unproved by this bounded source extension. Existing whole-archive SHA proof is retained."
+  },
+  "source_recipe_findings": {
+    "generator": "Linux musl through authenticated Starlark, subject to normal override/bootstrap/table inputs; naming does not prove static ELF",
+    "host_tools": "Independent default Rust1.97.1, Linux GNU",
+    "rustfmt": "Independent nightly/2026-07-16",
+    "component_recipe_count": 6,
+    "actual_component_digests_binaries_links_elf_and_current_roots": "Not proved by source recipes; actual normal materialization requests/results must establish integrity/current source facts"
+  },
+  "receipts": {
+    "input-prerequisite-audit.md": "08be6303f8b1829037a41fa2529a7553717e56055d382899d6fd0c486f2cb728",
+    "configuration-seam-audit.md": "7d61298c418f152175e2675f9d0962f8b51a59ca0602e9833a747be24506d349",
+    "sequencing-audit.md": "baf4078e33977623d338b5f689d26d9ef66277e221a445472b4c4c0cec9e94a3",
+    "root-decision.md": "8f60763334c66db09cb40c6f694177ff5deb1ec491c5e66c1bf939139210d9b6",
+    "design-review.md": "447f10fe7ebffd311a23bf0f8ea56c1f3fc84783628f66da0f52a015ddf2ce30",
+    "source-authentication.json": "247dccdb6d960e724b2488ec8a9234ff4cc2aaf4db15fc54123d08b091e85f30",
+    "known-shas-cap-refusal.json": "dfaf6e05e688309e6a366818662ab8d1a2e3c728fe014c8bee93afbdc669f5a6",
+    "final-review.md": "ae73334e0d4a01d60e13887ed8aa0aededfa18b1d6118699cc8818d3fa55ee5f"
+  },
+  "implementation": "Not implemented. Exact successor API/precharge/storage/file signatures require implementation DESIGN; complete actual runtime-root fit/source consumer remains a mandatory gate",
+  "retained_memory": "No production storage changes. Future configuration/facts/history use existing bank-backed Arc/Dupe/Allocative, credited vectors/fixed slots and actual lastDrop; caps unchanged",
+  "production_changed": false,
+  "cargo_bazel_cli_native_or_tool_runtime_executed": false,
+  "new_network_bytes": 0,
+  "source_operation_seconds": {
+    "successful_named_authentication": 0.5620074309990741,
+    "known_shas_failed_copy": "Invocation exit1 at member-size guard; no data copied; elapsed not durably recorded",
+    "header_refusal_inspection": "Invocation exit0; no data copied; elapsed not durably recorded"
+  },
+  "compile_test_seconds": 0,
+  "timing_scope": "Full packet wall/review duration not measured across continuation; named source operation duration recorded",
+  "validation": {
+    "source_hashes": "PASS:7 named copied sources match exact archived-source authentication",
+    "structure_plan_status_diff": "PASS",
+    "archive_status": "PASS"
+  },
+  "growth": {
+    "owner_plan_net_lines": 49,
+    "estimate_max_net_owner_lines": 60,
+    "reason": "Current configuration/source architecture and required proof, not chronological worker log"
+  },
+  "remaining": [
+    "Genuine normal current artifacts, component integrity/ELF/aliases/child environment, actual selected roots and measured fit",
+    "Exact successor implementation and executed source/view acceptance, including genuine root gate",
+    "Complete alias/loader/platform/kernel/all-access facts, mapped-identity and ptrace backend availability, quotas/descendant barrier and captured outputs",
+    "Source-consuming query plus locked generate, replay/watch/nonzero/repin fidelity and bootstrap",
+    "Reported40GB PID/full-build RSS attribution remains unproved; prior controlled path-history repair retained"
+  ],
+  "review_branch": "review/wp898-runtime-profile",
+  "independent_review": {
+    "DESIGN": "ACCEPT",
+    "FINAL": "ACCEPT",
+    "reviewer": "frontier_review",
+    "scope": "Source-only configuration/authority contract; implementation and actual-root/fullruntime/bootstrap/RSS are unproved."
+  }
+}

@@ -34,35 +34,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-197-m7a-issued-label-file-sources-r1
+Packet: WP-7-198-m7a-runtime-profile-configuration-decision-r1
 Status: accepted
 
-User-prioritized memory repair is accepted in 3afc49f95. Exact per-demand
-inputs replace cumulative path-map DICE history while preserving full semantic
-identity, historical transactions and explicit revocation. DICE 17/Workspace 81/
-Core 140 gates and default owner libraries plus production CLI compile pass;
-independent FINAL ACCEPT. Controlled 2,048-input RSS falls from about 370 MiB to
-10 MiB; actual reported 40 GB PID/full-build attribution remains unproved. See
-[memory receipt](slug-v2-subplans/memory-repair-2026-10-02.json) for scope and broader
-check limits. The local CLI is now rebuilt with the repair and WP897; help smoke
-passes. Package codegen overrides and artifact identity are in the WP897 receipt,
-without daemon/runtime or whole-build memory claims.
+WP898 selects the concrete request-selected runtime/source configuration decision
+needed for a genuine first-query tool/runtime/data lease. Authenticate missing
+host-tools component/layout source from the already pinned cached rules_rust
+archive; choose normal root-owner selection, complete caller input plumbing,
+original source mappings and demanded alias/loader/facet work. Independent DESIGN/FINAL ACCEPT, [receipt](slug-v2-subplans/wp898-acceptance.json).
+Source-design only; no Rust/runtime/network/probe or actual-root fit claim.
+Successor implementation API review and genuine-root audit remain mandatory. Contract in
+[current-packet.md](slug-v2-subplans/current-packet.md).
 
-WP897 75621a809 accepts normal ordered issued Label data sources and exact regular-file
-capture into the same restored guest view at original spellings. Explicit opt-in
-policy, no whole-parent imaging, honest sparse-parent Unowned semantics and
-retained current source/credit ownership are preserved. Independent DESIGN/FINAL
-ACCEPT; Shared47/Loading105/Core129/Workspace81 and default owner/CLI all-target
-checks pass. [Receipt](slug-v2-subplans/wp897-acceptance.json) and
-[contract](slug-v2-subplans/current-packet.md); successor selection is ready.
-
-WP896 c151cec23 accepts initial AliasDeny namespace facts/view;256 distinct focused
-gates and default owner/CLI checks plus independent FINAL ACCEPT pass;
-target/wp896/acceptance.json. Complete runtime roots/fit, data discovered beyond
-issued Labels, union aliases, loader/assets/platform, sealed kernel namespace,
-all-access mediation/quota/backend, query+locked generate and bootstrap remain.
-M7A stays partial; no total RSS claim. The daemon metadata scanner memory repair
-d95f2bda6 remains intact; fresh scanner-only RSS evidence is under target/memory-followup.
+WP897 75621a809 accepts normal ordered issued Label file sources through one
+restored guest view;362 focused gates, default owner/CLI checks and independent
+FINAL pass. [Receipt](slug-v2-subplans/wp897-acceptance.json) records rebuilt CLI
+settings/artifact identity. Memory repair3afc49f95 removes quadratic injected-map
+history (~370MiB to~10MiB in controlled2048-input RSS), while reported40GB/full-build
+attribution remains unproved; [memory receipt](slug-v2-subplans/memory-repair-2026-10-02.json).
+M7A stays partial. Actual runtime roots/fit, later data discovery, union aliases,
+loader/assets/platform, mapped-identity/ptrace backend, sealing/all-access quota,
+query+locked generate and bootstrap remain required. Metadata scanner repair
+remains intact. Accepted evidence does not activate a smaller process endpoint.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's
