@@ -5452,18 +5452,15 @@ root_rule(name = "root", deps = [":writer_a", ":writer_b"])
         let mut output_root = None;
         let projected = accepted.project(|terminal| {
             let evaluation = terminal.as_ref().as_ref().unwrap();
-            let configuration = evaluation
+            let output = evaluation
                 .analyses()
+                .flat_map(|analysis| analysis.actions())
+                .flat_map(|action| action.outputs())
                 .next()
-                .unwrap()
-                .configured_target_key()
-                .unwrap()
-                .configuration()
-                .slug_configuration()
                 .unwrap();
             output_root = Some(slug_core_v2::runtime::configured_output_root(
                 workspace,
-                configuration,
+                output.root(),
             ));
             TerminalOutput::new(0, String::new(), String::new())
         });

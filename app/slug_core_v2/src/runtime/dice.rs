@@ -493,6 +493,8 @@ mod input_image_bridge;
 mod path_inputs;
 #[path = "runtime_sources.rs"]
 mod runtime_sources;
+#[path = "selected_label_data.rs"]
+mod selected_label_data;
 #[path = "selected_scratch_source.rs"]
 mod selected_scratch_source;
 #[path = "selected_tool_source.rs"]

@@ -84,6 +84,7 @@ pub(super) fn validate(
 struct ViewOwner {
     facts: ObservedGuestNamespaceFacts,
     sources: runtime_sources::CertifiedRuntimeSourcesLease,
+    data: Option<selected_label_data::prepare::Lease>,
     invalid: AtomicBool,
     budget: slug_workspace_v2::ImageDescriptorBudget,
 }
@@ -157,24 +158,32 @@ pub(super) fn reserve_owner(
 pub(super) fn finish(
     facts: ObservedGuestNamespaceFacts,
     sources: runtime_sources::CertifiedRuntimeSourcesLease,
+    data: Option<selected_label_data::prepare::Lease>,
     credit: ImageDescriptorReservation,
     budget: &slug_workspace_v2::ImageDescriptorBudget,
 ) -> Result<PreparedGuestNamespaceViewLease, NativeDemandSessionError> {
     if facts.profile() != sources.profile() || !credit.same_budget(budget) {
         return Err(failure("guest capture profile mismatch"));
     }
+    if facts.data_sources() != data.as_ref().map(|lease| lease.sources()) {
+        return Err(failure("guest data capture association mismatch"));
+    }
     let view = PreparedGuestNamespaceViewLease(
         credit
             .freeze(ViewOwner {
                 facts,
                 sources,
+                data,
                 invalid: AtomicBool::new(false),
                 budget: budget.dupe(),
             })
             .map_err(|e| NativeDemandSessionError::InputImage(e.into()))?,
     );
     for node in view.facts().nodes() {
-        if !matches!(node.binding(), GuestNamespaceBinding::Scaffold) {
+        if !matches!(
+            node.binding(),
+            GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold
+        ) {
             view.with_bound_source(node, |_, _| Ok(()))
                 .map_err(|_| failure("guest source association mismatch"))?;
         }
@@ -204,7 +213,12 @@ impl PreparedGuestNamespaceViewLease {
         }
         let sources = &self.0.get().sources;
         match node.binding() {
-            GuestNamespaceBinding::Scaffold => Err(reader::ViewError::Stale),
+            GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold => {
+                Err(reader::ViewError::Stale)
+            }
+            GuestNamespaceBinding::DataLeaf { occurrence } => {
+                self.with_data_source(occurrence, node, visitor)
+            }
             GuestNamespaceBinding::ScratchEntry { entry } => {
                 sources.tools().with_scratch_root(|root, observed| {
                     if observed != self.facts().profile().tool_sources().prefix() {
@@ -264,6 +278,54 @@ impl PreparedGuestNamespaceViewLease {
         }
     }
 }
+impl PreparedGuestNamespaceViewLease {
+    fn with_data_source<R>(
+        &self,
+        occurrence: usize,
+        node: &GuestNamespaceNode,
+        visitor: impl FnOnce(&File, &Path) -> Result<R, reader::ViewError>,
+    ) -> Result<R, reader::ViewError> {
+        let lease = self.0.get().data.as_ref().ok_or(reader::ViewError::Stale)?;
+        let expected = self
+            .facts()
+            .data_sources()
+            .ok_or(reader::ViewError::Stale)?;
+        if lease.sources() != expected || expected.profile() != self.facts().profile() {
+            return Err(reader::ViewError::Stale);
+        }
+        let request = expected
+            .requests()
+            .requests()
+            .nth(occurrence)
+            .ok_or(reader::ViewError::Stale)?;
+        if node.path()
+            != request
+                .selection()
+                .selected_file()
+                .as_path()
+                .to_str()
+                .ok_or(reader::ViewError::Stale)?
+        {
+            return Err(reader::ViewError::Stale);
+        }
+        let source = expected
+            .sources()
+            .nth(occurrence)
+            .ok_or(reader::ViewError::Stale)?;
+        let (image, entry) = expected.member(source).ok_or(reader::ViewError::Stale)?;
+        match source.binding(){
+            slug_loading_v2::SelectedDataLabelBinding::Leaf{..}=>lease.with_leaf(occurrence,|root,relative,actual|{
+                if actual!=image || !actual.is_regular_file_root() || actual.entries().len()!=1{return Err(reader::ViewError::Stale)}
+                let e=&actual.entries()[0];
+                if e.mode()!=node.mode() || !matches!((node.kind(),e.kind()),(GuestNamespaceNodeKind::RegularFile(a),slug_workspace_v2::InputImageEntryKind::RegularFile(b)) if a==b){return Err(reader::ViewError::Stale)}
+                visitor(root,relative)
+            }).ok_or(reader::ViewError::Stale)?,
+            slug_loading_v2::SelectedDataLabelBinding::ToolMember{role,..}=>self.0.get().sources.tools().with_image_root(*role,|root,actual|image_member(root,actual,image,entry,node,visitor)).ok_or(reader::ViewError::Stale)?,
+            slug_loading_v2::SelectedDataLabelBinding::RuntimeMember{declaration,..}=>self.0.get().sources.with_image_root(*declaration,|root,actual|image_member(root,actual,image,entry,node,visitor)).ok_or(reader::ViewError::Stale)?,
+        }
+    }
+}
+
 fn image_member<R>(
     root: &File,
     image: &slug_workspace_v2::ObservedInputImage,

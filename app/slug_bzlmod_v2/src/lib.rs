@@ -112,6 +112,7 @@ pub use generated_repository_file_effect::GeneratedRepositorySymlinkEffect;
 pub use generated_repository_file_effect::generated_repository_archive_sha256_hex;
 #[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_sha256_sri;
+pub use guest_namespace_policy::GuestLabelDataPolicy;
 pub use guest_namespace_policy::GuestNamespaceLimits;
 pub use guest_namespace_policy::GuestNamespaceMetadataScheme;
 pub use guest_namespace_policy::GuestNamespacePolicy;

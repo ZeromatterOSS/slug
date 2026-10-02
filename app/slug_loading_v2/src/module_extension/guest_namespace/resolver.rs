@@ -130,6 +130,9 @@ impl ObservedGuestNamespaceFacts {
                 return Err(GuestLookupError::NotDirectory);
             }
             self.permission(node, 5)?;
+            if node.binding() == GuestNamespaceBinding::DataScaffold {
+                return Err(GuestLookupError::Unowned);
+            }
             checked(node, GuestDirectoryCheck::Listing, check)?;
             return Ok(node);
         }

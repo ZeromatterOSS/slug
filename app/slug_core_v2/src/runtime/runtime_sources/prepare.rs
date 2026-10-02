@@ -74,26 +74,51 @@ pub(in crate::runtime::dice) fn observe_combined(
     demands: Vec<PathObservationDemand>,
     deadline: std::time::Instant,
 ) -> Result<PathObservationEpoch, NativeDemandSessionError> {
+    observe_combined_with_data(command, tool, runtime, None, demands, deadline)
+}
+
+pub(in crate::runtime::dice) fn observe_combined_with_data(
+    command: &NativeDemandCommand<'_>,
+    tool: &selected_tool_source::declarations::Catalog,
+    runtime: &catalogue::Catalogue,
+    data: Option<&selected_label_data::catalogue::Catalogue>,
+    demands: Vec<PathObservationDemand>,
+    deadline: std::time::Instant,
+) -> Result<PathObservationEpoch, NativeDemandSessionError> {
     // Admission and every Vec/path/merge replacement peak precede all factories.
     let _credit = selected_tool_source::demand_credit(command, demands.iter())?;
+    let mut data_rows = Vec::with_capacity(if data.is_some() { demands.len() } else { 0 });
     let mut runtime_rows = Vec::with_capacity(demands.len());
     let mut other_rows = Vec::with_capacity(demands.len());
     for demand in demands {
-        if runtime.is_runtime(&demand)? {
+        if data
+            .map(|d| d.observes(&demand))
+            .transpose()?
+            .unwrap_or(false)
+        {
+            data_rows.push(demand)
+        } else if runtime.is_runtime(&demand)? {
             runtime_rows.push(demand)
         } else {
             other_rows.push(demand)
         }
     }
+    if let Some(data) = data {
+        data.preflight(command, &data_rows)?;
+    }
     runtime.preflight(command, &runtime_rows)?;
     tool.preflight(command, &other_rows)?;
     let first = tool.observe(command, other_rows, deadline)?;
     let second = runtime.observe(command, runtime_rows)?;
+    let third = data
+        .map(|data| data.observe(command, data_rows))
+        .transpose()?;
     PathObservationEpoch::from_shared(
         first
             .observations()
             .iter()
             .chain(second.observations().iter())
+            .chain(third.iter().flat_map(|epoch| epoch.observations().iter()))
             .map(|(demand, value)| (demand.clone(), value.dupe())),
     )
     .map_err(NativeDemandSessionError::PathEpoch)
@@ -150,6 +175,22 @@ pub(in crate::runtime::dice) fn progress_sources(
     runtime: &catalogue::Catalogue,
     deadline: std::time::Instant,
 ) -> Result<(), NativeDemandSessionError> {
+    progress_sources_with_data(
+        guard, need, key, plan, reachable, tool, runtime, None, deadline,
+    )
+}
+
+pub(in crate::runtime::dice) fn progress_sources_with_data(
+    guard: &mut NativeDemandAbortGuard<'_>,
+    need: &SourcePreparationNeeds,
+    key: &RuntimeSourceProfileKey,
+    plan: &ObservedRuntimeSourceRequests,
+    reachable: &SelectedWorkspaceDemands,
+    tool: &selected_tool_source::declarations::Catalog,
+    runtime: &catalogue::Catalogue,
+    data: Option<&selected_label_data::catalogue::Catalogue>,
+    deadline: std::time::Instant,
+) -> Result<(), NativeDemandSessionError> {
     selected_scratch_source::active(guard.command(), deadline)?;
     if !need.repository_executes().is_empty()
         || need.root_module_bootstrap_request().is_some()
@@ -167,14 +208,28 @@ pub(in crate::runtime::dice) fn progress_sources(
             guard.command(),
             batch.demands().iter(),
         )?);
+        let mut data_rows = Vec::with_capacity(if data.is_some() {
+            batch.demands().len()
+        } else {
+            0
+        });
         let mut runtime_rows = Vec::with_capacity(batch.demands().len());
         let mut other = Vec::with_capacity(batch.demands().len());
         for demand in batch.demands() {
-            if runtime.is_runtime(demand)? {
+            if data
+                .map(|d| d.observes(demand))
+                .transpose()?
+                .unwrap_or(false)
+            {
+                data_rows.push(demand.clone())
+            } else if runtime.is_runtime(demand)? {
                 runtime_rows.push(demand.clone())
             } else {
                 other.push(demand.clone())
             }
+        }
+        if let Some(data) = data {
+            data.preflight(guard.command(), &data_rows)?;
         }
         runtime.preflight(guard.command(), &runtime_rows)?;
         tool.preflight(guard.command(), &other)?;
@@ -206,10 +261,11 @@ pub(in crate::runtime::dice) fn progress_sources(
     }
     if let Some(batch) = need.path_observations() {
         let command = guard.command();
-        let fresh = observe_combined(
+        let fresh = observe_combined_with_data(
             command,
             tool,
             runtime,
+            data,
             batch.demands().iter().cloned().collect(),
             deadline,
         )?;

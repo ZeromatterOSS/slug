@@ -1015,3 +1015,6 @@ fn guest_view_genuine_current_label_tree_runtime_overlap_refuses_composition() {
     assert_eq!(f.runtime.image_resources.logical_bytes_used(), 0);
     f.restored();
 }
+
+#[path = "tests/data.rs"]
+mod data;

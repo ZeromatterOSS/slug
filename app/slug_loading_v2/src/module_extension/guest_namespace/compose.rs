@@ -388,6 +388,7 @@ fn link(
 pub(super) fn build(
     key: &SelectedGuestNamespaceFactsKey,
     profile: ObservedRuntimeSourceProfile,
+    data_sources: Option<ObservedSelectedDataLabelSources>,
     policy: GuestNamespacePolicy,
     resources: &SelectedScratchResources,
     check: &dyn Fn() -> bool,
@@ -413,6 +414,17 @@ pub(super) fn build(
         })?;
         parents(scope.root, &mut |p| totals.add(p, "", 0, policy))?;
     }
+    if let Some(data) = &data_sources {
+        preflight_data(data, &mounts[..length])?;
+        visit_data(data, &mut |r| {
+            active(check)?;
+            if r.mode & !0o777 != 0 {
+                return Err(GuestNamespaceFactsError::UnsupportedSource);
+            }
+            totals.add(r.root, "", size(r.data), policy)?;
+            parents(r.root, &mut |p| totals.add(p, "", 0, policy))
+        })?;
+    }
     let mut nodes = reserve::<GuestNamespaceNode>(&mut credit, totals.entries)?;
     for scope in mounts[..length].iter().flatten() {
         if !scope.duplicate {
@@ -424,14 +436,48 @@ pub(super) fn build(
             append(&mut nodes, &mut credit, scaffold(p, policy), policy, check)
         })?;
     }
-    nodes.sort_unstable_by(|a, b| a.path.cmp(&b.path));
-    // Only scaffolds duplicate here; actual source root collisions were refused.
+    if let Some(data) = &data_sources {
+        visit_data(data, &mut |r| {
+            let root = r.root;
+            append(&mut nodes, &mut credit, r, policy, check)?;
+            parents(root, &mut |p| {
+                let mut row = scaffold(p, policy);
+                row.binding = GuestNamespaceBinding::DataScaffold;
+                append(&mut nodes, &mut credit, row, policy, check)
+            })
+        })?;
+    }
+    // Prefer genuine complete source ownership, then data-required sparse parents.
+    nodes.sort_unstable_by(|a, b| {
+        a.path
+            .cmp(&b.path)
+            .then_with(|| priority(a.binding).cmp(&priority(b.binding)))
+            .then_with(|| match (a.binding, b.binding) {
+                (
+                    GuestNamespaceBinding::DataLeaf { occurrence: a },
+                    GuestNamespaceBinding::DataLeaf { occurrence: b },
+                ) => a.cmp(&b),
+                _ => std::cmp::Ordering::Equal,
+            })
+    });
     for pair in nodes.windows(2) {
         if pair[0].path == pair[1].path
-            && (pair[0].binding != GuestNamespaceBinding::Scaffold
-                || pair[1].binding != GuestNamespaceBinding::Scaffold)
+            && !is_scaffold(pair[0].binding)
+            && !is_scaffold(pair[1].binding)
+            && (pair[0].kind != pair[1].kind
+                || pair[0].mode != pair[1].mode
+                || pair[0].binding != pair[1].binding)
         {
-            return Err(GuestNamespaceFactsError::Collision);
+            // Full-equal new leaf duplicates were checked before allocation; retain first occurrence binding.
+            if !matches!(
+                (pair[0].binding, pair[1].binding),
+                (
+                    GuestNamespaceBinding::DataLeaf { .. },
+                    GuestNamespaceBinding::DataLeaf { .. }
+                )
+            ) {
+                return Err(GuestNamespaceFactsError::Collision);
+            }
         }
     }
     nodes.dedup_by(|a, b| a.path == b.path);
@@ -441,6 +487,7 @@ pub(super) fn build(
         .freeze(FactsInner {
             key: key.clone(),
             profile,
+            data_sources,
             policy,
             nodes,
             children,
@@ -448,4 +495,147 @@ pub(super) fn build(
         })
         .map(ObservedGuestNamespaceFacts)
         .map_err(|_| GuestNamespaceFactsError::Operational)
+}
+
+fn is_scaffold(b: GuestNamespaceBinding) -> bool {
+    matches!(
+        b,
+        GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold
+    )
+}
+fn priority(b: GuestNamespaceBinding) -> u8 {
+    match b {
+        GuestNamespaceBinding::Scaffold => 2,
+        GuestNamespaceBinding::DataScaffold => 1,
+        _ => 0,
+    }
+}
+fn visit_data(
+    data: &ObservedSelectedDataLabelSources,
+    visitor: &mut dyn FnMut(Row<'_>) -> Result<(), GuestNamespaceFactsError>,
+) -> Result<(), GuestNamespaceFactsError> {
+    use super::super::selected_label_data::SelectedDataLabelBinding as Binding;
+    for (request, source) in data.requests().requests().zip(data.sources()) {
+        let (image, index) = data
+            .member(source)
+            .ok_or(GuestNamespaceFactsError::UnsupportedSource)?;
+        let node = image
+            .entries()
+            .get(index)
+            .ok_or(GuestNamespaceFactsError::UnsupportedSource)?;
+        let root = request
+            .selection()
+            .selected_file()
+            .as_path()
+            .to_str()
+            .ok_or(GuestNamespaceFactsError::UnsupportedSource)?;
+        let kind = match node.kind() {
+            InputImageEntryKind::Directory => Data::Directory,
+            InputImageEntryKind::RegularFile(d) => Data::Digest(d),
+            _ => return Err(GuestNamespaceFactsError::UnsupportedSource),
+        };
+        let binding = match source.binding() {
+            Binding::Leaf { .. } => GuestNamespaceBinding::DataLeaf {
+                occurrence: request.occurrence_index(),
+            },
+            Binding::ToolMember { role, entry } => GuestNamespaceBinding::ToolImage {
+                role: *role,
+                entry: *entry,
+            },
+            Binding::RuntimeMember { declaration, entry } => GuestNamespaceBinding::RuntimeImage {
+                declaration: *declaration,
+                entry: *entry,
+            },
+        };
+        visitor(Row {
+            root,
+            suffix: "",
+            data: kind,
+            mode: node.mode(),
+            binding,
+            read_only: true,
+        })?;
+    }
+    Ok(())
+}
+fn preflight_data(
+    data: &ObservedSelectedDataLabelSources,
+    mounts: &[Option<Scope<'_>>],
+) -> Result<(), GuestNamespaceFactsError> {
+    use super::super::selected_label_data::SelectedDataLabelBinding as Binding;
+    for (request, source) in data.requests().requests().zip(data.sources()) {
+        let path = request.selection().selected_file().as_path();
+        for scope in mounts.iter().flatten() {
+            if path.starts_with(scope.root) || Path::new(scope.root).starts_with(path) {
+                let owned = match (source.binding(), scope.kind) {
+                    (Binding::ToolMember { role, .. }, ScopeKind::Tool(r)) => {
+                        *role == r
+                            || data
+                                .member(source)
+                                .is_some_and(|(image, _)| scope.image == Some(image))
+                    }
+                    (Binding::RuntimeMember { declaration, .. }, ScopeKind::Runtime(r)) => {
+                        *declaration == r
+                    }
+                    _ => false,
+                };
+                // A relocated runtime leaf is outside its guest tree; overlap is not a second spelling grant.
+                if !owned || !path.starts_with(scope.root) {
+                    return Err(GuestNamespaceFactsError::Collision);
+                }
+                let (image, entry) = data
+                    .member(source)
+                    .ok_or(GuestNamespaceFactsError::UnsupportedSource)?;
+                let item = image
+                    .entries()
+                    .get(entry)
+                    .ok_or(GuestNamespaceFactsError::UnsupportedSource)?;
+                let suffix = item
+                    .path()
+                    .as_path()
+                    .strip_prefix(image.source_root().as_path())
+                    .map_err(|_| GuestNamespaceFactsError::Collision)?;
+                if path.strip_prefix(scope.root).ok() != Some(suffix) {
+                    return Err(GuestNamespaceFactsError::Collision);
+                }
+            }
+        }
+        for (old_request, old_source) in data
+            .requests()
+            .requests()
+            .zip(data.sources())
+            .take(request.occurrence_index())
+        {
+            let old = old_request.selection().selected_file().as_path();
+            if path == old {
+                if matches!(
+                    (source.binding(), old_source.binding()),
+                    (Binding::Leaf { .. }, Binding::Leaf { .. })
+                ) {
+                    if request.selection() != old_request.selection()
+                        || source.leaf_image() != old_source.leaf_image()
+                    {
+                        return Err(GuestNamespaceFactsError::Collision);
+                    }
+                } else if source.binding() != old_source.binding() {
+                    return Err(GuestNamespaceFactsError::Collision);
+                }
+            } else if path.starts_with(old) || old.starts_with(path) {
+                // Covered directories already belong to a full real image. All other file ancestors refuse.
+                let (a, ai) = data
+                    .member(source)
+                    .ok_or(GuestNamespaceFactsError::Collision)?;
+                let (b, bi) = data
+                    .member(old_source)
+                    .ok_or(GuestNamespaceFactsError::Collision)?;
+                if a != b
+                    || (!matches!(a.entries()[ai].kind(), InputImageEntryKind::Directory)
+                        && !matches!(b.entries()[bi].kind(), InputImageEntryKind::Directory))
+                {
+                    return Err(GuestNamespaceFactsError::Collision);
+                }
+            }
+        }
+    }
+    Ok(())
 }

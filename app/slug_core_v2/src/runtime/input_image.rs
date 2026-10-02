@@ -19,6 +19,7 @@ use tempfile::TempDir;
 mod capture;
 #[cfg(target_os = "linux")]
 pub(super) mod elf_metadata;
+mod file_capture;
 #[cfg(target_os = "linux")]
 mod linux;
 #[cfg(all(test, target_os = "linux"))]
@@ -30,6 +31,8 @@ pub(super) use capture::capture_input_image;
 pub(super) use capture::capture_prepared_input_image;
 pub(super) use capture::prepare_input_image_stage;
 pub(super) use capture::verify_frontier;
+pub(super) use file_capture::CapturedInputFileLease;
+pub(super) use file_capture::capture_prepared_input_file;
 
 #[derive(Debug)]
 pub(super) enum InputImageCaptureError {
@@ -243,6 +246,8 @@ impl ScopedImageSource {
 pub(super) fn open_image_anchor(
     anchor: &NormalizedAbsolutePath,
 ) -> Result<File, InputImageCaptureError> {
+    #[cfg(test)]
+    IMAGE_ANCHOR_OPENS.with(|opens| opens.set(opens.get() + 1));
     #[cfg(target_os = "linux")]
     {
         Ok(linux::open_anchor(anchor.as_path())?)
@@ -252,4 +257,19 @@ pub(super) fn open_image_anchor(
         let _ = anchor;
         Err(InputImageCaptureError::UnsupportedPlatform)
     }
+}
+
+// Factories and current-anchor checks run synchronously on the native caller.
+// Count attempts at their common I/O boundary, including refused named opens.
+#[cfg(test)]
+thread_local! {
+    static IMAGE_ANCHOR_OPENS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+#[cfg(test)]
+pub(super) fn test_reset_anchor_open_count() {
+    IMAGE_ANCHOR_OPENS.with(|opens| opens.set(0));
+}
+#[cfg(test)]
+pub(super) fn test_anchor_open_count() -> usize {
+    IMAGE_ANCHOR_OPENS.with(std::cell::Cell::get)
 }

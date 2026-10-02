@@ -18,6 +18,8 @@ use tokio::sync::watch;
 /// Every variant stores the complete concrete key, including mode and source route.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 enum Node {
+    DataLabelRequests(Arc<crate::module_extension::selected_label_data::SelectedDataLabelRequestsKey>),
+    DataLabelSources(Arc<crate::module_extension::selected_label_data::SelectedDataLabelSourcesKey>),
     RuntimeSourceRequests(Arc<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>),
     RuntimeSourceProfile(Arc<crate::module_extension::runtime_sources::RuntimeSourceProfileKey>),
     GuestNamespace(Arc<crate::module_extension::guest_namespace::SelectedGuestNamespaceFactsKey>),
@@ -48,6 +50,8 @@ enum Node {
 
 impl Node {
     fn from_dyn(key: &DynKey) -> Option<Self> {
+        if let Some(key)=key.downcast_ref::<crate::module_extension::selected_label_data::SelectedDataLabelRequestsKey>() {return Some(Self::DataLabelRequests(Arc::new(key.clone())))}
+        if let Some(key)=key.downcast_ref::<crate::module_extension::selected_label_data::SelectedDataLabelSourcesKey>() {return Some(Self::DataLabelSources(Arc::new(key.clone())))}
         if let Some(key) =
             key.downcast_ref::<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>()
         {
@@ -155,6 +159,8 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::DataLabelRequests(key) => write!(f, "DataLabelRequests({key})"),
+            Self::DataLabelSources(key) => write!(f, "DataLabelSources({key})"),
             Self::RuntimeSourceRequests(key) => write!(f, "RuntimeSourceRequests({key})"),
             Self::RuntimeSourceProfile(key) => write!(f, "RuntimeSourceProfile({key})"),
             Self::GuestNamespace(key) => write!(f, "GuestNamespace({key})"),
@@ -740,4 +746,45 @@ pub async fn compute_selected_guest_namespace_facts(
         }
     }
     Ok(outcome)
+}
+
+/// Normal issued-Label requests retain no payload-bearing key and recheck live authority.
+pub async fn compute_selected_data_label_requests(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::selected_label_data::SelectedDataLabelRequestsKey,
+) -> Result<
+    crate::module_extension::selected_label_data::RequestsValue,
+    crate::module_extension::selected_label_data::SelectedDataLabelError,
+> {
+    use crate::module_extension::selected_label_data as data;
+    let v = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| data::SelectedDataLabelError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &v {
+        if !value.matches_key(key) {
+            return Err(data::SelectedDataLabelError::operational());
+        }
+        data::authorize_requests(ctx, value)?;
+    }
+    Ok(v)
+}
+/// Full profile/member bindings and live authority are checked even on cached Complete.
+pub async fn compute_selected_data_label_sources(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::selected_label_data::SelectedDataLabelSourcesKey,
+) -> Result<
+    crate::module_extension::selected_label_data::SourcesValue,
+    crate::module_extension::selected_label_data::SelectedDataLabelError,
+> {
+    use crate::module_extension::selected_label_data as data;
+    let v = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| data::SelectedDataLabelError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &v {
+        if !value.matches_key(key) {
+            return Err(data::SelectedDataLabelError::operational());
+        }
+        data::authorize_sources(ctx, value)?;
+    }
+    Ok(v)
 }

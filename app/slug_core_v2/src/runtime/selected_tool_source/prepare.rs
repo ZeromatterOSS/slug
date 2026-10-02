@@ -1,6 +1,7 @@
 //! One command lifecycle for Tools and configured Runtime preparation.
 use super::super::guest_namespace;
 use super::super::runtime_sources;
+use super::super::selected_label_data;
 use super::*;
 
 pub(in crate::runtime::dice) enum PreparationMode {
@@ -66,6 +67,33 @@ impl WorkspaceRuntime {
                 )
                 .ok_or_else(|| refusal("runtime attempt bound overflow"))?;
         }
+        let data_max = match &mode {
+            PreparationMode::Namespace { guest_policy, .. } => match guest_policy.label_data() {
+                slug_bzlmod_v2::GuestLabelDataPolicy::Disabled => None,
+                slug_bzlmod_v2::GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses } => {
+                    Some(max_witnesses)
+                }
+            },
+            _ => None,
+        };
+        if let Some(max) = data_max {
+            attempts = attempts
+                .checked_add(
+                    usize::from(max)
+                        .checked_mul(
+                            self.workspace
+                                .components()
+                                .count()
+                                .checked_add(70)
+                                .ok_or_else(|| refusal("data attempts overflow"))?,
+                        )
+                        .ok_or_else(|| refusal("data attempts overflow"))?,
+                )
+                .ok_or_else(|| refusal("data attempts overflow"))?;
+        }
+        let mut data_storage = data_max
+            .map(|max| selected_label_data::prepare::Storage::new(self, max))
+            .transpose()?;
         // All output directories precede the normal Label ancestor observations.
         let mut scratch = Some(selected_scratch_source::PreparedStage::new(self)?);
         let mut image_stages: [Option<input_image::PreparedInputImageStage>; 3] =
@@ -113,6 +141,7 @@ impl WorkspaceRuntime {
                 selected_scratch_source::active(guard.command(), deadline)?;
                 guard.begin_attempt()?;
                 let mut runtime_plan = None;
+                let mut data_plan = None;
                 let plan_attempt = self.runtime.block_on(async {
                     tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), async {
                         match &mode {
@@ -144,7 +173,7 @@ impl WorkspaceRuntime {
                     .map_err(|_| refusal("tool preparation cancelled"))?
                 });
                 self.runtime.block_on(self.dice.wait_for_idle());
-                let (plan, plan_demands) = match plan_attempt? {
+                let (plan, mut plan_demands) = match plan_attempt? {
                     attempt::Attempt::Need(need) => {
                         progress_baseline(&mut guard, &need, deadline)?;
                         continue;
@@ -190,6 +219,61 @@ impl WorkspaceRuntime {
                     .as_mut()
                     .expect("live tool command")
                     .scratch_metadata = Some(state);
+                if data_storage.is_some() {
+                    let runtime_key = match &mode {
+                        PreparationMode::Namespace { runtime_key, .. } => runtime_key,
+                        _ => unreachable!(),
+                    };
+                    guard.begin_attempt()?;
+                    let next = self.runtime.block_on(async {
+                        tokio::time::timeout_at(
+                            tokio::time::Instant::from_std(deadline),
+                            selected_label_data::plan(self, &mut guard, runtime_key, deadline),
+                        )
+                        .await
+                        .map_err(|_| refusal("data preparation cancelled"))?
+                    });
+                    self.runtime.block_on(self.dice.wait_for_idle());
+                    match next? {
+                        attempt::Attempt::Need(need) => {
+                            progress_baseline(&mut guard, &need, deadline)?;
+                            continue;
+                        }
+                        attempt::Attempt::Complete(data, selected) => {
+                            if data.runtime_requests() != runtime_plan.as_ref().unwrap() {
+                                return Err(refusal("data runtime plan changed"));
+                            }
+                            selected_label_data::validate_requests(
+                                guard.command(),
+                                runtime_key,
+                                &data,
+                                selected.sidecars().demands(),
+                                deadline,
+                            )?;
+                            let (_, demands, terminal) = selected.sidecars.into_parts();
+                            terminal
+                                .reset_to_idle()
+                                .map_err(NativeDemandSessionError::Effect)?;
+                            plan_demands = demands;
+                            data_plan = Some(data);
+                        }
+                    }
+                }
+                let data_catalog = if let Some(data) = &data_plan {
+                    let runtime_key = match &mode {
+                        PreparationMode::Namespace { runtime_key, .. } => runtime_key,
+                        _ => unreachable!(),
+                    };
+                    Some(selected_label_data::catalogue::Catalogue::new(
+                        self,
+                        runtime_key,
+                        data,
+                        &plan_demands,
+                        deadline,
+                    )?)
+                } else {
+                    None
+                };
                 let mut catalog = declarations::Catalog::new(self, &plan, deadline)?;
                 let runtime_catalog = if let (
                     PreparationMode::Runtime { key, .. }
@@ -283,7 +367,7 @@ impl WorkspaceRuntime {
                             runtime_key: key, ..
                         } = &mode
                         {
-                            runtime_sources::prepare::progress_sources(
+                            runtime_sources::prepare::progress_sources_with_data(
                                 &mut guard,
                                 &need,
                                 key,
@@ -291,6 +375,7 @@ impl WorkspaceRuntime {
                                 &plan_demands,
                                 &catalog,
                                 runtime_catalog.as_ref().expect("runtime catalogue"),
+                                data_catalog.as_ref(),
                                 deadline,
                             )?;
                         } else {
@@ -339,6 +424,24 @@ impl WorkspaceRuntime {
                             &catalog,
                             deadline,
                         )?;
+                        if let (Some(data_plan), Some(facts), Some(data_catalog)) =
+                            (&data_plan, &namespace_facts, &data_catalog)
+                        {
+                            let data = facts
+                                .data_sources()
+                                .ok_or_else(|| refusal("missing normal data sources"))?;
+                            selected_label_data::prepare::verify_final(
+                                guard.command(),
+                                data_catalog_key(&mode),
+                                data_plan,
+                                data,
+                                reachable,
+                                &catalog,
+                                runtime_catalog.as_ref().unwrap(),
+                                data_catalog,
+                                deadline,
+                            )?;
+                        }
                         if let (
                             PreparationMode::Runtime { key, .. }
                             | PreparationMode::Namespace {
@@ -439,6 +542,36 @@ impl WorkspaceRuntime {
                                 runtime_profile.as_ref().unwrap(),
                             )?;
                         }
+                        let data_lease = if let (
+                            Some(storage),
+                            Some(facts),
+                            Some(data_catalog),
+                            Some(data_plan),
+                        ) = (
+                            data_storage.as_mut(),
+                            &namespace_facts,
+                            &data_catalog,
+                            &data_plan,
+                        ) {
+                            let data = facts
+                                .data_sources()
+                                .ok_or_else(|| refusal("missing normal data sources"))?;
+                            storage.capture(guard.command(), data, data_catalog)?;
+                            selected_label_data::prepare::verify_final(
+                                guard.command(),
+                                data_catalog_key(&mode),
+                                data_plan,
+                                data,
+                                reachable,
+                                &catalog,
+                                runtime_catalog.as_ref().unwrap(),
+                                data_catalog,
+                                deadline,
+                            )?;
+                            Some(data_storage.take().unwrap().finish(data.dupe())?)
+                        } else {
+                            None
+                        };
                         let (_, _, terminal) = selected.sidecars.into_parts();
                         terminal
                             .reset_to_idle()
@@ -462,6 +595,7 @@ impl WorkspaceRuntime {
                                 guest_namespace::finish(
                                     facts,
                                     sources,
+                                    data_lease,
                                     namespace_credit.take().expect("namespace owner credit"),
                                     self.image_resources.descriptor_budget(),
                                 )
@@ -500,5 +634,12 @@ impl WorkspaceRuntime {
                 Err(error)
             }
         }
+    }
+}
+
+fn data_catalog_key(mode: &PreparationMode) -> &slug_loading_v2::RuntimeSourceProfileKey {
+    match mode {
+        PreparationMode::Namespace { runtime_key, .. } => runtime_key,
+        _ => unreachable!(),
     }
 }

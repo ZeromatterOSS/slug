@@ -212,6 +212,8 @@ pub use cycle_detector::bzl_load_cycle_detector;
 pub use dependency_cycle::compute_runtime_source_profile;
 #[doc(hidden)]
 pub use dependency_cycle::compute_runtime_source_requests;
+pub use dependency_cycle::compute_selected_data_label_requests;
+pub use dependency_cycle::compute_selected_data_label_sources;
 pub use dependency_cycle::compute_selected_guest_namespace_facts;
 #[doc(hidden)]
 pub use dependency_cycle::compute_selected_scratch_prefix;
@@ -266,6 +268,14 @@ pub use module_extension::runtime_sources::RuntimeSourceRequestsKey;
 pub use module_extension::runtime_sources::RuntimeSourceTotals;
 #[doc(hidden)]
 pub use module_extension::runtime_sources::RuntimeSourcesError;
+pub use module_extension::selected_label_data::ObservedSelectedDataLabelRequests;
+pub use module_extension::selected_label_data::ObservedSelectedDataLabelSources;
+pub use module_extension::selected_label_data::SelectedDataLabelBinding;
+pub use module_extension::selected_label_data::SelectedDataLabelError;
+pub use module_extension::selected_label_data::SelectedDataLabelRequest;
+pub use module_extension::selected_label_data::SelectedDataLabelRequestsKey;
+pub use module_extension::selected_label_data::SelectedDataLabelSource;
+pub use module_extension::selected_label_data::SelectedDataLabelSourcesKey;
 #[doc(hidden)]
 pub use module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey;
 #[doc(hidden)]

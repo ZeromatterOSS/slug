@@ -53,6 +53,16 @@ impl GuestNamespaceLimits {
     }
 }
 
+/// Explicit issued-Label footprint. Strings alone never grant source authority.
+#[derive(Debug, Clone, Copy, Dupe, Eq, PartialEq, Hash, Allocative, Default)]
+pub enum GuestLabelDataPolicy {
+    #[default]
+    Disabled,
+    IssuedFileLeaves {
+        max_witnesses: u8,
+    },
+}
+
 /// UniformLinuxV1 is explicit configuration, not a projection of staging stat.
 /// No default policy exists: credentials, virtual device and epoch are supplied.
 #[derive(Debug, Clone, Copy, Dupe, Eq, PartialEq, Hash, Allocative)]
@@ -67,6 +77,7 @@ pub struct GuestNamespacePolicy {
     epoch_nanoseconds: u32,
     scaffold_mode: u32,
     limits: GuestNamespaceLimits,
+    label_data: GuestLabelDataPolicy,
 }
 impl GuestNamespacePolicy {
     pub fn new(
@@ -101,7 +112,22 @@ impl GuestNamespacePolicy {
             epoch_nanoseconds,
             scaffold_mode,
             limits,
+            label_data: GuestLabelDataPolicy::Disabled,
         })
+    }
+    pub fn with_label_data(
+        mut self,
+        data: GuestLabelDataPolicy,
+    ) -> Result<Self, GuestNamespacePolicyError> {
+        if matches!(data, GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses } if !(1..=64).contains(&max_witnesses))
+        {
+            return Err(GuestNamespacePolicyError::InvalidPolicy);
+        }
+        self.label_data = data;
+        Ok(self)
+    }
+    pub fn label_data(&self) -> GuestLabelDataPolicy {
+        self.label_data
     }
     pub fn scheme(&self) -> GuestNamespaceMetadataScheme {
         self.scheme

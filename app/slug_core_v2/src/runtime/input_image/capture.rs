@@ -19,8 +19,8 @@ use super::WorkspaceImageResources;
 /// Only the normal NativeDemand bridge constructs this after current reachable
 /// closure and selected-source validation. It is deliberately not a public API.
 pub(in crate::runtime) struct AuthorizedObservedInputImage {
-    source: ScopedImageSource,
-    certificate: ObservedInputImage,
+    pub(super) source: ScopedImageSource,
+    pub(super) certificate: ObservedInputImage,
 }
 impl AuthorizedObservedInputImage {
     pub(in crate::runtime) fn new(
@@ -49,6 +49,9 @@ pub(in crate::runtime) struct PreparedInputImageStage {
     reservation: ImageDescriptorReservation,
 }
 impl PreparedInputImageStage {
+    pub(super) fn into_parts(self) -> (ImageDescriptorReservation, TempDir) {
+        (self.reservation, self.stage)
+    }
     #[cfg(test)]
     pub(in crate::runtime) fn test_path(&self) -> &Path {
         self.stage.path()
@@ -171,6 +174,9 @@ fn capture_with_stage(
     active: &dyn Fn() -> bool,
     prepared: Option<PreparedInputImageStage>,
 ) -> Result<CapturedInputImageLease, InputImageCaptureError> {
+    if authorized.certificate.is_regular_file_root() {
+        return Err(InputImageCaptureError::Unauthorized);
+    }
     if prepared
         .as_ref()
         .is_some_and(|stage| !stage.reservation.same_budget(resources.descriptor_budget()))

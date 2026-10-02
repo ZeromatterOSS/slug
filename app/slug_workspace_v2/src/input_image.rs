@@ -180,6 +180,7 @@ pub struct ObservedInputImageKey {
     anchor_root: ImageChargedPath,
     source_root: ImageChargedPath,
     policy: InputImagePolicy,
+    regular_root: bool,
 }
 
 impl ObservedInputImageKey {
@@ -214,7 +215,23 @@ impl ObservedInputImageKey {
             anchor_root,
             source_root: subtree_root,
             policy,
+            regular_root: false,
         })
+    }
+    /// An exact file footprint. Root shape is semantic and checked before any
+    /// directory observation, so a changed file cannot widen into a tree scan.
+    pub fn regular_file_from_charged(
+        namespace: PathObservationNamespace,
+        anchor_root: ImageChargedPath,
+        file: ImageChargedPath,
+        policy: InputImagePolicy,
+    ) -> Result<Self, InputImageSpecError> {
+        let mut key = Self::from_charged(namespace, anchor_root, file, policy)?;
+        key.regular_root = true;
+        Ok(key)
+    }
+    pub fn is_regular_file_root(&self) -> bool {
+        self.regular_root
     }
     pub fn namespace(&self) -> PathObservationNamespace {
         self.namespace
@@ -239,7 +256,11 @@ impl fmt::Display for ObservedInputImageKey {
             self.anchor_root(),
             self.source_root(),
             self.policy
-        )
+        )?;
+        if self.regular_root {
+            f.write_str(":regular-file")?;
+        }
+        Ok(())
     }
 }
 
@@ -300,6 +321,9 @@ struct InputImageCertificate {
 pub struct ObservedInputImage(BudgetedImageBlock<InputImageCertificate>);
 
 impl ObservedInputImage {
+    pub fn is_regular_file_root(&self) -> bool {
+        self.0.get().spec.is_regular_file_root()
+    }
     pub fn namespace(&self) -> PathObservationNamespace {
         self.0.get().spec.namespace()
     }
@@ -609,6 +633,9 @@ impl ImageBuilder<'_, '_, '_> {
         }
         self.path_limit(&path)?;
         let stat = self.lstat(&path).await?;
+        if depth == 0 && key.regular_root && stat.kind() != PathNodeKind::RegularFile {
+            return Err(failed(InputImageError::WrongKind));
+        }
         let mode = u32::try_from(stat.permissions())
             .map_err(|_| failed(InputImageError::UnsupportedMode))?;
         if mode > 0o7777 {
@@ -693,7 +720,7 @@ impl ImageBuilder<'_, '_, '_> {
                 }
             }
             PathNodeKind::RegularFile => {
-                if depth == 0 {
+                if depth == 0 && !key.regular_root {
                     return Err(failed(InputImageError::WrongKind));
                 }
                 let size = u64::try_from(stat.size())

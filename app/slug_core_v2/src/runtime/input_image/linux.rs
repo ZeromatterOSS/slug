@@ -35,6 +35,7 @@ use slug_workspace_v2::PathOperationResult;
 use super::InputImageCaptureError;
 use super::ScopedImageSource;
 mod copy;
+pub(super) mod file_copy;
 pub(super) mod fs;
 pub(super) use copy::copy_image;
 pub(super) use copy::finish_directory_modes;

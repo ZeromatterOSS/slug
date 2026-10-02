@@ -74,6 +74,258 @@ fn image(value: ImageValue) -> ObservedInputImage {
     }
 }
 
+fn file_root_epoch(
+    key: &ObservedInputImageKey,
+    budget: &ImageDescriptorBudget,
+    leaf: PathOperationResult<PathLstat>,
+    digest: Option<FileContentDigest>,
+) -> PathObservationEpoch {
+    let mut rows = Vec::new();
+    let mut add = |path: ImageChargedPath, operation, data| {
+        let request = ImageObservationRequest::new(key.anchor_root.dupe(), operation);
+        let demand =
+            PathObservationDemand::input_image(key.namespace, path.dupe(), request.dupe()).unwrap();
+        let result =
+            ImageObservationResult::new(path, request, data, budget.try_reserve(256).unwrap())
+                .unwrap();
+        rows.push((demand, PathObservationResult::InputImage(result)));
+    };
+    add(
+        key.anchor_root.dupe(),
+        ImageObservationOperation::Lstat,
+        ImageObservationData::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::Directory,
+            0,
+            1,
+            1,
+            1,
+            0o755,
+        ))),
+    );
+    add(
+        key.source_root.dupe(),
+        ImageObservationOperation::Lstat,
+        ImageObservationData::Lstat(leaf),
+    );
+    if let Some(digest) = digest {
+        add(
+            key.source_root.dupe(),
+            ImageObservationOperation::BoundedDigest {
+                max_bytes: key.policy.limits.max_file_bytes,
+            },
+            ImageObservationData::Digest(PathOperationResult::Present(digest)),
+        );
+    }
+    PathObservationEpoch::new(rows).unwrap()
+}
+
+#[tokio::test]
+async fn regular_root_replays_only_ancestor_lstat_leaf_lstat_and_leaf_digest() {
+    let budget = ImageDescriptorBudget::new(1 << 20);
+    let key = ObservedInputImageKey::regular_file_from_charged(
+        PathObservationNamespace::Host,
+        path("/image", &budget),
+        path("/image/config", &budget),
+        InputImagePolicy::plain(),
+    )
+    .unwrap();
+    let directory_key = ObservedInputImageKey::from_charged(
+        key.namespace,
+        key.anchor_root.dupe(),
+        key.source_root.dupe(),
+        key.policy,
+    )
+    .unwrap();
+    assert_ne!(key, directory_key);
+    assert!(key.is_regular_file_root());
+    assert!(!directory_key.is_regular_file_root());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut tx = dice.updater_with_data(user_data(&budget)).commit().await;
+    let mut rows = Vec::new();
+    let mut operations = Vec::new();
+    let ready = loop {
+        assert!(operations.len() <= 3, "leaf discovery must remain finite");
+        match tx.compute(&key).await.unwrap() {
+            PathOutcome::Complete(Ok(ready)) => break ready,
+            PathOutcome::Need(need) => {
+                for demand in need.demands() {
+                    let PathObservationOperation::InputImage(request) = demand.operation() else {
+                        panic!("leaf requires scoped image observations");
+                    };
+                    let data = match request.operation() {
+                        ImageObservationOperation::Lstat => {
+                            let kind = if demand.path() == key.source_root() {
+                                PathNodeKind::RegularFile
+                            } else {
+                                assert_eq!(demand.path(), key.anchor_root());
+                                PathNodeKind::Directory
+                            };
+                            ImageObservationData::Lstat(PathOperationResult::Present(
+                                PathLstat::new(kind, 0, 1, 1, 1, 0o644),
+                            ))
+                        }
+                        ImageObservationOperation::BoundedDigest { .. } => {
+                            assert_eq!(demand.path(), key.source_root());
+                            ImageObservationData::Digest(PathOperationResult::Present(
+                                FileContentDigest::new([4; 32], 0).unwrap(),
+                            ))
+                        }
+                        other => panic!("file footprint widened to {other:?}"),
+                    };
+                    operations.push(request.operation());
+                    let result = ImageObservationResult::new(
+                        demand.image_path().unwrap().dupe(),
+                        request.dupe(),
+                        data,
+                        budget.try_reserve(256).unwrap(),
+                    )
+                    .unwrap();
+                    rows.push((demand.dupe(), PathObservationResult::InputImage(result)));
+                }
+                let mut updater = tx.into_updater();
+                updater
+                    .changed_to(vec![(
+                        PathObservationEpochKey,
+                        PathObservationEpoch::new(rows.clone()).unwrap(),
+                    )])
+                    .unwrap();
+                tx = updater.commit().await;
+            }
+            value => panic!("unexpected file result: {value:?}"),
+        }
+    };
+    assert_eq!(operations.len(), 3);
+    assert!(ready.is_regular_file_root());
+    assert_eq!(ready.entries().len(), 1);
+    assert_eq!(
+        ready.entries()[0].path().normalized_ref(),
+        key.source_root()
+    );
+    assert!(matches!(
+        ready.entries()[0].kind(),
+        InputImageEntryKind::RegularFile(_)
+    ));
+    assert!(matches!(
+        tx.compute(&directory_key).await.unwrap(),
+        PathOutcome::Complete(Err(InputImageError::WrongKind))
+    ));
+}
+
+#[tokio::test]
+async fn regular_root_kind_bytes_modes_missing_and_restoration_are_normal_dependencies() {
+    let budget = ImageDescriptorBudget::new(1 << 20);
+    let key = ObservedInputImageKey::regular_file_from_charged(
+        PathObservationNamespace::Host,
+        path("/image", &budget),
+        path("/image/config", &budget),
+        InputImagePolicy::plain(),
+    )
+    .unwrap();
+    let digest = FileContentDigest::new([1; 32], 3).unwrap();
+    let stat = PathLstat::new(PathNodeKind::RegularFile, 3, 1, 1, 1, 0o644);
+    let a = file_root_epoch(
+        &key,
+        &budget,
+        PathOperationResult::Present(stat),
+        Some(digest),
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(user_data(&budget));
+    updater
+        .changed_to(vec![(PathObservationEpochKey, a.dupe())])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    let first = image(tx.compute(&key).await.unwrap());
+    let b = file_root_epoch(
+        &key,
+        &budget,
+        PathOperationResult::Present(PathLstat::new(PathNodeKind::RegularFile, 4, 2, 2, 1, 0o400)),
+        Some(FileContentDigest::new([2; 32], 4).unwrap()),
+    );
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, b)])
+        .unwrap();
+    tx = updater.commit().await;
+    let changed = image(tx.compute(&key).await.unwrap());
+    assert_ne!(first, changed);
+    assert_ne!(first.content(), changed.content());
+    assert_eq!(changed.entries()[0].mode(), 0o400);
+    for kind in [
+        Some(PathNodeKind::Directory),
+        Some(PathNodeKind::Symlink),
+        Some(PathNodeKind::SpecialFile),
+        None,
+    ] {
+        // No directory or readlink rows exist: any widened walk would return
+        // Need instead of the required stable normal refusal.
+        let leaf = kind.map_or(PathOperationResult::Missing, |kind| {
+            PathOperationResult::Present(PathLstat::new(kind, 0, 3, 3, 2, 0o755))
+        });
+        let mut updater = tx.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                file_root_epoch(&key, &budget, leaf, None),
+            )])
+            .unwrap();
+        tx = updater.commit().await;
+        let value = tx.compute(&key).await.unwrap();
+        let expected = if kind.is_some() {
+            InputImageError::WrongKind
+        } else {
+            InputImageError::Missing
+        };
+        assert!(
+            matches!(&value, PathOutcome::Complete(Err(error)) if *error == expected),
+            "{value:?}"
+        );
+        assert!(ObservedInputImageKey::validity(&value));
+        assert!(ObservedInputImageKey::equality(
+            &tx.compute(&key).await.unwrap(),
+            &value,
+        ));
+    }
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, a)])
+        .unwrap();
+    tx = updater.commit().await;
+    assert_eq!(image(tx.compute(&key).await.unwrap()), first);
+}
+
+#[tokio::test]
+async fn regular_root_file_byte_limit_refuses_before_digest_demand() {
+    let budget = ImageDescriptorBudget::new(1 << 20);
+    let mut limits = InputImageLimits::default();
+    limits.max_file_bytes = 2;
+    let key = ObservedInputImageKey::regular_file_from_charged(
+        PathObservationNamespace::Host,
+        path("/image", &budget),
+        path("/image/config", &budget),
+        InputImagePolicy::new(InputImageAliasPolicy::Deny, limits).unwrap(),
+    )
+    .unwrap();
+    let epoch = file_root_epoch(
+        &key,
+        &budget,
+        PathOperationResult::Present(PathLstat::new(PathNodeKind::RegularFile, 3, 1, 1, 1, 0o644)),
+        None,
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(user_data(&budget));
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    assert!(matches!(
+        tx.compute(&key).await.unwrap(),
+        PathOutcome::Complete(Err(InputImageError::LimitExceeded(
+            InputImageLimit::FileBytes
+        )))
+    ));
+}
+
 #[tokio::test]
 async fn metadata_freshness_changes_wrapper_without_changing_content_and_restores() {
     let budget = ImageDescriptorBudget::new(1 << 20);

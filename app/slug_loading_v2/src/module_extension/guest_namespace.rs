@@ -16,6 +16,9 @@ use slug_workspace_v2::ImageDescriptorBudget;
 use super::runtime_sources::ObservedRuntimeSourceProfile;
 use super::runtime_sources::RuntimeSourceProfileKey;
 use super::runtime_sources::RuntimeSourcesError;
+use super::selected_label_data::ObservedSelectedDataLabelSources;
+use super::selected_label_data::SelectedDataLabelError;
+use super::selected_label_data::SelectedDataLabelSourcesKey;
 use super::*;
 
 mod compose;
@@ -45,6 +48,7 @@ impl fmt::Display for SelectedGuestNamespaceFactsKey {
 pub enum GuestNamespaceFactsError {
     Policy(GuestNamespacePolicyError),
     Runtime(RuntimeSourcesError),
+    Data(SelectedDataLabelError),
     MissingDeclaration,
     Operational,
     Collision,
@@ -59,6 +63,7 @@ impl GuestNamespaceFactsError {
         match self {
             Self::Policy(e) => e.is_transient(),
             Self::Runtime(e) => e.is_transient(),
+            Self::Data(e) => e.is_transient(),
             Self::Operational => true,
             _ => false,
         }
@@ -86,6 +91,8 @@ pub enum GuestNamespaceNodeKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub enum GuestNamespaceBinding {
     Scaffold,
+    DataScaffold,
+    DataLeaf { occurrence: usize },
     ScratchEntry { entry: usize },
     ToolImage { role: usize, entry: usize },
     RuntimeImage { declaration: usize, entry: usize },
@@ -140,7 +147,10 @@ impl GuestNamespaceNode {
         self.read_only
     }
     pub fn is_owned_tree(&self) -> bool {
-        self.binding != GuestNamespaceBinding::Scaffold
+        !matches!(
+            self.binding,
+            GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold
+        )
     }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
@@ -179,6 +189,7 @@ pub enum GuestDirectoryCheck {
 struct FactsInner {
     key: SelectedGuestNamespaceFactsKey,
     profile: ObservedRuntimeSourceProfile,
+    data_sources: Option<ObservedSelectedDataLabelSources>,
     policy: GuestNamespacePolicy,
     nodes: Vec<GuestNamespaceNode>,
     children: Vec<usize>,
@@ -188,6 +199,7 @@ impl PartialEq for FactsInner {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key
             && self.profile == other.profile
+            && self.data_sources == other.data_sources
             && self.policy == other.policy
             && self.nodes == other.nodes
             && self.children == other.children
@@ -199,6 +211,9 @@ pub struct ObservedGuestNamespaceFacts(BudgetedImageBlock<FactsInner>);
 impl ObservedGuestNamespaceFacts {
     pub fn profile(&self) -> &ObservedRuntimeSourceProfile {
         &self.0.get().profile
+    }
+    pub fn data_sources(&self) -> Option<&ObservedSelectedDataLabelSources> {
+        self.0.get().data_sources.as_ref()
     }
     pub fn policy(&self) -> GuestNamespacePolicy {
         self.0.get().policy
@@ -226,6 +241,7 @@ impl ObservedGuestNamespaceFacts {
                 .lookup_budget
                 .same_instance(r.descriptor_budget())
             && self.profile().same_resources(r)
+            && self.data_sources().is_none_or(|d| d.same_resources(r))
     }
     pub fn authorized_by(
         &self,
@@ -238,6 +254,9 @@ impl ObservedGuestNamespaceFacts {
             && guest.authorizes(&self.policy())
             && guest.same_budget(r.descriptor_budget())
             && self.same_resources(r)
+            && self
+                .data_sources()
+                .is_none_or(|d| d.authorized_by(guest, runtime, scratch, r))
             && self.profile().authorized_by(runtime, scratch, r)
     }
 }
@@ -327,7 +346,32 @@ async fn compute(
         .get::<SelectedScratchElfMetadataTransaction>()
         .map_err(|_| GuestNamespaceFactsError::Operational)?
         .dupe();
-    let facts = compose::build(key, profile, policy, &resources, &active)?;
+    let data_sources = if matches!(
+        policy.label_data(),
+        slug_bzlmod_v2::GuestLabelDataPolicy::Disabled
+    ) {
+        None
+    } else {
+        match crate::dependency_cycle::compute_selected_data_label_sources(
+            ctx,
+            &SelectedDataLabelSourcesKey::new(key.profile_key().clone()),
+        )
+        .await
+        .map_err(GuestNamespaceFactsError::Data)?
+        {
+            SourcePreparationOutcome::Need(n) => return Ok(SourcePreparationOutcome::Need(n)),
+            SourcePreparationOutcome::Complete(v) => {
+                Some(v.map_err(GuestNamespaceFactsError::Data)?)
+            }
+        }
+    };
+    if data_sources
+        .as_ref()
+        .is_some_and(|d| d.profile() != &profile)
+    {
+        return Err(GuestNamespaceFactsError::Operational);
+    }
+    let facts = compose::build(key, profile, data_sources, policy, &resources, &active)?;
     if !active() || !facts.authorized_by(&guest, &runtime, &scratch, &resources) {
         return Err(GuestNamespaceFactsError::Operational);
     }

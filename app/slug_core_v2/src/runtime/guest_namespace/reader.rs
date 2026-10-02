@@ -103,7 +103,10 @@ impl PreparedGuestNamespaceViewLease {
             return Err(error);
         }
         let node = result.map_err(ViewError::Lookup)?;
-        if !matches!(node.binding(), GuestNamespaceBinding::Scaffold) {
+        if !matches!(
+            node.binding(),
+            GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold
+        ) {
             let _io_credit = self
                 .budget()
                 .try_reserve(8192)
@@ -187,7 +190,10 @@ impl PreparedGuestNamespaceViewLease {
         active: &dyn Fn() -> bool,
     ) -> Result<(), ViewError> {
         check_active(self, active)?;
-        if matches!(node.binding(), GuestNamespaceBinding::Scaffold) {
+        if matches!(
+            node.binding(),
+            GuestNamespaceBinding::Scaffold | GuestNamespaceBinding::DataScaffold
+        ) {
             return Ok(());
         }
         let _io_credit = self

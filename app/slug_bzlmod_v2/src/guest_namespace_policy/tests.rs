@@ -294,7 +294,22 @@ async fn normal_raw_absence_a_b_a_restore_and_history_keep_policy_inline() {
     let mut tx = dice.updater_with_data(data()).commit().await;
     assert_eq!(tx.compute(&consumer).await.unwrap(), None);
     drop(tx);
-    for expected in [Some(p), Some(changed), Some(p), None] {
+    let leaf_one = p
+        .with_label_data(GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses: 1 })
+        .unwrap();
+    let leaf_max = p
+        .with_label_data(GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses: 64 })
+        .unwrap();
+    for expected in [
+        Some(p),
+        Some(changed),
+        Some(p),
+        Some(leaf_one),
+        Some(leaf_max),
+        Some(leaf_one),
+        Some(p),
+        None,
+    ] {
         let mut updater = dice.updater_with_data(data());
         updater.changed_to(vec![(key.dupe(), expected)]).unwrap();
         let mut tx = updater.commit().await;
@@ -312,4 +327,33 @@ async fn normal_raw_absence_a_b_a_restore_and_history_keep_policy_inline() {
     );
     drop(dice);
     assert_eq!(b.used_bytes(), 0);
+}
+
+#[test]
+fn issued_label_data_opt_in_limits_and_current_identity() {
+    let old = policy();
+    assert_eq!(old.label_data(), GuestLabelDataPolicy::Disabled);
+    for n in [0, 65, 255] {
+        assert_eq!(
+            old.with_label_data(GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses: n }),
+            Err(GuestNamespacePolicyError::InvalidPolicy)
+        );
+    }
+    for n in [1, 64] {
+        let enabled = old
+            .with_label_data(GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses: n })
+            .unwrap();
+        assert_ne!(enabled, old);
+        assert_eq!(
+            enabled
+                .with_label_data(GuestLabelDataPolicy::Disabled)
+                .unwrap(),
+            old
+        );
+        let budget = ImageDescriptorBudget::new(4096);
+        let current =
+            GuestNamespaceTransaction::new(workspace(), Some(enabled), budget.dupe()).unwrap();
+        assert!(current.authorizes(&enabled));
+        assert!(!current.authorizes(&old));
+    }
 }

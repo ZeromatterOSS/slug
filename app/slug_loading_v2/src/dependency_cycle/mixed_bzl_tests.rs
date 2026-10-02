@@ -41,6 +41,11 @@ mod mixed_bzl_tests {
         generated_definition_cycle(3).await;
     }
 
+    #[tokio::test]
+    async fn issued_data_label_generated_definition_cycle_terminates_without_sources() {
+        generated_definition_cycle(4).await;
+    }
+
     async fn generated_definition_cycle(consumer: u8) {
         let with_tools = consumer != 0;
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
@@ -185,7 +190,7 @@ mod mixed_bzl_tests {
                 &[runtime_test_relative("runtime", "/runtime")],
                 Default::default(),
             );
-            let guest = if consumer == 3 {
+            let guest = if consumer >= 3 {
                 let guest = slug_bzlmod_v2::GuestNamespacePolicy::new(
                     1000,
                     1000,
@@ -198,6 +203,15 @@ mod mixed_bzl_tests {
                     Default::default(),
                 )
                 .unwrap();
+                let guest = if consumer == 4 {
+                    guest
+                        .with_label_data(slug_bzlmod_v2::GuestLabelDataPolicy::IssuedFileLeaves {
+                            max_witnesses: 64,
+                        })
+                        .unwrap()
+                } else {
+                    guest
+                };
                 let current = slug_bzlmod_v2::GuestNamespaceTransaction::new(
                     workspace.dupe(),
                     Some(guest),
@@ -230,7 +244,11 @@ mod mixed_bzl_tests {
         let mut guest_tx = tx.dupe();
         let guest_key =
             super::super::guest_namespace::SelectedGuestNamespaceFactsKey::new(runtime_key.clone());
-        let (owner, bzl, tools, runtime, guest) =
+        let mut data_tx = tx.dupe();
+        let data_key = super::super::selected_label_data::SelectedDataLabelSourcesKey::new(
+            runtime_key.clone(),
+        );
+        let (owner, bzl, tools, runtime, guest, data) =
             tokio::time::timeout(Duration::from_secs(2), async {
                 tokio::join!(
                     tx.compute(&key),
@@ -269,6 +287,17 @@ mod mixed_bzl_tests {
                                 )
                                 .await
                                 .unwrap(),
+                            )
+                        } else {
+                            None
+                        }
+                    },
+                    async {
+                        if consumer == 4 {
+                            Some(
+                                crate::compute_selected_data_label_sources(&mut data_tx, &data_key)
+                                    .await
+                                    .unwrap(),
                             )
                         } else {
                             None
@@ -368,7 +397,22 @@ mod mixed_bzl_tests {
                 "mixed cycle must refuse actual normal namespace: {guest:?}"
             );
         }
-        drop((tx, bzl_tx, tool_tx, runtime_tx, guest_tx));
+        if let Some(data) = data {
+            assert!(
+                matches!(
+                    data,
+                    SourcePreparationOutcome::Complete(Err(
+                        super::super::selected_label_data::SelectedDataLabelError::Runtime(
+                            super::super::runtime_sources::RuntimeSourcesError::Tool(
+                                super::super::selected_tools::SelectedToolSourcesError::Prefix(_)
+                            )
+                        )
+                    ))
+                ),
+                "data consumer must consume typed mixed error: {data:?}"
+            );
+        }
+        drop((tx, bzl_tx, tool_tx, runtime_tx, guest_tx, data_tx));
         dice.wait_for_idle().await;
         let dependencies = tracker.take_dependencies();
         if consumer == 1 {
@@ -399,7 +443,7 @@ mod mixed_bzl_tests {
                 "{dependencies:?}"
             );
         }
-        if consumer >= 2 {
+        if consumer == 2 || consumer == 3 {
             let (_, profile_dependencies) = dependencies
                 .iter()
                 .find(|(name, _)| name == &runtime_key.to_string())
@@ -424,6 +468,18 @@ mod mixed_bzl_tests {
                 tool_dependencies.contains(&tool_key.checkpoint().to_string()),
                 "{tool_dependencies:?}"
             );
+        }
+        if consumer == 4 {
+            let (_, source_deps) = dependencies
+                .iter()
+                .find(|(name, _)| name == &data_key.to_string())
+                .expect("DataSources must genuinely activate");
+            assert!(source_deps.contains(&data_key.requests_key().to_string()));
+            let (_, request_deps) = dependencies
+                .iter()
+                .find(|(name, _)| name == &data_key.requests_key().to_string())
+                .expect("DataRequests must genuinely activate");
+            assert!(request_deps.contains(&runtime_key.requests_key().to_string()));
         }
         let (_, fresh_bzl_dependencies) = dependencies
             .iter()
