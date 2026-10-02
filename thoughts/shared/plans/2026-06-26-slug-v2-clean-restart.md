@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-197-m7a-issued-label-file-sources-r1
-Status: implementation in progress
+Status: accepted
 
 User-prioritized memory repair is accepted in 3afc49f95. Exact per-demand
 inputs replace cumulative path-map DICE history while preserving full semantic
@@ -44,15 +44,17 @@ Core 140 gates and default owner libraries plus production CLI compile pass;
 independent FINAL ACCEPT. Controlled 2,048-input RSS falls from about 370 MiB to
 10 MiB; actual reported 40 GB PID/full-build attribution remains unproved. See
 [memory receipt](slug-v2-subplans/memory-repair-2026-10-02.json) for scope and broader
-check limits. The existing CLI binary predates this repair. WP897 candidate work
-is preserved and remains unaccepted; new native data tests remain unproved.
+check limits. The local CLI is now rebuilt with the repair and WP897; help smoke
+passes. Package codegen overrides and artifact identity are in the WP897 receipt,
+without daemon/runtime or whole-build memory claims.
 
-WP897 selects normal ordered issued Label data sources and exact regular-file
+WP897 75621a809 accepts normal ordered issued Label data sources and exact regular-file
 capture into the same restored guest view at original spellings. Explicit opt-in
 policy, no whole-parent imaging, honest sparse-parent Unowned semantics and
-retained current source/credit ownership are required. Independent DESIGN/API
-freeze ACCEPT; candidate preserved pending new native gates, contract in
-[current-packet.md](slug-v2-subplans/current-packet.md).
+retained current source/credit ownership are preserved. Independent DESIGN/FINAL
+ACCEPT; Shared47/Loading105/Core129/Workspace81 and default owner/CLI all-target
+checks pass. [Receipt](slug-v2-subplans/wp897-acceptance.json) and
+[contract](slug-v2-subplans/current-packet.md); successor selection is ready.
 
 WP896 c151cec23 accepts initial AliasDeny namespace facts/view;256 distinct focused
 gates and default owner/CLI checks plus independent FINAL ACCEPT pass;

@@ -406,6 +406,39 @@ prove actual runtime-root fit, POSIX aliases, loader/search/assets, complete
 process facets, kernel sealing/mediation/quota/backend, query+locked-generate,
 bootstrap or total RSS.
 
+WP897 (75621a809ce0724a6432c28ce9ac6df841b63fc8) adds opt-in
+GuestLabelDataPolicy::IssuedFileLeaves, with Disabled as the existing default.
+Normal DataRequests enumerates every ordered issued Label occurrence and
+guarded-recomputes its full selected recipe/current materialization; DataSources
+retains the full RuntimeProfile and either an exact certified covered member or
+a normal regular-root input image. Regular-root shape is structural identity;
+nonregular roots refuse from scoped Lstat before Directory/ReadLink or descendants.
+No parent image, arbitrary rendered-string authority or completed data injection
+is admitted. Equal captures may share only after full source equality; every
+witness/member/ancestor and regular-byte occurrence counts before sharing, with
+the first ordered equal witness binding retained deterministically.
+
+Sparse DataScaffold ancestors own explicit virtual metadata, while unknown
+siblings and directory listing remain Unowned. The sole existing private driver
+precreates exact-file storage, admits the whole mixed batch before any source
+anchor open or proof read, and streams64KiB through the actual current source FD.
+Exact private leaf leases bind regular-root certificates to the retained directory
+FD/internal filename. Covered tool directories and relocated runtime regular files
+reuse actual captures. Full normal frontier/current authority surrounds capture;
+the same updater restores complete prior Some/None state and drains before export.
+Stages retire before descriptor credit on early failure; shared view clones/history
+retain physical/logical/descriptor credits through actual last Drop.
+
+Shared47, Loading105, Core129 and Workspace81 pass (362 total, all256 protected
+WP896 selectors and25 new packet gates), plus default owner/CLI all-target checks.
+Independent DESIGN/FINAL ACCEPT; [compact receipt](wp897-acceptance.json) records
+normal Root and genuine immutable writer reads beside an unrelated8GiB sibling,
+current/freshness and occurrence limits, real FD reuse, zero-open mixed rejection,
+stream cancellation/tamper, pressure/history and full Some restoration. This
+accepts a bounded source/view prerequisite; actual runtime roots/fit, later data
+discovery, union aliases, loader/search/assets/platform/kernel, sealing/mediation/
+quota/backend, query+locked generate/bootstrap and total RSS remain unproved.
+
 Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
 generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
 or musl name cannot prove the selected bytes/interpreter. Host-tools come from the

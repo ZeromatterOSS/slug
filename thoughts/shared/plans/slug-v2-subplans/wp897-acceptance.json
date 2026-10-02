@@ -1,0 +1,304 @@
+{
+  "packet": "WP-7-197-m7a-issued-label-file-sources-r1",
+  "state": "accepted",
+  "baseline": "19dc92ebe82d8c60306ec31cc417eab0ed6e30eb",
+  "design_baseline": "c151cec23f5f4628ca647c18b891546641c2975c",
+  "compatibility": "Slug-native issued-Label source footprint and private namespace; inherited exact behavior protected",
+  "observable_gate_advanced": "Normal ordered issued Root/materialized config-only Label file sources captured/read at original spelling through the sole restored guest view; sparse ancestors remain Unowned",
+  "source_sha256": {
+    "app/slug_bzlmod_v2/src/guest_namespace_policy.rs": "7cdf686c4210bf40f240899a9c535d764399f67e0f84804394faee92e52434fb",
+    "app/slug_bzlmod_v2/src/guest_namespace_policy/tests.rs": "b66833d84bb78f4594f5e6c1f27b2b0895a3c20022005f3f623473dbc677324a",
+    "app/slug_bzlmod_v2/src/lib.rs": "1313a2f39a79695c8cf94fdef9ce603afd96a6448303fe098a57de495e119410",
+    "app/slug_cli_v2/tests/cli.rs": "4db1171e5d27747fc8ca75b00ddeb4b185c57a7eb2e9fafdd5adc55522236929",
+    "app/slug_core_v2/src/runtime/dice.rs": "2cd198945c515a1647ec5052ed4888ace366cb628fc883de133a9382716a61db",
+    "app/slug_core_v2/src/runtime/guest_namespace.rs": "6010fda6ac312ef369012577efb6d7726ffdb0006fa78afe593742aa04e3236f",
+    "app/slug_core_v2/src/runtime/guest_namespace/reader.rs": "ec7b05302540e9d14a7d4fa8c903940fdb97f388bdbd3cb10b8568bfdb231105",
+    "app/slug_core_v2/src/runtime/guest_namespace/tests.rs": "257877f8727ac1dec235012949407f69d3712c64e4ed83eafa32917a194c9c65",
+    "app/slug_core_v2/src/runtime/guest_namespace/tests/data.rs": "648d18955e704de18dd61b4c11c7d34c66d800e4defe988e11b2e113fc05c985",
+    "app/slug_core_v2/src/runtime/input_image.rs": "2e74f27de0875f52aec10ca8a0a0be7f0db54a7d47d1af837f67eb61788e3ea6",
+    "app/slug_core_v2/src/runtime/input_image/capture.rs": "0d95f48ebc1dc704bb2cb6af3cde574db07ba0420c07b450bdd3c2daab521b4d",
+    "app/slug_core_v2/src/runtime/input_image/file_capture.rs": "b327d97e03f0ef918c11f2473d3cfd999e535a2603127ddf7dd20a09f089e87b",
+    "app/slug_core_v2/src/runtime/input_image/linux.rs": "1a9c45d930022ba0f2c3408733494a1c69d55bb221cb886ff21810be19e3291b",
+    "app/slug_core_v2/src/runtime/input_image/linux/file_copy.rs": "5da5a0e9df55b77638e2a2997b673087d96dfb47a825bde75a1962576846df54",
+    "app/slug_core_v2/src/runtime/runtime_sources/prepare.rs": "bcb94f90a47f51455b00e69b34133f4eaaa9b758a989c34b8ba20b0635c0c2e8",
+    "app/slug_core_v2/src/runtime/selected_label_data.rs": "8065880c50aa2827fe61f5661b2122ae877b29e35e82f504ec42bf8c1b99e89f",
+    "app/slug_core_v2/src/runtime/selected_label_data/catalogue.rs": "6a2bae64fbd0a84ae9cdb1bdafacdfa66495993803ccb8c47c865a07d219bd22",
+    "app/slug_core_v2/src/runtime/selected_label_data/prepare.rs": "4a9dcb3dcf40fdcb9cdc1ec8a0c5e77b9c07af9fb4c5b34390343a52280340c1",
+    "app/slug_core_v2/src/runtime/selected_label_data/tests.rs": "f3b1c25252873e016fb7f1cad2468d4ecc48bc6bd6818ed7dbb5a3fa1f898601",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "40c4eb00fd05a0af0425f51e0f1392b3dc5585b8c272ae4cbd294deb906f0f1e",
+    "app/slug_loading_v2/src/dependency_cycle.rs": "1f5a755195e76479e328e15f1699c86727014e51f73bc88f64269de350fe7b1a",
+    "app/slug_loading_v2/src/dependency_cycle/mixed_bzl_tests.rs": "e516fd23605ccb72aba41a3c3d58206154c2da46cd8e079ff86e56053ce91f3b",
+    "app/slug_loading_v2/src/lib.rs": "f28900be358052e90841ad5fc77a65a86aabe9d5947aed4f709a624d8e98b663",
+    "app/slug_loading_v2/src/module_extension.rs": "add077e10eb809f8b5b099fe08f437c469a8b5f6264bd32f37bf69a058c29818",
+    "app/slug_loading_v2/src/module_extension/guest_namespace.rs": "3330c96dbdc621511efa5a576addabd35d68d78fcf9d2bc052a42c1798c5f7f3",
+    "app/slug_loading_v2/src/module_extension/guest_namespace/compose.rs": "e75323ac8f7d0700ebc9ce13adbc9b0f05bbbc5423c74923d787ff3c5cdb12e0",
+    "app/slug_loading_v2/src/module_extension/guest_namespace/resolver.rs": "3e25d0d0782bf8fa6a74a3981d0339eced0bd5c276a9d2f6c6edd30f0958a72d",
+    "app/slug_loading_v2/src/module_extension/selected_label_data.rs": "f7b5eb6d16c6888ec9b358c70a3869844c532aa5f07b98b8b3eea95ab4251886",
+    "app/slug_loading_v2/src/module_extension/selected_label_data/requests.rs": "f008438bcaba7f0110ec6473b1725572f3cc34fe316f4e8d0542ac76fe50a66b",
+    "app/slug_loading_v2/src/module_extension/selected_label_data/sources.rs": "96011a479597213e4c800ce0a7b190cb573ff029167f3cb1ea630eb19afcd785",
+    "app/slug_loading_v2/src/module_extension/selected_label_data/tests.rs": "9758fc13f1bbafd84372571d000a2aaaa9afe3e72761c53f91186e170e6cd33a",
+    "app/slug_workspace_v2/src/input_image.rs": "16579af669c8d60116850c09711ed531afef0e6c08584c01309ba112632be363",
+    "app/slug_workspace_v2/src/input_image/tests.rs": "d39e6b21f229f3cdd235bde515a350bdff2172725622bd96b92f55e686aa2006"
+  },
+  "owners": {
+    "bzlmod": {
+      "exit": 0,
+      "selected": 47,
+      "elapsed_seconds": 0.0181776030221954,
+      "passed": 47,
+      "artifact_sha256": "6a20f46d845caa305e7a0ad779ceb6ce9129e71a0174831fba07918a4e9a2dae",
+      "exact_selector_sha256": "048581b4715485f3225c5e9ec6fcafa51d2d3f2a3b60801eb0f6cc9ca8d91e80",
+      "log_sha256": "2a25c07a94287a3053ff217cc7d0769f0d121a448dfb545289b57483ffafb8c6",
+      "preflight_sha256": "e89ba12f55999286efbf3f3539b08f0e9eb764e9165f5a2bee7ba0c966f2f855",
+      "selection": "All protected WP896 selectors plus listed source-family selectors; exact single-thread run",
+      "added_selectors": [
+        "guest_namespace_policy::tests::issued_label_data_opt_in_limits_and_current_identity"
+      ]
+    },
+    "loading": {
+      "exit": 0,
+      "selected": 105,
+      "elapsed_seconds": 0.8939755350002088,
+      "passed": 105,
+      "artifact_sha256": "e2c1dbdc00bd5dc0a7af35be18286e3a6285840675c7852a9e90c23aa269faed",
+      "exact_selector_sha256": "1c99a31d4799e8728f966fe8181f9971227235d5c49c8a9d9680ba53ccc5051b",
+      "log_sha256": "e7223822a5df2627b0b7e5bd9921b443b850d86b13f9f5fd41c2023be98d1a5d",
+      "preflight_sha256": "c175da5c64c11db272c18fcd1814b7372407c5bfe052c21144ccc60d04e9ed6a",
+      "selection": "All protected WP896 selectors plus listed source-family selectors; exact single-thread run",
+      "added_selectors": [
+        "module_extension::tests::issued_data_labels_all_derived_occurrences_limit_and_uncovered_directory_refusal",
+        "module_extension::tests::issued_data_labels_current_services_guard_cold_and_warm_without_raw_changes",
+        "module_extension::tests::issued_data_labels_foreign_namespace_same_guest_claim_is_not_reused",
+        "module_extension::tests::issued_data_labels_full_leaf_frontier_a_b_a_and_warm_authorization",
+        "module_extension::tests::issued_data_labels_many_duplicates_keep_first_binding_and_count_all_parents",
+        "module_extension::tests::issued_data_labels_materialized_request_namespace_and_policy_a_b_a",
+        "module_extension::tests::issued_data_labels_normal_ordered_plan_need_leaf_and_sparse_view",
+        "module_extension::tests::issued_data_labels_reuse_runtime_regular_and_original_directory_without_leaf_needs",
+        "module_extension::tests::issued_data_labels_tool_parent_reuse_retains_complete_membership",
+        "module_extension::tests::issued_data_labels_witness_occurrence_caps_and_history_pressure_repair",
+        "module_extension::tests::mixed_bzl_tests::issued_data_label_generated_definition_cycle_terminates_without_sources"
+      ]
+    },
+    "core": {
+      "exit": 0,
+      "selected": 129,
+      "elapsed_seconds": 7.180846614006441,
+      "passed": 129,
+      "artifact_sha256": "035e2b712c5fc79ffff6a18b81c0eb4fdff21601f18ae7cf91df2e10334bec9e",
+      "exact_selector_sha256": "c5ca5870ce8112379f8ecab94411c9a5edc552e2e404f010cab4b5b79df71ed0",
+      "log_sha256": "6003688d4d2643a6adc8eda6023ae03d6ecf1dd601f737fb2847655c10464182",
+      "preflight_sha256": "2e16fe4c443bba3848f328dc9384de24f077f39fa93848c8af765cf4d679599d",
+      "selection": "All protected WP896 selectors plus listed source-family selectors; exact single-thread run",
+      "added_selectors": [
+        "runtime::dice::guest_namespace::tests::data::data_file_capture_cancel_after_written_chunk_releases_stage_and_logical_credit",
+        "runtime::dice::guest_namespace::tests::data::data_file_capture_rejects_directory_adapter_and_foreign_stage_before_source_io",
+        "runtime::dice::guest_namespace::tests::data::data_view_config_only_root_and_genuine_writer_original_reads_without_sibling_tree",
+        "runtime::dice::guest_namespace::tests::data::data_view_covered_tool_directories_and_relocated_runtime_file_reuse_captures",
+        "runtime::dice::guest_namespace::tests::data::data_view_current_source_mode_frontier_policy_a_b_a_and_stale_refusal",
+        "runtime::dice::guest_namespace::tests::data::data_view_descriptor_and_logical_pressure_repair_and_history_last_drop",
+        "runtime::dice::guest_namespace::tests::data::data_view_enabled_some_success_and_bound_failure_restore_full_prior_some",
+        "runtime::dice::guest_namespace::tests::data::data_view_file_tamper_and_after_first_chunk_cancel_poison_shared_view",
+        "runtime::dice::guest_namespace::tests::data::data_view_sparse_parents_unknown_and_listing_are_sticky_unowned",
+        "runtime::dice::path_inputs::tests::discarded_selected_updater_keeps_union_for_abort_revocation_and_restoration",
+        "runtime::dice::path_inputs::tests::selected_subset_revokes_surplus_and_successor_does_not_resurrect_it",
+        "runtime::dice::selected_label_data::tests::data_mixed_need_invalid_second_denies_before_proof_or_source_io_and_repairs",
+        "runtime::request_revision::tests::per_demand_source_change_retry_keeps_unrelated_inputs_without_aggregate_history"
+      ]
+    },
+    "workspace": {
+      "exit": 0,
+      "selected": 81,
+      "elapsed_seconds": 0.09448147201328538,
+      "passed": 81,
+      "artifact_sha256": "d972af0567993e1fe20f20c6ac4c023eb0a44076fafbac3edf44802fb74f667d",
+      "exact_selector_sha256": "0ef512c99f574e2143799f443d9aaf938fa407e86a8edd919591fd1ed8a01c0a",
+      "log_sha256": "42cf8808e288f5081bb4bc439822cbbb1ba81d2f2ed6fd97639aecfdd4ee3540",
+      "preflight_sha256": "5be8583b722028151010c621f16951eb83810595e253861891e9f78a2d939fc9",
+      "selection": "All ordinary Workspace selectors (1 ignored supervised RSS probe excluded)",
+      "added_selectors": [
+        "input_image::tests::regular_root_file_byte_limit_refuses_before_digest_demand",
+        "input_image::tests::regular_root_kind_bytes_modes_missing_and_restoration_are_normal_dependencies",
+        "input_image::tests::regular_root_replays_only_ancestor_lstat_leaf_lstat_and_leaf_digest"
+      ]
+    }
+  },
+  "protected_wp896": {
+    "bzlmod": 46,
+    "loading": 94,
+    "core": 116,
+    "total": 256
+  },
+  "new_packet_selectors": {
+    "bzlmod": 1,
+    "loading": 11,
+    "core": 10,
+    "workspace": 3
+  },
+  "accepted_memory_controls_in_owner_runs": {
+    "core": 3,
+    "workspace": 4
+  },
+  "material_invariant_evidence": {
+    "explicit disabled default, policy identity, absence/history/full restoration": [
+      "bzlmod: issued_label_data_opt_in_limits_and_current_identity",
+      "bzlmod: normal_raw_absence_a_b_a_restore_and_history_keep_policy_inline",
+      "core: data_view_enabled_some_success_and_bound_failure_restore_full_prior_some"
+    ],
+    "exact regular-root normal shape, no directory observation, current type/content/mode": [
+      "workspace: input_image::tests::regular_root_* three selectors",
+      "core: data_view_config_only_root_and_genuine_writer_original_reads_without_sibling_tree"
+    ],
+    "normal ordered root/materialized lineage, current authority and mixed cycles": [
+      "loading: issued_data_labels_normal_ordered_plan_need_leaf_and_sparse_view",
+      "loading: issued_data_labels_materialized_request_namespace_and_policy_a_b_a",
+      "loading: issued_data_labels_current_services_guard_cold_and_warm_without_raw_changes",
+      "loading: issued_data_label_generated_definition_cycle_terminates_without_sources"
+    ],
+    "exact complete covered reuse, actual FD association, foreign claim refusal": [
+      "loading: issued_data_labels_reuse_runtime_regular_and_original_directory_without_leaf_needs",
+      "loading: issued_data_labels_tool_parent_reuse_retains_complete_membership",
+      "loading: issued_data_labels_foreign_namespace_same_guest_claim_is_not_reused",
+      "core: data_view_covered_tool_directories_and_relocated_runtime_file_reuse_captures"
+    ],
+    "first ordered duplicate binding and per-occurrence caps before sharing": [
+      "loading: issued_data_labels_many_duplicates_keep_first_binding_and_count_all_parents",
+      "loading: issued_data_labels_all_derived_occurrences_limit_and_uncovered_directory_refusal",
+      "loading: issued_data_labels_witness_occurrence_caps_and_history_pressure_repair"
+    ],
+    "whole mixed batch before actual common anchor open or borrowed proof read": [
+      "core: data_mixed_need_invalid_second_denies_before_proof_or_source_io_and_repairs"
+    ],
+    "one restored native view, exact file adapter, sparse ancestors and sibling isolation": [
+      "core: data_view_config_only_root_and_genuine_writer_original_reads_without_sibling_tree",
+      "core: data_view_sparse_parents_unknown_and_listing_are_sticky_unowned",
+      "core: data_file_capture_rejects_directory_adapter_and_foreign_stage_before_source_io"
+    ],
+    "full frontier/freshness, sticky tamper, streamed cancellation and lastDrop pressure repair": [
+      "loading: issued_data_labels_full_leaf_frontier_a_b_a_and_warm_authorization",
+      "core: data_view_current_source_mode_frontier_policy_a_b_a_and_stale_refusal",
+      "core: data_view_file_tamper_and_after_first_chunk_cancel_poison_shared_view",
+      "core: data_view_descriptor_and_logical_pressure_repair_and_history_last_drop",
+      "core: data_file_capture_cancel_after_written_chunk_releases_stage_and_logical_credit"
+    ]
+  },
+  "default_all_target_checks": {
+    "default-core-all-targets": {
+      "exit": 0,
+      "elapsed_seconds": 20.6,
+      "peak_rss_kib": 1372504
+    },
+    "default-cli-all-targets": {
+      "exit": 0,
+      "elapsed_seconds": 9.27,
+      "peak_rss_kib": 714232
+    },
+    "default-loading-all-targets": {
+      "exit": 0,
+      "elapsed_seconds": 0.12,
+      "peak_rss_kib": 77256
+    },
+    "default-workspace-bzlmod-all-targets": {
+      "exit": 0,
+      "elapsed_seconds": 31.05,
+      "peak_rss_kib": 1628028
+    }
+  },
+  "compile_preparation": {
+    "bzlmod-frozen": {
+      "exit": 0,
+      "elapsed_seconds": 0.11,
+      "peak_rss_kib": 75896
+    },
+    "core-native-proof-complete": {
+      "exit": 0,
+      "elapsed_seconds": 9.09,
+      "peak_rss_kib": 1797576
+    },
+    "loading-host-inputs-corrected": {
+      "exit": 0,
+      "elapsed_seconds": 6.89,
+      "peak_rss_kib": 1989108
+    },
+    "workspace-final-owner": {
+      "exit": 0,
+      "elapsed_seconds": 0.09,
+      "peak_rss_kib": 68368
+    }
+  },
+  "limits": {
+    "preparation_seconds_per_invocation": 60,
+    "focused_test_seconds_per_invocation": 30,
+    "cargo_jobs": 1,
+    "serial_cargo_and_native_fixtures": true
+  },
+  "corrections": [
+    "CLI test prerequisite uses real ActionOutput root; assertions and dependencies unchanged.",
+    "DataLeaf equal-path/priority sort explicitly keeps first ordered occurrence.",
+    "Exact file capture drops private stage before descriptor reservation on early failure.",
+    "Core cfg(test) counts real common open_image_anchor attempts; invalid second demand asserts zero, valid positive control asserts nonzero.",
+    "Core test import/mutability compilation corrections; preserved failed artifacts.",
+    "Loading first 105 run: 95 passed, 10 failed common raw Host initialization. Existing scratch_test_inputs initializer added only in cfg(test); fresh 105 passed. first-failed logs retained.",
+    "60s combined owner preparation timed out after dependency progress; split remaining checks passed within same cap."
+  ],
+  "evidence_invalidation": {
+    "changed": [
+      "app/slug_loading_v2/src/module_extension/selected_label_data/tests.rs"
+    ],
+    "cause": "Missing raw platform/environment fixture initialization; existing scratch_test_inputs now invoked.",
+    "invalidated": "Loading owner unit executable and105test result; first failed receipt preserved.",
+    "preserved": "Core129/Shared47 and production Core/CLI default compile; Loading cfg(test) file is excluded from their normal dependency builds."
+  },
+  "source_format_diff_archive_plan_checks": "PASS; final status checker records accepted packet, M7A remains partial.",
+  "residuals": [
+    "No complete M7A, configured runtime root fit, union aliases, loader/search/assets, full platform/kernel facets, sealed installation, all-access mediation/quota/backend, actual query plus locked generate or bootstrap claim.",
+    "Unix and TCP bind EPERM in actual sandbox; no daemon/socket CLI runtime test claim.",
+    "No new whole-build RSS or reported 40GB PID attribution. Accepted per-demand repair3afc49f95 independently proves controlled 2048-input history ~370MiB to~10MiB; actual changed payload history remains retained."
+  ],
+  "timing_scope": "Per-invocation preparation/test times recorded; full packet wall/review duration not measured across continuations.",
+  "assembled_at_utc": "2026-10-02T12:21:29.062727+00:00",
+  "growth_review": {
+    "new_loading_test_lines": 1434,
+    "new_native_test_lines": 1092,
+    "disposition": "Cohesive responsibility review accepted: normal producers/raw observation/current authority/caps/history vs genuine private capture/view/FD reuse/restoration. Production request/source/composition/catalogue/capture/sole-driver seams remain distinct; no new donor, dependency, cache/interner or payload-heavy key."
+  },
+  "source_commit": "75621a809ce0724a6432c28ce9ac6df841b63fc8",
+  "independent_review": {
+    "phase": "FINAL",
+    "decision": "ACCEPT",
+    "reviewer": "frontier_review",
+    "receipt_sha256": "f1dac4f015e225fefef475f0b78f465f2ec240fadef5dd87ffde787a6d210391",
+    "scope": "Bounded normal issued Label data source/private view prerequisite; broader runtime, bootstrap and RSS attribution remain unproved."
+  },
+  "evidence_location": "target/wp897 contains exact Cargo/test commands, preflight/selector/logs, preserved failures and final review. Baseline WP896 protected selections in c151cec23 acceptance evidence.",
+  "linked_cli": {
+    "state": "rebuilt; help smoke passed",
+    "path": "/run/media/system/Colossus/dev/slug/target/debug/slug",
+    "artifact_sha256": "ae6476f6a0529fe8e1d2a31d4b906a8287ea1d457e20d85e884e69c0b036cf23",
+    "source_commit": "75621a809ce0724a6432c28ce9ac6df841b63fc8",
+    "command": [
+      "/usr/bin/time",
+      "-f",
+      "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+      "-o",
+      "target/wp897/rebuilt-cli-help-time.json",
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "30s",
+      "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "--help"
+    ],
+    "build_receipt": {
+      "exit": 0,
+      "elapsed_seconds": 8.94,
+      "peak_rss_kib": 2337200
+    },
+    "help_smoke": {
+      "exit": 0,
+      "elapsed_seconds": 0.0,
+      "peak_rss_kib": 14864
+    },
+    "profile": "Pinned nightly dev; Loading and Core package opt-level=0/debug=0 overrides only. Other packages default dev. Cargo configuration unchanged.",
+    "scope": "Current local CLI linked with accepted memory repair and WP897; help proves launcher only, no daemon/socket/full-build or RSS claim."
+  }
+}

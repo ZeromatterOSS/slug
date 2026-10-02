@@ -1,11 +1,13 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-197-m7a-issued-label-file-sources-r1
-Status: implementation in progress
+Status: accepted
 
-Independent DESIGN ACCEPT: target/wp897/design-review.md; frozen API proposals
-under target/wp897. Root Workspace and disjoint Shared/Loading/Core implementation
-are authorized within the allowlist; FINAL and gates remain unproved.
+Accepted source: 75621a809ce0724a6432c28ce9ac6df841b63fc8. Independent DESIGN and
+FINAL ACCEPT; [compact receipt](wp897-acceptance.json), full execution evidence under
+target/wp897. Shared47, Loading105, Core129 and Workspace81 (362 total) pass,
+including all256 WP896 protected gates and25 new packet selectors. Default
+owner/CLI all-target checks pass. M7A stays partial; successor selection is ready.
 
 ## User-prioritized memory repair override
 
@@ -16,9 +18,12 @@ historical transactions are preserved. Independent DESIGN/FINAL ACCEPT; compact
 [receipt](memory-repair-2026-10-02.json) records DICE 17/Workspace 81/Core 140 tests,
 default production compilation, controlled RSS and remaining broader-check limits.
 The 2,048-input history control falls from about 370 MiB to 10 MiB; full-build and
-reported 40 GB PID attribution remain unproved, and the existing CLI binary is older.
-WP897 candidate source is preserved and unaccepted; its new native data tests
-remain unauthored/unproved. No WP897 acceptance follows from the memory gates.
+reported 40 GB PID attribution remain unproved. The local CLI is now rebuilt with
+the repair and WP897; its help smoke passes. Loading/Core codegen overrides and
+artifact identity are recorded in the WP897 receipt; no daemon/runtime claim follows.
+WP897 normal producer/native data gates and independent FINAL pass separately;
+its acceptance follows its own contract and evidence. The memory receipt records
+the earlier acceptance snapshot; no whole-build memory claim follows.
 The daemon metadata scanner fix remains landed and rechecked at about 255 MiB.
 
 ## Outcome and authority
@@ -181,6 +186,10 @@ Stage5 selected-source authority and matching Stage9 row. Workspace change is a
 bounded key/root-kind guard; existing walk_node is above150lines; its small root-kind guard and regular-file
 case remain cohesive with scoped node observation, without a new traversal or
 unrelated alias refactor. Root owns integration/commit.
+Root also owns the compile prerequisite in app/slug_cli_v2/tests/cli.rs:
+the existing conflict sentinel helper must use the real ActionOutput root handle
+instead of passing SlugConfiguration to the current configured_output_root API.
+No new CLI behavior, dependency or weakened sentinel assertion is admitted.
 
 Shared/Loading worker: Bzlmod guest_namespace_policy.rs, its tests and lib.rs;
 Loading lib.rs, module_extension.rs, dependency_cycle.rs and mixed_bzl_tests.rs;
@@ -196,8 +205,13 @@ tests input_image/file_capture/tests.rs and guest_namespace/tests/data.rs; selec
 prepare.rs, runtime_sources/{attempt,prepare}.rs; guest_namespace.rs and guest_namespace/
 {attempt,reader,tests}.rs; runtime/mod.rs or dice.rs only module registration.
 Keep native capture, declaration/admission and sole driver responsibilities distinct.
-Growth reviewed: Workspace29prod/~250test for three normal-key discriminators; Shared/Loading~900prod/~500test;
-Core~1000prod/~600test. Overshoot triggers cohesive-owner review, not cap lifting.
+Initial growth estimates: Workspace29prod/~250test for three normal-key discriminators;
+Shared/Loading~900prod/~500test; Core~1000prod/~600test. Actual new Loading tests1434
+and native tests1092 exceed estimates. Independent cohesive-owner review accepts
+their distinct responsibilities: normal producer/raw observations/current authority/
+caps/history versus genuine private capture/view/reuse/restoration. Production
+requests, sources, composition, catalogue, capture and sole-driver seams remain
+separate; no unrelated extraction or cap lifting follows from the test growth.
 No Cargo/lockfile/dependency edits, arbitrary Host roots, source acquisition,
 backend probe/retry, alias/process activation, rules_rust selection duplication,
 legacy byte snapshots or implementation of all later Cargo-discovered data.

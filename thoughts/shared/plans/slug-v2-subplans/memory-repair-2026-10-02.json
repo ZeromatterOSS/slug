@@ -124,5 +124,15 @@
     "dice/dice/src/impls/tests.rs": "d8acfbd4b486abce67f5f41b2b4f9c1e6d4b3327b16b6b8f32c1516ec7417131",
     "dice/dice/src/impls/tests/injected_absence.rs": "102224c945ba8a32fb76199993a5e0cfecd4f01ad20634040fbe931f8bd79d4b",
     "dice/dice/src/impls/worker.rs": "bb9fdbbc231e8b2e6ea8389679af94dcde374e09e67d4e8733db1a4249e5c04e"
+  },
+  "original_acceptance_snapshot": "Tests, compile limitations and source hashes above describe memory source3afc49f95 at its original acceptance; later broader validation and linked binary are recorded below.",
+  "followup": {
+    "accepted_source": "75621a809ce0724a6432c28ce9ac6df841b63fc8",
+    "receipt": "wp897-acceptance.json",
+    "default_all_target_checks": "Workspace, Bzlmod, Loading, Core and CLI all-target checks now pass; CLI test prerequisite corrected in WP897.",
+    "linked_cli_sha256": "ae6476f6a0529fe8e1d2a31d4b906a8287ea1d457e20d85e884e69c0b036cf23",
+    "linked_cli_profile": "Pinned nightly dev; Loading and Core package opt-level=0/debug=0 overrides only. Other packages default dev. Cargo configuration unchanged.",
+    "launcher_smoke": "--help exit0",
+    "memory_scope": "No new whole-build RSS or reported40GB PID attribution; original alternating path-history measurements remain the performance evidence."
   }
 }
