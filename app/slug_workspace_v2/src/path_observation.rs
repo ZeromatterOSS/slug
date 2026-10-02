@@ -938,6 +938,153 @@ pub fn path_observation_shards(
         .collect()
 }
 
+/// Explicit semantic transport selection. Uninstalled mode preserves legacy fixtures.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub enum PathObservationInputMode {
+    LegacyEpoch,
+    PerDemand,
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathObservationInputModeKey;
+impl fmt::Display for PathObservationInputModeKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("path-observation-input-mode")
+    }
+}
+impl InjectedKey for PathObservationInputModeKey {
+    type Value = PathObservationInputMode;
+    fn equality(a: &Self::Value, b: &Self::Value) -> bool {
+        a == b
+    }
+}
+// A successful ordinary dependency even when the raw injected mode has not
+// been installed. Every publisher dirties this projection: a missing injected
+// input has no dependency to invalidate when it is first installed later.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct PathObservationInputModeProjectionKey;
+impl fmt::Display for PathObservationInputModeProjectionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("path-observation-input-mode-projection")
+    }
+}
+#[async_trait]
+impl Key for PathObservationInputModeProjectionKey {
+    type Value = PathObservationInputMode;
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        ctx.compute(&PathObservationInputModeKey)
+            .await
+            .unwrap_or(PathObservationInputMode::LegacyEpoch)
+    }
+    fn equality(a: &Self::Value, b: &Self::Value) -> bool {
+        a == b
+    }
+}
+/// Raw input for one exact demand, never a cumulative epoch or payload-bearing key.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathObservationInputKey(PathObservationDemand);
+impl PathObservationInputKey {
+    pub fn new(demand: PathObservationDemand) -> Self {
+        Self(demand)
+    }
+    pub fn demand(&self) -> &PathObservationDemand {
+        &self.0
+    }
+}
+impl fmt::Display for PathObservationInputKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "path-observation-input:{:?}:{:?}:{:?}",
+            self.0.namespace(),
+            self.0.path().as_path(),
+            self.0.operation()
+        )
+    }
+}
+impl InjectedKey for PathObservationInputKey {
+    type Value = Option<Arc<PathObservationResult>>;
+    fn equality(a: &Self::Value, b: &Self::Value) -> bool {
+        a == b
+    }
+}
+#[doc(hidden)]
+#[derive(Debug)]
+pub enum PathObservationInputInjectionError {
+    InvalidEpoch(PathObservationEpochError),
+    Injection,
+}
+impl fmt::Display for PathObservationInputInjectionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("path observation input injection failed")
+    }
+}
+impl std::error::Error for PathObservationInputInjectionError {}
+/// Inject one complete desired workset and revoke every known removed demand in
+/// the same updater. `known` must include all prior committed/provisional cells.
+/// This transports observed raw inputs; it performs no IO or source authorization.
+#[doc(hidden)]
+pub fn inject_path_observation_inputs(
+    updater: &mut dice::DiceTransactionUpdater,
+    desired: &PathObservationEpoch,
+    known: impl IntoIterator<Item = PathObservationDemand>,
+) -> Result<(), PathObservationInputInjectionError> {
+    // Epoch constructors enforce these invariants. Recheck the whole supplied
+    // workset before mutating the updater, without constructing another map.
+    for (demand, result) in desired.observations() {
+        if let PathObservationResult::InputImage(image) = result.as_ref() {
+            if image.issued_path().as_path() != demand.path().as_path() {
+                return Err(PathObservationInputInjectionError::InvalidEpoch(
+                    PathObservationEpochError::InputImagePathMismatch(demand.dupe()),
+                ));
+            }
+        }
+        if demand.operation() != result.operation() {
+            return Err(PathObservationInputInjectionError::InvalidEpoch(
+                PathObservationEpochError::OperationMismatch {
+                    demand: demand.dupe(),
+                    result_operation: result.operation(),
+                },
+            ));
+        }
+    }
+    let mut updates = desired
+        .observations()
+        .iter()
+        .map(|(d, r)| (d.dupe(), Some(r.dupe())))
+        .collect::<Vec<_>>();
+    updates.extend(
+        known
+            .into_iter()
+            .filter(|d| desired.get(d).is_none())
+            .map(|d| (d, None)),
+    );
+    updates.sort_unstable_by(|(a, _), (b, _)| a.cmp(b));
+    updates.dedup_by(|a, b| a.0 == b.0);
+    let updates = updates
+        .into_iter()
+        .map(|(d, r)| (PathObservationInputKey::new(d), r))
+        .collect::<Vec<_>>();
+    updater
+        .changed_to(updates)
+        .map_err(|_| PathObservationInputInjectionError::Injection)?;
+    updater
+        .changed_to([(
+            PathObservationInputModeKey,
+            PathObservationInputMode::PerDemand,
+        )])
+        .map_err(|_| PathObservationInputInjectionError::Injection)?;
+    updater
+        .changed([PathObservationInputModeProjectionKey])
+        .map_err(|_| PathObservationInputInjectionError::Injection)
+}
+
 /// The transient DICE projection for one exact observation demand.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct PathObservationKey {
@@ -986,6 +1133,33 @@ impl Key for PathObservationKey {
             if !path.same_budget(budget) {
                 return PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe()));
             }
+        }
+        let mode = match ctx.compute(&PathObservationInputModeProjectionKey).await {
+            Ok(mode) => mode,
+            Err(_) => {
+                return PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe()));
+            }
+        };
+        if mode == PathObservationInputMode::PerDemand {
+            // An absent/revoked cell is authoritative scheduling absence. NEVER
+            // resurrect a stale observation from legacy cumulative maps.
+            return match ctx
+                .compute(&PathObservationInputKey::new(self.demand.dupe()))
+                .await
+            {
+                Ok(Some(result))
+                    if result.operation() == self.demand.operation()
+                        && match result.as_ref() {
+                            PathObservationResult::InputImage(image) => {
+                                image.issued_path().as_path() == self.demand.path().as_path()
+                            }
+                            _ => true,
+                        } =>
+                {
+                    PathOutcome::Complete(result)
+                }
+                _ => PathOutcome::Need(NeedPathObservations::singleton(self.demand.dupe())),
+            };
         }
         if let Ok(shard) = ctx
             .compute(&PathObservationShardKey::for_demand(&self.demand))
@@ -1965,3 +2139,6 @@ mod tests {
         assert!(old_payload.complete_eq(&new_payload));
     }
 }
+
+#[cfg(test)]
+mod memory_tests;

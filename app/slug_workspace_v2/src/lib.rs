@@ -587,3 +587,14 @@ mod tests {
         }
     }
 }
+
+#[doc(hidden)]
+pub use path_observation::PathObservationInputInjectionError;
+#[doc(hidden)]
+pub use path_observation::PathObservationInputKey;
+#[doc(hidden)]
+pub use path_observation::PathObservationInputMode;
+#[doc(hidden)]
+pub use path_observation::PathObservationInputModeKey;
+#[doc(hidden)]
+pub use path_observation::inject_path_observation_inputs;

@@ -29,6 +29,7 @@ use tracing::Instrument;
 
 use crate::api::activation_tracker::ActivationData;
 use crate::api::activation_tracker::ActivationKind;
+use crate::api::storage_type::StorageType;
 use crate::arc::Arc;
 use crate::impls::core::graph::types::VersionedGraphKey;
 use crate::impls::core::graph::types::VersionedGraphResult;
@@ -192,7 +193,15 @@ impl DiceTaskWorker {
                 return result;
             }
             VersionedGraphResult::CheckDeps(mismatch2) => Some(mismatch2),
-            VersionedGraphResult::Compute => None,
+            VersionedGraphResult::Compute => {
+                // An absent injected input is unavailable at this version.
+                // InjectedKey has no producer to run: invoking its blanket
+                // compute would panic even for an ordinary scheduling miss.
+                if matches!(self.eval.storage_type(self.k), StorageType::Injected) {
+                    return Err(CancellationReason::Rejected);
+                }
+                None
+            }
             VersionedGraphResult::Rejected(..) => {
                 return Err(CancellationReason::Rejected);
             }

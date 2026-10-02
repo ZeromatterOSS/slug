@@ -204,6 +204,7 @@ use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
+#[cfg(test)]
 use slug_workspace_v2::path_observation_shards;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -488,6 +489,8 @@ fn read_file_observations(
 mod guest_namespace;
 #[path = "input_image_bridge.rs"]
 mod input_image_bridge;
+#[path = "path_inputs.rs"]
+mod path_inputs;
 #[path = "runtime_sources.rs"]
 mod runtime_sources;
 #[path = "selected_scratch_source.rs"]
@@ -1010,6 +1013,7 @@ struct NativeDemandCommand<'a> {
     repository_results: RepositoryMaterializationResultEpoch,
     execute_transcript: RepositoryExecuteTranscript,
     path_observations: PathObservationEpoch,
+    path_input_ledger: path_inputs::NativePathInputLedger,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
     download_results:
         SmallMap<Arc<HostSelectedExtensionOwner>, Arc<SelectedExtensionDownloadVerified>>,
@@ -6286,6 +6290,9 @@ impl WorkspaceRuntime {
                 repository_session,
                 inputs,
                 effects: CommandEffectOwner::new(),
+                path_input_ledger: path_inputs::NativePathInputLedger::new(
+                    &prior.path_observations,
+                ),
                 prior,
                 reusable_requests: preflight
                     .reusable_requests()
@@ -7597,6 +7604,7 @@ impl NativeDemandCommand<'_> {
             &self.inputs,
             self.repository_results.clone(),
             self.path_observations.clone(),
+            &self.path_input_ledger,
             &self.repository_environment_frontier,
             &self.prior.repository_environment_frontier,
         )
@@ -7934,6 +7942,7 @@ impl NativeDemandCommand<'_> {
                 &prior.inputs,
                 prior.repository_results,
                 prior.path_observations,
+                &self.path_input_ledger,
                 &prior.repository_environment_frontier,
                 &self.repository_environment_frontier,
             )
@@ -8692,6 +8701,7 @@ fn prepare_selected_native_demand_snapshot(
         &snapshot.inputs,
         snapshot.repository_results.clone(),
         snapshot.path_observations.clone(),
+        &command.path_input_ledger,
         &snapshot.repository_environment_frontier,
         &command.prior.repository_environment_frontier,
     )
@@ -8799,6 +8809,7 @@ fn inject_native_demand_snapshot(
     inputs: &NativeDemandInputBundle,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
+    path_input_ledger: &path_inputs::NativePathInputLedger,
     repository_environment_frontier: &slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
     replaced_repository_environment_frontier: &slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
 ) -> anyhow::Result<()> {
@@ -8878,12 +8889,9 @@ fn inject_native_demand_snapshot(
             repository_results,
         )])
         .context("injecting complete repository workset")?;
-    updater
-        .changed_to(path_observation_shards(&path_observations))
-        .context("injecting sharded path workset")?;
-    updater
-        .changed_to(vec![(PathObservationEpochKey, path_observations)])
-        .context("injecting complete path workset")
+    path_input_ledger
+        .inject(updater, &path_observations)
+        .context("injecting exact path inputs")
 }
 
 /// Open a one-shot workspace runtime and evaluate injected root observations.
@@ -11097,10 +11105,19 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .unwrap(),
                 expected.repository_results
             );
-            assert_eq!(
-                transaction.compute(&PathObservationEpochKey).await.unwrap(),
-                expected.path_observations
-            );
+            for (demand, result) in expected.path_observations.observations() {
+                assert_eq!(
+                    transaction
+                        .compute(&slug_workspace_v2::PathObservationInputKey::new(
+                            demand.clone()
+                        ))
+                        .await
+                        .unwrap()
+                        .as_ref(),
+                    Some(result)
+                );
+            }
+            assert!(transaction.compute(&PathObservationEpochKey).await.is_err());
         });
     }
 

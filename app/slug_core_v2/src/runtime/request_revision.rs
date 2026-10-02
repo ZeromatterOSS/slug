@@ -516,6 +516,18 @@ impl RequestRevisionRuntime {
         F: FnOnce(Vec<PathObservationDemand>) -> Result<PathObservationEpoch, RequestRevisionError>,
         P: FnOnce() -> std::io::Result<()>,
     {
+        // Read transport identity before taking the publication owner. This
+        // raw input has no callback or filesystem side effect; old live
+        // transactions retain their own transport mode.
+        let per_demand = {
+            let mut probe = terminal.clone();
+            matches!(
+                probe
+                    .compute(&slug_workspace_v2::PathObservationInputModeKey)
+                    .await,
+                Ok(slug_workspace_v2::PathObservationInputMode::PerDemand)
+            )
+        };
         let mut owner = self.owner.lock().await;
         let current = selected_updater.existing_state().await;
         if !current.equivalent(terminal) {
@@ -573,12 +585,25 @@ impl RequestRevisionRuntime {
         drop(selected_updater);
         let merged_epoch = replace_certificate_observations(full_epoch, certificate, &observed)?;
         let mut updater = self.updater();
-        updater
-            .changed_to(path_observation_shards(&merged_epoch))
+        if per_demand {
+            // Reobservation replaces values for the same full attempt keyset.
+            // No accumulated map is injected into production DICE history.
+            slug_workspace_v2::inject_path_observation_inputs(
+                &mut updater,
+                &merged_epoch,
+                full_epoch.observations().keys().cloned(),
+            )
             .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
-        updater
-            .changed_to(vec![(PathObservationEpochKey, merged_epoch.clone())])
-            .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+        } else {
+            // The explicit legacy certificate adapter is used by focused
+            // library tests; it does not serve ordinary daemon commands.
+            updater
+                .changed_to(path_observation_shards(&merged_epoch))
+                .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+            updater
+                .changed_to(vec![(PathObservationEpochKey, merged_epoch.clone())])
+                .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+        }
         self.commit_native_revision_under_owner(&mut owner, updater)
             .await?;
         drop(owner);
@@ -1719,6 +1744,90 @@ mod tests {
         assert_ne!(
             merged_epoch.get(first.certificate().demand()).unwrap(),
             first.certificate().observation()
+        );
+    }
+
+    #[tokio::test]
+    async fn per_demand_source_change_retry_keeps_unrelated_inputs_without_aggregate_history() {
+        let directory = tempfile::tempdir().unwrap();
+        let runtime = runtime(&directory);
+        let host = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(directory.path().join("host")).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let unrelated = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(directory.path().join("unrelated")).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let bytes = |value: &'static [u8]| {
+            Arc::new(PathObservationResult::FileBytes(
+                slug_workspace_v2::PathOperationResult::Present(Arc::from(value)),
+            ))
+        };
+        let a = bytes(b"a");
+        let untouched = bytes(b"untouched");
+        let full = PathObservationEpoch::from_shared([
+            (host.dupe(), a.dupe()),
+            (unrelated.dupe(), untouched.dupe()),
+        ])
+        .unwrap();
+        let certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared([(host.dupe(), a)]).unwrap(),
+        )
+        .unwrap();
+        let mut initial = runtime.updater();
+        slug_workspace_v2::inject_path_observation_inputs(
+            &mut initial,
+            &full,
+            full.observations().keys().cloned(),
+        )
+        .unwrap();
+        let terminal = runtime.commit_native_attempt(initial).await.unwrap();
+        let mut selected = runtime.updater();
+        slug_workspace_v2::inject_path_observation_inputs(
+            &mut selected,
+            certificate.observations(),
+            full.observations().keys().cloned(),
+        )
+        .unwrap();
+        let changed = bytes(b"changed");
+        let outcome = runtime
+            .finalize_native(&terminal, &certificate, selected, &full, |_| {
+                PathObservationEpoch::from_shared([(host.dupe(), changed.dupe())])
+                    .map_err(|error| RequestRevisionError::Observation(error.to_string()))
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            NativeFinalization::RetrySourceChanged { .. }
+        ));
+        let mut current = runtime.updater().existing_state().await;
+        assert!(Arc::ptr_eq(
+            &current
+                .compute(&slug_workspace_v2::PathObservationInputKey::new(host))
+                .await
+                .unwrap()
+                .unwrap(),
+            &changed,
+        ));
+        assert!(Arc::ptr_eq(
+            &current
+                .compute(&slug_workspace_v2::PathObservationInputKey::new(unrelated))
+                .await
+                .unwrap()
+                .unwrap(),
+            &untouched,
+        ));
+        assert!(current.compute(&PathObservationEpochKey).await.is_err());
+        assert_eq!(
+            current
+                .compute(&slug_workspace_v2::PathObservationInputModeKey)
+                .await
+                .unwrap(),
+            slug_workspace_v2::PathObservationInputMode::PerDemand,
         );
     }
 
