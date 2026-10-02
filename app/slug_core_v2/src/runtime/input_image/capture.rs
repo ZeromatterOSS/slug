@@ -107,6 +107,14 @@ impl std::fmt::Debug for CapturedInputImageLease {
 }
 
 impl CapturedInputImageLease {
+    pub(in crate::runtime) fn with_read_root<R>(
+        &self,
+        visitor: impl FnOnce(&File, &ObservedInputImage) -> R,
+    ) -> R {
+        let owner = self.0.get();
+        visitor(&owner.root, &owner.certificate)
+    }
+
     #[cfg(test)]
     pub(in crate::runtime) fn test_path(&self) -> &Path {
         self.0

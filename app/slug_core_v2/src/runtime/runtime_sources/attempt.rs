@@ -49,6 +49,34 @@ pub(in crate::runtime::dice) async fn sources(
     catalog: &mut selected_tool_source::declarations::Catalog,
     deadline: std::time::Instant,
 ) -> Result<Attempt<ObservedRuntimeSourceProfile>, NativeDemandSessionError> {
+    let mut transaction =
+        match source_transaction(runtime, guard, key, expected, catalog, deadline).await? {
+            Ok(transaction) => transaction,
+            Err(need) => return Ok(Attempt::Need(need)),
+        };
+    let profile = match complete(
+        slug_loading_v2::compute_runtime_source_profile(&mut transaction, key)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::Error::new(error)))?,
+    )? {
+        Err(need) => {
+            guard.seal_retry()?;
+            return Ok(Attempt::Need(need));
+        }
+        Ok(value) => value,
+    };
+    let selected = guard.seal_terminal()?.select(&transaction).await?;
+    Ok(Attempt::Complete(profile, selected))
+}
+
+pub(in crate::runtime::dice) async fn source_transaction(
+    runtime: &WorkspaceRuntime,
+    guard: &mut NativeDemandAbortGuard<'_>,
+    key: &RuntimeSourceProfileKey,
+    expected: &ObservedRuntimeSourceRequests,
+    catalog: &mut selected_tool_source::declarations::Catalog,
+    deadline: std::time::Instant,
+) -> Result<Result<dice::DiceTransaction, SourcePreparationNeeds>, NativeDemandSessionError> {
     let mut data = guard.attempt_user_computation_data()?;
     data.data
         .set(SelectedScratchPreparationDeadline::new(deadline));
@@ -62,7 +90,7 @@ pub(in crate::runtime::dice) async fn sources(
     )? {
         Err(need) => {
             guard.seal_retry()?;
-            return Ok(Attempt::Need(need));
+            return Ok(Err(need));
         }
         Ok(value) => value,
     };
@@ -79,19 +107,7 @@ pub(in crate::runtime::dice) async fn sources(
     .await?
     {
         guard.seal_retry()?;
-        return Ok(Attempt::Need(need));
+        return Ok(Err(need));
     }
-    let profile = match complete(
-        slug_loading_v2::compute_runtime_source_profile(&mut transaction, key)
-            .await
-            .map_err(|error| NativeDemandSessionError::Computation(anyhow::Error::new(error)))?,
-    )? {
-        Err(need) => {
-            guard.seal_retry()?;
-            return Ok(Attempt::Need(need));
-        }
-        Ok(value) => value,
-    };
-    let selected = guard.seal_terminal()?.select(&transaction).await?;
-    Ok(Attempt::Complete(profile, selected))
+    Ok(Ok(transaction))
 }

@@ -34,24 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-195-m7a-configured-runtime-source-profile-r1
-Status: accepted
+Packet: WP-7-196-m7a-keyed-guest-namespace-view-r1
+Status: accepted; next packet ready
 
-WP895 accepts explicit immutable runtime source configuration, genuine normal
-request/source-tree profile keys and one private native lease retaining certified
-tools plus configured runtime sources. Honest external Host root authority is a
-new reviewed current-policy/session factory; missing declarations refuse before
-IO. The bounded implementation contract is in
+WP896 accepts normal guest namespace facts from FULL selected tool/runtime source
+profile and scratch prefix, with explicit keyed Slug-native metadata and finite
+AliasDeny lookup outcomes. One private retained-FD view consumes genuine captured
+sources in the same restored command; no second binary tree or process activation.
+Shared46/Loading94/Core116 (256 distinct, all231 protected) focused gates pass;
+default owner all-target/CLI checks and independent FINAL ACCEPT pass;
+target/wp896/acceptance.json. The bounded contract is in
 [current-packet.md](slug-v2-subplans/current-packet.md).
 
-WP8941c912f364 accepts normal typed tool-source certificates/private staging;
-Shared31/Loading75/Core100 and default compile gates pass with independent FINAL.
-WP895 Shared40/Loading84/Core107 (231 distinct, protected206 plus25 new),
-default owner all-target/CLI checks and independent FINAL ACCEPT pass. Configured
-TreeOnly runtime source preparation is implemented. Complete namespace/loader/
-access facets, mediator/quota/backend and actual query plus locked generate remain
-required; M7A stays partial,
-with no process activation, selected-root fit or total RSS claim.
+WP895 c44ea8c68 accepts configured TreeOnly sources; Shared40/Loading84/Core107
+(231 distinct), default owner all-target/CLI checks and independent FINAL ACCEPT
+pass. Complete runtime roots/fit, aliases/loader/asset facets, kernel installation,
+all-access mediation/hard quota/backend and actual query plus locked generate/full
+bootstrap remain required. M7A stays partial, with no total RSS claim.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

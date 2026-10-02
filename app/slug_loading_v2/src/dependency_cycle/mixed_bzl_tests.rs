@@ -36,6 +36,11 @@ mod mixed_bzl_tests {
         generated_definition_cycle(2).await;
     }
 
+    #[tokio::test]
+    async fn guest_namespace_generated_definition_cycle_terminates_without_view() {
+        generated_definition_cycle(3).await;
+    }
+
     async fn generated_definition_cycle(consumer: u8) {
         let with_tools = consumer != 0;
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
@@ -174,13 +179,36 @@ mod mixed_bzl_tests {
         let runtime_key = super::super::runtime_sources::RuntimeSourceProfileKey::new(
             tool_key.requests_key().clone(),
         );
-        if consumer == 2 {
+        if consumer >= 2 {
             let policy = runtime_test_policy(
                 &resources,
                 &[runtime_test_relative("runtime", "/runtime")],
                 Default::default(),
             );
-            tx = runtime_test_install(
+            let guest = if consumer == 3 {
+                let guest = slug_bzlmod_v2::GuestNamespacePolicy::new(
+                    1000,
+                    1000,
+                    1000,
+                    1000,
+                    7,
+                    0,
+                    0,
+                    0o755,
+                    Default::default(),
+                )
+                .unwrap();
+                let current = slug_bzlmod_v2::GuestNamespaceTransaction::new(
+                    workspace.dupe(),
+                    Some(guest),
+                    resources.descriptor_budget().dupe(),
+                )
+                .unwrap();
+                Some((Some(guest), Some(current)))
+            } else {
+                None
+            };
+            tx = runtime_test_install_with_guest(
                 tx,
                 tracker.clone(),
                 &resources,
@@ -188,6 +216,7 @@ mod mixed_bzl_tests {
                 Some(runtime_test_authorization(&policy, &resources)),
                 None,
                 None,
+                guest,
             )
             .await;
         }
@@ -198,36 +227,57 @@ mod mixed_bzl_tests {
         let mut bzl_tx = tx.dupe();
         let mut tool_tx = tx.dupe();
         let mut runtime_tx = tx.dupe();
-        let (owner, bzl, tools, runtime) = tokio::time::timeout(Duration::from_secs(2), async {
-            tokio::join!(
-                tx.compute(&key),
-                bzl_tx.compute(&bzl_key),
-                async {
-                    if consumer == 1 {
-                        Some(
-                            crate::compute_selected_tool_sources(&mut tool_tx, &tool_key)
+        let mut guest_tx = tx.dupe();
+        let guest_key =
+            super::super::guest_namespace::SelectedGuestNamespaceFactsKey::new(runtime_key.clone());
+        let (owner, bzl, tools, runtime, guest) =
+            tokio::time::timeout(Duration::from_secs(2), async {
+                tokio::join!(
+                    tx.compute(&key),
+                    bzl_tx.compute(&bzl_key),
+                    async {
+                        if consumer == 1 {
+                            Some(
+                                crate::compute_selected_tool_sources(&mut tool_tx, &tool_key)
+                                    .await
+                                    .unwrap(),
+                            )
+                        } else {
+                            None
+                        }
+                    },
+                    async {
+                        if consumer == 2 {
+                            Some(
+                                crate::compute_runtime_source_profile(
+                                    &mut runtime_tx,
+                                    &runtime_key,
+                                )
                                 .await
                                 .unwrap(),
-                        )
-                    } else {
-                        None
-                    }
-                },
-                async {
-                    if consumer == 2 {
-                        Some(
-                            crate::compute_runtime_source_profile(&mut runtime_tx, &runtime_key)
+                            )
+                        } else {
+                            None
+                        }
+                    },
+                    async {
+                        if consumer == 3 {
+                            Some(
+                                crate::compute_selected_guest_namespace_facts(
+                                    &mut guest_tx,
+                                    &guest_key,
+                                )
                                 .await
                                 .unwrap(),
-                        )
-                    } else {
-                        None
+                            )
+                        } else {
+                            None
+                        }
                     }
-                }
-            )
-        })
-        .await
-        .expect("mixed generated-source cycle must terminate");
+                )
+            })
+            .await
+            .expect("mixed generated-source cycle must terminate");
         let SourcePreparationOutcome::Complete(Ok(owner)) = owner.unwrap() else {
             panic!("owner cycle must be a semantic terminal")
         };
@@ -303,7 +353,22 @@ mod mixed_bzl_tests {
                 "mixed cycle must refuse the new normal runtime profile: {runtime:?}"
             );
         }
-        drop((tx, bzl_tx, tool_tx, runtime_tx));
+        if let Some(guest) = guest {
+            assert!(
+                matches!(
+                    guest,
+                    SourcePreparationOutcome::Complete(Err(
+                        super::super::guest_namespace::GuestNamespaceFactsError::Runtime(
+                            super::super::runtime_sources::RuntimeSourcesError::Tool(
+                                super::super::selected_tools::SelectedToolSourcesError::Prefix(_)
+                            )
+                        )
+                    ))
+                ),
+                "mixed cycle must refuse actual normal namespace: {guest:?}"
+            );
+        }
+        drop((tx, bzl_tx, tool_tx, runtime_tx, guest_tx));
         dice.wait_for_idle().await;
         let dependencies = tracker.take_dependencies();
         if consumer == 1 {
@@ -324,7 +389,17 @@ mod mixed_bzl_tests {
                 "{request_dependencies:?}"
             );
         }
-        if consumer == 2 {
+        if consumer == 3 {
+            let (_, dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &guest_key.to_string())
+                .expect("Namespace consumer must genuinely activate");
+            assert!(
+                dependencies.contains(&runtime_key.to_string()),
+                "{dependencies:?}"
+            );
+        }
+        if consumer >= 2 {
             let (_, profile_dependencies) = dependencies
                 .iter()
                 .find(|(name, _)| name == &runtime_key.to_string())

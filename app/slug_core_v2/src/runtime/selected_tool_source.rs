@@ -58,6 +58,30 @@ impl fmt::Debug for CertifiedSelectedToolInputsLease {
     }
 }
 impl CertifiedSelectedToolInputsLease {
+    #[cfg(test)]
+    pub(super) fn test_scratch_path(&self) -> &std::path::Path {
+        self.0.get().scratch.test_path()
+    }
+
+    pub(super) fn with_image_root<R>(
+        &self,
+        role: usize,
+        visitor: impl FnOnce(&std::fs::File, &slug_workspace_v2::ObservedInputImage) -> R,
+    ) -> Option<R> {
+        let owner = self.0.get();
+        let index = *owner.image_for_role.get(role)?;
+        Some(owner.images.get(index?)?.as_ref()?.with_read_root(visitor))
+    }
+    pub(super) fn with_scratch_root<R>(
+        &self,
+        visitor: impl FnOnce(
+            &std::fs::File,
+            &slug_loading_v2::ObservedSelectedExtensionScratchPrefix,
+        ) -> R,
+    ) -> R {
+        self.0.get().scratch.with_read_root(visitor)
+    }
+
     #[allow(dead_code)]
     pub(super) fn certificate(&self) -> &ObservedSelectedExtensionToolSources {
         &self.0.get().certificate
@@ -88,7 +112,9 @@ impl WorkspaceRuntime {
             hook,
         )? {
             prepare::PreparedLease::Tools(lease) => Ok(lease),
-            prepare::PreparedLease::Runtime(_) => unreachable!("tool preparation mode"),
+            prepare::PreparedLease::Runtime(_) | PreparedLease::Namespace(_) => {
+                unreachable!("tool preparation mode")
+            }
         }
     }
 }

@@ -90,6 +90,17 @@ impl fmt::Debug for SelectedScratchSourceLease {
     }
 }
 impl SelectedScratchSourceLease {
+    pub(super) fn with_read_root<R>(
+        &self,
+        visitor: impl FnOnce(&File, &ObservedSelectedExtensionScratchPrefix) -> R,
+    ) -> R {
+        let owner = self.0.get();
+        visitor(
+            &owner.root,
+            owner.observed.as_ref().expect("promoted prefix"),
+        )
+    }
+
     #[allow(dead_code)]
     pub(super) fn observed(&self) -> &ObservedSelectedExtensionScratchPrefix {
         self.0.get().observed.as_ref().expect("promoted prefix")

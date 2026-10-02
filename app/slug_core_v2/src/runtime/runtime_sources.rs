@@ -27,7 +27,7 @@ mod factory;
 pub(super) mod prepare;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "runtime_sources/tests.rs"]
-mod tests;
+pub(in crate::runtime::dice) mod tests;
 
 fn refusal(message: &'static str) -> NativeDemandSessionError {
     NativeDemandSessionError::Computation(anyhow::anyhow!(message))
@@ -107,7 +107,9 @@ impl WorkspaceRuntime {
             hook,
         )? {
             PreparedLease::Runtime(lease) => Ok(lease),
-            PreparedLease::Tools(_) => unreachable!("runtime preparation mode"),
+            PreparedLease::Tools(_) | PreparedLease::Namespace(_) => {
+                unreachable!("runtime preparation mode")
+            }
         }
     }
 }
@@ -127,6 +129,32 @@ impl fmt::Debug for CertifiedRuntimeSourcesLease {
     }
 }
 impl CertifiedRuntimeSourcesLease {
+    #[cfg(test)]
+    pub(super) fn test_image_path(&self, declaration: usize) -> &std::path::Path {
+        self.0.get().images[declaration]
+            .as_ref()
+            .expect("captured runtime image")
+            .test_path()
+    }
+
+    pub(super) fn with_image_root<R>(
+        &self,
+        declaration: usize,
+        visitor: impl FnOnce(&std::fs::File, &ObservedInputImage) -> R,
+    ) -> Option<R> {
+        Some(
+            self.0
+                .get()
+                .images
+                .get(declaration)?
+                .as_ref()?
+                .with_read_root(visitor),
+        )
+    }
+    pub(super) fn tools(&self) -> &selected_tool_source::CertifiedSelectedToolInputsLease {
+        &self.0.get().tools
+    }
+
     pub(super) fn profile(&self) -> &ObservedRuntimeSourceProfile {
         &self.0.get().profile
     }

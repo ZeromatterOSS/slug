@@ -59,6 +59,27 @@ async fn runtime_test_install(
     )>,
     epoch: Option<PathObservationEpoch>,
 ) -> dice::DiceTransaction {
+    runtime_test_install_with_guest(tx, tracker, r, raw_policy, current, scratch, epoch, None).await
+}
+async fn runtime_test_install_with_guest(
+    tx: dice::DiceTransaction,
+    tracker: Arc<RepositoryRuleActivationTracker>,
+    r: &runtime_test_bzl::SelectedScratchResources,
+    raw_policy: Option<runtime_test_bzl::RuntimeSourceDeclarationPolicy>,
+    current: Option<runtime_test_bzl::RuntimeSourceDeclarationTransaction>,
+    scratch: Option<(
+        SelectedScratchElfMetadataTransaction,
+        Option<(
+            SelectedScratchElfMetadataEpochKey,
+            SelectedScratchElfMetadataEpoch,
+        )>,
+    )>,
+    epoch: Option<PathObservationEpoch>,
+    guest: Option<(
+        Option<runtime_test_bzl::GuestNamespacePolicy>,
+        Option<runtime_test_bzl::GuestNamespaceTransaction>,
+    )>,
+) -> dice::DiceTransaction {
     let mut data = dice::UserComputationData {
         cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
         activation_tracker: Some(tracker),
@@ -81,6 +102,18 @@ async fn runtime_test_install(
         data.data.set(current);
     }
     let mut updater = tx.into_updater();
+    let (guest_policy, guest_current) = guest.unwrap_or((None, None));
+    updater
+        .changed_to([(
+            runtime_test_bzl::RawGuestNamespacePolicyKey::new(
+                NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+            ),
+            guest_policy,
+        )])
+        .unwrap();
+    if let Some(current) = guest_current {
+        data.data.set(current);
+    }
     updater
         .changed_to([(
             runtime_test_bzl::RuntimeSourceDeclarationPolicyKey::new(

@@ -212,6 +212,7 @@ pub use cycle_detector::bzl_load_cycle_detector;
 pub use dependency_cycle::compute_runtime_source_profile;
 #[doc(hidden)]
 pub use dependency_cycle::compute_runtime_source_requests;
+pub use dependency_cycle::compute_selected_guest_namespace_facts;
 #[doc(hidden)]
 pub use dependency_cycle::compute_selected_scratch_prefix;
 #[doc(hidden)]
@@ -241,6 +242,16 @@ pub use host_package_inventory::HostPackageInventoryObservationError;
 pub use host_package_inventory::HostPackageInventoryObservationKey;
 #[doc(hidden)]
 pub use host_package_inventory::ObservedHostPackageInventory;
+pub use module_extension::guest_namespace::GuestDirectoryCheck;
+pub use module_extension::guest_namespace::GuestLookupError;
+pub use module_extension::guest_namespace::GuestNamespaceBinding;
+pub use module_extension::guest_namespace::GuestNamespaceFactsError;
+pub use module_extension::guest_namespace::GuestNamespaceMetadata;
+pub use module_extension::guest_namespace::GuestNamespaceNode;
+pub use module_extension::guest_namespace::GuestNamespaceNodeKind;
+pub use module_extension::guest_namespace::GuestNamespaceOperation;
+pub use module_extension::guest_namespace::ObservedGuestNamespaceFacts;
+pub use module_extension::guest_namespace::SelectedGuestNamespaceFactsKey;
 #[doc(hidden)]
 pub use module_extension::runtime_sources::ObservedRuntimeSourceProfile;
 #[doc(hidden)]

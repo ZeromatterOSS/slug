@@ -376,6 +376,36 @@ mutation/refusal/recovery, mixed cycle and lastDrop. Default owner all-target an
 CLI check pass; independent FINAL ACCEPT passes. This proves source-tree
 preparation only, with no runtime/namespace/root-fit/bootstrap/RSS claim.
 
+WP896 implements the Slug-native AliasDeny initial guest-facts producer and one
+private retained-FD view. Raw optional GuestNamespacePolicy owns UniformLinuxV1
+credentials/device/epoch/scaffold modes and independent occurrence limits;
+ordinary None computes stable missing before lower work and adds no new TX.
+Normal SelectedGuestNamespaceFacts depends on the FULL RuntimeProfile, retains
+all origins/frontiers/current services, and joins the exact live-context mixed
+graph. Sorted credited nodes/edges project explicit virtual metadata and original
+source mappings. Every source and scaffold occurrence counts before dedup;
+only identical full tool images at the same original root share physical rows.
+Source overlap, privileged bits, links and unowned facets refuse.
+
+Sequential raw lookup preserves dot/parent/trailing slash and search-before-missing.
+Final backed metadata validation precedes certified permission/type/readonly
+errors; membership precedes owned ENOENT, scaffold gaps remain Unowned. Each
+lookup reserves4352 before its fixed buffer; native directory verification uses
+precharged caller-owned8KiB getdents64 enumeration, and regular reads verify
+same-source kind/mode/length plus streamed64KiB SHA256. Operational/stale/unowned
+or unsupported outcomes poison all view clones; certified errno leaves validity.
+One existing Tools/Runtime/Namespace lifecycle captures, restores prior full
+Some/None raw policies and drains before export. Actual capture owners and normal
+history retain existing payload/logical/descriptor credits through last Drop;
+there is no second tool tree, writable FD authority or semantic native stat.
+
+WP896 Shared46/46, Loading94/94 and Core116/116 focused gates pass, including
+all231 protected selectors; default owner all-target/CLI checks pass. Independent
+DESIGN and FINAL ACCEPT; target/wp896/acceptance.json. This view does not
+prove actual runtime-root fit, POSIX aliases, loader/search/assets, complete
+process facets, kernel sealing/mediation/quota/backend, query+locked-generate,
+bootstrap or total RSS.
+
 Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
 generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
 or musl name cannot prove the selected bytes/interpreter. Host-tools come from the

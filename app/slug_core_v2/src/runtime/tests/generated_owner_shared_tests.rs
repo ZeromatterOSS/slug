@@ -236,6 +236,7 @@ fn reciprocal_owner_cycle_spans_two_independently_bound_request_proxies() {
             .unwrap(),
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
         runtime_sources: None,
+        guest_namespace: None,
     };
     let mut command = NativeDemandAbortGuard::new(
         fixture

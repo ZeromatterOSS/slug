@@ -1,9 +1,16 @@
 //! One command lifecycle for Tools and configured Runtime preparation.
+use super::super::guest_namespace;
 use super::super::runtime_sources;
 use super::*;
 
 pub(in crate::runtime::dice) enum PreparationMode {
     Tools,
+    Namespace {
+        key: slug_loading_v2::SelectedGuestNamespaceFactsKey,
+        runtime_key: slug_loading_v2::RuntimeSourceProfileKey,
+        runtime_policy: slug_bzlmod_v2::RuntimeSourceDeclarationPolicy,
+        guest_policy: slug_bzlmod_v2::GuestNamespacePolicy,
+    },
     Runtime {
         key: slug_loading_v2::RuntimeSourceProfileKey,
         policy: slug_bzlmod_v2::RuntimeSourceDeclarationPolicy,
@@ -11,6 +18,7 @@ pub(in crate::runtime::dice) enum PreparationMode {
 }
 pub(in crate::runtime::dice) enum PreparedLease {
     Tools(CertifiedSelectedToolInputsLease),
+    Namespace(guest_namespace::PreparedGuestNamespaceViewLease),
     Runtime(runtime_sources::CertifiedRuntimeSourcesLease),
 }
 impl WorkspaceRuntime {
@@ -40,7 +48,12 @@ impl WorkspaceRuntime {
             .and_then(|n| n.checked_add(key.checkpoint().policy().limits().max_depth))
             .and_then(|n| n.checked_add(6))
             .ok_or_else(|| refusal("tool attempt bound overflow"))?;
-        if let PreparationMode::Runtime { policy, .. } = &mode {
+        if let PreparationMode::Runtime { policy, .. }
+        | PreparationMode::Namespace {
+            runtime_policy: policy,
+            ..
+        } = &mode
+        {
             attempts = attempts
                 .checked_add(
                     policy
@@ -70,10 +83,25 @@ impl WorkspaceRuntime {
             .map_err(image_failure)?;
         let mut runtime_storage = match &mode {
             PreparationMode::Tools => None,
-            PreparationMode::Runtime { .. } => Some(runtime_sources::prepare::Storage::new(self)?),
+            PreparationMode::Runtime { .. } | PreparationMode::Namespace { .. } => {
+                Some(runtime_sources::prepare::Storage::new(self)?)
+            }
+        };
+        let mut namespace_credit = if matches!(&mode, PreparationMode::Namespace { .. }) {
+            Some(guest_namespace::reserve_owner(self)?)
+        } else {
+            None
         };
         let mut inputs = NativeDemandRequestInputBundle::normalized_initial();
-        if let PreparationMode::Runtime { policy, .. } = &mode {
+        if let PreparationMode::Namespace { guest_policy, .. } = &mode {
+            inputs.guest_namespace = Some(*guest_policy);
+        }
+        if let PreparationMode::Runtime { policy, .. }
+        | PreparationMode::Namespace {
+            runtime_policy: policy,
+            ..
+        } = &mode
+        {
             inputs.runtime_sources = Some(policy.dupe());
         }
         let mut guard = NativeDemandAbortGuard::new(
@@ -91,7 +119,10 @@ impl WorkspaceRuntime {
                             PreparationMode::Tools => {
                                 attempt::plan(self, &mut guard, &key, deadline).await
                             }
-                            PreparationMode::Runtime { key, .. } => {
+                            PreparationMode::Runtime { key, .. }
+                            | PreparationMode::Namespace {
+                                runtime_key: key, ..
+                            } => {
                                 match runtime_sources::attempt::plan(
                                     self, &mut guard, key, deadline,
                                 )
@@ -126,8 +157,13 @@ impl WorkspaceRuntime {
                             selected.sidecars().demands(),
                             deadline,
                         )?;
-                        if let (PreparationMode::Runtime { key, .. }, Some(runtime_plan)) =
-                            (&mode, &runtime_plan)
+                        if let (
+                            PreparationMode::Runtime { key, .. }
+                            | PreparationMode::Namespace {
+                                runtime_key: key, ..
+                            },
+                            Some(runtime_plan),
+                        ) = (&mode, &runtime_plan)
                         {
                             runtime_sources::validate_plan(
                                 guard.command(),
@@ -155,8 +191,13 @@ impl WorkspaceRuntime {
                     .expect("live tool command")
                     .scratch_metadata = Some(state);
                 let mut catalog = declarations::Catalog::new(self, &plan, deadline)?;
-                let runtime_catalog = if let (PreparationMode::Runtime { key, .. }, Some(plan)) =
-                    (&mode, &runtime_plan)
+                let runtime_catalog = if let (
+                    PreparationMode::Runtime { key, .. }
+                    | PreparationMode::Namespace {
+                        runtime_key: key, ..
+                    },
+                    Some(plan),
+                ) = (&mode, &runtime_plan)
                 {
                     Some(runtime_sources::catalogue::Catalogue::new(
                         self,
@@ -169,6 +210,7 @@ impl WorkspaceRuntime {
                     None
                 };
                 let mut runtime_profile = None;
+                let mut namespace_facts = None;
                 guard.begin_attempt()?;
                 let outcome = self.runtime.block_on(async {
                     tokio::time::timeout_at(tokio::time::Instant::from_std(deadline), async {
@@ -183,6 +225,28 @@ impl WorkspaceRuntime {
                                     deadline,
                                 )
                                 .await
+                            }
+                            PreparationMode::Namespace { key, .. } => {
+                                match guest_namespace::attempt::sources(
+                                    self,
+                                    &mut guard,
+                                    key,
+                                    runtime_plan.as_ref().expect("normal runtime plan"),
+                                    &mut catalog,
+                                    deadline,
+                                )
+                                .await?
+                                {
+                                    attempt::Attempt::Need(need) => {
+                                        Ok(attempt::Attempt::Need(need))
+                                    }
+                                    attempt::Attempt::Complete(facts, selected) => {
+                                        let tools = facts.profile().tool_sources().dupe();
+                                        runtime_profile = Some(facts.profile().dupe());
+                                        namespace_facts = Some(facts);
+                                        Ok(attempt::Attempt::Complete(tools, selected))
+                                    }
+                                }
                             }
                             PreparationMode::Runtime { key, .. } => {
                                 match runtime_sources::attempt::sources(
@@ -214,7 +278,11 @@ impl WorkspaceRuntime {
                 validate_plan(guard.command(), &key, &plan, &plan_demands, deadline)?;
                 match outcome? {
                     attempt::Attempt::Need(need) => {
-                        if let PreparationMode::Runtime { key, .. } = &mode {
+                        if let PreparationMode::Runtime { key, .. }
+                        | PreparationMode::Namespace {
+                            runtime_key: key, ..
+                        } = &mode
+                        {
                             runtime_sources::prepare::progress_sources(
                                 &mut guard,
                                 &need,
@@ -239,6 +307,17 @@ impl WorkspaceRuntime {
                     }
                     attempt::Attempt::Complete(certificate, selected) => {
                         let reachable = selected.sidecars().demands();
+                        if let (PreparationMode::Namespace { key, .. }, Some(facts)) =
+                            (&mode, &namespace_facts)
+                        {
+                            guest_namespace::validate(
+                                guard.command(),
+                                key,
+                                facts,
+                                runtime_profile.as_ref().unwrap(),
+                            )?;
+                        }
+
                         validate_final(
                             guard.command(),
                             &key,
@@ -260,8 +339,13 @@ impl WorkspaceRuntime {
                             &catalog,
                             deadline,
                         )?;
-                        if let (PreparationMode::Runtime { key, .. }, Some(profile)) =
-                            (&mode, &runtime_profile)
+                        if let (
+                            PreparationMode::Runtime { key, .. }
+                            | PreparationMode::Namespace {
+                                runtime_key: key, ..
+                            },
+                            Some(profile),
+                        ) = (&mode, &runtime_profile)
                         {
                             runtime_sources::prepare::verify_final(
                                 guard.command(),
@@ -326,8 +410,13 @@ impl WorkspaceRuntime {
                             &catalog,
                             deadline,
                         )?;
-                        if let (PreparationMode::Runtime { key, .. }, Some(profile)) =
-                            (&mode, &runtime_profile)
+                        if let (
+                            PreparationMode::Runtime { key, .. }
+                            | PreparationMode::Namespace {
+                                runtime_key: key, ..
+                            },
+                            Some(profile),
+                        ) = (&mode, &runtime_profile)
                         {
                             runtime_sources::prepare::verify_final(
                                 guard.command(),
@@ -338,6 +427,16 @@ impl WorkspaceRuntime {
                                 &catalog,
                                 runtime_catalog.as_ref().unwrap(),
                                 deadline,
+                            )?;
+                        }
+                        if let (PreparationMode::Namespace { key, .. }, Some(facts)) =
+                            (&mode, &namespace_facts)
+                        {
+                            guest_namespace::validate(
+                                guard.command(),
+                                key,
+                                facts,
+                                runtime_profile.as_ref().unwrap(),
                             )?;
                         }
                         let (_, _, terminal) = selected.sidecars.into_parts();
@@ -355,11 +454,21 @@ impl WorkspaceRuntime {
                             .map(CertifiedSelectedToolInputsLease)
                             .map_err(image_failure)?;
                         return if let Some(profile) = runtime_profile {
-                            runtime_storage
+                            let sources = runtime_storage
                                 .take()
                                 .expect("runtime prepared storage")
-                                .finish(profile, tools)
-                                .map(PreparedLease::Runtime)
+                                .finish(profile, tools)?;
+                            if let Some(facts) = namespace_facts {
+                                guest_namespace::finish(
+                                    facts,
+                                    sources,
+                                    namespace_credit.take().expect("namespace owner credit"),
+                                    self.image_resources.descriptor_budget(),
+                                )
+                                .map(PreparedLease::Namespace)
+                            } else {
+                                Ok(PreparedLease::Runtime(sources))
+                            }
                         } else {
                             Ok(PreparedLease::Tools(tools))
                         };

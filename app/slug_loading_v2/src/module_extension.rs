@@ -132,6 +132,7 @@ use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::starlark_label::StarlarkLabel;
+pub(crate) mod guest_namespace;
 mod owner_invocation;
 pub(crate) mod runtime_sources;
 mod selected_path;
@@ -8019,6 +8020,7 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
     include!("module_extension/selected_scratch/tests.rs");
     include!("module_extension/selected_tools/tests.rs");
     include!("module_extension/runtime_sources/tests.rs");
+    include!("module_extension/guest_namespace/tests.rs");
     include!("module_extension/selected_scratch/provenance_tests.rs");
     include!("module_extension/selected_path_owner_tests.rs");
     include!("module_extension_generated_path_tests.rs");

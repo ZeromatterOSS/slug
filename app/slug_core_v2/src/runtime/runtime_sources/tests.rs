@@ -683,7 +683,7 @@ fn runtime_sources_alias_missing_type_cancel_pressure_and_repair() {
     f.restored();
 }
 
-fn current_plan<'a>(
+pub(in crate::runtime::dice) fn current_plan<'a>(
     f: &'a Fixture,
     p: &RuntimeSourceDeclarationPolicy,
     k: &RuntimeSourceProfileKey,

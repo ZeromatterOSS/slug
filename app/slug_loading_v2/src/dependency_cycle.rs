@@ -20,6 +20,7 @@ use tokio::sync::watch;
 enum Node {
     RuntimeSourceRequests(Arc<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>),
     RuntimeSourceProfile(Arc<crate::module_extension::runtime_sources::RuntimeSourceProfileKey>),
+    GuestNamespace(Arc<crate::module_extension::guest_namespace::SelectedGuestNamespaceFactsKey>),
     SelectedToolRequests(Arc<crate::module_extension::selected_tools::SelectedExtensionToolSourceRequestsKey>),
     SelectedToolSources(Arc<crate::module_extension::selected_tools::SelectedExtensionToolSourcesKey>),
     SelectedScratchPrefix(Arc<crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey>),
@@ -51,6 +52,9 @@ impl Node {
             key.downcast_ref::<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>()
         {
             return Some(Self::RuntimeSourceRequests(Arc::new(key.clone())));
+        }
+        if let Some(key) = key.downcast_ref::<crate::module_extension::guest_namespace::SelectedGuestNamespaceFactsKey>() {
+            return Some(Self::GuestNamespace(Arc::new(key.clone())));
         }
         if let Some(key) =
             key.downcast_ref::<crate::module_extension::runtime_sources::RuntimeSourceProfileKey>()
@@ -153,6 +157,7 @@ impl fmt::Display for Node {
         match self {
             Self::RuntimeSourceRequests(key) => write!(f, "RuntimeSourceRequests({key})"),
             Self::RuntimeSourceProfile(key) => write!(f, "RuntimeSourceProfile({key})"),
+            Self::GuestNamespace(key) => write!(f, "GuestNamespace({key})"),
             Self::SelectedToolRequests(key) => write!(f, "SelectedToolRequests({key})"),
             Self::SelectedToolSources(key) => write!(f, "SelectedToolSources({key})"),
             Self::SelectedLabelSource(key) => write!(f, "SelectedLabelSource({key})"),
@@ -689,6 +694,49 @@ pub async fn compute_runtime_source_profile(
             || !value.authorized_by(transaction, scratch, resources)
         {
             return Err(RuntimeSourcesError::operational());
+        }
+    }
+    Ok(outcome)
+}
+
+/// Warm userdata authority is checked separately from DICE structural equality.
+pub async fn compute_selected_guest_namespace_facts(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::guest_namespace::SelectedGuestNamespaceFactsKey,
+) -> Result<
+    <crate::module_extension::guest_namespace::SelectedGuestNamespaceFactsKey as Key>::Value,
+    crate::module_extension::guest_namespace::GuestNamespaceFactsError,
+> {
+    use crate::module_extension::guest_namespace::GuestNamespaceFactsError;
+    let outcome = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| GuestNamespaceFactsError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &outcome {
+        let r = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchResources>()
+            .map_err(|_| GuestNamespaceFactsError::operational())?;
+        let guest = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::GuestNamespaceTransaction>()
+            .map_err(|_| GuestNamespaceFactsError::operational())?;
+        let runtime = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::RuntimeSourceDeclarationTransaction>()
+            .map_err(|_| GuestNamespaceFactsError::operational())?;
+        let scratch = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchElfMetadataTransaction>()
+            .map_err(|_| GuestNamespaceFactsError::operational())?;
+        if !value.matches_key(key)
+            || !value.same_resources(r)
+            || !value.authorized_by(guest, runtime, scratch, r)
+        {
+            return Err(GuestNamespaceFactsError::operational());
         }
     }
     Ok(outcome)

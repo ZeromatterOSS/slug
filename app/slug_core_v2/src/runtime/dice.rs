@@ -484,6 +484,8 @@ fn read_file_observations(
     )
 }
 
+#[path = "guest_namespace.rs"]
+mod guest_namespace;
 #[path = "input_image_bridge.rs"]
 mod input_image_bridge;
 #[path = "runtime_sources.rs"]
@@ -736,6 +738,7 @@ struct NativeDemandGenerationBundle {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct NativeDemandRequestInputBundle {
     runtime_sources: Option<slug_bzlmod_v2::RuntimeSourceDeclarationPolicy>,
+    guest_namespace: Option<slug_bzlmod_v2::GuestNamespacePolicy>,
     command_policy: BzlmodCommandPolicyKey,
     environment_policy: BzlmodEnvironmentPolicyKey,
     lockfile_mode: LockfileMode,
@@ -755,6 +758,7 @@ impl NativeDemandRequestInputBundle {
     fn normalized_initial() -> Self {
         Self {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false)
                 .expect("default bzlmod command policy is valid"),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
@@ -6664,6 +6668,7 @@ impl WorkspaceRuntime {
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -6852,6 +6857,7 @@ impl WorkspaceRuntime {
         };
         let request = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -6933,6 +6939,7 @@ impl WorkspaceRuntime {
         )?;
         let request = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -7564,6 +7571,12 @@ impl NativeDemandCommand<'_> {
             self.inputs.request.runtime_sources.as_ref(),
         )
         .map_err(NativeDemandSessionError::Injection)?;
+        guest_namespace::install_transaction(
+            &mut data,
+            self.runtime,
+            self.inputs.request.guest_namespace,
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
         // Loading uses this only to reject surplus prepared records on a
         // replay branch that no longer calls execute. A no-execute graph does
         // not acquire the transient DICE observation dependency.
@@ -7906,6 +7919,12 @@ impl NativeDemandCommand<'_> {
                 &mut data,
                 self.runtime,
                 prior.inputs.request.runtime_sources.as_ref(),
+            )
+            .map_err(NativeDemandSessionError::Restoration)?;
+            guest_namespace::install_transaction(
+                &mut data,
+                self.runtime,
+                prior.inputs.request.guest_namespace,
             )
             .map_err(NativeDemandSessionError::Restoration)?;
             let mut updater = self.runtime.dice.updater_with_data(data);
@@ -8660,6 +8679,12 @@ fn prepare_selected_native_demand_snapshot(
         snapshot.inputs.request.runtime_sources.as_ref(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    guest_namespace::install_transaction(
+        &mut data,
+        command.runtime,
+        snapshot.inputs.request.guest_namespace,
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     let mut updater = command.runtime.dice.updater_with_data(data);
     inject_native_demand_snapshot(
         &mut updater,
@@ -8835,6 +8860,12 @@ fn inject_native_demand_snapshot(
             NativeDemandWorkspaceRevision(inputs.generations.workspace_revision),
         )])
         .context("injecting fixed workspace revision")?;
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RawGuestNamespacePolicyKey::new(workspace.dupe()),
+            inputs.request.guest_namespace,
+        )])
+        .context("injecting guest namespace declaration input")?;
     updater
         .changed_to(vec![(
             slug_bzlmod_v2::RuntimeSourceDeclarationPolicyKey::new(workspace.dupe()),
@@ -11321,6 +11352,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
                 Some("all"),
@@ -11355,6 +11387,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
 
         let rejected_inputs = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .unwrap(),
@@ -11489,6 +11522,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
             runtime_sources: None,
+            guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
                 Some("all"),
