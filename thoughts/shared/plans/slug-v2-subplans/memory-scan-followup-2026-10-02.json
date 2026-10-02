@@ -1,0 +1,340 @@
+{
+  "request": "Reduce reported40GB memory footprint; scanner follow-up only",
+  "base": "d3392be459186b22eca800d3fe833988eb1048c2",
+  "scope": "Slug-native advisory scanner; no semantic/DICE or WP899 acceptance",
+  "cause": "Warm scan retained previous and current full path/metadata maps simultaneously",
+  "repair": "Consume old rows during scan; compare metadata before replacement; transfer overlapping path buffers; remaining old rows count deletions; canonicalization precedes state consumption",
+  "source_sha256": {
+    "app/slug_server_v2/src/workspace_metrics.rs": "d8aadbbb30a18b22f68030784f046e78252989eda1a8606ac5dc529e9b67529b",
+    "app/slug_server_v2/src/workspace_metrics/tests.rs": "02d4d9772c82a97dddc2ec7e1fae09e99bbb9e70f52071029762f576d5b3197d"
+  },
+  "toolchain": {
+    "rustc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+    "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+    "rustdoc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+    "rustfmt": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt"
+  },
+  "harness": "Actual production source, only tests-module path adjusted. Actual source tests, plus same two-observe checkout probe. Not daemon/workload RSS.",
+  "test_command": [
+    "timeout",
+    "--signal=TERM",
+    "--kill-after=3s",
+    "30s",
+    "/run/media/system/Colossus/dev/slug/target/memory-scan-followup/candidate-tests",
+    "--exact",
+    "workspace_metrics::tests::metadata_counts_warm_create_change_delete_and_recreate",
+    "workspace_metrics::tests::only_root_bazel_out_is_excluded",
+    "workspace_metrics::tests::root_canonicalization_error_preserves_previous_reporting_state",
+    "workspace_metrics::tests::sparse_binary_hidden_and_target_files_retain_only_metadata",
+    "workspace_metrics::tests::symlink_files_and_directories_are_not_followed",
+    "workspace_metrics::tests::overlapping_and_disjoint_scans_count_each_change_once",
+    "--test-threads=1"
+  ],
+  "selected_source_tests": 6,
+  "source_tests_passed": 6,
+  "rss_abba": [
+    {
+      "label": "baseline",
+      "exit": 0,
+      "elapsed_seconds": 4.42,
+      "peak_rss_kib": 262612
+    },
+    {
+      "label": "candidate-1",
+      "exit": 0,
+      "elapsed_seconds": 4.54,
+      "peak_rss_kib": 133296
+    },
+    {
+      "label": "candidate-2",
+      "exit": 0,
+      "elapsed_seconds": 4.51,
+      "peak_rss_kib": 133112
+    },
+    {
+      "label": "baseline-2",
+      "exit": 0,
+      "elapsed_seconds": 4.27,
+      "peak_rss_kib": 262732
+    }
+  ],
+  "mean_peak_reduction_percent": 49.2888,
+  "caps": "60s per compile preparation;30s per test/probe; no raises",
+  "independent_review": {
+    "path": "target/memory-scan-followup/final-review.md",
+    "sha256": "b82b9de5f844bcfd53a1cb18f672e96e1f007fd2015f2053eddc9480c16c0075",
+    "verdict": "FINAL ACCEPT for independent scanner patch; direct server/CLI compilation condition satisfied. WP899 remains unaccepted."
+  },
+  "limitations": [
+    "Reported40GB PID/command still unavailable; sandbox process list excludes host processes.",
+    "Current system snapshot approximately44GiB file cache and46GiB available; cannot infer which workload produced earlier40GB.",
+    "Disjoint scans can retain old plus new maps; this is not a total process bound.",
+    "Duplicate racing paths count/retain first observation; advisory only. Caught panic can lose prior reporting baseline.",
+    "Current daemon executable/lifecycle not inspected; on-disk rebuild does not upgrade an already running daemon.",
+    "Unbounded demanded FileBytes and registry response reads remain source-backed risks; known_shas.bzl required source is4.75MB so no speculative1MiB cap applied.",
+    "WP899 coupled source-profile candidate remains unaccepted; broad/native/actualroot gates remain pending."
+  ],
+  "artifacts_sha256": {
+    "baseline-tests": "3d5d8795a84758042e5006b9925b4b65d0bd22d550648446b5416546cb2c7abe",
+    "candidate-tests": "6af1ff74e911ce7d2eafc88fe1d89881e11c72b5cfb8db61fae3ca23f01055af",
+    "baseline.rs": "41c0ceb03e2e8f8870cfb4ed44f21e32af3ddff56aec04445927f6bd23be4ea7",
+    "candidate.rs": "b699ac609aa31ce5b43c9df6b75fcd8638dc47e770701a8d1b3f222768467a06",
+    "baseline-preflight.log": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e",
+    "candidate-preflight.log": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520",
+    "candidate-tests.log": "2dca40674bc4587be1bd2125b9c9f5339fd6f2c740a89db28fcaf5cc6c3a9c8b"
+  },
+  "baseline_test_source_sha256": "1ad4ccda947a220d1dad9f40913a7ea7505dc4bf8019cf2ba143a5d8b5bf5e6f",
+  "baseline_provenance": "Baseline rustc compilation preceded source/test edits. Original five tests at HEAD are preserved in baseline-tests-source.rs. Later ABBA only invokes identical frozen checkout_memory_probe.",
+  "direct_compile": {
+    "command": {
+      "command": [
+        "/usr/bin/time",
+        "-f",
+        "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+        "-o",
+        "/run/media/system/Colossus/dev/slug/target/wp899/memory-server-check-pass-receipt.json",
+        "env",
+        "CARGO_BUILD_JOBS=1",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_server_v2",
+        "--lib",
+        "-p",
+        "slug_cli_v2",
+        "--bins",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "cwd": "/run/media/system/Colossus/dev/slug"
+    },
+    "receipt": {
+      "exit": 0,
+      "elapsed_seconds": 9.67,
+      "peak_rss_kib": 664516
+    },
+    "context": "Actual working candidate includes unaccepted WP899; memory-only source uses unchanged baseline interfaces. Check-passed source source_preparation/attempt.rs has root-only missing-import correction. No WP899 acceptance or process activation."
+  },
+  "server_unit_preparation_attempt": {
+    "command": {
+      "command": [
+        "/usr/bin/time",
+        "-f",
+        "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+        "-o",
+        "/run/media/system/Colossus/dev/slug/target/wp899/memory-server-tests-receipt.json",
+        "env",
+        "CARGO_BUILD_JOBS=1",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_server_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_server_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_server_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "cwd": "/run/media/system/Colossus/dev/slug"
+    },
+    "receipt": {
+      "exit": 124,
+      "elapsed_seconds": 60.0,
+      "peak_rss_kib": 1787656
+    }
+  },
+  "additional_preparation": {
+    "memory-server-dependency": {
+      "command": {
+        "command": [
+          "/usr/bin/time",
+          "-f",
+          "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+          "-o",
+          "/run/media/system/Colossus/dev/slug/target/wp899/memory-server-dependency-receipt.json",
+          "env",
+          "CARGO_BUILD_JOBS=1",
+          "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "build",
+          "-p",
+          "slug_loading_v2",
+          "--lib",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "cwd": "/run/media/system/Colossus/dev/slug"
+      },
+      "receipt": {
+        "exit": 0,
+        "elapsed_seconds": 56.12,
+        "peak_rss_kib": 1303508
+      }
+    },
+    "memory-server-tests-final": {
+      "command": {
+        "command": [
+          "/usr/bin/time",
+          "-f",
+          "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+          "-o",
+          "/run/media/system/Colossus/dev/slug/target/wp899/memory-server-tests-final-receipt.json",
+          "env",
+          "CARGO_BUILD_JOBS=1",
+          "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_server_v2",
+          "--lib",
+          "--no-run",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "cwd": "/run/media/system/Colossus/dev/slug"
+      },
+      "receipt": {
+        "exit": 124,
+        "elapsed_seconds": 60.0,
+        "peak_rss_kib": 940812
+      }
+    },
+    "memory-core-dependency": {
+      "command": {
+        "command": [
+          "/usr/bin/time",
+          "-f",
+          "{\"exit\":%x,\"elapsed_seconds\":%e,\"peak_rss_kib\":%M}",
+          "-o",
+          "/run/media/system/Colossus/dev/slug/target/wp899/memory-core-dependency-receipt.json",
+          "env",
+          "CARGO_BUILD_JOBS=1",
+          "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "build",
+          "-p",
+          "slug_core_v2",
+          "--lib",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_server_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "cwd": "/run/media/system/Colossus/dev/slug"
+      },
+      "receipt": {
+        "exit": 124,
+        "elapsed_seconds": 60.0,
+        "peak_rss_kib": 1413580
+      }
+    }
+  },
+  "system_snapshot_kib": {
+    "MemAvailable": 48483312,
+    "Cached": 46378892,
+    "AnonPages": 7458104,
+    "context": "Host-wide snapshot; sandbox process namespace exposes only tool processes, no actual40GB PID attribution."
+  },
+  "status": "accepted narrow scanner source; larger40GB/full-workload attribution remains unproved",
+  "broader_validation_status": "Loading library preparation passed; server test preparation and separate Core library preparation hit60s caps. No server unit execution or new CLI link/installation claimed. Direct server+CLI check and isolated6 source tests passed."
+}

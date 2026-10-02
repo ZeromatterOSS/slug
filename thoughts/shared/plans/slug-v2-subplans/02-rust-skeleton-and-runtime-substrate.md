@@ -21,6 +21,15 @@ workspace file payloads. The legacy explicit Core snapshot helper remains for
 its bounded callers/tests. WP880 covers sparse payloads and genuine DICE content
 A/B/A even when advisory reporting says zero; its manifest owns validation.
 
+The memory follow-up drains predecessor metadata rows during warm scans and
+transfers overlapping path buffers instead of retaining two complete maps.
+Root canonicalization errors preserve the prior report; concurrent repeated
+paths use the first observation, still advisory. The scanner-only checkout
+A/B/B/A peak fell from mean262672KiB to133204KiB (49.3%); six source controls
+and direct server/CLI compilation pass. Disjoint scans, allocator retention,
+whole-build memory and the reported40GB process remain separate limitations.
+See [receipt](memory-scan-followup-2026-10-02.json). WP899 remains unaccepted.
+
 ## Native path-input history boundary
 
 Accepted source 3afc49f95b15a698a78bc8a84047302864ba4816 replaces ordinary command injection of cumulative

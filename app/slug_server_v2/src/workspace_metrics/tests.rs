@@ -27,7 +27,7 @@ fn sparse_binary_hidden_and_target_files_retain_only_metadata() {
     let file = std::fs::File::create(&sparse).unwrap();
     file.set_len(1_u64 << 40).unwrap();
     std::fs::write(root.path().join(".hidden"), [0xff, 0xfe]).unwrap();
-    let files = scan(root.path());
+    let files = scan(root.path(), None).0;
     assert_eq!(files.len(), 2);
     assert_eq!(files[&sparse].length, 1_u64 << 40);
     assert_eq!(files[&root.path().join(".hidden")].length, 2);
@@ -41,7 +41,7 @@ fn only_root_bazel_out_is_excluded() {
     std::fs::write(root.path().join("bazel-out/product"), b"ignored").unwrap();
     let nested = root.path().join("nested/bazel-out/source");
     std::fs::write(&nested, b"included").unwrap();
-    let files = scan(root.path());
+    let files = scan(root.path(), None).0;
     assert_eq!(files.len(), 1);
     assert!(files.contains_key(&nested));
 }
@@ -56,7 +56,7 @@ fn symlink_files_and_directories_are_not_followed() {
     std::os::unix::fs::symlink(external.path().join("file"), root.path().join("file-link"))
         .unwrap();
     std::os::unix::fs::symlink(root.path(), root.path().join("cycle")).unwrap();
-    assert!(scan(root.path()).is_empty());
+    assert!(scan(root.path(), None).0.is_empty());
 }
 
 #[test]
@@ -66,6 +66,28 @@ fn root_canonicalization_error_preserves_previous_reporting_state() {
     let mut adapter = FilesystemObservationAdapter::default();
     assert_eq!(adapter.observe(root.path()).unwrap(), 0);
     assert!(adapter.observe(&root.path().join("missing")).is_err());
+    assert_eq!(adapter.previous.as_ref().unwrap().len(), 1);
+    assert_eq!(adapter.observe(root.path()).unwrap(), 0);
+}
+
+#[test]
+fn overlapping_and_disjoint_scans_count_each_change_once() {
+    let root = tempfile::tempdir().unwrap();
+    for name in ["same", "changed", "deleted"] {
+        std::fs::write(root.path().join(name), b"old").unwrap();
+    }
+    let mut adapter = FilesystemObservationAdapter::default();
+    assert_eq!(adapter.observe(root.path()).unwrap(), 0);
+    std::fs::write(root.path().join("changed"), b"longer").unwrap();
+    std::fs::remove_file(root.path().join("deleted")).unwrap();
+    std::fs::write(root.path().join("new"), b"new").unwrap();
+    assert_eq!(adapter.observe(root.path()).unwrap(), 3);
+    assert_eq!(adapter.observe(root.path()).unwrap(), 0);
+    for name in ["same", "changed", "new"] {
+        std::fs::remove_file(root.path().join(name)).unwrap();
+    }
+    std::fs::write(root.path().join("replacement"), b"new").unwrap();
+    assert_eq!(adapter.observe(root.path()).unwrap(), 4);
     assert_eq!(adapter.previous.as_ref().unwrap().len(), 1);
     assert_eq!(adapter.observe(root.path()).unwrap(), 0);
 }

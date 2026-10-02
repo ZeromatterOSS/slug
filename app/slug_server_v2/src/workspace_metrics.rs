@@ -56,17 +56,9 @@ impl FilesystemObservationAdapter {
         let workspace = workspace
             .canonicalize()
             .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-        let current = scan(&workspace);
-        let invalidated = self.previous.as_ref().map_or(0, |previous| {
-            previous
-                .iter()
-                .filter(|(path, value)| current.get(*path) != Some(*value))
-                .count()
-                + current
-                    .keys()
-                    .filter(|path| !previous.contains_key(*path))
-                    .count()
-        });
+        // Drain old rows while scanning instead of retaining two complete maps.
+        // Canonicalization above must succeed before taking the reporting state.
+        let (current, invalidated) = scan(&workspace, self.previous.take());
         // A successful root observation replaces the old reporting state;
         // local scan errors never become semantic command errors.
         self.previous = Some(current);
@@ -74,8 +66,12 @@ impl FilesystemObservationAdapter {
     }
 }
 
-fn scan(workspace: &Path) -> BTreeMap<PathBuf, FileMetadata> {
+fn scan(
+    workspace: &Path,
+    mut previous: Option<BTreeMap<PathBuf, FileMetadata>>,
+) -> (BTreeMap<PathBuf, FileMetadata>, usize) {
     let mut files = BTreeMap::new();
+    let mut invalidated = 0;
     let mut directories: Vec<(PathBuf, ReadDir)> = Vec::new();
     if let Ok(entries) = std::fs::read_dir(workspace) {
         directories.push((workspace.to_path_buf(), entries));
@@ -97,7 +93,21 @@ fn scan(workspace: &Path) -> BTreeMap<PathBuf, FileMetadata> {
             continue;
         };
         if metadata.is_file() {
-            files.insert(path, FileMetadata::new(&metadata));
+            // A racing directory iterator may repeat a path. Advisory metrics
+            // observe each file once; they never authorize semantic cache hits.
+            if files.contains_key(&path) {
+                continue;
+            }
+            let value = FileMetadata::new(&metadata);
+            let old = previous
+                .as_mut()
+                .and_then(|files| files.remove_entry(&path));
+            if previous.is_some() && old.as_ref().map(|(_, value)| value) != Some(&value) {
+                invalidated += 1;
+            }
+            // Reuse the retained path allocation for overlapping entries too.
+            let path = old.map_or(path, |(path, _)| path);
+            files.insert(path, value);
         } else if metadata.is_dir() {
             if let Ok(entries) = std::fs::read_dir(&path) {
                 directories.push((path, entries));
@@ -106,7 +116,8 @@ fn scan(workspace: &Path) -> BTreeMap<PathBuf, FileMetadata> {
         // Symlinks and special files are not followed or opened. The iterator
         // stack retains directory state only along the current DFS ancestry.
     }
-    files
+    invalidated += previous.map_or(0, |files| files.len());
+    (files, invalidated)
 }
 
 #[cfg(test)]
