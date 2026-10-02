@@ -243,6 +243,12 @@ pub(super) struct PreparedSelectedLabelPath {
 }
 
 impl PreparedSelectedLabelPath {
+    pub(super) fn recipe(&self) -> &SelectedLabelSourceRecipe {
+        &self.recipe
+    }
+    pub(super) fn path(&self) -> &ImageChargedPath {
+        &self.path
+    }
     fn new(
         workspace: &NormalizedAbsolutePath,
         label: &CanonicalLabel,
@@ -274,7 +280,7 @@ impl PreparedSelectedLabelPath {
         })
     }
 
-    fn derive(&self, child: Option<&str>) -> Result<Self, SelectedLabelSourceError> {
+    pub(super) fn derive(&self, child: Option<&str>) -> Result<Self, SelectedLabelSourceError> {
         // Validate and reserve the ordered transform before allocating a path.
         let recipe = match child {
             Some(child) => self.recipe.child(child, &self.budget)?,

@@ -132,7 +132,9 @@ use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::starlark_label::StarlarkLabel;
+mod owner_invocation;
 mod selected_path;
+pub(crate) mod selected_scratch;
 use selected_path::SelectedModuleLabelPath;
 use selected_path::SelectedPathInvocation;
 use selected_path::SelectedPathReady;
@@ -1216,57 +1218,14 @@ fn generated_repository_label_refusal(label: &CanonicalLabel, site: &str) -> Str
 
 #[rustfmt::skip]
 async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, mode: PureInvocationsMode) -> OwnerPureDriver {
-    let (inputs, observations) = match mode {
-        PureInvocationsMode::Legacy => match ctx.compute(&HostSelectedExtensionOwnerInputsKey::new(key.workspace.dupe(), key.owner.clone())).await {
-            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
-            Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Compute(error.to_string().into())), PathObservationEpoch::empty()),
-        },
-        PureInvocationsMode::Observed => match ctx.compute(&HostSelectedExtensionOwnerInputsObservationKey::new(key.workspace.dupe(), key.owner.clone())).await {
-            Ok(SourcePreparationOutcome::Need(need)) => return SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => return SourcePreparationOutcome::Complete(Err(HostSelectedExtensionOwnerPureObservationError::Inputs(error))),
-            Ok(SourcePreparationOutcome::Complete(Ok(value))) => (value.result().dupe(), value.observations().dupe()),
-            Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Compute(error.to_string().into())), PathObservationEpoch::empty()),
-        },
-    };
-    let inputs = match inputs.as_ref() {
-        Ok(value) => Arc::new(value.clone()),
-        Err(error) => return owner_complete(Err(HostSelectedExtensionOwnerPureError::Inputs(error.clone())), observations),
-    };
-    let first_module = match owner_bzl(ctx, key, &inputs, None, observations, mode).await { Ok(value) => value, Err(outcome) => return outcome };
-    let first = match owner_projection(&first_module.0, inputs.request()) {
-        Ok(value) => Arc::new(value),
-        Err(error) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
-    };
-    drop(first_module.0);
-    let host = match observe_selected_host(ctx, &key.workspace, &first.definition.environment).await {
-        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Err(error)) => return owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1),
-        SourcePreparationOutcome::Complete(Ok(host)) => host,
-    };
-    let factors = Arc::new(SelectedExtensionEvalFactors::from_host(&first.definition, &host));
-    let owner = Arc::new(());
-    let modules = match owner_invocation_modules(&inputs, &first, &owner, MAX_INVOCATION_TAGS_PER_MODULE) {
+    let owner_invocation::PreparedOwnerInvocation {
+        inputs, first, host, factors, modules, owner, ready, module,
+        mut observations, root_usage,
+    } = match owner_invocation::prepare_owner_invocation(ctx, key, mode).await {
         Ok(value) => value,
-        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1)),
+        Err(outcome) => return outcome,
     };
-    let ready = match selected_download_preflight(ctx, key).await {
-        Ok(ready) => ready,
-        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), first_module.1)),
-    };
-    let (module, mut observations) = match owner_bzl(ctx, key, &inputs, Some(&first), first_module.1, mode).await { Ok(value) => value, Err(outcome) => return factor_owner_terminal(&factors, outcome) };
-    let second = match owner_projection(&module, inputs.request()) {
-        Ok(value) => value,
-        Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), error)), observations)),
-    };
-    if second != *first {
-        return factor_owner_terminal(&factors, owner_complete(Err(owner_after(&inputs, Arc::from([]), "reacquired selected module extension differs")), observations));
-    }
     let definition = module.module.get_assigned(inputs.request().parts().1).expect("projection authenticated export").0.downcast::<FrozenModuleExtensionDefinition>().expect("projection authenticated kind");
-    let root_usage = inputs.root_proxies().map(|proxies| RootModuleExtensionUsage::new(
-        proxies.iter().any(|proxy| !proxy.dev_dependency),
-        proxies.iter().any(|proxy| proxy.dev_dependency),
-    ));
     let mut ready_paths = SelectedPathReady::default();
     let mut ready_environment = Vec::new();
     loop {
@@ -2080,6 +2039,12 @@ impl<'v> StarlarkValue<'v> for InvocationContext {
     }
 }
 
+fn invocation_context_receiver<'v>(value: Value<'v>) -> Option<&'v InvocationContext> {
+    InvocationContext::from_value(value).or_else(|| {
+        selected_scratch::CheckpointContext::from_value(value).map(|context| &context.base)
+    })
+}
+
 #[starlark_module]
 fn invocation_context_methods(builder: &mut MethodsBuilder) {
     fn getenv<'v>(
@@ -2088,7 +2053,7 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let this = InvocationContext::from_value(this)
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let selected = this.selected_getenv.as_ref().ok_or_else(|| {
             anyhow::anyhow!("module_ctx.getenv is only supported for a selected module extension")
@@ -2106,7 +2071,7 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         this: Value<'v>,
         #[starlark(require = pos)] label: Value<'v>,
     ) -> anyhow::Result<Value<'v>> {
-        let this = InvocationContext::from_value(this)
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let watch = this.selected_watch.as_ref().ok_or_else(|| {
             anyhow::anyhow!("module_ctx.watch is only supported for a selected module extension")
@@ -2121,7 +2086,10 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] path: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let this = InvocationContext::from_value(this)
+        if let Some(context) = selected_scratch::CheckpointContext::from_value(this) {
+            return context.path(path, eval);
+        }
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         if this.selected_download.is_none() && this.selected_path.is_none() {
             anyhow::bail!("module_ctx.path is only supported for a selected module extension");
@@ -2152,7 +2120,10 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] executable: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let this = InvocationContext::from_value(this)
+        if let Some(context) = selected_scratch::CheckpointContext::from_value(this) {
+            return context.download(url, output, sha256, executable, eval);
+        }
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let download = this.selected_download.as_ref().ok_or_else(|| {
             anyhow::anyhow!("module_ctx.download is only supported for a selected module extension")
@@ -2186,7 +2157,7 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] reproducible: bool,
         #[starlark(require = named)] facts: Option<Value<'v>>,
     ) -> anyhow::Result<StarlarkModuleExtensionMetadata> {
-        InvocationContext::from_value(this)
+        invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let facts = metadata_facts(facts)?;
         let (regular, dev) =
@@ -2196,7 +2167,7 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         ))
     }
     fn is_dev_dependency(this: Value, tag: Value) -> anyhow::Result<bool> {
-        let this = InvocationContext::from_value(this)
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let tag = InvocationTag::from_value(tag)
             .ok_or_else(|| anyhow::anyhow!("expected a tag from ctx.modules"))?;
@@ -2206,7 +2177,7 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
         Ok(tag.dev_dependency)
     }
     fn tag_sort_key(this: Value, tag: Value) -> anyhow::Result<InvocationTagSortKey> {
-        let this = InvocationContext::from_value(this)
+        let this = invocation_context_receiver(this)
             .ok_or_else(|| anyhow::anyhow!("invalid module_ctx receiver"))?;
         let tag = InvocationTag::from_value(tag)
             .ok_or_else(|| anyhow::anyhow!("expected a tag from ctx.modules"))?;
@@ -8036,12 +8007,15 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
         let source = include_str!("module_extension.rs");
         let production = &source[..source.find("mod tests {").unwrap()];
         let owner = &production[production.find("async fn owner_bzl").unwrap()..];
+        let preparation = include_str!("module_extension/owner_invocation.rs");
         assert!(owner.contains("RootRepositoryRoute::for_selected_extension_definition"));
         assert!(owner.contains("ExternalBzlModuleEvalKey::new_bzlmod"));
         assert!(owner.contains("ExternalBzlModuleObservationKey::new_bzlmod"));
-        assert!(owner.contains("owner_bzl(ctx, key, &inputs, None"));
-        assert!(owner.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
+        assert!(preparation.contains("owner_bzl(ctx, key, &inputs, None"));
+        assert!(preparation.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
     }
+    include!("module_extension/selected_scratch/tests.rs");
+    include!("module_extension/selected_scratch/provenance_tests.rs");
     include!("module_extension/selected_path_owner_tests.rs");
     include!("module_extension_generated_path_tests.rs");
     include!("dependency_cycle/mixed_bzl_tests.rs");

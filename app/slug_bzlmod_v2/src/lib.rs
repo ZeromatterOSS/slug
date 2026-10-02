@@ -42,6 +42,7 @@ mod repository_label_path;
 pub mod resolution;
 mod root_bootstrap;
 mod selected_extension_download;
+mod selected_extension_scratch;
 mod selected_graph;
 mod selected_label_source;
 mod selected_repo_spec;
@@ -407,6 +408,8 @@ pub use selected_extension_download::SelectedExtensionDownloadTransaction;
 pub use selected_extension_download::SelectedExtensionDownloadVerified;
 #[doc(hidden)]
 pub use selected_extension_download::UsedDownloadRequestKey;
+#[doc(hidden)]
+pub use selected_extension_scratch::*;
 #[doc(hidden)]
 pub use selected_label_source::ObservedSelectedLabelSource;
 #[doc(hidden)]

@@ -34,18 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-192-m7a-selected-label-source-producer-r1
-Status: ACCEPTED; normal selected Label sources; no process activation
+Packet: WP-7-193-m7a-scratch-prefix-source-producer-r1
+Status: accepted; normal scratch-prefix source prerequisite, no process activation
 
-WP892 implements normal selected Label provenance and private image/ELF factory
-consumption. Full origin/ordered transforms, current root/request/session/budget,
-complete frontier and credited last-Drop history survive normal Need/replay.
-Bzlmod14/14, Loading40/40 and Core84/84 pass; owner all-target/default CLI compile,
-format/plan/archive/diff and independent FINAL ACCEPT pass. WP891 b3335729f owns
-full pipeline design: scratch/download prefix staging, runtime policy/complete
-namespace/mediator/quota and cohesive query+locked-generate remain required.
-Stage5/9 and manifest retain the contract and evidence. No method/process/full-
-runtime/bootstrap/RSS claim; goal stays active.
+WP893 accepts the normal first-process scratch-prefix producer and private native
+source staging. Actual definition/usage/env/Label/download dependencies, ordered
+writes and exact bytes/modes/spellings retain bounded credits through last Drop;
+normal mutating Needs refresh complete raw observations before recomputation.
+Shared23/Loading69/Core92 selected gates and owner all-target/default CLI checks
+pass with independent FINAL ACCEPT. No process activation or total RSS claim.
+
+Next readiness is the selected tool/runtime source producer: connect actual
+normal prefix/Label operands to observed ELF/runtime source authority and raw
+request policy. Complete namespace/mediator/quota and cohesive query plus locked
+generate remain the bootstrap pipeline; M7A stays partial and the goal active.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

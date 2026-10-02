@@ -486,11 +486,14 @@ fn read_file_observations(
 
 #[path = "input_image_bridge.rs"]
 mod input_image_bridge;
+#[path = "selected_scratch_source.rs"]
+mod selected_scratch_source;
 
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
     image_resources: super::input_image::WorkspaceImageResources,
+    scratch_resources: slug_bzlmod_v2::SelectedScratchResources,
     // Retained now so the request-projection packet cannot accidentally create
     // a second process owner at observation time.
     #[allow(dead_code)]
@@ -6085,11 +6088,17 @@ impl WorkspaceRuntime {
                 .expect("canonical workspace remains normalized"),
             runtime.handle().clone(),
         );
+        let image_resources = super::input_image::WorkspaceImageResources::new(
+            slug_workspace_v2::ImageDescriptorBudget::new(64 * 1024 * 1024),
+            2 * 1024 * 1024 * 1024,
+        );
+        let scratch_resources = slug_bzlmod_v2::SelectedScratchResources::new(
+            slug_bzlmod_v2::SelectedScratchPayloadBudget::new(256 * 1024 * 1024),
+            image_resources.descriptor_budget().clone(),
+        );
         Ok(Self {
-            image_resources: super::input_image::WorkspaceImageResources::new(
-                slug_workspace_v2::ImageDescriptorBudget::new(64 * 1024 * 1024),
-                2 * 1024 * 1024 * 1024,
-            ),
+            image_resources,
+            scratch_resources,
             workspace,
             process_host,
             configured_output,
@@ -6146,6 +6155,7 @@ impl WorkspaceRuntime {
         self.request_revision.install_cycle_detector(&mut data);
         data.data
             .set(self.image_resources.descriptor_budget().clone());
+        data.data.set(self.scratch_resources.clone());
         #[cfg(feature = "native-probe-observer")]
         if let Some(observer) = self.probe_observer.as_ref() {
             data.tracker = observer.clone();

@@ -209,6 +209,8 @@ pub use cc_header_info::alloc_frozen_cc_header_info;
 pub use cc_header_info::cc_header_info;
 pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
+pub use dependency_cycle::compute_selected_scratch_prefix;
+#[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSet;
 #[doc(hidden)]
 pub use external_subtree_package_set::ExternalSubtreePackageSetError;
@@ -231,6 +233,16 @@ pub use host_package_inventory::HostPackageInventoryObservationError;
 pub use host_package_inventory::HostPackageInventoryObservationKey;
 #[doc(hidden)]
 pub use host_package_inventory::ObservedHostPackageInventory;
+#[doc(hidden)]
+pub use module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey;
+#[doc(hidden)]
+pub use module_extension::selected_scratch::ObservedSelectedExtensionScratchPrefix;
+#[doc(hidden)]
+pub use module_extension::selected_scratch::SelectedScratchLabelSource;
+#[doc(hidden)]
+pub use module_extension::selected_scratch::SelectedScratchPrefixError;
+#[doc(hidden)]
+pub use module_extension::selected_scratch::SelectedScratchPreparationDeadline;
 #[doc(hidden)]
 pub use module_extension_repository_file_effect::HostSelectedRepositoryFileEffect;
 #[doc(hidden)]

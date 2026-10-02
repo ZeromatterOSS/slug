@@ -87,7 +87,7 @@ impl WorkspaceImageResources {
     pub(super) fn descriptor_budget(&self) -> &ImageDescriptorBudget {
         &self.descriptor
     }
-    fn reserve_logical(
+    pub(in crate::runtime) fn reserve_logical(
         &self,
         bytes: u64,
     ) -> Result<LogicalByteReservation, InputImageCaptureError> {
@@ -119,7 +119,7 @@ impl WorkspaceImageResources {
     }
 }
 
-struct LogicalByteReservation {
+pub(in crate::runtime) struct LogicalByteReservation {
     budget: Arc<LogicalByteBudget>,
     bytes: u64,
 }

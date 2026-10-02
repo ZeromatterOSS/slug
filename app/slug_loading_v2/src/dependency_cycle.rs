@@ -18,6 +18,7 @@ use tokio::sync::watch;
 /// Every variant stores the complete concrete key, including mode and source route.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 enum Node {
+    SelectedScratchPrefix(Arc<crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey>),
     SelectedLabelSource(Arc<slug_bzlmod_v2::SelectedLabelSourceKey>),
     LegacyBzl(Arc<crate::keys::BzlModuleEvalKey>),
     HostBzl(Arc<crate::bzl_module::HostBzlModuleEvalKey>),
@@ -42,6 +43,9 @@ enum Node {
 
 impl Node {
     fn from_dyn(key: &DynKey) -> Option<Self> {
+        if let Some(key) = key.downcast_ref::<crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey>() {
+            return Some(Self::SelectedScratchPrefix(Arc::new(key.clone())));
+        }
         if let Some(key) = key.downcast_ref::<slug_bzlmod_v2::SelectedLabelSourceKey>() {
             return Some(Self::SelectedLabelSource(Arc::new(key.clone())));
         }
@@ -128,6 +132,7 @@ impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::SelectedLabelSource(key) => write!(f, "SelectedLabelSource({key})"),
+            Self::SelectedScratchPrefix(key) => write!(f, "SelectedScratchPrefix({key})"),
             Self::LegacyBzl(key) => write!(f, "LegacyBzl({key})"),
             Self::HostBzl(key) => write!(f, "HostBzl({key})"),
             Self::ObservedHostBzl(key) => write!(f, "ObservedHostBzl({key})"),
@@ -510,4 +515,27 @@ pub async fn compute_selected_label_source(
     compute_guarded(ctx, key)
         .await
         .map_err(|_| slug_bzlmod_v2::SelectedLabelSourceError::Compute)
+}
+
+/// Guard the normal first-process producer and authenticate live resources on warm reuse.
+#[doc(hidden)]
+pub async fn compute_selected_scratch_prefix(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey,
+) -> Result<<crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey as Key>::Value, crate::module_extension::selected_scratch::SelectedScratchPrefixError>{
+    use crate::module_extension::selected_scratch::SelectedScratchPrefixError;
+    let outcome = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| SelectedScratchPrefixError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &outcome {
+        let resources = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchResources>()
+            .map_err(|_| SelectedScratchPrefixError::operational())?;
+        if !value.matches_key(key) || !value.same_resources(resources) {
+            return Err(SelectedScratchPrefixError::operational());
+        }
+    }
+    Ok(outcome)
 }

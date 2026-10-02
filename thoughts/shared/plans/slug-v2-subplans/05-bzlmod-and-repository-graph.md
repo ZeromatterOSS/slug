@@ -60,7 +60,10 @@ admits only confined GCC probes and returns no generated output tree; a module
 invocation must never impersonate that owner. Duplicate-path rejection in a
 repository file plan must not replace scratch overwrite semantics.
 
-The selected extension Pure(Observation)Key remains scratch/certificate producer.
+Ordinary Pure(Observation)Key remains the completed invocation owner. A separate
+guarded HostSelectedExtensionScratchPrefixKey shares its actual lower preparation
+and owns the first-process source checkpoint without computing a waiting outer
+PureOwner. Later process checkpoints still require genuine prior results.
 A distinct SelectedExtensionProcess epoch/verifier/used-footprint family binds
 full extension definition/usage, contiguous outer call index, ordered prior
 scratch ops/tree, typed source/tool/runtime certificates, exact argv/cwd and
@@ -300,10 +303,38 @@ format/plan/archive/diff and independent FINAL ACCEPT pass. Actual stale BUILD
 outside the image rejects promotion; foreign empty stage refuses before callback
 and drops its4352 credit/storage. The current manifest retains compact receipts.
 
-Scratch/download-prefix staging, actual selected host-tools/runtime roots, raw
-runtime-policy integration, complete namespace facets and finite mediator/quota
+Actual selected host-tools/runtime roots, raw runtime-policy integration,
+complete namespace facets and finite mediator/quota
 remain prerequisites for cohesive process activation. This source producer does
 not activate a Starlark process method or establish full bootstrap/total RSS.
+
+### Normal first-process scratch source producer
+
+WP893 implements bounded normal definition/usage/Host/getenv/Label/download
+evaluation through a private context until the first execute boundary. Ordered
+writes/downloads/overwrites, bytes/modes, typed external path events and exact
+argv/cwd/environment bind the prefix; literals grant no source IO authority.
+The boundary always stops evaluation without a fake process result. Ordinary
+Pure method visibility remains unchanged; prints are discarded and repositories
+cannot publish. Reads before this authenticated initial query remain unsupported.
+
+Keyed occurrence limits are independent of sharing. Workspace256MiB payload and
+existing64MiB descriptor services precharge headers/capacities/pins/merge peaks;
+prefixes and verified download pins retain credit through actual last Drop and
+DICE history. Existing evaluator/download/Core observation storage retains its
+baseline owners outside these service claims.
+
+The private key-only native factory recomputes normal Needs, authenticates the
+whole current prefix/request/frontier/session/resources, drops transactions and
+drains workers, then streams64KiB into a precreated private stage. Exact immutable
+Label source pins survive discard and runtime shutdown. Normal mutating Need
+fulfillment refreshes the complete existing raw observation workset before the
+next guarded compute; it never patches a completed prefix or skips ancestors.
+Final pre/post-copy freshness, discard/restoration before export and immediate
+stage removal at actual lease last Drop remain required. Logical storage credit
+survives cloned lease last Drop; unproved
+removal retains credit fail-closed. This source stage establishes no process
+namespace, backend, executable scratch quota, full query/generate or total RSS.
 
 ### Selected tool and runtime source authority
 
