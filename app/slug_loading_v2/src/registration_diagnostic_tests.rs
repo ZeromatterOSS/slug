@@ -40,6 +40,38 @@ async fn owner_fixture(
     )
     .await;
     let workspace = slug_workspace_v2::NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    // The legacy fixture supplies observations, but selected evaluation now
+    // consumes explicit host/download inputs and the corresponding path shards.
+    // Reuse its exact epoch rather than inventing a completed owner/certificate.
+    let epoch = tx
+        .compute(&slug_workspace_v2::PathObservationEpochKey)
+        .await
+        .unwrap();
+    let mut data = dice::UserComputationData {
+        cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+        ..Default::default()
+    };
+    data.data.set(slug_events_v2::CaptureEvaluationEvents);
+    data.data
+        .set(slug_bzlmod_v2::RepositoryHostInputTransaction::new(
+            slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+            slug_bzlmod_v2::RepositoryEnvironmentNameFrontier::empty(),
+        ));
+    data.data
+        .set(slug_bzlmod_v2::SelectedExtensionDownloadTransaction::empty(
+            workspace.clone(),
+        ));
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(slug_workspace_v2::path_observation_shards(&epoch))
+        .unwrap();
+    updater
+        .changed_to([(
+            slug_bzlmod_v2::RepositoryPlatformKey::new(workspace.clone()),
+            slug_bzlmod_v2::RepositoryPlatform::new("linux", "x86_64"),
+        )])
+        .unwrap();
+    let mut tx = updater.commit_with_data(data).await;
     let mapping = complete(
         tx.compute(&HostRootRepositoryMappingKey::new(workspace.clone()))
             .await
@@ -110,6 +142,22 @@ async fn registration_diagnostic_owner_plans_are_not_causal_text() {
     assert!(a != b);
     assert_eq!(render_node(Node::Pure(&a)), render_node(Node::Pure(&b)));
     assert_eq!(render_node(Node::Pure(&a)), "Pure: AfterInputs: CAUSE");
+    let operational = Pure::SourceOperational {
+        error: slug_bzlmod_v2::SelectedLabelSourceError::Budget(
+            slug_workspace_v2::ImageDescriptorBudgetError::ResourceLimit,
+        ),
+        prior: Arc::new(after(Arc::clone(&pure.receipt.repository_rule_calls))),
+    };
+    assert_eq!(
+        render_node(Node::Pure(&operational)),
+        "Pure: Source: selected Label source: Budget(ResourceLimit)",
+    );
+    let Pure::SourceOperational { prior, .. } = &operational else {
+        unreachable!()
+    };
+    assert!(
+        matches!(prior.as_ref(), Pure::AfterInputs { inputs, .. } if Arc::ptr_eq(inputs, &pure.inputs))
+    );
     let instantiated = instantiate_request(&pure.receipt).unwrap();
     let request_error = || HostInstantiateModuleExtensionRequestError {
         current: Arc::from(instantiated.parts().1),

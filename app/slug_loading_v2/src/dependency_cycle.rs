@@ -18,6 +18,7 @@ use tokio::sync::watch;
 /// Every variant stores the complete concrete key, including mode and source route.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 enum Node {
+    SelectedLabelSource(Arc<slug_bzlmod_v2::SelectedLabelSourceKey>),
     LegacyBzl(Arc<crate::keys::BzlModuleEvalKey>),
     HostBzl(Arc<crate::bzl_module::HostBzlModuleEvalKey>),
     ObservedHostBzl(Arc<crate::bzl_module::HostBzlModuleObservationKey>),
@@ -41,6 +42,9 @@ enum Node {
 
 impl Node {
     fn from_dyn(key: &DynKey) -> Option<Self> {
+        if let Some(key) = key.downcast_ref::<slug_bzlmod_v2::SelectedLabelSourceKey>() {
+            return Some(Self::SelectedLabelSource(Arc::new(key.clone())));
+        }
         if let Some(key) = key.downcast_ref::<crate::keys::BzlModuleEvalKey>() {
             return Some(Self::LegacyBzl(Arc::new(key.clone())));
         }
@@ -123,6 +127,7 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SelectedLabelSource(key) => write!(f, "SelectedLabelSource({key})"),
             Self::LegacyBzl(key) => write!(f, "LegacyBzl({key})"),
             Self::HostBzl(key) => write!(f, "HostBzl({key})"),
             Self::ObservedHostBzl(key) => write!(f, "ObservedHostBzl({key})"),
@@ -487,3 +492,22 @@ mod handoff_tests;
 
 #[cfg(test)]
 mod warm_tests;
+
+/// Private source preparation uses the same mixed graph guard as Loading waits.
+#[doc(hidden)]
+pub async fn compute_selected_label_source(
+    ctx: &mut DiceComputations<'_>,
+    key: &slug_bzlmod_v2::SelectedLabelSourceKey,
+) -> Result<
+    slug_bzlmod_v2::SourcePreparationOutcome<
+        Result<
+            slug_bzlmod_v2::ObservedSelectedLabelSource,
+            slug_bzlmod_v2::SelectedLabelSourceError,
+        >,
+    >,
+    slug_bzlmod_v2::SelectedLabelSourceError,
+> {
+    compute_guarded(ctx, key)
+        .await
+        .map_err(|_| slug_bzlmod_v2::SelectedLabelSourceError::Compute)
+}

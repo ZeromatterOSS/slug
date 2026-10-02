@@ -26,6 +26,8 @@ mod tests;
 pub(super) use capture::AuthorizedObservedInputImage;
 pub(super) use capture::CapturedInputImageLease;
 pub(super) use capture::capture_input_image;
+pub(super) use capture::capture_prepared_input_image;
+pub(super) use capture::prepare_input_image_stage;
 pub(super) use capture::verify_frontier;
 
 #[derive(Debug)]

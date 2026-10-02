@@ -361,3 +361,44 @@ async fn concrete_bzl_guards_preserve_pure_projection_and_receive_mixed_cycles()
     detector.finished_computing_key(&first_key);
     detector.finished_computing_key(&bridge_key);
 }
+
+#[test]
+fn selected_label_source_node_keeps_full_origin_and_ordered_recipe_identity() {
+    use slug_bzlmod_v2::HostRepositoryLabelPathSource;
+    use slug_bzlmod_v2::SelectedLabelSourceKey;
+    use slug_bzlmod_v2::SelectedLabelSourcePolicy;
+    use slug_bzlmod_v2::SelectedLabelSourceRecipe;
+    use slug_identity_v2::CanonicalLabel;
+    use slug_workspace_v2::ImageChargedPath;
+    use slug_workspace_v2::ImageDescriptorBudget;
+    let budget = ImageDescriptorBudget::new(64 * 1024 * 1024);
+    let make = |target| {
+        let label = CanonicalLabel::parse(target).unwrap();
+        SelectedLabelSourceRecipe::new(
+            ImageChargedPath::pin_existing(workspace(), &budget).unwrap(),
+            &label,
+            HostRepositoryLabelPathSource::Root(workspace()),
+            SelectedLabelSourcePolicy::plain(),
+            &budget,
+        )
+        .unwrap()
+    };
+    let a = make("@@//:marker");
+    let same_target = a
+        .parent(&budget)
+        .unwrap()
+        .child("bin/tool", &budget)
+        .unwrap();
+    let alternate_order = same_target
+        .parent(&budget)
+        .unwrap()
+        .child("tool", &budget)
+        .unwrap();
+    let node =
+        |recipe| Node::from_dyn(&DynKey::from_key(SelectedLabelSourceKey::new(recipe))).unwrap();
+    let a_node = node(same_target.clone());
+    assert_eq!(a_node, node(same_target));
+    assert_ne!(a_node, node(alternate_order));
+    assert_ne!(node(a), node(make("@@//:different-marker")));
+    assert!(a_node.to_string().starts_with("SelectedLabelSource("));
+}

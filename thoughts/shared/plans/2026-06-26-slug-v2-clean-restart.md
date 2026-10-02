@@ -34,17 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-191-m7a-selected-tool-source-authority-r1
-Status: ACCEPTED conditional source-owner design; no process activation
+Packet: WP-7-192-m7a-selected-label-source-producer-r1
+Status: ACCEPTED; normal selected Label sources; no process activation
 
-WP891 chooses typed normal Label provenance and ordered scratch/tool checkpoints,
-raw immutable request runtime source declarations, and normal scoped namespace
-facts. The actual sealed loader performs search; every exposed outcome must be
-source-owned and unowned access invalidates even if swallowed. Source confirms
-Linux musl default generator; neither release names nor ELF facts prove closure.
-Stage5/9 own the conditional contract. Actual roots/profile integration, complete
-namespace/mediator/quota/capture and query/locked-generate remain open. WP890
-c019778a1 metadata prerequisite remains accepted. No activation/bootstrap/RSS claim.
+WP892 implements normal selected Label provenance and private image/ELF factory
+consumption. Full origin/ordered transforms, current root/request/session/budget,
+complete frontier and credited last-Drop history survive normal Need/replay.
+Bzlmod14/14, Loading40/40 and Core84/84 pass; owner all-target/default CLI compile,
+format/plan/archive/diff and independent FINAL ACCEPT pass. WP891 b3335729f owns
+full pipeline design: scratch/download prefix staging, runtime policy/complete
+namespace/mediator/quota and cohesive query+locked-generate remain required.
+Stage5/9 and manifest retain the contract and evidence. No method/process/full-
+runtime/bootstrap/RSS claim; goal stays active.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

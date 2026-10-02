@@ -2,16 +2,23 @@
 
 use super::*;
 
-enum PreparationKind {
+pub(super) enum PreparationKind {
     Capture,
+    SelectedElf(ElfMetadataPolicy),
     Elf {
         relative_file: PathBuf,
         policy: ElfMetadataPolicy,
     },
 }
-enum PreparedInput {
-    Captured(CapturedInputImageLease),
-    Elf(ObservedElfMetadata),
+pub(super) enum PreparedInput {
+    Captured(
+        CapturedInputImageLease,
+        Option<slug_bzlmod_v2::ObservedSelectedLabelSource>,
+    ),
+    Elf(
+        ObservedElfMetadata,
+        Option<slug_bzlmod_v2::ObservedSelectedLabelSource>,
+    ),
 }
 enum ImageAttempt {
     Need(slug_bzlmod_v2::SourcePreparationNeeds),
@@ -19,6 +26,7 @@ enum ImageAttempt {
         ObservedInputImage,
         Option<ObservedElfMetadata>,
         NativeDemandTerminalSelection,
+        Option<slug_bzlmod_v2::ObservedSelectedLabelSource>,
     ),
 }
 
@@ -30,8 +38,8 @@ impl WorkspaceRuntime {
         policy: InputImagePolicy,
     ) -> Result<CapturedInputImageLease, NativeDemandSessionError> {
         match self.prepare_declared_input(source, policy, PreparationKind::Capture)? {
-            PreparedInput::Captured(image) => Ok(image),
-            PreparedInput::Elf(_) => unreachable!("capture mode"),
+            PreparedInput::Captured(image, _) => Ok(image),
+            PreparedInput::Elf(..) => unreachable!("capture mode"),
         }
     }
 
@@ -51,21 +59,84 @@ impl WorkspaceRuntime {
                 policy,
             },
         )? {
-            PreparedInput::Elf(metadata) => Ok(metadata),
-            PreparedInput::Captured(_) => unreachable!("ELF mode"),
+            PreparedInput::Elf(metadata, _) => Ok(metadata),
+            PreparedInput::Captured(..) => unreachable!("ELF mode"),
         }
     }
 
-    fn prepare_declared_input(
+    pub(super) fn prepare_declared_input(
         &self,
         source: DeclaredImageSource,
         policy: InputImagePolicy,
         kind: PreparationKind,
     ) -> Result<PreparedInput, NativeDemandSessionError> {
+        self.prepare_declared_input_inner(
+            source,
+            policy,
+            kind,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    pub(super) fn prepare_declared_input_inner(
+        &self,
+        source: DeclaredImageSource,
+        policy: InputImagePolicy,
+        kind: PreparationKind,
+        #[cfg(test)] before_final: Option<&dyn Fn()>,
+    ) -> Result<PreparedInput, NativeDemandSessionError> {
+        if matches!(
+            (&source, &kind),
+            (
+                DeclaredImageSource::SelectedLabel(_),
+                PreparationKind::Elf { .. }
+            ) | (
+                DeclaredImageSource::WorkspaceSubtree(_)
+                    | DeclaredImageSource::ImmutableRepository { .. },
+                PreparationKind::SelectedElf(_)
+            )
+        ) {
+            return Err(image_error("invalid selected Label preparation mode"));
+        }
+        if let DeclaredImageSource::SelectedLabel(key) = &source {
+            label_source::check_key(self, key, policy)?;
+        }
+        // Label resolution observes ancestors to '/'. Create the private empty
+        // output before command preflight, then fill that same directory later.
+        let mut prepared_stage = if matches!(
+            (&source, &kind),
+            (
+                DeclaredImageSource::SelectedLabel(_),
+                PreparationKind::Capture
+            )
+        ) {
+            Some(
+                input_image::prepare_input_image_stage(&self.image_resources)
+                    .map_err(NativeDemandSessionError::InputImage)?,
+            )
+        } else {
+            None
+        };
         let mut guard =
             NativeDemandAbortGuard::new(self.begin_native_demand_command()?.into_command());
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
         let prefix_depth = match &source {
+            DeclaredImageSource::SelectedLabel(key) => key
+                .recipe()
+                .workspace()
+                .as_path()
+                .components()
+                .count()
+                .saturating_add(
+                    key.recipe()
+                        .label()
+                        .package()
+                        .package()
+                        .as_str()
+                        .split('/')
+                        .count(),
+                ),
             DeclaredImageSource::WorkspaceSubtree(path)
             | DeclaredImageSource::ImmutableRepository { subtree: path, .. } => {
                 path.components().count()
@@ -98,12 +169,15 @@ impl WorkspaceRuntime {
                     ImageAttempt::Need(need) => {
                         guard.progress(&need)?;
                     }
-                    ImageAttempt::Complete(certificate, metadata, selected) => {
+                    ImageAttempt::Complete(certificate, metadata, selected, label) => {
                         let command = guard.command();
                         let request = command
                             .image_request
                             .as_ref()
                             .expect("current image request");
+                        if let Some(label) = &label {
+                            label_source::check_declaration(self, request, label)?;
+                        }
                         let source = request.source(command)?;
                         let active = || {
                             std::time::Instant::now() < deadline
@@ -122,19 +196,53 @@ impl WorkspaceRuntime {
                                     &active,
                                 )
                                 .map_err(NativeDemandSessionError::InputImage)?;
-                                PreparedInput::Elf(metadata)
+                                #[cfg(test)]
+                                if let Some(hook) = before_final {
+                                    hook();
+                                }
+                                if let Some(label) = &label {
+                                    label_source::verify_current(
+                                        command,
+                                        label,
+                                        &certificate,
+                                        Some(&metadata),
+                                    )?;
+                                }
+                                PreparedInput::Elf(metadata, label)
                             }
-                            None => PreparedInput::Captured(
-                                input_image::capture_input_image(
-                                    input_image::AuthorizedObservedInputImage::new(
-                                        source,
-                                        certificate,
+                            None => {
+                                let authorized = input_image::AuthorizedObservedInputImage::new(
+                                    source,
+                                    certificate.clone(),
+                                );
+                                let captured = match prepared_stage.take() {
+                                    Some(stage) => input_image::capture_prepared_input_image(
+                                        authorized,
+                                        &self.image_resources,
+                                        &active,
+                                        stage,
                                     ),
-                                    &self.image_resources,
-                                    &active,
-                                )
-                                .map_err(NativeDemandSessionError::InputImage)?,
-                            ),
+                                    None => input_image::capture_input_image(
+                                        authorized,
+                                        &self.image_resources,
+                                        &active,
+                                    ),
+                                }
+                                .map_err(NativeDemandSessionError::InputImage)?;
+                                #[cfg(test)]
+                                if let Some(hook) = before_final {
+                                    hook();
+                                }
+                                if let Some(label) = &label {
+                                    label_source::verify_current(
+                                        command,
+                                        label,
+                                        &certificate,
+                                        None,
+                                    )?;
+                                }
+                                PreparedInput::Captured(captured, label)
+                            }
                         };
                         drop(selected);
                         return Ok(prepared);
@@ -176,13 +284,14 @@ async fn prepare_attempt(
         .updater_with_data(guard.attempt_user_computation_data()?);
     guard.inject_attempt(&mut updater)?;
     let mut transaction = runtime.request_revision.commit(updater).await;
-    let (key, repository) = match select_source(runtime, &mut transaction, source, policy).await? {
-        SourceSelection::Need(need) => {
-            guard.seal_retry()?;
-            return Ok(ImageAttempt::Need(need));
-        }
-        SourceSelection::Ready(key, repository) => (key, repository),
-    };
+    let (key, repository, label) =
+        match select_source(runtime, &mut transaction, source, policy).await? {
+            SourceSelection::Need(need) => {
+                guard.seal_retry()?;
+                return Ok(ImageAttempt::Need(need));
+            }
+            SourceSelection::Ready(key, repository, label) => (key, repository, label),
+        };
     guard
         .command
         .as_mut()
@@ -212,21 +321,40 @@ async fn prepare_attempt(
     if !certificate.same_budget(budget) {
         return Err(image_error("foreign cached image budget"));
     }
-    let metadata = match kind {
-        PreparationKind::Capture => None,
+    if let Some(label) = &label {
+        label_source::check_member(runtime, label, &certificate)?;
+    }
+    let selected_elf_kind = if let PreparationKind::SelectedElf(policy) = kind {
+        let label = label
+            .as_ref()
+            .ok_or_else(|| image_error("missing selected Label"))?;
+        Some((label.selected_file().clone(), *policy))
+    } else {
+        None
+    };
+    let legacy_elf_file = match kind {
         PreparationKind::Elf {
             relative_file,
             policy,
         } => {
             let root = ImageChargedPath::pin_existing(key.source_root().clone(), budget)
                 .map_err(|_| image_error("ELF selected path admission failed"))?;
-            let file = join_relative(
-                root,
-                relative_file,
-                key.policy().limits().max_path_bytes,
-                budget,
-            )?;
-            let elf_key = ObservedElfMetadataKey::from_charged(key.clone(), file.clone(), *policy)
+            Some((
+                join_relative(
+                    root,
+                    relative_file,
+                    key.policy().limits().max_path_bytes,
+                    budget,
+                )?,
+                *policy,
+            ))
+        }
+        _ => None,
+    };
+    let metadata = match selected_elf_kind.or(legacy_elf_file) {
+        None => None,
+        Some((file, policy)) => {
+            let elf_key = ObservedElfMetadataKey::from_charged(key.clone(), file.clone(), policy)
                 .map_err(|_| image_error("invalid ELF selector"))?;
             // Only a completed normal image producer may mint native allowance.
             guard
@@ -239,7 +367,7 @@ async fn prepare_attempt(
                 .elf = Some(DeclaredElfRequest {
                 certificate: certificate.clone(),
                 file,
-                policy: *policy,
+                policy,
             });
             match transaction
                 .compute(&elf_key)
@@ -271,6 +399,9 @@ async fn prepare_attempt(
             metadata.observations()
         });
     let reachable = selected.sidecars().demands();
+    if let Some(label) = &label {
+        label_source::check_reachable(guard.command(), label, reachable)?;
+    }
     for (demand, observed) in frontier.observations() {
         if !reachable.unscoped_paths().contains(demand)
             || guard.command().path_observations.get(demand) != Some(observed)
@@ -280,27 +411,34 @@ async fn prepare_attempt(
             ));
         }
     }
-    if let Some((request, _)) = &guard
+    if let Some(repository) = &guard
         .command()
         .image_request
         .as_ref()
         .expect("image request")
         .repository
     {
+        let (request, _) = repository.selection();
         if !reachable.repository_requests().contains(request) {
             return Err(image_error("image repository is not reachable"));
         }
     }
-    Ok(ImageAttempt::Complete(certificate, metadata, selected))
+    Ok(ImageAttempt::Complete(
+        certificate,
+        metadata,
+        selected,
+        label,
+    ))
 }
 
-type SelectedRepository = Option<(
-    Arc<RepositoryMaterializationRequest>,
-    slug_bzlmod_v2::RepositoryMaterialization,
-)>;
-enum SourceSelection {
+type SelectedRepository = Option<DeclaredImageRepository>;
+pub(super) enum SourceSelection {
     Need(slug_bzlmod_v2::SourcePreparationNeeds),
-    Ready(ObservedInputImageKey, SelectedRepository),
+    Ready(
+        ObservedInputImageKey,
+        SelectedRepository,
+        Option<slug_bzlmod_v2::ObservedSelectedLabelSource>,
+    ),
 }
 
 async fn select_source(
@@ -310,7 +448,11 @@ async fn select_source(
     policy: InputImagePolicy,
 ) -> Result<SourceSelection, NativeDemandSessionError> {
     let budget = runtime.image_resources.descriptor_budget();
+    if let DeclaredImageSource::SelectedLabel(key) = source {
+        return label_source::select(runtime, transaction, key, policy).await;
+    }
     let (namespace, anchor, subtree, repository) = match source {
+        DeclaredImageSource::SelectedLabel(_) => unreachable!("selected Label handled above"),
         DeclaredImageSource::WorkspaceSubtree(subtree) => (
             PathObservationNamespace::Host,
             ImageChargedPath::pin_existing(
@@ -366,7 +508,10 @@ async fn select_source(
                 PathObservationNamespace::Materialization(*observation_instance),
                 anchor,
                 subtree,
-                Some((request.clone(), materialized)),
+                Some(DeclaredImageRepository::Explicit(
+                    request.clone(),
+                    materialized,
+                )),
             )
         }
     };
@@ -378,7 +523,7 @@ async fn select_source(
     )?;
     let key = ObservedInputImageKey::from_charged(namespace, anchor, root, policy)
         .map_err(|_| image_error("invalid image policy"))?;
-    Ok(SourceSelection::Ready(key, repository))
+    Ok(SourceSelection::Ready(key, repository, None))
 }
 
 fn validate_relative(path: &Path, limit: usize) -> Result<(), NativeDemandSessionError> {

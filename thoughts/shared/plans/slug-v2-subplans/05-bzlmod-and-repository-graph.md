@@ -258,6 +258,53 @@ credits through actual last Drop; authenticated rejection retires discarded
 partial-fact scratch and retains only the small enum block. No tool payload is
 retained or staged by metadata observation. No lock spans compute/new dependency.
 
+### Normal selected Label source producer
+
+WP892 implements the Label-source part of the source-authority contract below.
+SelectedLabelSourceKey consumes a credited immutable origin (actual normal Root/
+External route and full CanonicalLabel including mapping identity), semantic
+image/selection policy and ordered Parent/Child transcript. The original Label
+parent fixes the image tree; lexical display may leave it, but source consumption
+refuses escape. Limits are 64 transforms, 4096 UTF8 path bytes and 4MiB deterministic
+occurrences, independently of physical sharing. The normal Label/package and
+current materialization dependencies own selection and its complete frontier;
+this producer creates selectors, never file-content or native IO authority.
+
+Loading prepares lineage only from its genuine normal Label path producer. Shared
+ready handles retain origins through lexical operations and replay; swallowed
+budget/operation errors remain sticky and invalid through both PureOwner families.
+New graph nodes preserve full structural identities in the exact live context.
+Canonical Label clone capacity (including mapping IDs), child/transform/ready
+buffers, path normalization peaks and new shared headers retain actual workspace
+64MiB descriptor credit through last Drop and DICE history. Existing ordinary
+Label-key/route/request allocations keep their established owners; no payload is
+copied and no global cache/interner or compute-spanning lock is introduced.
+
+The private native bridge recomputes the guarded normal source key and declares
+its exact image/ELF member before Needs. A borrowed allocation-free source-kind
+preflight refuses all External Local/builtin native access. Workspace or exact
+current immutable request/result/root/session factories still authorize every
+read. Label reachability includes only unscoped paths or validation paths for the
+exact selected repository request. A credited opaque empty capture stage is
+created before source observations and retained through Needs, avoiding mutation
+of observed host ancestors after computation. Reachable Label+image+ELF frontiers
+and the repository request are checked;
+transactions drop and workers drain before provisional capture/full final source
+reobservation. Stale Label metadata outside the captured subtree rejects promotion,
+releases provisional disk credit and discards/restores through the existing owner.
+Generic paths, completed facts and foreign budgets cannot authorize source access.
+
+Acceptance:14 Bzlmod,40 Loading and84 Core exact selected gates pass (including
+39 prior image/ELF and39 protected controls); owner all-target/default CLI compile,
+format/plan/archive/diff and independent FINAL ACCEPT pass. Actual stale BUILD
+outside the image rejects promotion; foreign empty stage refuses before callback
+and drops its4352 credit/storage. The current manifest retains compact receipts.
+
+Scratch/download-prefix staging, actual selected host-tools/runtime roots, raw
+runtime-policy integration, complete namespace facets and finite mediator/quota
+remain prerequisites for cohesive process activation. This source producer does
+not activate a Starlark process method or establish full bootstrap/total RSS.
+
 ### Selected tool and runtime source authority
 
 Source-design WP891 selects internal prepared Label provenance, ordered scratch

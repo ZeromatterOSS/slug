@@ -5135,6 +5135,23 @@ enum RepositoryMaterializationMode {
     Legacy,
     Observed,
 }
+/// Borrowed equivalent of the pinned canonical rule-label comparisons below.
+/// Mapping provenance is part of CanonicalLabel equality, even when rendered
+/// label spelling is identical. This classification allocates no labels.
+fn is_immutable_repository_spec(repo_spec: &RepoSpec) -> bool {
+    let label = &repo_spec.rule_id.bzl_file;
+    label.mapping_id().is_none()
+        && label.package().repo().as_str() == "bazel_tools"
+        && label.package().package().as_str() == "tools/build_defs/repo"
+        && matches!(
+            (
+                label.target().as_str(),
+                repo_spec.rule_id.rule_name.as_str()
+            ),
+            ("http.bzl", "http_archive") | ("git.bzl", "git_repository")
+        )
+}
+
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
@@ -5189,14 +5206,7 @@ fn request_kind(
         .map_err(|error| RepositoryMaterializationError::Spec(error.to_string().into()))?;
         return Ok(RepositoryMaterializationKind::Local { logical_root: root });
     }
-    let http_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl")
-        .expect("pinned http repository label is canonical");
-    let git_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:git.bzl")
-        .expect("pinned git repository label is canonical");
-    if (repo_spec.rule_id.bzl_file == http_bzl && repo_spec.rule_id.rule_name == "http_archive")
-        || (repo_spec.rule_id.bzl_file == git_bzl
-            && repo_spec.rule_id.rule_name == "git_repository")
-    {
+    if is_immutable_repository_spec(repo_spec) {
         return Ok(RepositoryMaterializationKind::Immutable);
     }
     Err(RepositoryMaterializationError::Spec(

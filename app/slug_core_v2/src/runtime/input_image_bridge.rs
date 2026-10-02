@@ -19,6 +19,7 @@ use crate::runtime::input_image::{self};
 #[allow(dead_code)]
 #[derive(Clone)]
 pub(super) enum DeclaredImageSource {
+    SelectedLabel(slug_bzlmod_v2::SelectedLabelSourceKey),
     WorkspaceSubtree(PathBuf),
     ImmutableRepository {
         request: Arc<RepositoryMaterializationRequest>,
@@ -31,10 +32,30 @@ pub(super) struct DeclaredImageRequest {
     key: ObservedInputImageKey,
     elf: Option<DeclaredElfRequest>,
     deadline: std::time::Instant,
-    repository: Option<(
+    repository: Option<DeclaredImageRepository>,
+}
+
+#[derive(Clone)]
+enum DeclaredImageRepository {
+    Explicit(
         Arc<RepositoryMaterializationRequest>,
         slug_bzlmod_v2::RepositoryMaterialization,
-    )>,
+    ),
+    Selected(slug_bzlmod_v2::ObservedSelectedLabelSource),
+}
+
+impl DeclaredImageRepository {
+    fn selection(
+        &self,
+    ) -> (
+        &Arc<RepositoryMaterializationRequest>,
+        &slug_bzlmod_v2::RepositoryMaterialization,
+    ) {
+        match self {
+            Self::Explicit(request, result) => (request, result),
+            Self::Selected(selected) => selected.repository().expect("external selected source"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -92,7 +113,7 @@ impl DeclaredImageRequest {
                 self.key.anchor_root(),
                 self.repository
                     .as_ref()
-                    .map(|(request, result)| (request, result)),
+                    .map(DeclaredImageRepository::selection),
             )
             .map_err(NativeDemandSessionError::Repository)
     }
@@ -270,6 +291,13 @@ fn observe_declared_elf(
 
 #[path = "input_image_bridge/prepare.rs"]
 mod prepare;
+
+#[path = "input_image_bridge/label_source.rs"]
+mod label_source;
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "input_image_bridge/label_tests.rs"]
+mod label_tests;
 
 #[cfg(all(test, target_os = "linux"))]
 #[path = "input_image_bridge/tests.rs"]

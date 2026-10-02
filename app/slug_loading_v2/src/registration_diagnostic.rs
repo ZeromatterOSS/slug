@@ -294,6 +294,7 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     Pure::Inputs(error) => { out.write_str("Inputs: ")?; return error.write_registration_diagnostic(out); }
                     Pure::Compute(message) => return write!(out, "Compute: {message}"),
                     Pure::AfterInputs { message, .. } => return write!(out, "AfterInputs: {message}"),
+                    Pure::SourceOperational { error, .. } => return write!(out, "Source: {error}"),
                     Pure::Factored { .. } => unreachable!("factored selected error was unwrapped"),
                 }
             }

@@ -132,6 +132,13 @@ use crate::package::ModuleExtensionDefinitionProjection;
 use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::starlark_label::StarlarkLabel;
+mod selected_path;
+use selected_path::SelectedModuleLabelPath;
+use selected_path::SelectedPathInvocation;
+use selected_path::SelectedPathReady;
+use selected_path::observe_selected_path_label;
+use selected_path::source_owner_after;
+use slug_bzlmod_v2::SelectedLabelSourceError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostPureModuleExtensionInvocations {
@@ -721,7 +728,7 @@ impl SelectedExtensionEvalFactors {
 }
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum HostSelectedExtensionOwnerPureError { Inputs(HostSelectedExtensionOwnerInputsError), Compute(CompactString), AfterInputs { inputs: Arc<HostSelectedExtensionOwnerInputs>, request: HostSelectedExtensionDefinitionLoadRequest, current_calls: Arc<[RepositoryRuleCallRecord]>, message: CompactString }, Factored { factors: Arc<SelectedExtensionEvalFactors>, error: Arc<HostSelectedExtensionOwnerPureError> } }
+pub(crate) enum HostSelectedExtensionOwnerPureError { Inputs(HostSelectedExtensionOwnerInputsError), Compute(CompactString), AfterInputs { inputs: Arc<HostSelectedExtensionOwnerInputs>, request: HostSelectedExtensionDefinitionLoadRequest, current_calls: Arc<[RepositoryRuleCallRecord]>, message: CompactString }, Factored { factors: Arc<SelectedExtensionEvalFactors>, error: Arc<HostSelectedExtensionOwnerPureError> }, SourceOperational { error: SelectedLabelSourceError, prior: Arc<HostSelectedExtensionOwnerPureError> } }
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) struct HostSelectedExtensionOwnerPureKey { workspace: NormalizedAbsolutePath, owner: Arc<HostSelectedExtensionOwner> }
@@ -1207,169 +1214,6 @@ fn generated_repository_label_refusal(label: &CanonicalLabel, site: &str) -> Str
     )
 }
 
-async fn observe_selected_path_label(
-    ctx: &mut DiceComputations<'_>,
-    key: &HostSelectedExtensionOwnerPureKey,
-    inputs: &Arc<HostSelectedExtensionOwnerInputs>,
-    first: &Arc<OwnerProjection>,
-    calls: &Arc<[RepositoryRuleCallRecord]>,
-    label: &CanonicalLabel,
-    mut observations: PathObservationEpoch,
-) -> Result<(HostRepositoryLabelPathValue, PathObservationEpoch), OwnerPureDriver> {
-    macro_rules! merge {
-        ($incoming:expr) => {
-            observations = union_pure_observations(&observations, $incoming).map_err(|error| {
-                SourcePreparationOutcome::Complete(Err(
-                    HostSelectedExtensionOwnerPureObservationError::Merge {
-                        inputs: inputs.clone(),
-                        first: Some(first.clone()),
-                        error,
-                    },
-                ))
-            })?;
-        };
-    }
-    macro_rules! fail {
-        ($message:expr) => {
-            return Err(owner_complete(
-                Err(owner_after(inputs, calls.clone(), $message)),
-                observations,
-            ))
-        };
-    }
-    let address = RepositoryLabelPathAddress::from_label(label);
-    let route = if address.repo().is_root() {
-        None
-    } else {
-        // Resolve ownership without evaluating the producer. Self reads fail
-        // here; independent owners use the guarded, completed load route.
-        let demand = match ctx
-            .compute(&HostSelectedExtensionDemandObservationKey::new(
-                key.workspace.dupe(),
-                address.repo().clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return Err(SourcePreparationOutcome::Need(need));
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                return Err(SourcePreparationOutcome::Complete(Err(
-                    HostSelectedExtensionOwnerPureObservationError::Demand {
-                        inputs: inputs.clone(),
-                        first: first.clone(),
-                        error,
-                    },
-                )));
-            }
-            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
-            Err(error) => fail!(format!(
-                "module_ctx.path generated-owner preflight failed: {error}"
-            )),
-        };
-        merge!(demand.observations());
-        let generated_owner = match demand.result().as_ref() {
-            Ok(demand) if demand.owner() == &key.owner => {
-                fail!(generated_repository_label_refusal(
-                    label,
-                    "generated-owner-preflight"
-                ));
-            }
-            Ok(demand) => {
-                // Owner inequality is only a precondition. The actual shared
-                // DICE graph must cover all waits before admitting this path.
-                match ctx.cycle_guard::<DependencyCycleGuard>() {
-                    Ok(Some(_)) => {}
-                    Ok(None) => fail!(format!(
-                        "module_ctx.path generated Label requires the dependency cycle detector (label={label})"
-                    )),
-                    Err(error) => fail!(format!("module_ctx.path cycle guard failed: {error}")),
-                }
-                Some(demand.owner().clone())
-            }
-            Err(error)
-                if error.disposition() == HostSelectedExtensionDemandErrorDisposition::Missing =>
-            {
-                None
-            }
-            Err(error) => fail!(format!(
-                "module_ctx.path generated-owner preflight failed: {error}"
-            )),
-        };
-        let route = match compute_guarded(
-            ctx,
-            &HostCanonicalRepositoryLoadRouteObservationKey::new(
-                key.workspace.dupe(),
-                address.repo().clone(),
-            ),
-        )
-        .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return Err(SourcePreparationOutcome::Need(need));
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                return Err(SourcePreparationOutcome::Complete(Err(
-                    HostSelectedExtensionOwnerPureObservationError::CanonicalRoute {
-                        inputs: inputs.clone(),
-                        first: first.clone(),
-                        error: Arc::new(error),
-                    },
-                )));
-            }
-            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
-            Err(error) => fail!(format!("module_ctx.path canonical route failed: {error}")),
-        };
-        merge!(route.observations());
-        let route = match route.result().as_ref() {
-            Ok(value) => value,
-            Err(error) => fail!(format!("module_ctx.path canonical route failed: {error:?}")),
-        };
-        match (
-            generated_owner.as_ref(),
-            route.route().view().generated_effect_seed(),
-        ) {
-            (Some(owner), Some(seed)) if seed.owner() == owner => {}
-            (None, None) => {}
-            _ => fail!(generated_repository_label_refusal(
-                label,
-                "generated-effect-route"
-            )),
-        }
-        Some(HostRepositorySourceRoute::canonical(route.input().clone()))
-    };
-    let path_key = match route {
-        None => HostRepositoryLabelPathObservationKey::new_root(key.workspace.dupe(), address),
-        Some(route) => HostRepositoryLabelPathObservationKey::new_external(route, address),
-    };
-    let path_key = match path_key {
-        Ok(value) => value,
-        Err(error) => fail!(format!("module_ctx.path Label is unsupported: {error:?}")),
-    };
-    let observed = match ctx.compute(&path_key).await {
-        Ok(SourcePreparationOutcome::Need(need)) => {
-            return Err(SourcePreparationOutcome::Need(need));
-        }
-        Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-            return Err(SourcePreparationOutcome::Complete(Err(
-                HostSelectedExtensionOwnerPureObservationError::Merge {
-                    inputs: inputs.clone(),
-                    first: Some(first.clone()),
-                    error,
-                },
-            )));
-        }
-        Ok(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
-        Err(error) => fail!(format!("module_ctx.path Label lookup failed: {error}")),
-    };
-    merge!(observed.observations());
-    let path = match observed.result().as_ref() {
-        Ok(value) => value.clone(),
-        Err(error) => fail!(format!("module_ctx.path Label lookup failed: {error:?}")),
-    };
-    Ok((path, observations))
-}
-
 #[rustfmt::skip]
 async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOwnerPureKey, mode: PureInvocationsMode) -> OwnerPureDriver {
     let (inputs, observations) = match mode {
@@ -1423,14 +1267,17 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
         proxies.iter().any(|proxy| !proxy.dev_dependency),
         proxies.iter().any(|proxy| proxy.dev_dependency),
     ));
-    let mut ready_paths = Vec::new();
+    let mut ready_paths = SelectedPathReady::default();
     let mut ready_environment = Vec::new();
     loop {
         // Nothing emitted by an interrupted Starlark pass is published. The
         // path and environment ready maps are the only evaluator state retained for replay.
         let selected_download = Arc::new(SelectedDownloadInvocation::new(key.workspace.dupe(), key.owner.clone(), ready.clone()));
         let selected_watch = Arc::new(SelectedWatchInvocation::new());
-        let selected_path = Arc::new(SelectedPathInvocation::new(ready_paths.clone()));
+        let selected_path = match SelectedPathInvocation::new(ready_paths.clone()) {
+            Ok(value) => value,
+            Err(error) => return factor_owner_terminal(&factors, owner_complete(Err(source_owner_after(&inputs, Arc::from([]), error)), observations)),
+        };
         let selected_getenv = Arc::new(SelectedGetenvInvocation::new(ready_environment.clone()));
         let (returned, calls, capture, pending_download, pending_path, pending_getenv, reads) = {
             let invocation_module = Module::new();
@@ -1504,13 +1351,19 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
             Ok(observations) => observations,
             Err(terminal) => return factor_owner_terminal(&invocation_factors, terminal),
         };
+        if let Some(error) = selected_path.operation_error() {
+            return factor_owner_terminal(&invocation_factors, owner_complete(Err(source_owner_after(&inputs, calls, error)), observations));
+        }
         if let Some(label) = pending_path {
             let (path, next_observations) = match observe_selected_path_label(ctx, key, &inputs, &first, &calls, &label, observations).await {
                 Ok(value) => value,
                 Err(terminal) => return factor_owner_terminal(&invocation_factors, terminal),
             };
             observations = next_observations;
-            ready_paths.push((label, path));
+            ready_paths = match ready_paths.append(path) {
+                Ok(value) => value,
+                Err(error) => return factor_owner_terminal(&invocation_factors, owner_complete(Err(source_owner_after(&inputs, calls, error)), observations)),
+            };
             continue;
         }
         let request = inputs.request().clone();
@@ -1537,8 +1390,8 @@ async fn compute_owner_pure(ctx: &mut DiceComputations<'_>, key: &HostSelectedEx
 impl Key for HostSelectedExtensionOwnerPureKey {
     type Value = SourcePreparationOutcome<OwnerPureResult>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_pure(ctx, self, PureInvocationsMode::Legacy).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Ok((result, _))) => SourcePreparationOutcome::Complete(result), SourcePreparationOutcome::Complete(Err(_)) => unreachable!() } }
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
-    fn validity(value: &Self::Value) -> bool { value.is_complete() }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool { Self::validity(x) && Self::validity(y) && x.complete_eq(y) }
+    fn validity(value: &Self::Value) -> bool { matches!(value, SourcePreparationOutcome::Complete(result) if result.as_ref().as_ref().err().is_none_or(|error| !error.is_transient())) }
 }
 
 #[async_trait]
@@ -1546,8 +1399,8 @@ impl Key for HostSelectedExtensionOwnerPureKey {
 impl Key for HostSelectedExtensionOwnerPureObservationKey {
     type Value = SourcePreparationOutcome<Result<ObservedHostSelectedExtensionOwnerPure, HostSelectedExtensionOwnerPureObservationError>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value { match compute_owner_pure(ctx, &self.0, PureInvocationsMode::Observed).await { SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need), SourcePreparationOutcome::Complete(Err(error)) => SourcePreparationOutcome::Complete(Err(error)), SourcePreparationOutcome::Complete(Ok((result, observations))) => SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedExtensionOwnerPure { result, observations })) } }
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool { x.complete_eq(y) }
-    fn validity(value: &Self::Value) -> bool { value.is_complete() }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool { Self::validity(x) && Self::validity(y) && x.complete_eq(y) }
+    fn validity(value: &Self::Value) -> bool { match value { SourcePreparationOutcome::Need(_) => false, SourcePreparationOutcome::Complete(Err(_)) => true, SourcePreparationOutcome::Complete(Ok(observed)) => observed.result().as_ref().as_ref().err().is_none_or(|error| !error.is_transient()) } }
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -1961,45 +1814,6 @@ impl SelectedGetenvInvocation {
 }
 
 #[derive(Debug, Allocative)]
-struct SelectedPathInvocation {
-    ready: Vec<(CanonicalLabel, HostRepositoryLabelPathValue)>,
-    pending: Mutex<Option<CanonicalLabel>>,
-}
-
-impl SelectedPathInvocation {
-    fn new(ready: Vec<(CanonicalLabel, HostRepositoryLabelPathValue)>) -> Self {
-        Self {
-            ready,
-            pending: Mutex::new(None),
-        }
-    }
-
-    fn call(&self, label: &CanonicalLabel) -> anyhow::Result<HostRepositoryLabelPathValue> {
-        if let Some((_, path)) = self.ready.iter().find(|(candidate, _)| candidate == label) {
-            return Ok(path.clone());
-        }
-        if self.ready.len() == MAX_SELECTED_PATH_LABELS {
-            anyhow::bail!(
-                "module_ctx.path supports at most {MAX_SELECTED_PATH_LABELS} distinct Labels"
-            );
-        }
-        let mut pending = self
-            .pending
-            .lock()
-            .map_err(|_| anyhow::anyhow!("selected module extension path scratch unavailable"))?;
-        *pending = Some(label.clone());
-        anyhow::bail!("selected module extension Label path requires preparation")
-    }
-
-    fn pending(&self) -> Result<Option<CanonicalLabel>, CompactString> {
-        self.pending
-            .lock()
-            .map(|pending| pending.clone())
-            .map_err(|_| "selected module extension path scratch unavailable".into())
-    }
-}
-
-#[derive(Debug, Allocative)]
 struct SelectedWatchInvocation {
     called: Mutex<SmallSet<CanonicalLabel>>,
 }
@@ -2123,56 +1937,6 @@ starlark::starlark_simple_value!(SelectedModuleScratchPath);
 
 #[starlark_value(type = "module_extension_scratch_path")]
 impl<'v> StarlarkValue<'v> for SelectedModuleScratchPath {}
-
-/// A prepared Label path. Derivation is lexical and never probes the target.
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct SelectedModuleLabelPath(HostRepositoryLabelPathValue);
-
-impl fmt::Display for SelectedModuleLabelPath {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.0.path_str())
-    }
-}
-starlark::starlark_simple_value!(SelectedModuleLabelPath);
-
-#[starlark_value(type = "path")]
-impl<'v> StarlarkValue<'v> for SelectedModuleLabelPath {
-    fn get_attr(&self, name: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        if name != "dirname" {
-            return None;
-        }
-        let parent = self.0.path().as_path().parent()?;
-        let parent = NormalizedAbsolutePath::new(parent.to_path_buf())
-            .expect("the parent of a normalized absolute path is normalized");
-        let parent = HostRepositoryLabelPathValue::new(parent, self.0.namespace())
-            .expect("the parent of a Unicode path is Unicode");
-        Some(heap.alloc_simple(Self(parent)))
-    }
-
-    fn get_methods() -> Option<&'static Methods> {
-        static METHODS: MethodsStatic = MethodsStatic::new();
-        METHODS.methods(selected_module_label_path_methods)
-    }
-}
-
-#[starlark_module]
-fn selected_module_label_path_methods(builder: &mut MethodsBuilder) {
-    fn get_child<'v>(
-        this: Value<'v>,
-        #[starlark(require = pos)] child: &str,
-        eval: &mut Evaluator<'v, '_, '_>,
-    ) -> anyhow::Result<Value<'v>> {
-        let this = SelectedModuleLabelPath::from_value(this)
-            .ok_or_else(|| anyhow::anyhow!("invalid selected Label path receiver"))?;
-        let child = selected_scratch_relative(child)?;
-        let joined = this.0.path().as_path().join(child.as_path());
-        let joined = NormalizedAbsolutePath::new(joined)
-            .map_err(|_| anyhow::anyhow!("module_ctx.path get_child requires a relative path"))?;
-        let path = HostRepositoryLabelPathValue::new(joined, this.0.namespace())
-            .map_err(|_| anyhow::anyhow!("module_ctx.path get_child requires Unicode"))?;
-        Ok(eval.heap().alloc_simple(SelectedModuleLabelPath(path)))
-    }
-}
 
 fn selected_scratch_relative(path: &str) -> anyhow::Result<HostRepositoryRelativePath> {
     // PathBuf's component iterator normalizes some spellings, so check the
@@ -2376,7 +2140,9 @@ fn invocation_context_methods(builder: &mut MethodsBuilder) {
             )
         })?;
         let path = selected_path.call(label.canonical())?;
-        Ok(eval.heap().alloc_simple(SelectedModuleLabelPath(path)))
+        Ok(eval
+            .heap()
+            .alloc_simple(SelectedModuleLabelPath::new(path, selected_path.clone())))
     }
     fn download<'v>(
         this: Value<'v>,
@@ -5433,6 +5199,9 @@ mod tests {
             ..Default::default()
         };
         data.data.set(CaptureEvaluationEvents);
+        data.data.set(slug_workspace_v2::ImageDescriptorBudget::new(
+            64 * 1024 * 1024,
+        ));
         data.data.set(RepositoryHostInputTransaction::new(
             snapshot.clone(),
             frontier.clone(),
@@ -8204,7 +7973,9 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
             PathObservationNamespace::Host,
         )
         .unwrap();
-        let path = Arc::new(SelectedPathInvocation::new(vec![(label.clone(), physical)]));
+        let budget = slug_workspace_v2::ImageDescriptorBudget::new(64 * 1024 * 1024);
+        let ready = selected_path::test_ready(vec![(label.clone(), physical)], &budget);
+        let path = SelectedPathInvocation::new(ready).unwrap();
         let context =
             InvocationContext::new_modules(Arc::from([empty_module(&owner)]), &owner, None, None)
                 .with_selected_path(path.clone());
@@ -8248,7 +8019,8 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
                 )
             })
             .collect();
-        let capped = SelectedPathInvocation::new(ready);
+        let capped =
+            SelectedPathInvocation::new(selected_path::test_ready(ready, &budget)).unwrap();
         let error = capped
             .call(&CanonicalLabel::parse("@@//:overflow").unwrap())
             .unwrap_err();
@@ -8270,6 +8042,7 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
         assert!(owner.contains("owner_bzl(ctx, key, &inputs, None"));
         assert!(owner.contains("owner_bzl(ctx, key, &inputs, Some(&first)"));
     }
+    include!("module_extension/selected_path_owner_tests.rs");
     include!("module_extension_generated_path_tests.rs");
     include!("dependency_cycle/mixed_bzl_tests.rs");
 }

@@ -43,6 +43,7 @@ pub mod resolution;
 mod root_bootstrap;
 mod selected_extension_download;
 mod selected_graph;
+mod selected_label_source;
 mod selected_repo_spec;
 pub mod source_preparation;
 
@@ -364,6 +365,8 @@ pub use repository_host_input::RepositoryPlatformKey;
 pub use repository_label_path::HostRepositoryLabelPathError;
 pub use repository_label_path::HostRepositoryLabelPathKey;
 pub use repository_label_path::HostRepositoryLabelPathObservationKey;
+#[doc(hidden)]
+pub use repository_label_path::HostRepositoryLabelPathSource;
 pub use repository_label_path::HostRepositoryLabelPathValue;
 pub use repository_label_path::ObservedHostRepositoryLabelPath;
 pub use repository_label_path::RepositoryLabelPathAddress;
@@ -404,6 +407,24 @@ pub use selected_extension_download::SelectedExtensionDownloadTransaction;
 pub use selected_extension_download::SelectedExtensionDownloadVerified;
 #[doc(hidden)]
 pub use selected_extension_download::UsedDownloadRequestKey;
+#[doc(hidden)]
+pub use selected_label_source::ObservedSelectedLabelSource;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceChild;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceError;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceKey;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceLimit;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceLimits;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourcePolicy;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceRecipe;
+#[doc(hidden)]
+pub use selected_label_source::SelectedLabelSourceTransform;
 #[doc(hidden)]
 pub use selected_repo_spec::HostBuiltinBazelToolsRepositoryMapping;
 #[doc(hidden)]

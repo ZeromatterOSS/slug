@@ -6,6 +6,7 @@ use std::path::Path;
 
 use dupe::Dupe;
 use slug_workspace_v2::BudgetedImageBlock;
+use slug_workspace_v2::ImageDescriptorReservation;
 use slug_workspace_v2::ObservedInputImage;
 use slug_workspace_v2::PathObservationResult;
 use tempfile::TempDir;
@@ -38,6 +39,38 @@ struct CapturedImageOwner {
     root: File,
     stage: Option<TempDir>,
     logical: Option<LogicalByteReservation>,
+}
+
+/// Empty private output storage, created before ordinary source facts are read.
+/// Its allocation credit transfers to the completed owner. No writable path or
+/// FD escapes before promotion.
+pub(in crate::runtime) struct PreparedInputImageStage {
+    stage: TempDir,
+    reservation: ImageDescriptorReservation,
+}
+impl PreparedInputImageStage {
+    #[cfg(test)]
+    pub(in crate::runtime) fn test_path(&self) -> &Path {
+        self.stage.path()
+    }
+}
+
+pub(in crate::runtime) fn prepare_input_image_stage(
+    resources: &WorkspaceImageResources,
+) -> Result<PreparedInputImageStage, InputImageCaptureError> {
+    #[cfg(target_os = "linux")]
+    {
+        let reservation = resources.descriptor_budget().try_reserve(4096 + 256)?;
+        let stage = tempfile::Builder::new()
+            .prefix("slug-input-image-")
+            .tempdir()?;
+        Ok(PreparedInputImageStage { stage, reservation })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = resources;
+        Err(InputImageCaptureError::UnsupportedPlatform)
+    }
 }
 
 impl Drop for CapturedImageOwner {
@@ -112,6 +145,30 @@ pub(in crate::runtime) fn capture_input_image(
     resources: &WorkspaceImageResources,
     active: &dyn Fn() -> bool,
 ) -> Result<CapturedInputImageLease, InputImageCaptureError> {
+    capture_with_stage(authorized, resources, active, None)
+}
+
+pub(in crate::runtime) fn capture_prepared_input_image(
+    authorized: AuthorizedObservedInputImage,
+    resources: &WorkspaceImageResources,
+    active: &dyn Fn() -> bool,
+    stage: PreparedInputImageStage,
+) -> Result<CapturedInputImageLease, InputImageCaptureError> {
+    capture_with_stage(authorized, resources, active, Some(stage))
+}
+
+fn capture_with_stage(
+    authorized: AuthorizedObservedInputImage,
+    resources: &WorkspaceImageResources,
+    active: &dyn Fn() -> bool,
+    prepared: Option<PreparedInputImageStage>,
+) -> Result<CapturedInputImageLease, InputImageCaptureError> {
+    if prepared
+        .as_ref()
+        .is_some_and(|stage| !stage.reservation.same_budget(resources.descriptor_budget()))
+    {
+        return Err(InputImageCaptureError::Unauthorized);
+    }
     let AuthorizedObservedInputImage {
         source,
         certificate,
@@ -127,15 +184,22 @@ pub(in crate::runtime) fn capture_input_image(
         return Err(InputImageCaptureError::Unauthorized);
     }
     verify_frontier(&source, &certificate, resources, active)?;
-    // Reserve descriptor/header and logical payload before creating stage or
-    // copying a byte. The opaque certificate already retains its own credits.
-    let reservation = resources.descriptor_budget().try_reserve(4096 + 256)?;
+    // Prepared empty storage already owns its descriptor credit. Legacy capture
+    // reserves before creating storage; both reserve payload before first copy.
+    // Bind credit first so an early error drops stage buffers before the credit.
+    let (reservation, stage) = match prepared {
+        Some(prepared) => (prepared.reservation, Some(prepared.stage)),
+        None => (resources.descriptor_budget().try_reserve(4096 + 256)?, None),
+    };
     let logical = resources.reserve_logical(certificate.total_file_bytes())?;
     #[cfg(target_os = "linux")]
     {
-        let stage = tempfile::Builder::new()
-            .prefix("slug-input-image-")
-            .tempdir()?;
+        let stage = match stage {
+            Some(stage) => stage,
+            None => tempfile::Builder::new()
+                .prefix("slug-input-image-")
+                .tempdir()?,
+        };
         let root = super::linux::open_anchor(stage.path())?;
         let owner = CapturedImageOwner {
             certificate,
@@ -151,7 +215,7 @@ pub(in crate::runtime) fn capture_input_image(
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (reservation, logical);
+        let _ = (stage, reservation, logical);
         Err(InputImageCaptureError::UnsupportedPlatform)
     }
 }

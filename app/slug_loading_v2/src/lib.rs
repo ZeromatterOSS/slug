@@ -87,6 +87,8 @@ pub use cc_features::cc_feature_configuration_value;
 pub use cc_features::cc_toolchain_features_value;
 mod cycle_detector;
 mod dependency_cycle;
+#[doc(hidden)]
+pub use dependency_cycle::compute_selected_label_source;
 mod external_subtree_package_set;
 pub mod file_discovery;
 mod generated_repository_definition;
