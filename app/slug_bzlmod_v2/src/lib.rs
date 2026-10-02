@@ -41,6 +41,7 @@ mod repository_ignore;
 mod repository_label_path;
 pub mod resolution;
 mod root_bootstrap;
+mod runtime_source_declaration;
 mod selected_extension_download;
 mod selected_extension_scratch;
 mod selected_extension_tool_sources;
@@ -393,6 +394,20 @@ pub use root_bootstrap::RootModuleBootstrapApplyResult;
 pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
+pub use runtime_source_declaration::RuntimeSourceComponent;
+pub use runtime_source_declaration::RuntimeSourceDeclaration;
+pub use runtime_source_declaration::RuntimeSourceDeclarationError;
+pub use runtime_source_declaration::RuntimeSourceDeclarationInput;
+pub use runtime_source_declaration::RuntimeSourceDeclarationPolicy;
+pub use runtime_source_declaration::RuntimeSourceDeclarationPolicyKey;
+pub use runtime_source_declaration::RuntimeSourceDeclarationTransaction;
+pub use runtime_source_declaration::RuntimeSourceFactTier;
+pub use runtime_source_declaration::RuntimeSourceGuestPrefix;
+pub use runtime_source_declaration::RuntimeSourceLimit;
+pub use runtime_source_declaration::RuntimeSourceLimits;
+pub use runtime_source_declaration::RuntimeSourcePlatform;
+pub use runtime_source_declaration::RuntimeSourceSelectorInput;
+pub use runtime_source_declaration::RuntimeSourceSelectorRef;
 #[doc(hidden)]
 pub use selected_extension_download::SELECTED_EXTENSION_DOWNLOAD_LIMIT;
 #[doc(hidden)]

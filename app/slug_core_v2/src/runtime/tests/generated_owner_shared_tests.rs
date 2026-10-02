@@ -235,6 +235,7 @@ fn reciprocal_owner_cycle_spans_two_independently_bound_request_proxies() {
         registry_urls: RegistryUrls::from_request(&fixture.runtime.workspace, &fixture.registries)
             .unwrap(),
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+        runtime_sources: None,
     };
     let mut command = NativeDemandAbortGuard::new(
         fixture

@@ -774,3 +774,59 @@ async fn producer_path_and_descriptor_limits_precede_selector_growth() {
     );
     assert!(SelectedLabelSourceKey::validity(&value));
 }
+
+#[test]
+fn origin_parent_resets_transforms_without_recloning_credited_origin() {
+    let budget = ImageDescriptorBudget::new(64 << 10);
+    let label = CanonicalLabel::parse(&format!("@@//pkg:{}", "x".repeat(3000))).unwrap();
+    let original = root_recipe(&label, SelectedLabelSourcePolicy::plain(), &budget);
+    let derived = original
+        .parent(&budget)
+        .unwrap()
+        .child("bin/tool", &budget)
+        .unwrap();
+    let before = budget.used_bytes();
+    let parent = derived.origin_parent(&budget).unwrap();
+    let delta = budget.used_bytes() - before;
+    assert!(
+        delta < 512,
+        "origin reset allocates only one transform/header, not the long Label"
+    );
+    assert_eq!(parent.label(), original.label());
+    assert_eq!(parent.source(), original.source());
+    assert_eq!(parent.transforms(), &[SelectedLabelSourceTransform::Parent]);
+    let child = parent.child("lib", &budget).unwrap();
+    assert_eq!(child.transforms().len(), 2);
+    assert_eq!(child.transforms()[1].child(), Some("lib"));
+    assert_eq!(
+        derived.transforms().len(),
+        2,
+        "reset does not mutate retained tool recipe"
+    );
+    let foreign = ImageDescriptorBudget::new(64 << 10);
+    assert!(matches!(
+        derived.origin_parent(&foreign),
+        Err(SelectedLabelSourceError::Budget(
+            ImageDescriptorBudgetError::ForeignBudget
+        ))
+    ));
+    let held = budget
+        .try_reserve(budget.limit_bytes() - budget.used_bytes())
+        .unwrap();
+    assert!(matches!(
+        derived.origin_parent(&budget),
+        Err(SelectedLabelSourceError::Budget(
+            ImageDescriptorBudgetError::ResourceLimit
+        ))
+    ));
+    drop(held);
+    drop(original);
+    drop(derived);
+    drop(parent);
+    assert!(
+        budget.used_bytes() > 3000,
+        "reset child retains shared origin's original credit"
+    );
+    drop(child);
+    assert_eq!(budget.used_bytes(), 0);
+}

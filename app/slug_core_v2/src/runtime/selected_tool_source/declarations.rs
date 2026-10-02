@@ -7,13 +7,13 @@ use super::*;
 use crate::runtime::dice::input_image_bridge::DeclaredImageRequest;
 use crate::runtime::dice::input_image_bridge::{self};
 
-pub(super) struct Catalog {
+pub(in crate::runtime::dice) struct Catalog {
     entries: [Option<DeclaredImageRequest>; 3],
     // New fixed owner/header is charged for the entire declaration lifetime.
     _credit: slug_workspace_v2::ImageDescriptorReservation,
 }
 impl Catalog {
-    pub(super) fn new(
+    pub(in crate::runtime::dice) fn new(
         runtime: &WorkspaceRuntime,
         plan: &ObservedSelectedExtensionToolSourceRequests,
         deadline: Instant,
@@ -38,7 +38,7 @@ impl Catalog {
             _credit: credit,
         })
     }
-    pub(super) fn declare_elf(
+    pub(in crate::runtime::dice) fn declare_elf(
         &mut self,
         runtime: &WorkspaceRuntime,
         index: usize,
@@ -56,7 +56,7 @@ impl Catalog {
             policy,
         )
     }
-    pub(super) fn preflight(
+    pub(in crate::runtime::dice) fn preflight(
         &self,
         command: &NativeDemandCommand<'_>,
         demands: &[PathObservationDemand],
@@ -72,7 +72,7 @@ impl Catalog {
         }
         input_image_bridge::preflight_declared_image_paths(command, &entries[..count], demands)
     }
-    pub(super) fn observe(
+    pub(in crate::runtime::dice) fn observe(
         &self,
         command: &NativeDemandCommand<'_>,
         demands: Vec<PathObservationDemand>,
@@ -101,7 +101,7 @@ impl Catalog {
             &active,
         )
     }
-    pub(super) fn capture(
+    pub(in crate::runtime::dice) fn capture(
         &self,
         command: &NativeDemandCommand<'_>,
         index: usize,

@@ -18,6 +18,8 @@ use tokio::sync::watch;
 /// Every variant stores the complete concrete key, including mode and source route.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 enum Node {
+    RuntimeSourceRequests(Arc<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>),
+    RuntimeSourceProfile(Arc<crate::module_extension::runtime_sources::RuntimeSourceProfileKey>),
     SelectedToolRequests(Arc<crate::module_extension::selected_tools::SelectedExtensionToolSourceRequestsKey>),
     SelectedToolSources(Arc<crate::module_extension::selected_tools::SelectedExtensionToolSourcesKey>),
     SelectedScratchPrefix(Arc<crate::module_extension::selected_scratch::HostSelectedExtensionScratchPrefixKey>),
@@ -45,6 +47,16 @@ enum Node {
 
 impl Node {
     fn from_dyn(key: &DynKey) -> Option<Self> {
+        if let Some(key) =
+            key.downcast_ref::<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>()
+        {
+            return Some(Self::RuntimeSourceRequests(Arc::new(key.clone())));
+        }
+        if let Some(key) =
+            key.downcast_ref::<crate::module_extension::runtime_sources::RuntimeSourceProfileKey>()
+        {
+            return Some(Self::RuntimeSourceProfile(Arc::new(key.clone())));
+        }
         if let Some(key) = key.downcast_ref::<crate::module_extension::selected_tools::SelectedExtensionToolSourceRequestsKey>() {
             return Some(Self::SelectedToolRequests(Arc::new(key.clone())));
         }
@@ -139,6 +151,8 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::RuntimeSourceRequests(key) => write!(f, "RuntimeSourceRequests({key})"),
+            Self::RuntimeSourceProfile(key) => write!(f, "RuntimeSourceProfile({key})"),
             Self::SelectedToolRequests(key) => write!(f, "SelectedToolRequests({key})"),
             Self::SelectedToolSources(key) => write!(f, "SelectedToolSources({key})"),
             Self::SelectedLabelSource(key) => write!(f, "SelectedLabelSource({key})"),
@@ -602,6 +616,79 @@ pub async fn compute_selected_tool_sources(
             || !value.authorized_by(transaction, resources)
         {
             return Err(SelectedToolSourcesError::operational());
+        }
+    }
+    Ok(outcome)
+}
+
+/// Guard both normal computation and warm reuse against current declaration authority.
+pub async fn compute_runtime_source_requests(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::runtime_sources::RuntimeSourceRequestsKey,
+) -> Result<
+    <crate::module_extension::runtime_sources::RuntimeSourceRequestsKey as Key>::Value,
+    crate::module_extension::runtime_sources::RuntimeSourcesError,
+> {
+    use crate::module_extension::runtime_sources::RuntimeSourcesError;
+    let outcome = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| RuntimeSourcesError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &outcome {
+        let resources = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchResources>()
+            .map_err(|_| RuntimeSourcesError::operational())?;
+        let transaction = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::RuntimeSourceDeclarationTransaction>()
+            .map_err(|_| RuntimeSourcesError::operational())?;
+        if !value.matches_key(key)
+            || !value.same_resources(resources)
+            || !transaction.same_budget(resources.descriptor_budget())
+            || !value.authorized_by(transaction)
+        {
+            return Err(RuntimeSourcesError::operational());
+        }
+    }
+    Ok(outcome)
+}
+
+/// A completed profile additionally requires current full tool scratch authorization.
+pub async fn compute_runtime_source_profile(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::runtime_sources::RuntimeSourceProfileKey,
+) -> Result<
+    <crate::module_extension::runtime_sources::RuntimeSourceProfileKey as Key>::Value,
+    crate::module_extension::runtime_sources::RuntimeSourcesError,
+> {
+    use crate::module_extension::runtime_sources::RuntimeSourcesError;
+    let outcome = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| RuntimeSourcesError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &outcome {
+        let resources = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchResources>()
+            .map_err(|_| RuntimeSourcesError::operational())?;
+        let transaction = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::RuntimeSourceDeclarationTransaction>()
+            .map_err(|_| RuntimeSourcesError::operational())?;
+        let scratch = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchElfMetadataTransaction>()
+            .map_err(|_| RuntimeSourcesError::operational())?;
+        if !value.matches_key(key)
+            || !value.same_resources(resources)
+            || !transaction.same_budget(resources.descriptor_budget())
+            || !value.authorized_by(transaction, scratch, resources)
+        {
+            return Err(RuntimeSourcesError::operational());
         }
     }
     Ok(outcome)

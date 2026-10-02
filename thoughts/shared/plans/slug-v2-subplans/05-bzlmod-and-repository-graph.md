@@ -345,6 +345,37 @@ all-target and CLI compilation pass. Focused/protected gates pass Shared31/31,
 Loading75/75 and Core100/100; these establish source preparation,
 not runtime execution, actual-root fit or total RSS/performance.
 
+WP895 adds configured TreeOnly runtime source preparation. An ordered credited
+policy is an actual immutable command input, with valid raw None before any lower
+tool dependency. Its compact raw key shares the existing normalized workspace;
+Some policy and current transaction remain credited. Normal RuntimeRequests
+resolves explicit Host directories component-disjoint from the workspace,
+workspace-relative directories, or a selected role's genuine Label origin parent
+plus strict children. Guest prefixes cannot shadow selected tool spellings.
+Normal RuntimeProfile depends on the FULL tool certificate and each exact runtime
+image, retaining ordered mappings/provenance, bytes/modes and complete frontier.
+Guarded cold/warm consumers require exact current policy, scratch authorization
+and resource services. Both families join the full mixed live-context graph.
+
+One factored native Tools/Runtime command owns both source families. A new private
+current-policy/session factory admits honest outside-Host anchors without widening
+the materializer's workspace-only factory. Whole mixed batches are admitted before
+proof or root IO; subtree ancestors permit only Lstat. Retained nofollow FD and
+named-root identity checks surround capture. Fixed64 runtime stages are created
+before lower ancestor facts; unused stages survive actual lease lastDrop.
+The SAME snapshot updater revokes scratch cells and restores prior full Some/None
+policy before combined lease export. Runtime aggregate occurrence caps are checked
+serially after each bounded image; one image may reveal overflow, then no next tree
+is discovered. Shared64MiB descriptor/2GiB logical services and256MiB scratch
+payload retain physical/history credit independently of semantic limits.
+
+Shared40/40, Loading84/84 and Core107/107 focused/protected gates pass, including
+real external Host/workspace/independent generated Label writer captures, current
+spelling shadows, full prior Some restoration, aggregate boundaries, cancellation,
+mutation/refusal/recovery, mixed cycle and lastDrop. Default owner all-target and
+CLI check pass; independent FINAL ACCEPT passes. This proves source-tree
+preparation only, with no runtime/namespace/root-fit/bootstrap/RSS claim.
+
 Authenticated rules_rust0.73.0 _crate_impl selects Linux musl for its default
 generator; override/bootstrap/table branches run in actual Starlark. A GNU URL
 or musl name cannot prove the selected bytes/interpreter. Host-tools come from the
@@ -438,9 +469,9 @@ after transaction drop/drain. Tool images stream 64KiB; shared credited origins/
 Needs/recipes/facts/history survive actual last Drop. Complete namespace facets,
 finite all-writer/descendant mediation, hard quota/retained capture and actual
 source-consuming query plus locked generate remain required. No smaller method
-endpoint activates early. Runtime source policy/catalog remains accepted design
-only, separate from the accepted WP894 selected-tool producer. Actual runtime
-source configuration/roots, full namespace facts/catalog, selected-tool fit,
+endpoint activates early. Configured TreeOnly source policy, normal profile and
+private source catalogue are implemented by WP895; the COMPLETE runtime namespace
+catalogue remains required. Actual selected runtime roots/fit, full namespace facts,
 process/backend activation, source-consuming query plus locked generate, bootstrap
 and new RSS remain unproved.
 

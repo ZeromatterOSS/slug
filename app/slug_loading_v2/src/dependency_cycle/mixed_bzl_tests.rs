@@ -23,15 +23,21 @@ mod mixed_bzl_tests {
 
     #[tokio::test]
     async fn generated_path_and_producer_defining_bzl_cycle_has_fresh_bzl_listener() {
-        generated_definition_cycle(false).await;
+        generated_definition_cycle(0).await;
     }
 
     #[tokio::test]
     async fn selected_tools_generated_definition_cycle_terminates_without_certificate() {
-        generated_definition_cycle(true).await;
+        generated_definition_cycle(1).await;
     }
 
-    async fn generated_definition_cycle(with_tools: bool) {
+    #[tokio::test]
+    async fn runtime_profile_generated_definition_cycle_terminates_without_certificate() {
+        generated_definition_cycle(2).await;
+    }
+
+    async fn generated_definition_cycle(consumer: u8) {
+        let with_tools = consumer != 0;
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
         const SAFE: &str = "repo=repository_rule(lambda ctx:None)\ndef impl(ctx):\n    repo(name='proof')\next=module_extension(implementation=impl,environ=['FACTOR','MISSING','FACTOR'])\n";
         let mut builder = Dice::builder();
@@ -165,24 +171,60 @@ mod mixed_bzl_tests {
             )
             .await;
         }
+        let runtime_key = super::super::runtime_sources::RuntimeSourceProfileKey::new(
+            tool_key.requests_key().clone(),
+        );
+        if consumer == 2 {
+            let policy = runtime_test_policy(
+                &resources,
+                &[runtime_test_relative("runtime", "/runtime")],
+                Default::default(),
+            );
+            tx = runtime_test_install(
+                tx,
+                tracker.clone(),
+                &resources,
+                Some(policy.dupe()),
+                Some(runtime_test_authorization(&policy, &resources)),
+                None,
+                None,
+            )
+            .await;
+        }
         tracker.take();
         tracker.take_dependencies();
         // A separate ordinary request retains the defining .bzl waiter until its
         // own mixed notification records poison, even if the owner finishes first.
         let mut bzl_tx = tx.dupe();
         let mut tool_tx = tx.dupe();
-        let (owner, bzl, tools) = tokio::time::timeout(Duration::from_secs(2), async {
-            tokio::join!(tx.compute(&key), bzl_tx.compute(&bzl_key), async {
-                if with_tools {
-                    Some(
-                        crate::compute_selected_tool_sources(&mut tool_tx, &tool_key)
-                            .await
-                            .unwrap(),
-                    )
-                } else {
-                    None
+        let mut runtime_tx = tx.dupe();
+        let (owner, bzl, tools, runtime) = tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(
+                tx.compute(&key),
+                bzl_tx.compute(&bzl_key),
+                async {
+                    if consumer == 1 {
+                        Some(
+                            crate::compute_selected_tool_sources(&mut tool_tx, &tool_key)
+                                .await
+                                .unwrap(),
+                        )
+                    } else {
+                        None
+                    }
+                },
+                async {
+                    if consumer == 2 {
+                        Some(
+                            crate::compute_runtime_source_profile(&mut runtime_tx, &runtime_key)
+                                .await
+                                .unwrap(),
+                        )
+                    } else {
+                        None
+                    }
                 }
-            })
+            )
         })
         .await
         .expect("mixed generated-source cycle must terminate");
@@ -248,10 +290,23 @@ mod mixed_bzl_tests {
                 "mixed cycle must refuse the actual normal certificate: {tools:?}"
             );
         }
-        drop((tx, bzl_tx, tool_tx));
+        if let Some(runtime) = runtime {
+            assert!(
+                matches!(
+                    runtime,
+                    SourcePreparationOutcome::Complete(Err(
+                        super::super::runtime_sources::RuntimeSourcesError::Tool(
+                            super::super::selected_tools::SelectedToolSourcesError::Prefix(_)
+                        )
+                    ))
+                ),
+                "mixed cycle must refuse the new normal runtime profile: {runtime:?}"
+            );
+        }
+        drop((tx, bzl_tx, tool_tx, runtime_tx));
         dice.wait_for_idle().await;
         let dependencies = tracker.take_dependencies();
-        if with_tools {
+        if consumer == 1 {
             let (_, tool_dependencies) = dependencies
                 .iter()
                 .find(|(name, _)| name == &tool_key.to_string())
@@ -267,6 +322,32 @@ mod mixed_bzl_tests {
             assert!(
                 request_dependencies.contains(&tool_key.checkpoint().to_string()),
                 "{request_dependencies:?}"
+            );
+        }
+        if consumer == 2 {
+            let (_, profile_dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &runtime_key.to_string())
+                .expect("runtime Profile consumer must activate genuinely");
+            assert!(
+                profile_dependencies.contains(&runtime_key.requests_key().to_string()),
+                "{profile_dependencies:?}"
+            );
+            let (_, runtime_dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &runtime_key.requests_key().to_string())
+                .expect("runtime Requests consumer must activate genuinely");
+            assert!(
+                runtime_dependencies.contains(&tool_key.requests_key().to_string()),
+                "{runtime_dependencies:?}"
+            );
+            let (_, tool_dependencies) = dependencies
+                .iter()
+                .find(|(name, _)| name == &tool_key.requests_key().to_string())
+                .expect("normal ToolRequests dependency must activate genuinely");
+            assert!(
+                tool_dependencies.contains(&tool_key.checkpoint().to_string()),
+                "{tool_dependencies:?}"
             );
         }
         let (_, fresh_bzl_dependencies) = dependencies

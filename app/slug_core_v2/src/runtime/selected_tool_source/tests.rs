@@ -15,13 +15,13 @@ use tempfile::TempDir;
 use super::*;
 use crate::runtime::ProcessHostOwner;
 
-struct Fixture {
-    workspace: TempDir,
-    runtime: WorkspaceRuntime,
-    key: HostSelectedExtensionScratchPrefixKey,
+pub(in crate::runtime::dice) struct Fixture {
+    pub(in crate::runtime::dice) workspace: TempDir,
+    pub(in crate::runtime::dice) runtime: WorkspaceRuntime,
+    pub(in crate::runtime::dice) key: HostSelectedExtensionScratchPrefixKey,
 }
 impl Fixture {
-    fn new(source: &str) -> Self {
+    pub(in crate::runtime::dice) fn new(source: &str) -> Self {
         let workspace = tempfile::tempdir().unwrap();
         let platforms = workspace.path().join("platforms");
         fs::create_dir_all(platforms.join("host")).unwrap();
@@ -64,10 +64,10 @@ impl Fixture {
             key,
         }
     }
-    fn replace(&self, source: &str) {
+    pub(in crate::runtime::dice) fn replace(&self, source: &str) {
         fs::write(self.workspace.path().join("ext.bzl"), source).unwrap();
     }
-    fn restored(&self) {
+    pub(in crate::runtime::dice) fn restored(&self) {
         let preflight = self.runtime.begin_native_demand_command().unwrap();
         assert!(preflight.path_observations().observations().is_empty());
         assert!(preflight.command.download_results.is_empty());
@@ -77,7 +77,9 @@ impl Fixture {
     }
 }
 
-fn discover_owner(runtime: &WorkspaceRuntime) -> Arc<HostSelectedExtensionOwner> {
+pub(in crate::runtime::dice) fn discover_owner(
+    runtime: &WorkspaceRuntime,
+) -> Arc<HostSelectedExtensionOwner> {
     let mut guard = NativeDemandAbortGuard::new(
         runtime
             .begin_native_demand_command()
@@ -157,7 +159,7 @@ fn discover_owner(runtime: &WorkspaceRuntime) -> Arc<HostSelectedExtensionOwner>
     owner
 }
 
-fn wire(entry: u8) -> Vec<u8> {
+pub(in crate::runtime::dice) fn wire(entry: u8) -> Vec<u8> {
     let mut bytes = vec![0; 64];
     bytes[..9].copy_from_slice(b"\x7fELF\x02\x01\x01\x00\x00");
     bytes[16] = 2;
@@ -168,7 +170,7 @@ fn wire(entry: u8) -> Vec<u8> {
     bytes[54] = 56;
     bytes
 }
-fn literal(bytes: &[u8]) -> String {
+pub(in crate::runtime::dice) fn literal(bytes: &[u8]) -> String {
     assert!(
         bytes.iter().all(|byte| *byte < 128),
         "wire fixture is ASCII"
@@ -181,13 +183,13 @@ fn literal(bytes: &[u8]) -> String {
             .collect::<String>()
     )
 }
-fn scratch_program(entry: u8) -> String {
+pub(in crate::runtime::dice) fn scratch_program(entry: u8) -> String {
     format!(
         "def impl(ctx):\n    tool=ctx.path('bin/generator')\n    ctx.file(tool,{},executable=True)\n    ctx.file('config.json','config',executable=False)\n    ctx.execute([tool,'query',ctx.path('config.json')])\next=module_extension(implementation=impl)\n",
         literal(&wire(entry))
     )
 }
-fn key(fixture: &Fixture) -> SelectedExtensionToolSourcesKey {
+pub(in crate::runtime::dice) fn key(fixture: &Fixture) -> SelectedExtensionToolSourcesKey {
     SelectedExtensionToolSourcesKey::new(
         fixture.key.clone(),
         SelectedToolSourcesPolicy::new(

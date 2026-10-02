@@ -34,21 +34,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-194-m7a-selected-tool-source-producer-r1
-Status: accepted; normal tool sources and private native lease; runtime prerequisites remain open
+Packet: WP-7-195-m7a-configured-runtime-source-profile-r1
+Status: accepted
 
-WP894 accepts actual typed first-checkpoint tools through normal source/image/ELF
-facts and one private retained native source lease. Shared31/Loading75/Core100
-focused/protected gates, default owner all-target/CLI compile and independent FINAL
-ACCEPT pass; target/wp894/acceptance.json records the evidence. Full current
-structural origin/request and credited history/last-Drop ownership remain mandatory.
-The bounded implementation contract is in
+WP895 accepts explicit immutable runtime source configuration, genuine normal
+request/source-tree profile keys and one private native lease retaining certified
+tools plus configured runtime sources. Honest external Host root authority is a
+new reviewed current-policy/session factory; missing declarations refuse before
+IO. The bounded implementation contract is in
 [current-packet.md](slug-v2-subplans/current-packet.md).
 
-WP89396fc6562a supplies the accepted first-process scratch-prefix producer.
-Runtime raw policy/profile/catalog, complete namespace/loader/access facets,
-mediator/quota/backend and genuine query plus locked generate remain required;
-M7A stays partial, with no activation, linked CLI or total RSS claim.
+WP8941c912f364 accepts normal typed tool-source certificates/private staging;
+Shared31/Loading75/Core100 and default compile gates pass with independent FINAL.
+WP895 Shared40/Loading84/Core107 (231 distinct, protected206 plus25 new),
+default owner all-target/CLI checks and independent FINAL ACCEPT pass. Configured
+TreeOnly runtime source preparation is implemented. Complete namespace/loader/
+access facets, mediator/quota/backend and actual query plus locked generate remain
+required; M7A stays partial,
+with no process activation, selected-root fit or total RSS claim.
 
 WP794 at `38dec0791` repaired the shared selected file-effect fixture's
 empty download transaction, restoring 19/19 file-effect tests while WP793's

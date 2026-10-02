@@ -119,7 +119,7 @@ pub(super) fn check_key(
     Ok(())
 }
 
-pub(super) fn check_selection(
+pub(in crate::runtime::dice) fn check_selection(
     runtime: &WorkspaceRuntime,
     selected: &ObservedSelectedLabelSource,
 ) -> Result<(), NativeDemandSessionError> {
@@ -221,7 +221,7 @@ pub(super) fn check_member(
     Ok(())
 }
 
-pub(super) fn check_reachable(
+pub(in crate::runtime::dice) fn check_reachable(
     command: &NativeDemandCommand<'_>,
     selected: &ObservedSelectedLabelSource,
     reachable: &SelectedWorkspaceDemands,

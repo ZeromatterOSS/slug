@@ -196,6 +196,32 @@ impl SelectedLabelSourceRecipe {
         let transforms = budget.try_reserve(0)?.freeze(Vec::new())?;
         Ok(Self { origin, transforms })
     }
+    /// Select the original Label's parent, sharing its credited origin rather
+    /// than cloning Label/source ownership or retaining prior derived transforms.
+    pub fn origin_parent(
+        &self,
+        budget: &ImageDescriptorBudget,
+    ) -> Result<Self, SelectedLabelSourceError> {
+        if !self.same_budget(budget) {
+            return Err(ImageDescriptorBudgetError::ForeignBudget.into());
+        }
+        if self.policy().limits.max_transforms == 0 {
+            return Err(SelectedLabelSourceError::LimitExceeded(
+                SelectedLabelSourceLimit::Transforms,
+            ));
+        }
+        check_descriptors(add(self.origin.get().descriptor_bytes, 16)?, &self.policy())?;
+        let credit = budget.try_reserve(size_of::<SelectedLabelSourceTransform>())?;
+        let mut transforms = Vec::new();
+        transforms
+            .try_reserve_exact(1)
+            .map_err(|_| ImageDescriptorBudgetError::ResourceLimit)?;
+        transforms.push(SelectedLabelSourceTransform::Parent);
+        Ok(Self {
+            origin: self.origin.dupe(),
+            transforms: credit.freeze(transforms)?,
+        })
+    }
     pub fn parent(&self, budget: &ImageDescriptorBudget) -> Result<Self, SelectedLabelSourceError> {
         self.append(None, budget)
     }

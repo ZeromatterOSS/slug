@@ -486,6 +486,8 @@ fn read_file_observations(
 
 #[path = "input_image_bridge.rs"]
 mod input_image_bridge;
+#[path = "runtime_sources.rs"]
+mod runtime_sources;
 #[path = "selected_scratch_source.rs"]
 mod selected_scratch_source;
 #[path = "selected_tool_source.rs"]
@@ -733,6 +735,7 @@ struct NativeDemandGenerationBundle {
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct NativeDemandRequestInputBundle {
+    runtime_sources: Option<slug_bzlmod_v2::RuntimeSourceDeclarationPolicy>,
     command_policy: BzlmodCommandPolicyKey,
     environment_policy: BzlmodEnvironmentPolicyKey,
     lockfile_mode: LockfileMode,
@@ -751,6 +754,7 @@ struct NativeDemandInputBundle {
 impl NativeDemandRequestInputBundle {
     fn normalized_initial() -> Self {
         Self {
+            runtime_sources: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false)
                 .expect("default bzlmod command policy is valid"),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
@@ -6659,6 +6663,7 @@ impl WorkspaceRuntime {
         )
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -6846,6 +6851,7 @@ impl WorkspaceRuntime {
             include_tool,
         };
         let request = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -6926,6 +6932,7 @@ impl WorkspaceRuntime {
             completion,
         )?;
         let request = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -7551,6 +7558,12 @@ impl NativeDemandCommand<'_> {
         if let Some(state) = &self.scratch_metadata {
             state.install(&mut data)?;
         }
+        runtime_sources::install_declaration_transaction(
+            &mut data,
+            self.runtime,
+            self.inputs.request.runtime_sources.as_ref(),
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
         // Loading uses this only to reject surplus prepared records on a
         // replay branch that no longer calls execute. A no-execute graph does
         // not acquire the transient DICE observation dependency.
@@ -7887,6 +7900,12 @@ impl NativeDemandCommand<'_> {
                 &mut data,
                 &self.runtime.workspace,
                 &prior.download_results,
+            )
+            .map_err(NativeDemandSessionError::Restoration)?;
+            runtime_sources::install_declaration_transaction(
+                &mut data,
+                self.runtime,
+                prior.inputs.request.runtime_sources.as_ref(),
             )
             .map_err(NativeDemandSessionError::Restoration)?;
             let mut updater = self.runtime.dice.updater_with_data(data);
@@ -8635,6 +8654,12 @@ fn prepare_selected_native_demand_snapshot(
         &snapshot.download_results,
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    runtime_sources::install_declaration_transaction(
+        &mut data,
+        command.runtime,
+        snapshot.inputs.request.runtime_sources.as_ref(),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     let mut updater = command.runtime.dice.updater_with_data(data);
     inject_native_demand_snapshot(
         &mut updater,
@@ -8810,6 +8835,12 @@ fn inject_native_demand_snapshot(
             NativeDemandWorkspaceRevision(inputs.generations.workspace_revision),
         )])
         .context("injecting fixed workspace revision")?;
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RuntimeSourceDeclarationPolicyKey::new(workspace.dupe()),
+            inputs.request.runtime_sources.dupe(),
+        )])
+        .context("injecting runtime source declaration input")?;
     updater
         .changed_to(vec![(
             RepositoryMaterializationResultEpochKey { workspace },
@@ -11289,6 +11320,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let path = native_host_file_demand(root.join("probe.txt"));
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
                 Some("all"),
@@ -11322,6 +11354,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .clone();
 
         let rejected_inputs = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
                 .unwrap(),
@@ -11455,6 +11488,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let path = native_host_file_demand(root.join("probe.txt"));
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
+            runtime_sources: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
             environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
                 Some("all"),

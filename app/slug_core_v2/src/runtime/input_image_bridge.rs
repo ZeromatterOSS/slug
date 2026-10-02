@@ -217,7 +217,7 @@ pub(super) fn observe_declared_image_paths(
     observe_authorized_image_paths(command, declarations, &sources, demands, credit, active)
 }
 
-fn image_batch_credit(
+pub(in crate::runtime::dice) fn image_batch_credit(
     command: &NativeDemandCommand<'_>,
     demands: &[PathObservationDemand],
 ) -> Result<slug_workspace_v2::ImageDescriptorReservation, NativeDemandSessionError> {
@@ -321,29 +321,47 @@ fn observe_authorized_image_paths(
     active: &dyn Fn() -> bool,
 ) -> Result<PathObservationEpoch, NativeDemandSessionError> {
     let budget = command.runtime.image_resources.descriptor_budget();
+    observe_image_rows(command, demands, _credit, active, |demand| {
+        let PathObservationOperation::InputImage(scope) = demand.operation() else {
+            unreachable!()
+        };
+        let index = declarations
+            .iter()
+            .position(|request| request.allows(demand))
+            .expect("whole batch authorized");
+        let source = sources[index].as_ref().expect("retained authorized source");
+        let result = if matches!(
+            scope.operation(),
+            ImageObservationOperation::BoundedElfMetadata { .. }
+        ) {
+            observe_declared_elf(command, source, demand, active)?
+        } else {
+            source
+                .scoped()
+                .observe(demand, budget, active)
+                .map_err(NativeDemandSessionError::InputImage)?
+        };
+        Ok(result)
+    })
+}
+
+pub(in crate::runtime::dice) fn observe_image_rows(
+    command: &NativeDemandCommand<'_>,
+    demands: Vec<PathObservationDemand>,
+    _credit: slug_workspace_v2::ImageDescriptorReservation,
+    active: &dyn Fn() -> bool,
+    mut observe_image: impl FnMut(
+        &PathObservationDemand,
+    ) -> Result<PathObservationResult, NativeDemandSessionError>,
+) -> Result<PathObservationEpoch, NativeDemandSessionError> {
     let mut observations = Vec::with_capacity(demands.len());
     let mut legacy = Vec::new();
     for demand in demands {
         if !active() {
             return Err(image_error("image preparation cancelled"));
         }
-        if let PathObservationOperation::InputImage(scope) = demand.operation() {
-            let index = declarations
-                .iter()
-                .position(|request| request.allows(&demand))
-                .expect("whole batch authorized");
-            let source = sources[index].as_ref().expect("retained authorized source");
-            let result = if matches!(
-                scope.operation(),
-                ImageObservationOperation::BoundedElfMetadata { .. }
-            ) {
-                observe_declared_elf(command, source, &demand, active)?
-            } else {
-                source
-                    .scoped()
-                    .observe(&demand, budget, active)
-                    .map_err(NativeDemandSessionError::InputImage)?
-            };
+        if matches!(demand.operation(), PathObservationOperation::InputImage(_)) {
+            let result = observe_image(&demand)?;
             observations.push((demand, Arc::new(result)));
         } else {
             legacy.push(demand);
@@ -514,7 +532,7 @@ fn observe_declared_elf(
 mod prepare;
 
 #[path = "input_image_bridge/label_source.rs"]
-mod label_source;
+pub(in crate::runtime::dice) mod label_source;
 
 #[cfg(all(test, target_os = "linux"))]
 #[path = "input_image_bridge/label_tests.rs"]

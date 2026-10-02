@@ -22,13 +22,13 @@ struct StateInner {
 #[derive(Clone, Dupe)]
 pub(in crate::runtime::dice) struct ScratchMetadataState(BudgetedImageBlock<StateInner>);
 impl ScratchMetadataState {
-    pub(super) fn new(
+    pub(in crate::runtime::dice) fn new(
         plan: &ObservedSelectedExtensionToolSourceRequests,
         resources: &SelectedScratchResources,
     ) -> Result<Self, NativeDemandSessionError> {
         Self::for_plan(plan, resources, None)
     }
-    pub(super) fn for_plan(
+    pub(in crate::runtime::dice) fn for_plan(
         plan: &ObservedSelectedExtensionToolSourceRequests,
         resources: &SelectedScratchResources,
         previous: Option<&Self>,
@@ -103,7 +103,7 @@ impl ScratchMetadataState {
         }
         Ok(Self(credit.freeze(inner).map_err(image_failure)?))
     }
-    pub(super) fn transaction(
+    pub(in crate::runtime::dice) fn transaction(
         &self,
     ) -> Result<SelectedScratchElfMetadataTransaction, NativeDemandSessionError> {
         let inner = self.0.get();
@@ -157,7 +157,7 @@ impl ScratchMetadataState {
         }
         Ok(())
     }
-    pub(super) fn preflight(
+    pub(in crate::runtime::dice) fn preflight(
         &self,
         plan: &ObservedSelectedExtensionToolSourceRequests,
         need: &SelectedScratchElfMetadataNeeds,
@@ -180,7 +180,7 @@ impl ScratchMetadataState {
         }
         Ok(())
     }
-    pub(super) fn fulfill(
+    pub(in crate::runtime::dice) fn fulfill(
         &self,
         plan: &ObservedSelectedExtensionToolSourceRequests,
         need: &SelectedScratchElfMetadataNeeds,
