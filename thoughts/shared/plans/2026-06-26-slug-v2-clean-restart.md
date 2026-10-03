@@ -35,16 +35,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual distinct registry frontier accepted as evidence; bounded capacity decision next; full WP899 unaccepted
+Status: bounded actual-root registry profile validated; supervised source admission next; full WP899 unaccepted
 
 The one new global7 observation is spent:128 admitted distinct registry identities,
 0 repeats, first new identity129 refused by RegistryAttempts. No timeout origin
 or source capture occurred. Restoration/engine retirement,49/49 censuses, actual
 child join/stage cleanup and exact empty-parent removal are proved with three
 independent terminal FINALs. [Frontier receipt](slug-v2-subplans/wp899-distinct-registry-frontier-2026-10-03.json).
-Next is the bounded natural registry-profile capacity decision;129 is a lower
-bound, not full closure. No version skip, automatic retry or weakened byte/memory/
-time safeguard is admitted. FullWP899/source fit/historical40GB remain unaccepted.
+The bounded profile component now keeps Default128 and selects explicit diagnostic256,
+with fully charged allowance-sized storage in the unchanged16MiB bank. Fresh44/44
+and default Core+CLI all-target compilation pass; independent FINAL accepts only
+this component. [Receipt](slug-v2-subplans/wp899-bounded-registry-profile-2026-10-03.json).
+Next actual source observation needs a new reviewed contract/freeze.129 remains a
+lower bound; fullWP899/source fit/historical40GB remain unaccepted.
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and

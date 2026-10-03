@@ -26,7 +26,7 @@ pub(in crate::runtime) enum SourceCounter {
     WrittenBytes,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) struct SourceServiceLimits {
     pub(in crate::runtime) registry_object_bytes: u64,
     pub(in crate::runtime) registry_attempts: u64,
@@ -52,11 +52,21 @@ impl Default for SourceServiceLimits {
     }
 }
 impl SourceServiceLimits {
+    pub(super) const MAX_REGISTRY_ATTEMPTS: u64 = 256;
+
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn actual_root() -> Self {
+        Self {
+            registry_attempts: Self::MAX_REGISTRY_ATTEMPTS,
+            ..Self::default()
+        }
+    }
+
     fn valid(self) -> bool {
         let max = Self::default();
         [
             (self.registry_object_bytes, max.registry_object_bytes),
-            (self.registry_attempts, max.registry_attempts),
+            (self.registry_attempts, Self::MAX_REGISTRY_ATTEMPTS),
             (self.registry_admitted_bytes, max.registry_admitted_bytes),
             (self.source_attempts, max.source_attempts),
             (self.transferred_bytes, max.transferred_bytes),

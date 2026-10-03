@@ -1215,16 +1215,18 @@ fn actual_source_admission(emitted: &Cell<bool>) -> Result<(), &'static str> {
         .revalidate_before_runtime()
         .map_err(|_| "clock or stage setup refused")?;
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).map_err(|_| "workspace refused")?;
+    let limits = SourceServiceLimits::actual_root();
     let diagnostic = SourcePreparationDiagnosticRuntime::new(
         workspace,
         crate::runtime::ProcessHostOwner::native(),
         clock.work_deadline(),
         clock.cleanup_deadline(),
-        SourceServiceLimits::default(),
+        limits,
     )
     .map_err(|_| "diagnostic constructor refused")?;
     let mut receipt = Receipt::new(diagnostic.descriptor_budget())?;
     receipt.number("schema", 1)?;
+    receipt.number("registry_attempt_limit", limits.registry_attempts)?;
     receipt.number(
         "work_deadline_monotonic_ns",
         clock.work_deadline_monotonic_ns(),

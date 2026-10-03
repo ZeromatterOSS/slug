@@ -9,6 +9,7 @@ use slug_bzlmod_v2::RegistryFileUrl;
 use super::SourceBufferReservation;
 use super::SourceCounter;
 use super::SourceServiceError;
+use super::SourceServiceLimits;
 use super::SourceServiceScope;
 use super::timeout_provenance::SourceTimeoutSnapshot;
 use super::timeout_provenance::SourceTimeoutState;
@@ -16,10 +17,9 @@ use super::timeout_provenance::SourceTimeoutState;
 #[path = "registry_association/tests.rs"]
 mod tests;
 
-const ROWS: usize = 128;
+const ROWS: usize = SourceServiceLimits::MAX_REGISTRY_ATTEMPTS as usize;
 const IDENTITY_BYTES: usize = 8192;
 const ROW_BYTES: usize = IDENTITY_BYTES * 2;
-const SLAB_BYTES: usize = ROWS * ROW_BYTES;
 
 pub(super) enum RegistryRequestRef<'a> {
     Url(&'a RegistryFileUrl),
@@ -121,8 +121,12 @@ pub(super) struct RegistryChargeObservation {
 }
 impl RegistryRequestAssociation {
     pub(super) fn new(scope: &Arc<SourceServiceScope>) -> Result<Arc<Self>, SourceServiceError> {
+        let slab_bytes = usize::try_from(scope.limits().registry_attempts)
+            .ok()
+            .and_then(|rows| rows.checked_mul(ROW_BYTES))
+            .ok_or(SourceServiceError::BufferLimit)?;
         // Includes fixed rows/lock/Arc headers and construction-header overlap.
-        let charged = SLAB_BYTES
+        let charged = slab_bytes
             .checked_add(
                 std::mem::size_of::<Self>()
                     .checked_mul(2)
@@ -133,12 +137,12 @@ impl RegistryRequestAssociation {
             .ok_or(SourceServiceError::BufferLimit)?;
         let credit = scope.reserve_buffer(charged)?;
         let mut slab = Vec::new();
-        slab.try_reserve_exact(SLAB_BYTES)
+        slab.try_reserve_exact(slab_bytes)
             .map_err(|_| scope.poison(SourceServiceError::Allocation))?;
-        if slab.capacity() > SLAB_BYTES {
+        if slab.capacity() > slab_bytes {
             return Err(scope.poison(SourceServiceError::Allocation));
         }
-        slab.resize(SLAB_BYTES, 0);
+        slab.resize(slab_bytes, 0);
         Ok(Arc::new(Self {
             state: Mutex::new(AssociationState {
                 slab,
@@ -221,7 +225,9 @@ impl RegistryRequestAssociation {
                 {
                     state.snapshot.complete = false;
                 }
-            } else if bounded && state.snapshot.retained_rows < ROWS as u64 {
+            } else if bounded
+                && state.snapshot.retained_rows < (state.slab.len() / ROW_BYTES) as u64
+            {
                 let index = state.snapshot.retained_rows as usize;
                 let base = index * ROW_BYTES;
                 state.slab[base..base + url.len()].copy_from_slice(url);

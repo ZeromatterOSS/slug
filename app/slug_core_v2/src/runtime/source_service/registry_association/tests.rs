@@ -247,6 +247,82 @@ async fn registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_byt
     }
 }
 
+#[tokio::test]
+async fn actual_root_256_distinct_then_257_refuses_before_io_and_preserves_origin() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("source");
+    std::fs::write(&path, b"x").unwrap();
+    let mut sentinel = watch(&path);
+    let owner = scope(SourceServiceLimits::actual_root().registry_attempts);
+    let ledger = owner.arm_registry_association_for_test().unwrap();
+    let adapter = ScopedRegistryIo::new(owner.clone());
+    for ordinal in 1..=256 {
+        adapter
+            .read_local_exact(&url(&format!("file:///identity-{ordinal}")), &path)
+            .await
+            .unwrap();
+    }
+    let positive = drain_events(&mut sentinel);
+    assert_ne!(positive & libc::IN_OPEN, 0);
+    assert_ne!(positive & libc::IN_ACCESS, 0);
+    let before = owner.snapshot();
+    let admitted = ledger.snapshot();
+    assert!(admitted.complete);
+    assert_eq!(
+        (
+            admitted.admitted_entries,
+            admitted.admitted_distinct,
+            admitted.admitted_repeated,
+            admitted.retained_rows
+        ),
+        (256, 256, 0, 256)
+    );
+    for ordinal in [257, 1] {
+        let error = adapter
+            .read_local_exact(&url(&format!("file:///identity-{ordinal}")), &path)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.cause,
+            Some(RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Limit(
+                    RegistryRefusalScopeCounter::RegistryAttempts
+                )),
+            })
+        );
+        assert_eq!(drain_events(&mut sentinel), 0);
+        let after = owner.snapshot();
+        assert_eq!(after.registry_attempts, 256);
+        assert_eq!(
+            after.registry_admitted_bytes,
+            before.registry_admitted_bytes
+        );
+        assert_eq!(after.live_buffer_bytes, before.live_buffer_bytes);
+        assert_eq!(after.peak_buffer_bytes, before.peak_buffer_bytes);
+        let observed = ledger.snapshot();
+        assert!(observed.complete);
+        assert_eq!(observed.first_limit_call_ordinal, Some(257));
+        assert_eq!(
+            observed.first_limit_relation,
+            RegistryLimitRelation::NewDistinctUnretained {
+                unique_ordinal: 257
+            }
+        );
+    }
+    let observed = ledger.snapshot();
+    assert_eq!(
+        (
+            observed.attempted_entries,
+            observed.refused_entries,
+            observed.sticky_refused_entries
+        ),
+        (258, 2, 1)
+    );
+    drop(ledger);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+}
+
 #[test]
 fn concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order() {
     let owner = scope(1);
@@ -371,6 +447,46 @@ fn registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_histo
 #[test]
 fn registry_association_credit_pressure_weak_attachment_and_clone_last_drop() {
     let deadline = Instant::now() + Duration::from_secs(2);
+    for limit in [128, 256] {
+        let expected = limit as usize * ROW_BYTES
+            + 2 * std::mem::size_of::<RegistryRequestAssociation>()
+            + std::mem::size_of::<SourceTimeoutState>()
+            + 64;
+        for capacity in [expected - 1, expected] {
+            let owner = SourceServiceScope::new_for_test(
+                NormalizedAbsolutePath::new("/profile-credit").unwrap(),
+                deadline,
+                deadline + Duration::from_secs(1),
+                SourceServiceLimits {
+                    registry_attempts: limit,
+                    live_buffer_bytes: capacity,
+                    ..SourceServiceLimits::default()
+                },
+            )
+            .unwrap();
+            let armed = owner.arm_registry_association_for_test();
+            if capacity < expected {
+                assert!(matches!(armed, Err(SourceServiceError::BufferLimit)));
+                assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+                continue;
+            }
+            let ledger = armed.unwrap();
+            assert_eq!(ledger.snapshot().charged_bytes, expected);
+            assert_eq!(
+                ledger.state.lock().unwrap().slab.len(),
+                limit as usize * ROW_BYTES
+            );
+            assert_eq!(owner.snapshot().live_buffer_bytes, expected);
+            let weak = Arc::downgrade(&ledger);
+            let clone = ledger.clone();
+            drop(ledger);
+            assert_eq!(owner.snapshot().live_buffer_bytes, expected);
+            drop(clone);
+            assert!(weak.upgrade().is_none());
+            assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+            assert!(!owner.registry_observation_for_test().1.armed);
+        }
+    }
     let limits = SourceServiceLimits {
         live_buffer_bytes: 1024,
         ..SourceServiceLimits::default()
@@ -402,7 +518,7 @@ fn registry_association_credit_pressure_weak_attachment_and_clone_last_drop() {
     let ledger = owner.arm_registry_association_for_test().unwrap();
     let clone = ledger.clone();
     let charged = ledger.snapshot().charged_bytes;
-    assert!(charged > SLAB_BYTES);
+    assert!(charged > ROW_BYTES);
     assert_eq!(owner.snapshot().live_buffer_bytes, charged);
     drop(ledger);
     drop(owner);

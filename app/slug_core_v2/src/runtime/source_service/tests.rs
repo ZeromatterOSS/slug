@@ -23,6 +23,81 @@ fn scope(limits: SourceServiceLimits) -> Arc<SourceServiceScope> {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
+fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() {
+    let defaults = SourceServiceLimits::default();
+    assert_eq!(defaults.registry_attempts, 128);
+    let profile = SourceServiceLimits::actual_root();
+    assert_eq!(profile.registry_attempts, 256);
+    assert_eq!(
+        profile,
+        SourceServiceLimits {
+            registry_attempts: 256,
+            ..defaults
+        }
+    );
+    for limit in [1, 128, 129, 256] {
+        let owner = scope(SourceServiceLimits {
+            registry_attempts: limit,
+            ..defaults
+        });
+        owner
+            .charge(SourceCounter::RegistryAttempts, limit)
+            .unwrap();
+        assert_eq!(
+            owner.charge(SourceCounter::RegistryAttempts, 1),
+            Err(SourceServiceError::Limit(SourceCounter::RegistryAttempts))
+        );
+        assert_eq!(owner.snapshot().registry_attempts, limit);
+    }
+    type Setter = fn(&mut SourceServiceLimits, u64);
+    let ceilings: [(u64, Setter); 7] = [
+        (defaults.registry_object_bytes, |l, n| {
+            l.registry_object_bytes = n
+        }),
+        (256, |l, n| l.registry_attempts = n),
+        (defaults.registry_admitted_bytes, |l, n| {
+            l.registry_admitted_bytes = n
+        }),
+        (defaults.source_attempts, |l, n| l.source_attempts = n),
+        (defaults.transferred_bytes, |l, n| l.transferred_bytes = n),
+        (defaults.decoded_bytes, |l, n| l.decoded_bytes = n),
+        (defaults.written_bytes, |l, n| l.written_bytes = n),
+    ];
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let construct = |limits| {
+        SourceServiceScope::new(
+            NormalizedAbsolutePath::new("/profile-limit-test").unwrap(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            limits,
+        )
+    };
+    for (ceiling, set) in ceilings {
+        let mut limits = defaults;
+        set(&mut limits, ceiling);
+        assert!(construct(limits).is_ok());
+        for invalid in [0, ceiling + 1] {
+            set(&mut limits, invalid);
+            assert_eq!(
+                construct(limits).err(),
+                Some(SourceServiceError::InvalidLimits)
+            );
+        }
+    }
+    for invalid in [0, defaults.live_buffer_bytes + 1] {
+        assert_eq!(
+            construct(SourceServiceLimits {
+                live_buffer_bytes: invalid,
+                ..defaults
+            })
+            .err(),
+            Some(SourceServiceError::InvalidLimits)
+        );
+    }
+}
+
+#[test]
 fn source_scope_inclusive_counters_first_poison_and_no_refund() {
     for counter in [
         SourceCounter::RegistryAttempts,
