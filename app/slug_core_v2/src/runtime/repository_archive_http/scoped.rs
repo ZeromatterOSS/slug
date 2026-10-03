@@ -1,5 +1,7 @@
 //! Owned diagnostic archive transport. Baseline capture remains separate.
 use super::*;
+use crate::runtime::dice::source_service::SourceBufferSite;
+use crate::runtime::dice::source_service::SourceBufferUnit;
 use crate::runtime::dice::source_service::SourceHttpAdmission;
 use crate::runtime::dice::source_service::request_scoped;
 
@@ -11,9 +13,14 @@ pub(super) fn transfer_selected_capture(
     scope: &Arc<SourceServiceScope>,
 ) -> Result<Arc<[u8]>, String> {
     let _arc_credit = scope
-        .reserve_buffer(size.checked_add(64).ok_or("capture allocation overflow")?)
+        .reserve_buffer_at(
+            size.checked_add(64).ok_or("capture allocation overflow")?,
+            SourceBufferSite::SelectedPayload,
+        )
         .map_err(|e| e.to_string())?;
-    let _scratch_credit = scope.reserve_buffer(64 * 1024).map_err(|e| e.to_string())?;
+    let _scratch_credit = scope
+        .reserve_buffer_at(64 * 1024, SourceBufferSite::SelectedScratch)
+        .map_err(|e| e.to_string())?;
     // The final Arc allocation was already infallible in the Vec conversion.
     // Partial failures keep MaybeUninit storage and never expose its bytes.
     let mut bytes = Arc::<[u8]>::new_uninit_slice(size);
@@ -39,7 +46,12 @@ pub(super) fn transfer_selected_capture(
             .ok_or("selected extension artifact exceeds 33554432 byte capture limit")?;
         if next > size {
             return Err(scope
-                .poison(source_service::SourceServiceError::BufferLimit)
+                .poison_buffer_limit_at(
+                    SourceBufferSite::SelectedPayloadGrowth,
+                    next,
+                    size,
+                    SourceBufferUnit::Bytes,
+                )
                 .to_string());
         }
         let slots = Arc::get_mut(&mut bytes).expect("unpublished capture Arc is unique");
@@ -117,7 +129,9 @@ pub(super) fn capture_one(
     live()?;
     check_address(scope, original)?;
     // Covers the bounded parsed URL plus old/new redirect spellings concurrently.
-    let _address_credit = scope.reserve_buffer(64 * 1024).map_err(|e| e.to_string())?;
+    let _address_credit = scope
+        .reserve_buffer_at(64 * 1024, SourceBufferSite::ArchiveAddress)
+        .map_err(|e| e.to_string())?;
     if original
         .get(..5)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
@@ -164,7 +178,12 @@ pub(super) fn capture_one(
                 .map(|v| {
                     if v.as_bytes().len() > 8192 {
                         return Err(scope
-                            .poison(source_service::SourceServiceError::BufferLimit)
+                            .poison_buffer_limit_at(
+                                SourceBufferSite::RedirectLength,
+                                v.as_bytes().len(),
+                                8192,
+                                SourceBufferUnit::Bytes,
+                            )
                             .to_string());
                     }
                     v.to_str()
@@ -252,7 +271,12 @@ fn check_address(scope: &Arc<SourceServiceScope>, text: &str) -> Result<(), Stri
     scope.check().map_err(|e| e.to_string())?;
     if text.len() > 8192 {
         return Err(scope
-            .poison(source_service::SourceServiceError::BufferLimit)
+            .poison_buffer_limit_at(
+                SourceBufferSite::ArchiveUrlLength,
+                text.len(),
+                8192,
+                SourceBufferUnit::Bytes,
+            )
             .to_string());
     }
     Ok(())

@@ -451,6 +451,7 @@ fn registry_association_credit_pressure_weak_attachment_and_clone_last_drop() {
         let expected = limit as usize * ROW_BYTES
             + 2 * std::mem::size_of::<RegistryRequestAssociation>()
             + std::mem::size_of::<SourceTimeoutState>()
+            + std::mem::size_of::<SourceBufferState>()
             + 64;
         for capacity in [expected - 1, expected] {
             let owner = SourceServiceScope::new_for_test(

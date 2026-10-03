@@ -331,6 +331,7 @@ fn arm_candidates_credit_clone_pin_and_last_drop_disarm_exact_owner() {
     let expected = (128usize * 8192 * 2)
         + 2 * std::mem::size_of::<RegistryRequestAssociation>()
         + std::mem::size_of::<SourceTimeoutState>()
+        + std::mem::size_of::<super::super::buffer_provenance::SourceBufferState>()
         + 64;
     assert_eq!(winner.snapshot().charged_bytes, expected);
     assert_eq!(owner.snapshot().live_buffer_bytes, expected);
@@ -383,7 +384,7 @@ fn concurrent_last_drop_and_timeout_creation_never_leave_uncredited_evidence() {
     start.wait();
     drop(ledger);
     assert_eq!(producer.join().unwrap(), SourceServiceError::WorkDeadline);
-    let (counters, cleared) = owner.registry_observation_for_test();
+    let (counters, cleared, _) = owner.registry_observation_for_test();
     assert_eq!(counters.live_buffer_bytes, 0);
     assert!(!cleared.armed && cleared.origin.is_none());
     assert!(!cleared.later_sticky_work_deadline_observed);

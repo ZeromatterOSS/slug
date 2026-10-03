@@ -17,6 +17,8 @@ use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 
 use super::SourceBufferReservation;
+use super::SourceBufferSite;
+use super::SourceBufferUnit;
 use super::SourceServiceError;
 use super::SourceServiceScope;
 use super::SourceTransportFailure;
@@ -56,9 +58,12 @@ fn bounded_addresses_typed(
     let mut bounded = Vec::with_capacity(64);
     for address in addresses.take(65) {
         if bounded.len() == 64 {
-            return Err(SourceTransportFailure::scope(
-                scope.poison(SourceServiceError::BufferLimit),
-            ));
+            return Err(SourceTransportFailure::scope(scope.poison_buffer_limit_at(
+                SourceBufferSite::DnsCardinality,
+                65,
+                64,
+                SourceBufferUnit::Entries,
+            )));
         }
         bounded.push(address);
     }
@@ -183,9 +188,12 @@ pub(in crate::runtime) async fn request_scoped_typed(
 ) -> Result<ScopedHttpResponse, SourceTransportFailure> {
     scope.check().map_err(SourceTransportFailure::scope)?;
     if url.as_str().len() > 8192 {
-        return Err(SourceTransportFailure::scope(
-            scope.poison(SourceServiceError::BufferLimit),
-        ));
+        return Err(SourceTransportFailure::scope(scope.poison_buffer_limit_at(
+            SourceBufferSite::HttpUrlLength,
+            url.as_str().len(),
+            8192,
+            SourceBufferUnit::Bytes,
+        )));
     }
     validate_address(url, admission).map_err(|message| {
         SourceTransportFailure::opaque(RegistryRefusalSite::AddressValidation, message)
@@ -203,7 +211,10 @@ pub(in crate::runtime) async fn request_scoped_typed(
         )
     })?;
     let credit = scope
-        .reserve_buffer(64 * 1024 + 128 * 256 + 32 * 1024)
+        .reserve_buffer_at(
+            64 * 1024 + 128 * 256 + 32 * 1024,
+            SourceBufferSite::HttpParser,
+        )
         .map_err(SourceTransportFailure::scope)?;
     let addresses = scope
         .during_at(SourceTimeoutSite::Dns, Duration::from_secs(15), async {
@@ -385,7 +396,10 @@ pub(super) async fn request_test_io_typed(
     io: tokio::io::DuplexStream,
 ) -> Result<ScopedHttpResponse, SourceTransportFailure> {
     let credit = scope
-        .reserve_buffer(64 * 1024 + 128 * 256 + 32 * 1024)
+        .reserve_buffer_at(
+            64 * 1024 + 128 * 256 + 32 * 1024,
+            SourceBufferSite::HttpDuplexParser,
+        )
         .map_err(SourceTransportFailure::scope)?;
     request_on_io(scope, url, Box::new(io), credit).await
 }

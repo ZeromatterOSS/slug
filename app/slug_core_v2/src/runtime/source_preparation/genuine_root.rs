@@ -36,6 +36,11 @@ use super::*;
 use crate::runtime::dice::source_service::DiagnosticObserver;
 use crate::runtime::dice::source_service::RegistryAssociationSnapshot;
 use crate::runtime::dice::source_service::RegistryLimitRelation;
+use crate::runtime::dice::source_service::SourceBufferKind;
+use crate::runtime::dice::source_service::SourceBufferOrigin;
+use crate::runtime::dice::source_service::SourceBufferSite;
+use crate::runtime::dice::source_service::SourceBufferSnapshot;
+use crate::runtime::dice::source_service::SourceBufferUnit;
 use crate::runtime::dice::source_service::SourcePreparationDiagnosticRuntime;
 use crate::runtime::dice::source_service::SourceServiceCounters;
 use crate::runtime::dice::source_service::SourceServiceError;
@@ -706,6 +711,85 @@ fn emit_timeout_provenance(
     Ok(())
 }
 
+fn emit_buffer_provenance(
+    snapshot: SourceBufferSnapshot,
+    settled: bool,
+    installed_scope: bool,
+    first_poison: Option<SourceServiceError>,
+    selected_native: Option<slug_bzlmod_v2::RegistryRefusalCause>,
+    receipt: &mut Receipt,
+) -> Result<(), &'static str> {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let origin = snapshot.origin;
+    let proved = settled
+        && installed_scope
+        && snapshot.armed
+        && snapshot.first_error_is_buffer_limit
+        && first_poison == Some(SourceServiceError::BufferLimit)
+        && origin.is_some_and(SourceBufferOrigin::complete);
+    let paired = proved
+        && matches!(
+            selected_native,
+            Some(RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::BufferLimit),
+            })
+        );
+    for (key, value) in [
+        ("buffer_provenance_settled", u64::from(settled)),
+        (
+            "buffer_provenance_installed_scope",
+            u64::from(installed_scope),
+        ),
+        ("buffer_provenance_armed", u64::from(snapshot.armed)),
+        (
+            "buffer_first_error_is_buffer_limit",
+            u64::from(snapshot.first_error_is_buffer_limit),
+        ),
+        ("buffer_origin_present", u64::from(origin.is_some())),
+        ("buffer_origin_site", origin.map_or(0, |o| o.site.code())),
+        ("buffer_origin_kind", origin.map_or(0, |o| o.kind.code())),
+        ("buffer_origin_unit", origin.map_or(0, |o| o.unit.code())),
+        (
+            "buffer_origin_requested_present",
+            u64::from(origin.is_some_and(|o| o.requested.is_some())),
+        ),
+        (
+            "buffer_origin_requested",
+            origin.and_then(|o| o.requested).map_or(0, |n| n as u64),
+        ),
+        (
+            "buffer_origin_bound_present",
+            u64::from(origin.is_some_and(|o| o.bound.is_some())),
+        ),
+        (
+            "buffer_origin_bound",
+            origin.and_then(|o| o.bound).map_or(0, |n| n as u64),
+        ),
+        (
+            "buffer_origin_live_bytes",
+            origin.map_or(0, |o| o.live_bytes as u64),
+        ),
+        (
+            "buffer_origin_bank_ceiling_bytes",
+            origin.map_or(0, |o| o.bank_ceiling_bytes as u64),
+        ),
+        (
+            "buffer_reservation_add_overflow",
+            u64::from(origin.is_some_and(|o| o.kind == SourceBufferKind::ReservationOverflow)),
+        ),
+        ("buffer_named_creator_proved", u64::from(proved)),
+        ("buffer_first_scope_origin_paired", u64::from(paired)),
+        ("buffer_selected_leaf_call_identity_proved", 0),
+    ] {
+        receipt.number(key, value)?;
+    }
+    Ok(())
+}
+
 fn emit_success(
     view: &source_service::ScopedPreparedSourceViewLease,
     inputs: &NativeDemandRequestInputBundle,
@@ -1120,6 +1204,14 @@ fn run(
     )?;
     emit_timeout_provenance(
         association_snapshot.timeout,
+        settled,
+        true,
+        first_poison,
+        selected_native,
+        receipt,
+    )?;
+    emit_buffer_provenance(
+        association_snapshot.buffer,
         settled,
         true,
         first_poison,
@@ -1556,6 +1648,315 @@ fn genuine_timeout_receipt_requires_settled_named_creator_and_exact_chosen_cause
 }
 
 #[test]
+fn genuine_buffer_receipt_rejects_malformed_origins_and_keeps_native_pair_separate() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let limit = SourceServiceLimits::default().live_buffer_bytes;
+    let origin = SourceBufferOrigin {
+        site: SourceBufferSite::SelectedPayload,
+        kind: SourceBufferKind::ReservationCeiling,
+        unit: SourceBufferUnit::Bytes,
+        requested: Some(2),
+        bound: Some(limit),
+        live_bytes: limit - 1,
+        bank_ceiling_bytes: limit,
+    };
+    let snapshot = SourceBufferSnapshot {
+        armed: true,
+        first_error_is_buffer_limit: true,
+        origin: Some(origin),
+    };
+    let poison = Some(SourceServiceError::BufferLimit);
+    let native = Some(RegistryRefusalCause {
+        site: RegistryRefusalSite::Scope,
+        detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::BufferLimit),
+    });
+    let budget = ImageDescriptorBudget::new(128 * 1024);
+    let mut receipt = Receipt::new(&budget).unwrap();
+    emit_buffer_provenance(snapshot, true, true, poison, native, &mut receipt).unwrap();
+    for expected in [
+        "buffer_origin_site=8\n",
+        "buffer_origin_kind=1\n",
+        "buffer_origin_unit=1\n",
+        "buffer_origin_requested_present=1\n",
+        "buffer_origin_requested=2\n",
+        "buffer_named_creator_proved=1\n",
+        "buffer_first_scope_origin_paired=1\n",
+        "buffer_selected_leaf_call_identity_proved=0\n",
+    ] {
+        assert!(receipt.text.contains(expected), "{expected}");
+    }
+    drop(receipt);
+    assert_eq!(budget.used_bytes(), 0);
+    let explicit = SourceBufferOrigin {
+        site: SourceBufferSite::ArchiveUrlLength,
+        kind: SourceBufferKind::ExplicitBound,
+        requested: Some(8193),
+        bound: Some(8192),
+        ..origin
+    };
+    let dns = SourceBufferOrigin {
+        site: SourceBufferSite::DnsCardinality,
+        unit: SourceBufferUnit::Entries,
+        requested: Some(65),
+        bound: Some(64),
+        ..explicit
+    };
+    let growth = SourceBufferOrigin {
+        site: SourceBufferSite::SelectedPayloadGrowth,
+        requested: Some(2),
+        bound: Some(1),
+        ..explicit
+    };
+    let overflow = SourceBufferOrigin {
+        kind: SourceBufferKind::ReservationOverflow,
+        requested: Some(usize::MAX),
+        ..origin
+    };
+    let invalid = [
+        SourceBufferOrigin {
+            site: SourceBufferSite::Unattributed,
+            ..origin
+        },
+        SourceBufferOrigin {
+            site: SourceBufferSite::ArchiveUrlLength,
+            ..origin
+        },
+        SourceBufferOrigin {
+            unit: SourceBufferUnit::Entries,
+            ..origin
+        },
+        SourceBufferOrigin {
+            kind: SourceBufferKind::ExplicitBound,
+            ..origin
+        },
+        SourceBufferOrigin {
+            kind: SourceBufferKind::ReservationOverflow,
+            ..origin
+        },
+        SourceBufferOrigin {
+            requested: Some(1),
+            ..origin
+        },
+        SourceBufferOrigin {
+            requested: None,
+            ..origin
+        },
+        SourceBufferOrigin {
+            bound: None,
+            ..origin
+        },
+        SourceBufferOrigin {
+            bound: Some(limit - 1),
+            ..origin
+        },
+        SourceBufferOrigin {
+            live_bytes: limit + 1,
+            ..origin
+        },
+        SourceBufferOrigin {
+            bank_ceiling_bytes: 0,
+            ..origin
+        },
+        SourceBufferOrigin {
+            bank_ceiling_bytes: limit + 1,
+            ..origin
+        },
+        SourceBufferOrigin {
+            site: SourceBufferSite::SelectedPayload,
+            ..explicit
+        },
+        SourceBufferOrigin {
+            bound: Some(8191),
+            ..explicit
+        },
+        SourceBufferOrigin {
+            requested: Some(8192),
+            ..explicit
+        },
+        SourceBufferOrigin {
+            unit: SourceBufferUnit::Entries,
+            ..explicit
+        },
+        SourceBufferOrigin {
+            bound: Some(63),
+            ..dns
+        },
+        SourceBufferOrigin {
+            unit: SourceBufferUnit::Bytes,
+            ..dns
+        },
+        SourceBufferOrigin {
+            requested: Some(32 * 1024 * 1024 + 1),
+            bound: Some(32 * 1024 * 1024),
+            ..growth
+        },
+        SourceBufferOrigin {
+            requested: Some(1),
+            ..growth
+        },
+    ];
+    for origin in invalid {
+        let mut receipt = Receipt::new(&budget).unwrap();
+        emit_buffer_provenance(
+            SourceBufferSnapshot {
+                origin: Some(origin),
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+            &mut receipt,
+        )
+        .unwrap();
+        assert!(
+            receipt.text.contains("buffer_named_creator_proved=0\n"),
+            "{origin:?}"
+        );
+        assert!(
+            receipt
+                .text
+                .contains("buffer_first_scope_origin_paired=0\n")
+        );
+        assert!(
+            receipt
+                .text
+                .contains("buffer_selected_leaf_call_identity_proved=0\n")
+        );
+    }
+    for origin in [explicit, dns, growth, overflow] {
+        let mut receipt = Receipt::new(&budget).unwrap();
+        emit_buffer_provenance(
+            SourceBufferSnapshot {
+                origin: Some(origin),
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            None,
+            &mut receipt,
+        )
+        .unwrap();
+        assert!(receipt.text.contains("buffer_named_creator_proved=1\n"));
+        assert!(
+            receipt
+                .text
+                .contains("buffer_first_scope_origin_paired=0\n")
+        );
+    }
+    for (sample, settled, installed, first, selected, proved, paired) in [
+        (snapshot, false, true, poison, native, false, false),
+        (snapshot, true, false, poison, native, false, false),
+        (
+            SourceBufferSnapshot {
+                armed: false,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+            false,
+            false,
+        ),
+        (
+            SourceBufferSnapshot {
+                first_error_is_buffer_limit: false,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+            false,
+            false,
+        ),
+        (
+            SourceBufferSnapshot {
+                origin: None,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+            false,
+            false,
+        ),
+        (snapshot, true, true, None, native, false, false),
+        (
+            snapshot,
+            true,
+            true,
+            Some(SourceServiceError::Cancelled),
+            native,
+            false,
+            false,
+        ),
+        (snapshot, true, true, poison, None, true, false),
+        (
+            snapshot,
+            true,
+            true,
+            poison,
+            Some(RegistryRefusalCause {
+                site: RegistryRefusalSite::HttpBody,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::BufferLimit),
+            }),
+            true,
+            false,
+        ),
+        (
+            snapshot,
+            true,
+            true,
+            poison,
+            Some(RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::WorkDeadline),
+            }),
+            true,
+            false,
+        ),
+    ] {
+        let mut receipt = Receipt::new(&budget).unwrap();
+        emit_buffer_provenance(sample, settled, installed, first, selected, &mut receipt).unwrap();
+        assert!(receipt.text.contains(&format!(
+            "buffer_origin_present={}\n",
+            u64::from(sample.origin.is_some())
+        )));
+        assert!(receipt.text.contains(&format!(
+            "buffer_origin_requested_present={}\n",
+            u64::from(sample.origin.is_some_and(|o| o.requested.is_some()))
+        )));
+        assert!(receipt.text.contains(&format!(
+            "buffer_origin_requested={}\n",
+            sample.origin.and_then(|o| o.requested).unwrap_or(0)
+        )));
+        assert!(receipt.text.contains(if proved {
+            "buffer_named_creator_proved=1\n"
+        } else {
+            "buffer_named_creator_proved=0\n"
+        }));
+        assert!(receipt.text.contains(if paired {
+            "buffer_first_scope_origin_paired=1\n"
+        } else {
+            "buffer_first_scope_origin_paired=0\n"
+        }));
+        assert!(
+            receipt
+                .text
+                .contains("buffer_selected_leaf_call_identity_proved=0\n")
+        );
+    }
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
 fn genuine_registry_association_receipt_requires_complete_settled_same_scope_origin() {
     use slug_bzlmod_v2::RegistryRefusalCause;
     use slug_bzlmod_v2::RegistryRefusalDetail;
@@ -1576,6 +1977,7 @@ fn genuine_registry_association_receipt_requires_complete_settled_same_scope_ori
         first_limit_relation: RegistryLimitRelation::NewDistinctUnretained { unique_ordinal: 2 },
         charged_bytes: 2 << 20,
         timeout: SourceTimeoutSnapshot::default(),
+        buffer: SourceBufferSnapshot::default(),
     };
     let native = Some(RegistryRefusalCause {
         site: RegistryRefusalSite::Scope,

@@ -1,6 +1,8 @@
 //! Private, consumed diagnostic acquisition service. Ordinary native services
 //! do not install this scope; none of these limits are a total RSS guarantee.
 
+#[path = "source_service/buffer_provenance.rs"]
+mod buffer_provenance;
 #[path = "source_service/diagnostic.rs"]
 mod diagnostic;
 #[path = "source_service/failure.rs"]
@@ -20,6 +22,14 @@ mod tests;
 #[path = "source_service/timeout_provenance.rs"]
 mod timeout_provenance;
 
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use buffer_provenance::SourceBufferKind;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use buffer_provenance::SourceBufferOrigin;
+pub(in crate::runtime) use buffer_provenance::SourceBufferSite;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use buffer_provenance::SourceBufferSnapshot;
+pub(in crate::runtime) use buffer_provenance::SourceBufferUnit;
 #[cfg(test)]
 pub(in crate::runtime::dice) use diagnostic::DiagnosticObserver;
 pub(in crate::runtime::dice) use diagnostic::ScopedPreparedSourceViewLease;

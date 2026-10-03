@@ -121,9 +121,10 @@ fn apply_file(
     }
     let _buffer = scope
         .map(|s| {
-            s.reserve_buffer(
+            s.reserve_buffer_at(
                 usize::try_from(metadata.len())
                     .map_err(|_| materialization("patch target size overflow"))?,
+                source_service::SourceBufferSite::PatchTarget,
             )
             .map_err(|e| materialization(e.to_string()))
         })

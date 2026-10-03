@@ -1,7 +1,13 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: post-transfer BufferLimit frontier preserved; first buffer-creator provenance next; full WP899 unaccepted
+Status: first buffer-creator provenance accepted; one reviewed actual observation next; full WP899 unaccepted
+
+The optional first-BufferLimit POD is accepted after three FINAL reviews, fresh62/62
+controls and default Core+CLI compilation. [Receipt](wp899-buffer-provenance-2026-10-03.json). Named creation facts
+remain separate from selected native pairing and leaf identity. Next is ONE separately
+reviewed frozen actual observation on the new artifact; no cap change or historical
+creator attribution is selected. FullWP899/M7A remain unaccepted.
 
 The separately frozen global10 observation emitted89 Slug records:192 distinct
 registry admissions/zero repeats or refusals,16 source attempts, then first Scope
@@ -9,10 +15,10 @@ BufferLimit with outer DownloadCapture. Peak charged credit15221766B and live
 4211111B do not identify the failed allocation. Restore/raw/engine and591/591
 censuses pass; child101, actual join/stage and exact parent cleanup are proved
 after three terminal FINALs. [Receipt](wp899-post-transfer-buffer-frontier-2026-10-03.json).
-Source admission remains failed. Next bounded owner is first BufferLimit creation
-under the Scope mutex: discriminate reservation versus explicit bound, finite
-producer site and requested/live/ceiling/overflow facts before choosing a repair.
-No cap change or identical actual retry is selected.
+Source admission remains failed. The accepted Scope creator diagnostic now
+distinguishes reservation versus explicit bound, finite producer site and exact
+requested/live/ceiling/overflow facts. One new reviewed observation can collect
+these facts before choosing a repair. No cap change is selected.
 
 Accepted components remain protected: [bounded registry profile](wp899-bounded-registry-profile-2026-10-03.json),
 [single-payload transfer](wp899-single-payload-transfer-2026-10-03.json) with55 unique

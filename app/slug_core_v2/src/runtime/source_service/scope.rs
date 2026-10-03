@@ -6,6 +6,16 @@ use std::time::Instant;
 
 use slug_workspace_v2::NormalizedAbsolutePath;
 
+#[cfg(all(test, target_os = "linux"))]
+use super::buffer_provenance::SourceBufferKind;
+#[cfg(all(test, target_os = "linux"))]
+use super::buffer_provenance::SourceBufferOrigin;
+use super::buffer_provenance::SourceBufferSite;
+#[cfg(all(test, target_os = "linux"))]
+use super::buffer_provenance::SourceBufferSnapshot;
+#[cfg(all(test, target_os = "linux"))]
+use super::buffer_provenance::SourceBufferState;
+use super::buffer_provenance::SourceBufferUnit;
 use super::timeout_provenance::SourceTimeoutDeadline;
 use super::timeout_provenance::SourceTimeoutOrigin;
 use super::timeout_provenance::SourceTimeoutPhase;
@@ -141,6 +151,8 @@ struct ScopeState {
     closed: bool,
     #[cfg(all(test, target_os = "linux"))]
     timeout: SourceTimeoutState,
+    #[cfg(all(test, target_os = "linux"))]
+    buffer: SourceBufferState,
 }
 
 pub(in crate::runtime) struct SourceServiceScope {
@@ -280,7 +292,55 @@ impl SourceServiceScope {
         error: SourceServiceError,
         origin: SourceTimeoutOrigin,
     ) -> SourceServiceError {
-        let first = Self::poison_locked(&mut self.state(), error, origin);
+        let first = {
+            let mut state = self.state();
+            #[cfg(all(test, target_os = "linux"))]
+            let created = state.first.is_none();
+            let first = Self::poison_locked(&mut state, error, origin);
+            #[cfg(all(test, target_os = "linux"))]
+            if created && error == SourceServiceError::BufferLimit {
+                let origin = SourceBufferOrigin::unknown(
+                    state.counters.live_buffer_bytes,
+                    self.limits.live_buffer_bytes,
+                );
+                state.buffer.created(origin);
+            }
+            first
+        };
+        self.cancelled.send_replace(true);
+        first
+    }
+    pub(in crate::runtime) fn poison_buffer_limit_at(
+        &self,
+        _site: SourceBufferSite,
+        _requested: usize,
+        _bound: usize,
+        _unit: SourceBufferUnit,
+    ) -> SourceServiceError {
+        let first = {
+            let mut state = self.state();
+            #[cfg(all(test, target_os = "linux"))]
+            let created = state.first.is_none();
+            let first = Self::poison_locked(
+                &mut state,
+                SourceServiceError::BufferLimit,
+                SourceTimeoutOrigin::unattributed(),
+            );
+            #[cfg(all(test, target_os = "linux"))]
+            if created {
+                let origin = SourceBufferOrigin {
+                    site: _site,
+                    kind: SourceBufferKind::ExplicitBound,
+                    unit: _unit,
+                    requested: Some(_requested),
+                    bound: Some(_bound),
+                    live_bytes: state.counters.live_buffer_bytes,
+                    bank_ceiling_bytes: self.limits.live_buffer_bytes,
+                };
+                state.buffer.created(origin);
+            }
+            first
+        };
         self.cancelled.send_replace(true);
         first
     }
@@ -356,6 +416,7 @@ impl SourceServiceScope {
         let attached = self.registry_association.set(Arc::downgrade(&association));
         if attached.is_ok() {
             state.timeout.arm();
+            state.buffer.arm();
         }
         drop(state);
         attached.map_err(|_| SourceServiceError::ForeignScope)?;
@@ -373,19 +434,27 @@ impl SourceServiceScope {
             .is_some_and(|weak| weak.as_ptr() == recorder)
         {
             state.timeout.clear();
+            state.buffer.clear();
         }
         // No recorder upgrade or association lock; guard drops before credit Drop.
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(super) fn registry_observation_for_test(
         &self,
-    ) -> (SourceServiceCounters, SourceTimeoutSnapshot) {
+    ) -> (
+        SourceServiceCounters,
+        SourceTimeoutSnapshot,
+        SourceBufferSnapshot,
+    ) {
         let state = self.state();
         (
             state.counters,
             state
                 .timeout
                 .snapshot(state.first == Some(SourceServiceError::WorkDeadline)),
+            state
+                .buffer
+                .snapshot(state.first == Some(SourceServiceError::BufferLimit)),
         )
     }
     #[cfg(all(test, target_os = "linux"))]
@@ -428,15 +497,36 @@ impl SourceServiceScope {
         self: &Arc<Self>,
         bytes: usize,
     ) -> Result<SourceBufferReservation, SourceServiceError> {
+        self.reserve_buffer_at(bytes, SourceBufferSite::Unattributed)
+    }
+    pub(in crate::runtime) fn reserve_buffer_at(
+        self: &Arc<Self>,
+        bytes: usize,
+        _site: SourceBufferSite,
+    ) -> Result<SourceBufferReservation, SourceServiceError> {
         let mut state = self.state();
         self.check_locked(&mut state, false)?;
         let Some(next) = state.counters.live_buffer_bytes.checked_add(bytes) else {
             state.first = Some(SourceServiceError::BufferLimit);
+            #[cfg(all(test, target_os = "linux"))]
+            self.record_buffer_reservation(
+                &mut state,
+                _site,
+                bytes,
+                SourceBufferKind::ReservationOverflow,
+            );
             self.cancelled.send_replace(true);
             return Err(SourceServiceError::BufferLimit);
         };
         if next > self.limits.live_buffer_bytes {
             state.first = Some(SourceServiceError::BufferLimit);
+            #[cfg(all(test, target_os = "linux"))]
+            self.record_buffer_reservation(
+                &mut state,
+                _site,
+                bytes,
+                SourceBufferKind::ReservationCeiling,
+            );
             self.cancelled.send_replace(true);
             return Err(SourceServiceError::BufferLimit);
         }
@@ -446,6 +536,24 @@ impl SourceServiceScope {
             scope: Arc::clone(self),
             bytes,
         })
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    fn record_buffer_reservation(
+        &self,
+        state: &mut ScopeState,
+        site: SourceBufferSite,
+        requested: usize,
+        kind: SourceBufferKind,
+    ) {
+        state.buffer.created(SourceBufferOrigin {
+            site,
+            kind,
+            unit: SourceBufferUnit::Bytes,
+            requested: Some(requested),
+            bound: Some(self.limits.live_buffer_bytes),
+            live_bytes: state.counters.live_buffer_bytes,
+            bank_ceiling_bytes: self.limits.live_buffer_bytes,
+        });
     }
     pub(in crate::runtime) async fn during<T, F>(
         &self,
@@ -560,7 +668,13 @@ impl SourceBufferReservation {
     pub(super) fn same_scope(&self, scope: &Arc<SourceServiceScope>) -> bool {
         Arc::ptr_eq(&self.scope, scope)
     }
-    pub(super) fn registry_observation(&self) -> (SourceServiceCounters, SourceTimeoutSnapshot) {
+    pub(super) fn registry_observation(
+        &self,
+    ) -> (
+        SourceServiceCounters,
+        SourceTimeoutSnapshot,
+        SourceBufferSnapshot,
+    ) {
         self.scope.registry_observation_for_test()
     }
     pub(super) fn disarm_timeout(&self, recorder: *const super::RegistryRequestAssociation) {

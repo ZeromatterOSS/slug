@@ -7,10 +7,13 @@ use std::sync::Mutex;
 use slug_bzlmod_v2::RegistryFileUrl;
 
 use super::SourceBufferReservation;
+use super::SourceBufferSite;
 use super::SourceCounter;
 use super::SourceServiceError;
 use super::SourceServiceLimits;
 use super::SourceServiceScope;
+use super::buffer_provenance::SourceBufferSnapshot;
+use super::buffer_provenance::SourceBufferState;
 use super::timeout_provenance::SourceTimeoutSnapshot;
 use super::timeout_provenance::SourceTimeoutState;
 
@@ -76,6 +79,7 @@ pub(in crate::runtime) struct RegistryAssociationSnapshot {
     pub(in crate::runtime) first_limit_relation: RegistryLimitRelation,
     pub(in crate::runtime) charged_bytes: usize,
     pub(in crate::runtime) timeout: SourceTimeoutSnapshot,
+    pub(in crate::runtime) buffer: SourceBufferSnapshot,
 }
 impl RegistryAssociationSnapshot {
     fn new(charged_bytes: usize) -> Self {
@@ -93,6 +97,7 @@ impl RegistryAssociationSnapshot {
             first_limit_relation: RegistryLimitRelation::Unknown,
             charged_bytes,
             timeout: SourceTimeoutSnapshot::default(),
+            buffer: SourceBufferSnapshot::default(),
         }
     }
 }
@@ -133,9 +138,10 @@ impl RegistryRequestAssociation {
                     .ok_or(SourceServiceError::BufferLimit)?,
             )
             .and_then(|n| n.checked_add(std::mem::size_of::<SourceTimeoutState>()))
+            .and_then(|n| n.checked_add(std::mem::size_of::<SourceBufferState>()))
             .and_then(|n| n.checked_add(64))
             .ok_or(SourceServiceError::BufferLimit)?;
-        let credit = scope.reserve_buffer(charged)?;
+        let credit = scope.reserve_buffer_at(charged, SourceBufferSite::AssociationRecorder)?;
         let mut slab = Vec::new();
         slab.try_reserve_exact(slab_bytes)
             .map_err(|_| scope.poison(SourceServiceError::Allocation))?;
@@ -158,9 +164,10 @@ impl RegistryRequestAssociation {
     pub(in crate::runtime) fn snapshot(&self) -> RegistryAssociationSnapshot {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut snapshot = state.snapshot;
-        let (counters, timeout) = self.credit.registry_observation();
+        let (counters, timeout, buffer) = self.credit.registry_observation();
         snapshot.scope_admitted_entries = counters.registry_attempts;
         snapshot.timeout = timeout;
+        snapshot.buffer = buffer;
         snapshot.complete &= snapshot.scope_admitted_entries == snapshot.admitted_entries;
         if !snapshot.complete {
             snapshot.first_limit_relation = RegistryLimitRelation::Unknown;

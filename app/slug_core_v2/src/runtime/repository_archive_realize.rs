@@ -71,8 +71,9 @@ pub(super) fn realize_selected_bcr(
                     .metadata()
                     .map_err(|e| materialization(e.to_string()))?
                     .len();
-                s.reserve_buffer(
+                s.reserve_buffer_at(
                     usize::try_from(size).map_err(|_| materialization("patch size overflow"))?,
+                    source_service::SourceBufferSite::PatchCapture,
                 )
                 .map_err(|e| materialization(e.to_string()))
             })

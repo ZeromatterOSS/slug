@@ -5,6 +5,8 @@ use std::io::{self};
 use std::sync::Arc;
 
 use crate::runtime::dice::source_service::SourceBufferReservation;
+pub(in crate::runtime) use crate::runtime::dice::source_service::SourceBufferSite;
+pub(in crate::runtime) use crate::runtime::dice::source_service::SourceBufferUnit;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceCounter;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceServiceError;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceServiceScope;
@@ -39,7 +41,10 @@ pub(in crate::runtime) fn buffer(
     bytes: usize,
 ) -> Result<Option<SourceBufferReservation>, String> {
     scope
-        .map(|s| s.reserve_buffer(bytes).map_err(|e| e.to_string()))
+        .map(|s| {
+            s.reserve_buffer_at(bytes, SourceBufferSite::SharedIoBuffer)
+                .map_err(|e| e.to_string())
+        })
         .transpose()
 }
 

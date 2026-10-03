@@ -11,6 +11,8 @@ use slug_bzlmod_v2::RegistryRefusalSite;
 use slug_bzlmod_v2::RegistryTransportError;
 
 use super::SourceBufferReservation;
+use super::SourceBufferSite;
+use super::SourceBufferUnit;
 use super::SourceCounter;
 use super::SourceHttpAdmission;
 use super::SourceServiceError;
@@ -49,7 +51,10 @@ impl RegistryBuffer {
             )
         })?;
         let credit = scope
-            .reserve_buffer(maximum + std::mem::size_of::<Vec<u8>>())
+            .reserve_buffer_at(
+                maximum + std::mem::size_of::<Vec<u8>>(),
+                SourceBufferSite::RegistryCapture,
+            )
             .map_err(error)?;
         let mut bytes = Vec::new();
         bytes
@@ -91,7 +96,9 @@ impl RegistryBuffer {
         scope.check().map_err(error)?;
         // Arc conversion may allocate: reserve its entire block while Vec
         // bytes and credit remain live. Scope cumulative bytes pins history.
-        let _conversion = scope.reserve_buffer(self.bytes.len() + 64).map_err(error)?;
+        let _conversion = scope
+            .reserve_buffer_at(self.bytes.len() + 64, SourceBufferSite::RegistryArc)
+            .map_err(error)?;
         let result = Arc::<[u8]>::from(self.bytes.as_slice());
         scope.check().map_err(error)?;
         drop(self);
@@ -116,9 +123,17 @@ impl RegistryIo for ScopedRegistryIo {
             ))
             .map_err(error)?;
         if url.as_str().len() > 8192 {
-            return Err(error(self.scope.poison(SourceServiceError::BufferLimit)));
+            return Err(error(self.scope.poison_buffer_limit_at(
+                SourceBufferSite::RegistryUrlLength,
+                url.as_str().len(),
+                8192,
+                SourceBufferUnit::Bytes,
+            )));
         }
-        let _address_credit = self.scope.reserve_buffer(64 * 1024).map_err(error)?;
+        let _address_credit = self
+            .scope
+            .reserve_buffer_at(64 * 1024, SourceBufferSite::RegistryAddress)
+            .map_err(error)?;
         let parsed = url::Url::parse(url.as_str()).map_err(|_| {
             opaque(
                 RegistryRefusalSite::AddressValidation,
@@ -297,7 +312,9 @@ fn read_local(
         ));
     }
     let mut buffer = RegistryBuffer::new(scope)?;
-    let _read_credit = scope.reserve_buffer(64 * 1024).map_err(error)?;
+    let _read_credit = scope
+        .reserve_buffer_at(64 * 1024, SourceBufferSite::RegistryFileRead)
+        .map_err(error)?;
     let mut chunk = [0u8; 64 * 1024];
     loop {
         scope.check().map_err(error)?;
