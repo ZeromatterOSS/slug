@@ -7,10 +7,12 @@ launch this file concurrently with another native fixture owner.
 """
 from __future__ import annotations
 
+import errno
 import json
 import os
 from pathlib import Path
 import resource
+import select
 import signal
 import subprocess
 import sys
@@ -131,6 +133,175 @@ time.sleep(.1)
             os.symlink(root, link)
             with self.assertRaises(s.AccountingError):
                 s.disk_sample(link, [], time.monotonic_ns() + 1_000_000_000)
+
+    def test_missing_root_and_redacted_projection_are_exact_and_closed(self):
+        with tempfile.TemporaryDirectory(prefix="slug-disk-detail-") as temp:
+            with self.assertRaises(s.AccountingError) as caught:
+                s.disk_sample(Path(temp) / "missing-secret", [],
+                              time.monotonic_ns() + 1_000_000_000)
+            self.assertEqual(caught.exception.detail,
+                             s.DiskFailure(s.DiskSite.ROOT_OPEN,
+                                           s.DiskOrigin.OS_ERROR, errno.ENOENT))
+            self.assertEqual(str(caught.exception), "disk_accounting_unavailable")
+        for secret in ("credential-one", "credential-two"):
+            def denied():
+                raise PermissionError(errno.EACCES, secret, "/private-secret")
+            with self.assertRaises(s.AccountingError) as caught:
+                s._disk_call(s.DiskSite.PROC_FD_INFO, denied)
+            self.assertEqual(caught.exception.detail,
+                             s.DiskFailure(s.DiskSite.PROC_FD_INFO,
+                                           s.DiskOrigin.OS_ERROR, errno.EACCES))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+            self.assertNotIn(secret, repr(caught.exception))
+            self.assertNotIn("private", repr(caught.exception.detail))
+        for flags in ("other: 1", "flags: not-octal-secret"):
+            with self.assertRaises(s.AccountingError) as caught:
+                s._disk_call(s.DiskSite.FLAGS_PARSE, s._disk_access, flags)
+            self.assertEqual(caught.exception.detail,
+                             s.DiskFailure(s.DiskSite.FLAGS_PARSE,
+                                           s.DiskOrigin.INVALID_METADATA))
+        # Keep the original parser domain: extra tokens are ignored and a
+        # truncated operand retains its inherited unclassified IndexError.
+        self.assertEqual(s._disk_access("flags: 0 extra"), os.O_RDONLY)
+        with self.assertRaises(IndexError):
+            s._disk_call(s.DiskSite.FLAGS_PARSE, s._disk_access, "flags:")
+        with self.assertRaises(ValueError):
+            s.DiskFailure(999, s.DiskOrigin.OS_ERROR, errno.EACCES)
+        with self.assertRaises(ValueError):
+            s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, True)
+        with self.assertRaises(ValueError):
+            s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, 2 ** 40)
+        with self.assertRaises(AttributeError):
+            caught.exception.detail.errno = 7
+
+    def proc_close_fixture(self, exit_child: bool):
+        # Dedicated actual child retains its regular FD until the census has
+        # obtained that real proc entry. No replacement stat or synthetic errno.
+        with tempfile.TemporaryDirectory(prefix="slug-disk-handoff-") as temp:
+            root = Path(temp)
+            leaf = root / "held"
+            leaf.write_bytes(b"abc")
+            code = r'''
+import os, sys
+held = open(sys.argv[1], "rb")
+print(held.fileno(), flush=True)
+command = sys.stdin.buffer.read(1)
+if command == b"E":
+    os._exit(0)
+if command == b"C":
+    held.close()
+    print("closed", flush=True)
+    sys.stdin.buffer.read(1)
+'''
+            probe = subprocess.Popen([sys.executable, "-I", "-c", code, str(leaf)],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL)
+            owner = None
+            try:
+                self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                number = int(probe.stdout.readline(32))
+                owner = s.OwnedProcess.pin(probe.pid, {os.getpid()})
+                real_scandir = s.os.scandir
+                handoffs = []
+                observed_errors = []
+                def scanned(path):
+                    iterator = real_scandir(path)
+                    if path != f"/proc/{probe.pid}/fd":
+                        return iterator
+                    class Gate:
+                        def __enter__(self):
+                            return self
+                        def __exit__(self, *args):
+                            iterator.close()
+                        def __iter__(self):
+                            return self
+                        def __next__(self):
+                            entry = next(iterator)
+                            if entry.name == str(number):
+                                handoffs.append(entry.name)
+                                probe.stdin.write(b"E" if exit_child else b"C")
+                                probe.stdin.flush()
+                                if exit_child:
+                                    self_outer.assertTrue(select.select([owner.pidfd], [], [], 2)[0])
+                                    # Observe actual exit without reaping the PID.
+                                    exited = os.waitid(os.P_PID, probe.pid,
+                                                      os.WEXITED | os.WNOWAIT)
+                                    self_outer.assertEqual(exited.si_pid, probe.pid)
+                                    self_outer.assertIsNone(probe.returncode)
+                                else:
+                                    self_outer.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                                    self_outer.assertEqual(probe.stdout.readline(32), b"closed\n")
+                                    self_outer.assertFalse(owner.exited())
+                            return entry
+                    return Gate()
+                self_outer = self
+                def census(pids):
+                    try:
+                        return s.disk_sample(root, pids, time.monotonic_ns() + 1_000_000_000)
+                    except s.AccountingError as error:
+                        observed_errors.append(error.detail)
+                        raise
+                positive = census([probe.pid])
+                self.assertEqual(positive.logical_bytes, 3)
+                with patch.object(s.os, "scandir", side_effect=scanned):
+                    if exit_child:
+                        complete = s._complete_disk_census(census, [probe.pid],
+                                                         lambda pid: owner.exited())
+                        self.assertEqual(complete.logical_bytes, 3)
+                        self.assertEqual(complete.allocated_bytes, positive.allocated_bytes)
+                        # No diagnostic follows this genuine complete sample.
+                        self.assertFalse(hasattr(complete, "detail"))
+                    else:
+                        with self.assertRaises(s.AccountingError) as caught:
+                            s._complete_disk_census(census, [probe.pid],
+                                                    lambda pid: owner.exited())
+                        self.assertEqual(caught.exception.detail,
+                                         s.DiskFailure(s.DiskSite.PROC_FD_STAT,
+                                                       s.DiskOrigin.OS_ERROR, errno.ENOENT))
+                self.assertEqual(len(handoffs), 1)
+                self.assertEqual(observed_errors,
+                                 [s.DiskFailure(s.DiskSite.PROC_FD_STAT,
+                                                s.DiskOrigin.OS_ERROR, errno.ENOENT)])
+            finally:
+                try:
+                    probe.communicate(b"Q", timeout=2)
+                except subprocess.TimeoutExpired:
+                    probe.kill()  # Only this still-unreaped direct test child.
+                    probe.communicate(timeout=2)
+                if owner is not None:
+                    owner.close()
+            self.assertEqual(probe.returncode, 0)
+            self.assertEqual(s.children(os.getpid()), set())
+
+    def test_actual_proc_fd_close_after_enumeration_refuses_no_partial_sample(self):
+        self.proc_close_fixture(False)
+
+    def test_actual_full_exit_discards_failed_census_detail(self):
+        self.proc_close_fixture(True)
+
+    def test_first_accounting_detail_survives_later_cleanup_and_unrelated_first(self):
+        first = s.DiskFailure(s.DiskSite.PROC_FD_STAT, s.DiskOrigin.OS_ERROR, errno.ENOENT)
+        later = s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, errno.EACCES)
+        real_preserve = s.preserve_log
+        def cleanup(*args):
+            real_preserve(*args)
+            raise s.AccountingError("later_cleanup", later)
+        with patch.object(s, "disk_sample",
+                          side_effect=s.AccountingError("disk_accounting_unavailable", first)), \
+                patch.object(s, "preserve_log", side_effect=cleanup):
+            result, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(result["refusal"], "disk_accounting_unavailable")
+        self.assertEqual((result["disk_failure_site"], result["disk_failure_origin"],
+                          result["disk_failure_errno"]), (8, 1, errno.ENOENT))
+        with patch.object(s.OwnedProcess, "pin",
+                          side_effect=s.AccountingError("first_setup")), \
+                patch.object(s, "preserve_log", side_effect=cleanup):
+            result, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(result["refusal"], "first_setup")
+        self.assertEqual((result["disk_failure_site"], result["disk_failure_origin"],
+                          result["disk_failure_errno"]), (0, 0, None))
+        self.assertFalse(result["supervision_ok"])
 
     def test_expired_cleanup_keeps_owned_stage_and_never_follows_link(self):
         with tempfile.TemporaryDirectory(prefix="slug-supervisor-cleanup-") as temp:

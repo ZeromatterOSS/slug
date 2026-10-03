@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: waiting on native resolution for genuine source admission
+Status: ready to freeze an observation with precise disk-accounting refusal evidence
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
@@ -55,6 +55,18 @@ reservation credit peaked at442387 bytes; this is not heap/RSS or full source fi
 Native resolution for the unchanged normal requests is a prerequisite; the
 underlying failure reason and a code correction are unproved. Both spent attempts
 stay immutable, with no automatic retry. [Typed terminal receipt](slug-v2-subplans/wp899-typed-root-terminal-2026-10-03.json).
+Current supplied execution profile enables unrestricted network access; direct DNS
+and both BCR dependency MODULE requests succeed. ONE separately reviewed actual
+source-admission observation completed with unchanged caller/source/caps; its
+contract is `target/wp899/genuine-root-network-contract.md`. Actual fit remains
+unproved; connectivity does not retrospectively diagnose the older failure.
+The supervisor refused disk accounting before Slug emitted a numeric receipt;
+exact operation/errno remains unknown. Bounded first-refusal disk site/category/
+errno diagnostics now pass17/17 with independent FINAL and unchanged accounting/
+limits/join/cleanup. Four prior socket-permission focused gates separately pass4/4.
+[Recovery receipt](slug-v2-subplans/wp899-network-recovery-2026-10-03.json).
+The next actual observation requires a new contract/review/freeze; no automatic
+retry or fullWP899/source-fit/historical40GB acceptance follows.
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 from dataclasses import dataclass
+from enum import IntEnum
 import errno
 import json
 import os
@@ -35,8 +36,96 @@ CLEANUP_ENV = "SLUG_SOURCE_ADMISSION_CLEANUP_DEADLINE_MONOTONIC_NS"
 STAGE_ENV = "SLUG_SOURCE_ADMISSION_STAGE_ROOT"
 
 
+class DiskSite(IntEnum):
+    UNKNOWN = 0
+    ROOT_OPEN = 1
+    DIRECTORY_OPEN = 2
+    ROOT_STAT = 3
+    TREE_STAT = 4
+    CHILD_OPEN = 5
+    CHILD_STAT = 6
+    PROC_FD_OPEN = 7
+    PROC_FD_STAT = 8
+    PROC_FD_LINK = 9
+    PROC_FD_INFO = 10
+    FLAGS_PARSE = 11
+    ROOT_REVALIDATE = 12
+    DIRECTORY_NEXT = 13
+    PROC_FD_NEXT = 14
+
+
+class DiskOrigin(IntEnum):
+    OS_ERROR = 1
+    INVALID_METADATA = 2
+
+
+@dataclass(frozen=True)
+class DiskFailure:
+    site: DiskSite
+    origin: DiskOrigin
+    errno: int | None = None
+
+    def __post_init__(self) -> None:
+        if (type(self.site) is not DiskSite or type(self.origin) is not DiskOrigin
+                or (self.errno is not None and
+                    (type(self.errno) is not int or not -(2 ** 31) <= self.errno < 2 ** 31))):
+            raise ValueError("invalid disk diagnostic scalar")
+
+
 class AccountingError(Exception):
-    """Fixed reason only: never report a discovered path, argv or environment."""
+    """Fixed reason and optional scalar detail; never retain exception text."""
+    def __init__(self, reason: str, detail: DiskFailure | None = None):
+        super().__init__(reason)
+        if detail is not None and type(detail) is not DiskFailure:
+            raise ValueError("invalid disk diagnostic detail")
+        self.detail = detail
+
+
+def _disk_detail(site: DiskSite, exc) -> DiskFailure:
+    origin = DiskOrigin.OS_ERROR if isinstance(exc, OSError) else DiskOrigin.INVALID_METADATA
+    number = exc.errno if isinstance(exc, OSError) else None
+    # OS errno is a signed C int; unknown non-OS/future values stay absent.
+    if type(number) is not int or not -(2 ** 31) <= number < 2 ** 31:
+        number = None
+    return DiskFailure(site, origin, number)
+
+
+def _disk_call(site: DiskSite, operation, *args, **kwargs):
+    try:
+        return operation(*args, **kwargs)
+    except (OSError, ValueError, StopIteration) as exc:
+        detail = _disk_detail(site, exc)
+    # Outside the handler: retain neither native exception nor its traceback.
+    raise AccountingError("disk_accounting_unavailable", detail) from None
+
+
+def _disk_entries(iterator, site: DiskSite):
+    while True:
+        try:
+            entry = next(iterator)
+        except StopIteration:
+            return
+        except (OSError, ValueError) as exc:
+            detail = _disk_detail(site, exc)
+        else:
+            yield entry
+            continue
+        raise AccountingError("disk_accounting_unavailable", detail) from None
+
+
+def _disk_access(flags: str) -> int:
+    return next(int(row.split()[1], 8) & os.O_ACCMODE
+                for row in flags.splitlines() if row.startswith("flags:"))
+
+
+def _complete_disk_census(census, live, exited):
+    try:
+        return census(live)
+    except AccountingError:
+        if not all(exited(pid) for pid in live):
+            raise
+        # Discard the failed live census ONLY after confirmed full exit.
+        return census([])
 
 
 @dataclass(frozen=True)
@@ -215,71 +304,77 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
     stack: list[tuple[int, object]] = []
     def push_directory(fd: int) -> None:
         try:
-            stack.append((fd, os.scandir(fd)))
+            stack.append((fd, _disk_call(DiskSite.DIRECTORY_OPEN, os.scandir, fd)))
         except BaseException:
             os.close(fd)
             raise
 
     try:
-        root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-                          | os.O_CLOEXEC)
+        root_fd = _disk_call(DiskSite.ROOT_OPEN, os.open, root,
+                             os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
         push_directory(root_fd)
-        root_info = os.fstat(root_fd)
+        root_info = _disk_call(DiskSite.ROOT_STAT, os.fstat, root_fd)
         if expected_root is not None and (root_info.st_dev, root_info.st_ino) != expected_root:
             raise AccountingError("stage_identity_changed")
         account(root_info)
         while stack:
             fd, iterator = stack[-1]
             try:
-                entry = next(iterator)
+                entry = next(_disk_entries(iterator, DiskSite.DIRECTORY_NEXT))
             except StopIteration:
                 iterator.close()
                 os.close(fd)
                 stack.pop()
                 continue
-            info = os.stat(entry.name, dir_fd=fd, follow_symlinks=False)
+            info = _disk_call(DiskSite.TREE_STAT, os.stat, entry.name,
+                              dir_fd=fd, follow_symlinks=False)
             account(info)
             if stat.S_ISDIR(info.st_mode):
                 if len(stack) >= 128:
                     raise AccountingError("disk_census_depth")
-                child = os.open(entry.name, os.O_RDONLY | os.O_DIRECTORY
-                                | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
-                opened = os.fstat(child)
+                child = _disk_call(DiskSite.CHILD_OPEN, os.open, entry.name,
+                                   os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+                                   | os.O_CLOEXEC, dir_fd=fd)
+                opened = _disk_call(DiskSite.CHILD_STAT, os.fstat, child)
                 if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
                     os.close(child)
                     raise AccountingError("disk_directory_raced")
                 push_directory(child)
         root_text = str(root)
         for pid in pids:
-            with os.scandir(f"/proc/{pid}/fd") as fds:
-                for entry in fds:
+            with _disk_call(DiskSite.PROC_FD_OPEN, os.scandir, f"/proc/{pid}/fd") as fds:
+                for entry in _disk_entries(fds, DiskSite.PROC_FD_NEXT):
                     if time.monotonic_ns() >= deadline_ns:
                         raise AccountingError("disk_census_bound")
-                    info = os.stat(entry.path)
+                    info = _disk_call(DiskSite.PROC_FD_STAT, os.stat, entry.path)
                     if not stat.S_ISREG(info.st_mode):
                         continue
-                    name = os.readlink(entry.path)
+                    name = _disk_call(DiskSite.PROC_FD_LINK, os.readlink, entry.path)
                     original = name.removesuffix(" (deleted)")
                     private = original.startswith(root_text + "/")
                     anonymous = original.startswith(("/memfd:", "memfd:"))
                     if private or anonymous or (info.st_dev, info.st_ino) in seen:
                         account(info)
                         continue
-                    flags = Path(f"/proc/{pid}/fdinfo/{entry.name}").read_text()
-                    access = next(int(s.split()[1], 8) & os.O_ACCMODE
-                                  for s in flags.splitlines() if s.startswith("flags:"))
+                    flags = _disk_call(DiskSite.PROC_FD_INFO,
+                                       Path(f"/proc/{pid}/fdinfo/{entry.name}").read_text)
+                    access = _disk_call(
+                        DiskSite.FLAGS_PARSE,
+                        _disk_access, flags)
                     if access != os.O_RDONLY:
                         raise AccountingError("external_writable_file")
-        after = root.lstat()
+        after = _disk_call(DiskSite.ROOT_REVALIDATE, root.lstat)
         if (after.st_dev, after.st_ino) != (root_info.st_dev, root_info.st_ino):
             raise AccountingError("stage_identity_changed")
         return DiskSample(allocated, logical, len(seen))
     except (OSError, ValueError, StopIteration) as exc:
-        raise AccountingError("disk_accounting_unavailable") from exc
+        # Unwrapped context operations have an honest unknown site.
+        detail = _disk_detail(DiskSite.UNKNOWN, exc)
     finally:
         for fd, iterator in reversed(stack):
             iterator.close()
             os.close(fd)
+    raise AccountingError("disk_accounting_unavailable", detail) from None
 
 
 def resource_refusal(rss: int, swap: int, disk: DiskSample, limits: Limits) -> str | None:
@@ -413,6 +508,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     owners: dict[int, OwnedProcess] = {}
     process = None
     reason = None
+    disk_failure = None
     joined = False
     removed = False
     descendants = 0
@@ -435,10 +531,11 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
         os.write(handshake_w, struct.pack("!QQ", soft, hard))
         os.close(handshake_w)
 
-    def refuse(why: str) -> None:
-        nonlocal reason, terminal_ns, kill_ns
+    def refuse(why: str, detail: DiskFailure | None = None) -> None:
+        nonlocal reason, disk_failure, terminal_ns, kill_ns
         if reason is None:
             reason = why
+            disk_failure = detail
             terminal_ns = min(terminal_ns, time.monotonic_ns()
                               + int(limits.terminal_seconds * 1e9))
             kill_ns = min(terminal_ns, time.monotonic_ns()
@@ -577,14 +674,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                             rss += r
                             swap += s
                             live.append(pid)
-                        try:
-                            disk = census(live)
-                        except AccountingError:
-                            if not all(owners[p].exited() for p in live):
-                                raise
-                            # Expected process exit removes its FD namespace.
-                            # Take a final owned-stage census, never partial data.
-                            disk = census([])
+                        disk = _complete_disk_census(
+                            census, live, lambda pid: owners[pid].exited())
                         samples += 1
                         peak_rss = max(peak_rss, rss)
                         peak_swap = max(peak_swap, swap)
@@ -601,7 +692,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                         if disk.allocated_bytes >= limits.disk_bytes:
                             refuse("sampled_disk_limit")
                 except AccountingError as exc:
-                    refuse(str(exc))
+                    refuse(str(exc), exc.detail)
                 if owners[process.pid].exited():
                     # Adoption happens on root exit; never stop before checking.
                     try:
@@ -611,7 +702,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                             joined = True
                             break
                     except AccountingError as exc:
-                        refuse(str(exc))
+                        refuse(str(exc), exc.detail)
                 now = time.monotonic_ns()
                 if now >= deadline.cleanup_ns:
                     refuse("outer_deadline")
@@ -649,7 +740,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                     break
                 time.sleep(limits.poll_seconds)
     except (OSError, AccountingError, subprocess.SubprocessError) as exc:
-        refuse("supervisor_operation_failed" if not isinstance(exc, AccountingError) else str(exc))
+        refuse("supervisor_operation_failed" if not isinstance(exc, AccountingError) else str(exc),
+               exc.detail if isinstance(exc, AccountingError) else None)
         # Unexpected supervisor failure grants no success. Keep actual bounded
         # joins after KILL; signal only pinned owners and adopted relationships.
         for owner in owners.values():
@@ -691,7 +783,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                     preserve_log(stage_log, log, terminal_ns)
                     log_preserved = True
             except AccountingError as exc:
-                refuse(str(exc))
+                refuse(str(exc), exc.detail)
             except OSError:
                 refuse("diagnostic_log_preservation_failed")
             try:
@@ -702,7 +794,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                     remove_owned_stage(stage, (root_info.st_dev, root_info.st_ino), terminal_ns)
                     removed = not stage.exists()
             except AccountingError as exc:
-                refuse(str(exc))
+                refuse(str(exc), exc.detail)
             except OSError:
                 refuse("stage_cleanup_failed")
         os.close(handshake_r)
@@ -739,6 +831,9 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             "terminal_cleanup_exhausted": time.monotonic_ns() >= terminal_ns,
             "supervision_ok": reason is None and joined and removed,
             "source_gate_verified": False,
+            "disk_failure_site": 0 if disk_failure is None else int(disk_failure.site),
+            "disk_failure_origin": 0 if disk_failure is None else int(disk_failure.origin),
+            "disk_failure_errno": None if disk_failure is None else disk_failure.errno,
             "kernel_rss_quota": False, "swap_disabled": False, "disk_quota": False}
 
 

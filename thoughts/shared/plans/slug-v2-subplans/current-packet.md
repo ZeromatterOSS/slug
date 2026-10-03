@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: waiting on native resolution for genuine source admission
+Status: ready to freeze an observation with precise disk-accounting refusal evidence
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -28,6 +28,25 @@ establishes no implementation correction. Native resolution for the unchanged
 normal requests is the next prerequisite. Both spent attempts remain immutable;
 any future observation needs a new concrete contract and independently reviewed
 freeze after a relevant state change. No automatic retry or CLI/process activation.
+Current user/developer execution profile now supplies unrestricted network access;
+direct native DNS and both declared BCR dependency MODULE requests succeed without
+a proxy. Root completed ONE new actual observation under
+`target/wp899/genuine-root-network-contract.md`, with unchanged caller/source/caps
+and independently reviewed unique freeze. Connectivity alone does not prove
+Slug source admission or explain the older restricted resolver error. The new
+observation refused with supervisor disk_accounting_unavailable; child terminated
+and joined, stage and exact empty parent removed after independent review. No Slug
+numeric receipt was emitted, so DNS progress/source/restoration/credit proof stays
+unobserved. Four earlier socket-permission focused gates now pass4/4 separately.
+The validated bounded component records exact first-selected disk census site/category/errno
+under `target/wp899/disk-accounting-diagnostic-contract.md`; accounting refusal,
+resource caps and join/cleanup remain unchanged. All17 supervisor cases pass on
+the corrected final source; independent FINAL accepts only this component. The
+baseline flags parser domain is preserved, including inherited unclassified raw
+IndexError. [Network recovery receipt](wp899-network-recovery-2026-10-03.json)
+preserves the spent observation, supplemental4/4 and diagnostic source/test/review
+evidence. A next actual observation requires its own contract/review/freeze; no
+automatic retry or fullWP899/source-fit/40GB acceptance follows.
 
 ## Observable result and authority
 
