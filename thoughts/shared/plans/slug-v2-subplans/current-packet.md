@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: global9 child-accounting refusal preserved; bounded supervisor attribution next; full WP899 unaccepted
+Status: bounded child-accounting attribution validated; actual accounting observation next; full WP899 unaccepted
 
 The [bounded profile amendment](wp899-bounded-registry-profile.md) keeps Default128
 and selects explicit256 only for the Linux actual-root diagnostic. Its allowance-sized
@@ -29,6 +29,14 @@ FINALs accept only this limited evidence. [Receipt](wp899-child-accounting-front
 Next owner is supervisor `children()`: task enumeration/read/parse and exact errno
 remain unknown. Use bounded local discriminators before a separately reviewed
 observation; no identical retry, accounting skip or inferred thread-exit race.
+
+The bounded supervisor attribution component now retains finite first-selected
+child site/context/owner/origin/errno, separately from disk detail; all accounting
+loss remains fatal and all lifecycle/clocks/caps are unchanged. A real local
+worker-retirement fixture proves its own children-read ENOENT, without attributing
+global9.29/29 controls pass in3.441s, including25 unchanged protected methods;
+three independent FINALs accept only the component. [Receipt](wp899-child-accounting-attribution-2026-10-03.json).
+Next gate is one new independently reviewed actual freeze using these fields.
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the

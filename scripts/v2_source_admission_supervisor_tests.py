@@ -696,6 +696,197 @@ if command == b"C":
     def test_actual_full_exit_discards_failed_census_detail(self):
         self.proc_close_fixture(True)
 
+    def test_child_census_sites_close_precedence_and_redaction(self):
+        context, owner = s.ChildContext.ACTIVE_DISCOVERY, s.ChildOwner.ROOT
+        denied = PermissionError(errno.EACCES, "credential-secret", "/private-secret")
+        missing = FileNotFoundError(errno.ENOENT, "read-secret", "/task-secret")
+
+        class Tasks:
+            def __init__(self, rows, close_error=None):
+                self.rows, self.close_error, self.closed = iter(rows), close_error, False
+            def __enter__(self): return self
+            def __iter__(self): return self
+            def __next__(self):
+                value = next(self.rows)
+                if isinstance(value, BaseException): raise value
+                return SimpleNamespace(path=value)
+            def __exit__(self, *_):
+                self.closed = True
+                if self.close_error is not None: raise self.close_error
+
+        # Iterator loss after a valid row and parse loss after one valid PID
+        # must still refuse instead of publishing any partially accumulated set.
+        cases = [
+            ("open", None, denied, [], s.ChildSite.TASK_OPEN, errno.EACCES),
+            ("next", Tasks(["one", missing]), None, ["7"], s.ChildSite.TASK_NEXT, errno.ENOENT),
+            ("read", Tasks(["one"]), None, [missing], s.ChildSite.CHILDREN_READ, errno.ENOENT),
+            ("parse", Tasks(["one"]), None, ["7 invalid-secret"], s.ChildSite.PID_PARSE, None),
+            ("close", Tasks(["one"], denied), None, ["7"], s.ChildSite.TASK_CLOSE, errno.EACCES),
+            ("close-after-read", Tasks(["one"], denied), None, [missing], s.ChildSite.TASK_CLOSE, errno.EACCES),
+            ("close-after-unrelated", Tasks(["one"], denied), None,
+             [RuntimeError("unrelated-secret")], s.ChildSite.TASK_CLOSE, errno.EACCES),
+        ]
+        for name, tasks, opening, reads, site, number in cases:
+            with self.subTest(case=name), \
+                    patch.object(s.os, "scandir", return_value=tasks, side_effect=opening), \
+                    patch.object(s.Path, "read_text", side_effect=reads):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.children(123, context=context, owner=owner)
+            origin = s.ChildOrigin.INVALID_METADATA if number is None else s.ChildOrigin.OS_ERROR
+            self.assertEqual(caught.exception.detail, s.ChildFailure(site, origin, context, owner, number))
+            self.assertEqual(caught.exception.args, ("child_accounting_unavailable",))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+            self.assertNotIn("secret", repr(caught.exception) + repr(caught.exception.detail))
+            if tasks is not None: self.assertTrue(tasks.closed)
+        tasks = Tasks(["one", "two"])
+        with patch.object(s.os, "scandir", return_value=tasks), \
+                patch.object(s.Path, "read_text", side_effect=["+7 0008 7", "9 -3"]):
+            self.assertEqual(s.children(123), {7, 8, 9, -3})  # Original int parser domain.
+        self.assertTrue(tasks.closed)
+        tasks = Tasks(["one"])
+        unrelated = RuntimeError("original-domain")
+        with patch.object(s.os, "scandir", return_value=tasks), \
+                patch.object(s.Path, "read_text", side_effect=unrelated):
+            with self.assertRaises(RuntimeError) as caught:
+                s.children(123)
+        self.assertIs(caught.exception, unrelated)
+        self.assertTrue(tasks.closed)
+
+    def test_child_diagnostic_scalar_and_caller_domains(self):
+        values = [s.ChildSite.CHILDREN_READ, s.ChildOrigin.OS_ERROR,
+                  s.ChildContext.ACTIVE_DISCOVERY, s.ChildOwner.ROOT, errno.ENOENT]
+        for index, invalid in ((0, 3), (1, 1), (2, 2), (3, 2), (4, True), (4, 2 ** 40)):
+            changed = values.copy(); changed[index] = invalid
+            with self.subTest(index=index, invalid=invalid), self.assertRaises(ValueError):
+                s.ChildFailure(*changed)
+        for kwargs in ({"context": 2}, {"owner": 2}):
+            with patch.object(s.os, "scandir") as scan, self.assertRaises(ValueError):
+                s.children(123, **kwargs)
+            scan.assert_not_called()
+        with self.assertRaises(ValueError):
+            s.AccountingError("child_accounting_unavailable", SimpleNamespace(**{}))
+
+    def test_actual_thread_retirement_after_enumeration_refuses_no_partial_children(self):
+        code = r'''
+import sys, threading
+release = threading.Event()
+worker = threading.Thread(target=release.wait)
+worker.start()
+print(worker.native_id, flush=True)
+while True:
+    command = sys.stdin.buffer.read(1)
+    if command in (b"R", b"E", b""):
+        release.set(); worker.join(timeout=2)
+        assert not worker.is_alive()
+        if command == b"R": print("retired", flush=True)
+        else: break
+'''
+        parent_pid = os.getpid()
+        probe = subprocess.Popen([sys.executable, "-I", "-c", code],
+                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL, start_new_session=True,
+                                 preexec_fn=lambda: s.parent_death_guard(parent_pid))
+        pinned = None
+        try:
+            self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+            tid = int(probe.stdout.readline(32))
+            pinned = s.OwnedProcess.pin(probe.pid, {parent_pid})
+            target = Path(f"/proc/{probe.pid}/task/{tid}/children")
+            self.assertTrue(target.exists())
+            real_read = s.Path.read_text
+            retired = []
+            def retire_then_read(path, *args, **kwargs):
+                if path == target and not retired:
+                    # children() obtained this real task entry before the hook.
+                    probe.stdin.write(b"R"); probe.stdin.flush()
+                    self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                    self.assertEqual(probe.stdout.readline(32), b"retired\n")
+                    self.assertFalse(target.exists())  # Actual worker join, no fake ENOENT.
+                    retired.append(True)
+                return real_read(path, *args, **kwargs)
+            with patch.object(s.Path, "read_text", autospec=True, side_effect=retire_then_read):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.children(probe.pid, context=s.ChildContext.ACTIVE_DISCOVERY,
+                               owner=s.ChildOwner.ROOT)
+            self.assertEqual(retired, [True])
+            self.assertEqual(caught.exception.detail,
+                             s.ChildFailure(s.ChildSite.CHILDREN_READ, s.ChildOrigin.OS_ERROR,
+                                            s.ChildContext.ACTIVE_DISCOVERY, s.ChildOwner.ROOT,
+                                            errno.ENOENT))
+            self.assertIsNone(caught.exception.__cause__)
+            self.assertIsNone(caught.exception.__context__)
+        finally:
+            # Every assertion path releases/joins the worker and the actual child.
+            try:
+                probe.communicate(b"E", timeout=2)
+            except subprocess.TimeoutExpired:
+                probe.kill()  # Still-unreaped direct fixture child only.
+                probe.communicate(timeout=2)
+            if pinned is not None: pinned.close()
+            self.assertEqual(s.children(os.getpid()), set())
+        self.assertEqual(probe.returncode, 0)
+
+    def test_child_contexts_and_cross_kind_first_detail_survive_actual_cleanup(self):
+        real_children, real_preserve = s.children, s.preserve_log
+        calls = []
+        def traverse(pid, **kwargs):
+            calls.append((kwargs.get("context"), kwargs.get("owner")))
+            return real_children(pid, **kwargs)
+        with patch.object(s, "children", side_effect=traverse):
+            healthy, _ = self.run_child("import time; time.sleep(.05)")
+        self.assertTrue(healthy["supervision_ok"], healthy)
+        self.assertIn((s.ChildContext.ISOLATION, s.ChildOwner.SUPERVISOR), calls)
+        self.assertIn((s.ChildContext.ACTIVE_DISCOVERY, s.ChildOwner.ROOT), calls)
+        self.assertIn((s.ChildContext.STOPPED_DISCOVERY, s.ChildOwner.ROOT), calls)
+        self.assertIn((s.ChildContext.JOIN, s.ChildOwner.SUPERVISOR), calls)
+        first = s.ChildFailure(s.ChildSite.CHILDREN_READ, s.ChildOrigin.OS_ERROR,
+                               s.ChildContext.ACTIVE_DISCOVERY, s.ChildOwner.ROOT, errno.ENOENT)
+        disk = s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, errno.EACCES)
+        def cleanup_child(*args):
+            real_preserve(*args)
+            raise s.AccountingError("child_accounting_unavailable", first)
+        def cleanup_disk(*args):
+            real_preserve(*args)
+            raise s.AccountingError("disk_accounting_unavailable", disk)
+        injected = []
+        def refuse_once(pid, **kwargs):
+            calls.append((kwargs.get("context"), kwargs.get("owner")))
+            if (kwargs.get("context") == s.ChildContext.ACTIVE_DISCOVERY
+                    and kwargs.get("owner") == s.ChildOwner.ROOT and not injected):
+                injected.append(True)
+                raise s.AccountingError("child_accounting_unavailable", first)
+            return real_children(pid, **kwargs)
+        with patch.object(s, "children", side_effect=refuse_once), \
+                patch.object(s, "preserve_log", side_effect=cleanup_disk):
+            child_first, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(injected, [True])
+        self.assertIn((s.ChildContext.TERMINAL_DISCOVERY, s.ChildOwner.SUPERVISOR), calls)
+        self.assertTrue(child_first["term_sent"])
+        self.assertEqual(child_first["child_exit_code"], -signal.SIGTERM)
+        self.assertEqual(child_first["refusal"], "child_accounting_unavailable")
+        child_fields = ("child_failure_site", "child_failure_origin", "child_failure_context",
+                        "child_failure_owner", "child_failure_errno")
+        disk_fields = ("disk_failure_site", "disk_failure_origin", "disk_failure_errno")
+        self.assertEqual(tuple(child_first[k] for k in child_fields), (3, 1, 2, 2, errno.ENOENT))
+        self.assertEqual(tuple(child_first[k] for k in disk_fields), (0, 0, None))
+        with patch.object(s, "disk_sample",
+                          side_effect=s.AccountingError("disk_accounting_unavailable", disk)), \
+                patch.object(s, "preserve_log", side_effect=cleanup_child):
+            disk_first, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(disk_first["refusal"], "disk_accounting_unavailable")
+        self.assertEqual(tuple(disk_first[k] for k in disk_fields), (1, 1, errno.EACCES))
+        self.assertEqual(tuple(disk_first[k] for k in child_fields), (0, 0, 0, 0, None))
+        with patch.object(s.OwnedProcess, "pin", side_effect=s.AccountingError("first_setup")), \
+                patch.object(s, "preserve_log", side_effect=cleanup_child):
+            unrelated_first, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(unrelated_first["refusal"], "first_setup")
+        self.assertEqual(tuple(unrelated_first[k] for k in child_fields), (0, 0, 0, 0, None))
+        for result in (healthy, child_first, disk_first, unrelated_first):
+            self.assertNotIn("command", result)
+            self.assertNotIn("environment", result)
+            self.assertFalse(result["source_gate_verified"])
+
     def test_first_accounting_detail_survives_later_cleanup_and_unrelated_first(self):
         first = s.DiskFailure(s.DiskSite.PROC_FD_STAT, s.DiskOrigin.OS_ERROR, errno.ENOENT)
         later = s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, errno.EACCES)

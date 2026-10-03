@@ -72,12 +72,57 @@ class DiskFailure:
             raise ValueError("invalid disk diagnostic scalar")
 
 
+class ChildSite(IntEnum):
+    TASK_OPEN = 1
+    TASK_NEXT = 2
+    CHILDREN_READ = 3
+    PID_PARSE = 4
+    TASK_CLOSE = 5
+
+
+class ChildOrigin(IntEnum):
+    OS_ERROR = 1
+    INVALID_METADATA = 2
+
+
+class ChildContext(IntEnum):
+    UNKNOWN = 0
+    ISOLATION = 1
+    ACTIVE_DISCOVERY = 2
+    STOPPED_DISCOVERY = 3
+    TERMINAL_DISCOVERY = 4
+    JOIN = 5
+
+
+class ChildOwner(IntEnum):
+    UNKNOWN = 0
+    SUPERVISOR = 1
+    ROOT = 2
+    DESCENDANT = 3
+
+
+@dataclass(frozen=True)
+class ChildFailure:
+    site: ChildSite
+    origin: ChildOrigin
+    context: ChildContext
+    owner: ChildOwner
+    errno: int | None = None
+
+    def __post_init__(self) -> None:
+        if (type(self.site) is not ChildSite or type(self.origin) is not ChildOrigin
+                or type(self.context) is not ChildContext or type(self.owner) is not ChildOwner
+                or (self.errno is not None and
+                    (type(self.errno) is not int or not -(2 ** 31) <= self.errno < 2 ** 31))):
+            raise ValueError("invalid child diagnostic scalar")
+
+
 class AccountingError(Exception):
     """Fixed reason and optional scalar detail; never retain exception text."""
-    def __init__(self, reason: str, detail: DiskFailure | None = None):
+    def __init__(self, reason: str, detail: DiskFailure | ChildFailure | None = None):
         super().__init__(reason)
-        if detail is not None and type(detail) is not DiskFailure:
-            raise ValueError("invalid disk diagnostic detail")
+        if detail is not None and type(detail) not in (DiskFailure, ChildFailure):
+            raise ValueError("invalid accounting diagnostic detail")
         self.detail = detail
 
 
@@ -187,16 +232,42 @@ def process_stat(pid: int) -> ProcessStat:
         raise AccountingError("process_identity_unavailable") from exc
 
 
-def children(pid: int) -> set[int]:
+def _child_detail(site: ChildSite, context: ChildContext, owner: ChildOwner, exc) -> ChildFailure:
+    origin = ChildOrigin.OS_ERROR if isinstance(exc, OSError) else ChildOrigin.INVALID_METADATA
+    number = exc.errno if isinstance(exc, OSError) else None
+    if type(number) is not int or not -(2 ** 31) <= number < 2 ** 31:
+        number = None
+    return ChildFailure(site, origin, context, owner, number)
+
+
+def children(pid: int, *, context: ChildContext = ChildContext.UNKNOWN,
+             owner: ChildOwner = ChildOwner.UNKNOWN) -> set[int]:
     # Linux's per-thread children list avoids a system-wide PID/argv scan.
+    if type(context) is not ChildContext or type(owner) is not ChildOwner:
+        raise ValueError("invalid child accounting caller")
     result: set[int] = set()
+    detail = None
+    site = ChildSite.TASK_OPEN
     try:
         with os.scandir(f"/proc/{pid}/task") as tasks:
-            for task in tasks:
-                result.update(int(p) for p in
-                              Path(task.path, "children").read_text().split())
+            try:
+                site = ChildSite.TASK_NEXT
+                for task in tasks:
+                    site = ChildSite.CHILDREN_READ
+                    contents = Path(task.path, "children").read_text()
+                    site = ChildSite.PID_PARSE
+                    result.update(int(p) for p in contents.split())
+                    site = ChildSite.TASK_NEXT
+            except (OSError, ValueError) as exc:
+                detail = _child_detail(site, context, owner, exc)
+            finally:
+                site = ChildSite.TASK_CLOSE
     except (OSError, ValueError) as exc:
-        raise AccountingError("child_accounting_unavailable") from exc
+        detail = _child_detail(site, context, owner, exc)
+    # Defer the redacted raise until context close and every handler have exited.
+    # A close failure supersedes a body error as in the original with-context.
+    if detail is not None:
+        raise AccountingError("child_accounting_unavailable", detail) from None
     return result
 
 
@@ -651,7 +722,9 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     limits.validate()
     if sys.platform != "linux" or not command:
         raise ValueError("Linux and one explicit command required")
-    if len(list(Path("/proc/self/task").iterdir())) != 1 or children(os.getpid()):
+    if (len(list(Path("/proc/self/task").iterdir())) != 1
+            or children(os.getpid(), context=ChildContext.ISOLATION,
+                        owner=ChildOwner.SUPERVISOR)):
         raise AccountingError("supervisor_not_isolated")
     if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
         raise AccountingError("pidfd_unavailable")
@@ -667,6 +740,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     process = None
     reason = None
     disk_failure = None
+    child_failure = None
     joined = False
     removed = False
     descendants = 0
@@ -693,17 +767,18 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
         os.write(handshake_w, struct.pack("!QQQ", soft, hard, guard))
         os.close(handshake_w)
 
-    def refuse(why: str, detail: DiskFailure | None = None) -> None:
-        nonlocal reason, disk_failure, terminal_ns, kill_ns
+    def refuse(why: str, detail: DiskFailure | ChildFailure | None = None) -> None:
+        nonlocal reason, disk_failure, child_failure, terminal_ns, kill_ns
         if reason is None:
             reason = why
-            disk_failure = detail
+            disk_failure = detail if type(detail) is DiskFailure else None
+            child_failure = detail if type(detail) is ChildFailure else None
             terminal_ns = min(terminal_ns, time.monotonic_ns()
                               + int(limits.terminal_seconds * 1e9))
             kill_ns = min(terminal_ns, time.monotonic_ns()
                           + int(limits.terminal_seconds * 0.5e9))
 
-    def discover() -> None:
+    def discover(context: ChildContext = ChildContext.ACTIVE_DISCOVERY) -> None:
         nonlocal descendants
         parent_ids = {os.getpid(), *owners}
         pending = list(parent_ids)
@@ -711,7 +786,10 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             parent = pending.pop()
             if parent != os.getpid() and owners[parent].exited():
                 continue
-            for pid in children(parent):
+            role = (ChildOwner.SUPERVISOR if parent == os.getpid() else
+                    ChildOwner.ROOT if process is not None and parent == process.pid else
+                    ChildOwner.DESCENDANT)
+            for pid in children(parent, context=context, owner=role):
                 if pid in owners:
                     try:
                         listed = process_stat(pid)
@@ -770,7 +848,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
         root_owner = owners.get(process.pid)
         if root_owner is not None and not root_owner.exited():
             return False
-        if children(os.getpid()) - {process.pid}:
+        if children(os.getpid(), context=ChildContext.JOIN,
+                    owner=ChildOwner.SUPERVISOR) - {process.pid}:
             return False
         if any(pid != process.pid for pid in owners):
             return False
@@ -795,7 +874,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                            deadline_reason=deadline_reason)
 
     def sole_child() -> None:
-        discover()
+        discover(ChildContext.STOPPED_DISCOVERY)
         if reason is not None or set(owners) != {process.pid}:
             raise AccountingError("census_interrupted")
 
@@ -834,7 +913,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                 refuse("root_session_unverified")
             while True:
                 try:
-                    discover()
+                    discover(ChildContext.ACTIVE_DISCOVERY if reason is None else
+                             ChildContext.TERMINAL_DISCOVERY)
                     reap_descendants()
                     if not owners[process.pid].exited():
                         rss = swap = 0
@@ -880,7 +960,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                 if owners[process.pid].exited():
                     # Adoption happens on root exit; never stop before checking.
                     try:
-                        discover()
+                        discover(ChildContext.ACTIVE_DISCOVERY if reason is None else
+                                 ChildContext.TERMINAL_DISCOVERY)
                         reap_descendants()
                         if join_if_complete():
                             joined = True
@@ -917,7 +998,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                     # KILL was already sent within the original terminal budget;
                     # no new grace. D-state/unjoined children stay an explicit
                     # failure and owned storage is not claimed removed.
-                    discover()
+                    discover(ChildContext.TERMINAL_DISCOVERY)
                     reap_descendants()
                     if join_if_complete():
                         joined = True
@@ -945,7 +1026,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                 pass
         while process is not None and time.monotonic_ns() < terminal_ns:
             try:
-                discover()
+                discover(ChildContext.TERMINAL_DISCOVERY)
                 for owner in owners.values():
                     owner.signal(signal.SIGKILL)
                 reap_descendants()
@@ -1024,6 +1105,11 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             "disk_failure_site": 0 if disk_failure is None else int(disk_failure.site),
             "disk_failure_origin": 0 if disk_failure is None else int(disk_failure.origin),
             "disk_failure_errno": None if disk_failure is None else disk_failure.errno,
+            "child_failure_site": 0 if child_failure is None else int(child_failure.site),
+            "child_failure_origin": 0 if child_failure is None else int(child_failure.origin),
+            "child_failure_context": 0 if child_failure is None else int(child_failure.context),
+            "child_failure_owner": 0 if child_failure is None else int(child_failure.owner),
+            "child_failure_errno": None if child_failure is None else child_failure.errno,
             "kernel_rss_quota": False, "swap_disabled": False, "disk_quota": False}
 
 

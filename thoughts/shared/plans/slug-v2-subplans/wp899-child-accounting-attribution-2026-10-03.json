@@ -1,0 +1,108 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "status": "ACCEPT_COMPONENT_FULL_WP899_UNACCEPTED",
+  "baseline": "4a324c4fc7b5dfd396e1317f0f357cc76498d608",
+  "compatibility": "Slug-native Linux diagnostic attribution",
+  "contract": "wp899-child-accounting-attribution.md",
+  "contract_sha256": "8999518db1d38ba4e25f33379a8c61ec3ee59be090891944e7beba3f5d4fd9f1",
+  "source_sha256": {
+    "scripts/v2_source_admission_supervisor.py": "f377e34e9a295d106967f1d9e0c3f4c001fd494d5b2b8a3589fd87dbfd37089c",
+    "scripts/v2_source_admission_supervisor_tests.py": "7d6d65528bc491f307aee5a6b5ac8b08c34b4de803cdeaafca05f679123ad70e"
+  },
+  "independent_design": {
+    "receipt": "target/wp899/child-accounting-design-review.json",
+    "sha256": "f3767f96af1f101ffef8b7ffb25909c079e52f835d1eaa184c9a6b18b7b27c5a",
+    "three_final_designs": "ACCEPT corrected immutable contract8999518d; no policy repair selected."
+  },
+  "independent_final_sha256": {
+    "source": "668b68ea9ed82e008ed2a7cde99af7417d53a684fac9db7d532cdc9e2d1a9077",
+    "supervisor": "1a7d2f103283df0a960841db8343c9ebe4abde12cc10b535c7a522f8fd3416cc",
+    "evidence": "901c839f5d5be60e1870f804c442397bef0dcd6d5e76fee8bef0f97583a3db27"
+  },
+  "validation": {
+    "schema": 1,
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "30s",
+      "/usr/bin/python3.12",
+      "-m",
+      "unittest",
+      "discover",
+      "-s",
+      "scripts",
+      "-p",
+      "v2_source_admission_supervisor_tests.py",
+      "-v"
+    ],
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "source_sha256": {
+      "scripts/v2_source_admission_supervisor.py": "f377e34e9a295d106967f1d9e0c3f4c001fd494d5b2b8a3589fd87dbfd37089c",
+      "scripts/v2_source_admission_supervisor_tests.py": "7d6d65528bc491f307aee5a6b5ac8b08c34b4de803cdeaafca05f679123ad70e",
+      "thoughts/shared/plans/slug-v2-subplans/wp899-child-accounting-attribution.md": "8999518db1d38ba4e25f33379a8c61ec3ee59be090891944e7beba3f5d4fd9f1"
+    },
+    "interpreter_sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+    "selected_count": 29,
+    "selected_names": [
+      "test_stopped_multithread_census_fresh_cycles_exact_totals_and_progress",
+      "test_stopped_absent_wrong_prior_and_expired_ack_never_scan",
+      "test_stopped_scan_failure_resume_failure_and_term_preserve_primary",
+      "test_stopped_actual_exit_is_unreaped_complete_stage_only",
+      "test_disk_leaf_deadline_producer_reason_and_invalid_code_before_io",
+      "test_guard_setup_and_ordinary_executable_boundaries_fail_closed",
+      "test_first_resume_failure_refuses_then_actually_kills_and_joins",
+      "test_fatal_stopped_supervisor_parent_guard_outer_join_before_cleanup",
+      "test_hard_address_readback_enomem_and_shared_clock",
+      "test_actual_unlinked_fd_hardlink_dedup_and_equality_refusal",
+      "test_accounting_failure_is_not_a_partial_disk_success",
+      "test_missing_root_and_redacted_projection_are_exact_and_closed",
+      "test_actual_proc_fd_close_after_enumeration_refuses_no_partial_sample",
+      "test_actual_full_exit_discards_failed_census_detail",
+      "test_child_census_sites_close_precedence_and_redaction",
+      "test_child_diagnostic_scalar_and_caller_domains",
+      "test_actual_thread_retirement_after_enumeration_refuses_no_partial_children",
+      "test_child_contexts_and_cross_kind_first_detail_survive_actual_cleanup",
+      "test_first_accounting_detail_survives_later_cleanup_and_unrelated_first",
+      "test_expired_cleanup_keeps_owned_stage_and_never_follows_link",
+      "test_actual_disk_equality_latches_and_joins",
+      "test_escaped_descendant_and_root_exit_adoption_are_refused_and_joined",
+      "test_term_ignoring_root_kill_and_actual_join_with_one_clock",
+      "test_no_success_after_nonzero_child_and_no_environment_argv_receipt",
+      "test_root_pin_setup_failure_still_kills_joins_and_cleans",
+      "test_oversize_log_refuses_before_external_copy_without_truncation",
+      "test_actual_external_writable_accounting_loss_refuses_and_cleans",
+      "test_actual_supervisor_term_latches_and_joins_root_exit_escapee",
+      "test_deadline_and_resource_policy_cannot_expand_or_reset"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.441344752034638,
+    "log_sha256": "3e210e50c0119f938557fc82557818039b630656d506e8ea088687bf9ad227fc",
+    "compile_required": false,
+    "timeout_seconds": 30,
+    "term_kill_grace_seconds": 3,
+    "protected25_method_bytes_unchanged": true
+  },
+  "validation_receipt_sha256": "e8104c9b249cff386c439135f537fab20a62825ac36d04f3d0da5f11436fd5f9",
+  "invariant_to_evidence": {
+    "complete_or_refused_original_parser_close_precedence_and_redaction": "test_child_census_sites_close_precedence_and_redaction",
+    "finite_detail_and_caller_domains": "test_child_diagnostic_scalar_and_caller_domains",
+    "real_enumerated_worker_retirement_then_real_children_read_ENOENT_no_partial_result": "test_actual_thread_retirement_after_enumeration_refuses_no_partial_children",
+    "finite_context_tags_first_cross_kind_detail_actual_TERM_join_stage_cleanup": "test_child_contexts_and_cross_kind_first_detail_survive_actual_cleanup",
+    "protected_lifecycle_and_resource_controls": "25 unchanged existing method bytes; all executed in fresh29/29 batch"
+  },
+  "scope_and_growth": {
+    "production_net_lines": 106,
+    "test_net_lines": 191,
+    "rust_or_cargo_change": false,
+    "actual_source_invocation": false,
+    "windows_change": false
+  },
+  "checks": {
+    "diff_check": true,
+    "v1_archive_status": true
+  },
+  "claim_boundary": "Controlled retirement fixture proves its own real CHILDREN_READ/OS_ERROR/ENOENT only. Global9 exact site/caller/errno remains unknown. No ENOENT skip, partial census, retry, policy change, clock refresh, PID/path/text/environment emission or actual source-fit/fullWP899/40GB claim.",
+  "next_gate": "One separately reviewed frozen actual observation may now discriminate child failure site/context/owner/origin/errno; preserve every prior attempt and resource limit."
+}
