@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual DownloadCapture BufferLimit frontier accepted as evidence; first-buffer producer next; full WP899 unaccepted
+Status: scoped single-payload transfer repair validated; actual source admission next; full WP899 unaccepted
 
 The [bounded profile amendment](wp899-bounded-registry-profile.md) keeps Default128
 and selects explicit256 only for the Linux actual-root diagnostic. Its allowance-sized
@@ -13,9 +13,14 @@ with zero repeats/refusals and16 source attempts, then selects outer DownloadCap
 with first Scope BufferLimit. The exact failed reservation/producer remains unproved.
 Restore/raw/engine,582/582 censuses, actual join/stage cleanup and exact empty-parent
 removal are proved after three terminal FINALs. [Receipt](wp899-buffer-frontier-2026-10-03.json).
-Next audit distinguishes first reserve_buffer refusal from explicit BufferLimit poison
-in the normal selected-extension artifact-capture owner. Preserve all limits; no
-automatic retry, complete source-fit or historical40GB claim follows.
+Independent source audit and real10MiB normal-file regression now establish the
+scoped Vec-to-Arc conversion overlap. The [single-payload amendment](wp899-single-payload-transfer.md)
+replaces that overlap with one precharged directly initialized Arc, preserving
+unscoped behavior and all limits.55 unique controls (52 initial passes+3 corrected
+socket passes) and default Core+CLI compile pass; three FINALs accept the component.
+[Receipt](wp899-single-payload-transfer-2026-10-03.json). Global8 exact creator stays
+unproved. Next actual observation needs a new independently reviewed contract/freeze;
+no automatic retry, complete source-fit or historical40GB claim follows.
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the

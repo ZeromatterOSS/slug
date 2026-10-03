@@ -428,6 +428,204 @@ fn assert_captures_deleted(environment: &TestEnvironment) {
 
 #[cfg(target_os = "linux")]
 #[test]
+fn scoped_selected_capture_uses_one_payload_under_actual_root_bank() {
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+
+    let mut source = tempfile::NamedTempFile::new().unwrap();
+    let chunk = [0x5a; 64 * 1024];
+    let mut hash = Sha256::new();
+    for _ in 0..160 {
+        source.write_all(&chunk).unwrap();
+        hash.update(chunk);
+    }
+    let digest = hash.finalize().into();
+    let file = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let limits = SourceServiceLimits::actual_root();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let owner = SourceServiceScope::new_for_test(
+        NormalizedAbsolutePath::new("/selected-transfer-test").unwrap(),
+        deadline,
+        deadline + Duration::from_secs(1),
+        limits,
+    )
+    .unwrap();
+    let recorder = owner.arm_registry_association_for_test().unwrap();
+    let baseline = owner.snapshot().live_buffer_bytes;
+    let size = 10 * 1024 * 1024;
+    let one_payload = baseline + size + 64 + chunk.len();
+    assert!(one_payload <= limits.live_buffer_bytes);
+    assert!(one_payload + size > limits.live_buffer_bytes);
+    let bytes =
+        capture_selected_extension_artifact(&file, digest, &runtime(), &|| true, Some(&owner))
+            .unwrap();
+    assert_eq!(bytes.len(), size);
+    assert!(bytes.iter().all(|b| *b == 0x5a));
+    assert_eq!(Sha256::digest(&*bytes).as_slice(), digest);
+    assert_eq!(owner.snapshot().peak_buffer_bytes, one_payload);
+    assert_eq!(owner.snapshot().live_buffer_bytes, baseline);
+    assert!(owner.check().is_ok());
+    let clone = bytes.clone();
+    assert!(Arc::ptr_eq(&clone, &bytes));
+    drop(bytes);
+    let weak = Arc::downgrade(&owner);
+    drop(owner);
+    assert!(weak.upgrade().is_some());
+    drop(recorder);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(&clone[..chunk.len()], &chunk);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn scoped_selected_transfer_credit_boundary_refuses_before_body_read() {
+    use std::cell::Cell;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceError;
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+
+    let required = 4 + 64 + 64 * 1024;
+    for capacity in [required - 1, required] {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let owner = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/transfer-credit").unwrap(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits {
+                live_buffer_bytes: capacity,
+                ..SourceServiceLimits::default()
+            },
+        )
+        .unwrap();
+        let mut capture = tempfile::NamedTempFile::new().unwrap();
+        capture.write_all(b"abcd").unwrap();
+        let path = capture.path().to_owned();
+        let mut shared = capture.as_file().try_clone().unwrap();
+        let calls = Cell::new(0);
+        let result = transfer_selected_capture(
+            capture,
+            Sha256::digest(b"abcd").into(),
+            &|| {
+                calls.set(calls.get() + 1);
+                true
+            },
+            Some(&owner),
+        );
+        if capacity < required {
+            assert!(result.unwrap_err().contains("BufferLimit"));
+            assert_eq!(owner.check(), Err(SourceServiceError::BufferLimit));
+            assert_eq!(calls.get(), 0);
+            assert_eq!(shared.stream_position().unwrap(), 0);
+        } else {
+            assert_eq!(&*result.unwrap(), b"abcd");
+            assert_eq!(owner.snapshot().peak_buffer_bytes, required);
+            assert!(owner.check().is_ok());
+        }
+        assert!(!path.exists());
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn scoped_selected_transfer_partial_integrity_mutation_and_cancellation_never_publish() {
+    use std::cell::Cell;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceError;
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+
+    for case in [
+        "empty",
+        "valid",
+        "wrong_hash",
+        "shrink",
+        "grow",
+        "tamper",
+        "cancel_partial",
+        "cancel_final",
+        "cancel_validated",
+        "sticky",
+    ] {
+        let mut capture = tempfile::NamedTempFile::new().unwrap();
+        let size = if case == "empty" { 0 } else { 65539 };
+        let content = vec![b'a'; size];
+        capture.write_all(&content).unwrap();
+        let path = capture.path().to_owned();
+        let writer = capture.as_file().try_clone().unwrap();
+        let digest = match case {
+            "wrong_hash" | "cancel_final" => [0; 32],
+            "shrink" => Sha256::digest(&content[..65536]).into(),
+            _ => Sha256::digest(&content).into(),
+        };
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let owner = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/transfer-integrity").unwrap(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let calls = Cell::new(0);
+        let result = transfer_selected_capture(
+            capture,
+            digest,
+            &|| {
+                let call = calls.get() + 1;
+                calls.set(call);
+                if call == 2 {
+                    match case {
+                        "shrink" => writer.set_len(65536).unwrap(),
+                        "grow" => writer.set_len(65540).unwrap(),
+                        "tamper" => {
+                            // pwrite preserves the shared reader's offset.
+                            use std::os::unix::fs::FileExt;
+                            writer.write_all_at(b"bbb", 65536).unwrap();
+                        }
+                        "sticky" => owner.cancel(),
+                        _ => {}
+                    }
+                }
+                !((case == "cancel_partial" && call == 2)
+                    || (case == "cancel_final" && call == 4)
+                    || (case == "cancel_validated" && call == 5))
+            },
+            Some(&owner),
+        );
+        match case {
+            "empty" | "valid" => assert_eq!(&*result.unwrap(), content.as_slice()),
+            "shrink" => assert_eq!(
+                result.unwrap_err(),
+                "selected extension artifact capture changed length"
+            ),
+            "grow" => {
+                assert!(result.unwrap_err().contains("BufferLimit"));
+                assert_eq!(owner.check(), Err(SourceServiceError::BufferLimit));
+            }
+            "sticky" => {
+                assert!(result.unwrap_err().contains("Cancelled"));
+                assert_eq!(owner.check(), Err(SourceServiceError::Cancelled));
+            }
+            "wrong_hash" | "tamper" => assert_eq!(
+                result.unwrap_err(),
+                "selected extension artifact SHA-256 mismatch"
+            ),
+            _ => assert_eq!(
+                result.unwrap_err(),
+                "selected extension artifact capture cancelled"
+            ),
+        }
+        assert!(!path.exists());
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[test]
 fn selected_extension_file_capture_retains_only_verified_bytes() {
     let mut source = tempfile::NamedTempFile::new().unwrap();
     source.write_all(b"generator bytes").unwrap();

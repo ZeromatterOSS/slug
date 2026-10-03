@@ -3,6 +3,72 @@ use super::*;
 use crate::runtime::dice::source_service::SourceHttpAdmission;
 use crate::runtime::dice::source_service::request_scoped;
 
+pub(super) fn transfer_selected_capture(
+    mut capture: tempfile::NamedTempFile,
+    size: usize,
+    sha256: [u8; 32],
+    active: &dyn Fn() -> bool,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<Arc<[u8]>, String> {
+    let _arc_credit = scope
+        .reserve_buffer(size.checked_add(64).ok_or("capture allocation overflow")?)
+        .map_err(|e| e.to_string())?;
+    let _scratch_credit = scope.reserve_buffer(64 * 1024).map_err(|e| e.to_string())?;
+    // The final Arc allocation was already infallible in the Vec conversion.
+    // Partial failures keep MaybeUninit storage and never expose its bytes.
+    let mut bytes = Arc::<[u8]>::new_uninit_slice(size);
+    let mut buffer = [0u8; 64 * 1024];
+    let mut hasher = Sha256::new();
+    let mut initialized = 0usize;
+    loop {
+        source_service::check(Some(scope))?;
+        if !active() {
+            return Err("selected extension artifact capture cancelled".into());
+        }
+        let count = match capture.as_file_mut().read(&mut buffer) {
+            Ok(count) => count,
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err("selected extension artifact capture unreadable".into()),
+        };
+        if count == 0 {
+            break;
+        }
+        let next = initialized
+            .checked_add(count)
+            .filter(|n| *n as u64 <= SELECTED_EXTENSION_CAPTURE_LIMIT)
+            .ok_or("selected extension artifact exceeds 33554432 byte capture limit")?;
+        if next > size {
+            return Err(scope
+                .poison(source_service::SourceServiceError::BufferLimit)
+                .to_string());
+        }
+        let slots = Arc::get_mut(&mut bytes).expect("unpublished capture Arc is unique");
+        for (slot, value) in slots[initialized..next].iter_mut().zip(&buffer[..count]) {
+            slot.write(*value);
+        }
+        initialized = next;
+        hasher.update(&buffer[..count]);
+    }
+    if !active() {
+        return Err("selected extension artifact capture cancelled".into());
+    }
+    if hasher.finalize().as_slice() != sha256 {
+        return Err("selected extension artifact SHA-256 mismatch".into());
+    }
+    source_service::check(Some(scope))?;
+    if initialized != size {
+        return Err("selected extension artifact capture changed length".into());
+    }
+    source_service::check(Some(scope))?;
+    if !active() {
+        return Err("selected extension artifact capture cancelled".into());
+    }
+    // SAFETY: every slot in 0..size was written exactly through the bounded
+    // initialized prefix; EOF, exact size and digest were verified above. No
+    // Arc clone or initialized slice escaped while any slot was uninitialized.
+    Ok(unsafe { bytes.assume_init() })
+}
+
 pub(super) fn capture_urls(
     urls: &[String],
     integrity: [u8; 32],

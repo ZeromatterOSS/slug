@@ -513,6 +513,9 @@ fn transfer_selected_capture(
         .as_file_mut()
         .rewind()
         .map_err(|_| "selected extension artifact capture unreadable")?;
+    if let Some(scope) = scope {
+        return scoped::transfer_selected_capture(capture, size as usize, sha256, active, scope);
+    }
     let _vec_credit = source_service::buffer(scope, size as usize)?;
     let _scratch_credit = source_service::buffer(scope, 64 * 1024)?;
     let mut bytes = if scope.is_none() {

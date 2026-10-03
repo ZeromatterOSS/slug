@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual DownloadCapture BufferLimit frontier accepted as evidence; first-buffer producer next; full WP899 unaccepted
+Status: scoped single-payload transfer repair validated; actual source admission next; full WP899 unaccepted
 
 The reviewed bounded profile keeps Default128 and selects explicit diagnostic256,
 with fully charged allowance-sized storage in the unchanged16MiB bank. Fresh44/44
@@ -45,9 +45,11 @@ zero repeats/refusals and16 source attempts, then returns DownloadCapture with
 first Scope BufferLimit. Exact failed reservation/producer remains unproved.
 Restore/raw/engine,582/582 censuses, join/stage and exact parent cleanup are proved
 with three terminal FINALs. [Frontier receipt](slug-v2-subplans/wp899-buffer-frontier-2026-10-03.json).
-Next: first BufferLimit producer attribution in normal selected-extension capture,
-distinguishing reserve_buffer from explicit poison before repair. No limit growth
-or automatic retry; fullWP899/source fit/historical40GB remain unaccepted.
+Independent local source/fixture evidence establishes a scoped Vec-to-Arc payload
+overlap. The reviewed single-payload repair passes55 unique controls and default
+Core+CLI compile in the unchanged bank. [Receipt](slug-v2-subplans/wp899-single-payload-transfer-2026-10-03.json).
+Next actual observation needs its own reviewed contract/freeze. Global8 exact creator
+stays unknown; no limit growth/automatic retry or fullWP899/source-fit/40GB claim.
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
