@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: registry association validated; actual request-cardinality observation pending
+Status: actual registry association measured; timeout provenance design pending
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -133,6 +133,20 @@ observation after independent freeze review. Existing60s compile/30s focused
 execution and all source/RSS/disk/time ceilings persist. No actual launch follows
 from this component; prior global1–5 freezes remain spent. FullWP899 and reported
 40GB attribution remain open; selected leaf own-call identity stays unproved.
+The ONE independently frozen global6 observation is now spent. Complete settled
+association proves101 admitted distinct RegistryIo identities and0 repeats in THIS
+run, before selected Scope::WorkDeadline. No registry-limit creator/origin was
+observed; earlier global5's128 identities remain unknown. Restoration/all7 raw and
+engine retirement pass;688/688 censuses, joined child/stage cleanup and exact empty
+parent removal are proved. Sampled76.723MiB RSS/zero swap cover only this refusal.
+[Terminal receipt](wp899-registry-association-terminal-2026-10-03.json) preserves the
+ordered81-record schema, freeze/ledger, three terminal reviews and cleanup.
+Independent FINAL accepts Root's source audit: original common deadline and15/30s
+HTTP step timers share WorkDeadline, so exact producer remains unknown. Next is a
+bounded optional producer-owned timeout-provenance design, with first-creator versus
+sticky selection, charged storage and unchanged source/error/budget authority.
+No implementation or new actual invocation follows before reviewed design and
+focused portable gates. Full source admission and coupledWP899 FINAL remain required.
 
 ## Observable result and authority
 

@@ -1,0 +1,947 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "1b0452a507fd9a23683dd59db10a7486aed52f91",
+  "classification": "Slug-native actual diagnostic terminal, full WP899 unaccepted",
+  "global_actual_attempt": 6,
+  "contract_attempt": 1,
+  "state": "TERMINAL_NO_RETRY",
+  "observable_gate_advanced": "Complete settled admitted identity cardinality101distinct/0repeated for THIS run; selectedWorkDeadline and firstpoison5, no registrylimitcreator; actual restoration/engine/complete census and joined cleanup.",
+  "contract": {
+    "path": "target/wp899/genuine-root-association-contract.md",
+    "sha256": "b6f8a71c69b4133e160e20b846227341256b1adc8a6318f4775128aa50554593",
+    "text": "# Root ONE actual registry request-cardinality observation\n\nWP-7-199-m7a-request-selected-source-profile-r1, clean accepted component1b0452a50.\nPrevious goal turn is PROGRESS: bounded exact association committed with independent\nFINAL,34 unique gates (33 preserved+1 strengthened) and default Core+CLI check.\nRoot selects ONE new global6/local1 observation, not a retry of prior spent freezes.\n\nHypothesis: producer-owned complete exact identities can discriminate the previously\nobserved128 registry admissions as distinct versus repeated RegistryIo entries and\nidentify first causal exhaustion as an existing row or unretained new distinct row.\nLiteral URL+route+supplied Local OS bytes within one immutable workspace Scope are\ninvocation identities, not full DICE semantic keys. Repeated entries alone do not\nestablish redundant semantic work or authorize skipping versions/frontiers/generation.\n\nInherit genuine-root-typed-contract.md, genuine-harness-config.md and the accepted\nwp899-registry-association-checkpoint-2026-10-03.json contract. Current Core a66c\nincludes reviewed optional Linux cfgtest recorder and observed Bzlmod counting\nassertions; no public semantic key/cache/policy/source/transport authority changes.\nAll unrelated compiled source pins stay identical to global5. Same six semantic\ninputs, full single opaque valid-Unicode environment with operational clock/stage\nvariables consumed normally; no value/credential/environment hashing or filtering.\nSame normal prepare_once driver, no preliminary owner command or source fallback.\n\nFixed128 rows plus2MiB slab/checked headers are precharged in existing16MiB source\nbank. Real pressure/highwater remain counted; earlier BufferLimit/deadline is a\ntruthful possible terminal. No cap growth, credit subtraction or fit assumption.\nHarness Arc pins recorder; Scope holds Weak, data drops before credit. Snapshot\nonly after actual accepted+all7 raw restoration, worker drain and engine retirement;\nthen drop recorder before existing exported-view clone/scope/lastDrop controls.\nComplete scalar partition/counter equality, fresh sole installed Scope, actual first\npoison and actual selected native Scope Limit RegistryAttempts are required to pair\nthe first causal exhaustion. Selected leaf own-call identity always stays0/unproved.\nMissing/oversized/gapped/overflow association is explicitly incomplete/Unknown.\nCall ordinal and unique-row ordinal are separate; never infer counts from lock history.\n\nUnchanged supervisor1329: verified hard4GiBAS and SIGKILL parent-death guard,\nsampled4GiBRSS/anyswap/anydescendant/accountingloss refusal,6GiB sampled allocated\nstage disk,1MiB log, immutable27work+3cleanup+3terminal,20ms poll,100ms whole-group\nconfirmed stop/full census/resume. Nontransparent stops charge the same deadlines.\nNo row skipping, generic EINTR retry or clock reset. Not hardRSS/no-swap/diskquota,\nexternal filesystem atomicity or exact whole-workload peak-fit evidence.\n\nFresh canonical empty owner0700 parent and unused association output paths pinned\nin the exact draft. Three independent caller/supervisor/ordered-evidence eligibility\nreviews precede Root reconciliation and immediate source/prereq/spent/input/artifact/\ninterpreter/parent/outputs/clean/no-overlap checks. Exclusive ledger claims attempt1;\nterminal is TERMINAL_NO_RETRY. Join/stage cleanup precede three terminal reviews,\nthen only exact empty parent removal. Prior global1\u20135 evidence stays immutable.\n\nPreserve schema1 ordered numeric records, including repeated native/tool tags; strip\nonly the exact known libtest heading. No raw URLs/paths/identity vectors emitted.\nComplete admitted distinct+repeat partition is measured only if settled+installed+\ncomplete flags and actual counter equality hold. First exhaustion pairing requires\nall exact typed conditions above. Supervisor/exit0/partial defaults alone prove none.\nStatus1 still needs full actual source/profile/query shape/caller/restoration/engine/\nretained-clone read/lastDrop, with unchanged controls. A typed refusal may accept only\nthis observation and identify the next natural owner, never fullWP899/40GB readiness.\nNo actual tool/process/query/locked-generate/bootstrap activation is selected.\n"
+  },
+  "freeze": {
+    "path": "target/wp899/genuine-root-association-invocation-freeze.json",
+    "sha256": "8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6",
+    "data": {
+      "schema": 1,
+      "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+      "base": "1b0452a507fd9a23683dd59db10a7486aed52f91",
+      "state": "ROOT_RECONCILED_FROZEN_READY_FOR_ONE_ASSOCIATION_OBSERVATION",
+      "attempt_budget": 1,
+      "automatic_retries": false,
+      "cwd": "/run/media/system/Colossus/dev/slug",
+      "command": [
+        "/usr/bin/python3.12",
+        "scripts/v2_source_admission_supervisor.py",
+        "--stage-parent",
+        "/tmp/slug-wp899-association-parent-ks6qq8zr",
+        "--receipt",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one-receipt.json",
+        "--log",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one.log",
+        "--",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--ignored",
+        "--exact",
+        "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "python": {
+        "path": "/usr/bin/python3.12",
+        "sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+        "version": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]"
+      },
+      "artifact": {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "sha256": "a66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047"
+      },
+      "selector": "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "source_hashes": {
+        "app/slug_bzlmod_v2/src/host_registry.rs": "ae3f4b292bf0d2fee0d4e669d7295c658b160a8df7c60ab89daa0f565f1c36c6",
+        "app/slug_bzlmod_v2/src/lib.rs": "f55b2798561ac8ab83357b3f7c7f12bc84ff108676d0717e0ae5859c22054c6d",
+        "app/slug_bzlmod_v2/src/registry_dice.rs": "c8a5e4eb64db3d675b7e099b5bf5fff6949698dad5a88f447ec89ccece641615",
+        "app/slug_bzlmod_v2/src/registry_dice/refusal.rs": "20ebf70ddf5ed4b16e60a83f946fea4d0ea6d1562d75f172309fb5d00bd72eb5",
+        "app/slug_bzlmod_v2/src/registry_dice/refusal_debug.rs": "dde980c91e29098ce232228f37662e5d35dfe81cca10e1b2448cdc1e43a5be24",
+        "app/slug_bzlmod_v2/src/registry_dice/refusal_observation_tests.rs": "923888af63eaed2002f5801f6d79a5c99f2b5fb068b8ec544392b5e24510c15d",
+        "app/slug_bzlmod_v2/src/registry_dice/refusal_tests.rs": "5ee63392672280dfec1d73c549872fbcf3e48184078baa37d501ee68a3685132",
+        "app/slug_bzlmod_v2/src/runtime_source_declaration.rs": "f2e9a99739cd008bd0d3cc3458e3cb08f6917894afc5926867a58b9df569f1d4",
+        "app/slug_bzlmod_v2/src/runtime_source_declaration/policy.rs": "525e71ccce1f6020a402ac9206d29d447281d67a537eb857672a72b289eaa0ed",
+        "app/slug_bzlmod_v2/src/runtime_source_declaration/tests.rs": "fa1a9ea064964894313fc0c3178009aad56404da42b72d696977d6e5b5e97129",
+        "app/slug_bzlmod_v2/src/runtime_source_declaration/types.rs": "5aa2b419049d6539bffc7e0e03cda7d3926e90884b3250e02388943b0485698f",
+        "app/slug_bzlmod_v2/src/selected_graph.rs": "50fbcee5eacad1653665fce91a9cffdd852cacd7078fd63ad720fc51eb8f33c2",
+        "app/slug_bzlmod_v2/src/selected_repo_spec.rs": "10934c864be64f55e2c66a05f3fffbeb583c674b31bc5bbaa275d59771b87bc9",
+        "app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs": "cce13e872d5581d979a113a7423c9ba1d7cf695ec67c0043b2f8e618be434d74",
+        "app/slug_bzlmod_v2/src/selected_source_refusal.rs": "ea05ee0ec13a301bd195f64958d26281e4a3671ae02480d191143d5e50c562c3",
+        "app/slug_bzlmod_v2/src/selected_source_refusal/tests.rs": "b8a8b40b2fa5a38212fb79f5b1ea18bf59f6894045dff05f8ec577283246494b",
+        "app/slug_bzlmod_v2/src/source_preparation.rs": "58ca0a535437c46a5e02e49ba11966744ec9c482eabc92133fecc576b502930f",
+        "app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs": "64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907",
+        "app/slug_bzlmod_v2/tests/registry_dice.rs": "f0a481a315547dee551d10df70d3e5acbfd0fc549c50e4fb56396edb6abe0beb",
+        "app/slug_bzlmod_v2/tests/source_preparation_dice.rs": "fc72349f563f1e9f940270a96dd2d2a960b6adfce78bdcce90e943181fb1a06d",
+        "app/slug_core_v2/src/runtime/dice.rs": "30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a",
+        "app/slug_core_v2/src/runtime/guest_namespace.rs": "79adbfe155c3436df6b5d45ed85dd7e352cc380129b5e4951019e7e98d703e24",
+        "app/slug_core_v2/src/runtime/guest_namespace/attempt.rs": "6fd42a42cbd67ab20ced36cb8ba8ecb9707bc43d2b5326c259c3c37f68386e1a",
+        "app/slug_core_v2/src/runtime/guest_namespace/tests.rs": "ce7a961ca36552f509f53633432f2a551e0ab7594ef1375c02427a6a5b331abe",
+        "app/slug_core_v2/src/runtime/guest_namespace/tests/data.rs": "64dede16dbd47862b1e94be6ad72f00faa7c5e2799529e2e07700a5444943c2c",
+        "app/slug_core_v2/src/runtime/input_image.rs": "5955b8a8c400ef3232248bca4d0980749a70674709c3ad163e6e3339936afe84",
+        "app/slug_core_v2/src/runtime/input_image/capture.rs": "33ed25486eee2c6abd4f0c534f88958601ac3083254c4961f90670f0c6e10fdf",
+        "app/slug_core_v2/src/runtime/input_image/file_capture.rs": "84c22424bed8e75f39fe4f0c9223cc441143c417b10d3022cb9975efdc39fe06",
+        "app/slug_core_v2/src/runtime/input_image/tests.rs": "b4ef37988a7d06bdd3289f83f66c7259cff18522e485fff7763f464401538255",
+        "app/slug_core_v2/src/runtime/input_image_bridge.rs": "5690b0710b54e57f522512ace214ba6503a29f01c5d916b5bff4e3f31598e2ef",
+        "app/slug_core_v2/src/runtime/input_image_bridge/label_tests.rs": "ce330f894e758e24af004320505189a353a0f6a75dbaf895aa6fca55b95f0b56",
+        "app/slug_core_v2/src/runtime/registry_io.rs": "31a1d6ac177d6764f07c86937be4559ea69677484c31f9213ace782b3e58c457",
+        "app/slug_core_v2/src/runtime/repository_archive.rs": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561",
+        "app/slug_core_v2/src/runtime/repository_archive_file.rs": "0614efe0db9a9490bddfc206d9c69f2ab728121c797227bde0a74e3f6bcf5027",
+        "app/slug_core_v2/src/runtime/repository_archive_http.rs": "19790b239e26d0c7740bd89628c227ca4aaad9b78511a357b6a83ed20e13f274",
+        "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "a7ea07667f0f6d98c9db535dbe60743a148134064393728f7a4ef694ea042a6f",
+        "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "561af5f1e6e398d04671f39d1039717a0697d14bc186324b6e5241192d99cc72",
+        "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "f1768713fb592b267c3b6b9e925f91079351f2b2d212c376c716d8ae043b66d2",
+        "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "e6525fcf83fb9cd09826bd030186d8be9325f40efa89fd8cd6eefbb61cfbb708",
+        "app/slug_core_v2/src/runtime/repository_io.rs": "e95682a4d832010c42c6803c6765332b905fb4c9ce08e746b80b162d84b24c59",
+        "app/slug_core_v2/src/runtime/repository_io/local_request.rs": "01bf25bdbbb7fc654bfca44ec632b5d200cb334c8728fa5506371d63c809ec5b",
+        "app/slug_core_v2/src/runtime/repository_io/local_request/tests.rs": "3bc04d5f85f3f6b3cc8039e0ffe14ce84c9289f7391202dbbf5d378979ea8291",
+        "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "f50491495f6450774bc281cc8b74704f3705da2e1a41d0aed9aad548daedc52f",
+        "app/slug_core_v2/src/runtime/repository_io/source_service_tests.rs": "d066e5cb4c41381cccb67e245716138bcf6b0b6f19f26c066e181b52ee5f4517",
+        "app/slug_core_v2/src/runtime/runtime_sources.rs": "6ece7ff8decb64617364707596a43cfe1cd8900c64b07a03a83d73f05f45ba03",
+        "app/slug_core_v2/src/runtime/runtime_sources/attempt.rs": "e008b01c0dfc92c9188a8f96bcd6fbd0971ff6dc22e95069d900391580eac7e9",
+        "app/slug_core_v2/src/runtime/runtime_sources/catalogue.rs": "3f02af4ad0152d239695338975186ee11ab29b99cc578bf916552649516a949f",
+        "app/slug_core_v2/src/runtime/runtime_sources/factory.rs": "aa1d4fc035813aed52c450bc36874c160152f09ae7b204c900d3d63873e6ec03",
+        "app/slug_core_v2/src/runtime/runtime_sources/prepare.rs": "6caf17a0a1b08825d3480e3f16395ae29d19930f9354f09c69dd71da79295f6d",
+        "app/slug_core_v2/src/runtime/runtime_sources/tests.rs": "cb29f8efcb16504ab45ddc1d1e05837322e45f381b4988de3deda9a66374d502",
+        "app/slug_core_v2/src/runtime/selected_label_data.rs": "b074bc22550d3578b23f2c85dbf4c24250e028109e385aec55f2b58e8d158048",
+        "app/slug_core_v2/src/runtime/selected_label_data/catalogue.rs": "53935c5f9de2ab37942c8734d83e51dcce00bdf8d2b46f08157d7c39bcab637d",
+        "app/slug_core_v2/src/runtime/selected_label_data/prepare.rs": "fe9dd8a3bf046582771570ed7ded54dd090dcb62b9da07df151799f206b9c1e2",
+        "app/slug_core_v2/src/runtime/selected_label_data/tests.rs": "c97f6a976b290b032a3d75d24842b1e71e44010cadcb8550dc30992f2ba18ca6",
+        "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+        "app/slug_core_v2/src/runtime/selected_scratch_source/tests.rs": "10478aab4c2aadb55127c0dfc3da8606d16f636c09f681a771300c9496529b1f",
+        "app/slug_core_v2/src/runtime/selected_tool_source.rs": "1d54edbf5e1894132606547e97c0f673c5fb1ff324b513b87225a987710b1e27",
+        "app/slug_core_v2/src/runtime/selected_tool_source/attempt.rs": "eb1d2f6310ce4c5e06c6ba658b35781a6dbe4ddd38200ab6288999e0bcedef78",
+        "app/slug_core_v2/src/runtime/selected_tool_source/declarations.rs": "624d5e998ca8663436573cd50c22c1a4cda97c67e66d2cab42a175551499f02f",
+        "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "85f5f77c36e69d8060829f75ec7b2670709467c00720f50bac5666ed8a14075c",
+        "app/slug_core_v2/src/runtime/selected_tool_source/prepare/capture.rs": "8e5158190153d2ee74be78bb5cb5748cc4752f3151aa238c8fc4074632592c88",
+        "app/slug_core_v2/src/runtime/selected_tool_source/prepare/setup.rs": "b101848a9724c21adcad63971c89e5f3322f04ac0e5c1dbdd959c80f2777a984",
+        "app/slug_core_v2/src/runtime/selected_tool_source/tests.rs": "853af0600981093c004f442592a5caf0492bb7571f14f5b075b48519f925f35a",
+        "app/slug_core_v2/src/runtime/source_preparation.rs": "55c7fced51be8d5ea0eb60a9660ef9186b842784bf620b0216f963795f8779f7",
+        "app/slug_core_v2/src/runtime/source_preparation/attempt.rs": "3706dc28c7d41901805a4b6c1f8082f7a0d900f983fe9bc388fbc42633145267",
+        "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa",
+        "app/slug_core_v2/src/runtime/source_preparation/harness_clock.rs": "ddca8674a50e793d21c6b91df24f95de849bbc95ccb933de77fac4eda95caeb3",
+        "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258",
+        "app/slug_core_v2/src/runtime/source_preparation/request.rs": "1c95c6ab0af8a3058b5467db90c786129d497700c29558624972aacaa243c6da",
+        "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "166663f44eee230dfd01ea42b854976295cd052c7959dc23eadf0d5799dad2f7",
+        "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+        "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "ce1566cce9e7db2861745d7e133e4bd1678de1bade203da1a342a11630725be6",
+        "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+        "app/slug_core_v2/src/runtime/source_service/failure.rs": "2de74ac11a738e890598945d7b5bfe4063664bf2281ee0b34b319a9b785e9870",
+        "app/slug_core_v2/src/runtime/source_service/failure/tests.rs": "6879c38c3c296af786b2d051e55b400642b1fa0811ae832e7d190012b34247df",
+        "app/slug_core_v2/src/runtime/source_service/http.rs": "704504187ee3d5574aed0e95531c563929fcae0cbaf3f46342f40f41d5cc4d6a",
+        "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+        "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+        "app/slug_core_v2/src/runtime/source_service/tests.rs": "a6daf392a53d05ee515931b26b4c0fa4e26c241c6b2ef65002cc7370b3c810a5",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "2465fff9e1467faeebd6a7902fdb99b5864b2ef2f25ce9ec9bac1c3cbf607ed2",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs": "adae1975f1a15a61385bd2239357992149126d8db3c29b658c8f3a2b7f4d559e",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "16820d42a9ecaa9a8088a6ea5c5e52b1bd541533b9ade1946f57afdb414da557",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "a35a3d6c8c922f27631786bce6c34e25bb415af1c9e4d57da2a56a3fd81d21d1",
+        "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "4646cf1654b0ad7b91487cd4bcfa9c66d6ea588f75389fb97c87929c79573029",
+        "app/slug_loading_v2/src/dependency_cycle.rs": "6506dbb40b11ed29bf260d9f54676381ef738c3d7ac9b4e175764803977a01a0",
+        "app/slug_loading_v2/src/dependency_cycle/mixed_bzl_tests.rs": "26cc7057034732234d113c846210b8191270c90dc9b7385efdaecc8acc579ea2",
+        "app/slug_loading_v2/src/dependency_cycle/tests.rs": "e126f9197b91d9af82bf290f48b96a7542947174cd30b914817d3dc9420ae29f",
+        "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+        "app/slug_loading_v2/src/module_extension.rs": "17c14557c46a84195c73d47d0b0cfb5ad44ef1b00313e42df2e2ae339a45d279",
+        "app/slug_loading_v2/src/module_extension/guest_namespace/compose.rs": "4baf52c3e48da6399e9852745dd99099b95ad365380b8a461e17e80e09442e11",
+        "app/slug_loading_v2/src/module_extension/runtime_sources.rs": "0a05ecce2c90b736fc619a0e39fb7f7571325fe406f1808f45d113293552d1b8",
+        "app/slug_loading_v2/src/module_extension/runtime_sources/covered_tool.rs": "6e642a2a2dab1ef01173d3d4438e4d3ee8776b422c0ca0f3a6915b111ce16788",
+        "app/slug_loading_v2/src/module_extension/runtime_sources/profile.rs": "5aa89f48f3695ed6e81e0dbe6c18d99ba7fdc5f891a58e450f96a72095ccf920",
+        "app/slug_loading_v2/src/module_extension/runtime_sources/requests.rs": "15e3b4b7e431edc6cae9c3c3afcbe2a1abae2ba668e2b77ba6df31dced66ca69",
+        "app/slug_loading_v2/src/module_extension/runtime_sources/test_fixture.rs": "e999fba1cfb7d87de610e16f0b732bf157b6a9688ed088cd0246a6891bc4b91a",
+        "app/slug_loading_v2/src/module_extension/runtime_sources/tests.rs": "020a6217c5af1aeded7591f8b372ba2e5d1e84875399e1618979e035395b6e23",
+        "app/slug_loading_v2/src/module_extension/selected_source_preparation.rs": "ef0ce72bc3c55b4f13b3dae1a968f5ed8e6e3499273572e2839b057e97c3067f",
+        "app/slug_loading_v2/src/module_extension/selected_source_preparation/tests.rs": "0bb30d0e519eb5cdf797cf42f9c2471bcae44a782fa296f0341fe14f96829b1b",
+        "app/slug_workspace_v2/src/input_image/budget.rs": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb",
+        "app/slug_workspace_v2/src/input_image/budget/tests.rs": "cc2d3590a35b603a1dabf14d27436fd3dd33af07a92db5fd0a0a488338292035",
+        "app/slug_workspace_v2/src/input_image/tests.rs": "8b40dd9c7f68d374798e7cee27ebb4f4b10bf04fa6e7b53e4b61e155c8e2c7ea",
+        "scripts/v2_source_admission_supervisor.py": "820473bed16fbc137048966fa2860044d4bc78c975fb9ca8b4240418aa1bc1ff",
+        "scripts/v2_source_admission_supervisor_tests.py": "0f522d9d631e8cdd79d4ece1d7f3c1e9f5fbc355ab05e86fa537462b414eba57",
+        "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+        "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81"
+      },
+      "prerequisite_hashes": {
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-contract.md": "8cd2a403a43957a3a5eb343a62ace41bfdda9e1dcc29973c63e138c6660d5ba6",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-config.md": "7827b9d2316b57061583614be8943bf4a663e20f16b5eb4a9ef132ed301bf60e",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-input-pins.json": "82d080002035f958ef5f0bc446d4e5f7e25e24e82e2421972bb26451cf4f5a50",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-design.md": "056bed20499b06f17fe14cd33876a9b2ea825c9931277b78f16c6aaa08087fef",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-review.md": "ab26ec905d4d6657e30520e79c45f0cb83f9f5db0eacdff19cb7eb4bcb4f780e",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-final-review.md": "5754097dc2d62cd11517a40c98ecc089bd5ba2adfa702224704b01066a02ec72",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-ignored-selection.json": "f32e3165b83baa7c1f98913edd9f8d237e0352ab0cb1cf6082457ff657650ee0",
+        "/run/media/system/Colossus/dev/slug/target/wp899/descriptor-workspace-tests.json": "6d9f37489ef48201f61a2b389b49384e1a53843fa852523a003ee4a7e1342742",
+        "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.json": "44d2da61bfa8ffe7628cd9039881166552951a8010ac5fd1f6bd8227f3367160",
+        "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.log": "c8dfc0fed97bf35283736aa461c09f858e7700a9f69472a6acf152504b5f859e",
+        "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.json": "3dec95436651b3d4d6653ce2e71c449ddd2b07195532e8f60328182f1dae8abe",
+        "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.log": "b0f64927e4776fce2a2310607595810f23cc2dac272dddc801dd576daac6d3fb",
+        "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.json": "fdad80300e7e0ddb9d439cffd27330bb6454a1dbfa4c2af4c776f2275428de93",
+        "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_loading_v2-tests.json": "362a1f0471fe4d3cac50fc35d953b70dbe853743ac26a24c6b0453b3b545252b",
+        "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-receipt.json": "0faf35bc0b3892b57f2d2d1f7f028f4d65637316be910305ca95e658dadb1180",
+        "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-command.json": "047908f0991c2e6a501b41009a0fdcbec6e9f95ad8be2dffd0426589590cb7ad",
+        "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-evidence-review.md": "c17629b406b38a24e1dd526edabc27a536a1f7afc8277e7b69365a134cddcedf",
+        "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-format.json": "edb35ab45ea190401c1de16edd14fd65c4fb71aeb9d352f39fb30f418def3702",
+        "/run/media/system/Colossus/dev/slug/target/wp899/refusal-frontier-lifecycle-delta-review.md": "c5aa22a724d2b736bab6b6f6a8b2fd29484664657dfe0212265bc882e8aa8e7d",
+        "/run/media/system/Colossus/dev/slug/target/wp899/source-admission-supervisor-final-review.md": "c5755fc6e01b6fa00862ca9465cb45a0a08d761893a04f354dfeaab1e56b6e13",
+        "/run/media/system/Colossus/dev/slug/target/wp899/supervisor-sanity-3.log": "79867c0cd9974e1a55be89247687e88ad5f87b0ac39071a1ae0e0e05f95128f9",
+        "/run/media/system/Colossus/dev/slug/target/wp899/toolchain.json": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07",
+        "/run/media/system/Colossus/dev/slug/thoughts/shared/plans/slug-v2-subplans/wp899-typed-accounting-checkpoint-2026-10-03.json": "eb1fe71cdeb1a0f6068e3b560e8fd4aacd4aca2405d6b86ff23d363a3c0de155",
+        "target/wp899/genuine-root-network-contract.md": "00cad4b8baa0f057bfdbcad6c0b852600a020893f31bf422a57d1f676bf28d65",
+        "target/wp899/genuine-root-network-connectivity.json": "31c432cfd6ef3b889b2dd927a24434bd90998a3bf45988a88264ba279d47a388",
+        "target/wp899/genuine-root-disk-contract.md": "7afe3a46982771b9ad558e1f7feac160d415b69cb77927d48c5dd4c058101586",
+        "target/wp899/genuine-root-disk-current-source.json": "68ea1559ef70c8cccd10092931cd257f063496c97fece79f4ad88dba2d56fdde",
+        "target/wp899/disk-accounting-diagnostic-contract.md": "518c7fdbbb6316f1ed1209e013f50a2cac2332f26954c69abf8f92236d5f601a",
+        "target/wp899/disk-accounting-diagnostic-design-review.md": "c5f20cea21b62372b6cfd1d32c2f5eaf45f2b50663a79f4590d17cd1e7d76f15",
+        "target/wp899/disk-accounting-diagnostic-corrected-tests.json": "4b28f70a6a5571718898b9555e0940efa103927e8a565685645a7d4bff2ad4e0",
+        "target/wp899/disk-accounting-diagnostic-corrected-tests.log": "e200cbdcddf8046c7b6538b0d2edc1820ef872909b1c8c870d52a91e590f7496",
+        "target/wp899/disk-accounting-diagnostic-final-review.md": "86440cbb8f02917fd4040f490ddf152d508b57c9dd60470f38bab494c3f1454f",
+        "target/wp899/network-restored-socket-gates.json": "ef4d9c11521567acf4d1a9a855a8131b4cb2f6c67cdd891023fcee8db7636814",
+        "target/wp899/network-restored-socket-gates.log": "d5959950a180b549f8724c02382ee13781a9aeb8fdd61cd3bd02201bf4d28546",
+        "thoughts/shared/plans/slug-v2-subplans/wp899-network-recovery-2026-10-03.json": "675df1d29203505a62e8927efb17168a33f5fd7c0bcbe538a95b9dc0affbca64",
+        "target/wp899/genuine-root-quiescent-contract.md": "a024c9d57b190b0140f67e954dcdf34716ba64841ee0507b98660f7f2cd894e8",
+        "target/wp899/genuine-root-quiescent-contract-proposal.md": "7dad7012b07bc7dd5e7350c08043f1842adee8f9fb3d27f8d325d8c62d39e804",
+        "target/wp899/genuine-root-quiescent-current-source.json": "4541f03de799ffe67e1598fb22d61acd7af739a690ba661e0166a934b34978a0",
+        "target/wp899/disk-census-quiescence-contract.md": "99705ee71005d8554324a0f232da1970f5ca99777e37fa93d863e928af727a47",
+        "target/wp899/disk-census-quiescence-design-review.md": "34d40a9f23e983d5aa1a4ad3bfc439371377a465ca72c4729e7f1848110141d2",
+        "target/wp899/disk-census-quiescence-deadline-delta.md": "a89872e6d5ce9d10c9a6b80b9c17eb35589083b374bf1f45fc6ac5fb13a99219",
+        "target/wp899/disk-census-quiescence-tests.json": "caab436dc25338e2bf6d25bf344ac61dd8c43183ced618b16aa96e1e04f9b765",
+        "target/wp899/disk-census-quiescence-tests.log": "db6a5a1d45270b6f8284537a43370601f997db2893edb95ea82918b2afb2bba9",
+        "target/wp899/disk-census-quiescence-term-strengthened.json": "2f2e16fabe72160bb82d4bd3916201a8c7bd05523f83469f08035684ee3f31d2",
+        "target/wp899/disk-census-quiescence-term-strengthened.log": "548aeea8b649f8cd25134f94ec546adc06f0ec812b1a57ebd46334a068ff0ec9",
+        "target/wp899/disk-census-quiescence-final-review.md": "714e1146face25ab32353550bd089fc79089055442ee395125629b7d320974d0",
+        "target/wp899/disk-census-quiescence-test-final-review.md": "637bd427cceae09fc6dd145ca46069e45e592ad9c05dd5353eea61bfe5791e15",
+        "target/wp899/quiescence-protected-final-ast.json": "6fdf3532fd9528ebc1378feec068e959f22d19e1d79887f87b423bcb62269890",
+        "target/wp899/quiescence-tokio-audit.md": "8ef9180e6652a0adf5447b5cd084932239c25797d24443a565a71a10b98ac6e6",
+        "target/wp899/quiescence-tokio-build-plan.json": "0c5a5b709ef6c934196d9741eec32769c7407a22b3021757ea6baa8dc4d8db3e",
+        "target/wp899/quiescence-tokio-probe.rs": "f79b6a7fd8dc94d85a496cd0906200d08a39769534c2332d73e12ce58a5d46e4",
+        "target/wp899/quiescence-tokio-compile.json": "089993552c2284095676abaa9a51c5c5db73be53f73c8f0b3c41dfccb6d5d786",
+        "target/wp899/quiescence-tokio-run.json": "cdff19affde669a38dadfa1de4cb2bd9a71fbc6997fc81ea130a8093786264ef",
+        "target/wp899/quiescence-tokio-run.log": "7ea9f5b2795f001ea6794b10de6577b02ff96e1769ea67ce8053a15555f0c5ac",
+        "target/wp899/quiescence-child-boundary-audit.md": "320e579576fe9bd7b9f0d3c8ca895c3bd0bcfdae7d2fc781d00e1483ca226322",
+        "thoughts/shared/plans/slug-v2-subplans/wp899-disk-census-repair-2026-10-03.json": "f1f1c1f9f4073fa4e9efeb97046bfe13c9f9fd83c5bce31569232f759b9519c6",
+        "thoughts/shared/plans/slug-v2-subplans/wp899-quiescent-root-terminal-2026-10-03.json": "cb30fe11b5015814c735bf7f38435bdeb9e666a551b5c65160d29644f69608f1",
+        "thoughts/shared/plans/slug-v2-subplans/wp899-registry-association-checkpoint-2026-10-03.json": "9daeaac8ef88a3a29a6416461d913c703f97c15b747dd497d22ff7e4c5cd12d9",
+        "target/wp899/genuine-root-association-contract.md": "b6f8a71c69b4133e160e20b846227341256b1adc8a6318f4775128aa50554593",
+        "target/wp899/registry-association-compile-strengthened.json": "d8b0e866cd213cc6402f508534dba010f7f2c365d999df0893bb3e1fdcc0694c",
+        "target/wp899/registry-association-strengthened-test.json": "25fd51841994b85f98312d4ca094e2c46fa7c44b248438f432947a2671f68ef7",
+        "target/wp899/registry-association-strengthening-bridge.json": "e11f9e6f3419f77094a9f533a5b0f39d982868820aa17389529008a431c48e13",
+        "target/wp899/registry-request-association-final-review.md": "ada51c2a7d4a89c8c3b02f21c852020dbbe3a4e88dc8f6c6e520958408abfd69",
+        "target/wp899/genuine-root-association-ignored-selection.json": "66ef58b543527364b9a4878db0c63eb3013d06795c8b95150d5ee47739940758",
+        "target/wp899/genuine-root-association-launch.py": "586c53182c408810503e1402380f6f1f36c2c64e00e1d1cfb538bba1acc1d46d"
+      },
+      "stage_parent": {
+        "path": "/tmp/slug-wp899-association-parent-ks6qq8zr",
+        "device": 54,
+        "inode": 793406,
+        "uid": 1000,
+        "mode": "0o700",
+        "empty": true
+      },
+      "controls": {
+        "hard_address_space_bytes": 4294967296,
+        "sampled_rss_refusal_bytes": 4294967296,
+        "sampled_allocated_stage_disk_refusal_bytes": 6442450944,
+        "any_swap_or_descendant_or_accounting_loss_refuses": true,
+        "work_seconds": 27,
+        "cleanup_seconds": 3,
+        "terminal_seconds": 3,
+        "log_bytes": 1048576,
+        "same_immutable_deadlines_transport": true,
+        "kernel_rss_quota": false,
+        "swap_disabled": false,
+        "disk_quota": false,
+        "parent_death_signal": 9,
+        "confirmed_quiescent_census": true,
+        "census_seconds": 0.1,
+        "poll_seconds": 0.02,
+        "stop_time_charged_to_same_deadlines": true
+      },
+      "receipt_interpretation": "Ordered schema1, repeated nested_variant_code/tool rows preserved. Actual retained owner/native chosen error only; opaque/unknown/depth detail explicit. Settled lifetime maximum is admitted reservation-credit, not physical allocation/RSS/source-fit. status1 needs actual full normal source/shape/caller/restoration/engineDrop/clone-reader/lastDrop, not exit0 or samples. No historical40GB/process/fullruntime/query/bootstrap claim. Association completeness requires settled installed full counter partition; paired first origin requires actual first poison+selected native RegistryAttempts. RegistryIo identity is not semantic DICE request equivalence. Selected leaf own-call identity remains unproved0.",
+      "known_unproved": [
+        "Historical40GB workload attribution",
+        "Full loader/runtime closure and tool process/query/bootstrap",
+        "ActualRoot successful source/profile admission and coupled integration FINAL",
+        "Actual distinct/repeated RegistryIo entries and first exhaustion relation until this ONE observation",
+        "Selected leaf own-call identity remains unproved even with complete association"
+      ],
+      "independent_final_reviews": {
+        "target/wp899/genuine-root-association-caller-review.md": "e433417a581a2f5eb37c16cec491b402cb97526dcc505e989a244edbf7fcf55c",
+        "target/wp899/genuine-root-association-supervisor-review.md": "749f4e1739db94db942f952bee27200705b612fdfadc9a076c8c78de2cacafcf",
+        "target/wp899/genuine-root-association-frontier-review.md": "8af244e84bba4105b87791be541d005a4f088222169c20f138c963480afbdc79"
+      },
+      "root_decision": "ONE global6 cardinality observation after accepted instrumented association, same fullcaller/inputs/sourceauthority/caps. No automatic retry; previous freezes spent.",
+      "global_actual_attempt": 6,
+      "new_contract_attempt": 1,
+      "prior_spent_evidence": {
+        "genuine-root-invocation-freeze.json": "d0eeb0ee779e39781d6b8d05f81bc53995d8f0423f36cf0c5aff03e2de21b476",
+        "genuine-root-attempt-ledger.json": "ac325f638dbb642664f058f25707ef39c308f9a18b51f02ec87562cb226ea34a",
+        "genuine-root-one-receipt.json": "3e4d2bba65b0cfe7181e90d4760df99a6325877fa9392099173eee736fbd0d8e",
+        "genuine-root-one.log": "c20d50c870a94c5e335cfebaef49c22335200a587cbd0d72b820b364611b0ec2",
+        "genuine-root-one-analysis.json": "2d01dfc30a26ac4f9839afec9a15999fda199a1ed8221996c274b59491510743",
+        "genuine-root-typed-invocation-freeze.json": "d04cad608e31fe8c7d3f18217b24d6bc16fb98355ac22ce0e5fc8d042d680af4",
+        "genuine-root-typed-attempt-ledger.json": "708482e7615c9be469d9645fa6918e5cb223f35099a0ba20360a5c54a85f8d71",
+        "genuine-root-typed-one-receipt.json": "d5f8a463fb675f4d8c52abfce145d94f6c7ce5bbf3f51d3523270651b1fd3aea",
+        "genuine-root-typed-one.log": "7989ca62c968f74c63b942d86b0a76a0009451a6d11dc4754f71874fd493f111",
+        "genuine-root-typed-one-analysis.json": "6f75e32161bb6f624ab961646cba55fd02074e71ad7fc4f2249c30f045464194",
+        "genuine-root-typed-parent-cleanup.json": "9737bfd2175e5f7c18ea9a8a1a584bf5f34c2ed115acce7ab7838423c66626c3",
+        "genuine-root-network-invocation-freeze.json": "44c496c752c53516745c1e87d35e2cfd3c3cc48fb32ca30e17b9d856cf1a8398",
+        "genuine-root-network-attempt-ledger.json": "4d0126fc14517905f881806bc97698201dfb7c66a460cc961d633eda62a642e3",
+        "genuine-root-network-one-receipt.json": "028e59f5dc1854e7fcf0569fb45db749a38373127ed22a7b3bf5a28ecc312f51",
+        "genuine-root-network-one.log": "9dee560219de158fdc60ff554723e5d119f27ab67381469664de68248d37e8d3",
+        "genuine-root-network-one-analysis.json": "d944d027a27159ad5131cc1da3a8dac984465e3eba2dcfdec4c7e296ca76ffef",
+        "genuine-root-network-parent-cleanup.json": "e278a895e04a9b6b9e6f7d11ebf1caf74e14a14ffba29c54811f639ae229667c",
+        "genuine-root-disk-invocation-freeze.json": "4f9a9b27156986445605c427d7d91ac4b0466437481574b47d0d1daa459f792e",
+        "genuine-root-disk-attempt-ledger.json": "766a38eff60f346bca26897e70897b8f1e301d45aa0d8d4008c89145256dd151",
+        "genuine-root-disk-one-receipt.json": "61e9ae01db0dd7bd502f28e2b118245ad43c5eb988d5c5a90e79af1657ba29cc",
+        "genuine-root-disk-one.log": "9dee560219de158fdc60ff554723e5d119f27ab67381469664de68248d37e8d3",
+        "genuine-root-disk-one-analysis.json": "e9d00359404745edd4b9df0a1cd5dcc1969577d89a4de891b650551d94ba368a",
+        "genuine-root-disk-raw-records.json": "189d1a57b2eb2d42540edfd673fae67071e49c6ed023623c108e0818b93eeb5f",
+        "genuine-root-disk-parent-cleanup.json": "ba5aebb6ab05cf266ed53ea02bb569494a5b553b6b857fa77bc8d4f50ab9e4bc",
+        "genuine-root-disk-terminal-record-audit.md": "59eb5ca42f01fc1115b834fa3632afea80b2acc66d17f776804700f9d08d260b",
+        "genuine-root-disk-terminal-supervisor-review.md": "3ce30a31ff3cdd6ee933bb7e358a3fa00abbbc454562ade3f59a338b8001afcf",
+        "genuine-root-disk-terminal-frontier-review.md": "4423d0c7f09bb475f393b98521c9d7ca9cdb10be91e48681b855ef62709471aa",
+        "genuine-root-quiescent-invocation-freeze.json": "3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d",
+        "genuine-root-quiescent-attempt-ledger.json": "b08ad3901f11bfec8903ed6e3d3e1b9c245af7a127bb2a621944b94f532fae4c",
+        "genuine-root-quiescent-one-receipt.json": "604d30c2c7ce3385611465127ea888015182fa66b98c02ac8b3e23b3138c8fc1",
+        "genuine-root-quiescent-one.log": "2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de",
+        "genuine-root-quiescent-one-analysis.json": "a8788d1dea74b7aa0de2c1aea748417683f32d0b78574cc69c83c6c4a0fa433f",
+        "genuine-root-quiescent-raw-records.json": "f6ed0a1a6e0f642121a2b4c6182f677744db41bf6d9ceeb8e51bc0e684702290",
+        "genuine-root-quiescent-parent-cleanup.json": "8704fe2045a93eacf811d526b1115ffa4aa00fe381fb5d3935891e823fe139dc",
+        "genuine-root-quiescent-terminal-record-audit.md": "a21fd592ec5c522739ebaf588531e1561d4ce82c86bd5d6d21dfb416a8650405",
+        "genuine-root-quiescent-terminal-supervisor-review.md": "7824c2126bcd7edf204edfe860bb3f062dd454bae851279cfe9c2f069d189103",
+        "genuine-root-quiescent-terminal-frontier-review.md": "d27ab81c764e53be7e1bef64be2ea701719b54060b12cceb32a751168362eb9c"
+      },
+      "output_paths_absent": [
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-invocation-freeze.json",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-attempt-ledger.json",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one-receipt.json",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one.log",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one-analysis.json",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-raw-records.json"
+      ],
+      "reviewed_draft_sha256": "30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd"
+    }
+  },
+  "draft": {
+    "path": "target/wp899/genuine-root-association-invocation-draft.json",
+    "sha256": "30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd",
+    "reconstruction": "Exact freeze data with state DRAFT_FOR_THREE_INDEPENDENT_ELIGIBILITY_REVIEWS, independent_final_reviews empty and reviewed_draft_sha256 removed. Frozen source/command/controls otherwise unchanged."
+  },
+  "ignored_selector_selection": {
+    "path": "target/wp899/genuine-root-association-ignored-selection.json",
+    "sha256": "66ef58b543527364b9a4878db0c63eb3013d06795c8b95150d5ee47739940758",
+    "data": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--ignored",
+        "--exact",
+        "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+        "--list"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0031814139802008867,
+      "artifact": {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "sha256": "a66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047"
+      },
+      "stdout": "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission: test\n\n1 test, 0 benchmarks\n",
+      "stderr": "",
+      "selected_ignored": 1,
+      "actual_root_executed": false
+    }
+  },
+  "launcher": {
+    "path": "target/wp899/genuine-root-association-launch.py",
+    "sha256": "586c53182c408810503e1402380f6f1f36c2c64e00e1d1cfb538bba1acc1d46d",
+    "text": "import hashlib,json,os,stat,subprocess,time\nfrom pathlib import Path\nbase=Path('target/wp899')\nfreeze=base/'genuine-root-association-invocation-freeze.json'\nraw=freeze.read_bytes();d=json.loads(raw)\nassert d['state']=='ROOT_RECONCILED_FROZEN_READY_FOR_ONE_ASSOCIATION_OBSERVATION'\nassert d['global_actual_attempt']==6 and d['new_contract_attempt']==1 and d['attempt_budget']==1 and not d['automatic_retries']\nassert hashlib.sha256((base/'genuine-root-association-invocation-draft.json').read_bytes()).hexdigest()==d['reviewed_draft_sha256']\nassert len(d['independent_final_reviews'])==3\nfor table in ['source_hashes','prerequisite_hashes','independent_final_reviews']:\n    for name,pin in d[table].items():assert hashlib.sha256(Path(name).read_bytes()).hexdigest()==pin,name\nfor name,pin in d['prior_spent_evidence'].items():assert hashlib.sha256((base/name).read_bytes()).hexdigest()==pin,name\nfor key in ['python','artifact']:assert hashlib.sha256(Path(d[key]['path']).read_bytes()).hexdigest()==d[key]['sha256']\nfor item in json.loads((base/'genuine-harness-input-pins.json').read_text())['inputs']:\n    content=Path(item['path']).read_bytes();assert len(content)==item['bytes'] and hashlib.sha256(content).hexdigest()==item['sha256']\np=Path(d['stage_parent']['path']);fd=os.open(p,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW|os.O_CLOEXEC)\ntry:\n    i=os.fstat(fd);want=d['stage_parent']\n    assert (i.st_dev,i.st_ino,i.st_uid,oct(stat.S_IMODE(i.st_mode)))==(want['device'],want['inode'],want['uid'],want['mode'])\n    assert not os.listdir(fd)\nfinally:os.close(fd)\nfor name in d['output_paths_absent']:\n    if name!=str(freeze.resolve()):assert not os.path.lexists(name),name\nassert not subprocess.run(['git','status','--porcelain'],capture_output=True,text=True,check=True).stdout\nassert subprocess.run(['git','rev-parse','HEAD'],capture_output=True,text=True,check=True).stdout.strip()==d['base']\nassert subprocess.run(['ps','-C','cargo','-C','rustc','-C','slug','-C','slugd','-o','pid=,comm='],capture_output=True,text=True).stdout.strip()==''\nledger=base/'genuine-root-association-attempt-ledger.json'\nr={'schema':1,'freeze_sha256':hashlib.sha256(raw).hexdigest(),'global_actual_attempt':6,'new_contract_attempt':1,'state':'CLAIMED_NO_RETRY','command':d['command'],'prelaunch_source_prereq_review_spent_artifact_python_input6_parent_outputs_clean_no_overlap_verified':True}\nwith ledger.open('x') as output:output.write(json.dumps(r,indent=2)+'\\n')\nstart=time.monotonic()\nrun=subprocess.run(d['command'],cwd=d['cwd'],stdout=subprocess.PIPE,stderr=subprocess.PIPE)\nr.update({'state':'TERMINAL_NO_RETRY','wrapper_exit_code':run.returncode,'wrapper_elapsed_seconds':time.monotonic()-start,'supervisor_stdout_bytes':len(run.stdout),'supervisor_stderr_bytes':len(run.stderr)})\nledger.write_text(json.dumps(r,indent=2)+'\\n')\nprint(json.dumps(r))\n"
+  },
+  "eligibility_reviews": [
+    {
+      "path": "target/wp899/genuine-root-association-caller-review.md",
+      "sha256": "e433417a581a2f5eb37c16cec491b402cb97526dcc505e989a244edbf7fcf55c",
+      "text": "# WP899 association caller eligibility FINAL\n\nVerdict: FINAL ACCEPT for caller/source/artifact eligibility of the exact reviewed ONE global6/local1 draft only. Root reconciliation with the other two reviews and immediate launch-time pin/identity/no-overlap checks remain required. This is not full WP899 acceptance, source fit, 40GB attribution or permission for retries.\n\nReviewed draft `genuine-root-association-invocation-draft.json` SHA30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd and launcher `genuine-root-association-launch.py` SHA586c53182c408810503e1402380f6f1f36c2c64e00e1d1cfb538bba1acc1d46d. Contract SHA b6f8a71c69b4133e160e20b846227341256b1adc8a6318f4775128aa50554593. Baseline clean1b0452a507fd9a23683dd59db10a7486aed52f91. Source/caller details and exact6 input identities are recorded in genuine-root-association-caller-prerequisite.md.\n\nAll106 live source hashes,65 prerequisite hashes and37 spent-reference hashes match the draft; none of the prior104 source paths was removed. Delta versus global5 is exactly7 existing paths plus2 new association children, including accepted Bzlmod counting test SHA64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907 and the independently accepted8-source association component. The actual request/env/input/tool/clock construction sections remain byte-identical to global5. No additional roots, fallback, preliminary owner command, environment filtering/hashing/logging or physical reverse authority was introduced.\n\nThe current a66c artifact's bytes match the draft, compile/test bridge and fresh ignored-selection receipt; the exact selector lists once with0 benchmarks, exit0 without execution. Interpreter `/usr/bin/python3.12` bytes match1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118. The compiled artifact is a Core test executable, not a linked CLI readiness claim. Coverage is the accepted33+1 composite and unchanged-production default check; old global5 artifact76de is not substituted for a66c.\n\nAt read-only inspection the new parent `/tmp/slug-wp899-association-parent-ks6qq8zr` was an actual nonsymlink empty0700 directory, dev54/ino793406/uid1000; all6 proposed terminal output paths were absent. Launcher reopens the parent with O_NOFOLLOW and checks the same identity/emptiness before claim. It rehashes sources/prerequisites/reviews/spent refs/input6/artifact/Python, checks clean exact HEAD and absence of cargo/rustc/slug/slugd, claims the ledger exclusively, then invokes only the frozen supervisor command. It reads neither environment nor credentials, logs no environment/URLs, and does not implement a retry. Launch-time checks are still necessary because this audit is a snapshot, not a retained parent capability.\n\nControls are exactly equal to global5: hard4GiB RLIMIT_AS; sampled4GiBRSS/anyswap/descendant/accounting-loss refusal; sampled6GiB owned allocated disk;1MiB log; absolute27s work+3s cleanup+3s terminal;20ms polling/100ms fresh whole-group census. No kernel RSS quota, disabled-swap or disk-quota claim. Recorder2MiB slab/headers are charged to the same16MiB source bank; its increased real pressure is not removed from measurements or used to justify a cap increase.\n\nSole installed Scope pointer checks, one consumed prepare_once_observed command, actual7 raw+accepted restoration/drain/engine retirement, Weak attachment and recorder-before-export lastDrop controls match the accepted component. Complete counts require settled/installed/coverage and actual counter partition. First-origin pairing additionally requires actual first poison and actual selected native RegistryAttempts cause. Selected leaf own-call identity stays0. A terminal refusal cannot establish successful source closure or redundant semantic work from repeated literal IO identities.\n\nNo material caller/artifact eligibility gap remains in this draft. No executable/listing/native fixture/Cargo/network/probe/cleanup was run; read-only hash/JSON/source/git verification commands exited0. The ONE observation remains unexecuted at this review.\n"
+    },
+    {
+      "path": "target/wp899/genuine-root-association-supervisor-review.md",
+      "sha256": "749f4e1739db94db942f952bee27200705b612fdfadc9a076c8c78de2cacafcf",
+      "text": "# FINAL eligibility \u2014 exact association draft\n\nACCEPT eligibility of draft SHA256 `30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd` for ONE global6/local1 observation. This is distinct from self-acceptance of the recorder or supervisor component, both independently accepted by their recorded reviews. No launch, test, network/acquisition, source change, parent allocation or cleanup by reviewer. Source-fit/fullWP899/historical40GB remain unaccepted.\n\nIndependently checked current clean HEAD1b0452a507fd9a23683dd59db10a7486aed52f91, actual command/cwd/ignored selector, all106 current sources,65 prerequisites (including launcher) and37 immutable prior spent references: no hash mismatches. Current Python1643 and Corea66c actual bytes match draft. Both are canonical regular0755/no-setid executables; fixed security.capability checks returned ENODATA61, with no capability payload read or logged. Fresh ignored-only selection is exactly1/list-only/not executed. Unchanged supervisor820473/tests0f match global5; every control field equals the prior freeze. Same six inputs/full caller are pinned by inherited config/current draft prerequisites and immediately rechecked by launcher; no environment comparison between attempts is inferred.\n\nParent `/tmp/slug-wp899-association-parent-ks6qq8zr` is canonical non-symlink empty0700, dev54/ino793406/UID1000. All six association freeze/ledger/receipt/log/analysis/raw outputs are lexically absent, including dangling-link check. Never reuse old parent/ledger. Immediate prelaunch checks are Root obligations; the metadata observation is not a future guarantee. Named process snapshot showed no recognized Slug/compiler/native test workload; Root must also confirm its own serial validation/supervisor handles idle.\n\nRead actual launcher `target/wp899/genuine-root-association-launch.py`, SHA256 `586c53182c408810503e1402380f6f1f36c2c64e00e1d1cfb538bba1acc1d46d`, now included in draft prerequisites. It requires reconciled-ready state/global6/local1/budget1/no-retry, reviewed-draft hash, exactly three review pins, every current/source/prerequisite/spent/artifact/Python/input pin, nofollow parent FD identity/emptiness, output absence except the newly created freeze, clean HEAD and named Cargo/rustc/Slug overlap absence. It exclusively claims ledger with mode'x' BEFORE one command and sets terminal state afterwards; no retry branch. Named ps alone is narrower than all native-test/other Python workload checks, so Root's immediate trusted serial-handle confirmation remains required. The launcher and subprocess APIs retain inherited fixed command/control boundaries; no caller argv/env/credential capture occurs.\n\nRoot reconciliation must now add the three exact lane reviews and reviewed draft SHA to the freeze, leaving command/source/config/artifact/controls/parent unchanged. Review hashes cannot be inferred from the current empty draft review map; eligibility does not permit launching before that reconciliation. The unchanged supervisor validates guard/AS handshake, owns the direct child unreaped with pidfd/starttime, confirms fresh group-stop events and one bounded census, attempts CONT in cleanup, refuses descendants/accounting/native interruption truthfully, and joins before identity-checked FD stage cleanup. Keep4GiB hardAS/4GiB sampledRSS/6GiB sampled disk/anyswap,27+3+3,20ms/100ms and1MiBlog. No hardRSS/no-swap/diskquota guarantee.\n\nRequired terminal interpretation: ordered schema preserves repeated tags; complete settled admitted identity partition and actual chosen first-exhaustion pairing have distinct predicates. New recorder pressure is counted in the same16MiB bank and real RSS, not hidden/subtracted. First creator is not selected-leaf caller identity. Refusal or incomplete recording consumes this freeze; no automatic retry. Successful supervision or low RSS does not waive source/current-frontier/caller/queryshape/restoration/engine/retained clone/lastDrop proof. Prior global1\u20135 causes are unchanged; no historical40GB/full workload fit inference.\n"
+    },
+    {
+      "path": "target/wp899/genuine-root-association-frontier-review.md",
+      "sha256": "8af244e84bba4105b87791be541d005a4f088222169c20f138c963480afbdc79",
+      "text": "# WP899 ONE registry association \u2014 independent FINAL eligibility\n\n**ACCEPT eligibility for the exact draft below, solely for ONE global6/local1 registry association observation.** Phase: FINAL invocation/evidence eligibility, clean base `1b0452a507fd9a23683dd59db10a7486aed52f91`. No actual-root invocation, execution, network, Cargo, cleanup or source change occurred in this review. Full WP899/source fit/historical40GB remain unaccepted.\n\nAuthoritative reviewed draft SHA256: `30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd` (`target/wp899/genuine-root-association-invocation-draft.json`). This supersedes the earlier draft identifier only; old global1\u20135 spent freezes are immutable. Contract SHA256 `b6f8a71c69b4133e160e20b846227341256b1adc8a6318f4775128aa50554593`; pinned launcher `586c53182c408810503e1402380f6f1f36c2c64e00e1d1cfb538bba1acc1d46d`. Interpretation prerequisite `genuine-root-association-frontier-prerequisite.md` SHA256 `4c75a011246d1d01b89c3b16e9019c2fd25cc7ae0946140db80979d54fa67b87` applies.\n\n## Concrete correspondence\n\nIndependently rehashed all106 current source pins,65 prerequisite pins and37 prior-spent references: every match succeeded. The current Core bytes match `a66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047`; Python bytes match `1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118`. The recorded exact ignored listing is selector1 and that same artifact, not an executed actual-root result. Rechecked the six designated semantic file sizes/digests against the frozen input-pins receipt; no mismatch. No ambient environment/configuration content was inspected or emitted.\n\nCompared with global5, changed pins are exactly the accepted observed-graph counting test and eight-file registry association component (including its two new children); no prior source pin is removed. Reuse the independent accepted source/34-composite-gate/default-dependent evidence; do not treat the reused executable filename as old bytes. The actual caller remains the complete opaque environment snapshot, Error lock mode, default BCR, no command overrides and fixed Some(empty) runtime/explicit guest policy. Actual normal selected first-query sources, tool roles0/9/11 and6 pinned files are unchanged. No substitute source/profile or preliminary command is selected.\n\nRead-only parent check matched `/tmp/slug-wp899-association-parent-ks6qq8zr`, device54/inode793406/UID1000, real nonsymlink directory mode0700 and empty. All six unique output paths were absent. Checkout was clean. These are review-time observations, not durable prelaunch assertions; Root must repeat immediate checks through the frozen launcher after reconciliation.\n\n## Ordering, attribution and bounded memory\n\nThe contract admits an honest new hypothesis: exact charge-owner identities can classify admitted RegistryIo repetitions/distinctness and first exhaustion relation, which global5 counters could not. It does not assume the current owner still reaches the same128-limit frontier. Complete counts require actual settled installed-scope flags, full scope/sample/admitted equality and checked distinct+repeat partition. First-origin pairing additionally requires actual first registry poison and the returned chosen typed native RegistryAttempts limit, with separately observed creator ordinal/relation. Repeated ordered semantic codes and tool records must remain grouped; absent/opaque/unknown/depth evidence remains explicit. Selected leaf own-call identity always0, even on paired1. Same RegistryIo identity is not full DICE semantic equivalence or proof of avoidable refetch; actual source generations/frontiers may legitimately repeat it.\n\nThe ledger's fixed2MiB slab plus checked headers is charged in the unchanged16MiB service bank and remains live at the earlier source-counter sample. Its actual charge/peak is not subtracted from RSS or bank highwater. Earlier BufferLimit/deadline or incomplete evidence is a legitimate terminal; no fit assumption or cap growth follows. Exact settled descriptor reservation maximum is a same-bank credit metric, not heap/RSS or final-used0. The Root drops the recorder before existing retained reader/clone/scope-lastDrop proof; snapshot is taken only after actual restoration/drain/engine retirement. Status1 must still carry all actual source/query/fullcaller/materialization/capture-equivalence and clone-read/lastDrop gates; status0 can at most accept the reached attributed frontier. Full runtime closure/process execution/historical attribution remain0.\n\nAll supervisor controls remain unchanged: hard4GiB AS; sampled4GiB RSS/any-swap/descendant/accounting-loss refusal;6GiB sampled allocated stage disk;1MiB log; absolute27+3+3 clocks;20ms poll;100ms whole-group confirmed stop/census/resume with death guard and nontransparent interruption. These are not hard RSS/disk quotas or full-workload peak-fit guarantees. Prior global5's72.258MiB refused-branch sample and442387 descriptor credits do not predict current fit with instrumentation or attribute40GB.\n\n## Freeze and one-shot boundary\n\nThe reviewed launcher reads the reconciled final freeze, verifies its reviewed-draft hash and exactly three independent review hashes, then rechecks current sources/prerequisites/spent references/artifact/Python/semantic inputs/parent/output absence/clean base and no listed overlapping build/daemon owners. The private parent is opened nofollow and fstat-checked. The ledger is created exclusively before the exact one command; it records CLAIMED_NO_RETRY then TERMINAL_NO_RETRY. There is no fallback command, cap mutation or retry loop. Existing unbounded temporal/environment scheduling assumptions are not promoted to proofs by that preflight: Root owns exclusive no-overlap scheduling through the attempt.\n\nOnly Root may reconcile final state and reviews and immediately launch after all three independent verdicts. Join/stage cleanup must precede terminal reviews and exact empty parent removal. A setup/supervisor/partial-schema terminal retains its missing evidence honestly; no old terminal cause is reclassified. This eligibility is not permission for an additional observation, automatic retry, semantic deduplication, tool/query execution or full bootstrap acceptance.\n"
+    }
+  ],
+  "ledger": {
+    "path": "target/wp899/genuine-root-association-attempt-ledger.json",
+    "sha256": "ea79fe0f06416710f7148f09573589466f7bdc7cd446431859364fc7f58dc1f9",
+    "data": {
+      "schema": 1,
+      "freeze_sha256": "8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6",
+      "global_actual_attempt": 6,
+      "new_contract_attempt": 1,
+      "state": "TERMINAL_NO_RETRY",
+      "command": [
+        "/usr/bin/python3.12",
+        "scripts/v2_source_admission_supervisor.py",
+        "--stage-parent",
+        "/tmp/slug-wp899-association-parent-ks6qq8zr",
+        "--receipt",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one-receipt.json",
+        "--log",
+        "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-association-one.log",
+        "--",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--ignored",
+        "--exact",
+        "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "prelaunch_source_prereq_review_spent_artifact_python_input6_parent_outputs_clean_no_overlap_verified": true,
+      "wrapper_exit_code": 1,
+      "wrapper_elapsed_seconds": 15.807721227989532,
+      "supervisor_stdout_bytes": 0,
+      "supervisor_stderr_bytes": 0
+    }
+  },
+  "supervisor": {
+    "path": "target/wp899/genuine-root-association-one-receipt.json",
+    "sha256": "8a5724a4d9499add037845b84473261bea77f5f596ae212bdf539953ea83d692",
+    "data": {
+      "schema": 1,
+      "limit_kind": "RLIMIT_AS",
+      "address_space_limit_bytes": 4294967296,
+      "address_space_limit_verified": true,
+      "parent_death_signal_verified": true,
+      "sampled_rss_limit_bytes": 4294967296,
+      "sampled_disk_limit_bytes": 6442450944,
+      "sampled_rss_peak_bytes": 80449536,
+      "sampled_swap_peak_bytes": 0,
+      "sampled_disk_peak_bytes": 8192,
+      "sampled_logical_disk_peak_bytes": 4576,
+      "samples": 688,
+      "poll_interval_seconds": 0.02,
+      "census_deadline_seconds": 0.1,
+      "census_cycle_attempts": 688,
+      "census_cycle_completions": 688,
+      "census_cycle_total_ns": 1618356096,
+      "census_cycle_max_ns": 5549855,
+      "census_resume_failures": 0,
+      "elapsed_seconds": 15.768532562,
+      "work_seconds": 27.0,
+      "cleanup_seconds": 3.0,
+      "terminal_seconds": 3.0,
+      "unexpected_descendants": 0,
+      "child_exit_code": 101,
+      "refusal": "child_exit_nonzero",
+      "term_sent": false,
+      "kill_sent": false,
+      "joined": true,
+      "stage_removed": true,
+      "diagnostic_log_bytes": 4576,
+      "diagnostic_log_preserved": true,
+      "diagnostic_log_limit_bytes": 1048576,
+      "terminal_cleanup_exhausted": false,
+      "supervision_ok": false,
+      "source_gate_verified": false,
+      "disk_failure_site": 0,
+      "disk_failure_origin": 0,
+      "disk_failure_errno": null,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false
+    }
+  },
+  "ordered_records": {
+    "path": "target/wp899/genuine-root-association-raw-records.json",
+    "sha256": "1b3a7c6781a0d8d5a1e02420298fcd0b947bb8d72c9a3ec4a2e32532f2cb8974",
+    "data": {
+      "schema": 1,
+      "ordered_records": [
+        [
+          "schema",
+          1
+        ],
+        [
+          "work_deadline_monotonic_ns",
+          312032720762351
+        ],
+        [
+          "cleanup_deadline_monotonic_ns",
+          312035720762351
+        ],
+        [
+          "full_runtime_closure_proved",
+          0
+        ],
+        [
+          "process_execution_proved",
+          0
+        ],
+        [
+          "historical_memory_attribution_proved",
+          0
+        ],
+        [
+          "progress_rounds",
+          0
+        ],
+        [
+          "owner_refreshes",
+          0
+        ],
+        [
+          "reached_capture",
+          0
+        ],
+        [
+          "completed_capture",
+          0
+        ],
+        [
+          "stage_containment_proved",
+          0
+        ],
+        [
+          "stage_paths_observed",
+          0
+        ],
+        [
+          "no_containment_violation_observed",
+          1
+        ],
+        [
+          "snapshot_restoration_proved",
+          1
+        ],
+        [
+          "raw_restoration_proved",
+          1
+        ],
+        [
+          "engine_retired",
+          1
+        ],
+        [
+          "first_poison_code",
+          5
+        ],
+        [
+          "poison_observation_before_close",
+          1
+        ],
+        [
+          "source_counters_sampled",
+          1
+        ],
+        [
+          "registry_attempts",
+          101
+        ],
+        [
+          "registry_bytes",
+          211961
+        ],
+        [
+          "source_attempts",
+          0
+        ],
+        [
+          "transferred_bytes",
+          0
+        ],
+        [
+          "decoded_bytes",
+          0
+        ],
+        [
+          "written_bytes",
+          0
+        ],
+        [
+          "live_source_buffer_bytes",
+          2105744
+        ],
+        [
+          "source_buffer_peak_bytes",
+          13250743
+        ],
+        [
+          "descriptor_phase_sample_lower_bound",
+          0
+        ],
+        [
+          "outer_error_code",
+          4
+        ],
+        [
+          "nested_owner_error_observed",
+          1
+        ],
+        [
+          "nested_owner_error_category",
+          5
+        ],
+        [
+          "nested_owner_refusal_site",
+          2
+        ],
+        [
+          "nested_refusal_termination",
+          1
+        ],
+        [
+          "nested_variant_path_complete",
+          1
+        ],
+        [
+          "nested_variant_code_count",
+          7
+        ],
+        [
+          "nested_variant_code",
+          6
+        ],
+        [
+          "nested_variant_code",
+          12
+        ],
+        [
+          "nested_variant_code",
+          17
+        ],
+        [
+          "nested_variant_code",
+          42
+        ],
+        [
+          "nested_variant_code",
+          54
+        ],
+        [
+          "nested_variant_code",
+          66
+        ],
+        [
+          "nested_variant_code",
+          167
+        ],
+        [
+          "nested_native_detail_observed",
+          1
+        ],
+        [
+          "nested_native_cause_present",
+          1
+        ],
+        [
+          "nested_native_site",
+          20
+        ],
+        [
+          "nested_native_detail_kind",
+          4
+        ],
+        [
+          "nested_native_io_kind",
+          0
+        ],
+        [
+          "nested_native_errno_present",
+          0
+        ],
+        [
+          "nested_native_errno_negative",
+          0
+        ],
+        [
+          "nested_native_errno_magnitude",
+          0
+        ],
+        [
+          "nested_native_status_present",
+          0
+        ],
+        [
+          "nested_native_status",
+          0
+        ],
+        [
+          "nested_native_protocol",
+          0
+        ],
+        [
+          "nested_native_scope",
+          5
+        ],
+        [
+          "nested_native_scope_counter_present",
+          0
+        ],
+        [
+          "nested_native_scope_counter",
+          0
+        ],
+        [
+          "nested_frontier_proof_missing",
+          0
+        ],
+        [
+          "registry_association_settled",
+          1
+        ],
+        [
+          "registry_association_installed_scope",
+          1
+        ],
+        [
+          "registry_identity_counts_complete",
+          1
+        ],
+        [
+          "registry_association_attempted_entries",
+          101
+        ],
+        [
+          "registry_association_admitted_entries",
+          101
+        ],
+        [
+          "registry_association_scope_admitted_entries",
+          101
+        ],
+        [
+          "registry_association_refused_entries",
+          0
+        ],
+        [
+          "registry_association_sticky_refusals",
+          0
+        ],
+        [
+          "registry_association_distinct_rows",
+          101
+        ],
+        [
+          "registry_association_repeated_entries",
+          0
+        ],
+        [
+          "registry_association_retained_rows",
+          101
+        ],
+        [
+          "registry_association_charged_bytes",
+          2105744
+        ],
+        [
+          "registry_first_limit_call_present",
+          0
+        ],
+        [
+          "registry_first_limit_call_ordinal",
+          0
+        ],
+        [
+          "registry_first_limit_relation",
+          0
+        ],
+        [
+          "registry_first_limit_existing_row",
+          0
+        ],
+        [
+          "registry_first_limit_prior_admissions",
+          0
+        ],
+        [
+          "registry_first_limit_prospective_unique",
+          0
+        ],
+        [
+          "registry_first_exhaustion_origin_paired",
+          0
+        ],
+        [
+          "registry_selected_leaf_call_identity_proved",
+          0
+        ],
+        [
+          "descriptor_reserved_highwater_bytes",
+          442387
+        ],
+        [
+          "descriptor_reserved_highwater_settled",
+          1
+        ],
+        [
+          "descriptor_exact_peak_proved",
+          1
+        ],
+        [
+          "status",
+          0
+        ]
+      ],
+      "log_sha256": "24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6",
+      "records": 81,
+      "unique_keys": 75
+    },
+    "projection": "Original raw-records JSON ordered list and counts; values_by_key omitted here and derivable without erasing repeated rows."
+  },
+  "analysis": {
+    "path": "target/wp899/genuine-root-association-one-analysis.json",
+    "sha256": "2a5295b0a6961d7dcef992172a4aaf8014036081c11d29aa76144c037935447a",
+    "data": {
+      "schema": 1,
+      "global_actual_attempt": 6,
+      "contract_attempt": 1,
+      "actual_root_executed_once": true,
+      "terminal": "typed selected SourceServiceError::WorkDeadline, before source capture",
+      "selected_variant_path": [
+        6,
+        12,
+        17,
+        42,
+        54,
+        66,
+        167
+      ],
+      "native": {
+        "site": 20,
+        "detail": 4,
+        "scope": 5,
+        "counter_present": 0
+      },
+      "association": {
+        "registry_association_settled": 1,
+        "registry_association_installed_scope": 1,
+        "registry_identity_counts_complete": 1,
+        "registry_association_attempted_entries": 101,
+        "registry_association_admitted_entries": 101,
+        "registry_association_scope_admitted_entries": 101,
+        "registry_association_refused_entries": 0,
+        "registry_association_sticky_refusals": 0,
+        "registry_association_distinct_rows": 101,
+        "registry_association_repeated_entries": 0,
+        "registry_association_retained_rows": 101,
+        "registry_association_charged_bytes": 2105744,
+        "registry_first_limit_call_present": 0,
+        "registry_first_limit_call_ordinal": 0,
+        "registry_first_limit_relation": 0,
+        "registry_first_limit_existing_row": 0,
+        "registry_first_limit_prior_admissions": 0,
+        "registry_first_limit_prospective_unique": 0,
+        "registry_first_exhaustion_origin_paired": 0,
+        "registry_selected_leaf_call_identity_proved": 0
+      },
+      "registry_admitted_bytes": 211961,
+      "sampled_rss_peak_mib": 76.72265625,
+      "source_buffer_peak_reservation_bytes": 13250743,
+      "live_recorder_credit_at_sample_bytes": 2105744,
+      "settled_descriptor_peak_reservation_bytes": 442387,
+      "restoration_engine": [
+        1,
+        1,
+        1
+      ],
+      "source_capture_admitted": false,
+      "first_registry_limit_not_observed": true,
+      "selected_leaf_own_call_identity_proved": false,
+      "work_timeout_producer_or_stage_unknown": true,
+      "limitations": [
+        "Complete101 admitted RegistryIo identities, no repeats; cannot extrapolate to global5 previous128 or all actual closure.",
+        "WorkDeadline can represent command or smaller per-step deadline; actual expiry producer not yet identified.",
+        "Zero association refusals means all101 invocation entries admitted; downstream IO may still timeout.",
+        "Recorder memory/highwater counted; reservation metrics are not heap/RSS.",
+        "FullWP899, successful source/runtime/process and historical40GB remain unproved."
+      ],
+      "supervisor_receipt_sha256": "8a5724a4d9499add037845b84473261bea77f5f596ae212bdf539953ea83d692",
+      "log_sha256": "24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6"
+    }
+  },
+  "log": {
+    "path": "target/wp899/genuine-root-association-one.log",
+    "sha256": "24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6",
+    "text": "\nrunning 1 test\ntest runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission ... SLUG_SOURCE_ADMISSION schema=1\nSLUG_SOURCE_ADMISSION work_deadline_monotonic_ns=312032720762351\nSLUG_SOURCE_ADMISSION cleanup_deadline_monotonic_ns=312035720762351\nSLUG_SOURCE_ADMISSION full_runtime_closure_proved=0\nSLUG_SOURCE_ADMISSION process_execution_proved=0\nSLUG_SOURCE_ADMISSION historical_memory_attribution_proved=0\nSLUG_SOURCE_ADMISSION progress_rounds=0\nSLUG_SOURCE_ADMISSION owner_refreshes=0\nSLUG_SOURCE_ADMISSION reached_capture=0\nSLUG_SOURCE_ADMISSION completed_capture=0\nSLUG_SOURCE_ADMISSION stage_containment_proved=0\nSLUG_SOURCE_ADMISSION stage_paths_observed=0\nSLUG_SOURCE_ADMISSION no_containment_violation_observed=1\nSLUG_SOURCE_ADMISSION snapshot_restoration_proved=1\nSLUG_SOURCE_ADMISSION raw_restoration_proved=1\nSLUG_SOURCE_ADMISSION engine_retired=1\nSLUG_SOURCE_ADMISSION first_poison_code=5\nSLUG_SOURCE_ADMISSION poison_observation_before_close=1\nSLUG_SOURCE_ADMISSION source_counters_sampled=1\nSLUG_SOURCE_ADMISSION registry_attempts=101\nSLUG_SOURCE_ADMISSION registry_bytes=211961\nSLUG_SOURCE_ADMISSION source_attempts=0\nSLUG_SOURCE_ADMISSION transferred_bytes=0\nSLUG_SOURCE_ADMISSION decoded_bytes=0\nSLUG_SOURCE_ADMISSION written_bytes=0\nSLUG_SOURCE_ADMISSION live_source_buffer_bytes=2105744\nSLUG_SOURCE_ADMISSION source_buffer_peak_bytes=13250743\nSLUG_SOURCE_ADMISSION descriptor_phase_sample_lower_bound=0\nSLUG_SOURCE_ADMISSION outer_error_code=4\nSLUG_SOURCE_ADMISSION nested_owner_error_observed=1\nSLUG_SOURCE_ADMISSION nested_owner_error_category=5\nSLUG_SOURCE_ADMISSION nested_owner_refusal_site=2\nSLUG_SOURCE_ADMISSION nested_refusal_termination=1\nSLUG_SOURCE_ADMISSION nested_variant_path_complete=1\nSLUG_SOURCE_ADMISSION nested_variant_code_count=7\nSLUG_SOURCE_ADMISSION nested_variant_code=6\nSLUG_SOURCE_ADMISSION nested_variant_code=12\nSLUG_SOURCE_ADMISSION nested_variant_code=17\nSLUG_SOURCE_ADMISSION nested_variant_code=42\nSLUG_SOURCE_ADMISSION nested_variant_code=54\nSLUG_SOURCE_ADMISSION nested_variant_code=66\nSLUG_SOURCE_ADMISSION nested_variant_code=167\nSLUG_SOURCE_ADMISSION nested_native_detail_observed=1\nSLUG_SOURCE_ADMISSION nested_native_cause_present=1\nSLUG_SOURCE_ADMISSION nested_native_site=20\nSLUG_SOURCE_ADMISSION nested_native_detail_kind=4\nSLUG_SOURCE_ADMISSION nested_native_io_kind=0\nSLUG_SOURCE_ADMISSION nested_native_errno_present=0\nSLUG_SOURCE_ADMISSION nested_native_errno_negative=0\nSLUG_SOURCE_ADMISSION nested_native_errno_magnitude=0\nSLUG_SOURCE_ADMISSION nested_native_status_present=0\nSLUG_SOURCE_ADMISSION nested_native_status=0\nSLUG_SOURCE_ADMISSION nested_native_protocol=0\nSLUG_SOURCE_ADMISSION nested_native_scope=5\nSLUG_SOURCE_ADMISSION nested_native_scope_counter_present=0\nSLUG_SOURCE_ADMISSION nested_native_scope_counter=0\nSLUG_SOURCE_ADMISSION nested_frontier_proof_missing=0\nSLUG_SOURCE_ADMISSION registry_association_settled=1\nSLUG_SOURCE_ADMISSION registry_association_installed_scope=1\nSLUG_SOURCE_ADMISSION registry_identity_counts_complete=1\nSLUG_SOURCE_ADMISSION registry_association_attempted_entries=101\nSLUG_SOURCE_ADMISSION registry_association_admitted_entries=101\nSLUG_SOURCE_ADMISSION registry_association_scope_admitted_entries=101\nSLUG_SOURCE_ADMISSION registry_association_refused_entries=0\nSLUG_SOURCE_ADMISSION registry_association_sticky_refusals=0\nSLUG_SOURCE_ADMISSION registry_association_distinct_rows=101\nSLUG_SOURCE_ADMISSION registry_association_repeated_entries=0\nSLUG_SOURCE_ADMISSION registry_association_retained_rows=101\nSLUG_SOURCE_ADMISSION registry_association_charged_bytes=2105744\nSLUG_SOURCE_ADMISSION registry_first_limit_call_present=0\nSLUG_SOURCE_ADMISSION registry_first_limit_call_ordinal=0\nSLUG_SOURCE_ADMISSION registry_first_limit_relation=0\nSLUG_SOURCE_ADMISSION registry_first_limit_existing_row=0\nSLUG_SOURCE_ADMISSION registry_first_limit_prior_admissions=0\nSLUG_SOURCE_ADMISSION registry_first_limit_prospective_unique=0\nSLUG_SOURCE_ADMISSION registry_first_exhaustion_origin_paired=0\nSLUG_SOURCE_ADMISSION registry_selected_leaf_call_identity_proved=0\nSLUG_SOURCE_ADMISSION descriptor_reserved_highwater_bytes=442387\nSLUG_SOURCE_ADMISSION descriptor_reserved_highwater_settled=1\nSLUG_SOURCE_ADMISSION descriptor_exact_peak_proved=1\nSLUG_SOURCE_ADMISSION status=0\nError: \"actual source admission refused\"\nFAILED\n\nfailures:\n\nfailures:\n    runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 728 filtered out; finished in 15.76s\n\n"
+  },
+  "terminal_reviews": [
+    {
+      "path": "target/wp899/genuine-root-association-terminal-record-audit.md",
+      "sha256": "7abeb33e02cc64aaec8f56ecf0669a07cb57a4626ee00822257dcd2cd02cc910",
+      "text": "# WP899 global6 terminal ordered-record FINAL audit\n\nVerdict: FINAL ACCEPT of bounded terminal evidence and its stated interpretation. The separately frozen ONE global6/local1 observation is TERMINAL_NO_RETRY; it refused source admission. This does not accept full WP899, successful source/runtime/query/bootstrap fit, historical40GB attribution or a new attempt.\n\nExact ledger freeze association and command match freeze8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6. Independently rehashed all106 source pins,65 prerequisite pins,3 eligibility reviews and37 prior spent references; all matched. Current6 input byte sizes/SHA, a66c artifact and1643 Python also matched. Prior global1\u20135 remain immutable/spent. The inherited caller/source eligibility review remains applicable. No execution, retry, network, Cargo, source mutation or cleanup was performed by this audit.\n\n| Evidence | SHA256 |\n| --- | --- |\n| `genuine-root-association-invocation-freeze.json` | `8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6` |\n| `genuine-root-association-attempt-ledger.json` | `ea79fe0f06416710f7148f09573589466f7bdc7cd446431859364fc7f58dc1f9` |\n| `genuine-root-association-one-receipt.json` | `8a5724a4d9499add037845b84473261bea77f5f596ae212bdf539953ea83d692` |\n| `genuine-root-association-one.log` | `24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6` |\n| `genuine-root-association-raw-records.json` | `1b3a7c6781a0d8d5a1e02420298fcd0b947bb8d72c9a3ec4a2e32532f2cb8974` |\n| `genuine-root-association-one-analysis.json` | `2a5295b0a6961d7dcef992172a4aaf8014036081c11d29aa76144c037935447a` |\n\nIndependently parsed exact4576 log bytes, removing only the exact libtest heading prefix on the first schema line. All81 ordered numeric records and75 unique keys exactly match raw-records.json, including values_by_key; the only repeated key is nested_variant_code seven times, in order6,12,17,42,54,66,167. No last-value dictionary erased the path. The literal footer is0 passed/1 failed/0 ignored; child exit101, launcher wrapper exit1, wrapper elapsed15.807721s. Launcher process itself returning0 to its caller is not child success. The log contains fixed numeric metadata and the constant refusal, no URL/environment/identity vector.\n\nSource-decoded selected error: outer4 is Computation, nested owner5 is SourceSelection at MappingSemantic2, termination1 Classified with complete seven-code path and actual native cause present1. Native site20 is Scope; detail4 is Scope; scope5 is WorkDeadline (`registry_dice/refusal.rs:205`, `source_service/failure.rs:150`). Counter/IO/errno/status/protocol presence is absent; no DNS, EAI, EPERM, HTTP-status or permissions attribution follows. Actual first poison is also5 with observed source counters1. `scope.rs:358\u2013383` uses min(common work deadline, now+step) and returns the same WorkDeadline for both; HTTP has15s step boundaries at http.rs:208/222/285/315. Elapsed15.8s is not evidence of full27s expiry. The actual smaller-step/transport/clock producer and precise stalled phase remain unobserved. No cap or semantic correction is justified solely by this terminal.\n\nAssociation evidence is complete for this observation: settled1, installed Scope1, counts_complete1; attempted/admitted/actualscope101; admitted distinct101, repeated0, retained rows101; refused/sticky0. The admitted partition101+0=101 equals actual scoped registry_attempts101. Registry bytes211961 were charged. Exact identity semantics are fixed workspace + literal full URL + route kind/actual Local OS path (`registry_association.rs:166\u2013250`), not semantic DICE key equivalence, successful HTTP responses or complete closure cardinality. Full coverage/current counter checks at snapshot and emission prohibit missing/gapped identities being certified. These101 admissions are distinct for THIS run only; they cannot classify global5's earlier128 admissions, establish an all-root lower bound, or authorize skipping semantic versions/frontiers/generation.\n\nFirst-limit ordinal is absent0, relationUnknown0, all relation details0, first-exhaustion pairing0 and selected-leaf own-call identity0. All101 RegistryIo charge entries were admitted before the downstream deadline; zero association refusals does not prove successful IO. No RegistryAttempts128 exhaustion was observed here, and no first origin is reconstructed from global5. `genuine_root.rs:516\u2013539` requires a real limit ordinal/relation, actual first poisonRegistryAttempts and actual selected nativeRegistryAttempts to pair; all are appropriately unavailable in this WorkDeadline terminal.\n\nActual snapshot/raw restoration and engine retirement records are1/1/1. Raw restoration1 means all7 existing caller raw cells were checked against the accepted prior request, its read transaction dropped and DICE drained (`genuine_root.rs:371\u2013459`); diagnostic runtime destroys acquisition runtime/engine before export (`diagnostic.rs:141\u2013181`). This run reached no progress/owner refresh/capture and visited zero capture stage paths. Containment_proved0 is correct; no_containment_violation1 is vacuous and supplies no captured-root proof. Status0; no source/read/clone/export success or final lastDrop/input_pins_unchanged marker was emitted. External audit reverified actual6 input bytes separately.\n\nAt the intentionally recorder-held snapshot, live buffer credit2105744 equals its reported charged bytes; peak13250743 is service reservation highwater, not physical heap/RSS. Harness then drops recorder before returning refusal (`genuine_root.rs:1012\u20131022`); no final zero-credit scalar is emitted on this refused path, so this review does not invent one. Settled descriptor highwater442387 with flags1 is exact within the reservation accountant, not RSS or source-fit evidence.\n\nSupervisor receipt separately records688/688 confirmed census cycles, zero resume failures/unexpected descendants, no TERM/KILL, child joined and private stage removed, bounded log preserved, cleanup not exhausted. Sampled RSS peak80449536 bytes=76.72265625MiB, sampled swap0, allocated private disk8192 bytes. These are this early-refusal run's sampled measurements under hard4GiB RLIMIT_AS and existing sampled thresholds; no kernel RSS/no-swap/disk quota or historical40GB/full-workload fit claim follows. Root's outer empty parent remains separately owned pending terminal reviews; this audit neither removed it nor certified its later removal.\n\nRoot one-analysis.json agrees with every decoded association value, native path/cause, restoration/engine flags, receipt/log hash and the explicit unknown deadline producer/earlier-cardinality limitations. No material evidence-interpretation correction is required. Verification consisted only of source reads and independent local hash/JSON/ordered-line checks, all exit0.\n"
+    },
+    {
+      "path": "target/wp899/genuine-root-association-terminal-supervisor-review.md",
+      "sha256": "04a59b59edd6f859f2e12b47fe25dadc64ec42b540bcf1cef93f9a2b08147bc4",
+      "text": "# WP899 global6 terminal supervisor FINAL review\n\nVerdict: **FINAL ACCEPT of bounded terminal supervision and evidence integrity only.** Global6/local1 is `TERMINAL_NO_RETRY`; source admission refused. WP899, successful source/runtime/process fit and the historical 40 GB attribution remain unaccepted. This audit performed no workload execution, retry, network acquisition, Cargo, source mutation or cleanup.\n\nThe spent freeze SHA256 is `8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6`; ledger `ea79fe0f06416710f7148f09573589466f7bdc7cd446431859364fc7f58dc1f9` names that exact freeze and command. Its global6/local1 budget remains one with no automatic retries. The freeze differs from reviewed draft `30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd` only in reconciled state, reviewed-draft hash and the three eligibility-review hashes. All 106 source pins, 65 prerequisites, three eligibility reviews and 37 prior-spent references independently rehashed without mismatch. Python `1643dacd\u2026`, artifact `a66c60bb\u2026`, and all six input sizes/digests still match. Current HEAD is `1b0452a507fd9a23683dd59db10a7486aed52f91` and tracked workspace state is clean. Prior global1\u20135 remain immutable/spent.\n\n| Terminal evidence | SHA256 |\n| --- | --- |\n| `genuine-root-association-one-receipt.json` | `8a5724a4d9499add037845b84473261bea77f5f596ae212bdf539953ea83d692` |\n| `genuine-root-association-one.log` | `24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6` |\n| `genuine-root-association-raw-records.json` | `1b3a7c6781a0d8d5a1e02420298fcd0b947bb8d72c9a3ec4a2e32532f2cb8974` |\n| `genuine-root-association-one-analysis.json` | `2a5295b0a6961d7dcef992172a4aaf8014036081c11d29aa76144c037935447a` |\n\nThe launcher completed its one invocation and wrote the terminal ledger: wrapper exit1 in15.807721s; child101, supervisor elapsed15.768533s. Launcher exit0 reported by Root is its own bookkeeping completion, not workload success. Receipt refusal is `child_exit_nonzero`, with `supervision_ok=false` and `source_gate_verified=false`. Its hard RLIMIT_AS4GiB and parent-death guard were verified. Controls equal the global5 freeze exactly: sampled RSS4GiB, allocated stage disk6GiB, any swap/descendant/accounting loss refusal, shared absolute27+3+3 seconds,20ms polling,100ms complete census,1MiB log. These sampled controls are not kernel RSS, swap-disable or disk quotas.\n\nAll688 census attempts completed, zero resume failures and zero unexpected descendants. Maximum census cycle was5,549,855ns; total1,618,356,096ns. No TERM/KILL was needed; child was actually joined, the private stage removed, log preserved and terminal cleanup not exhausted. Sampled RSS peak80,449,536B (76.72265625MiB), swap0, allocated disk8192B and logical disk4576B are measurements of this refused run only. Log length4576B is within its immutable cap and matches the raw-records log hash. Actual joining precedes owned stage removal under the unchanged reviewed supervisor lifecycle; no new accounting relaxation or skip is present.\n\nThe ordered numeric receipt has81 records/75 keys. Selected native cause is Scope/WorkDeadline, with first poison5; no errno, DNS, status or selected counter attribution is available. Command-wide and smaller per-step expiry share this code, so15.8s does not prove which deadline producer expired or where downstream work stalled. Association counts are complete for this run:101 attempted/admitted/scope entries,101 distinct identities, zero repeats/refusals/sticky refusals. No RegistryAttempts exhaustion or first-limit pairing occurred. These are exact RegistryIo entry identities, not semantic DICE uniqueness or successful responses; they do not classify the prior128 admissions in global5. Capture/progress were not reached. Accepted/raw restoration and engine retirement are1/1/1. Recorder-held live reservation2,105,744B, service reservation highwater13,250,743B and settled descriptor highwater442,387B are accountant credits, not RSS or complete-source-fit evidence; refused-path final zero-credit/export proof must not be invented.\n\nRead-only no-follow directory-FD inspection confirms retained outer parent `/tmp/slug-wp899-association-parent-ks6qq8zr` is canonical, empty and exactly dev54/ino793406/UID1000/mode0700. Separate name-only snapshots of `/proc` and `/run/host/proc` each read601 names with no denied entries and no slug/slugd/cargo/rustc/rustdoc or Core/Loading/Bzlmod test overlap. This is terminal-time evidence; launcher prelaunch checks and Root's single serial slot cover launch-time obligations, not a continuous ambient-process proof.\n\n**Parent cleanup eligibility:** after all three independent terminal reviews are accepted and pinned, Root may remove only this exact still-empty owned parent, after rechecking no-follow FD identity/mode/ownership/emptiness immediately before removal. This review establishes the current prerequisites, not that all three reviews already exist or that later identity/emptiness is unchanged. No workload retry is authorized by cleanup. No material supervision/control/identity correction was found.\n"
+    },
+    {
+      "path": "target/wp899/genuine-root-association-terminal-frontier-review.md",
+      "sha256": "daf8d92e1691f4d3be937c626f75f1a468d2c2b3caac7a7daf0573144bd0b84d",
+      "text": "# WP899 global6 registry association \u2014 independent FINAL terminal frontier\n\n**ACCEPT the reached terminal evidence only.** ONE global6/local1 is spent, TERMINAL_NO_RETRY; full WP899 and successful actual source admission remain unaccepted. The new observation proves complete101 distinct admitted RegistryIo identities before a chosen typed WorkDeadline refusal. It does not prove a registry-attempt limit, identify the timeout producer, explain global5's128 identities, or attribute the reported40GB footprint.\n\n## Provenance and ordered evidence\n\nFreeze SHA256 `8bc6e6d97aaf39ad43709c9c049e48dcdaf258f8e6df4446e6fd27620bc1b3d6` matches the ledger's exact freeze link. Compared the freeze to reviewed draft `30067f989c8e6be14242579fefaf28655393ba34ba929bd7183872e0c920f5fd`: only permitted final state, three review pins and reviewed-draft link were reconciled. All106 current source pins,65 prerequisite pins, three eligibility reviews and37 prior spent references rehash correctly. No source drift or older-terminal reinterpretation is involved.\n\nLog4576 bytes, SHA256 `24cd4d584d65ec039f0fe7b39fdebb03ba53a4b0f61b4e421e62691d232b10b6`. Independently decoded81 ordered records/75 unique keys, stripping only the exact known libtest heading prefix. Exact ordered list matches raw-records JSON; the only repeated key is nested_variant_code, preserving all seven values in order. No unexpected singleton duplication or numeric schema mismatch was found. The analysis agrees with the raw values and source codebook. All unknown/absent native payload markers remain explicit rather than inferred from the terminal error text.\n\nActual chosen returned error: outerComputation4; ownerSourceSelection5 atMappingSemantic2; terminationClassified1, full variant path1, native-detail-observed1 and frontier-proof-missing0. Ordered path `6/12/17/42/54/66/167` decodes RootMappingPredecessor\u2192ExtensionMappingsRoutes\u2192RoutesGraph\u2192GraphDiscoveryLeaf\u2192DiscoverySourcePreparation\u2192ModuleSourceRegistryFile\u2192RegistryFileTransport. Native is siteScope20/detailScope4/WorkDeadline5. Counter-present0, errno-present0 and status-present0 mean those data are absent, not observed counter/errno/status0. Actual first scope poison is WorkDeadline5. The copied typed path is fully classified at this tier; exact timing stage/selected request identity remain unrepresented.\n\n## What the association establishes\n\nSettled1, installed-scope1 and complete1 are backed by accepted snapshot restoration1, all7 raw restoration1 and actual engine retirement1. Attempted=admitted=actual scope admitted=sampled registry_attempts=101; refused0/sticky0; distinct101/repeated0/retained rows101. Checked complete partition holds. This is exact RegistryIo identity cardinality for this current reached invocation history, using the accepted scope workspace/route/literal URL/supplied Local OS bytes owner. It is not101 successful HTTP responses, unique valid modules, semantic DICE keys or proof of duplicate elimination.211961 admitted registry bytes reflect consumed registry body bytes independently of the invocation count.\n\nFirst registry-limit call absent0 and ordinal0, relationUnknown0, existing row/prior count/prospective distinct0, paired-first-exhaustion0. Those zero payloads are paired with absence markers: no first RegistryAttempts exhaustion was observed. The101 charges were admitted; an admitted downstream IO future can still return a timeout without a charge refusal. No selected-leaf own-call identity is proved (flag0); neither the last admitted row nor a concurrent sibling can be assigned to this returned error from counts alone.\n\nGlobal5 remains its separate spent128-admission RegistryAttempts-limit observation with unrecorded identities. Current101 unique/zero-repeat cannot be extrapolated to its128 or the unread rest of the actual closure. Source/service instrumentation has real pressure and timing cost; a differently reached frontier is not evidence of an optimized graph or permission to skip generation/frontier semantics.\n\n## Memory, restoration and supervisor boundary\n\nLive source buffer2105744 bytes equals the exact retained recorder credit; it is intentionally still owned at the post-restoration source-counter sample. Source buffer reservation highwater13250743 bytes includes it and stays below the unchanged16MiB bank. No subtraction or earlier-live0 claim is appropriate. Descriptor lifetime reservation highwater442387 bytes has settled1/exact1, based on actual raw transaction drain/engine retirement. It is conservative admitted bank credit including headers/capacity/receipt and conversions, not physical heap, workload RSS, or a final-used0 assertion. Source attempts/transferred/decoded/written are all0.\n\nSupervisor receipt SHA256 `8a5724a4d9499add037845b84473261bea77f5f596ae212bdf539953ea83d692`: child101, wrapper1, child_exit_nonzero, noTERM/noKILL, joined1, stage_removed1. Wrapper15.807721s/supervisor15.768533s is observed duration, not proof of which immutable bound expired. Hard4GiB AS and parent-death guard verified;688/688 confirmed census cycles,0 resume failures/descendants, sampled RSS80449536 bytes=76.72265625MiB, swap0, sampled allocated disk8192 bytes. These are measurements of this refused preparatory branch. supervision_ok/source_gate_verified are false because source admission failed, not evidence of a lost census or successful source gate.\n\nCapture reached0/completed0, stage_paths_observed0 and containment_proved0. The vacuous no_containment_violation_observed1 is not containment proof. No actual query shape/source certificate/materialized host-tool tree/clone read/lastDrop success record was emitted. Exact restoration and settled credits on this refusal cannot substitute for those positive gates. Full runtime closure/process execution/historical attribution remain0. Small refused-branch RSS proves neither full-root fit nor the40GB workload's owner/fix.\n\nRead-only parent metadata still matches device54/inode793406/UID1000/mode0700, empty and unremoved; no parent-cleanup receipt exists. No cleanup was performed. Only Root may remove the exact empty parent after its required terminal reviews; this review supplies no new run or retry authorization.\n\n## Next natural prerequisite\n\nThe next source-backed task is an audit of the existing timing owner, not a cap change or replay. `SourceServiceScope::check_locked` produces WorkDeadline from the immutable command work deadline. `Scope::during` instead selects min(command deadline, now+step), can produce the same WorkDeadline at its timer or post-completion check, and preserves first poison/primary inner errors. Scoped HTTP has existing15s and30s phase budgets. The current typed cause does not retain which producer/phase/selected bound created the first poison. The15.8s duration alone cannot prove DNS, TCP, TLS, header/body phase, full27s exhaustion, remote slowness or quiescence overhead as the causal producer.\n\nAudit those original creation sites and selected-bound propagation under the unchanged clocks; if finer actual evidence is needed, choose a bounded reviewed typed provenance projection at the natural first-poison/error owner, with separate first-origin versus chosen sticky-caller semantics. Do not infer provenance by matching error Eq, strings, last request ordinal or elapsed duration. Reuse portable exact deadline/primary-error controls; any new discriminator must prove the selected producer without altering source policy, budget, cancellation, fallback or authority. A future actual observation requires a new hypothesis, independent exact freeze and unchanged explicit ceilings. There is no automatic retry, registry cap increase or whole-packet acceptance from this terminal.\n\nSole review output is this receipt. No Cargo/tests/network/actual execution/source/fixture/environment/configuration mutation or cleanup occurred.\n"
+    }
+  ],
+  "exact_parent_cleanup": {
+    "path": "target/wp899/genuine-root-association-parent-cleanup.json",
+    "sha256": "b12ae6fcedbb840f7a6ee43fb2a6e9cf14d2993f6c09a815536c8fbe5b2f7975",
+    "data": {
+      "schema": 1,
+      "stage_parent": {
+        "path": "/tmp/slug-wp899-association-parent-ks6qq8zr",
+        "device": 54,
+        "inode": 793406,
+        "uid": 1000,
+        "mode": "0o700",
+        "empty": true
+      },
+      "joined_before_cleanup": true,
+      "stage_removed_before_cleanup": true,
+      "three_terminal_review_sha256": {
+        "genuine-root-association-terminal-record-audit.md": "7abeb33e02cc64aaec8f56ecf0669a07cb57a4626ee00822257dcd2cd02cc910",
+        "genuine-root-association-terminal-supervisor-review.md": "04a59b59edd6f859f2e12b47fe25dadc64ec42b540bcf1cef93f9a2b08147bc4",
+        "genuine-root-association-terminal-frontier-review.md": "daf8d92e1691f4d3be937c626f75f1a468d2c2b3caac7a7daf0573144bd0b84d"
+      },
+      "nofollow_fd_identity_and_empty_rechecked": true,
+      "removed_exact_empty_parent_only": true,
+      "path_absent_after": true,
+      "new_execution_or_retry": false
+    }
+  },
+  "next_timeout_source_audit": {
+    "path": "target/wp899/genuine-root-association-timeout-source-audit.md",
+    "sha256": "e935c8676a613f5976bace7acd5dd8caa5420e3b97efc1593b64b33f46382f85",
+    "text": "# Root source audit \u2014 actual WorkDeadline ambiguity\n\nRead-only source audit after the ONE spent global6 observation; no executable,\nnetwork request, source change or retry. Actual81 ordered records prove chosen\nnative Scope20/detailScope4/WorkDeadline5, current first-poison5 and complete101\nadmitted distinct RegistryIo identities. The exact timer-producing HTTP step and\nselected leaf own call remain unknown. No redundant fetch defect is established.\n\n## Natural timeout owner\n\nscope.rs:191\u2013206 check_locked creates WorkDeadline on actual scope work expiry.\n:367\u2013390 during creates effective deadline=min(original work, now+step), and both\nits timer branch and synchronous-return postcheck poison the same WorkDeadline\nvariant. Original primary-error precedence and sticky first poison are preserved.\nThe result carries neither deadline-domain nor call-site provenance. failure.rs:150\nmaps that same error to RegistryRefusalScopeFailure::WorkDeadline, while the scope\ntransport constructor assigns generic RegistryRefusalSite::Scope. Later callers\nmay propagate the existing poison rather than create it. Consequently actual\nreturned native Scope5 alone cannot identify the originating timer or HTTP site.\n\nhttp.rs:208 DNS,222 each TCP connect,285 TLS handshake and315 HTTP handshake use\n15s steps. :349 response headers and:112 body reads use30s steps, always capped by\nthe same original scope deadline. TCP connect's async error branch can try a later\nbounded address; a scoped deadline refusal returns before that fallback. This is\nexisting bounded policy, not proof of a defective address/lookup/retry in global6.\nNo payload/URL/address or identity vectors were logged; exact timed-out request,\ntransport phase and actual root's remaining demand cannot be reconstructed.\n\n## Clock/resource evidence\n\nSupervisor supplies original27s work/3s cleanup monotonic deadlines. harness_clock\ntranslates CLOCK_MONOTONIC conservatively via a bounded10ms sampling bracket,\nretains original transported values and never resets them. Whole-child supervisor\nelapsed15.768532562s is earlier than the declared27s envelope; this is consistent\nwith a smaller per-step deadline, rather than evidence that the27s ceiling needs\ngrowth. It does not identify which transport step or scheduling cause expired.\nConfirmed stops remain nontransparent and consume these same absolute clocks;\n688 complete cycles total1.618356096s do not establish that stopping caused expiry.\nNo deadline, source-bank, request, AS/RSS, disk or log cap is changed by this audit.\n\n## Next bounded prerequisite\n\nIf exact timeout attribution is required, it belongs at the natural during/timer\nproducer with first-cause creation distinguished from sticky propagation, bounded\nredacted domain/site fields, unchanged error/primary selection and no extra IO.\nA new optional observation design must charge storage, retain scope lifecycle,\ndiscriminate timer versus postcheck/common versus step and concurrent sticky\nselection using existing focused scope/HTTP controls. Do not add a generic trace,\nURL log, cache, request normalization, source fallback, cap increase or network\nretry. Source review/portable gates must precede any separately contracted actual\nobservation. Historical40GB and fullWP899 remain open; normal source admission is\nstill the required packet result, not acceptance of this refusal.\n\n## Current source pins\n- app/slug_core_v2/src/runtime/source_service/scope.rs SHA256 44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62\n- app/slug_core_v2/src/runtime/source_service/http.rs SHA256 704504187ee3d5574aed0e95531c563929fcae0cbaf3f46342f40f41d5cc4d6a\n- app/slug_core_v2/src/runtime/source_service/failure.rs SHA256 2de74ac11a738e890598945d7b5bfe4063664bf2281ee0b34b319a9b785e9870\n- app/slug_core_v2/src/runtime/source_preparation/harness_clock.rs SHA256 ddca8674a50e793d21c6b91df24f95de849bbc95ccb933de77fac4eda95caeb3\n- scripts/v2_source_admission_supervisor.py SHA256 820473bed16fbc137048966fa2860044d4bc78c975fb9ca8b4240418aa1bc1ff\n"
+  },
+  "timeout_source_audit_final_review": {
+    "path": "target/wp899/genuine-root-association-timeout-source-review.md",
+    "sha256": "96bd1d026d56c98ff87671f9b337dfe71357a230e9c942e41dfe200fcaf27dba",
+    "text": "# WP899 timeout ambiguity \u2014 independent FINAL source supplement\n\n**ACCEPT the bounded source audit and its next-prerequisite recommendation.** Reviewed exact audit SHA256 `e935c8676a613f5976bace7acd5dd8caa5420e3b97efc1593b64b33f46382f85` against the named current sources. This accepts source-supported possibilities, not an actual timeout producer, implementation API, new invocation or full WP899.\n\nThe recorded source pins for scope/http/failure match current bytes. Scope::check_locked creates WorkDeadline at the immutable command work deadline; Scope::during chooses min(command work deadline, now+step) and uses the same variant for its timer and post-completion expiry paths. Its original primary-inner-error and sticky-first-poison precedence remains intact. The scope-to-registry cause projection preserves only generic Scope/WorkDeadline, so this returned variant does not identify its creation site or chosen deadline domain. A later selected caller can propagate poison created elsewhere.\n\nThe four15s phase anchors are accurate: DNS lookup, each bounded TCP-address connect, TLS handshake and HTTP handshake. Response-header acquisition and each body-read wait use30s, capped by the same original work deadline. TCP IO failure can continue to another already bounded address; a Scope deadline returned at its boundary exits before that fallback. This static behavior establishes no actual failed address, resolver cause or retry defect.\n\nHarnessClockStage uses the BEFORE Instant/CLOCK_MONOTONIC/AFTER bracket, refuses a bracket over10ms, and bases translation on BEFORE with the original transported absolute values. No remaining27s budget is restarted. Actual child elapsed15.768532562s is consistent with an earlier per-step boundary; it neither identifies which15s phase expired nor proves stopping, network latency, scheduling or the27s envelope as the causal producer. The688 confirmed cycles and their measured total are separate overhead evidence, not causal attribution.\n\nThe proposed next task is sound only as a bounded natural-owner design investigation: distinguish actual deadline-domain/site and creation-versus-sticky propagation at the original check/timer/postcheck producer, preserve error/first-poison/primary selection and clocks, charge any added storage, and prove selected-error association rather than joining equal errors or a side trace. Portable timer/postcheck/full-vs-step/concurrent-first-poison controls must precede any later separately reviewed actual observation. Exact APIs and allowlist still require independent DESIGN before implementation.\n\nNo evidence from global6 is revised: complete101 unique admitted RegistryIo identities, no registry-limit creator, typed WorkDeadline, restored/raw/engine1 and no source/capture success. Global5's128 identity cardinality stays unknown. No ceiling growth, source fallback, network replay, historical40GB attribution or whole-packet acceptance is selected. No source edit, execution, Cargo, network, fixture/configuration/environment access or cleanup occurred; sole output is this review.\n"
+  },
+  "preserved_gate_scope": [
+    "81ordered numericrecords/75keys; seven repeatedsemanticpath codes preserved",
+    "101admitted RegistryIo identities !=101successfulHTTPresponses/modules/semanticDICEkeys",
+    "zerocharge refusals and no firstRegistryAttempts creator/origin; selectedleafowncall identity0",
+    "accepted snapshot+all7raw restoration andenginegone1",
+    "livebuffer2105744bytes exactlyretainedrecordercredit atsample; noactualfinalzerocredit/clone/export/read/lastDrop success marker invented",
+    "descriptor442387settledreservationcredit !=heap/RSS",
+    "sampled80449536bytesRSS=76.72265625MiB/swap0 onlythisearlyrefusedbranch; not40GBowner/wholeloadfit",
+    "688/688completecensuses,0resumefailure/descendants, child101joined/noTERM/KILL, stageremoved thenexactemptyparentremovedafter3reviews"
+  ],
+  "resource_ceilings_unchanged": true,
+  "earlier_global1_to5_spent_evidence_unchanged": true,
+  "next_gate": "Design bounded optional timer/selected-bound provenance at natural first-poison owner, under unchanged semantics/caps, with charged memory and creator versus sticky propagation controls. No new actual run eligibility.",
+  "goal_previous_turn": "progress: accepted request association committed; this turn new measured actual evidence and source-backed next prerequisite",
+  "time_scope": "No fresh Cargo/build; exactignoredlisting0.003181s; one wrapper15.807721s/supervisor15.768533s; review/totalturn elapsed not independently measured.",
+  "full_source_capture_proved": false,
+  "full_wp899_accepted": false,
+  "historical_40gb_attribution_proved": false,
+  "user_workload_clarification": "still pending; no active slug/slugd in current process RSS snapshot; unrelated processes not attributed to historical footprint",
+  "final_structure_checks": {
+    "v2_plan_status": 0,
+    "v2_archive_status": 0,
+    "git_diff_check": 0,
+    "reviewed_draft_reconstruction_sha256_match": true
+  }
+}
