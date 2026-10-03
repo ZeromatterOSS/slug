@@ -29,10 +29,12 @@ pub(super) use capture::CapturedInputImageLease;
 pub(super) use capture::PreparedInputImageStage;
 pub(super) use capture::capture_input_image;
 pub(super) use capture::capture_prepared_input_image;
+pub(super) use capture::capture_prepared_input_image_retaining;
 pub(super) use capture::prepare_input_image_stage;
 pub(super) use capture::verify_frontier;
 pub(super) use file_capture::CapturedInputFileLease;
 pub(super) use file_capture::capture_prepared_input_file;
+pub(super) use file_capture::capture_prepared_input_file_retaining;
 
 #[derive(Debug)]
 pub(super) enum InputImageCaptureError {

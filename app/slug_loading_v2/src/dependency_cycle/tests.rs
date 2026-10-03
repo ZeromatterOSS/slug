@@ -29,6 +29,52 @@ pub(super) fn load(repo: &str) -> DynKey {
     ))
 }
 
+#[tokio::test]
+async fn selected_preparation_owner_and_observed_mapping_demand_keep_full_node_identity() {
+    use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
+    use slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey;
+
+    use crate::SelectedPreparationOwnerKey;
+    let budget = slug_workspace_v2::ImageDescriptorBudget::new(1 << 20);
+    let apparent = slug_identity_v2::ApparentRepoName::new("tools").unwrap();
+    let owner = DynKey::from_key(
+        SelectedPreparationOwnerKey::new(workspace(), &apparent, &budget).unwrap(),
+    );
+    let mapping = DynKey::from_key(HostRootRepositoryMappingObservationKey::new(workspace()));
+    let demand = DynKey::from_key(HostSelectedExtensionDemandObservationKey::new(
+        workspace(),
+        CanonicalRepoName::new("canonical_tools").unwrap(),
+    ));
+    assert!(matches!(
+        Node::from_dyn(&owner),
+        Some(Node::SelectedPreparationOwner(_))
+    ));
+    assert!(matches!(
+        Node::from_dyn(&mapping),
+        Some(Node::ObservedRootMapping(_))
+    ));
+    assert!(matches!(
+        Node::from_dyn(&demand),
+        Some(Node::ObservedSelectedDemand(_))
+    ));
+    let other = DynKey::from_key(HostSelectedExtensionDemandObservationKey::new(
+        workspace(),
+        CanonicalRepoName::new("other_tools").unwrap(),
+    ));
+    assert_ne!(Node::from_dyn(&demand), Node::from_dyn(&other));
+    let graph = Arc::new(DependencyCycleGraph::default());
+    let a = graph.start(&owner).unwrap();
+    a.add_edge(&mapping);
+    let b = graph.start(&mapping).unwrap();
+    b.add_edge(&demand);
+    let c = graph.start(&demand).unwrap();
+    c.add_edge(&owner);
+    let (one, two, three) = tokio::join!(detected(&a), detected(&b), detected(&c));
+    assert_eq!(one, two);
+    assert_eq!(one, three);
+    assert_eq!(one.nodes.len(), 4);
+}
+
 #[test]
 fn bounded_formatter_counts_unicode_and_stops_before_formatting_tail() {
     struct WithTail(std::cell::Cell<bool>);

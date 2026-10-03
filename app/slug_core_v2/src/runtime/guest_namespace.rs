@@ -23,7 +23,7 @@ pub(super) mod attempt;
 mod reader;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "guest_namespace/tests.rs"]
-mod tests;
+pub(in crate::runtime::dice) mod tests;
 
 fn failure(message: &'static str) -> NativeDemandSessionError {
     NativeDemandSessionError::Computation(anyhow::anyhow!(message))
@@ -118,7 +118,7 @@ impl WorkspaceRuntime {
         runtime_policy: Option<slug_bzlmod_v2::RuntimeSourceDeclarationPolicy>,
         guest_policy: Option<GuestNamespacePolicy>,
         #[cfg(test)] hook: Option<
-            &dyn Fn(selected_tool_source::ToolPhase) -> Result<(), NativeDemandSessionError>,
+            &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
         >,
     ) -> Result<PreparedGuestNamespaceViewLease, NativeDemandSessionError> {
         let guest_policy = guest_policy.ok_or_else(|| failure("missing guest policy"))?;
@@ -155,6 +155,20 @@ pub(super) fn reserve_owner(
         .try_reserve(std::mem::size_of::<ViewOwner>() + 256)
         .map_err(|e| NativeDemandSessionError::InputImage(e.into()))
 }
+pub(in crate::runtime::dice) struct ViewCapture {
+    partial: Option<ViewOwner>,
+    complete: Option<PreparedGuestNamespaceViewLease>,
+    credit: Option<ImageDescriptorReservation>,
+}
+impl ViewCapture {
+    pub(in crate::runtime::dice) fn new(credit: ImageDescriptorReservation) -> Self {
+        Self {
+            partial: None,
+            complete: None,
+            credit: Some(credit),
+        }
+    }
+}
 pub(super) fn finish(
     facts: ObservedGuestNamespaceFacts,
     sources: runtime_sources::CertifiedRuntimeSourcesLease,
@@ -162,23 +176,51 @@ pub(super) fn finish(
     credit: ImageDescriptorReservation,
     budget: &slug_workspace_v2::ImageDescriptorBudget,
 ) -> Result<PreparedGuestNamespaceViewLease, NativeDemandSessionError> {
-    if facts.profile() != sources.profile() || !credit.same_budget(budget) {
+    finish_retaining(facts, sources, data, &mut ViewCapture::new(credit), budget)
+}
+pub(super) fn finish_retaining(
+    facts: ObservedGuestNamespaceFacts,
+    sources: runtime_sources::CertifiedRuntimeSourcesLease,
+    data: Option<selected_label_data::prepare::Lease>,
+    capture: &mut ViewCapture,
+    budget: &slug_workspace_v2::ImageDescriptorBudget,
+) -> Result<PreparedGuestNamespaceViewLease, NativeDemandSessionError> {
+    if capture.partial.is_some() || capture.complete.is_some() {
+        return Err(failure("guest capture already attempted"));
+    }
+    capture.partial = Some(ViewOwner {
+        facts,
+        sources,
+        data,
+        invalid: AtomicBool::new(false),
+        budget: budget.dupe(),
+    });
+    let owner = capture.partial.as_ref().unwrap();
+    if owner.facts.profile() != owner.sources.profile()
+        || !capture
+            .credit
+            .as_ref()
+            .is_some_and(|r| r.same_budget(budget))
+    {
         return Err(failure("guest capture profile mismatch"));
     }
-    if facts.data_sources() != data.as_ref().map(|lease| lease.sources()) {
+    if owner.facts.data_sources() != owner.data.as_ref().map(|lease| lease.sources()) {
         return Err(failure("guest data capture association mismatch"));
     }
-    let view = PreparedGuestNamespaceViewLease(
-        credit
-            .freeze(ViewOwner {
-                facts,
-                sources,
-                data,
-                invalid: AtomicBool::new(false),
-                budget: budget.dupe(),
-            })
-            .map_err(|e| NativeDemandSessionError::InputImage(e.into()))?,
-    );
+    let view = match capture
+        .credit
+        .take()
+        .unwrap()
+        .freeze_preserving(capture.partial.take().unwrap())
+    {
+        Ok(block) => PreparedGuestNamespaceViewLease(block),
+        Err((error, owner, credit)) => {
+            capture.partial = Some(owner);
+            capture.credit = Some(credit);
+            return Err(NativeDemandSessionError::InputImage(error.into()));
+        }
+    };
+    capture.complete = Some(view.dupe());
     for node in view.facts().nodes() {
         if !matches!(
             node.binding(),
@@ -190,7 +232,14 @@ pub(super) fn finish(
     }
     Ok(view)
 }
+
 impl PreparedGuestNamespaceViewLease {
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn sources(
+        &self,
+    ) -> &runtime_sources::CertifiedRuntimeSourcesLease {
+        &self.0.get().sources
+    }
     pub(super) fn facts(&self) -> &ObservedGuestNamespaceFacts {
         &self.0.get().facts
     }
@@ -270,8 +319,8 @@ impl PreparedGuestNamespaceViewLease {
                     .nth(declaration)
                     .ok_or(reader::ViewError::Stale)?;
                 sources
-                    .with_image_root(declaration, |root, image| {
-                        image_member(root, image, expected, entry, node, visitor)
+                    .with_image_source(declaration, |root, base, image| {
+                        image_member_at_base(root, base, image, expected, entry, node, visitor)
                     })
                     .ok_or(reader::ViewError::Stale)?
             }
@@ -321,13 +370,25 @@ impl PreparedGuestNamespaceViewLease {
                 visitor(root,relative)
             }).ok_or(reader::ViewError::Stale)?,
             slug_loading_v2::SelectedDataLabelBinding::ToolMember{role,..}=>self.0.get().sources.tools().with_image_root(*role,|root,actual|image_member(root,actual,image,entry,node,visitor)).ok_or(reader::ViewError::Stale)?,
-            slug_loading_v2::SelectedDataLabelBinding::RuntimeMember{declaration,..}=>self.0.get().sources.with_image_root(*declaration,|root,actual|image_member(root,actual,image,entry,node,visitor)).ok_or(reader::ViewError::Stale)?,
+            slug_loading_v2::SelectedDataLabelBinding::RuntimeMember{declaration,..}=>self.0.get().sources.with_image_source(*declaration,|root,base,actual|image_member_at_base(root,base,actual,image,entry,node,visitor)).ok_or(reader::ViewError::Stale)?,
         }
     }
 }
 
 fn image_member<R>(
     root: &File,
+    image: &slug_workspace_v2::ObservedInputImage,
+    expected: &slug_workspace_v2::ObservedInputImage,
+    entry: usize,
+    node: &GuestNamespaceNode,
+    visitor: impl FnOnce(&File, &Path) -> Result<R, reader::ViewError>,
+) -> Result<R, reader::ViewError> {
+    image_member_at_base(root, Path::new(""), image, expected, entry, node, visitor)
+}
+
+fn image_member_at_base<R>(
+    root: &File,
+    base: &Path,
     image: &slug_workspace_v2::ObservedInputImage,
     expected: &slug_workspace_v2::ObservedInputImage,
     entry: usize,
@@ -351,10 +412,29 @@ fn image_member<R>(
     if !same || node.mode() != e.mode() {
         return Err(reader::ViewError::Stale);
     }
+    // Compose the certified relative base without allocating a second path:
+    // strip the exact suffix from the normal absolute image root, then borrow
+    // the member relative to that actual backing root. No ambient pathname IO.
+    let mut backing_root = image.source_root().as_path();
+    for component in base.components() {
+        if !matches!(component, std::path::Component::Normal(_)) {
+            return Err(reader::ViewError::Stale);
+        }
+        backing_root = backing_root.parent().ok_or(reader::ViewError::Stale)?;
+    }
+    if image
+        .source_root()
+        .as_path()
+        .strip_prefix(backing_root)
+        .ok()
+        != Some(base)
+    {
+        return Err(reader::ViewError::Stale);
+    }
     let relative = e
         .path()
         .as_path()
-        .strip_prefix(image.source_root().as_path())
+        .strip_prefix(backing_root)
         .map_err(|_| reader::ViewError::Stale)?;
     visitor(root, relative)
 }

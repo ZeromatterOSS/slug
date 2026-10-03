@@ -113,8 +113,9 @@ impl SelectedScratchSourceLease {
 
 pub(super) struct PreparedStage {
     // Owner drops before credit, including early errors and panic unwinding.
-    owner: StageOwner,
-    reservation: ImageDescriptorReservation,
+    owner: Option<StageOwner>,
+    reservation: Option<ImageDescriptorReservation>,
+    attempted: bool,
 }
 impl PreparedStage {
     pub(super) fn new(runtime: &WorkspaceRuntime) -> Result<Self, NativeDemandSessionError> {
@@ -137,14 +138,15 @@ impl PreparedStage {
                 return Err(failure(ScratchSourceFailure::Unauthorized));
             }
             Ok(Self {
-                owner: StageOwner {
+                owner: Some(StageOwner {
                     observed: None,
                     sources: Vec::new(),
                     root,
                     stage: Some(stage),
                     logical: None,
-                },
-                reservation,
+                }),
+                reservation: Some(reservation),
+                attempted: false,
             })
         }
         #[cfg(not(target_os = "linux"))]
@@ -153,23 +155,33 @@ impl PreparedStage {
             Err(failure(ScratchSourceFailure::UnsupportedPlatform))
         }
     }
-    pub(super) fn capture(
-        mut self,
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn visit_stage_paths(&self, visitor: &mut dyn FnMut(&Path)) {
+        if let Some(owner) = &self.owner {
+            if let Some(stage) = &owner.stage {
+                visitor(stage.path());
+            }
+        }
+    }
+    pub(super) fn capture_retaining(
+        &mut self,
         command: &NativeDemandCommand<'_>,
         key: &HostSelectedExtensionScratchPrefixKey,
         observed: ObservedSelectedExtensionScratchPrefix,
         reachable: &SelectedWorkspaceDemands,
         deadline: Instant,
     ) -> Result<SelectedScratchSourceLease, NativeDemandSessionError> {
-        if !self
-            .reservation
-            .same_budget(command.runtime.scratch_resources.descriptor_budget())
+        if self.attempted
+            || !self.reservation.as_ref().is_some_and(|r| {
+                r.same_budget(command.runtime.scratch_resources.descriptor_budget())
+            })
         {
             return Err(failure(ScratchSourceFailure::Unauthorized));
         }
         verify_current(command, key, &observed, reachable, deadline)?;
-        pin_sources(command, &observed, &mut self, deadline)?;
-        self.owner.logical = Some(
+        self.attempted = true;
+        pin_sources(command, &observed, self, deadline)?;
+        self.owner.as_mut().unwrap().logical = Some(
             command
                 .runtime
                 .image_resources
@@ -180,7 +192,7 @@ impl PreparedStage {
                 .map_err(NativeDemandSessionError::InputImage)?,
         );
         write_prefix(
-            &self.owner.root,
+            &self.owner.as_ref().unwrap().root,
             observed.prefix(),
             command.runtime,
             &|| active(command, deadline),
@@ -188,11 +200,25 @@ impl PreparedStage {
             None,
         )?;
         verify_current(command, key, &observed, reachable, deadline)?;
-        self.owner.observed = Some(observed);
-        self.reservation
-            .freeze(self.owner)
-            .map(SelectedScratchSourceLease)
-            .map_err(|error| NativeDemandSessionError::InputImage(error.into()))
+        self.owner.as_mut().unwrap().observed = Some(observed);
+        self.promote()
+    }
+
+    fn promote(&mut self) -> Result<SelectedScratchSourceLease, NativeDemandSessionError> {
+        let owner = self.owner.take().expect("partial scratch owner");
+        match self
+            .reservation
+            .take()
+            .expect("scratch owner credit")
+            .freeze_preserving(owner)
+        {
+            Ok(block) => Ok(SelectedScratchSourceLease(block)),
+            Err((error, owner, reservation)) => {
+                self.owner = Some(owner);
+                self.reservation = Some(reservation);
+                Err(NativeDemandSessionError::InputImage(error.into()))
+            }
+        }
     }
 }
 
@@ -240,7 +266,14 @@ impl WorkspaceRuntime {
         #[cfg(test)]
         if let Some(hook) = hook {
             hook(StagePhase::Prepared(
-                stage.owner.stage.as_ref().expect("prepared stage").path(),
+                stage
+                    .owner
+                    .as_ref()
+                    .unwrap()
+                    .stage
+                    .as_ref()
+                    .expect("prepared stage")
+                    .path(),
             ))?;
         }
         let mut guard =
@@ -291,13 +324,15 @@ impl WorkspaceRuntime {
                         active(command, deadline)?;
                         if !stage
                             .reservation
+                            .as_ref()
+                            .unwrap()
                             .same_budget(self.scratch_resources.descriptor_budget())
                         {
                             return Err(failure(ScratchSourceFailure::Unauthorized));
                         }
                         pin_sources(command, &observed, &mut stage, deadline)?;
                         verify_current(command, &key, &observed, reachable, deadline)?;
-                        stage.owner.logical = Some(
+                        stage.owner.as_mut().unwrap().logical = Some(
                             self.image_resources
                                 .reserve_logical(
                                     u64::try_from(observed.prefix().occurrence_bytes()).map_err(
@@ -307,7 +342,7 @@ impl WorkspaceRuntime {
                                 .map_err(NativeDemandSessionError::InputImage)?,
                         );
                         write_prefix(
-                            &stage.owner.root,
+                            &stage.owner.as_ref().unwrap().root,
                             observed.prefix(),
                             self,
                             &|| active(command, deadline),
@@ -319,13 +354,9 @@ impl WorkspaceRuntime {
                             hook(StagePhase::AfterCopy)?;
                         }
                         verify_current(command, &key, &observed, reachable, deadline)?;
-                        stage.owner.observed = Some(observed);
+                        stage.owner.as_mut().unwrap().observed = Some(observed);
                         drop(selected);
-                        return stage
-                            .reservation
-                            .freeze(stage.owner)
-                            .map(SelectedScratchSourceLease)
-                            .map_err(|error| NativeDemandSessionError::InputImage(error.into()));
+                        return stage.promote();
                     }
                 }
             }
@@ -687,10 +718,14 @@ pub(super) fn pin_sources(
         .ok_or_else(|| failure(ScratchSourceFailure::InvalidPrefix))?;
     stage
         .reservation
+        .as_mut()
+        .unwrap()
         .try_grow(charge)
         .map_err(|error| NativeDemandSessionError::InputImage(error.into()))?;
     stage
         .owner
+        .as_mut()
+        .unwrap()
         .sources
         .try_reserve_exact(count)
         .map_err(|_| failure(ScratchSourceFailure::InvalidPrefix))?;
@@ -700,7 +735,7 @@ pub(super) fn pin_sources(
             continue;
         }
         let selected = witness.selection();
-        stage.owner.sources.push(
+        stage.owner.as_mut().unwrap().sources.push(
             command
                 .runtime
                 .repository_materializer

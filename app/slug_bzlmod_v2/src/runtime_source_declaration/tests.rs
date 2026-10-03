@@ -26,7 +26,7 @@ fn workspace(b: &ImageDescriptorBudget) -> ImageChargedPath {
 fn input<'a>(root: &'a str, guest: &'a str) -> RuntimeSourceDeclarationInput<'a> {
     RuntimeSourceDeclarationInput {
         source: RuntimeSourceSelectorInput::ExplicitHostDirectory { anchor: root },
-        guest_prefix: guest,
+        guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix(guest),
     }
 }
 fn policy(
@@ -56,14 +56,14 @@ fn ordered_policy_preserves_selector_mapping_limits_and_finite_fact_tier() {
         input("/host/tools", "/runtime"),
         RuntimeSourceDeclarationInput {
             source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory { relative: "" },
-            guest_prefix: "/sources",
+            guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix("/sources"),
         },
         RuntimeSourceDeclarationInput {
             source: RuntimeSourceSelectorInput::SelectedToolOriginLabelParent {
                 role: SelectedToolRole::Cargo,
                 children: "lib/runtime",
             },
-            guest_prefix: "/label",
+            guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix("/label"),
         },
     ];
     let p =
@@ -72,10 +72,10 @@ fn ordered_policy_preserves_selector_mapping_limits_and_finite_fact_tier() {
     assert_eq!(p.fact_tier(), RuntimeSourceFactTier::TreeOnly);
     assert!(p.same_budget(&b));
     let declarations: Vec<_> = p.declarations().collect();
-    assert_eq!(
-        declarations[0].guest_prefix().as_path(),
-        std::path::Path::new("/runtime")
-    );
+    assert!(matches!(
+        declarations[0].guest_mapping(),
+        RuntimeSourceGuestMappingRef::ExplicitPrefix(p) if p.as_path() == std::path::Path::new("/runtime")
+    ));
     assert_eq!(
         declarations[0].image_policy().aliases(),
         InputImageAliasPolicy::Deny
@@ -157,7 +157,7 @@ fn strict_literals_and_whole_borrowed_admission_precede_owned_allocation() {
                     source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                         relative: bad,
                     },
-                    guest_prefix: "/bad",
+                    guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix("/bad"),
                 },
             ],
             RuntimeSourceLimits::default(),
@@ -267,8 +267,10 @@ fn declaration_limits_have_exact_boundary_and_one_over_refusals() {
     );
     assert_eq!(
         RuntimeSourceDeclarationPolicy::new(&w, &[], RuntimeSourceLimits::default(), &b)
-            .unwrap_err(),
-        RuntimeSourceDeclarationError::InvalidDeclaration
+            .unwrap()
+            .declarations()
+            .len(),
+        0
     );
     let exact = "/é";
     let limits = RuntimeSourceLimits {
@@ -289,7 +291,7 @@ fn declaration_limits_have_exact_boundary_and_one_over_refusals() {
             role: SelectedToolRole::Generator,
             children: s,
         },
-        guest_prefix: "/g",
+        guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix("/g"),
     };
     assert!(RuntimeSourceDeclarationPolicy::new(&w, &[make("one")], limits, &b).is_ok());
     assert_eq!(
@@ -432,6 +434,8 @@ async fn normal_raw_none_policy_a_b_a_and_revocation_invalidate_dependencies() {
     let w = workspace(&b);
     let a = policy(&w, &b, "/a");
     let changed = policy(&w, &b, "/b");
+    let empty =
+        RuntimeSourceDeclarationPolicy::new(&w, &[], RuntimeSourceLimits::default(), &b).unwrap();
     let used = b.used_bytes();
     let held = b.try_reserve(b.limit_bytes() - used).unwrap();
     let key = RuntimeSourceDeclarationPolicyKey::new(w.normalized_ref().dupe());
@@ -449,7 +453,15 @@ async fn normal_raw_none_policy_a_b_a_and_revocation_invalidate_dependencies() {
         "uninstalled raw key supplies absence only"
     );
     drop(tx);
-    for value in [Some(a.dupe()), Some(changed.dupe()), Some(a.dupe()), None] {
+    for value in [
+        Some(a.dupe()),
+        Some(empty.dupe()),
+        None,
+        Some(empty),
+        Some(changed.dupe()),
+        Some(a.dupe()),
+        None,
+    ] {
         let mut updater = dice.updater_with_data(data(&b, value.as_ref()));
         updater
             .changed_to(vec![(key.dupe(), value.dupe())])
@@ -487,6 +499,219 @@ async fn normal_raw_none_policy_a_b_a_and_revocation_invalidate_dependencies() {
             .unwrap()
             .authorizes(&warm)
     );
+}
+
+#[test]
+fn empty_policy_is_present_current_and_has_no_declarations() {
+    let b = ImageDescriptorBudget::new(1 << 20);
+    let w = workspace(&b);
+    let make = |limits| RuntimeSourceDeclarationPolicy::new(&w, &[], limits, &b).unwrap();
+    let p = make(RuntimeSourceLimits::default());
+    assert_eq!(p.declarations().len(), 0);
+    assert_ne!(Some(p.dupe()), None);
+    let changed = make(RuntimeSourceLimits {
+        max_entries: 1,
+        ..RuntimeSourceLimits::default()
+    });
+    assert_ne!(p, changed, "empty configuration still owns every limit");
+    let tx = RuntimeSourceDeclarationTransaction::new(w.dupe(), Some(p.dupe()), b.dupe()).unwrap();
+    assert!(tx.authorizes(&p));
+    assert!(!tx.authorizes(&changed));
+    let absent = RuntimeSourceDeclarationTransaction::new(w.dupe(), None, b.dupe()).unwrap();
+    assert!(!absent.authorizes(&p));
+    let foreign = ImageDescriptorBudget::new(1 << 20);
+    let fp = RuntimeSourceDeclarationPolicy::new(
+        &workspace(&foreign),
+        &[],
+        RuntimeSourceLimits::default(),
+        &foreign,
+    )
+    .unwrap();
+    assert_eq!(p, fp);
+    assert_eq!(hash(&p), hash(&fp));
+    assert!(
+        !tx.authorizes(&fp),
+        "equal empty rows do not waive actual service"
+    );
+    assert_eq!(
+        RuntimeSourceDeclarationPolicy::new(
+            &w,
+            &[],
+            RuntimeSourceLimits {
+                max_declarations: 0,
+                ..RuntimeSourceLimits::default()
+            },
+            &b
+        )
+        .unwrap_err(),
+        RuntimeSourceDeclarationError::InvalidDeclaration,
+    );
+}
+
+#[test]
+fn original_mapping_and_equal_explicit_spelling_have_distinct_identity() {
+    let b = ImageDescriptorBudget::new(1 << 20);
+    let w = workspace(&b);
+    let input = RuntimeSourceDeclarationInput {
+        source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
+            anchor: "/host/tools",
+        },
+        guest_mapping: RuntimeSourceGuestMappingInput::OriginalSource,
+    };
+    let a = RuntimeSourceDeclarationPolicy::new(&w, &[input], RuntimeSourceLimits::default(), &b)
+        .unwrap();
+    let explicit = RuntimeSourceDeclarationInput {
+        guest_mapping: RuntimeSourceGuestMappingInput::ExplicitPrefix("/host/tools"),
+        ..input
+    };
+    let e =
+        RuntimeSourceDeclarationPolicy::new(&w, &[explicit], RuntimeSourceLimits::default(), &b)
+            .unwrap();
+    assert_ne!(a, e);
+    assert_ne!(hash(&a), hash(&e));
+    assert!(matches!(
+        a.declarations().next().unwrap().guest_mapping(),
+        RuntimeSourceGuestMappingRef::OriginalSource
+    ));
+    let resolved = RuntimeSourceGuestPrefix::new("/host/tools", a.limits(), &b).unwrap();
+    assert!(
+        matches!(e.declarations().next().unwrap().guest_mapping(), RuntimeSourceGuestMappingRef::ExplicitPrefix(p) if p == &resolved)
+    );
+    assert!(resolved.same_budget(&b));
+    assert!(!resolved.same_budget(&ImageDescriptorBudget::new(1 << 20)));
+    for bad in ["/", "/__slug_module", "/__slug_module/lib", "/host/../lib"] {
+        assert!(RuntimeSourceGuestPrefix::new(bad, a.limits(), &b).is_err());
+    }
+    let changed = RuntimeSourceDeclarationPolicy::new(
+        &w,
+        &[RuntimeSourceDeclarationInput {
+            source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
+                anchor: "/other/tools",
+            },
+            ..input
+        }],
+        a.limits(),
+        &b,
+    )
+    .unwrap();
+    assert_ne!(a, changed, "OriginalSource preserves its actual selector");
+}
+
+#[test]
+fn original_mapping_whole_input_and_resolved_prefix_precharge_are_bounded() {
+    let b = ImageDescriptorBudget::new(1 << 20);
+    let w = workspace(&b);
+    let original = RuntimeSourceDeclarationInput {
+        source: RuntimeSourceSelectorInput::ExplicitHostDirectory { anchor: "/host/a" },
+        guest_mapping: RuntimeSourceGuestMappingInput::OriginalSource,
+    };
+    let used = b.used_bytes();
+    assert!(
+        RuntimeSourceDeclarationPolicy::new(
+            &w,
+            &[original, input("/host/b", "/bad/../guest")],
+            RuntimeSourceLimits::default(),
+            &b
+        )
+        .is_err()
+    );
+    assert_eq!(
+        b.used_bytes(),
+        used,
+        "invalid later raw row allocates no earlier owned row"
+    );
+    assert_eq!(
+        RuntimeSourceDeclarationPolicy::new(
+            &w,
+            &[
+                original,
+                RuntimeSourceDeclarationInput {
+                    source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
+                        anchor: "/host/a/sub"
+                    },
+                    guest_mapping: RuntimeSourceGuestMappingInput::OriginalSource,
+                }
+            ],
+            RuntimeSourceLimits::default(),
+            &b
+        )
+        .unwrap_err(),
+        RuntimeSourceDeclarationError::Overlap
+    );
+    let held = b.try_reserve(b.limit_bytes() - used).unwrap();
+    assert_eq!(
+        RuntimeSourceGuestPrefix::new("/resolved", RuntimeSourceLimits::default(), &b).unwrap_err(),
+        RuntimeSourceDeclarationError::Resource(ImageDescriptorBudgetError::ResourceLimit)
+    );
+    assert_eq!(b.used_bytes(), b.limit_bytes());
+    drop(held);
+    let prefix =
+        RuntimeSourceGuestPrefix::new("/resolved", RuntimeSourceLimits::default(), &b).unwrap();
+    let held = prefix.dupe();
+    let charged = b.used_bytes();
+    drop(prefix);
+    assert_eq!(b.used_bytes(), charged);
+    drop(held);
+    assert_eq!(b.used_bytes(), used);
+}
+
+#[tokio::test]
+async fn empty_and_original_policy_history_retains_credit_until_engine_drop() {
+    let b = ImageDescriptorBudget::new(128 << 10);
+    let w = workspace(&b);
+    let key = RuntimeSourceDeclarationPolicyKey::new(w.normalized_ref().dupe());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let empty =
+        RuntimeSourceDeclarationPolicy::new(&w, &[], RuntimeSourceLimits::default(), &b).unwrap();
+    let original = RuntimeSourceDeclarationPolicy::new(
+        &w,
+        &[RuntimeSourceDeclarationInput {
+            source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory { relative: "lib" },
+            guest_mapping: RuntimeSourceGuestMappingInput::OriginalSource,
+        }],
+        RuntimeSourceLimits::default(),
+        &b,
+    )
+    .unwrap();
+    let mut old = None;
+    for value in [Some(empty.dupe()), Some(original), Some(empty), None] {
+        let mut updater = dice.updater_with_data(data(&b, value.as_ref()));
+        updater
+            .changed_to(vec![(key.dupe(), value.dupe())])
+            .unwrap();
+        let mut tx = updater.commit().await;
+        assert_eq!(
+            tx.compute(&PolicyConsumer(key.dupe())).await.unwrap(),
+            value
+        );
+        if old.is_none() {
+            old = Some(tx);
+        }
+    }
+    drop(w);
+    dice.wait_for_idle().await;
+    assert!(b.used_bytes() > 0);
+    assert!(
+        old.as_mut()
+            .unwrap()
+            .compute(&PolicyConsumer(key.dupe()))
+            .await
+            .unwrap()
+            .unwrap()
+            .declarations()
+            .len()
+            == 0
+    );
+    drop(old);
+    drop(dice);
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while b.used_bytes() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("empty and original policy history must retire on actual engine drop");
+    assert_eq!(b.used_bytes(), 0);
 }
 
 #[tokio::test]

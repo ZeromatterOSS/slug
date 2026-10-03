@@ -18,6 +18,9 @@ use tokio::sync::watch;
 /// Every variant stores the complete concrete key, including mode and source route.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 enum Node {
+    SelectedPreparationOwner(Arc<crate::module_extension::selected_source_preparation::SelectedPreparationOwnerKey>),
+    ObservedRootMapping(Arc<slug_bzlmod_v2::HostRootRepositoryMappingObservationKey>),
+    ObservedSelectedDemand(Arc<slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey>),
     DataLabelRequests(Arc<crate::module_extension::selected_label_data::SelectedDataLabelRequestsKey>),
     DataLabelSources(Arc<crate::module_extension::selected_label_data::SelectedDataLabelSourcesKey>),
     RuntimeSourceRequests(Arc<crate::module_extension::runtime_sources::RuntimeSourceRequestsKey>),
@@ -50,6 +53,17 @@ enum Node {
 
 impl Node {
     fn from_dyn(key: &DynKey) -> Option<Self> {
+        if let Some(key) = key.downcast_ref::<crate::module_extension::selected_source_preparation::SelectedPreparationOwnerKey>() { return Some(Self::SelectedPreparationOwner(Arc::new(key.clone()))) }
+        if let Some(key) =
+            key.downcast_ref::<slug_bzlmod_v2::HostRootRepositoryMappingObservationKey>()
+        {
+            return Some(Self::ObservedRootMapping(Arc::new(key.clone())));
+        }
+        if let Some(key) =
+            key.downcast_ref::<slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey>()
+        {
+            return Some(Self::ObservedSelectedDemand(Arc::new(key.clone())));
+        }
         if let Some(key)=key.downcast_ref::<crate::module_extension::selected_label_data::SelectedDataLabelRequestsKey>() {return Some(Self::DataLabelRequests(Arc::new(key.clone())))}
         if let Some(key)=key.downcast_ref::<crate::module_extension::selected_label_data::SelectedDataLabelSourcesKey>() {return Some(Self::DataLabelSources(Arc::new(key.clone())))}
         if let Some(key) =
@@ -159,6 +173,9 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::SelectedPreparationOwner(key) => write!(f, "SelectedPreparationOwner({key})"),
+            Self::ObservedRootMapping(key) => write!(f, "ObservedRootMapping({key})"),
+            Self::ObservedSelectedDemand(key) => write!(f, "ObservedSelectedDemand({key})"),
             Self::DataLabelRequests(key) => write!(f, "DataLabelRequests({key})"),
             Self::DataLabelSources(key) => write!(f, "DataLabelSources({key})"),
             Self::RuntimeSourceRequests(key) => write!(f, "RuntimeSourceRequests({key})"),
@@ -787,4 +804,45 @@ pub async fn compute_selected_data_label_sources(
         data::authorize_sources(ctx, value)?;
     }
     Ok(v)
+}
+
+/// The compact owner selector waits only on the observed, downward Bzlmod source DAG.
+#[doc(hidden)]
+pub async fn compute_selected_preparation_owner(
+    ctx: &mut DiceComputations<'_>,
+    key: &crate::module_extension::selected_source_preparation::SelectedPreparationOwnerKey,
+) -> Result<
+    <crate::module_extension::selected_source_preparation::SelectedPreparationOwnerKey as Key>::Value,
+    crate::module_extension::selected_source_preparation::SelectedPreparationOwnerError,
+>{
+    use crate::module_extension::selected_source_preparation::SelectedPreparationOwnerError;
+    use crate::module_extension::selected_source_preparation::{self};
+    if std::time::Instant::now() >= selected_source_preparation::deadline(ctx) {
+        return Err(SelectedPreparationOwnerError::operational());
+    }
+    let resources = ctx
+        .per_transaction_data()
+        .data
+        .get::<slug_bzlmod_v2::SelectedScratchResources>()
+        .map_err(|_| SelectedPreparationOwnerError::operational())?;
+    if !key.same_resources(resources) {
+        return Err(SelectedPreparationOwnerError::operational());
+    }
+    let outcome = compute_guarded(ctx, key)
+        .await
+        .map_err(|_| SelectedPreparationOwnerError::operational())?;
+    if let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) = &outcome {
+        let resources = ctx
+            .per_transaction_data()
+            .data
+            .get::<slug_bzlmod_v2::SelectedScratchResources>()
+            .map_err(|_| SelectedPreparationOwnerError::operational())?;
+        if !value.matches_key(key)
+            || !value.same_resources(resources)
+            || std::time::Instant::now() >= selected_source_preparation::deadline(ctx)
+        {
+            return Err(SelectedPreparationOwnerError::operational());
+        }
+    }
+    Ok(outcome)
 }

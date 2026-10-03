@@ -457,7 +457,9 @@ fn data_view_covered_tool_directories_and_relocated_runtime_file_reuse_captures(
             source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                 relative: "runtime",
             },
-            guest_prefix: "/relocated",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/relocated",
+            ),
         }],
         RuntimeSourceLimits::default(),
         budget,
@@ -654,7 +656,7 @@ fn data_file_capture_cancel_after_written_chunk_releases_stage_and_logical_credi
     );
     assert_eq!(
         f.runtime.image_resources.descriptor_budget().used_bytes(),
-        credit_before - 4352
+        credit_before - (4096 + 256 + std::mem::size_of::<input_image::PreparedInputImageStage>())
     );
     guard.discard().unwrap();
     drop(view);

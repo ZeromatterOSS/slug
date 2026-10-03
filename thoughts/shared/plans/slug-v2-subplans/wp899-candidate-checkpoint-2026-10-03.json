@@ -1,0 +1,179 @@
+{
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "date": "2026-10-03",
+  "status": "PRESERVATION_ONLY_UNACCEPTED",
+  "branch": "review/wp899-request-source-profile",
+  "original_base": "d3392be459186b22eca800d3fe833988eb1048c2",
+  "accepted_memory_base": "1fe253f63f9bf831aad70ae239555715aacb0e80",
+  "compatibility": "Slug-native request preparation, mapping configuration and physical source reuse; protected exact Label/download/Root surfaces preserved",
+  "observable_checkpoint": "Full caller -> normal apparent selected owner -> tools/runtime/data -> one restored opaque source view passes portable normal-writer fixtures; actualRoot source/admission not yet supplied",
+  "source_hashes": {
+    "app/slug_bzlmod_v2/src/lib.rs": "b489c4b99a87d413babf149ad05715f6869d40d6cf437463e01c0072f9aa0112",
+    "app/slug_bzlmod_v2/src/runtime_source_declaration.rs": "f2e9a99739cd008bd0d3cc3458e3cb08f6917894afc5926867a58b9df569f1d4",
+    "app/slug_bzlmod_v2/src/runtime_source_declaration/policy.rs": "525e71ccce1f6020a402ac9206d29d447281d67a537eb857672a72b289eaa0ed",
+    "app/slug_bzlmod_v2/src/runtime_source_declaration/tests.rs": "fa1a9ea064964894313fc0c3178009aad56404da42b72d696977d6e5b5e97129",
+    "app/slug_bzlmod_v2/src/runtime_source_declaration/types.rs": "5aa2b419049d6539bffc7e0e03cda7d3926e90884b3250e02388943b0485698f",
+    "app/slug_core_v2/src/runtime/dice.rs": "357ac96cf70c2aee5c2fc59f0e1b7d4ceac0f3ce8005f4c43ab7997a1b14f64a",
+    "app/slug_core_v2/src/runtime/guest_namespace.rs": "d0778222d9e45885f1187180475fbbb7981dfe1a64d5511aaaa0d24617044361",
+    "app/slug_core_v2/src/runtime/guest_namespace/attempt.rs": "6fd42a42cbd67ab20ced36cb8ba8ecb9707bc43d2b5326c259c3c37f68386e1a",
+    "app/slug_core_v2/src/runtime/guest_namespace/tests.rs": "ce7a961ca36552f509f53633432f2a551e0ab7594ef1375c02427a6a5b331abe",
+    "app/slug_core_v2/src/runtime/guest_namespace/tests/data.rs": "64dede16dbd47862b1e94be6ad72f00faa7c5e2799529e2e07700a5444943c2c",
+    "app/slug_core_v2/src/runtime/input_image.rs": "5955b8a8c400ef3232248bca4d0980749a70674709c3ad163e6e3339936afe84",
+    "app/slug_core_v2/src/runtime/input_image/capture.rs": "33ed25486eee2c6abd4f0c534f88958601ac3083254c4961f90670f0c6e10fdf",
+    "app/slug_core_v2/src/runtime/input_image/file_capture.rs": "84c22424bed8e75f39fe4f0c9223cc441143c417b10d3022cb9975efdc39fe06",
+    "app/slug_core_v2/src/runtime/input_image/tests.rs": "b4ef37988a7d06bdd3289f83f66c7259cff18522e485fff7763f464401538255",
+    "app/slug_core_v2/src/runtime/input_image_bridge.rs": "40477d1c6a1babc980d8a5ad1fa7c40bcbf3f9454d471009e8f3dd55267dcf23",
+    "app/slug_core_v2/src/runtime/input_image_bridge/label_tests.rs": "ce330f894e758e24af004320505189a353a0f6a75dbaf895aa6fca55b95f0b56",
+    "app/slug_core_v2/src/runtime/repository_io.rs": "e0347b995581982ae244fc1594ddc7885388b1e16ce683d49dd0fb665ee02b5e",
+    "app/slug_core_v2/src/runtime/repository_io/local_request.rs": "01bf25bdbbb7fc654bfca44ec632b5d200cb334c8728fa5506371d63c809ec5b",
+    "app/slug_core_v2/src/runtime/repository_io/local_request/tests.rs": "3bc04d5f85f3f6b3cc8039e0ffe14ce84c9289f7391202dbbf5d378979ea8291",
+    "app/slug_core_v2/src/runtime/runtime_sources.rs": "6ece7ff8decb64617364707596a43cfe1cd8900c64b07a03a83d73f05f45ba03",
+    "app/slug_core_v2/src/runtime/runtime_sources/attempt.rs": "e008b01c0dfc92c9188a8f96bcd6fbd0971ff6dc22e95069d900391580eac7e9",
+    "app/slug_core_v2/src/runtime/runtime_sources/catalogue.rs": "3f02af4ad0152d239695338975186ee11ab29b99cc578bf916552649516a949f",
+    "app/slug_core_v2/src/runtime/runtime_sources/factory.rs": "aa1d4fc035813aed52c450bc36874c160152f09ae7b204c900d3d63873e6ec03",
+    "app/slug_core_v2/src/runtime/runtime_sources/prepare.rs": "6caf17a0a1b08825d3480e3f16395ae29d19930f9354f09c69dd71da79295f6d",
+    "app/slug_core_v2/src/runtime/runtime_sources/tests.rs": "cb29f8efcb16504ab45ddc1d1e05837322e45f381b4988de3deda9a66374d502",
+    "app/slug_core_v2/src/runtime/selected_label_data.rs": "b074bc22550d3578b23f2c85dbf4c24250e028109e385aec55f2b58e8d158048",
+    "app/slug_core_v2/src/runtime/selected_label_data/catalogue.rs": "53935c5f9de2ab37942c8734d83e51dcce00bdf8d2b46f08157d7c39bcab637d",
+    "app/slug_core_v2/src/runtime/selected_label_data/prepare.rs": "fe9dd8a3bf046582771570ed7ded54dd090dcb62b9da07df151799f206b9c1e2",
+    "app/slug_core_v2/src/runtime/selected_label_data/tests.rs": "c97f6a976b290b032a3d75d24842b1e71e44010cadcb8550dc30992f2ba18ca6",
+    "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "5118b3bcf437ee92c15193f7eaf729d6e866f7e03e2a5eb9cbc013c2a0b5362b",
+    "app/slug_core_v2/src/runtime/selected_scratch_source/tests.rs": "10478aab4c2aadb55127c0dfc3da8606d16f636c09f681a771300c9496529b1f",
+    "app/slug_core_v2/src/runtime/selected_tool_source.rs": "1d54edbf5e1894132606547e97c0f673c5fb1ff324b513b87225a987710b1e27",
+    "app/slug_core_v2/src/runtime/selected_tool_source/attempt.rs": "eb1d2f6310ce4c5e06c6ba658b35781a6dbe4ddd38200ab6288999e0bcedef78",
+    "app/slug_core_v2/src/runtime/selected_tool_source/declarations.rs": "624d5e998ca8663436573cd50c22c1a4cda97c67e66d2cab42a175551499f02f",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "caba4fe73682e814640b7c437d6b5ac349184c1e48c8c63d98fd33e3160cfeb7",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare/capture.rs": "8e5158190153d2ee74be78bb5cb5748cc4752f3151aa238c8fc4074632592c88",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare/setup.rs": "b101848a9724c21adcad63971c89e5f3322f04ac0e5c1dbdd959c80f2777a984",
+    "app/slug_core_v2/src/runtime/selected_tool_source/tests.rs": "853af0600981093c004f442592a5caf0492bb7571f14f5b075b48519f925f35a",
+    "app/slug_core_v2/src/runtime/source_preparation.rs": "5661286ecf70eed156e43abfa865518c6e947db11bfefd9ff35471a60e9fb899",
+    "app/slug_core_v2/src/runtime/source_preparation/attempt.rs": "3706dc28c7d41901805a4b6c1f8082f7a0d900f983fe9bc388fbc42633145267",
+    "app/slug_core_v2/src/runtime/source_preparation/request.rs": "1c95c6ab0af8a3058b5467db90c786129d497700c29558624972aacaa243c6da",
+    "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "552a43fd6981b8395378ed46d8e8a5fe1923f5ee272cba74b9b315c48d428ced",
+    "app/slug_loading_v2/src/dependency_cycle.rs": "6506dbb40b11ed29bf260d9f54676381ef738c3d7ac9b4e175764803977a01a0",
+    "app/slug_loading_v2/src/dependency_cycle/mixed_bzl_tests.rs": "26cc7057034732234d113c846210b8191270c90dc9b7385efdaecc8acc579ea2",
+    "app/slug_loading_v2/src/dependency_cycle/tests.rs": "e126f9197b91d9af82bf290f48b96a7542947174cd30b914817d3dc9420ae29f",
+    "app/slug_loading_v2/src/lib.rs": "b1a49f32f64a42a78beee7d934df48d2cc60cc70b6f283bd4cf4cd82cf760567",
+    "app/slug_loading_v2/src/module_extension.rs": "17c14557c46a84195c73d47d0b0cfb5ad44ef1b00313e42df2e2ae339a45d279",
+    "app/slug_loading_v2/src/module_extension/guest_namespace/compose.rs": "4baf52c3e48da6399e9852745dd99099b95ad365380b8a461e17e80e09442e11",
+    "app/slug_loading_v2/src/module_extension/runtime_sources.rs": "0a05ecce2c90b736fc619a0e39fb7f7571325fe406f1808f45d113293552d1b8",
+    "app/slug_loading_v2/src/module_extension/runtime_sources/covered_tool.rs": "6e642a2a2dab1ef01173d3d4438e4d3ee8776b422c0ca0f3a6915b111ce16788",
+    "app/slug_loading_v2/src/module_extension/runtime_sources/profile.rs": "5aa89f48f3695ed6e81e0dbe6c18d99ba7fdc5f891a58e450f96a72095ccf920",
+    "app/slug_loading_v2/src/module_extension/runtime_sources/requests.rs": "15e3b4b7e431edc6cae9c3c3afcbe2a1abae2ba668e2b77ba6df31dced66ca69",
+    "app/slug_loading_v2/src/module_extension/runtime_sources/test_fixture.rs": "e999fba1cfb7d87de610e16f0b732bf157b6a9688ed088cd0246a6891bc4b91a",
+    "app/slug_loading_v2/src/module_extension/runtime_sources/tests.rs": "020a6217c5af1aeded7591f8b372ba2e5d1e84875399e1618979e035395b6e23",
+    "app/slug_loading_v2/src/module_extension/selected_source_preparation.rs": "16a5c647dc3411e9a6cceba70d22586d8620e141d321e5486dfc9cb1fb19432a",
+    "app/slug_loading_v2/src/module_extension/selected_source_preparation/tests.rs": "d8e8c65e06c3661908b6c391a600aaa33424fdeb755d46df03fbc86279301ee8",
+    "app/slug_workspace_v2/src/input_image/budget.rs": "026983aeb2fd14ea145810c9757f45a6c1ed881e0a2b4c57e58fd480ccc44b23",
+    "app/slug_workspace_v2/src/input_image/tests.rs": "c25e8da11355b9d48778040f959610b1f56cd92e0de83b8fef6f52ebe279c208"
+  },
+  "validation": {
+    "shared": {
+      "exit": 0,
+      "selected": 51,
+      "passed": 51,
+      "elapsed_seconds": 0.01465741399442777,
+      "receipt": "target/wp899/bzlmod-tests.json",
+      "receipt_sha256": "d99e7a498f76800e48c18ec3ee3246f07ffb2e720dfdbf952ec49d8e66a4acf5",
+      "executable_sha256": "0cc8a08adc49c997b55df9c1b45ca35ed226472a89a8ede879693dbb0c9e9c0b"
+    },
+    "loading": {
+      "exit": 0,
+      "selected": 115,
+      "passed": 115,
+      "elapsed_seconds": 0.9029638399952091,
+      "receipt": "target/wp899/loading-tests.json",
+      "receipt_sha256": "b30f9fb7ee74a3f329a0eaef322985d858ddc599476aa9c471b6003e720fa73c",
+      "executable_sha256": "332edf7458e959dad556b1d587d01e8f0b7e3e345a2668d04b32fcfb9f0a87ff"
+    },
+    "core": {
+      "exit": 0,
+      "selected": 150,
+      "passed": 150,
+      "elapsed_seconds": 8.55912549799541,
+      "receipt": "target/wp899/core-tests.json",
+      "receipt_sha256": "a84501b678b21bc8b675b9d4d3cabec89b18470bc414873dfef2daddaa40dcb4",
+      "executable_sha256": "3f2b1f577b0aeb5136b8765741a0d94f0b1fb0863bfc1260734f55ee246df478"
+    },
+    "workspace": {
+      "exit": 0,
+      "selected": 83,
+      "passed": 83,
+      "elapsed_seconds": 0.08497655898099765,
+      "receipt": "target/wp899/../memory-scan-followup/history-corrected-workspace-tests.json",
+      "receipt_sha256": "85ede121641832d6b2502f4e93fca571893a976096a3546f89b66edb017c75fc",
+      "executable_sha256": "936fe4f1d2c47df21c71fd0b9ca3c25e09dda48231dad1d453807c86e62c15f1"
+    }
+  },
+  "protected_predecessor_selectors": {
+    "receipt": "wp897-acceptance.json",
+    "shared": 47,
+    "loading": 105,
+    "core": 129,
+    "workspace": 81,
+    "total": 362
+  },
+  "new_or_extended_proofs": [
+    "Some(empty) versus None; OriginalSource versus ExplicitPrefix full structural identity/current banks",
+    "Normal root mapping/selected demand full frontier, mixed cycle recovery and guarded current owner",
+    "Complete certified tool subtree interval; independent ExplicitPrefix physical overlap; actual guest collisions remain refused",
+    "Same transaction full command/environment/lockfile/registry raw input checks, genuine nonempty command override, exact full prior Some/None restoration",
+    "Borrowed ready/partial/success/unused stage owners and credit retained through actual restoration/drain; partial no-retry and actual lastDrop",
+    "Existing structural CommandAbsolute Local request validated by the same pure exact rule/path/root helper in both native entry points; rootless success and no external image authority"
+  ],
+  "default_check": {
+    "packages": [
+      "slug_bzlmod_v2",
+      "slug_loading_v2",
+      "slug_core_v2",
+      "slug_workspace_v2",
+      "slug_cli_v2"
+    ],
+    "args": [
+      "check",
+      "--all-targets",
+      "--offline",
+      "--message-format=json"
+    ],
+    "overrides": null,
+    "receipt": {
+      "exit": 0,
+      "elapsed_seconds": 34.71,
+      "peak_rss_kib": 1673600
+    },
+    "command_receipt": "target/wp899/default-all-targets-prepared-followup-command.json",
+    "receipt_sha256": "9109e70f8fbc25ec6de2d62354cc728d842930a0fb89076effee16f9b1efa309",
+    "bounded_preparation": "Three prior60s preparation limits preserved; completed metadata artifacts warmed exact followup. No cap raise."
+  },
+  "focused_compile": "Pinned nightly-2025-09-14; jobs1/offline; no-run JSON; package-only opt0/debug0 for Shared/Loading/Core tests; each60s TERM/KILL3; serial exact preflight/group<=30s",
+  "independent_reviews": {
+    "design-review.md": "55e0aa558842967b61a87b67d3fbed72b7e57ca7f18b86c7340ecac1e43e4ab9",
+    "core-lifecycle-final-review.md": "1253f95ceac208688704ad2529b6774842ab0617d4609e2e43ef37de8bea9a6e",
+    "native-command-local-design.md": "41ed0faa7f7f108c7bff2d8fbfaf90082fca6fd3bafbcc288aeaa952dbe28506",
+    "core-failure-discriminators.md": "a17531e1b4ef18ccc95590b34c096e5fa3faf069c3cf406a3f6fde115383097f",
+    "preservation-open-gates.md": "7ea012373bb93b0199c668e501de6aba00619663557b10ebd4137fa87bf589e7",
+    "source-service-api.md": "f9562a213f75e79c985378f1677eacfc13c781fbeaf50571d6156c5ce362b4b1",
+    "source-service-signatures.md": "f12ff6f0e7fa37f6256f7ba5d0f083b9a700f983fcbf1651b458862bc7f4be9f",
+    "source-service-design-review.md": "c5999be0ad3f75abb1d91b82a410cc8a826a532f42642e6d8b90094ea12bc66c",
+    "root-supervisor-prerequisite.md": "15ffbcf6acc7eb0b9a4c4170f8f71de921edd41c88b54a0f255f0e7842eff383"
+  },
+  "preserved_failure_evidence": [
+    "core-initial-failures.json/log:128/139, stage/header/producer/source fixture findings",
+    "core-after-coverage-failures.json/log:138/139, real command override native relative-only gap",
+    "core-owner-diagnostic-test.log: genuine normal mapping source failure; temporary diagnostics immediately restored",
+    "core-native-local-corrected: test-only SmallMap inference errors; explicit CompactString correction leaves assertions unchanged"
+  ],
+  "required_remaining_gates": [
+    "Implement and validate bounded fresh consumed diagnostic source service; current API/signatures are DESIGN only",
+    "Implement/review/freeze owned-process supervisor and small control probes, using hard4GiB RLIMIT_AS plus explicit sampled RSS/swap/private6GiB disk refusal; no cgroup quota claim",
+    "ONE separately frozen/reviewed genuine actual MODULE slug_crates source/admission outcome; typed missing source/alias/layout/fit cannot accept complete packet",
+    "Full coupled FINAL integration review after actualRoot source/admission and updated source-service implementation evidence"
+  ],
+  "exclusions": [
+    "No source-service Rust implementation, actualRoot acquisition or network run in this checkpoint",
+    "No CLI/process/query/locked-generate/bootstrap activation, no newly linked CLI or daemon restart",
+    "No actual40GB process attribution or full-workload RSS claim; unique payload/version history and generic whole-body reads remain risks"
+  ],
+  "memory_repair": "Independent accepted1fe253f63 remains accepted; controlled32x1MiB A/B/B/A RSS74.2% lower,115DICE/83Workspace tests and default dependent/CLI checks. Receipt memory-payload-reuse-2026-10-03.json",
+  "goal_turn": "progress: memory repair accepted, native full-caller defect corrected, all399 portable/protected ordinary gates and default all-target checks advanced; fullgoal remainsactive"
+}

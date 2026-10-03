@@ -325,6 +325,16 @@ async fn observe_certificate_subtree(
     resources: &WorkspaceImageResources,
     policy: slug_workspace_v2::InputImagePolicy,
 ) -> slug_workspace_v2::ObservedInputImage {
+    observe_certificate_shape(root, subtree, resources, policy, false).await
+}
+
+async fn observe_certificate_shape(
+    root: &Path,
+    subtree: &Path,
+    resources: &WorkspaceImageResources,
+    policy: slug_workspace_v2::InputImagePolicy,
+    regular_root: bool,
+) -> slug_workspace_v2::ObservedInputImage {
     use dice::DetectCycles;
     use dice::Dice;
     use dice::UserComputationData;
@@ -334,14 +344,29 @@ async fn observe_certificate_subtree(
     use slug_workspace_v2::PathOutcome;
     let approved = source(root);
     let budget = resources.descriptor_budget();
-    let key = ObservedInputImageKey::new(
-        PathObservationNamespace::Host,
-        NormalizedAbsolutePath::new(root).unwrap(),
-        NormalizedAbsolutePath::new(root.join(subtree)).unwrap(),
-        policy,
-        budget,
-    )
-    .unwrap();
+    let key = if regular_root {
+        ObservedInputImageKey::regular_file_from_charged(
+            PathObservationNamespace::Host,
+            ImageChargedPath::pin_existing(NormalizedAbsolutePath::new(root).unwrap(), budget)
+                .unwrap(),
+            ImageChargedPath::pin_existing(
+                NormalizedAbsolutePath::new(root.join(subtree)).unwrap(),
+                budget,
+            )
+            .unwrap(),
+            policy,
+        )
+        .unwrap()
+    } else {
+        ObservedInputImageKey::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(root).unwrap(),
+            NormalizedAbsolutePath::new(root.join(subtree)).unwrap(),
+            policy,
+            budget,
+        )
+        .unwrap()
+    };
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut observations = Vec::new();
     let mut saw_need = false;
@@ -607,4 +632,136 @@ async fn contained_alias_capture_preserves_literal_without_following_host_paths(
         5,
         "aliases share certified target bytes"
     );
+}
+
+#[tokio::test]
+async fn retaining_capture_pre_copy_and_promotion_refusals_keep_stage_and_credit() {
+    for regular_root in [false, true] {
+        let temporary = tempfile::tempdir().unwrap();
+        std::fs::create_dir(temporary.path().join("input")).unwrap();
+        std::fs::write(temporary.path().join("input/value"), b"owned").unwrap();
+        let budget = ImageDescriptorBudget::new(64 * 1024 * 1024);
+        let resources = WorkspaceImageResources::new(budget.clone(), 1024);
+        let mut first = prepare_input_image_stage(&resources).unwrap();
+        let certificate = observe_certificate_shape(
+            temporary.path(),
+            if regular_root {
+                Path::new("input/value")
+            } else {
+                Path::new("input")
+            },
+            &resources,
+            slug_workspace_v2::InputImagePolicy::plain(),
+            regular_root,
+        )
+        .await;
+        let capture = |authorized,
+                       resources: &WorkspaceImageResources,
+                       active: &dyn Fn() -> bool,
+                       stage: &mut PreparedInputImageStage| {
+            if regular_root {
+                capture_prepared_input_file_retaining(authorized, resources, active, stage)
+                    .map(drop)
+            } else {
+                capture_prepared_input_image_retaining(authorized, resources, active, stage)
+                    .map(drop)
+            }
+        };
+        let calls = Cell::new(0usize);
+        capture(
+            AuthorizedObservedInputImage::new(source(temporary.path()), certificate.dupe()),
+            &resources,
+            &|| {
+                calls.set(calls.get() + 1);
+                true
+            },
+            &mut first,
+        )
+        .unwrap();
+        assert!(calls.get() > 0);
+        let completed_calls = calls.get();
+        drop(first);
+        assert_eq!(resources.logical_bytes_used(), 0);
+        let baseline = budget.used_bytes();
+        let mut stage = prepare_input_image_stage(&resources).unwrap();
+        let path = stage.test_path().to_owned();
+        let ready_charge = budget.used_bytes();
+        let denied_calls = Cell::new(0);
+        let foreign = WorkspaceImageResources::new(ImageDescriptorBudget::new(1024 * 1024), 1024);
+        assert!(matches!(
+            capture(
+                AuthorizedObservedInputImage::new(source(temporary.path()), certificate.dupe()),
+                &foreign,
+                &|| {
+                    denied_calls.set(denied_calls.get() + 1);
+                    true
+                },
+                &mut stage,
+            ),
+            Err(InputImageCaptureError::Unauthorized)
+        ));
+        assert_eq!(denied_calls.get(), 0);
+        assert!(!stage.test_is_partial());
+        assert!(path.exists());
+        assert_eq!(budget.used_bytes(), ready_charge);
+        let calls = Cell::new(0usize);
+        let pressure = std::cell::RefCell::new(None);
+        let result = capture(
+            AuthorizedObservedInputImage::new(source(temporary.path()), certificate.dupe()),
+            &resources,
+            &|| {
+                calls.set(calls.get() + 1);
+                if calls.get() == completed_calls {
+                    *pressure.borrow_mut() = Some(
+                        budget
+                            .try_reserve(budget.limit_bytes() - budget.used_bytes())
+                            .unwrap(),
+                    );
+                }
+                true
+            },
+            &mut stage,
+        );
+        assert!(matches!(
+            result,
+            Err(InputImageCaptureError::DescriptorBudget(_))
+        ));
+        assert!(
+            pressure.borrow().is_some(),
+            "pressure must reach the last pre-promotion activity check"
+        );
+        assert!(stage.test_is_partial());
+        assert!(
+            path.join(if regular_root { "leaf" } else { "value" })
+                .exists()
+        );
+        assert_eq!(
+            std::fs::read(path.join(if regular_root { "leaf" } else { "value" })).unwrap(),
+            b"owned"
+        );
+        assert_eq!(resources.logical_bytes_used(), 5);
+        drop(pressure);
+        let held_charge = budget.used_bytes();
+        assert!(held_charge > baseline);
+        let retry_calls = Cell::new(0);
+        assert!(matches!(
+            capture(
+                AuthorizedObservedInputImage::new(source(temporary.path()), certificate),
+                &resources,
+                &|| {
+                    retry_calls.set(retry_calls.get() + 1);
+                    true
+                },
+                &mut stage,
+            ),
+            Err(InputImageCaptureError::Unauthorized)
+        ));
+        assert_eq!(retry_calls.get(), 0);
+        assert_eq!(budget.used_bytes(), held_charge);
+        drop(stage);
+        assert!(!path.exists());
+        assert_eq!(resources.logical_bytes_used(), 0);
+        // The consumed certificate has released its descriptors as well.
+        assert!(budget.used_bytes() <= baseline);
+    }
 }

@@ -44,6 +44,8 @@ pub(super) async fn compute(
         .try_reserve(256)
         .map_err(|_| RuntimeSourcesError::Operational)?;
     let mut images = reserve_rows::<ObservedInputImage>(&mut credit, requests.requests().len())?;
+    let mut bindings =
+        reserve_rows::<RuntimeSourceImageBinding>(&mut credit, requests.requests().len())?;
     let mut observations = merge(&mut credit, requests.observations(), tools.observations())?;
     let limits = requests.policy().limits();
     let mut totals = RuntimeSourceTotals {
@@ -98,6 +100,7 @@ pub(super) async fn compute(
             return Err(RuntimeSourcesError::AggregateLimit);
         }
         observations = merge(&mut credit, &observations, image.observations())?;
+        bindings.push(covered_tool::certify(row, &image, &tools, &active)?);
         images.push(image);
     }
     require_active(&active)?;
@@ -107,6 +110,7 @@ pub(super) async fn compute(
                 requests,
                 tools,
                 images,
+                bindings,
                 observations,
                 totals,
             })

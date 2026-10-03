@@ -46,7 +46,7 @@ fn host_policy(f: &Fixture, host: &Path, guest: &str) -> RuntimeSourceDeclaratio
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: host.to_str().unwrap(),
             },
-            guest_prefix: guest,
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(guest),
         }],
         RuntimeSourceLimits::default(),
     )
@@ -89,13 +89,17 @@ fn runtime_sources_outside_host_workspace_policy_a_b_a_and_last_drop() {
                     source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                         anchor: host.path().to_str().unwrap(),
                     },
-                    guest_prefix: guest,
+                    guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                        guest,
+                    ),
                 },
                 RuntimeSourceDeclarationInput {
                     source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                         relative: "runtime",
                     },
-                    guest_prefix: "/workspace-runtime",
+                    guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                        "/workspace-runtime",
+                    ),
                 },
             ],
             RuntimeSourceLimits::default(),
@@ -160,7 +164,10 @@ fn runtime_sources_outside_host_workspace_policy_a_b_a_and_last_drop() {
             .unwrap(),
             "workspace source"
         );
-        assert_eq!(lease.0.get().unused.iter().flatten().count(), 62);
+        assert_eq!(
+            lease.0.get().unused.iter().flatten().count(),
+            lease.profile().requests().requests().len() - lease.test_captured_count()
+        );
         f.restored();
         retained.push(lease);
     }
@@ -270,20 +277,26 @@ ext=module_extension(implementation=_consumer,tag_classes={{'path':path_tag}})
                 source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                     anchor: host.path().to_str().unwrap(),
                 },
-                guest_prefix: "/host-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/host-runtime",
+                ),
             },
             RuntimeSourceDeclarationInput {
                 source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                     relative: "runtime",
                 },
-                guest_prefix: "/workspace-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/workspace-runtime",
+                ),
             },
             RuntimeSourceDeclarationInput {
                 source: RuntimeSourceSelectorInput::SelectedToolOriginLabelParent {
                     role: SelectedToolRole::Cargo,
                     children: "lib",
                 },
-                guest_prefix: "/writer-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/writer-runtime",
+                ),
             },
         ],
         RuntimeSourceLimits::default(),
@@ -366,7 +379,9 @@ ext=module_extension(implementation=_consumer,tag_classes={{'path':path_tag}})
                     role: SelectedToolRole::Cargo,
                     children: "lib",
                 },
-                guest_prefix: guest,
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    guest,
+                ),
             }],
             RuntimeSourceLimits::default(),
         );
@@ -380,6 +395,7 @@ ext=module_extension(implementation=_consumer,tag_classes={{'path':path_tag}})
             &mut guard,
             &k,
             Instant::now() + Duration::from_secs(10),
+            None,
         )) {
             Err(error) => error,
             Ok(_) => panic!("current normal Label tool shadow was admitted"),
@@ -706,7 +722,7 @@ pub(in crate::runtime::dice) fn current_plan<'a>(
         let result = f
             .runtime
             .runtime
-            .block_on(attempt::plan(&f.runtime, &mut guard, k, deadline))
+            .block_on(attempt::plan(&f.runtime, &mut guard, k, deadline, None))
             .unwrap();
         f.runtime.runtime.block_on(f.runtime.dice.wait_for_idle());
         match result {
@@ -779,20 +795,24 @@ fn runtime_sources_invalid_second_before_first_proof_or_factory_and_live_control
                 source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                     anchor: host.path().to_str().unwrap(),
                 },
-                guest_prefix: "/runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/runtime",
+                ),
             },
             RuntimeSourceDeclarationInput {
                 source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                     relative: "runtime",
                 },
-                guest_prefix: "/workspace-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/workspace-runtime",
+                ),
             },
         ],
         RuntimeSourceLimits::default(),
     );
     let k = key(&f);
     let deadline = Instant::now() + Duration::from_secs(15);
-    let _storage = prepare::Storage::new(&f.runtime).unwrap();
+    let _storage = prepare::Storage::new(&f.runtime, p.declarations().len()).unwrap();
     let (mut guard, plan, reachable) = current_plan(&f, &p, &k);
     let resources = &f.runtime.scratch_resources;
     guard.command.as_mut().unwrap().scratch_metadata = Some(
@@ -926,7 +946,7 @@ fn runtime_sources_invalid_second_before_first_proof_or_factory_and_live_control
     guard.discard().unwrap();
     f.restored();
     // Recompute normal facts after rename/restore; do not repair a certificate.
-    let _next_storage = prepare::Storage::new(&f.runtime).unwrap();
+    let _next_storage = prepare::Storage::new(&f.runtime, p.declarations().len()).unwrap();
     let (mut guard, plan, reachable) = current_plan(&f, &p, &k);
     guard.command.as_mut().unwrap().scratch_metadata = Some(
         selected_tool_source::ScratchMetadataState::new(plan.tool_requests(), resources).unwrap(),
@@ -966,7 +986,7 @@ fn runtime_sources_invalid_second_before_first_proof_or_factory_and_live_control
         .runtime
         .runtime
         .block_on(attempt::sources(
-            &f.runtime, &mut guard, &k, &plan, &mut tool, deadline,
+            &f.runtime, &mut guard, &k, &plan, &mut tool, deadline, None,
         ))
         .unwrap()
     {
@@ -1020,19 +1040,25 @@ fn runtime_sources_aggregate_refuses_before_next_tree_and_recovers() {
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: first.path().to_str().unwrap(),
             },
-            guest_prefix: "/runtime-one",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/runtime-one",
+            ),
         },
         RuntimeSourceDeclarationInput {
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: second.path().to_str().unwrap(),
             },
-            guest_prefix: "/runtime-two",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/runtime-two",
+            ),
         },
         RuntimeSourceDeclarationInput {
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: missing.to_str().unwrap(),
             },
-            guest_prefix: "/runtime-three",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/runtime-three",
+            ),
         },
     ];
     let mut limits = RuntimeSourceLimits::default();

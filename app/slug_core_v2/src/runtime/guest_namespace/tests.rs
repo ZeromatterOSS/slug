@@ -58,7 +58,9 @@ fn host_policy(f: &Fixture, host: &Path) -> RuntimeSourceDeclarationPolicy {
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: host.to_str().unwrap(),
             },
-            guest_prefix: "/external",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/external",
+            ),
         }],
         RuntimeSourceLimits::default(),
         budget,
@@ -79,7 +81,10 @@ fn prepare(
         .prepare_selected_guest_namespace_view(key(f), Some(p.dupe()), Some(g))
         .unwrap()
 }
-fn read(view: &PreparedGuestNamespaceViewLease, path: &str) -> Vec<u8> {
+pub(in crate::runtime::dice) fn read(
+    view: &PreparedGuestNamespaceViewLease,
+    path: &str,
+) -> Vec<u8> {
     let mut bytes = Vec::new();
     view.read_regular(
         path,
@@ -153,7 +158,7 @@ fn entry_policy(max_entries: usize) -> GuestNamespacePolicy {
     .unwrap()
 }
 
-fn composite_fixture() -> (
+pub(in crate::runtime::dice) fn composite_fixture() -> (
     Fixture,
     tempfile::TempDir,
     tempfile::TempDir,
@@ -239,20 +244,26 @@ ext=module_extension(implementation=_consumer,tag_classes={{'path':path_tag}})
                 source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                     anchor: host.path().to_str().unwrap(),
                 },
-                guest_prefix: "/external",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/external",
+                ),
             },
             RuntimeSourceDeclarationInput {
                 source: RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
                     relative: "runtime",
                 },
-                guest_prefix: "/workspace-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/workspace-runtime",
+                ),
             },
             RuntimeSourceDeclarationInput {
                 source: RuntimeSourceSelectorInput::SelectedToolOriginLabelParent {
                     role: SelectedToolRole::Cargo,
                     children: "lib",
                 },
-                guest_prefix: "/writer-runtime",
+                guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                    "/writer-runtime",
+                ),
             },
         ],
         RuntimeSourceLimits::default(),
@@ -874,7 +885,8 @@ fn guest_view_genuine_current_label_tree_runtime_overlap_refuses_composition() {
     let (f, _download, _host, p, k, _) = composite_fixture();
     // Precreate storage before normal Label ancestor facts, just like the
     // production driver. No capture or completed profile is injected here.
-    let storage = runtime_sources::prepare::Storage::new(&f.runtime).unwrap();
+    let storage =
+        runtime_sources::prepare::Storage::new(&f.runtime, p.declarations().len()).unwrap();
     let (mut guard, initial, _) = runtime_sources::tests::current_plan(&f, &p, k.profile_key());
     let original_root = initial
         .tool_requests()
@@ -899,7 +911,9 @@ fn guest_view_genuine_current_label_tree_runtime_overlap_refuses_composition() {
                 role: SelectedToolRole::Cargo,
                 children: "lib",
             },
-            guest_prefix: collision.to_str().unwrap(),
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                collision.to_str().unwrap(),
+            ),
         }],
         RuntimeSourceLimits::default(),
         f.runtime.image_resources.descriptor_budget(),
@@ -921,6 +935,7 @@ fn guest_view_genuine_current_label_tree_runtime_overlap_refuses_composition() {
                     &mut guard,
                     k.profile_key(),
                     deadline,
+                    None,
                 ))
                 .unwrap();
             f.runtime.runtime.block_on(f.runtime.dice.wait_for_idle());
@@ -978,7 +993,7 @@ fn guest_view_genuine_current_label_tree_runtime_overlap_refuses_composition() {
         .find_map(|_| {
             guard.begin_attempt().unwrap();
             let attempt = f.runtime.runtime.block_on(attempt::sources(
-                &f.runtime, &mut guard, &k, &plan, &mut tools, deadline,
+                &f.runtime, &mut guard, &k, &plan, &mut tools, deadline, None,
             ));
             f.runtime.runtime.block_on(f.runtime.dice.wait_for_idle());
             match attempt {

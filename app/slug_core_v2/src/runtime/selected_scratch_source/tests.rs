@@ -455,7 +455,7 @@ fn native_scratch_mid_copy_cancel_error_cleanup_and_restoration() {
     let copy_active = Cell::new(true);
     let chunks = Cell::new(0);
     let error = write_prefix(
-        &owned.owner.root,
+        &owned.owner.as_ref().unwrap().root,
         recovered.observed().prefix(),
         &fixture.runtime,
         &|| {
@@ -481,7 +481,15 @@ fn native_scratch_mid_copy_cancel_error_cleanup_and_restoration() {
         matches!(error, NativeDemandSessionError::Computation(ref error)
         if matches!(error.downcast_ref::<ScratchSourceFailure>(), Some(ScratchSourceFailure::Cancelled)))
     );
-    let owned_path = owned.owner.stage.as_ref().unwrap().path().to_owned();
+    let owned_path = owned
+        .owner
+        .as_ref()
+        .unwrap()
+        .stage
+        .as_ref()
+        .unwrap()
+        .path()
+        .to_owned();
     drop(owned);
     assert!(!owned_path.exists());
     assert_eq!(
@@ -648,7 +656,15 @@ fn native_scratch_whole_frontier_current_batch_refuses_before_source_open() {
     guard.command.as_mut().unwrap().path_observations = original;
     drop(selected);
     guard.discard().unwrap();
-    let path = stage.owner.stage.as_ref().unwrap().path().to_owned();
+    let path = stage
+        .owner
+        .as_ref()
+        .unwrap()
+        .stage
+        .as_ref()
+        .unwrap()
+        .path()
+        .to_owned();
     drop(stage);
     assert!(!path.exists());
     fixture.restored();
@@ -847,5 +863,240 @@ fn native_scratch_descriptor_and_logical_exhaustion_repair() {
     );
     drop(repaired);
     assert_eq!(fixture.runtime.image_resources.logical_bytes_used(), 0);
+    fixture.restored();
+}
+
+#[test]
+fn borrowed_scratch_copy_and_promotion_refusals_retain_owner_credit_and_deny_retry() {
+    let fixture = Fixture::new(
+        "def impl(ctx):\n    ctx.file('copied','first',executable=False)\n    ctx.file('blocked/second','second',executable=False)\n    ctx.execute(['tool','copied'])\next=module_extension(implementation=impl)\n",
+    );
+    let runtime = &fixture.runtime;
+    let budget = runtime.scratch_resources.descriptor_budget();
+    // Every empty output directory precedes real ordinary ancestor observations.
+    let mut copy_stage = PreparedStage::new(runtime).unwrap();
+    let mut promotion_stage = PreparedStage::new(runtime).unwrap();
+    let copy_path = copy_stage
+        .owner
+        .as_ref()
+        .unwrap()
+        .stage
+        .as_ref()
+        .unwrap()
+        .path()
+        .to_owned();
+    let promotion_path = promotion_stage
+        .owner
+        .as_ref()
+        .unwrap()
+        .stage
+        .as_ref()
+        .unwrap()
+        .path()
+        .to_owned();
+    fs::write(copy_path.join("blocked"), b"non-directory collision").unwrap();
+    let deadline = Instant::now() + std::time::Duration::from_secs(10);
+    let complete = |guard: &mut NativeDemandAbortGuard<'_>| {
+        (0..128)
+            .find_map(|_| {
+                guard.begin_attempt().unwrap();
+                let result = runtime
+                    .runtime
+                    .block_on(prefix_attempt(runtime, guard, &fixture.key, deadline))
+                    .unwrap();
+                runtime.runtime.block_on(runtime.dice.wait_for_idle());
+                match result {
+                    PrefixAttempt::Need(need) => {
+                        guard.progress(&need).unwrap();
+                        None
+                    }
+                    PrefixAttempt::Complete(observed, selected) => Some((observed, selected)),
+                }
+            })
+            .expect("actual normal checkpoint completed")
+    };
+    let mut guard = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
+    );
+    let (observed, selected) = complete(&mut guard);
+    let reachable = selected.sidecars().demands();
+    validate(
+        guard.command(),
+        &fixture.key,
+        &observed,
+        reachable,
+        deadline,
+    )
+    .unwrap();
+    let bytes = observed.prefix().occurrence_bytes() as u64;
+    assert!(bytes > 0);
+    let charge = copy_stage.reservation.as_ref().unwrap().charged_bytes();
+    let error = copy_stage
+        .capture_retaining(
+            guard.command(),
+            &fixture.key,
+            observed.dupe(),
+            reachable,
+            deadline,
+        )
+        .unwrap_err();
+    assert!(matches!(error,NativeDemandSessionError::Computation(ref e)
+        if matches!(e.downcast_ref::<ScratchSourceFailure>(),Some(ScratchSourceFailure::Io(_)))));
+    assert!(copy_stage.attempted);
+    assert!(copy_stage.owner.is_some());
+    assert_eq!(
+        copy_stage.reservation.as_ref().unwrap().charged_bytes(),
+        charge
+    );
+    assert_eq!(fs::read(copy_path.join("copied")).unwrap(), b"first");
+    assert!(copy_path.exists());
+    assert_eq!(runtime.image_resources.logical_bytes_used(), bytes);
+
+    // Exercise the borrowed promotion leaf with an actually copied and verified
+    // normal prefix. No hand-built prefix/certificate or replacement owner is used.
+    verify_current(
+        guard.command(),
+        &fixture.key,
+        &observed,
+        reachable,
+        deadline,
+    )
+    .unwrap();
+    promotion_stage.attempted = true;
+    pin_sources(guard.command(), &observed, &mut promotion_stage, deadline).unwrap();
+    promotion_stage.owner.as_mut().unwrap().logical =
+        Some(runtime.image_resources.reserve_logical(bytes).unwrap());
+    write_prefix(
+        &promotion_stage.owner.as_ref().unwrap().root,
+        observed.prefix(),
+        runtime,
+        &|| active(guard.command(), deadline),
+        None,
+    )
+    .unwrap();
+    verify_current(
+        guard.command(),
+        &fixture.key,
+        &observed,
+        reachable,
+        deadline,
+    )
+    .unwrap();
+    promotion_stage.owner.as_mut().unwrap().observed = Some(observed.dupe());
+    use std::os::fd::AsRawFd;
+    let actual_fd = promotion_stage.owner.as_ref().unwrap().root.as_raw_fd();
+    let original_charge = promotion_stage
+        .reservation
+        .as_ref()
+        .unwrap()
+        .charged_bytes();
+    let pressure = budget
+        .try_reserve(budget.limit_bytes() - budget.used_bytes())
+        .unwrap();
+    let error = promotion_stage.promote().unwrap_err();
+    assert!(matches!(
+        error,
+        NativeDemandSessionError::InputImage(
+            input_image::InputImageCaptureError::DescriptorBudget(
+                slug_workspace_v2::ImageDescriptorBudgetError::ResourceLimit
+            )
+        )
+    ));
+    assert_eq!(
+        promotion_stage.owner.as_ref().unwrap().root.as_raw_fd(),
+        actual_fd
+    );
+    assert_eq!(
+        promotion_stage.owner.as_ref().unwrap().observed.as_ref(),
+        Some(&observed)
+    );
+    assert_eq!(
+        promotion_stage
+            .reservation
+            .as_ref()
+            .unwrap()
+            .charged_bytes(),
+        original_charge
+    );
+    assert_eq!(budget.used_bytes(), budget.limit_bytes());
+    assert_eq!(
+        fs::read(promotion_path.join("blocked/second")).unwrap(),
+        b"second"
+    );
+    assert_eq!(runtime.image_resources.logical_bytes_used(), 2 * bytes);
+    drop(pressure);
+    let retained_credit = budget.used_bytes();
+    // An absent source would make frontier I/O fail; both attempted cells must
+    // instead reject at admission even after the external pressure is released.
+    let hidden = fixture
+        .workspace
+        .path()
+        .with_extension("borrowed-source-hidden");
+    fs::rename(fixture.workspace.path(), &hidden).unwrap();
+    for stage in [&mut copy_stage, &mut promotion_stage] {
+        let error = stage
+            .capture_retaining(
+                guard.command(),
+                &fixture.key,
+                observed.dupe(),
+                reachable,
+                deadline,
+            )
+            .unwrap_err();
+        assert!(matches!(error,NativeDemandSessionError::Computation(ref e)
+            if matches!(e.downcast_ref::<ScratchSourceFailure>(),Some(ScratchSourceFailure::Unauthorized))));
+    }
+    fs::rename(&hidden, fixture.workspace.path()).unwrap();
+    assert_eq!(budget.used_bytes(), retained_credit);
+    assert!(copy_path.exists() && promotion_path.exists());
+    drop(selected);
+    guard.discard().unwrap();
+    // Real discard/restoration does not own or prematurely retire either cell.
+    assert!(copy_path.exists() && promotion_path.exists());
+    assert_eq!(runtime.image_resources.logical_bytes_used(), 2 * bytes);
+    drop(copy_stage);
+    assert!(!copy_path.exists() && promotion_path.exists());
+    assert_eq!(runtime.image_resources.logical_bytes_used(), bytes);
+    drop(promotion_stage);
+    assert!(!promotion_path.exists());
+    assert_eq!(runtime.image_resources.logical_bytes_used(), 0);
+    fixture.restored();
+
+    // A new cell and fresh normal transaction repair the refusals; the old
+    // attempted cells were never reused or granted a read capability.
+    let mut fresh = PreparedStage::new(runtime).unwrap();
+    let mut guard = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command()
+            .unwrap()
+            .into_command(),
+    );
+    let (observed, selected) = complete(&mut guard);
+    let lease = fresh
+        .capture_retaining(
+            guard.command(),
+            &fixture.key,
+            observed,
+            selected.sidecars().demands(),
+            deadline,
+        )
+        .unwrap();
+    let repaired_path = lease.test_path().to_owned();
+    assert_eq!(fs::read(repaired_path.join("copied")).unwrap(), b"first");
+    assert_eq!(
+        fs::read(repaired_path.join("blocked/second")).unwrap(),
+        b"second"
+    );
+    assert!(fresh.owner.is_none() && fresh.reservation.is_none());
+    drop(selected);
+    guard.discard().unwrap();
+    drop(fresh);
+    assert!(repaired_path.exists());
+    drop(lease);
+    assert!(!repaired_path.exists());
+    assert_eq!(runtime.image_resources.logical_bytes_used(), 0);
     fixture.restored();
 }

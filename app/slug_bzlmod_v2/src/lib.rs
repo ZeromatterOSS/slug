@@ -410,6 +410,10 @@ pub use runtime_source_declaration::RuntimeSourceDeclarationPolicy;
 pub use runtime_source_declaration::RuntimeSourceDeclarationPolicyKey;
 pub use runtime_source_declaration::RuntimeSourceDeclarationTransaction;
 pub use runtime_source_declaration::RuntimeSourceFactTier;
+#[doc(hidden)]
+pub use runtime_source_declaration::RuntimeSourceGuestMappingInput;
+#[doc(hidden)]
+pub use runtime_source_declaration::RuntimeSourceGuestMappingRef;
 pub use runtime_source_declaration::RuntimeSourceGuestPrefix;
 pub use runtime_source_declaration::RuntimeSourceLimit;
 pub use runtime_source_declaration::RuntimeSourceLimits;

@@ -106,17 +106,30 @@ impl Catalog {
         command: &NativeDemandCommand<'_>,
         index: usize,
         image: ObservedInputImage,
-        stage: input_image::PreparedInputImageStage,
+        stage: &mut input_image::PreparedInputImageStage,
         deadline: Instant,
+        #[cfg(test)] activity: Option<&dyn Fn(&std::path::Path) -> bool>,
     ) -> Result<input_image::CapturedInputImageLease, NativeDemandSessionError> {
-        input_image_bridge::capture_selected_image(
+        #[cfg(test)]
+        let staged_path = stage.test_path().to_owned();
+        let active = || {
+            if !selected_scratch_source::active(command, deadline).is_ok() {
+                return false;
+            }
+            #[cfg(test)]
+            if let Some(activity) = activity {
+                return activity(&staged_path);
+            }
+            true
+        };
+        input_image_bridge::capture_selected_image_retaining(
             command,
             self.entries[index]
                 .as_ref()
                 .ok_or_else(|| refusal("missing Label capture declaration"))?,
             image,
             stage,
-            &|| selected_scratch_source::active(command, deadline).is_ok(),
+            &active,
         )
     }
 }

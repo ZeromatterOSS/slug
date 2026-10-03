@@ -105,7 +105,14 @@ impl std::error::Error for RuntimeSourceDeclarationError {}
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeSourceDeclarationInput<'a> {
     pub source: RuntimeSourceSelectorInput<'a>,
-    pub guest_prefix: &'a str,
+    pub guest_mapping: RuntimeSourceGuestMappingInput<'a>,
+}
+/// Raw mapping instruction; normal source selection owns the original spelling.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub enum RuntimeSourceGuestMappingInput<'a> {
+    OriginalSource,
+    ExplicitPrefix(&'a str),
 }
 #[derive(Debug, Clone, Copy)]
 pub enum RuntimeSourceSelectorInput<'a> {
@@ -145,7 +152,8 @@ impl RuntimeSourceGuestPrefix {
     pub fn as_path(&self) -> &Path {
         Path::new(self.as_str())
     }
-    pub(super) fn same_budget(&self, budget: &ImageDescriptorBudget) -> bool {
+    #[doc(hidden)]
+    pub fn same_budget(&self, budget: &ImageDescriptorBudget) -> bool {
         self.0.same_budget(budget)
     }
 }

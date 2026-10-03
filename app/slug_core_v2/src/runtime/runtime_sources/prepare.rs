@@ -6,12 +6,17 @@ use super::*;
 pub(in crate::runtime::dice) struct Storage {
     stages: [Option<input_image::PreparedInputImageStage>; 64],
     images: [Option<input_image::CapturedInputImageLease>; 64],
-    credit: ImageDescriptorReservation,
+    failed_owner: Option<RuntimeInputOwner>,
+    credit: Option<ImageDescriptorReservation>,
 }
 impl Storage {
     pub(in crate::runtime::dice) fn new(
         runtime: &WorkspaceRuntime,
+        admitted_len: usize,
     ) -> Result<Self, NativeDemandSessionError> {
+        if admitted_len > 64 {
+            return Err(refusal("runtime stage count overflow"));
+        }
         // Both fixed slot arrays and the final owner are admitted BEFORE any
         // stage allocation. Their ownership moves into the final retained block.
         let credit = runtime
@@ -22,7 +27,7 @@ impl Storage {
             )
             .map_err(image_error)?;
         let mut stages = std::array::from_fn(|_| None);
-        for slot in &mut stages {
+        for slot in &mut stages[..admitted_len] {
             *slot = Some(
                 input_image::prepare_input_image_stage(&runtime.image_resources)
                     .map_err(NativeDemandSessionError::InputImage)?,
@@ -31,7 +36,8 @@ impl Storage {
         Ok(Self {
             stages,
             images: std::array::from_fn(|_| None),
-            credit,
+            failed_owner: None,
+            credit: Some(credit),
         })
     }
     pub(in crate::runtime::dice) fn capture(
@@ -39,31 +45,93 @@ impl Storage {
         command: &NativeDemandCommand<'_>,
         profile: &ObservedRuntimeSourceProfile,
         catalog: &catalogue::Catalogue,
+        tools: &selected_tool_source::CertifiedSelectedToolInputsLease,
     ) -> Result<(), NativeDemandSessionError> {
+        if tools.certificate() != profile.tool_sources() {
+            return Err(refusal("runtime capture has foreign tools"));
+        }
         for (index, image) in profile.images().enumerate() {
-            self.images[index] = Some(catalog.capture(
-                command,
-                index,
-                image.dupe(),
-                self.stages[index].take().expect("precreated runtime stage"),
-            )?);
+            match profile
+                .image_binding(index)
+                .ok_or_else(|| refusal("missing runtime binding"))?
+            {
+                slug_loading_v2::RuntimeSourceImageBinding::Captured => {}
+                slug_loading_v2::RuntimeSourceImageBinding::CoveredTool { .. } => {
+                    // Normal interval proof plus actual retained certificate binds the FD.
+                    let root = profile
+                        .tool_root_member(index)
+                        .ok_or_else(|| refusal("missing covered runtime root"))?;
+                    let matched = tools
+                        .with_image_root(root.0, |_, actual| {
+                            actual.entries().get(root.1).is_some_and(|e| {
+                                e.path().as_path() == image.source_root().as_path()
+                            }) && actual.namespace() == image.namespace()
+                                && actual.anchor_root() == image.anchor_root()
+                        })
+                        .unwrap_or(false);
+                    if !matched {
+                        return Err(refusal("covered runtime capture root changed"));
+                    }
+                    continue;
+                }
+            }
+            self.images[index] = Some(
+                catalog.capture(
+                    command,
+                    index,
+                    image.dupe(),
+                    self.stages[index]
+                        .as_mut()
+                        .expect("precreated runtime stage"),
+                )?,
+            );
+            self.stages[index].take();
         }
         Ok(())
     }
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn visit_stage_paths(
+        &self,
+        visitor: &mut dyn FnMut(&std::path::Path),
+    ) {
+        for stage in self.stages.iter().flatten() {
+            visitor(stage.test_path());
+        }
+        for image in self.images.iter().flatten() {
+            visitor(image.test_path());
+        }
+        if let Some(owner) = &self.failed_owner {
+            for stage in owner.unused.iter().flatten() {
+                visitor(stage.test_path());
+            }
+            for image in owner.images.iter().flatten() {
+                visitor(image.test_path());
+            }
+        }
+    }
     pub(in crate::runtime::dice) fn finish(
-        self,
+        &mut self,
         profile: ObservedRuntimeSourceProfile,
         tools: selected_tool_source::CertifiedSelectedToolInputsLease,
     ) -> Result<CertifiedRuntimeSourcesLease, NativeDemandSessionError> {
-        self.credit
-            .freeze(RuntimeInputOwner {
+        let result = self
+            .credit
+            .take()
+            .ok_or_else(|| refusal("capture storage already consumed"))?
+            .freeze_preserving(RuntimeInputOwner {
                 profile,
                 tools,
-                images: self.images,
-                unused: self.stages,
-            })
-            .map(CertifiedRuntimeSourcesLease)
-            .map_err(image_error)
+                images: std::mem::replace(&mut self.images, std::array::from_fn(|_| None)),
+                unused: std::mem::replace(&mut self.stages, std::array::from_fn(|_| None)),
+            });
+        match result {
+            Ok(block) => Ok(CertifiedRuntimeSourcesLease(block)),
+            Err((error, owner, credit)) => {
+                self.failed_owner = Some(owner);
+                self.credit = Some(credit);
+                Err(image_error(error))
+            }
+        }
     }
 }
 

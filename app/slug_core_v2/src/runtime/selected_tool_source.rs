@@ -16,7 +16,7 @@ use super::*;
 use crate::runtime::input_image;
 
 #[path = "selected_tool_source/prepare.rs"]
-mod prepare;
+pub(in crate::runtime::dice) mod prepare;
 pub(in crate::runtime::dice) use prepare::PreparationMode;
 pub(in crate::runtime::dice) use prepare::PreparedLease;
 
@@ -103,7 +103,7 @@ impl WorkspaceRuntime {
     fn prepare_selected_tool_inputs_inner(
         &self,
         key: SelectedExtensionToolSourcesKey,
-        #[cfg(test)] hook: Option<&dyn Fn(ToolPhase) -> Result<(), NativeDemandSessionError>>,
+        #[cfg(test)] hook: Option<&dyn Fn(ToolPhase<'_>) -> Result<(), NativeDemandSessionError>>,
     ) -> Result<CertifiedSelectedToolInputsLease, NativeDemandSessionError> {
         match self.prepare_selected_sources_inner(
             key,
@@ -389,7 +389,15 @@ fn progress_sources(
 }
 #[cfg(test)]
 #[derive(Clone, Copy)]
-pub(in crate::runtime::dice) enum ToolPhase {
+pub(in crate::runtime::dice) enum ToolPhase<'stage> {
     BeforeCapture,
     AfterCapture,
+    CaptureActivity(&'stage std::path::Path),
+    BeforeProgress(&'stage SourcePreparationNeeds),
+    OwnerRefreshed(
+        &'stage slug_loading_v2::ObservedSelectedPreparationOwner,
+        &'stage slug_loading_v2::ObservedSelectedPreparationOwner,
+    ),
+    BeforeRestore(&'stage prepare::setup::Stages),
+    AfterRestore(&'stage prepare::setup::Stages),
 }

@@ -53,6 +53,7 @@ use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
+mod local_request;
 mod source_generations;
 pub(super) use source_generations::NativeSourceGenerations;
 
@@ -1913,7 +1914,7 @@ fn materialize_native_attempt(
         request.repo_spec.rule_id.rule_name.as_str(),
     ) {
         ("@@bazel_tools//tools/build_defs/repo:local.bzl", "local_repository") => {
-            match validate_local_spec(workspace, &request.repo_spec) {
+            match local_request::validate(workspace, request) {
                 Ok(()) => RepositoryMaterializationAttempt::Local,
                 Err(error) => RepositoryMaterializationAttempt::SpecError(error.message.into()),
             }
@@ -1985,19 +1986,9 @@ fn validate_native_request(
             RepositoryMaterializationKind::GeneratedFileEffects(_),
         ) => Err(RepositorySessionError::KindMismatch),
         (_, _, RepositoryMaterializationKind::GeneratedFileEffects(_)) => Ok(()),
-        (
-            "@@bazel_tools//tools/build_defs/repo:local.bzl",
-            "local_repository",
-            RepositoryMaterializationKind::Local { logical_root },
-        ) => {
-            if let Ok(relative) = local_relative_path(&request.repo_spec) {
-                let expected = NormalizedAbsolutePath::new(workspace.as_path().join(relative))
-                    .map_err(|_| RepositorySessionError::KindMismatch)?;
-                if *logical_root != expected {
-                    return Err(RepositorySessionError::KindMismatch);
-                }
-            }
-            Ok(())
+        (_, _, RepositoryMaterializationKind::Local { .. }) => {
+            local_request::validate(workspace.as_path(), request)
+                .map_err(|_| RepositorySessionError::KindMismatch)
         }
         (
             "@@bazel_tools//tools/build_defs/repo:http.bzl",

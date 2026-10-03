@@ -109,6 +109,7 @@ pub(super) async fn plan(
     guard: &mut NativeDemandAbortGuard<'_>,
     key: &RuntimeSourceProfileKey,
     deadline: std::time::Instant,
+    owner: Option<&super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<
     selected_tool_source::attempt::Attempt<ObservedSelectedDataLabelRequests>,
     NativeDemandSessionError,
@@ -121,6 +122,10 @@ pub(super) async fn plan(
     let mut updater = runtime.dice.updater_with_data(data);
     guard.inject_attempt(&mut updater)?;
     let mut tx = runtime.request_revision.commit(updater).await;
+    if let Some(need) = super::source_preparation::attempt::authorize(&mut tx, owner).await? {
+        guard.seal_retry()?;
+        return Ok(selected_tool_source::attempt::Attempt::Need(need));
+    }
     let plan = match slug_loading_v2::compute_selected_data_label_requests(
         &mut tx,
         &SelectedDataLabelRequestsKey::new(key.requests_key().clone()),

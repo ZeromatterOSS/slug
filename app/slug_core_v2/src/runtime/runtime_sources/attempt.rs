@@ -20,6 +20,7 @@ pub(in crate::runtime::dice) async fn plan(
     guard: &mut NativeDemandAbortGuard<'_>,
     key: &RuntimeSourceProfileKey,
     deadline: std::time::Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<Attempt<ObservedRuntimeSourceRequests>, NativeDemandSessionError> {
     let mut data = guard.attempt_user_computation_data()?;
     data.data
@@ -27,6 +28,12 @@ pub(in crate::runtime::dice) async fn plan(
     let mut updater = runtime.dice.updater_with_data(data);
     guard.inject_attempt(&mut updater)?;
     let mut transaction = runtime.request_revision.commit(updater).await;
+    if let Some(need) =
+        super::super::source_preparation::attempt::authorize(&mut transaction, owner).await?
+    {
+        guard.seal_retry()?;
+        return Ok(Attempt::Need(need));
+    }
     let observed = match complete(
         slug_loading_v2::compute_runtime_source_requests(&mut transaction, key.requests_key())
             .await
@@ -48,9 +55,10 @@ pub(in crate::runtime::dice) async fn sources(
     expected: &ObservedRuntimeSourceRequests,
     catalog: &mut selected_tool_source::declarations::Catalog,
     deadline: std::time::Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<Attempt<ObservedRuntimeSourceProfile>, NativeDemandSessionError> {
     let mut transaction =
-        match source_transaction(runtime, guard, key, expected, catalog, deadline).await? {
+        match source_transaction(runtime, guard, key, expected, catalog, deadline, owner).await? {
             Ok(transaction) => transaction,
             Err(need) => return Ok(Attempt::Need(need)),
         };
@@ -76,6 +84,7 @@ pub(in crate::runtime::dice) async fn source_transaction(
     expected: &ObservedRuntimeSourceRequests,
     catalog: &mut selected_tool_source::declarations::Catalog,
     deadline: std::time::Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<Result<dice::DiceTransaction, SourcePreparationNeeds>, NativeDemandSessionError> {
     let mut data = guard.attempt_user_computation_data()?;
     data.data
@@ -83,6 +92,12 @@ pub(in crate::runtime::dice) async fn source_transaction(
     let mut updater = runtime.dice.updater_with_data(data);
     guard.inject_attempt(&mut updater)?;
     let mut transaction = runtime.request_revision.commit(updater).await;
+    if let Some(need) =
+        super::super::source_preparation::attempt::authorize(&mut transaction, owner).await?
+    {
+        guard.seal_retry()?;
+        return Ok(Err(need));
+    }
     let current = match complete(
         slug_loading_v2::compute_runtime_source_requests(&mut transaction, key.requests_key())
             .await

@@ -12,6 +12,21 @@ struct Owner {
 #[derive(Clone, Dupe)]
 pub(in crate::runtime::dice) struct Lease(BudgetedImageBlock<Owner>);
 impl Lease {
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn visit_stage_paths(
+        &self,
+        visitor: &mut dyn FnMut(&std::path::Path),
+    ) {
+        let owner = self.0.get();
+        for stage in owner._unused.iter().flatten() {
+            visitor(stage.test_path());
+        }
+        for image in owner.captures.iter().flatten() {
+            let path = image.test_path();
+            visitor(path.parent().unwrap());
+        }
+    }
+
     pub(in crate::runtime::dice) fn sources(&self) -> &ObservedSelectedDataLabelSources {
         &self.0.get().sources
     }
@@ -34,7 +49,8 @@ pub(in crate::runtime::dice) struct Storage {
     stages: [Option<input_image::PreparedInputImageStage>; 64],
     captures: [Option<input_image::CapturedInputFileLease>; 64],
     capture_for_occurrence: [Option<usize>; 64],
-    credit: ImageDescriptorReservation,
+    failed_owner: Option<Owner>,
+    credit: Option<ImageDescriptorReservation>,
 }
 impl Storage {
     pub(in crate::runtime::dice) fn new(
@@ -60,7 +76,8 @@ impl Storage {
             stages,
             captures: std::array::from_fn(|_| None),
             capture_for_occurrence: [None; 64],
-            credit,
+            failed_owner: None,
+            credit: Some(credit),
         })
     }
     pub(in crate::runtime::dice) fn capture(
@@ -96,27 +113,59 @@ impl Storage {
                     index,
                     image.dupe(),
                     self.stages[index]
-                        .take()
+                        .as_mut()
                         .ok_or_else(|| refusal("missing precreated data Label stage"))?,
                 )?,
             );
+            self.stages[index].take();
             self.capture_for_occurrence[index] = Some(index);
         }
         Ok(())
     }
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn visit_stage_paths(
+        &self,
+        visitor: &mut dyn FnMut(&std::path::Path),
+    ) {
+        for stage in self.stages.iter().flatten() {
+            visitor(stage.test_path());
+        }
+        for image in self.captures.iter().flatten() {
+            let path = image.test_path();
+            visitor(path.parent().unwrap());
+        }
+        if let Some(owner) = &self.failed_owner {
+            for stage in owner._unused.iter().flatten() {
+                visitor(stage.test_path());
+            }
+            for image in owner.captures.iter().flatten() {
+                let path = image.test_path();
+                visitor(path.parent().unwrap());
+            }
+        }
+    }
     pub(in crate::runtime::dice) fn finish(
-        self,
+        &mut self,
         sources: ObservedSelectedDataLabelSources,
     ) -> Result<Lease, NativeDemandSessionError> {
-        self.credit
-            .freeze(Owner {
+        let result = self
+            .credit
+            .take()
+            .ok_or_else(|| refusal("capture storage already consumed"))?
+            .freeze_preserving(Owner {
                 sources,
-                captures: self.captures,
+                captures: std::mem::replace(&mut self.captures, std::array::from_fn(|_| None)),
                 capture_for_occurrence: self.capture_for_occurrence,
-                _unused: self.stages,
-            })
-            .map(Lease)
-            .map_err(image_error)
+                _unused: std::mem::replace(&mut self.stages, std::array::from_fn(|_| None)),
+            });
+        match result {
+            Ok(block) => Ok(Lease(block)),
+            Err((error, owner, credit)) => {
+                self.failed_owner = Some(owner);
+                self.credit = Some(credit);
+                Err(image_error(error))
+            }
+        }
     }
 }
 

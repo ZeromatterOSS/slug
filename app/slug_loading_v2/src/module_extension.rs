@@ -138,6 +138,7 @@ pub(crate) mod runtime_sources;
 pub(crate) mod selected_label_data;
 mod selected_path;
 pub(crate) mod selected_scratch;
+pub(crate) mod selected_source_preparation;
 pub(crate) mod selected_tools;
 use selected_path::SelectedModuleLabelPath;
 use selected_path::SelectedPathInvocation;
@@ -8021,6 +8022,7 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
     include!("module_extension/selected_scratch/tests.rs");
     include!("module_extension/selected_tools/tests.rs");
     include!("module_extension/runtime_sources/tests.rs");
+    include!("module_extension/selected_source_preparation/tests.rs");
     include!("module_extension/guest_namespace/tests.rs");
     include!("module_extension/selected_label_data/tests.rs");
     include!("module_extension/selected_scratch/provenance_tests.rs");

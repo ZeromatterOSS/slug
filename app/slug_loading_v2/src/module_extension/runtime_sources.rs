@@ -24,6 +24,7 @@ use super::selected_tools::SelectedExtensionToolSourceRequestsKey;
 use super::selected_tools::SelectedExtensionToolSourcesKey;
 use super::selected_tools::SelectedToolSourcesError;
 use super::*;
+mod covered_tool;
 mod profile;
 mod requests;
 
@@ -149,6 +150,7 @@ pub struct RuntimeSourceRequest {
     index: usize,
     image: ObservedInputImageKey,
     selected: Option<ObservedSelectedLabelSource>,
+    guest: RuntimeSourceGuestPrefix,
 }
 impl RuntimeSourceRequest {
     pub fn declaration_index(&self) -> usize {
@@ -161,11 +163,7 @@ impl RuntimeSourceRequest {
         self.selected.as_ref()
     }
     pub fn guest_prefix(&self) -> &RuntimeSourceGuestPrefix {
-        self.policy
-            .declarations()
-            .nth(self.index)
-            .expect("declared index")
-            .guest_prefix()
+        &self.guest
     }
 }
 #[derive(Debug, PartialEq, Eq, Allocative)]
@@ -203,6 +201,7 @@ impl ObservedRuntimeSourceRequests {
             && self.requests().all(|row| {
                 row.policy == *self.policy()
                     && row.policy.same_budget(b)
+                    && row.guest.same_budget(b)
                     && row.selected.as_ref().is_none_or(|s| s.same_budget(b))
             })
     }
@@ -216,11 +215,22 @@ pub struct RuntimeSourceTotals {
     pub file_bytes: u64,
     pub descriptor_bytes: usize,
 }
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+pub enum RuntimeSourceImageBinding {
+    Captured,
+    CoveredTool {
+        role: usize,
+        root_entry: usize,
+        entry_count: usize,
+    },
+}
 #[derive(Debug, PartialEq, Eq, Allocative)]
 struct ProfileInner {
     requests: ObservedRuntimeSourceRequests,
     tools: ObservedSelectedExtensionToolSources,
     images: Vec<ObservedInputImage>,
+    bindings: Vec<RuntimeSourceImageBinding>,
     observations: PathObservationEpoch,
     totals: RuntimeSourceTotals,
 }
@@ -237,6 +247,27 @@ impl ObservedRuntimeSourceProfile {
     pub fn images(&self) -> impl ExactSizeIterator<Item = &ObservedInputImage> {
         self.0.get().images.iter()
     }
+    pub fn image_binding(&self, declaration: usize) -> Option<RuntimeSourceImageBinding> {
+        self.0.get().bindings.get(declaration).copied()
+    }
+    pub fn tool_root_member(&self, declaration: usize) -> Option<(usize, usize)> {
+        match self.image_binding(declaration)? {
+            RuntimeSourceImageBinding::CoveredTool {
+                role, root_entry, ..
+            } => Some((role, root_entry)),
+            RuntimeSourceImageBinding::Captured => None,
+        }
+    }
+    pub fn tool_member(&self, declaration: usize, entry: usize) -> Option<(usize, usize)> {
+        match self.image_binding(declaration)? {
+            RuntimeSourceImageBinding::CoveredTool {
+                role,
+                root_entry,
+                entry_count,
+            } if entry < entry_count => Some((role, root_entry.checked_add(entry)?)),
+            _ => None,
+        }
+    }
     pub fn observations(&self) -> &PathObservationEpoch {
         &self.0.get().observations
     }
@@ -247,6 +278,8 @@ impl ObservedRuntimeSourceProfile {
         self.requests().matches_key(key.requests_key())
             && self.tool_sources().matches_key(&key.tool_sources_key())
             && self.tool_sources().requests() == self.requests().tool_requests()
+            && self.0.get().bindings.len() == self.0.get().images.len()
+            && self.0.get().images.len() == self.requests().requests().len()
     }
     pub fn same_resources(&self, r: &SelectedScratchResources) -> bool {
         self.0.same_budget(r.descriptor_budget())
@@ -264,6 +297,15 @@ impl ObservedRuntimeSourceProfile {
     ) -> bool {
         self.requests().authorized_by(tx) && self.tool_sources().authorized_by(scratch, r)
     }
+}
+
+#[cfg(test)]
+pub(super) fn certify_runtime_test(
+    row: &RuntimeSourceRequest,
+    image: &ObservedInputImage,
+    tools: &ObservedSelectedExtensionToolSources,
+) -> Result<RuntimeSourceImageBinding, RuntimeSourcesError> {
+    covered_tool::certify(row, image, tools, &|| true)
 }
 
 type RequestsValue =

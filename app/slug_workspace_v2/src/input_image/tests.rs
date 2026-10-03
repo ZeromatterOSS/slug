@@ -1183,3 +1183,70 @@ async fn ordinary_image_key_refuses_missing_kind_depth_and_aggregate_limits() {
         );
     }
 }
+
+#[test]
+fn preserving_freeze_refusal_keeps_exact_owner_credit_and_owner_first_drop() {
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    struct Owner {
+        identity: Box<u8>,
+        budget: ImageDescriptorBudget,
+        drops: std::sync::Arc<AtomicUsize>,
+    }
+    impl Drop for Owner {
+        fn drop(&mut self) {
+            assert!(
+                self.budget.used_bytes() >= 64,
+                "owner cleanup needs live credit"
+            );
+            self.drops.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    let budget = ImageDescriptorBudget::new(64);
+    let drops = std::sync::Arc::new(AtomicUsize::new(0));
+    let make = || Owner {
+        identity: Box::new(11),
+        budget: budget.dupe(),
+        drops: drops.clone(),
+    };
+    let owner = make();
+    let identity = &*owner.identity as *const u8;
+    let result = budget.try_reserve(64).unwrap().freeze_preserving(owner);
+    let (error, owner, credit) = match result {
+        Err(failure) => failure,
+        Ok(_) => panic!("fixed header cannot fit"),
+    };
+    assert_eq!(error, ImageDescriptorBudgetError::ResourceLimit);
+    assert_eq!(&*owner.identity as *const u8, identity);
+    assert_eq!(credit.charged_bytes(), 64);
+    assert_eq!(budget.used_bytes(), 64);
+    assert_eq!(drops.load(Ordering::SeqCst), 0);
+    drop(owner);
+    assert_eq!(budget.used_bytes(), 64);
+    drop(credit);
+    assert_eq!(budget.used_bytes(), 0);
+    // Ignoring the preserving error must still destroy owner before credit.
+    drop(budget.try_reserve(64).unwrap().freeze_preserving(make()));
+    assert_eq!(budget.used_bytes(), 0);
+    assert!(budget.try_reserve(64).unwrap().freeze(make()).is_err());
+    assert_eq!(drops.load(Ordering::SeqCst), 3);
+    assert_eq!(budget.used_bytes(), 0);
+    let larger = ImageDescriptorBudget::new(4096);
+    let held = larger
+        .try_reserve(64)
+        .unwrap()
+        .freeze_preserving(Owner {
+            identity: Box::new(12),
+            budget: larger.dupe(),
+            drops: drops.clone(),
+        })
+        .ok()
+        .unwrap();
+    let clone = held.dupe();
+    let live = larger.used_bytes();
+    drop(held);
+    assert_eq!(larger.used_bytes(), live);
+    drop(clone);
+    assert_eq!(larger.used_bytes(), 0);
+    assert_eq!(drops.load(Ordering::SeqCst), 4);
+}

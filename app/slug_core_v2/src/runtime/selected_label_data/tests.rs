@@ -103,7 +103,9 @@ ext=module_extension(implementation=_consumer,tag_classes={{'cfg':cfg}})
             source: RuntimeSourceSelectorInput::ExplicitHostDirectory {
                 anchor: host.path().to_str().unwrap(),
             },
-            guest_prefix: "/external",
+            guest_mapping: slug_bzlmod_v2::RuntimeSourceGuestMappingInput::ExplicitPrefix(
+                "/external",
+            ),
         }],
         RuntimeSourceLimits::default(),
         b,
@@ -143,7 +145,7 @@ fn current_data<'a>(
         let result = f
             .runtime
             .runtime
-            .block_on(super::plan(&f.runtime, &mut guard, key, deadline))
+            .block_on(super::plan(&f.runtime, &mut guard, key, deadline, None))
             .unwrap();
         f.runtime.runtime.block_on(f.runtime.dice.wait_for_idle());
         match result {
@@ -194,7 +196,8 @@ fn data_mixed_need_invalid_second_denies_before_proof_or_source_io_and_repairs()
     use crate::runtime::input_image::elf_metadata;
     let (f, _host, p, key) = fixture("//:data");
     let _storage = prepare::Storage::new(&f.runtime, 2).unwrap();
-    let _runtime = runtime_sources::prepare::Storage::new(&f.runtime).unwrap();
+    let _runtime =
+        runtime_sources::prepare::Storage::new(&f.runtime, p.declarations().len()).unwrap();
     let _scratch = selected_scratch_source::PreparedStage::new(&f.runtime).unwrap();
     let deadline = Instant::now() + Duration::from_secs(10);
     let (mut guard, plan, reachable) = current_data(&f, &p, key.profile_key(), deadline);

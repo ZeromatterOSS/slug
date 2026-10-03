@@ -30,7 +30,7 @@ fn runtime_test_relative<'a>(
         source: runtime_test_bzl::RuntimeSourceSelectorInput::WorkspaceRelativeDirectory {
             relative,
         },
-        guest_prefix: guest,
+        guest_mapping: runtime_test_bzl::RuntimeSourceGuestMappingInput::ExplicitPrefix(guest),
     }
 }
 fn runtime_test_authorization(

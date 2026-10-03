@@ -26,9 +26,14 @@ enum Selector {
     ),
 }
 #[derive(Debug, Clone, Dupe, Eq, PartialEq, Hash, Allocative)]
+enum GuestMapping {
+    OriginalSource,
+    ExplicitPrefix(RuntimeSourceGuestPrefix),
+}
+#[derive(Debug, Clone, Dupe, Eq, PartialEq, Hash, Allocative)]
 pub struct RuntimeSourceDeclaration {
     source: BudgetedImageBlock<Selector>,
-    guest: RuntimeSourceGuestPrefix,
+    guest: GuestMapping,
     image_policy: InputImagePolicy,
 }
 #[derive(Debug, Clone, Copy)]
@@ -43,6 +48,12 @@ pub enum RuntimeSourceSelectorRef<'a> {
         role: crate::SelectedToolRole,
         components: &'a [RuntimeSourceComponent],
     },
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub enum RuntimeSourceGuestMappingRef<'a> {
+    OriginalSource,
+    ExplicitPrefix(&'a RuntimeSourceGuestPrefix),
 }
 impl RuntimeSourceDeclaration {
     pub fn selector(&self) -> RuntimeSourceSelectorRef<'_> {
@@ -59,15 +70,24 @@ impl RuntimeSourceDeclaration {
             }
         }
     }
-    pub fn guest_prefix(&self) -> &RuntimeSourceGuestPrefix {
-        &self.guest
+    #[doc(hidden)]
+    pub fn guest_mapping(&self) -> RuntimeSourceGuestMappingRef<'_> {
+        match &self.guest {
+            GuestMapping::OriginalSource => RuntimeSourceGuestMappingRef::OriginalSource,
+            GuestMapping::ExplicitPrefix(prefix) => {
+                RuntimeSourceGuestMappingRef::ExplicitPrefix(prefix)
+            }
+        }
     }
     pub fn image_policy(&self) -> InputImagePolicy {
         self.image_policy
     }
     fn same_budget(&self, budget: &ImageDescriptorBudget) -> bool {
         self.source.same_budget(budget)
-            && self.guest.same_budget(budget)
+            && match &self.guest {
+                GuestMapping::OriginalSource => true,
+                GuestMapping::ExplicitPrefix(p) => p.same_budget(budget),
+            }
             && match self.source.get() {
                 Selector::Host(p) => p.same_budget(budget),
                 Selector::Workspace(rows) | Selector::Label(_, rows) => {
@@ -103,9 +123,6 @@ impl RuntimeSourceDeclarationPolicy {
             return Err(ImageDescriptorBudgetError::ForeignBudget.into());
         }
         limits.validate()?;
-        if declarations.is_empty() {
-            return Err(RuntimeSourceDeclarationError::InvalidDeclaration);
-        }
         if declarations.len() > limits.max_declarations {
             return Err(RuntimeSourceDeclarationError::LimitExceeded(
                 RuntimeSourceLimit::Declarations,
@@ -114,10 +131,13 @@ impl RuntimeSourceDeclarationPolicy {
         // Validate the WHOLE borrowed input before allocating any owned row.
         let mut bytes = 0usize;
         for (i, row) in declarations.iter().enumerate() {
-            absolute(row.guest_prefix, &limits)?;
-            if overlaps(Path::new(row.guest_prefix), Path::new("/__slug_module")) {
-                return Err(RuntimeSourceDeclarationError::Overlap);
-            }
+            let guest_bytes = match row.guest_mapping {
+                RuntimeSourceGuestMappingInput::OriginalSource => 0,
+                RuntimeSourceGuestMappingInput::ExplicitPrefix(prefix) => {
+                    guest_prefix(prefix, &limits)?;
+                    prefix.len()
+                }
+            };
             let (text, relative) = source_text(row.source);
             let component_count = if relative {
                 relative_path(text, &limits)?
@@ -129,7 +149,7 @@ impl RuntimeSourceDeclarationPolicy {
                 0
             };
             let row_bytes = add(
-                add(row.guest_prefix.len(), text.len())?,
+                add(guest_bytes, text.len())?,
                 add(64, mul(component_count, 16)?)?,
             )?;
             bytes = add(bytes, row_bytes)?;
@@ -139,9 +159,14 @@ impl RuntimeSourceDeclarationPolicy {
                 ));
             }
             for earlier in &declarations[..i] {
-                if overlaps(Path::new(row.guest_prefix), Path::new(earlier.guest_prefix))
-                    || same_source_overlap(row.source, earlier.source)
-                {
+                let known_guest_overlap = match (row.guest_mapping, earlier.guest_mapping) {
+                    (
+                        RuntimeSourceGuestMappingInput::ExplicitPrefix(a),
+                        RuntimeSourceGuestMappingInput::ExplicitPrefix(b),
+                    ) => overlaps(Path::new(a), Path::new(b)),
+                    _ => false, // Normal Requests owns source-derived original mappings.
+                };
+                if known_guest_overlap || same_source_overlap(row.source, earlier.source) {
                     return Err(RuntimeSourceDeclarationError::Overlap);
                 }
             }
@@ -174,7 +199,14 @@ impl RuntimeSourceDeclarationPolicy {
             };
             rows[i] = Some(RuntimeSourceDeclaration {
                 source: budget.try_reserve(0)?.freeze(selector)?,
-                guest: RuntimeSourceGuestPrefix(text_block(row.guest_prefix, budget)?),
+                guest: match row.guest_mapping {
+                    RuntimeSourceGuestMappingInput::OriginalSource => GuestMapping::OriginalSource,
+                    RuntimeSourceGuestMappingInput::ExplicitPrefix(prefix) => {
+                        GuestMapping::ExplicitPrefix(RuntimeSourceGuestPrefix::new(
+                            prefix, limits, budget,
+                        )?)
+                    }
+                },
                 image_policy,
             });
         }
@@ -207,6 +239,30 @@ impl RuntimeSourceDeclarationPolicy {
             && self.workspace().same_budget(budget)
             && self.declarations().all(|r| r.same_budget(budget))
     }
+}
+impl RuntimeSourceGuestPrefix {
+    /// Resolve a finite guest spelling after normal source selection. This
+    /// configuration value grants no native source or descriptor authority.
+    #[doc(hidden)]
+    pub fn new(
+        text: &str,
+        limits: RuntimeSourceLimits,
+        budget: &ImageDescriptorBudget,
+    ) -> Result<Self, RuntimeSourceDeclarationError> {
+        limits.validate()?;
+        guest_prefix(text, &limits)?;
+        Ok(Self(text_block(text, budget)?))
+    }
+}
+fn guest_prefix(
+    text: &str,
+    limits: &RuntimeSourceLimits,
+) -> Result<(), RuntimeSourceDeclarationError> {
+    absolute(text, limits)?;
+    if overlaps(Path::new(text), Path::new("/__slug_module")) {
+        return Err(RuntimeSourceDeclarationError::Overlap);
+    }
+    Ok(())
 }
 fn source_text<'a>(input: RuntimeSourceSelectorInput<'a>) -> (&'a str, bool) {
     match input {

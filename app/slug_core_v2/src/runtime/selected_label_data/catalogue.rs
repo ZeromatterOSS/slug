@@ -185,7 +185,7 @@ impl Catalogue {
         command: &NativeDemandCommand<'_>,
         index: usize,
         image: ObservedInputImage,
-        stage: input_image::PreparedInputImageStage,
+        stage: &mut input_image::PreparedInputImageStage,
     ) -> Result<input_image::CapturedInputFileLease, NativeDemandSessionError> {
         let row = self
             .plan
@@ -194,7 +194,7 @@ impl Catalogue {
             .ok_or_else(|| refusal("unknown data Label capture"))?;
         check_image(row.leaf_image_key(), &image)?;
         let active = || selected_scratch_source::active(command, self.deadline).is_ok();
-        input_image::capture_prepared_input_file(
+        input_image::capture_prepared_input_file_retaining(
             input_image::AuthorizedObservedInputImage::new(self.source(command, index)?, image),
             &command.runtime.image_resources,
             &active,

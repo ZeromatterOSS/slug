@@ -499,6 +499,8 @@ mod selected_label_data;
 mod selected_scratch_source;
 #[path = "selected_tool_source.rs"]
 mod selected_tool_source;
+#[path = "source_preparation.rs"]
+mod source_preparation;
 
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {

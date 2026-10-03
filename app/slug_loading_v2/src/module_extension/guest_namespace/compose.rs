@@ -93,21 +93,37 @@ fn scopes(
     }
     for i in 0..length {
         let current = rows[i].unwrap();
+        let mut duplicate = current.duplicate;
         for previous in rows[..i].iter().flatten() {
             if Path::new(current.root).starts_with(previous.root)
                 || Path::new(previous.root).starts_with(current.root)
             {
+                if let (ScopeKind::Runtime(declaration), ScopeKind::Tool(previous_role)) =
+                    (current.kind, previous.kind)
+                {
+                    if let Some(crate::module_extension::runtime_sources::RuntimeSourceImageBinding::CoveredTool { role, .. }) = profile.image_binding(declaration) {
+                        let certified = profile.tool_sources().sources().nth(role)
+                            .and_then(|s| s.label_metadata()).map(|m| m.image());
+                        if (role == previous_role || certified == previous.image)
+                            && Path::new(current.root).starts_with(previous.root)
+                            && current.image.is_some_and(|image| image.source_root().as_path() == Path::new(current.root)) {
+                            duplicate = true;
+                            continue;
+                        }
+                    }
+                }
                 if matches!(current.kind, ScopeKind::Tool(_))
                     && matches!(previous.kind, ScopeKind::Tool(_))
                     && current.root == previous.root
                     && current.image == previous.image
                 {
-                    rows[i].as_mut().unwrap().duplicate = true;
+                    duplicate = true;
                     break;
                 }
                 return Err(GuestNamespaceFactsError::Collision);
             }
         }
+        rows[i].as_mut().unwrap().duplicate = duplicate;
     }
     Ok((rows, length))
 }

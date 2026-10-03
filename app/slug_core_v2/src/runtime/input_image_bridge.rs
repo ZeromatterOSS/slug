@@ -496,6 +496,29 @@ pub(super) fn capture_selected_image(
     .map_err(NativeDemandSessionError::InputImage)
 }
 
+pub(super) fn capture_selected_image_retaining(
+    command: &NativeDemandCommand<'_>,
+    declaration: &DeclaredImageRequest,
+    certificate: ObservedInputImage,
+    stage: &mut input_image::PreparedInputImageStage,
+    active: &dyn Fn() -> bool,
+) -> Result<CapturedInputImageLease, NativeDemandSessionError> {
+    if certificate.namespace() != declaration.key.namespace()
+        || certificate.anchor_root() != declaration.key.anchor_root()
+        || certificate.source_root() != declaration.key.source_root()
+        || certificate.policy() != declaration.key.policy()
+    {
+        return Err(image_error("selected capture certificate changed"));
+    }
+    input_image::capture_prepared_input_image_retaining(
+        input_image::AuthorizedObservedInputImage::new(declaration.source(command)?, certificate),
+        &command.runtime.image_resources,
+        active,
+        stage,
+    )
+    .map_err(NativeDemandSessionError::InputImage)
+}
+
 fn image_error(message: &'static str) -> NativeDemandSessionError {
     NativeDemandSessionError::Computation(anyhow::anyhow!(message))
 }

@@ -97,11 +97,24 @@ pub(in crate::runtime::dice) fn preflight(
         .nth(row.declaration_index())
         .ok_or_else(|| refusal("foreign runtime declaration index"))?;
     let key = row.image_key();
-    if key.policy() != &declaration.image_policy()
-        || row.guest_prefix() != declaration.guest_prefix()
-        || key.source_root().as_path() == Path::new("/")
+    if key.policy() != &declaration.image_policy() || key.source_root().as_path() == Path::new("/")
     {
         return Err(refusal("foreign runtime source scope"));
+    }
+    match declaration.guest_mapping() {
+        slug_bzlmod_v2::RuntimeSourceGuestMappingRef::OriginalSource => {
+            if row.guest_prefix().as_path() != key.source_root().as_path() {
+                return Err(refusal("foreign original runtime mapping"));
+            }
+        }
+        slug_bzlmod_v2::RuntimeSourceGuestMappingRef::ExplicitPrefix(prefix) => {
+            if row.guest_prefix() != prefix {
+                return Err(refusal("foreign explicit runtime mapping"));
+            }
+        }
+    }
+    if !row.guest_prefix().same_budget(budget) {
+        return Err(refusal("foreign resolved runtime mapping budget"));
     }
     match declaration.selector() {
         RuntimeSourceSelectorRef::ExplicitHostDirectory { anchor } => {

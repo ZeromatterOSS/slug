@@ -32,6 +32,11 @@ mod mixed_bzl_tests {
     }
 
     #[tokio::test]
+    async fn selected_apparent_owner_then_tools_generated_definition_cycle_terminates() {
+        generated_definition_cycle(5).await;
+    }
+
+    #[tokio::test]
     async fn runtime_profile_generated_definition_cycle_terminates_without_certificate() {
         generated_definition_cycle(2).await;
     }
@@ -47,6 +52,8 @@ mod mixed_bzl_tests {
     }
 
     async fn generated_definition_cycle(consumer: u8) {
+        let select_owner = consumer == 5;
+        let consumer = if select_owner { 1 } else { consumer };
         let with_tools = consumer != 0;
         const MODULE: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1', repo_name='dep_alias')\ne=use_extension('@dep_alias//:ext.bzl','ext')\nuse_repo(e, proof='proof')\nf=use_extension('@dep_alias//:b.bzl','other')\nuse_repo(f, other='other')\n";
         const SAFE: &str = "repo=repository_rule(lambda ctx:None)\ndef impl(ctx):\n    repo(name='proof')\next=module_extension(implementation=impl,environ=['FACTOR','MISSING','FACTOR'])\n";
@@ -233,6 +240,21 @@ mod mixed_bzl_tests {
                 guest,
             )
             .await;
+        }
+        if select_owner {
+            let selected_key = crate::SelectedPreparationOwnerKey::new(
+                workspace.dupe(),
+                &ApparentRepoName::new("proof").unwrap(),
+                resources.descriptor_budget(),
+            )
+            .unwrap();
+            let selected = owner_test_value(
+                crate::compute_selected_preparation_owner(&mut tx, &selected_key)
+                    .await
+                    .unwrap(),
+            );
+            assert_eq!(selected.owner(), &key.0.owner);
+            assert_eq!(selected.requested(), &a);
         }
         tracker.take();
         tracker.take_dependencies();

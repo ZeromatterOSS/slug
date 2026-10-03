@@ -2,6 +2,7 @@ use std::path::Path;
 
 use slug_bzlmod_v2::HostRepositoryLabelPathSource;
 use slug_bzlmod_v2::RuntimeSourceDeclarationPolicyKey;
+use slug_bzlmod_v2::RuntimeSourceGuestMappingRef;
 use slug_bzlmod_v2::RuntimeSourceSelectorRef;
 use slug_bzlmod_v2::SelectedLabelSourceKey;
 use slug_workspace_v2::ImageChargedPath;
@@ -58,13 +59,6 @@ pub(super) async fn compute(
     }
     for (index, declaration) in policy.declarations().enumerate() {
         require_active(&active)?;
-        let guest = declaration.guest_prefix().as_path();
-        if tools.requests().any(|tool| {
-            let spelling = Path::new(tool.selection().spelling());
-            spelling.starts_with(guest) || guest.starts_with(spelling)
-        }) {
-            return Err(RuntimeSourcesError::InvalidScope);
-        }
         let (image, selected) = match declaration.selector() {
             RuntimeSourceSelectorRef::ExplicitHostDirectory { anchor } => {
                 let workspace = key.workspace().as_path();
@@ -168,11 +162,35 @@ pub(super) async fn compute(
         {
             return Err(RuntimeSourcesError::InvalidScope);
         }
+        let guest = match declaration.guest_mapping() {
+            RuntimeSourceGuestMappingRef::ExplicitPrefix(p) => p.dupe(),
+            RuntimeSourceGuestMappingRef::OriginalSource => RuntimeSourceGuestPrefix::new(
+                image
+                    .source_root()
+                    .as_path()
+                    .to_str()
+                    .ok_or(RuntimeSourcesError::InvalidScope)?,
+                policy.limits(),
+                r.descriptor_budget(),
+            )?,
+        };
+        if rows.iter().any(|previous| {
+            let old = previous.guest_prefix().as_path();
+            let new = guest.as_path();
+            old.starts_with(new) || new.starts_with(old)
+        }) || tools.requests().any(|tool| {
+            let spelling = Path::new(tool.selection().spelling());
+            (spelling.starts_with(guest.as_path()) || guest.as_path().starts_with(spelling))
+                && !covered_tool::candidate(declaration, selected.as_ref(), tool.label_selection())
+        }) {
+            return Err(RuntimeSourcesError::InvalidScope);
+        }
         rows.push(RuntimeSourceRequest {
             policy: policy.dupe(),
             index,
             image,
             selected,
+            guest,
         });
     }
     require_active(&active)?;

@@ -34,17 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-198-m7a-runtime-profile-configuration-decision-r1
-Status: accepted
+Packet: WP-7-199-m7a-request-selected-source-profile-r1
+Status: ready
 
-WP898 selects the concrete request-selected runtime/source configuration decision
-needed for a genuine first-query tool/runtime/data lease. Authenticate missing
-host-tools component/layout source from the already pinned cached rules_rust
-archive; choose normal root-owner selection, complete caller input plumbing,
-original source mappings and demanded alias/loader/facet work. Independent DESIGN/FINAL ACCEPT, [receipt](slug-v2-subplans/wp898-acceptance.json).
-Source-design only; no Rust/runtime/network/probe or actual-root fit claim.
-Successor implementation API review and genuine-root audit remain mandatory. Contract in
-[current-packet.md](slug-v2-subplans/current-packet.md).
+WP899 implements the accepted WP898 full-caller request, normal apparent imported
+owner in ONE preparation command, explicit zero extra roots/original mappings and
+provenance-certified covered captures. Independent DESIGN ACCEPT; implementation ready, contract in
+[current-packet.md](slug-v2-subplans/current-packet.md). Full normal fixture reads
+and genuine-root first-query source/admission evidence are required. A typed missing
+source/alias/fit terminal cannot accept complete actual runtime-profile proof.
+WP898 source-only decision accepted in d3392be45; [receipt](slug-v2-subplans/wp898-acceptance.json).
+No process/bootstrap/whole-build memory closure follows from source integration.
+User memory steering accepted independent physical sharing1fe253f63: repeated
+equal input payloads32->1, controlled32x1MiB peak RSS74.2% lower;115 DICE/83
+Workspace gates and default dependent/CLI compile pass. [Receipt](slug-v2-subplans/memory-payload-reuse-2026-10-03.json).
+WP899 and historical40GB attribution remain unaccepted/unproved.
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

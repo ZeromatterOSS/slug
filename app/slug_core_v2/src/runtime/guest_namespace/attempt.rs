@@ -9,6 +9,7 @@ pub(in crate::runtime::dice) async fn sources(
     expected: &slug_loading_v2::ObservedRuntimeSourceRequests,
     catalog: &mut selected_tool_source::declarations::Catalog,
     deadline: std::time::Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<
     selected_tool_source::attempt::Attempt<ObservedGuestNamespaceFacts>,
     NativeDemandSessionError,
@@ -20,6 +21,7 @@ pub(in crate::runtime::dice) async fn sources(
         expected,
         catalog,
         deadline,
+        owner,
     )
     .await?
     {

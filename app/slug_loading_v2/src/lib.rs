@@ -216,6 +216,8 @@ pub use dependency_cycle::compute_selected_data_label_requests;
 pub use dependency_cycle::compute_selected_data_label_sources;
 pub use dependency_cycle::compute_selected_guest_namespace_facts;
 #[doc(hidden)]
+pub use dependency_cycle::compute_selected_preparation_owner;
+#[doc(hidden)]
 pub use dependency_cycle::compute_selected_scratch_prefix;
 #[doc(hidden)]
 pub use dependency_cycle::compute_selected_tool_source_requests;
@@ -259,6 +261,8 @@ pub use module_extension::runtime_sources::ObservedRuntimeSourceProfile;
 #[doc(hidden)]
 pub use module_extension::runtime_sources::ObservedRuntimeSourceRequests;
 #[doc(hidden)]
+pub use module_extension::runtime_sources::RuntimeSourceImageBinding;
+#[doc(hidden)]
 pub use module_extension::runtime_sources::RuntimeSourceProfileKey;
 #[doc(hidden)]
 pub use module_extension::runtime_sources::RuntimeSourceRequest;
@@ -286,6 +290,12 @@ pub use module_extension::selected_scratch::SelectedScratchLabelSource;
 pub use module_extension::selected_scratch::SelectedScratchPrefixError;
 #[doc(hidden)]
 pub use module_extension::selected_scratch::SelectedScratchPreparationDeadline;
+#[doc(hidden)]
+pub use module_extension::selected_source_preparation::ObservedSelectedPreparationOwner;
+#[doc(hidden)]
+pub use module_extension::selected_source_preparation::SelectedPreparationOwnerError;
+#[doc(hidden)]
+pub use module_extension::selected_source_preparation::SelectedPreparationOwnerKey;
 #[doc(hidden)]
 pub use module_extension::selected_tools::ObservedSelectedExtensionToolSourceRequests;
 #[doc(hidden)]

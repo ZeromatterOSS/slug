@@ -125,15 +125,32 @@ impl ImageDescriptorReservation {
 
     /// All heap storage reachable from `value` must already be reserved. This
     /// adds the shared block's fixed storage before creating its allocation.
-    pub fn freeze<T>(
+    pub fn freeze<T>(self, value: T) -> Result<BudgetedImageBlock<T>, ImageDescriptorBudgetError> {
+        self.freeze_preserving(value)
+            .map_err(|(error, value, reservation)| {
+                // Failed owners may remove storage while their exact credit is live.
+                drop(value);
+                drop(reservation);
+                error
+            })
+    }
+
+    /// Like `freeze`, but preserves both admitted storage and its reservation
+    /// on refusal. The owner precedes the credit even if the error is dropped.
+    #[doc(hidden)]
+    pub fn freeze_preserving<T>(
         mut self,
         value: T,
-    ) -> Result<BudgetedImageBlock<T>, ImageDescriptorBudgetError> {
+    ) -> Result<BudgetedImageBlock<T>, (ImageDescriptorBudgetError, T, Self)> {
         let header = std::mem::size_of::<BlockInner<T>>()
             .checked_add(2 * std::mem::size_of::<usize>())
-            .and_then(|n| n.checked_add(std::mem::align_of::<BlockInner<T>>()))
-            .ok_or(ImageDescriptorBudgetError::ChargeOverflow)?;
-        self.try_grow(header)?;
+            .and_then(|n| n.checked_add(std::mem::align_of::<BlockInner<T>>()));
+        let Some(header) = header else {
+            return Err((ImageDescriptorBudgetError::ChargeOverflow, value, self));
+        };
+        if let Err(error) = self.try_grow(header) {
+            return Err((error, value, self));
+        }
         Ok(BudgetedImageBlock(Arc::new(BlockInner {
             value,
             reservation: self,

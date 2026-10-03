@@ -751,7 +751,7 @@ fn current_plan<'a>(
         let outcome = fixture
             .runtime
             .runtime
-            .block_on(attempt::plan(&fixture.runtime, &mut guard, key, deadline))
+            .block_on(attempt::plan(&fixture.runtime, &mut guard, key, deadline, None))
             .unwrap();
         fixture
             .runtime

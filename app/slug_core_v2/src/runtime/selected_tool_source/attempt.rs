@@ -24,6 +24,7 @@ pub(in crate::runtime::dice) async fn plan(
     guard: &mut NativeDemandAbortGuard<'_>,
     key: &SelectedExtensionToolSourcesKey,
     deadline: Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<Attempt<ObservedSelectedExtensionToolSourceRequests>, NativeDemandSessionError> {
     let mut data = guard.attempt_user_computation_data()?;
     data.data
@@ -31,6 +32,12 @@ pub(in crate::runtime::dice) async fn plan(
     let mut updater = runtime.dice.updater_with_data(data);
     guard.inject_attempt(&mut updater)?;
     let mut transaction = runtime.request_revision.commit(updater).await;
+    if let Some(need) =
+        super::super::source_preparation::attempt::authorize(&mut transaction, owner).await?
+    {
+        guard.seal_retry()?;
+        return Ok(Attempt::Need(need));
+    }
     let observed = match complete(
         slug_loading_v2::compute_selected_tool_source_requests(
             &mut transaction,
@@ -55,6 +62,7 @@ pub(in crate::runtime::dice) async fn sources(
     expected: &ObservedSelectedExtensionToolSourceRequests,
     catalog: &mut declarations::Catalog,
     deadline: Instant,
+    owner: Option<&super::super::source_preparation::OwnerAuthorization<'_>>,
 ) -> Result<Attempt<ObservedSelectedExtensionToolSources>, NativeDemandSessionError> {
     let mut data = guard.attempt_user_computation_data()?;
     data.data
@@ -62,6 +70,12 @@ pub(in crate::runtime::dice) async fn sources(
     let mut updater = runtime.dice.updater_with_data(data);
     guard.inject_attempt(&mut updater)?;
     let mut transaction = runtime.request_revision.commit(updater).await;
+    if let Some(need) =
+        super::super::source_preparation::attempt::authorize(&mut transaction, owner).await?
+    {
+        guard.seal_retry()?;
+        return Ok(Attempt::Need(need));
+    }
     let current = match complete(
         slug_loading_v2::compute_selected_tool_source_requests(
             &mut transaction,

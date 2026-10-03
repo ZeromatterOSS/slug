@@ -10,11 +10,17 @@ use tempfile::TempDir;
 
 use super::*;
 
-struct FileOwner {
+pub(super) struct FileOwner {
     certificate: ObservedInputImage,
     root: File,
     stage: Option<TempDir>,
     logical: Option<LogicalByteReservation>,
+}
+impl FileOwner {
+    #[cfg(test)]
+    pub(super) fn stage_path(&self) -> &Path {
+        self.stage.as_ref().unwrap().path()
+    }
 }
 impl Drop for FileOwner {
     fn drop(&mut self) {
@@ -49,16 +55,27 @@ pub(in crate::runtime) fn capture_prepared_input_file(
     authorized: AuthorizedObservedInputImage,
     resources: &WorkspaceImageResources,
     active: &dyn Fn() -> bool,
-    stage: PreparedInputImageStage,
+    mut stage: PreparedInputImageStage,
 ) -> Result<CapturedInputFileLease, InputImageCaptureError> {
-    // Local drop order keeps storage cleanup ahead of descriptor credit release
-    // on every early refusal before the completed FileOwner exists.
-    let (mut reservation, stage) = stage.into_parts();
+    capture_prepared_input_file_retaining(authorized, resources, active, &mut stage)
+}
+
+pub(in crate::runtime) fn capture_prepared_input_file_retaining(
+    authorized: AuthorizedObservedInputImage,
+    resources: &WorkspaceImageResources,
+    active: &dyn Fn() -> bool,
+    prepared: &mut PreparedInputImageStage,
+) -> Result<CapturedInputFileLease, InputImageCaptureError> {
+    use super::capture::PreparedStageState;
     let AuthorizedObservedInputImage {
         source,
         certificate,
     } = authorized;
-    if !reservation.same_budget(resources.descriptor_budget())
+    if !matches!(prepared.state, PreparedStageState::Ready(_))
+        || !prepared
+            .reservation
+            .as_ref()
+            .is_some_and(|r| r.same_budget(resources.descriptor_budget()))
         || !certificate.same_budget(resources.descriptor_budget())
         || !certificate.is_regular_file_root()
         || certificate.entries().len() != 1
@@ -76,17 +93,33 @@ pub(in crate::runtime) fn capture_prepared_input_file(
     {
         return Err(InputImageCaptureError::Unauthorized);
     }
-    reservation.try_grow(std::mem::size_of::<FileOwner>() + 256)?;
+    prepared
+        .reservation
+        .as_mut()
+        .unwrap()
+        .try_grow(std::mem::size_of::<FileOwner>() + 256)?;
     super::capture::verify_frontier(&source, &certificate, resources, active)?;
     let logical = resources.reserve_logical(certificate.total_file_bytes())?;
     #[cfg(target_os = "linux")]
     {
-        let root = super::linux::open_anchor(stage.path())?;
-        let owner = FileOwner {
+        let root = match &prepared.state {
+            PreparedStageState::Ready(stage) => super::linux::open_anchor(stage.path())?,
+            _ => unreachable!(),
+        };
+        let PreparedStageState::Ready(stage) =
+            std::mem::replace(&mut prepared.state, PreparedStageState::Consumed)
+        else {
+            unreachable!()
+        };
+        prepared.state = PreparedStageState::PartialFile(FileOwner {
             certificate,
             root,
             stage: Some(stage),
             logical: Some(logical),
+        });
+        let owner = match &prepared.state {
+            PreparedStageState::PartialFile(owner) => owner,
+            _ => unreachable!(),
         };
         let _scratch = resources
             .descriptor_budget()
@@ -97,11 +130,28 @@ pub(in crate::runtime) fn capture_prepared_input_file(
         if !active() {
             return Err(InputImageCaptureError::Cancelled);
         }
-        Ok(CapturedInputFileLease(reservation.freeze(owner)?))
+        let PreparedStageState::PartialFile(owner) =
+            std::mem::replace(&mut prepared.state, PreparedStageState::Consumed)
+        else {
+            unreachable!()
+        };
+        match prepared
+            .reservation
+            .take()
+            .unwrap()
+            .freeze_preserving(owner)
+        {
+            Ok(block) => Ok(CapturedInputFileLease(block)),
+            Err((error, owner, reservation)) => {
+                prepared.state = PreparedStageState::PartialFile(owner);
+                prepared.reservation = Some(reservation);
+                Err(error.into())
+            }
+        }
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = (stage, logical);
+        let _ = logical;
         Err(InputImageCaptureError::UnsupportedPlatform)
     }
 }

@@ -170,7 +170,7 @@ impl Catalogue {
         command: &NativeDemandCommand<'_>,
         index: usize,
         image: ObservedInputImage,
-        stage: input_image::PreparedInputImageStage,
+        stage: &mut input_image::PreparedInputImageStage,
     ) -> Result<input_image::CapturedInputImageLease, NativeDemandSessionError> {
         let row = self
             .plan
@@ -185,7 +185,7 @@ impl Catalogue {
             return Err(refusal("foreign runtime capture certificate"));
         }
         let active = || selected_scratch_source::active(command, self.deadline).is_ok();
-        input_image::capture_prepared_input_image(
+        input_image::capture_prepared_input_image_retaining(
             input_image::AuthorizedObservedInputImage::new(
                 self.source(command, index, &active)?,
                 image,

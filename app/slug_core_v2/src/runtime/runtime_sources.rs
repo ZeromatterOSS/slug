@@ -91,7 +91,7 @@ impl WorkspaceRuntime {
         key: RuntimeSourceProfileKey,
         policy: Option<RuntimeSourceDeclarationPolicy>,
         #[cfg(test)] hook: Option<
-            &dyn Fn(selected_tool_source::ToolPhase) -> Result<(), NativeDemandSessionError>,
+            &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
         >,
     ) -> Result<CertifiedRuntimeSourcesLease, NativeDemandSessionError> {
         let policy = policy.ok_or_else(|| refusal("missing runtime source declaration"))?;
@@ -130,6 +130,38 @@ impl fmt::Debug for CertifiedRuntimeSourcesLease {
 }
 impl CertifiedRuntimeSourcesLease {
     #[cfg(test)]
+    pub(in crate::runtime::dice) fn visit_stage_paths(
+        &self,
+        visitor: &mut dyn FnMut(&std::path::Path),
+    ) {
+        let owner = self.0.get();
+        for stage in owner.unused.iter().flatten() {
+            visitor(stage.test_path());
+        }
+        for image in owner.images.iter().flatten() {
+            visitor(image.test_path());
+        }
+    }
+
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn test_captured_count(&self) -> usize {
+        self.0
+            .get()
+            .images
+            .iter()
+            .filter(|image| image.is_some())
+            .count()
+    }
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn test_stage_count(&self) -> usize {
+        self.0
+            .get()
+            .unused
+            .iter()
+            .filter(|stage| stage.is_some())
+            .count()
+    }
+    #[cfg(test)]
     pub(super) fn test_image_path(&self, declaration: usize) -> &std::path::Path {
         self.0.get().images[declaration]
             .as_ref()
@@ -137,19 +169,71 @@ impl CertifiedRuntimeSourcesLease {
             .test_path()
     }
 
+    pub(super) fn with_image_source<R>(
+        &self,
+        declaration: usize,
+        visitor: impl FnOnce(&std::fs::File, &std::path::Path, &ObservedInputImage) -> R,
+    ) -> Option<R> {
+        let owner = self.0.get();
+        let expected = owner.profile.images().nth(declaration)?;
+        if owner.tools.certificate() != owner.profile.tool_sources() {
+            return None;
+        }
+        match owner.profile.image_binding(declaration)? {
+            slug_loading_v2::RuntimeSourceImageBinding::Captured => owner
+                .images
+                .get(declaration)?
+                .as_ref()?
+                .with_read_root(|root, actual| {
+                    if actual != expected {
+                        return None;
+                    }
+                    Some(visitor(root, std::path::Path::new(""), expected))
+                }),
+            slug_loading_v2::RuntimeSourceImageBinding::CoveredTool { .. } => {
+                let (role, entry) = owner.profile.tool_root_member(declaration)?;
+                let tool = owner
+                    .profile
+                    .tool_sources()
+                    .sources()
+                    .nth(role)?
+                    .label_metadata()?
+                    .image();
+                owner.tools.with_image_root(role, |root, actual| {
+                    if actual != tool {
+                        return None;
+                    }
+                    let entry = actual.entries().get(entry)?;
+                    if entry.path().as_path() != expected.source_root().as_path()
+                        || expected.namespace() != actual.namespace()
+                        || expected.anchor_root() != actual.anchor_root()
+                    {
+                        return None;
+                    }
+                    let base = entry
+                        .path()
+                        .as_path()
+                        .strip_prefix(actual.source_root().as_path())
+                        .ok()?;
+                    Some(visitor(root, base, expected))
+                })?
+            }
+        }
+    }
+
+    // Root-only legacy visitor must never falsely identify a covered subtree FD.
     pub(super) fn with_image_root<R>(
         &self,
         declaration: usize,
         visitor: impl FnOnce(&std::fs::File, &ObservedInputImage) -> R,
     ) -> Option<R> {
-        Some(
-            self.0
-                .get()
-                .images
-                .get(declaration)?
-                .as_ref()?
-                .with_read_root(visitor),
-        )
+        self.with_image_source(declaration, |root, base, image| {
+            if base.as_os_str().is_empty() {
+                Some(visitor(root, image))
+            } else {
+                None
+            }
+        })?
     }
     pub(super) fn tools(&self) -> &selected_tool_source::CertifiedSelectedToolInputsLease {
         &self.0.get().tools

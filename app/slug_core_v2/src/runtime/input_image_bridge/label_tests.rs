@@ -464,7 +464,10 @@ fn selected_label_exact_declaration_and_whole_batch_deny_before_source_open() {
     let baseline = foreign_budget.used_bytes();
     let stage = input_image::prepare_input_image_stage(&foreign_resources).unwrap();
     let stage_path = stage.test_path().to_owned();
-    assert_eq!(foreign_budget.used_bytes() - baseline, 4096 + 256);
+    assert_eq!(
+        foreign_budget.used_bytes() - baseline,
+        4096 + 256 + std::mem::size_of::<input_image::PreparedInputImageStage>()
+    );
     let source = runtime
         .repository_materializer
         .image_source(

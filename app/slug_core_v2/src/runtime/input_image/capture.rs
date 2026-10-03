@@ -34,7 +34,7 @@ impl AuthorizedObservedInputImage {
     }
 }
 
-struct CapturedImageOwner {
+pub(super) struct CapturedImageOwner {
     certificate: ObservedInputImage,
     root: File,
     stage: Option<TempDir>,
@@ -45,16 +45,40 @@ struct CapturedImageOwner {
 /// Its allocation credit transfers to the completed owner. No writable path or
 /// FD escapes before promotion.
 pub(in crate::runtime) struct PreparedInputImageStage {
-    stage: TempDir,
-    reservation: ImageDescriptorReservation,
+    // Stage/partial owner must clean up before its descriptor credit is released.
+    pub(super) state: PreparedStageState,
+    pub(super) reservation: Option<ImageDescriptorReservation>,
+}
+pub(super) enum PreparedStageState {
+    Ready(TempDir),
+    PartialDirectory(CapturedImageOwner),
+    PartialFile(super::file_capture::FileOwner),
+    // Only reached when ownership has transferred into a verified normal lease.
+    // A consumed or partial stage is never a retry/read capability.
+    Consumed,
 }
 impl PreparedInputImageStage {
     pub(super) fn into_parts(self) -> (ImageDescriptorReservation, TempDir) {
-        (self.reservation, self.stage)
+        match self.state {
+            PreparedStageState::Ready(stage) => (self.reservation.expect("ready credit"), stage),
+            _ => unreachable!("legacy capture accepts only a fresh private stage"),
+        }
+    }
+    #[cfg(test)]
+    pub(in crate::runtime) fn test_is_partial(&self) -> bool {
+        matches!(
+            self.state,
+            PreparedStageState::PartialDirectory(_) | PreparedStageState::PartialFile(_)
+        )
     }
     #[cfg(test)]
     pub(in crate::runtime) fn test_path(&self) -> &Path {
-        self.stage.path()
+        match &self.state {
+            PreparedStageState::Ready(stage) => stage.path(),
+            PreparedStageState::PartialDirectory(owner) => owner.stage.as_ref().unwrap().path(),
+            PreparedStageState::PartialFile(owner) => owner.stage_path(),
+            PreparedStageState::Consumed => panic!("completed stage has transferred its owner"),
+        }
     }
 }
 
@@ -63,11 +87,16 @@ pub(in crate::runtime) fn prepare_input_image_stage(
 ) -> Result<PreparedInputImageStage, InputImageCaptureError> {
     #[cfg(target_os = "linux")]
     {
-        let reservation = resources.descriptor_budget().try_reserve(4096 + 256)?;
+        let reservation = resources
+            .descriptor_budget()
+            .try_reserve(4096 + 256 + std::mem::size_of::<PreparedInputImageStage>())?;
         let stage = tempfile::Builder::new()
             .prefix("slug-input-image-")
             .tempdir()?;
-        Ok(PreparedInputImageStage { stage, reservation })
+        Ok(PreparedInputImageStage {
+            state: PreparedStageState::Ready(stage),
+            reservation: Some(reservation),
+        })
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -163,9 +192,93 @@ pub(in crate::runtime) fn capture_prepared_input_image(
     authorized: AuthorizedObservedInputImage,
     resources: &WorkspaceImageResources,
     active: &dyn Fn() -> bool,
-    stage: PreparedInputImageStage,
+    mut stage: PreparedInputImageStage,
 ) -> Result<CapturedInputImageLease, InputImageCaptureError> {
-    capture_with_stage(authorized, resources, active, Some(stage))
+    capture_prepared_input_image_retaining(authorized, resources, active, &mut stage)
+}
+
+/// The caller keeps this cell through command restoration on every refusal.
+/// Only a Ready cell can begin capture; Partial never grants read/retry authority.
+pub(in crate::runtime) fn capture_prepared_input_image_retaining(
+    authorized: AuthorizedObservedInputImage,
+    resources: &WorkspaceImageResources,
+    active: &dyn Fn() -> bool,
+    prepared: &mut PreparedInputImageStage,
+) -> Result<CapturedInputImageLease, InputImageCaptureError> {
+    if !matches!(prepared.state, PreparedStageState::Ready(_))
+        || !prepared
+            .reservation
+            .as_ref()
+            .is_some_and(|r| r.same_budget(resources.descriptor_budget()))
+    {
+        return Err(InputImageCaptureError::Unauthorized);
+    }
+    let AuthorizedObservedInputImage {
+        source,
+        certificate,
+    } = authorized;
+    if certificate.is_regular_file_root()
+        || source.namespace != certificate.namespace()
+        || &source.anchor != certificate.anchor_root()
+        || !certificate
+            .source_root()
+            .as_path()
+            .starts_with(source.anchor.as_path())
+        || !certificate.same_budget(resources.descriptor_budget())
+    {
+        return Err(InputImageCaptureError::Unauthorized);
+    }
+    verify_frontier(&source, &certificate, resources, active)?;
+    let logical = resources.reserve_logical(certificate.total_file_bytes())?;
+    #[cfg(target_os = "linux")]
+    {
+        let root = match &prepared.state {
+            PreparedStageState::Ready(stage) => super::linux::open_anchor(stage.path())?,
+            _ => unreachable!(),
+        };
+        let PreparedStageState::Ready(stage) =
+            std::mem::replace(&mut prepared.state, PreparedStageState::Consumed)
+        else {
+            unreachable!()
+        };
+        // Install the partial owner before the first copy or subsequent refusal.
+        prepared.state = PreparedStageState::PartialDirectory(CapturedImageOwner {
+            certificate,
+            root,
+            stage: Some(stage),
+            logical: Some(logical),
+        });
+        let PreparedStageState::PartialDirectory(owner) = &prepared.state else {
+            unreachable!()
+        };
+        super::linux::copy_image(&source, &owner.root, &owner.certificate, active)?;
+        verify_frontier(&source, &owner.certificate, resources, active)?;
+        super::linux::finish_directory_modes(&owner.root, &owner.certificate, active)?;
+        source.check_current_anchor(active)?;
+        let PreparedStageState::PartialDirectory(owner) =
+            std::mem::replace(&mut prepared.state, PreparedStageState::Consumed)
+        else {
+            unreachable!()
+        };
+        match prepared
+            .reservation
+            .take()
+            .unwrap()
+            .freeze_preserving(owner)
+        {
+            Ok(block) => Ok(CapturedInputImageLease(block)),
+            Err((error, owner, reservation)) => {
+                prepared.state = PreparedStageState::PartialDirectory(owner);
+                prepared.reservation = Some(reservation);
+                Err(error.into())
+            }
+        }
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = logical;
+        Err(InputImageCaptureError::UnsupportedPlatform)
+    }
 }
 
 fn capture_with_stage(
@@ -177,10 +290,12 @@ fn capture_with_stage(
     if authorized.certificate.is_regular_file_root() {
         return Err(InputImageCaptureError::Unauthorized);
     }
-    if prepared
-        .as_ref()
-        .is_some_and(|stage| !stage.reservation.same_budget(resources.descriptor_budget()))
-    {
+    if prepared.as_ref().is_some_and(|stage| {
+        !stage
+            .reservation
+            .as_ref()
+            .is_some_and(|r| r.same_budget(resources.descriptor_budget()))
+    }) {
         return Err(InputImageCaptureError::Unauthorized);
     }
     let AuthorizedObservedInputImage {
@@ -202,7 +317,10 @@ fn capture_with_stage(
     // reserves before creating storage; both reserve payload before first copy.
     // Bind credit first so an early error drops stage buffers before the credit.
     let (reservation, stage) = match prepared {
-        Some(prepared) => (prepared.reservation, Some(prepared.stage)),
+        Some(prepared) => {
+            let (credit, stage) = prepared.into_parts();
+            (credit, Some(stage))
+        }
         None => (resources.descriptor_budget().try_reserve(4096 + 256)?, None),
     };
     let logical = resources.reserve_logical(certificate.total_file_bytes())?;
