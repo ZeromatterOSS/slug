@@ -41,6 +41,12 @@ use crate::runtime::dice::source_service::SourceServiceCounters;
 use crate::runtime::dice::source_service::SourceServiceError;
 use crate::runtime::dice::source_service::SourceServiceLimits;
 use crate::runtime::dice::source_service::SourceServiceScope;
+use crate::runtime::dice::source_service::SourceTimeoutDomain;
+use crate::runtime::dice::source_service::SourceTimeoutOrigin;
+use crate::runtime::dice::source_service::SourceTimeoutPhase;
+use crate::runtime::dice::source_service::SourceTimeoutReturn;
+use crate::runtime::dice::source_service::SourceTimeoutSite;
+use crate::runtime::dice::source_service::SourceTimeoutSnapshot;
 use crate::runtime::input_image;
 
 const WORKSPACE: &str = "/run/media/system/Colossus/dev/slug";
@@ -606,6 +612,100 @@ fn emit_registry_association(
     Ok(())
 }
 
+fn emit_timeout_provenance(
+    snapshot: SourceTimeoutSnapshot,
+    settled: bool,
+    installed_scope: bool,
+    first_poison: Option<SourceServiceError>,
+    selected_native: Option<slug_bzlmod_v2::RegistryRefusalCause>,
+    receipt: &mut Receipt,
+) -> Result<(), &'static str> {
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+
+    let declared_wait = snapshot.origin.is_some_and(|origin| {
+        matches!(
+            origin.site,
+            SourceTimeoutSite::Dns
+                | SourceTimeoutSite::Connect
+                | SourceTimeoutSite::TlsHandshake
+                | SourceTimeoutSite::HttpHandshake
+                | SourceTimeoutSite::Headers
+                | SourceTimeoutSite::Body
+        ) && origin.domain != SourceTimeoutDomain::Uncomputed
+            && matches!(
+                origin.phase,
+                SourceTimeoutPhase::DuringEntryCheck
+                    | SourceTimeoutPhase::Timer
+                    | SourceTimeoutPhase::Postcheck
+                    | SourceTimeoutPhase::DuringFinalCheck
+            )
+            && origin.return_disposition == SourceTimeoutReturn::Deadline
+            && (!origin.step_add_overflow || origin.domain == SourceTimeoutDomain::Common)
+    });
+    let proved = settled
+        && installed_scope
+        && snapshot.armed
+        && snapshot.first_error_is_work_deadline
+        && first_poison == Some(SourceServiceError::WorkDeadline)
+        && declared_wait;
+    let paired = proved
+        && matches!(
+            selected_native,
+            Some(slug_bzlmod_v2::RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::WorkDeadline),
+            })
+        );
+    // Raw fixed tags remain observations when proof is absent. Even pairing
+    // certifies first scope origin, never the selected leaf's own caller/site.
+    let origin = snapshot.origin;
+    for (key, value) in [
+        ("timeout_provenance_settled", u64::from(settled)),
+        (
+            "timeout_provenance_installed_scope",
+            u64::from(installed_scope),
+        ),
+        ("timeout_provenance_armed", u64::from(snapshot.armed)),
+        ("timeout_origin_present", u64::from(origin.is_some())),
+        (
+            "timeout_first_error_is_work_deadline",
+            u64::from(snapshot.first_error_is_work_deadline),
+        ),
+        (
+            "timeout_origin_site",
+            origin.map_or(0, |o| u64::from(o.site.code())),
+        ),
+        (
+            "timeout_origin_domain",
+            origin.map_or(0, |o| u64::from(o.domain.code())),
+        ),
+        (
+            "timeout_origin_phase",
+            origin.map_or(0, |o| u64::from(o.phase.code())),
+        ),
+        (
+            "timeout_origin_return",
+            origin.map_or(0, |o| u64::from(o.return_disposition.code())),
+        ),
+        (
+            "timeout_step_add_overflow",
+            u64::from(origin.is_some_and(|o| o.step_add_overflow)),
+        ),
+        (
+            "timeout_later_sticky_observed",
+            u64::from(snapshot.later_sticky_work_deadline_observed),
+        ),
+        ("timeout_declared_wait_origin_proved", u64::from(proved)),
+        ("timeout_first_scope_origin_paired", u64::from(paired)),
+        ("timeout_selected_leaf_call_identity_proved", 0),
+    ] {
+        receipt.number(key, value)?;
+    }
+    Ok(())
+}
+
 fn emit_success(
     view: &source_service::ScopedPreparedSourceViewLease,
     inputs: &NativeDemandRequestInputBundle,
@@ -1009,8 +1109,17 @@ fn run(
         .scope
         .upgrade()
         .and_then(|scope| scope.first_error_for_test());
+    let association_snapshot = association.snapshot();
     emit_registry_association(
-        association.snapshot(),
+        association_snapshot,
+        settled,
+        true,
+        first_poison,
+        selected_native,
+        receipt,
+    )?;
+    emit_timeout_provenance(
+        association_snapshot.timeout,
         settled,
         true,
         first_poison,
@@ -1152,6 +1261,299 @@ fn actual_source_admission(emitted: &Cell<bool>) -> Result<(), &'static str> {
 }
 
 #[test]
+fn genuine_timeout_receipt_requires_settled_named_creator_and_exact_chosen_cause() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let origin = SourceTimeoutOrigin {
+        site: SourceTimeoutSite::Headers,
+        domain: SourceTimeoutDomain::Common,
+        phase: SourceTimeoutPhase::Timer,
+        return_disposition: SourceTimeoutReturn::Deadline,
+        step_add_overflow: false,
+    };
+    let snapshot = SourceTimeoutSnapshot {
+        armed: true,
+        first_error_is_work_deadline: true,
+        origin: Some(origin),
+        later_sticky_work_deadline_observed: true,
+    };
+    let poison = Some(SourceServiceError::WorkDeadline);
+    let native = Some(RegistryRefusalCause {
+        site: RegistryRefusalSite::Scope,
+        detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::WorkDeadline),
+    });
+    let budget = ImageDescriptorBudget::new(128 * 1024);
+    let mut receipt = Receipt::new(&budget).unwrap();
+    emit_timeout_provenance(snapshot, true, true, poison, native, &mut receipt).unwrap();
+    assert!(
+        receipt
+            .text
+            .contains("timeout_declared_wait_origin_proved=1\n")
+    );
+    assert!(
+        receipt
+            .text
+            .contains("timeout_first_scope_origin_paired=1\n")
+    );
+    assert!(
+        receipt
+            .text
+            .contains("timeout_selected_leaf_call_identity_proved=0\n")
+    );
+    for expected in [
+        "timeout_origin_site=7\n",
+        "timeout_origin_domain=1\n",
+        "timeout_origin_phase=3\n",
+        "timeout_origin_return=1\n",
+        "timeout_step_add_overflow=0\n",
+        "timeout_later_sticky_observed=1\n",
+    ] {
+        assert!(receipt.text.contains(expected));
+    }
+    drop(receipt);
+    assert_eq!(budget.used_bytes(), 0);
+    for (site, domain, phase, overflow) in [
+        (
+            SourceTimeoutSite::Dns,
+            SourceTimeoutDomain::Step,
+            SourceTimeoutPhase::Timer,
+            false,
+        ),
+        (
+            SourceTimeoutSite::Connect,
+            SourceTimeoutDomain::Tie,
+            SourceTimeoutPhase::Postcheck,
+            false,
+        ),
+        (
+            SourceTimeoutSite::TlsHandshake,
+            SourceTimeoutDomain::Common,
+            SourceTimeoutPhase::DuringEntryCheck,
+            false,
+        ),
+        (
+            SourceTimeoutSite::HttpHandshake,
+            SourceTimeoutDomain::Common,
+            SourceTimeoutPhase::DuringFinalCheck,
+            false,
+        ),
+        (
+            SourceTimeoutSite::Headers,
+            SourceTimeoutDomain::Common,
+            SourceTimeoutPhase::Timer,
+            false,
+        ),
+        (
+            SourceTimeoutSite::Body,
+            SourceTimeoutDomain::Common,
+            SourceTimeoutPhase::Timer,
+            true,
+        ),
+    ] {
+        let sample = SourceTimeoutSnapshot {
+            origin: Some(SourceTimeoutOrigin {
+                site,
+                domain,
+                phase,
+                step_add_overflow: overflow,
+                ..origin
+            }),
+            ..snapshot
+        };
+        let mut receipt = Receipt::new(&budget).unwrap();
+        emit_timeout_provenance(sample, true, true, poison, native, &mut receipt).unwrap();
+        assert!(
+            receipt
+                .text
+                .contains("timeout_declared_wait_origin_proved=1\n")
+        );
+        assert!(
+            receipt
+                .text
+                .contains("timeout_first_scope_origin_paired=1\n")
+        );
+        assert!(
+            receipt
+                .text
+                .contains("timeout_selected_leaf_call_identity_proved=0\n")
+        );
+        drop(receipt);
+        assert_eq!(budget.used_bytes(), 0);
+    }
+    let wrong_native = Some(RegistryRefusalCause {
+        site: RegistryRefusalSite::Scope,
+        detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Cancelled),
+    });
+    let wrong_site = native.map(|cause| RegistryRefusalCause {
+        site: RegistryRefusalSite::Dns,
+        ..cause
+    });
+    let variant = |changed| SourceTimeoutSnapshot {
+        origin: Some(changed),
+        ..snapshot
+    };
+    for (sample, settled, installed, first, selected) in [
+        (snapshot, false, true, poison, native),
+        (snapshot, true, false, poison, native),
+        (
+            SourceTimeoutSnapshot {
+                armed: false,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            SourceTimeoutSnapshot {
+                first_error_is_work_deadline: false,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            SourceTimeoutSnapshot {
+                origin: None,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (snapshot, true, true, None, native),
+        (
+            snapshot,
+            true,
+            true,
+            Some(SourceServiceError::Cancelled),
+            native,
+        ),
+        (snapshot, true, true, poison, None),
+        (snapshot, true, true, poison, wrong_native),
+        (snapshot, true, true, poison, wrong_site),
+        (
+            variant(SourceTimeoutOrigin {
+                return_disposition: SourceTimeoutReturn::CompletedPrimary,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                return_disposition: SourceTimeoutReturn::Unknown,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                site: SourceTimeoutSite::GenericScope,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                site: SourceTimeoutSite::GenericWait,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                domain: SourceTimeoutDomain::Uncomputed,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                phase: SourceTimeoutPhase::UnattributedPoison,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                phase: SourceTimeoutPhase::ScopeCheck,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            variant(SourceTimeoutOrigin {
+                domain: SourceTimeoutDomain::Step,
+                step_add_overflow: true,
+                ..origin
+            }),
+            true,
+            true,
+            poison,
+            native,
+        ),
+    ] {
+        let mut receipt = Receipt::new(&budget).unwrap();
+        emit_timeout_provenance(sample, settled, installed, first, selected, &mut receipt).unwrap();
+        assert!(
+            receipt
+                .text
+                .contains("timeout_first_scope_origin_paired=0\n")
+        );
+        assert!(
+            receipt
+                .text
+                .contains("timeout_selected_leaf_call_identity_proved=0\n")
+        );
+        assert!(receipt.text.lines().all(|line| {
+            line.strip_prefix("SLUG_SOURCE_ADMISSION ")
+                .and_then(|r| r.split_once('='))
+                .is_some_and(|(_, value)| value.parse::<u64>().is_ok())
+        }));
+        let origin_should_be_proved = settled
+            && installed
+            && sample.armed
+            && sample.first_error_is_work_deadline
+            && first == poison
+            && sample.origin == Some(origin);
+        assert!(receipt.text.contains(if origin_should_be_proved {
+            "timeout_declared_wait_origin_proved=1\n"
+        } else {
+            "timeout_declared_wait_origin_proved=0\n"
+        }));
+        drop(receipt);
+        assert_eq!(budget.used_bytes(), 0);
+    }
+}
+
+#[test]
 fn genuine_registry_association_receipt_requires_complete_settled_same_scope_origin() {
     use slug_bzlmod_v2::RegistryRefusalCause;
     use slug_bzlmod_v2::RegistryRefusalDetail;
@@ -1171,6 +1573,7 @@ fn genuine_registry_association_receipt_requires_complete_settled_same_scope_ori
         first_limit_call_ordinal: Some(129),
         first_limit_relation: RegistryLimitRelation::NewDistinctUnretained { unique_ordinal: 2 },
         charged_bytes: 2 << 20,
+        timeout: SourceTimeoutSnapshot::default(),
     };
     let native = Some(RegistryRefusalCause {
         site: RegistryRefusalSite::Scope,

@@ -10,6 +10,8 @@ use super::SourceBufferReservation;
 use super::SourceCounter;
 use super::SourceServiceError;
 use super::SourceServiceScope;
+use super::timeout_provenance::SourceTimeoutSnapshot;
+use super::timeout_provenance::SourceTimeoutState;
 
 #[path = "registry_association/tests.rs"]
 mod tests;
@@ -73,6 +75,7 @@ pub(in crate::runtime) struct RegistryAssociationSnapshot {
     pub(in crate::runtime) first_limit_call_ordinal: Option<u64>,
     pub(in crate::runtime) first_limit_relation: RegistryLimitRelation,
     pub(in crate::runtime) charged_bytes: usize,
+    pub(in crate::runtime) timeout: SourceTimeoutSnapshot,
 }
 impl RegistryAssociationSnapshot {
     fn new(charged_bytes: usize) -> Self {
@@ -89,6 +92,7 @@ impl RegistryAssociationSnapshot {
             first_limit_call_ordinal: None,
             first_limit_relation: RegistryLimitRelation::Unknown,
             charged_bytes,
+            timeout: SourceTimeoutSnapshot::default(),
         }
     }
 }
@@ -124,6 +128,7 @@ impl RegistryRequestAssociation {
                     .checked_mul(2)
                     .ok_or(SourceServiceError::BufferLimit)?,
             )
+            .and_then(|n| n.checked_add(std::mem::size_of::<SourceTimeoutState>()))
             .and_then(|n| n.checked_add(64))
             .ok_or(SourceServiceError::BufferLimit)?;
         let credit = scope.reserve_buffer(charged)?;
@@ -149,7 +154,9 @@ impl RegistryRequestAssociation {
     pub(in crate::runtime) fn snapshot(&self) -> RegistryAssociationSnapshot {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut snapshot = state.snapshot;
-        snapshot.scope_admitted_entries = self.credit.registry_attempts();
+        let (counters, timeout) = self.credit.registry_observation();
+        snapshot.scope_admitted_entries = counters.registry_attempts;
+        snapshot.timeout = timeout;
         snapshot.complete &= snapshot.scope_admitted_entries == snapshot.admitted_entries;
         if !snapshot.complete {
             snapshot.first_limit_relation = RegistryLimitRelation::Unknown;
@@ -255,4 +262,12 @@ fn bump(value: &mut u64) -> Option<u64> {
     let next = value.checked_add(1)?;
     *value = next;
     Some(next)
+}
+
+impl Drop for RegistryRequestAssociation {
+    fn drop(&mut self) {
+        // Exact pointer guard keeps a failed competing arm from clearing a winner.
+        // Scope-only lock is released before state/slab and credit fields drop.
+        self.credit.disarm_timeout(self as *const Self);
+    }
 }

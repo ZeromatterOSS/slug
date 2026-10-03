@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual registry association measured; timeout provenance design pending
+Status: timeout provenance accepted; actual timing observation pending
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
@@ -91,9 +91,13 @@ growth or automatic retry. [Component checkpoint](slug-v2-subplans/wp899-registr
 The separately frozen global6 run proves101distinct/0repeated admissions, then typed
 WorkDeadline; no registry-limit origin and no inference about earlier128 identities.
 Restoration/engine/join/cleanup and688/688 censuses pass;76.723MiB sampled RSS covers
-only this refused branch. Next is bounded source-owned timeout-provenance design,
-under unchanged caps/semantics, before any new actual eligibility. FullWP899/40GB
-remain unproved. [Latest terminal receipt](slug-v2-subplans/wp899-registry-association-terminal-2026-10-03.json).
+only this refused branch. Bounded timeout provenance now has independent FINAL,
+43 unique controls (42 preserved+1 natural15s TLS Step) and current default
+Core+CLI check. Coincident Common/outer cancellation cannot guarantee the natural
+first creator; the reviewed TLS fixture retains the actual typed timeout and
+strict restoration/lastDrop under unchanged production policy. [Checkpoint](slug-v2-subplans/wp899-timeout-provenance-checkpoint-2026-10-03.json).
+Next is one separately contracted current-source actual timing observation after
+eligibility reviews; no new launch or cap growth here. FullWP899/40GB remain unproved. [Latest terminal receipt](slug-v2-subplans/wp899-registry-association-terminal-2026-10-03.json).
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

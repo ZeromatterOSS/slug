@@ -17,6 +17,8 @@ mod scope;
 #[cfg(test)]
 #[path = "source_service/tests.rs"]
 mod tests;
+#[path = "source_service/timeout_provenance.rs"]
+mod timeout_provenance;
 
 #[cfg(test)]
 pub(in crate::runtime::dice) use diagnostic::DiagnosticObserver;
@@ -40,3 +42,15 @@ pub(in crate::runtime) use scope::SourceServiceCounters;
 pub(in crate::runtime) use scope::SourceServiceError;
 pub(in crate::runtime) use scope::SourceServiceLimits;
 pub(in crate::runtime) use scope::SourceServiceScope;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutDomain;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutOrigin;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutPhase;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutReturn;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutSite;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use timeout_provenance::SourceTimeoutSnapshot;

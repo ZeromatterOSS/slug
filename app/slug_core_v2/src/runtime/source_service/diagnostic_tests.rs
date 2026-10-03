@@ -37,8 +37,19 @@ fn diagnostic_fixture_with_limits(
     SourcePreparationDiagnosticRuntime,
     NativeDemandRequestInputBundle,
 ) {
+    diagnostic_fixture_with_work(f, limits, Duration::from_secs(10))
+}
+
+fn diagnostic_fixture_with_work(
+    f: &selected_tool_source::tests::Fixture,
+    limits: SourceServiceLimits,
+    work_duration: Duration,
+) -> (
+    SourcePreparationDiagnosticRuntime,
+    NativeDemandRequestInputBundle,
+) {
     let workspace = f.runtime.repository_materializer.workspace().clone();
-    let work = Instant::now() + Duration::from_secs(10);
+    let work = Instant::now() + work_duration;
     let diagnostic = SourcePreparationDiagnosticRuntime::new(
         workspace,
         crate::runtime::ProcessHostOwner::native(),
@@ -523,6 +534,60 @@ fn actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_
     }
 }
 
+struct FullRawObserver(RestoredDiagnosticObserver, Cell<bool>);
+impl DiagnosticObserver for FullRawObserver {
+    fn after_restore<'a>(
+        &'a self,
+        runtime: &'a WorkspaceRuntime,
+        prepared: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>> {
+        Box::pin(async move {
+            // The existing helper checks every accepted field and Runtime/Guest raw cells.
+            let checked = self.0.after_restore(runtime, prepared).await;
+            let prior = &self.0.prior.inputs.request;
+            let workspace = runtime.workspace.clone();
+            let mut tx = runtime.dice.updater().commit().await;
+            macro_rules! raw {
+                ($key:expr, $expected:expr) => {
+                    assert_eq!(tx.compute(&$key).await.unwrap(), $expected);
+                };
+            }
+            raw!(
+                RootModuleCommandPolicyKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleCommandPolicy::from(prior.command_policy.clone())
+            );
+            raw!(
+                RootModuleEnvironmentPolicyKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(prior.environment_policy.clone())
+            );
+            raw!(
+                RootModuleLockfileModeKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleLockfileMode::from(prior.lockfile_mode.clone())
+            );
+            raw!(
+                RootModuleRegistryUrlsKey { workspace },
+                slug_bzlmod_v2::RootModuleRegistryUrls::from(prior.registry_urls.clone())
+            );
+            raw!(
+                slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey::new(
+                    runtime.repository_materializer.workspace().clone()
+                ),
+                prior.repository_environment.clone()
+            );
+            drop(tx);
+            runtime.dice.wait_for_idle().await;
+            self.1.set(true);
+            checked
+        })
+    }
+}
+
 #[test]
 fn normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder() {
     use slug_bzlmod_v2::RegistryRefusalCause;
@@ -534,62 +599,6 @@ fn normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder(
     use slug_loading_v2::SelectedPreparationOwnerError;
 
     use crate::runtime::dice::source_service::RegistryLimitRelation;
-
-    struct FullRawObserver(RestoredDiagnosticObserver, Cell<bool>);
-    impl DiagnosticObserver for FullRawObserver {
-        fn after_restore<'a>(
-            &'a self,
-            runtime: &'a WorkspaceRuntime,
-            prepared: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
-        ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>> {
-            Box::pin(async move {
-                // The existing helper checks every accepted field and Runtime/Guest raw cells.
-                let checked = self.0.after_restore(runtime, prepared).await;
-                let prior = &self.0.prior.inputs.request;
-                let workspace = runtime.workspace.clone();
-                let mut tx = runtime.dice.updater().commit().await;
-                macro_rules! raw {
-                    ($key:expr, $expected:expr) => {
-                        assert_eq!(tx.compute(&$key).await.unwrap(), $expected);
-                    };
-                }
-                raw!(
-                    RootModuleCommandPolicyKey {
-                        workspace: workspace.clone()
-                    },
-                    slug_bzlmod_v2::RootModuleCommandPolicy::from(prior.command_policy.clone())
-                );
-                raw!(
-                    RootModuleEnvironmentPolicyKey {
-                        workspace: workspace.clone()
-                    },
-                    slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(
-                        prior.environment_policy.clone()
-                    )
-                );
-                raw!(
-                    RootModuleLockfileModeKey {
-                        workspace: workspace.clone()
-                    },
-                    slug_bzlmod_v2::RootModuleLockfileMode::from(prior.lockfile_mode.clone())
-                );
-                raw!(
-                    RootModuleRegistryUrlsKey { workspace },
-                    slug_bzlmod_v2::RootModuleRegistryUrls::from(prior.registry_urls.clone())
-                );
-                raw!(
-                    slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey::new(
-                        runtime.repository_materializer.workspace().clone()
-                    ),
-                    prior.repository_environment.clone()
-                );
-                drop(tx);
-                runtime.dice.wait_for_idle().await;
-                self.1.set(true);
-                checked
-            })
-        }
-    }
 
     let f =
         selected_tool_source::tests::Fixture::new(&selected_tool_source::tests::scratch_program(1));
@@ -724,6 +733,283 @@ fn normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder(
     drop(inputs);
     drop(observer);
     await_descriptor_retirement(&descriptors);
+}
+
+// Withhold the TLS response after a real normal registry ClientHello.
+// Drop always stops and joins this owned server, including assertion/unwind paths.
+struct StalledRegistryServer {
+    url: String,
+    acknowledged: std::sync::mpsc::Receiver<()>,
+    stop: std::sync::mpsc::Sender<()>,
+    worker: Option<std::thread::JoinHandle<bool>>,
+}
+impl StalledRegistryServer {
+    fn new() -> Self {
+        use std::io::Read;
+
+        let listener = std::net::TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let url = format!("https://{}/", listener.local_addr().unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let (ack, acknowledged) = std::sync::mpsc::sync_channel(1);
+        let (stop, stopped) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let bound = Instant::now() + Duration::from_secs(18);
+            let mut stream = loop {
+                if stopped.try_recv() != Err(std::sync::mpsc::TryRecvError::Empty)
+                    || Instant::now() >= bound
+                {
+                    return false;
+                }
+                match listener.accept() {
+                    Ok((stream, _)) => break stream,
+                    Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(1));
+                    }
+                    Err(_) => return false,
+                }
+            };
+            stream
+                .set_read_timeout(Some(Duration::from_millis(50)))
+                .unwrap();
+            let mut bytes = [0u8; 8192];
+            let mut len = 0;
+            let mut wanted = 5;
+            while len < wanted {
+                if Instant::now() >= bound
+                    || stopped.try_recv() != Err(std::sync::mpsc::TryRecvError::Empty)
+                {
+                    return false;
+                }
+                match stream.read(&mut bytes[len..wanted]) {
+                    Ok(0) => return false,
+                    Ok(n) => len += n,
+                    Err(error)
+                        if matches!(
+                            error.kind(),
+                            std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                        ) => {}
+                    Err(_) => return false,
+                }
+                if len == 5 && wanted == 5 {
+                    if bytes[0] != 22 || bytes[1] != 3 || !matches!(bytes[2], 1..=3) {
+                        return false;
+                    }
+                    let record_len = u16::from_be_bytes([bytes[3], bytes[4]]) as usize;
+                    if record_len < 4 || record_len > bytes.len() - 5 {
+                        return false;
+                    }
+                    wanted = 5 + record_len;
+                }
+            }
+            let hello_len =
+                ((bytes[6] as usize) << 16) | ((bytes[7] as usize) << 8) | bytes[8] as usize;
+            if bytes[5] != 1 || hello_len != wanted - 9 || hello_len < 35 || bytes[9..11] != [3, 3]
+            {
+                return false;
+            }
+            // Validate the complete bounded ClientHello envelope, not an arbitrary
+            // first byte. Legacy version/random, session, ciphers, compression and
+            // extensions must fit exactly within the one observed TLS record.
+            let session_len = bytes[43] as usize;
+            let mut cursor = 44 + session_len;
+            if session_len > 32 || cursor + 2 > wanted {
+                return false;
+            }
+            let cipher_len = u16::from_be_bytes([bytes[cursor], bytes[cursor + 1]]) as usize;
+            cursor += 2;
+            if cipher_len < 2 || cipher_len % 2 != 0 || cursor + cipher_len >= wanted {
+                return false;
+            }
+            cursor += cipher_len;
+            let compression_len = bytes[cursor] as usize;
+            cursor += 1;
+            if compression_len == 0 || cursor + compression_len + 2 > wanted {
+                return false;
+            }
+            cursor += compression_len;
+            let extensions_len = u16::from_be_bytes([bytes[cursor], bytes[cursor + 1]]) as usize;
+            if cursor + 2 + extensions_len != wanted {
+                return false;
+            }
+            if ack.send(()).is_err() {
+                return false;
+            }
+            // Keep the actual connection open; EOF must not become the primary.
+            let stopped = stopped
+                .recv_timeout(bound.saturating_duration_since(Instant::now()))
+                .is_ok();
+            let _ = stream.shutdown(std::net::Shutdown::Both);
+            stopped
+        });
+        Self {
+            url,
+            acknowledged,
+            stop,
+            worker: Some(worker),
+        }
+    }
+    fn finish(mut self) -> bool {
+        let _ = self.stop.send(());
+        self.worker.take().unwrap().join().unwrap()
+    }
+}
+impl Drop for StalledRegistryServer {
+    fn drop(&mut self) {
+        let _ = self.stop.send(());
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
+#[test]
+fn normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    use slug_bzlmod_v2::SelectedSourceRefusalTermination;
+    use slug_loading_v2::SelectedPreparationOwnerError;
+
+    use crate::runtime::dice::source_service::SourceTimeoutDomain;
+    use crate::runtime::dice::source_service::SourceTimeoutPhase;
+    use crate::runtime::dice::source_service::SourceTimeoutReturn;
+    use crate::runtime::dice::source_service::SourceTimeoutSite;
+
+    let f =
+        selected_tool_source::tests::Fixture::new(&selected_tool_source::tests::scratch_program(1));
+    let module = f.workspace.path().join("MODULE.bazel");
+    let mut text = std::fs::read_to_string(&module).unwrap();
+    text.push_str("\nbazel_dep(name='timeout_probe',version='1.0')\n");
+    std::fs::write(module, text).unwrap();
+    let server = StalledRegistryServer::new();
+    // Fixture/listener setup precedes the common clock; the original15s TLS
+    // step expires first without changing the production timeout algorithm.
+    let (diagnostic, mut inputs) =
+        diagnostic_fixture_with_work(&f, SourceServiceLimits::default(), Duration::from_secs(22));
+    inputs.registry_urls = RegistryUrls::new([server.url.as_str()]);
+    let (engine, images, prior, recorder) = diagnostic.inspect_for_test(|runtime, scope| {
+        assert!(
+            runtime
+                .source_scope()
+                .is_some_and(|installed| Arc::ptr_eq(installed, scope))
+        );
+        (
+            Arc::downgrade(&runtime.dice),
+            runtime.image_resources.clone(),
+            runtime
+                .native_demand_sessions
+                .state
+                .lock()
+                .unwrap()
+                .accepted
+                .clone(),
+            scope.arm_registry_association_for_test().unwrap(),
+        )
+    });
+    let scope = diagnostic.scope.clone();
+    let scope_weak = Arc::downgrade(&scope);
+    assert!(recorder.same_scope(&scope));
+    let observer = FullRawObserver(
+        RestoredDiagnosticObserver {
+            prior,
+            calls: Cell::new(0),
+            reject: true,
+        },
+        Cell::new(false),
+    );
+    let result = diagnostic.prepare_once_observed(
+        SelectedSourcePreparationRequest {
+            apparent_repository: &ApparentRepoName::new("proof").unwrap(),
+            inputs: &inputs,
+            scratch_policy: *f.key.policy(),
+            tool_policy: selected_tool_source::tests::key(&f).policy(),
+        },
+        &|_| Ok(()),
+        &observer,
+    );
+    assert!(
+        server.acknowledged.try_recv().is_ok(),
+        "the real bounded TLS ClientHello must reach the owned server"
+    );
+    assert!(
+        server.finish(),
+        "owned server must stop and join before retirement assertions"
+    );
+    assert_eq!(observer.0.calls.get(), 1);
+    assert!(observer.1.get());
+    assert!(engine.upgrade().is_none());
+    let Err(NativeDemandSessionError::Computation(error)) = result else {
+        panic!("normal selected owner must retain the transport timeout as primary");
+    };
+    // The original15s TLS step precedes the22s common owner clock. Require
+    // the actual returned typed source error, not the side Scope record.
+    let owner = error
+        .chain()
+        .take(16)
+        .find_map(|cause| cause.downcast_ref::<SelectedPreparationOwnerError>())
+        .expect("the selected normal source primary must remain typed");
+    let SelectedPreparationOwnerError::SourceSelection { classification, .. } = owner else {
+        panic!("timeout must follow the chosen normal source predecessor");
+    };
+    assert_eq!(
+        classification.termination(),
+        SelectedSourceRefusalTermination::Classified
+    );
+    assert!(classification.variant_path_complete() && classification.native_detail_observed());
+    let selected_native = classification.native_cause();
+    assert_eq!(
+        selected_native,
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::Scope,
+            detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::WorkDeadline),
+        })
+    );
+    assert_eq!(
+        scope.first_error_for_test(),
+        Some(SourceServiceError::WorkDeadline)
+    );
+    let snapshot = recorder.snapshot();
+    assert!(
+        snapshot.complete
+            && snapshot.timeout.armed
+            && snapshot.timeout.first_error_is_work_deadline
+    );
+    assert_eq!(snapshot.admitted_entries, 1);
+    assert_eq!(snapshot.scope_admitted_entries, 1);
+    assert_eq!(snapshot.admitted_distinct, 1);
+    assert_eq!(snapshot.admitted_repeated, 0);
+    let origin = snapshot
+        .timeout
+        .origin
+        .expect("actual first timer creator is required");
+    assert_eq!(origin.site, SourceTimeoutSite::TlsHandshake);
+    assert_eq!(origin.domain, SourceTimeoutDomain::Step);
+    assert_eq!(origin.phase, SourceTimeoutPhase::Timer);
+    assert_eq!(origin.return_disposition, SourceTimeoutReturn::Deadline);
+    assert!(!origin.step_add_overflow);
+    // The first scope creator is proved, not the selected leaf's own call.
+    assert!(recorder.same_scope(&scope));
+    assert_eq!(scope.snapshot().source_attempts, 0);
+    assert_eq!(scope.snapshot().registry_admitted_bytes, 0);
+    assert_eq!(scope.snapshot().live_buffer_bytes, snapshot.charged_bytes);
+    drop(error);
+    drop(scope);
+    assert!(scope_weak.upgrade().is_some());
+    drop(recorder);
+    assert!(
+        scope_weak.upgrade().is_none(),
+        "no recorder/Scope strong cycle"
+    );
+    assert_eq!(images.logical_bytes_used(), 0);
+    let descriptors = images.descriptor_budget().clone();
+    drop(inputs);
+    drop(observer);
+    await_descriptor_retirement(&descriptors);
+    let selected_native_present = u64::from(selected_native.is_some());
+    println!("SLUG_TIMEOUT_FIXTURE selected_native_present={selected_native_present}");
+    println!("SLUG_TIMEOUT_FIXTURE first_scope_origin_paired={selected_native_present}");
+    println!("SLUG_TIMEOUT_FIXTURE selected_leaf_call_identity_proved=0");
 }
 
 fn await_descriptor_retirement(budget: &slug_workspace_v2::ImageDescriptorBudget) {

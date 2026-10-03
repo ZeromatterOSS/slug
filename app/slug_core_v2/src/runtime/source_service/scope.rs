@@ -6,6 +6,16 @@ use std::time::Instant;
 
 use slug_workspace_v2::NormalizedAbsolutePath;
 
+use super::timeout_provenance::SourceTimeoutDeadline;
+use super::timeout_provenance::SourceTimeoutOrigin;
+use super::timeout_provenance::SourceTimeoutPhase;
+use super::timeout_provenance::SourceTimeoutReturn;
+use super::timeout_provenance::SourceTimeoutSite;
+#[cfg(all(test, target_os = "linux"))]
+use super::timeout_provenance::SourceTimeoutSnapshot;
+#[cfg(all(test, target_os = "linux"))]
+use super::timeout_provenance::SourceTimeoutState;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) enum SourceCounter {
     RegistryAttempts,
@@ -119,6 +129,8 @@ struct ScopeState {
     counters: SourceServiceCounters,
     first: Option<SourceServiceError>,
     closed: bool,
+    #[cfg(all(test, target_os = "linux"))]
+    timeout: SourceTimeoutState,
 }
 
 pub(in crate::runtime) struct SourceServiceScope {
@@ -190,7 +202,25 @@ impl SourceServiceScope {
         state: &mut ScopeState,
         allow_closed: bool,
     ) -> Result<(), SourceServiceError> {
+        self.check_locked_at(
+            state,
+            allow_closed,
+            SourceTimeoutSite::GenericScope,
+            SourceTimeoutPhase::ScopeCheck,
+        )
+    }
+    fn check_locked_at(
+        &self,
+        state: &mut ScopeState,
+        allow_closed: bool,
+        site: SourceTimeoutSite,
+        phase: SourceTimeoutPhase,
+    ) -> Result<(), SourceServiceError> {
         if let Some(error) = state.first {
+            #[cfg(all(test, target_os = "linux"))]
+            if error == SourceServiceError::WorkDeadline {
+                state.timeout.sticky();
+            }
             return Err(error);
         }
         let error = if *self.cancelled.borrow() {
@@ -203,7 +233,7 @@ impl SourceServiceScope {
             None
         };
         if let Some(error) = error {
-            state.first = Some(error);
+            let error = Self::poison_locked(state, error, SourceTimeoutOrigin::common(site, phase));
             self.cancelled.send_replace(true);
             Err(error)
         } else {
@@ -214,10 +244,33 @@ impl SourceServiceScope {
         self.check_locked(&mut self.state(), false)
     }
     pub(in crate::runtime) fn poison(&self, error: SourceServiceError) -> SourceServiceError {
-        let first = {
-            let mut state = self.state();
-            *state.first.get_or_insert(error)
-        };
+        self.poison_at(error, SourceTimeoutOrigin::unattributed())
+    }
+    fn poison_locked(
+        state: &mut ScopeState,
+        error: SourceServiceError,
+        _origin: SourceTimeoutOrigin,
+    ) -> SourceServiceError {
+        if let Some(first) = state.first {
+            #[cfg(all(test, target_os = "linux"))]
+            if first == SourceServiceError::WorkDeadline {
+                state.timeout.sticky();
+            }
+            return first;
+        }
+        state.first = Some(error);
+        #[cfg(all(test, target_os = "linux"))]
+        if error == SourceServiceError::WorkDeadline {
+            state.timeout.created(_origin);
+        }
+        error
+    }
+    fn poison_at(
+        &self,
+        error: SourceServiceError,
+        origin: SourceTimeoutOrigin,
+    ) -> SourceServiceError {
+        let first = Self::poison_locked(&mut self.state(), error, origin);
         self.cancelled.send_replace(true);
         first
     }
@@ -291,9 +344,39 @@ impl SourceServiceScope {
             return Err(SourceServiceError::ForeignScope);
         }
         let attached = self.registry_association.set(Arc::downgrade(&association));
+        if attached.is_ok() {
+            state.timeout.arm();
+        }
         drop(state);
         attached.map_err(|_| SourceServiceError::ForeignScope)?;
         Ok(association)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn disarm_timeout_for_test(
+        &self,
+        recorder: *const super::RegistryRequestAssociation,
+    ) {
+        let mut state = self.state();
+        if self
+            .registry_association
+            .get()
+            .is_some_and(|weak| weak.as_ptr() == recorder)
+        {
+            state.timeout.clear();
+        }
+        // No recorder upgrade or association lock; guard drops before credit Drop.
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn registry_observation_for_test(
+        &self,
+    ) -> (SourceServiceCounters, SourceTimeoutSnapshot) {
+        let state = self.state();
+        (
+            state.counters,
+            state
+                .timeout
+                .snapshot(state.first == Some(SourceServiceError::WorkDeadline)),
+        )
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(super) fn charge_registry_request_for_test(
@@ -362,27 +445,58 @@ impl SourceServiceScope {
     where
         F: Future<Output = Result<T, SourceServiceError>>,
     {
+        self.during_at(SourceTimeoutSite::GenericWait, step, future)
+            .await
+    }
+    pub(in crate::runtime) async fn during_at<T, F>(
+        &self,
+        site: SourceTimeoutSite,
+        step: Duration,
+        future: F,
+    ) -> Result<T, SourceServiceError>
+    where
+        F: Future<Output = Result<T, SourceServiceError>>,
+    {
         let mut cancel = self.cancelled.subscribe();
-        self.check()?;
-        let deadline = self.work_deadline.min(
-            Instant::now()
-                .checked_add(step)
-                .unwrap_or(self.work_deadline),
-        );
+        self.check_locked_at(
+            &mut self.state(),
+            false,
+            site,
+            SourceTimeoutPhase::DuringEntryCheck,
+        )?;
+        let chosen = SourceTimeoutDeadline::select(self.work_deadline, Instant::now(), step);
+        let deadline = chosen.deadline;
         let result = tokio::select! { biased;
             _=cancel.changed()=>return Err(self.poison(SourceServiceError::Cancelled)),
-            _=tokio::time::sleep_until(deadline.into())=>return Err(self.poison(SourceServiceError::WorkDeadline)),
+            _=tokio::time::sleep_until(deadline.into())=>return Err(self.poison_at(
+                SourceServiceError::WorkDeadline,
+                chosen.origin(site, SourceTimeoutPhase::Timer, SourceTimeoutReturn::Deadline))),
             value=future=>value,
         };
         if Instant::now() >= deadline {
-            let expired = self.poison(SourceServiceError::WorkDeadline);
+            let disposition = if result.is_err() {
+                SourceTimeoutReturn::CompletedPrimary
+            } else {
+                SourceTimeoutReturn::Deadline
+            };
+            let expired = self.poison_at(
+                SourceServiceError::WorkDeadline,
+                chosen.origin(site, SourceTimeoutPhase::Postcheck, disposition),
+            );
             return match result {
                 Err(primary) => Err(primary),
                 Ok(_) => Err(expired),
             };
         }
         let value = result.map_err(|error| self.poison(error))?;
-        self.check()?;
+        #[cfg(all(test, target_os = "linux"))]
+        super::timeout_provenance::before_final_check_for_test();
+        self.check_locked_at(
+            &mut self.state(),
+            false,
+            site,
+            SourceTimeoutPhase::DuringFinalCheck,
+        )?;
         Ok(value)
     }
     pub(in crate::runtime) async fn during_cleanup<T, F>(
@@ -436,8 +550,11 @@ impl SourceBufferReservation {
     pub(super) fn same_scope(&self, scope: &Arc<SourceServiceScope>) -> bool {
         Arc::ptr_eq(&self.scope, scope)
     }
-    pub(super) fn registry_attempts(&self) -> u64 {
-        self.scope.snapshot().registry_attempts
+    pub(super) fn registry_observation(&self) -> (SourceServiceCounters, SourceTimeoutSnapshot) {
+        self.scope.registry_observation_for_test()
+    }
+    pub(super) fn disarm_timeout(&self, recorder: *const super::RegistryRequestAssociation) {
+        self.scope.disarm_timeout_for_test(recorder);
     }
 }
 impl Drop for SourceBufferReservation {

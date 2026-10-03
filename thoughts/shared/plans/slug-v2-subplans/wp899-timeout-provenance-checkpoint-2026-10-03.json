@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "status": "VALIDATED_TIMEOUT_COMPONENT_ON_REVIEW_BRANCH_FULL_WP899_UNACCEPTED",
+  "baseline": "d1413c029c200826eec8e41125e72afbb257f65e",
+  "review_branch": "review/wp899-request-source-profile",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/source_service.rs": "9d76fefd0326237f06e8096da3b4d90e07373ef147500c6c29cdc5887a1c51c7",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "6477da76df3adab87b7dae5e7fe68aea3bee50af7a16921559152697bacf6021",
+    "app/slug_core_v2/src/runtime/source_service/http.rs": "f5a11df91935f0595d65b138995f890414a586c7ed725db628bce32fad0bd191",
+    "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "bb09c3e86104caccfd3f8852e242f4dd9a56dd2e2b201cf521a1f861dba8aba5",
+    "app/slug_core_v2/src/runtime/source_service/timeout_provenance.rs": "5202d475f923db29d7f55f3e1359080899440ee5eb9e79eb73b30933385f7bbc",
+    "app/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs": "65132977df099b42878c2b6c5c593c3da24d11a1b0f22b60f8af1bbec6cb1d9f",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5f6b6c508d71fb4983c9d931050ea82afc1b284c6c75d378ea3d960b97a310df",
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "e0fe1aa9186ff238713797c55dc8b0e8e3f90a6e22602b9f12e5ca8954ba9348"
+  },
+  "private_evidence_sha256": {
+    "timeout-provenance-root-contract.md": "c1f2275222648b43a7e75ffc69c732eefb176fab4575eaf460aca018cf6b26f6",
+    "timeout-provenance-design-review.md": "9bc2389985239ed5d1c0f0e0ff61160c5e12868c5a0ddbfe868793ea5e2ff904",
+    "timeout-provenance-natural-tls-correction-design-review.md": "02e23b8daf3728ccc2b7c5a7c1e474289befb7b0f09ba0c3463977b5caf2972c",
+    "timeout-provenance-tls-compile.json": "9a2182f37ad3481841b96351751268d00c5915a9b3fc83465321431023ac2761",
+    "timeout-provenance-tls-test.json": "ed41d55f0b4090bd481802a6c8f1657b56c8b743c93407f156f430a341cceea5",
+    "timeout-provenance-default-final-check.json": "f1a3365cfb53dd17f13e92b737f6b877ac7bb9302d65e86ca317d57b43a66fb1",
+    "timeout-provenance-reused-counting.json": "b56bc08f0cb33d934d49dbd3b24530692bf14aa3b2f20eeb9894e19ab9157eb8",
+    "timeout-provenance-focused.json": "840ca952224199591b23ba0399d86e5beb630c580b1b415d0fa287de38cc328a",
+    "timeout-provenance-natural-corrected-test.json": "5e3b5114e9c7b74eb63578a4d8e3693c1ecb6db3bfb5d47463b071c00eb8636c"
+  },
+  "reconciliation_review_sha256": "a4346f1d484482d353a73ed2943bf26c32731900951b7fbdba51d06a91a1ef27",
+  "source_decision": "Same first-poison mutex records fixed creator; optional Linux cfgtest association retains Weak and credits Scope POD/header/overlap in existing bank; exact-pointer Drop disarms before credit. Original deadline/error/source policy unchanged.",
+  "validation": {
+    "core_unique_controls": 43,
+    "composition": "42 source-bridged preserved passes plus 1 fresh TLS replacement; not one 43-pass batch",
+    "protected_predecessor_controls": 34,
+    "tls": {
+      "selector": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--exact",
+        "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "preflight": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--exact",
+        "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_tls_step_timeout_retains_origin_and_retires_recorder"
+      ],
+      "preflight_exit": 0,
+      "exit": 0,
+      "selected": 1,
+      "passed": 1,
+      "seconds": 15.03332289296668,
+      "artifact_sha256": "d15ad1b523b6a4942b8bef8bb004c304073453539eff108903f8d7f5db0eb4f3",
+      "actual_branch": {
+        "selected_native_present": 1,
+        "first_scope_origin_paired": 1,
+        "selected_leaf_call_identity_proved": 0
+      }
+    },
+    "default_core_cli_all_targets": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--all-targets",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit": 0,
+      "seconds": 2.3460944879916497,
+      "profile_overrides": false
+    },
+    "existing_bzlmod_counting": {
+      "selected": 1,
+      "passed": 1,
+      "source_and_artifact_pins_verified": true
+    },
+    "hygiene": "pinned rustfmt --check skip_children=true all eight source files and git diff --check pass"
+  },
+  "superseded_failures_preserved": [
+    "initial focused batch 42/43, exit101",
+    "corrected Common integration 0/1, exit101; TLS correction supersedes only new natural server/gate"
+  ],
+  "interpretation": "Direct Common controls and natural TLS Step prove distinct producer branches. Pairing never certifies selected leaf call identity; CompletedPrimary/Unknown/uncomputed/foreign/unsettled/missing origin are unpaired.",
+  "remaining": [
+    "successful actual normal source admission and source/private-lease/clone-read/lastDrop fit",
+    "fresh reviewed exact actual diagnostic contract/freeze before any new invocation",
+    "coupled full-WP899 integration FINAL",
+    "CLI/process/query/bootstrap and full runtime closure",
+    "historical 40GB workload attribution"
+  ],
+  "new_actual_root_invocation": false,
+  "integration": "preserve candidate only; no main activation or push"
+}

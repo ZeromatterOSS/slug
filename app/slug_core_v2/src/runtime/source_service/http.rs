@@ -21,6 +21,7 @@ use super::SourceServiceError;
 use super::SourceServiceScope;
 use super::SourceTransportFailure;
 use super::failure::hyper_detail;
+use super::timeout_provenance::SourceTimeoutSite;
 
 trait SourceIo: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> SourceIo for T {}
@@ -109,7 +110,7 @@ impl ScopedHttpResponse {
             let frame = body.frame();
             tokio::pin!(frame);
             let connection = &mut self.connection;
-            let result=self.scope.during(Duration::from_secs(30),async {
+            let result=self.scope.during_at(SourceTimeoutSite::Body,Duration::from_secs(30),async {
                 let result=if let Some(conn)=connection.as_mut() {
                     tokio::select! {
                         result=&mut frame=>result,
@@ -205,7 +206,7 @@ pub(in crate::runtime) async fn request_scoped_typed(
         .reserve_buffer(64 * 1024 + 128 * 256 + 32 * 1024)
         .map_err(SourceTransportFailure::scope)?;
     let addresses = scope
-        .during(Duration::from_secs(15), async {
+        .during_at(SourceTimeoutSite::Dns, Duration::from_secs(15), async {
             Ok(tokio::net::lookup_host((host, port)).await.map_err(|e| {
                 SourceTransportFailure::io(RegistryRefusalSite::Dns, &e, "source DNS lookup failed")
             }))
@@ -219,7 +220,7 @@ pub(in crate::runtime) async fn request_scoped_typed(
     let mut last_failure = None;
     for address in bounded {
         let result = scope
-            .during(Duration::from_secs(15), async {
+            .during_at(SourceTimeoutSite::Connect, Duration::from_secs(15), async {
                 Ok(TcpStream::connect(address).await)
             })
             .await
@@ -282,18 +283,22 @@ pub(in crate::runtime) async fn request_scoped_typed(
             SourceTransportFailure::opaque(RegistryRefusalSite::TlsName, "source TLS name refused")
         })?;
         let stream = scope
-            .during(Duration::from_secs(15), async {
-                Ok(TlsConnector::from(Arc::new(config))
-                    .connect(name, stream)
-                    .await
-                    .map_err(|e| {
-                        SourceTransportFailure::io(
-                            RegistryRefusalSite::TlsHandshake,
-                            &e,
-                            "source TLS handshake failed",
-                        )
-                    }))
-            })
+            .during_at(
+                SourceTimeoutSite::TlsHandshake,
+                Duration::from_secs(15),
+                async {
+                    Ok(TlsConnector::from(Arc::new(config))
+                        .connect(name, stream)
+                        .await
+                        .map_err(|e| {
+                            SourceTransportFailure::io(
+                                RegistryRefusalSite::TlsHandshake,
+                                &e,
+                                "source TLS handshake failed",
+                            )
+                        }))
+                },
+            )
             .await
             .map_err(SourceTransportFailure::scope)??;
         Box::new(stream)
@@ -312,16 +317,20 @@ async fn request_on_io(
     let mut builder = http1::Builder::new();
     builder.max_buf_size(64 * 1024).max_headers(128);
     let (mut sender, connection) = scope
-        .during(Duration::from_secs(15), async {
-            Ok(builder.handshake(TokioIo::new(io)).await.map_err(|error| {
-                http_error(
-                    scope,
-                    error,
-                    RegistryRefusalSite::HttpHandshake,
-                    "source HTTP handshake failed",
-                )
-            }))
-        })
+        .during_at(
+            SourceTimeoutSite::HttpHandshake,
+            Duration::from_secs(15),
+            async {
+                Ok(builder.handshake(TokioIo::new(io)).await.map_err(|error| {
+                    http_error(
+                        scope,
+                        error,
+                        RegistryRefusalSite::HttpHandshake,
+                        "source HTTP handshake failed",
+                    )
+                }))
+            },
+        )
         .await
         .map_err(SourceTransportFailure::scope)??;
     let uri = url.as_str().parse::<hyper::Uri>().map_err(|_| {
@@ -346,7 +355,7 @@ async fn request_on_io(
             )
         })?;
     let mut connection = Some(Box::pin(connection));
-    let response=scope.during(Duration::from_secs(30),async {
+    let response=scope.during_at(SourceTimeoutSite::Headers,Duration::from_secs(30),async {
         let request=sender.send_request(request);tokio::pin!(request);
         let result=tokio::select! {
             result=&mut request=>result,

@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual registry association measured; timeout provenance design pending
+Status: timeout provenance accepted; actual timing observation pending
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -147,6 +147,28 @@ bounded optional producer-owned timeout-provenance design, with first-creator ve
 sticky selection, charged storage and unchanged source/error/budget authority.
 No implementation or new actual invocation follows before reviewed design and
 focused portable gates. Full source admission and coupledWP899 FINAL remain required.
+Root selects `target/wp899/timeout-provenance-root-contract.md` SHAc1f22752,
+proposal9f02b738/Input52b782a4 for independent DESIGN. First creator POD in the
+original Scope mutex, original during algorithm once, six HTTP site tags; existing
+association charge includes ScopePOD and enlarged headers, exact-pointer disarm
+protects losing-arm candidate and actual lastDrop. Tags are private; observation
+Linuxcfgtest-only. CompletedPrimary/Unknown/generic-uncomputed origin never pairs.
+Supervisor owns service/{scope,http,registry_association}, module reexports and new
+cohesive timeout_provenance/{module,tests}; Input owns genuine diagnostic fixture;
+Root owns actual harness scalar projection and serial validation. Exact allowlist,
+portable discriminator matrix/defaultCore+CLI and60/30s caps are in Root contract.
+Independent DESIGN ACCEPT SHA9bc23899 freezes the enumerated8-file contract.
+The bounded timeout component now has independent FINAL and43 unique passing
+controls (42 preserved+1 real15s TLS Step normal-owner gate), plus current default
+Core+CLI all-target compilation. The initial short Common fixtures correctly failed:
+outer owner cancellation shares that clock and cannot guarantee the first HTTP
+creator or a typed returned timeout. Reviewed TLS amendment preserves original
+15s policy before22s test Common and proves actual chosen native/first origin,
+all7 restoration and strict lastDrop. Root numeric projection remains conservative;
+selected leaf identity stays0. [Checkpoint](wp899-timeout-provenance-checkpoint-2026-10-03.json)
+preserves both failures, DESIGN amendments, source bridge and FINAL. Next is one
+separately contracted source-matched actual timeout observation after eligibility
+reviews; no actual launch/cap increase or fullWP899/40GB acceptance follows here.
 
 ## Observable result and authority
 
