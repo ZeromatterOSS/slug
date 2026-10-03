@@ -1,15 +1,21 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded actual-root registry profile validated; supervised source admission next; full WP899 unaccepted
+Status: actual DownloadCapture BufferLimit frontier accepted as evidence; first-buffer producer next; full WP899 unaccepted
 
 The [bounded profile amendment](wp899-bounded-registry-profile.md) keeps Default128
 and selects explicit256 only for the Linux actual-root diagnostic. Its allowance-sized
 identity slab and fixed256 metadata are fully charged to the existing16MiB bank;
 all byte/time/supervisor limits stay unchanged. Fresh44/44 focused controls and
 default Core+CLI all-target compilation pass. [Receipt](wp899-bounded-registry-profile-2026-10-03.json).
-No actual observation is part of this component; any next run needs its own
-reviewed contract/freeze. The spent global7 result remains the lower-bound evidence.
+The separately frozen global8 observation now admits192 distinct registry requests
+with zero repeats/refusals and16 source attempts, then selects outer DownloadCapture
+with first Scope BufferLimit. The exact failed reservation/producer remains unproved.
+Restore/raw/engine,582/582 censuses, actual join/stage cleanup and exact empty-parent
+removal are proved after three terminal FINALs. [Receipt](wp899-buffer-frontier-2026-10-03.json).
+Next audit distinguishes first reserve_buffer refusal from explicit BufferLimit poison
+in the normal selected-extension artifact-capture owner. Preserve all limits; no
+automatic retry, complete source-fit or historical40GB claim follows.
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
