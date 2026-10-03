@@ -9782,7 +9782,9 @@ async fn observed_selected_graph_nonregistry_restores_with_unaffected_root_arc()
 #[tokio::test]
 async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
     let module = |name: &str, body: &str| {
-        Arc::from(format!("module(name='{name}',version='1')\nprint('{name}')\n{body}").into_bytes())
+        Arc::from(
+            format!("module(name='{name}',version='1')\nprint('{name}')\n{body}").into_bytes(),
+        )
     };
     let io = Arc::new(ModuleSourceRegistryIo::new([
         (
@@ -9794,10 +9796,7 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         ),
         (
             "https://registry.invalid/modules/b/1/MODULE.bazel",
-            ModuleSourceRegistryResponse::Found(module(
-                "b",
-                "bazel_dep(name='c',version='1')\n",
-            )),
+            ModuleSourceRegistryResponse::Found(module("b", "bazel_dep(name='c',version='1')\n")),
         ),
         (
             "https://registry.invalid/modules/b/2/MODULE.bazel",
@@ -9808,14 +9807,11 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         ),
         (
             "https://registry.invalid/modules/c/1/MODULE.bazel",
-            ModuleSourceRegistryResponse::Found(module(
-                "c",
-                "bazel_dep(name='a',version='1')\n",
-            )),
+            ModuleSourceRegistryResponse::Found(module("c", "bazel_dep(name='a',version='1')\n")),
         ),
     ]));
     let mut builder = Dice::builder();
-    crate::install_registry_io(&mut builder, io);
+    crate::install_registry_io(&mut builder, io.dupe());
     let dice = Arc::new(builder.build(DetectCycles::Enabled));
     let tracker = Arc::new(NonregistryPreflightTracker::default());
     let root = "module(name='bazel_tools')\nbazel_dep(name='a',version='1')\n";
@@ -9828,6 +9824,25 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         PathObservationEpoch::empty(),
     )
     .await;
+    let urls = [
+        "https://registry.invalid/modules/a/1/MODULE.bazel",
+        "https://registry.invalid/modules/b/1/MODULE.bazel",
+        "https://registry.invalid/modules/b/2/MODULE.bazel",
+        "https://registry.invalid/modules/c/1/MODULE.bazel",
+    ];
+    let assert_calls = |per_url: usize| {
+        let mut actual = std::collections::BTreeMap::new();
+        for url in io.calls.lock().unwrap().iter() {
+            *actual.entry(url.clone()).or_insert(0usize) += 1;
+        }
+        let expected = if per_url == 0 {
+            std::collections::BTreeMap::new()
+        } else {
+            urls.iter().map(|url| (url.to_string(), per_url)).collect()
+        };
+        assert_eq!(actual, expected);
+    };
+    assert_calls(0);
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
     let observed_key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
     tracker.rows.lock().unwrap().clear();
@@ -9835,15 +9850,56 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
     let observed_value = transaction.compute(&observed_key).await.unwrap();
     let observed = complete_observed_selected_graph(&observed_value);
     let graph = observed.result().as_ref().as_ref().unwrap();
+    // Diamond/cycle and nodep fixed-point revisits share the same normal file keys.
+    assert_calls(1);
+    let identities = |entries: &[crate::selected_graph::HostSelectedModuleEntry]| {
+        entries
+            .iter()
+            .map(|entry| match &entry.key {
+                HostGraphModuleKey::Root => None,
+                HostGraphModuleKey::Module { name, version } => {
+                    Some((name.to_string(), version.normalized().to_owned()))
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        identities(&graph.unpruned),
+        vec![
+            None,
+            Some(("a".to_owned(), "1".to_owned())),
+            Some(("b".to_owned(), "1".to_owned())),
+            Some(("b".to_owned(), "2".to_owned())),
+            Some(("c".to_owned(), "1".to_owned())),
+        ]
+    );
+    assert_eq!(
+        identities(&graph.resolved),
+        vec![
+            None,
+            Some(("a".to_owned(), "1".to_owned())),
+            Some(("b".to_owned(), "2".to_owned())),
+            Some(("c".to_owned(), "1".to_owned())),
+        ]
+    );
     for entries in [&graph.resolved, &graph.unpruned] {
         assert_eq!(entries[1].nodep_dependencies.len(), 1);
         assert!(matches!(&entries[1].nodep_dependencies[0].key,
-            HostGraphModuleKey::Module { name, .. } if name == "b"));
+            HostGraphModuleKey::Module { name, version } if name == "b" && version.normalized() == "2"));
     }
-    assert!(!tracker.rows.lock().unwrap().iter().any(|(owner, dependencies)| {
-        owner.contains("discovered") && owner.contains("absent_nodep")
-            || dependencies.iter().any(|dep| dep.contains("discovered") && dep.contains("absent_nodep"))
-    }));
+    assert!(
+        !tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(owner, dependencies)| {
+                owner.contains("discovered") && owner.contains("absent_nodep")
+                    || dependencies
+                        .iter()
+                        .any(|dep| dep.contains("discovered") && dep.contains("absent_nodep"))
+            })
+    );
     assert_eq!(
         graph
             .unpruned
@@ -9920,6 +9976,46 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         ]
     );
 
+    tracker.batches.lock().unwrap().clear();
+    let warm = transaction.compute(&observed_key).await.unwrap();
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &observed_value,
+        &warm
+    ));
+    assert_calls(1);
+    assert!(
+        tracker
+            .batches
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|(_, _, batch)| batch.is_none())
+    );
+    let mut same_current = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        990,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let reopened = same_current.compute(&observed_key).await.unwrap();
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &observed_value,
+        &reopened
+    ));
+    assert_calls(1);
+    assert!(
+        tracker
+            .batches
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|(_, _, batch)| batch.is_none())
+    );
+    drop(same_current);
+
     tracker.rows.lock().unwrap().clear();
     tracker.batches.lock().unwrap().clear();
     let legacy_key = HostSelectedModuleGraphKey::new(workspace);
@@ -9929,6 +10025,8 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
         panic!("legacy topology must complete")
     };
     assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    // Legacy parity deliberately evaluates a different normal file-key family.
+    assert_calls(2);
     let legacy_row = tracker
         .rows
         .lock()
@@ -9943,7 +10041,12 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
             .iter()
             .map(|(owner, _)| owner.clone())
             .collect::<Vec<_>>(),
-        legacy_dependency_order(&observed_events.iter().map(|(owner, _)| owner.clone()).collect::<Vec<_>>()),
+        legacy_dependency_order(
+            &observed_events
+                .iter()
+                .map(|(owner, _)| owner.clone())
+                .collect::<Vec<_>>()
+        ),
     );
     assert_eq!(legacy_row, legacy_dependency_order(&observed_row));
     assert_eq!(
@@ -9952,14 +10055,56 @@ async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
     );
     // Same semantic graph, but changed real root-byte observations: no wrapper cutoff.
     let mut comment_transaction = module_source_registry_transaction(
-        &dice, tracker, &format!("{root}# observation-only edit\n"),
-        &["https://registry.invalid"], 990, PathObservationEpoch::empty(),
-    ).await;
+        &dice,
+        tracker.dupe(),
+        &format!("{root}# observation-only edit\n"),
+        &["https://registry.invalid"],
+        990,
+        PathObservationEpoch::empty(),
+    )
+    .await;
     let comment_value = comment_transaction.compute(&observed_key).await.unwrap();
     let comment = complete_observed_selected_graph(&comment_value);
+    // Changed observed policy frontier legitimately refetches, even at generation990.
+    assert_calls(3);
     assert_eq!(observed.result(), comment.result());
     assert_ne!(observed.observations(), comment.observations());
-    assert!(!HostSelectedModuleGraphObservationKey::equality(&observed_value, &comment_value));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &observed_value,
+        &comment_value
+    ));
+
+    let mut updater = comment_transaction.into_updater();
+    crate::inject_registry_request_inputs(
+        &mut updater,
+        Path::new("/workspace"),
+        crate::RegistryUrls::new(["https://registry.invalid"]),
+        crate::RegistryRequestGeneration(991),
+    )
+    .unwrap();
+    tracker.batches.lock().unwrap().clear();
+    let mut next_generation = updater.commit().await;
+    let refetched = next_generation.compute(&observed_key).await.unwrap();
+    // Unrecorded FetchUnverified inputs acquire generation; identical returned facts cut off.
+    assert_calls(4);
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &comment_value,
+        &refetched
+    ));
+    assert!(
+        tracker
+            .batches
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|(_, _, batch)| batch.is_none())
+    );
+    let warm_refetched = next_generation.compute(&observed_key).await.unwrap();
+    assert_calls(4);
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &refetched,
+        &warm_refetched
+    ));
 }
 
 #[tokio::test]

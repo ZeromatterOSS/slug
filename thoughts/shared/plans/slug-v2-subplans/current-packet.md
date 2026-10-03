@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready to freeze an actual observation under reviewed quiescent disk census
+Status: bounded actual registry-request association design
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -65,6 +65,43 @@ Deadline reasons follow the selected bound to its producer; quota reason stays
 original. [Receipt](wp899-disk-census-repair-2026-10-03.json) preserves failed initial
 batch and final source/test/review evidence. A later actual observation needs its
 own reviewed contract/freeze; fullWP899/source-fit/40GB remain unaccepted.
+
+The separately frozen global5 observation completed68/68 quiescent censuses and
+emitted its full ordered Slug receipt. The actual selected cause is
+Scope::Limit(RegistryAttempts):128 admitted entries and234593 admitted bytes,
+before source capture. Peak sampled RSS72.258MiB/zero swap covers only this refused
+preparation branch. Full snapshot/all7 raw inputs were restored, actual engine
+retired, child joined and stage removed; Root removed the exact empty parent after
+three independent terminal reviews. [Terminal receipt](wp899-quiescent-root-terminal-2026-10-03.json)
+preserves this new evidence; all earlier attempts remain immutable.
+
+Next useful work is source-owned registry demand attribution. Existing transport
+charges once per RegistryIo entry; no double charge or retry defect is established.
+Normal graph discovery precedes version selection; the lock records162 MODULE
+versions but does not prove this run needs them all. Reuse existing normal graph
+fixtures and counting adapters to establish exact request sharing, multiple-version
+and nodep fixed-point behavior, then current-generation invalidation. Root owns
+plan/evidence reconciliation and serial validation. Independent DESIGN accepts
+the assertion-only delta in the existing observed diamond/cycle/nodep fixture
+(`app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`), using its normal
+ModuleSourceRegistryIo adapter. Exact full-URL multiplicities and name/version
+rows distinguish four legitimate pre-selection demands from warm/current sharing;
+legacy-family reads and full root-frontier edits are counted separately. Generation
+refetch is conditional: this unrecorded fixture tracks generation, while existing
+pinned-SHA success/refusal controls retain their established matrix. No production
+key/adapter/representation or source authority changes. Test growth estimate is
+net145 lines in the one existing function; all other bytes and existing assertions
+stay protected. Root compiles separately under60s, preflights the exact selector,
+executes under30s and obtains independent FINAL. No actual-root retry, cap increase,
+source bypass or semantic production change is selected.
+Distinct versus repeated requests in the actual run remains unobserved.
+Fresh exact fixture1/1 passes after38.742s compile; independent FINAL accepts the
+counting slice, reusing unchanged lower registry lifecycle gates. All four URLs are
+read once for cold observed discovery and not refetched on unchanged-current warm
+requests; separate legacy, root-frontier and generation phases are proved. Next
+design is optional bounded producer-owned actual request association, with full
+identity, charged memory and explicit selected-leaf identity limits. No new actual
+observation is authorized by the portable fixture.
 
 ## Observable result and authority
 

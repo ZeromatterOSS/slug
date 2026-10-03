@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready to freeze an actual observation under reviewed quiescent disk census
+Status: bounded actual registry-request association design
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
@@ -76,6 +76,14 @@ and explicit interruption semantics. Independent FINAL accepts the component:
 25 gates covered (24 preserved+1 strengthened),17 protected tests unchanged, and
 pinned Tokio progresses through16 fresh cycles. Actual source fit stays unproved;
 a new reviewed contract/freeze is required, with no automatic actual-root retry. [Receipt](slug-v2-subplans/wp899-disk-census-repair-2026-10-03.json).
+
+
+The new independently frozen global5 observation completes68/68 censuses and
+selects Scope::Limit(RegistryAttempts) at128 charges/234593 admitted bytes, before
+capture. Restoration/engine retirement and child join/stage/empty-parent cleanup
+are proved; sampled72.258MiB RSS is only this refused branch. Next work reuses normal
+graph counting fixtures to distinguish legitimate multiple-version discovery from
+repeated requests; no cap increase or actual retry is selected. [Terminal receipt](slug-v2-subplans/wp899-quiescent-root-terminal-2026-10-03.json).
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

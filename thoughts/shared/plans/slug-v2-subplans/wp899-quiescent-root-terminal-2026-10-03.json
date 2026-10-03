@@ -1,0 +1,1153 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "1329ca995be0dade5c5b46f6c02b9822097c5aac",
+  "global_actual_attempt": 5,
+  "attempt_state": "TERMINAL_NO_RETRY",
+  "compatibility": "Slug-native bounded diagnostic; unchanged semantic caller/inputs/production owners",
+  "evidence": {
+    "target/wp899/genuine-root-quiescent-contract.md": "a024c9d57b190b0140f67e954dcdf34716ba64841ee0507b98660f7f2cd894e8",
+    "target/wp899/genuine-root-quiescent-invocation-freeze.json": "3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d",
+    "target/wp899/genuine-root-quiescent-attempt-ledger.json": "b08ad3901f11bfec8903ed6e3d3e1b9c245af7a127bb2a621944b94f532fae4c",
+    "target/wp899/genuine-root-quiescent-one-receipt.json": "604d30c2c7ce3385611465127ea888015182fa66b98c02ac8b3e23b3138c8fc1",
+    "target/wp899/genuine-root-quiescent-one.log": "2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de",
+    "target/wp899/genuine-root-quiescent-raw-records.json": "f6ed0a1a6e0f642121a2b4c6182f677744db41bf6d9ceeb8e51bc0e684702290",
+    "target/wp899/genuine-root-quiescent-one-analysis.json": "a8788d1dea74b7aa0de2c1aea748417683f32d0b78574cc69c83c6c4a0fa433f",
+    "target/wp899/genuine-root-quiescent-terminal-record-audit.md": "a21fd592ec5c522739ebaf588531e1561d4ce82c86bd5d6d21dfb416a8650405",
+    "target/wp899/genuine-root-quiescent-terminal-supervisor-review.md": "7824c2126bcd7edf204edfe860bb3f062dd454bae851279cfe9c2f069d189103",
+    "target/wp899/genuine-root-quiescent-terminal-frontier-review.md": "d27ab81c764e53be7e1bef64be2ea701719b54060b12cceb32a751168362eb9c",
+    "target/wp899/genuine-root-quiescent-parent-cleanup.json": "8704fe2045a93eacf811d526b1115ffa4aa00fe381fb5d3935891e823fe139dc",
+    "target/wp899/registry-attempt-charge-audit.md": "f7ab7e111464ba9c3297dfccf29ba3245859ee0f515b91c23e77cb1fca78dd14",
+    "target/wp899/registry-attempt-demand-audit.md": "cfab04d536dfddef05c53c3705ae2883893a104110a5b340e3f1b02d29012688",
+    "target/wp899/registry-counting-design-review.md": "c5bc929162e554c1fd51c04a632b569c8c71a7d039af2762771455936d67e746",
+    "target/wp899/registry-counting-fixture-implementation.json": "851228541ce10fec66c468cd5414d086cc03c5ec0cf4a5bac67a6fbe00d6c16b",
+    "target/wp899/registry-counting-compile.json": "ac81b0c697aeb7cea75e5f06b9843229d572b15a90b5b661050c4dbece6bb6e6",
+    "target/wp899/registry-counting-compile.jsonl": "ab87cce34d82efee0f3a4a2676315c1f86a377db31d06084e484ac569e714fdb",
+    "target/wp899/registry-counting-compile.stderr": "83950cb23dbe73c173d38c2f2921dd4012acaf22e9445ee25b287c766f45999e",
+    "target/wp899/registry-counting-preflight.log": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/registry-counting-test.json": "dd7eccd6350d238476478e4795fd689124431b3658f3d1b44e2de6fbb0481efb",
+    "target/wp899/registry-counting-test.log": "a6e4e1df3b0f384aaa60642f974864aacfac8ef5ffd93a8bce9a3c7dfbe0e1b4",
+    "target/wp899/registry-counting-final-review.md": "5a27a8eadde6be4920fb16a83214e47884ce09ca9d4dda772eb80210ecfaedce",
+    "target/wp899/registry-limit-existing-gates.md": "ddeec364c1c692c61374afeba3f008a53249cc2e1cb65327bb45e2053bb207a2",
+    "target/wp899/shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.json": "fdad80300e7e0ddb9d439cffd27330bb6454a1dbfa4c2af4c776f2275428de93",
+    "target/wp899/shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.log": "dafe28524d5d02913082d3279d4c097f74b7b01f4e0c65cfa4da8710b5e64cdc"
+  },
+  "freeze": {
+    "schema": 1,
+    "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+    "base": "1329ca995be0dade5c5b46f6c02b9822097c5aac",
+    "state": "ROOT_RECONCILED_FROZEN_READY_FOR_ONE_QUIESCENT_OBSERVATION",
+    "attempt_budget": 1,
+    "automatic_retries": false,
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "command": [
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor.py",
+      "--stage-parent",
+      "/tmp/slug-wp899-quiescent-parent-6c8y_7qc",
+      "--receipt",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one-receipt.json",
+      "--log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one.log",
+      "--",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "--ignored",
+      "--exact",
+      "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "python": {
+      "path": "/usr/bin/python3.12",
+      "sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+      "version": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]"
+    },
+    "artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "sha256": "76de8b42175cdb1191a554cb90e9abaaee292517748fa5a75f2a93cf259670a5"
+    },
+    "selector": "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+    "source_hashes": {
+      "app/slug_bzlmod_v2/src/host_registry.rs": "ae3f4b292bf0d2fee0d4e669d7295c658b160a8df7c60ab89daa0f565f1c36c6",
+      "app/slug_bzlmod_v2/src/lib.rs": "f55b2798561ac8ab83357b3f7c7f12bc84ff108676d0717e0ae5859c22054c6d",
+      "app/slug_bzlmod_v2/src/registry_dice.rs": "c8a5e4eb64db3d675b7e099b5bf5fff6949698dad5a88f447ec89ccece641615",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal.rs": "20ebf70ddf5ed4b16e60a83f946fea4d0ea6d1562d75f172309fb5d00bd72eb5",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_debug.rs": "dde980c91e29098ce232228f37662e5d35dfe81cca10e1b2448cdc1e43a5be24",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_observation_tests.rs": "923888af63eaed2002f5801f6d79a5c99f2b5fb068b8ec544392b5e24510c15d",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_tests.rs": "5ee63392672280dfec1d73c549872fbcf3e48184078baa37d501ee68a3685132",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration.rs": "f2e9a99739cd008bd0d3cc3458e3cb08f6917894afc5926867a58b9df569f1d4",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/policy.rs": "525e71ccce1f6020a402ac9206d29d447281d67a537eb857672a72b289eaa0ed",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/tests.rs": "fa1a9ea064964894313fc0c3178009aad56404da42b72d696977d6e5b5e97129",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/types.rs": "5aa2b419049d6539bffc7e0e03cda7d3926e90884b3250e02388943b0485698f",
+      "app/slug_bzlmod_v2/src/selected_graph.rs": "50fbcee5eacad1653665fce91a9cffdd852cacd7078fd63ad720fc51eb8f33c2",
+      "app/slug_bzlmod_v2/src/selected_repo_spec.rs": "10934c864be64f55e2c66a05f3fffbeb583c674b31bc5bbaa275d59771b87bc9",
+      "app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs": "cce13e872d5581d979a113a7423c9ba1d7cf695ec67c0043b2f8e618be434d74",
+      "app/slug_bzlmod_v2/src/selected_source_refusal.rs": "ea05ee0ec13a301bd195f64958d26281e4a3671ae02480d191143d5e50c562c3",
+      "app/slug_bzlmod_v2/src/selected_source_refusal/tests.rs": "b8a8b40b2fa5a38212fb79f5b1ea18bf59f6894045dff05f8ec577283246494b",
+      "app/slug_bzlmod_v2/src/source_preparation.rs": "58ca0a535437c46a5e02e49ba11966744ec9c482eabc92133fecc576b502930f",
+      "app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs": "0e1e427b118c9dee1d4d341e1c64481fb7ad0d6f4e5f3af2fc9f652a4158dcee",
+      "app/slug_bzlmod_v2/tests/registry_dice.rs": "f0a481a315547dee551d10df70d3e5acbfd0fc549c50e4fb56396edb6abe0beb",
+      "app/slug_bzlmod_v2/tests/source_preparation_dice.rs": "fc72349f563f1e9f940270a96dd2d2a960b6adfce78bdcce90e943181fb1a06d",
+      "app/slug_core_v2/src/runtime/dice.rs": "30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a",
+      "app/slug_core_v2/src/runtime/guest_namespace.rs": "79adbfe155c3436df6b5d45ed85dd7e352cc380129b5e4951019e7e98d703e24",
+      "app/slug_core_v2/src/runtime/guest_namespace/attempt.rs": "6fd42a42cbd67ab20ced36cb8ba8ecb9707bc43d2b5326c259c3c37f68386e1a",
+      "app/slug_core_v2/src/runtime/guest_namespace/tests.rs": "ce7a961ca36552f509f53633432f2a551e0ab7594ef1375c02427a6a5b331abe",
+      "app/slug_core_v2/src/runtime/guest_namespace/tests/data.rs": "64dede16dbd47862b1e94be6ad72f00faa7c5e2799529e2e07700a5444943c2c",
+      "app/slug_core_v2/src/runtime/input_image.rs": "5955b8a8c400ef3232248bca4d0980749a70674709c3ad163e6e3339936afe84",
+      "app/slug_core_v2/src/runtime/input_image/capture.rs": "33ed25486eee2c6abd4f0c534f88958601ac3083254c4961f90670f0c6e10fdf",
+      "app/slug_core_v2/src/runtime/input_image/file_capture.rs": "84c22424bed8e75f39fe4f0c9223cc441143c417b10d3022cb9975efdc39fe06",
+      "app/slug_core_v2/src/runtime/input_image/tests.rs": "b4ef37988a7d06bdd3289f83f66c7259cff18522e485fff7763f464401538255",
+      "app/slug_core_v2/src/runtime/input_image_bridge.rs": "5690b0710b54e57f522512ace214ba6503a29f01c5d916b5bff4e3f31598e2ef",
+      "app/slug_core_v2/src/runtime/input_image_bridge/label_tests.rs": "ce330f894e758e24af004320505189a353a0f6a75dbaf895aa6fca55b95f0b56",
+      "app/slug_core_v2/src/runtime/registry_io.rs": "31a1d6ac177d6764f07c86937be4559ea69677484c31f9213ace782b3e58c457",
+      "app/slug_core_v2/src/runtime/repository_archive.rs": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561",
+      "app/slug_core_v2/src/runtime/repository_archive_file.rs": "0614efe0db9a9490bddfc206d9c69f2ab728121c797227bde0a74e3f6bcf5027",
+      "app/slug_core_v2/src/runtime/repository_archive_http.rs": "19790b239e26d0c7740bd89628c227ca4aaad9b78511a357b6a83ed20e13f274",
+      "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "a7ea07667f0f6d98c9db535dbe60743a148134064393728f7a4ef694ea042a6f",
+      "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "561af5f1e6e398d04671f39d1039717a0697d14bc186324b6e5241192d99cc72",
+      "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "f1768713fb592b267c3b6b9e925f91079351f2b2d212c376c716d8ae043b66d2",
+      "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "e6525fcf83fb9cd09826bd030186d8be9325f40efa89fd8cd6eefbb61cfbb708",
+      "app/slug_core_v2/src/runtime/repository_io.rs": "e95682a4d832010c42c6803c6765332b905fb4c9ce08e746b80b162d84b24c59",
+      "app/slug_core_v2/src/runtime/repository_io/local_request.rs": "01bf25bdbbb7fc654bfca44ec632b5d200cb334c8728fa5506371d63c809ec5b",
+      "app/slug_core_v2/src/runtime/repository_io/local_request/tests.rs": "3bc04d5f85f3f6b3cc8039e0ffe14ce84c9289f7391202dbbf5d378979ea8291",
+      "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "f50491495f6450774bc281cc8b74704f3705da2e1a41d0aed9aad548daedc52f",
+      "app/slug_core_v2/src/runtime/repository_io/source_service_tests.rs": "d066e5cb4c41381cccb67e245716138bcf6b0b6f19f26c066e181b52ee5f4517",
+      "app/slug_core_v2/src/runtime/runtime_sources.rs": "6ece7ff8decb64617364707596a43cfe1cd8900c64b07a03a83d73f05f45ba03",
+      "app/slug_core_v2/src/runtime/runtime_sources/attempt.rs": "e008b01c0dfc92c9188a8f96bcd6fbd0971ff6dc22e95069d900391580eac7e9",
+      "app/slug_core_v2/src/runtime/runtime_sources/catalogue.rs": "3f02af4ad0152d239695338975186ee11ab29b99cc578bf916552649516a949f",
+      "app/slug_core_v2/src/runtime/runtime_sources/factory.rs": "aa1d4fc035813aed52c450bc36874c160152f09ae7b204c900d3d63873e6ec03",
+      "app/slug_core_v2/src/runtime/runtime_sources/prepare.rs": "6caf17a0a1b08825d3480e3f16395ae29d19930f9354f09c69dd71da79295f6d",
+      "app/slug_core_v2/src/runtime/runtime_sources/tests.rs": "cb29f8efcb16504ab45ddc1d1e05837322e45f381b4988de3deda9a66374d502",
+      "app/slug_core_v2/src/runtime/selected_label_data.rs": "b074bc22550d3578b23f2c85dbf4c24250e028109e385aec55f2b58e8d158048",
+      "app/slug_core_v2/src/runtime/selected_label_data/catalogue.rs": "53935c5f9de2ab37942c8734d83e51dcce00bdf8d2b46f08157d7c39bcab637d",
+      "app/slug_core_v2/src/runtime/selected_label_data/prepare.rs": "fe9dd8a3bf046582771570ed7ded54dd090dcb62b9da07df151799f206b9c1e2",
+      "app/slug_core_v2/src/runtime/selected_label_data/tests.rs": "c97f6a976b290b032a3d75d24842b1e71e44010cadcb8550dc30992f2ba18ca6",
+      "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+      "app/slug_core_v2/src/runtime/selected_scratch_source/tests.rs": "10478aab4c2aadb55127c0dfc3da8606d16f636c09f681a771300c9496529b1f",
+      "app/slug_core_v2/src/runtime/selected_tool_source.rs": "1d54edbf5e1894132606547e97c0f673c5fb1ff324b513b87225a987710b1e27",
+      "app/slug_core_v2/src/runtime/selected_tool_source/attempt.rs": "eb1d2f6310ce4c5e06c6ba658b35781a6dbe4ddd38200ab6288999e0bcedef78",
+      "app/slug_core_v2/src/runtime/selected_tool_source/declarations.rs": "624d5e998ca8663436573cd50c22c1a4cda97c67e66d2cab42a175551499f02f",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "85f5f77c36e69d8060829f75ec7b2670709467c00720f50bac5666ed8a14075c",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare/capture.rs": "8e5158190153d2ee74be78bb5cb5748cc4752f3151aa238c8fc4074632592c88",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare/setup.rs": "b101848a9724c21adcad63971c89e5f3322f04ac0e5c1dbdd959c80f2777a984",
+      "app/slug_core_v2/src/runtime/selected_tool_source/tests.rs": "853af0600981093c004f442592a5caf0492bb7571f14f5b075b48519f925f35a",
+      "app/slug_core_v2/src/runtime/source_preparation.rs": "55c7fced51be8d5ea0eb60a9660ef9186b842784bf620b0216f963795f8779f7",
+      "app/slug_core_v2/src/runtime/source_preparation/attempt.rs": "3706dc28c7d41901805a4b6c1f8082f7a0d900f983fe9bc388fbc42633145267",
+      "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "c7cc4011733f05c01de68841e6dc1fb5295bc2a564b62ace867125da07cc0a90",
+      "app/slug_core_v2/src/runtime/source_preparation/harness_clock.rs": "ddca8674a50e793d21c6b91df24f95de849bbc95ccb933de77fac4eda95caeb3",
+      "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "1433745fd6dbf90b24cf9efc00444b7efe639d1d1e2b92e7a25bcf1c0a837206",
+      "app/slug_core_v2/src/runtime/source_preparation/request.rs": "1c95c6ab0af8a3058b5467db90c786129d497700c29558624972aacaa243c6da",
+      "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "166663f44eee230dfd01ea42b854976295cd052c7959dc23eadf0d5799dad2f7",
+      "app/slug_core_v2/src/runtime/source_service.rs": "e10674cfeb03eb6c0c6fe7e64d244d50f001806891518ab8536859aa59a4ce68",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "ce1566cce9e7db2861745d7e133e4bd1678de1bade203da1a342a11630725be6",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5c4f59952fb78b15a206eee7ad3260179df12776a44e28c53b2f84af76279630",
+      "app/slug_core_v2/src/runtime/source_service/failure.rs": "2de74ac11a738e890598945d7b5bfe4063664bf2281ee0b34b319a9b785e9870",
+      "app/slug_core_v2/src/runtime/source_service/failure/tests.rs": "6879c38c3c296af786b2d051e55b400642b1fa0811ae832e7d190012b34247df",
+      "app/slug_core_v2/src/runtime/source_service/http.rs": "704504187ee3d5574aed0e95531c563929fcae0cbaf3f46342f40f41d5cc4d6a",
+      "app/slug_core_v2/src/runtime/source_service/registry.rs": "014b040ca940d37d086f5ff6546dcabf5d18780fb6b16867c5ba345268d24515",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs": "a8a28481c79be7cbcb8492be1e98e247b196c00b5ae34c8b24ee8e0cef44f2a3",
+      "app/slug_core_v2/src/runtime/source_service/tests.rs": "a6daf392a53d05ee515931b26b4c0fa4e26c241c6b2ef65002cc7370b3c810a5",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "2465fff9e1467faeebd6a7902fdb99b5864b2ef2f25ce9ec9bac1c3cbf607ed2",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs": "adae1975f1a15a61385bd2239357992149126d8db3c29b658c8f3a2b7f4d559e",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "16820d42a9ecaa9a8088a6ea5c5e52b1bd541533b9ade1946f57afdb414da557",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "a35a3d6c8c922f27631786bce6c34e25bb415af1c9e4d57da2a56a3fd81d21d1",
+      "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "4646cf1654b0ad7b91487cd4bcfa9c66d6ea588f75389fb97c87929c79573029",
+      "app/slug_loading_v2/src/dependency_cycle.rs": "6506dbb40b11ed29bf260d9f54676381ef738c3d7ac9b4e175764803977a01a0",
+      "app/slug_loading_v2/src/dependency_cycle/mixed_bzl_tests.rs": "26cc7057034732234d113c846210b8191270c90dc9b7385efdaecc8acc579ea2",
+      "app/slug_loading_v2/src/dependency_cycle/tests.rs": "e126f9197b91d9af82bf290f48b96a7542947174cd30b914817d3dc9420ae29f",
+      "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+      "app/slug_loading_v2/src/module_extension.rs": "17c14557c46a84195c73d47d0b0cfb5ad44ef1b00313e42df2e2ae339a45d279",
+      "app/slug_loading_v2/src/module_extension/guest_namespace/compose.rs": "4baf52c3e48da6399e9852745dd99099b95ad365380b8a461e17e80e09442e11",
+      "app/slug_loading_v2/src/module_extension/runtime_sources.rs": "0a05ecce2c90b736fc619a0e39fb7f7571325fe406f1808f45d113293552d1b8",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/covered_tool.rs": "6e642a2a2dab1ef01173d3d4438e4d3ee8776b422c0ca0f3a6915b111ce16788",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/profile.rs": "5aa89f48f3695ed6e81e0dbe6c18d99ba7fdc5f891a58e450f96a72095ccf920",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/requests.rs": "15e3b4b7e431edc6cae9c3c3afcbe2a1abae2ba668e2b77ba6df31dced66ca69",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/test_fixture.rs": "e999fba1cfb7d87de610e16f0b732bf157b6a9688ed088cd0246a6891bc4b91a",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/tests.rs": "020a6217c5af1aeded7591f8b372ba2e5d1e84875399e1618979e035395b6e23",
+      "app/slug_loading_v2/src/module_extension/selected_source_preparation.rs": "ef0ce72bc3c55b4f13b3dae1a968f5ed8e6e3499273572e2839b057e97c3067f",
+      "app/slug_loading_v2/src/module_extension/selected_source_preparation/tests.rs": "0bb30d0e519eb5cdf797cf42f9c2471bcae44a782fa296f0341fe14f96829b1b",
+      "app/slug_workspace_v2/src/input_image/budget.rs": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb",
+      "app/slug_workspace_v2/src/input_image/budget/tests.rs": "cc2d3590a35b603a1dabf14d27436fd3dd33af07a92db5fd0a0a488338292035",
+      "app/slug_workspace_v2/src/input_image/tests.rs": "8b40dd9c7f68d374798e7cee27ebb4f4b10bf04fa6e7b53e4b61e155c8e2c7ea",
+      "scripts/v2_source_admission_supervisor.py": "820473bed16fbc137048966fa2860044d4bc78c975fb9ca8b4240418aa1bc1ff",
+      "scripts/v2_source_admission_supervisor_tests.py": "0f522d9d631e8cdd79d4ece1d7f3c1e9f5fbc355ab05e86fa537462b414eba57"
+    },
+    "prerequisite_hashes": {
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-contract.md": "8cd2a403a43957a3a5eb343a62ace41bfdda9e1dcc29973c63e138c6660d5ba6",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-config.md": "7827b9d2316b57061583614be8943bf4a663e20f16b5eb4a9ef132ed301bf60e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-input-pins.json": "82d080002035f958ef5f0bc446d4e5f7e25e24e82e2421972bb26451cf4f5a50",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-design.md": "056bed20499b06f17fe14cd33876a9b2ea825c9931277b78f16c6aaa08087fef",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-review.md": "ab26ec905d4d6657e30520e79c45f0cb83f9f5db0eacdff19cb7eb4bcb4f780e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-final-review.md": "5754097dc2d62cd11517a40c98ecc089bd5ba2adfa702224704b01066a02ec72",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-ignored-selection.json": "f32e3165b83baa7c1f98913edd9f8d237e0352ab0cb1cf6082457ff657650ee0",
+      "/run/media/system/Colossus/dev/slug/target/wp899/descriptor-workspace-tests.json": "6d9f37489ef48201f61a2b389b49384e1a53843fa852523a003ee4a7e1342742",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.json": "44d2da61bfa8ffe7628cd9039881166552951a8010ac5fd1f6bd8227f3367160",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.log": "c8dfc0fed97bf35283736aa461c09f858e7700a9f69472a6acf152504b5f859e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.json": "3dec95436651b3d4d6653ce2e71c449ddd2b07195532e8f60328182f1dae8abe",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.log": "b0f64927e4776fce2a2310607595810f23cc2dac272dddc801dd576daac6d3fb",
+      "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.json": "fdad80300e7e0ddb9d439cffd27330bb6454a1dbfa4c2af4c776f2275428de93",
+      "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_loading_v2-tests.json": "362a1f0471fe4d3cac50fc35d953b70dbe853743ac26a24c6b0453b3b545252b",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-receipt.json": "0faf35bc0b3892b57f2d2d1f7f028f4d65637316be910305ca95e658dadb1180",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-command.json": "047908f0991c2e6a501b41009a0fdcbec6e9f95ad8be2dffd0426589590cb7ad",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-evidence-review.md": "c17629b406b38a24e1dd526edabc27a536a1f7afc8277e7b69365a134cddcedf",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-format.json": "edb35ab45ea190401c1de16edd14fd65c4fb71aeb9d352f39fb30f418def3702",
+      "/run/media/system/Colossus/dev/slug/target/wp899/refusal-frontier-lifecycle-delta-review.md": "c5aa22a724d2b736bab6b6f6a8b2fd29484664657dfe0212265bc882e8aa8e7d",
+      "/run/media/system/Colossus/dev/slug/target/wp899/source-admission-supervisor-final-review.md": "c5755fc6e01b6fa00862ca9465cb45a0a08d761893a04f354dfeaab1e56b6e13",
+      "/run/media/system/Colossus/dev/slug/target/wp899/supervisor-sanity-3.log": "79867c0cd9974e1a55be89247687e88ad5f87b0ac39071a1ae0e0e05f95128f9",
+      "/run/media/system/Colossus/dev/slug/target/wp899/toolchain.json": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07",
+      "/run/media/system/Colossus/dev/slug/thoughts/shared/plans/slug-v2-subplans/wp899-typed-accounting-checkpoint-2026-10-03.json": "eb1fe71cdeb1a0f6068e3b560e8fd4aacd4aca2405d6b86ff23d363a3c0de155",
+      "target/wp899/genuine-root-network-contract.md": "00cad4b8baa0f057bfdbcad6c0b852600a020893f31bf422a57d1f676bf28d65",
+      "target/wp899/genuine-root-network-connectivity.json": "31c432cfd6ef3b889b2dd927a24434bd90998a3bf45988a88264ba279d47a388",
+      "target/wp899/genuine-root-disk-contract.md": "7afe3a46982771b9ad558e1f7feac160d415b69cb77927d48c5dd4c058101586",
+      "target/wp899/genuine-root-disk-current-source.json": "68ea1559ef70c8cccd10092931cd257f063496c97fece79f4ad88dba2d56fdde",
+      "target/wp899/disk-accounting-diagnostic-contract.md": "518c7fdbbb6316f1ed1209e013f50a2cac2332f26954c69abf8f92236d5f601a",
+      "target/wp899/disk-accounting-diagnostic-design-review.md": "c5f20cea21b62372b6cfd1d32c2f5eaf45f2b50663a79f4590d17cd1e7d76f15",
+      "target/wp899/disk-accounting-diagnostic-corrected-tests.json": "4b28f70a6a5571718898b9555e0940efa103927e8a565685645a7d4bff2ad4e0",
+      "target/wp899/disk-accounting-diagnostic-corrected-tests.log": "e200cbdcddf8046c7b6538b0d2edc1820ef872909b1c8c870d52a91e590f7496",
+      "target/wp899/disk-accounting-diagnostic-final-review.md": "86440cbb8f02917fd4040f490ddf152d508b57c9dd60470f38bab494c3f1454f",
+      "target/wp899/network-restored-socket-gates.json": "ef4d9c11521567acf4d1a9a855a8131b4cb2f6c67cdd891023fcee8db7636814",
+      "target/wp899/network-restored-socket-gates.log": "d5959950a180b549f8724c02382ee13781a9aeb8fdd61cd3bd02201bf4d28546",
+      "thoughts/shared/plans/slug-v2-subplans/wp899-network-recovery-2026-10-03.json": "675df1d29203505a62e8927efb17168a33f5fd7c0bcbe538a95b9dc0affbca64",
+      "target/wp899/genuine-root-quiescent-contract.md": "a024c9d57b190b0140f67e954dcdf34716ba64841ee0507b98660f7f2cd894e8",
+      "target/wp899/genuine-root-quiescent-contract-proposal.md": "7dad7012b07bc7dd5e7350c08043f1842adee8f9fb3d27f8d325d8c62d39e804",
+      "target/wp899/genuine-root-quiescent-current-source.json": "4541f03de799ffe67e1598fb22d61acd7af739a690ba661e0166a934b34978a0",
+      "target/wp899/disk-census-quiescence-contract.md": "99705ee71005d8554324a0f232da1970f5ca99777e37fa93d863e928af727a47",
+      "target/wp899/disk-census-quiescence-design-review.md": "34d40a9f23e983d5aa1a4ad3bfc439371377a465ca72c4729e7f1848110141d2",
+      "target/wp899/disk-census-quiescence-deadline-delta.md": "a89872e6d5ce9d10c9a6b80b9c17eb35589083b374bf1f45fc6ac5fb13a99219",
+      "target/wp899/disk-census-quiescence-tests.json": "caab436dc25338e2bf6d25bf344ac61dd8c43183ced618b16aa96e1e04f9b765",
+      "target/wp899/disk-census-quiescence-tests.log": "db6a5a1d45270b6f8284537a43370601f997db2893edb95ea82918b2afb2bba9",
+      "target/wp899/disk-census-quiescence-term-strengthened.json": "2f2e16fabe72160bb82d4bd3916201a8c7bd05523f83469f08035684ee3f31d2",
+      "target/wp899/disk-census-quiescence-term-strengthened.log": "548aeea8b649f8cd25134f94ec546adc06f0ec812b1a57ebd46334a068ff0ec9",
+      "target/wp899/disk-census-quiescence-final-review.md": "714e1146face25ab32353550bd089fc79089055442ee395125629b7d320974d0",
+      "target/wp899/disk-census-quiescence-test-final-review.md": "637bd427cceae09fc6dd145ca46069e45e592ad9c05dd5353eea61bfe5791e15",
+      "target/wp899/quiescence-protected-final-ast.json": "6fdf3532fd9528ebc1378feec068e959f22d19e1d79887f87b423bcb62269890",
+      "target/wp899/quiescence-tokio-audit.md": "8ef9180e6652a0adf5447b5cd084932239c25797d24443a565a71a10b98ac6e6",
+      "target/wp899/quiescence-tokio-build-plan.json": "0c5a5b709ef6c934196d9741eec32769c7407a22b3021757ea6baa8dc4d8db3e",
+      "target/wp899/quiescence-tokio-probe.rs": "f79b6a7fd8dc94d85a496cd0906200d08a39769534c2332d73e12ce58a5d46e4",
+      "target/wp899/quiescence-tokio-compile.json": "089993552c2284095676abaa9a51c5c5db73be53f73c8f0b3c41dfccb6d5d786",
+      "target/wp899/quiescence-tokio-run.json": "cdff19affde669a38dadfa1de4cb2bd9a71fbc6997fc81ea130a8093786264ef",
+      "target/wp899/quiescence-tokio-run.log": "7ea9f5b2795f001ea6794b10de6577b02ff96e1769ea67ce8053a15555f0c5ac",
+      "target/wp899/quiescence-child-boundary-audit.md": "320e579576fe9bd7b9f0d3c8ca895c3bd0bcfdae7d2fc781d00e1483ca226322",
+      "thoughts/shared/plans/slug-v2-subplans/wp899-disk-census-repair-2026-10-03.json": "f1f1c1f9f4073fa4e9efeb97046bfe13c9f9fd83c5bce31569232f759b9519c6"
+    },
+    "stage_parent": {
+      "path": "/tmp/slug-wp899-quiescent-parent-6c8y_7qc",
+      "device": 54,
+      "inode": 793160,
+      "uid": 1000,
+      "mode": "0o700",
+      "empty": true
+    },
+    "controls": {
+      "hard_address_space_bytes": 4294967296,
+      "sampled_rss_refusal_bytes": 4294967296,
+      "sampled_allocated_stage_disk_refusal_bytes": 6442450944,
+      "any_swap_or_descendant_or_accounting_loss_refuses": true,
+      "work_seconds": 27,
+      "cleanup_seconds": 3,
+      "terminal_seconds": 3,
+      "log_bytes": 1048576,
+      "same_immutable_deadlines_transport": true,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false,
+      "parent_death_signal": 9,
+      "confirmed_quiescent_census": true,
+      "census_seconds": 0.1,
+      "poll_seconds": 0.02,
+      "stop_time_charged_to_same_deadlines": true
+    },
+    "receipt_interpretation": "Ordered schema1, repeated nested_variant_code/tool rows preserved. Actual retained owner/native chosen error only; opaque/unknown/depth detail explicit. Settled lifetime maximum is admitted reservation-credit, not physical allocation/RSS/source-fit. status1 needs actual full normal source/shape/caller/restoration/engineDrop/clone-reader/lastDrop, not exit0 or samples. No historical40GB/process/fullruntime/query/bootstrap claim.",
+    "known_unproved": [
+      "Historical40GB workload attribution",
+      "Full loader/runtime closure and tool process/query/bootstrap",
+      "ActualRoot successful source/profile admission, private lease/clone read/lastDrop and coupled integration FINAL",
+      "Exact operation/errno of actual new disk census refusal until this ONE observation"
+    ],
+    "independent_final_reviews": {
+      "target/wp899/genuine-root-quiescent-caller-review.md": "5de7dc4e3c0eebe294be70778eec1026584e254ab35c6875d20764adb849bb1a",
+      "target/wp899/genuine-root-quiescent-supervisor-review.md": "a8ef003aabb75f965274c686e07106c69f3f4d075fa5c7c8ea9063acac7dcce1",
+      "target/wp899/genuine-root-quiescent-frontier-review.md": "c92866814889cb0a019a8b022c8dabc05af72aad5fbfbed4bbe7e99944282a0a"
+    },
+    "root_decision": "ONE newly selected actual observation after accepted complete bounded quiescent census; same fullcaller/Rustsource/artifact/inputs/caps, no automatic retries or loss skip.",
+    "global_actual_attempt": 5,
+    "new_contract_attempt": 1,
+    "prior_spent_evidence": {
+      "genuine-root-invocation-freeze.json": "d0eeb0ee779e39781d6b8d05f81bc53995d8f0423f36cf0c5aff03e2de21b476",
+      "genuine-root-attempt-ledger.json": "ac325f638dbb642664f058f25707ef39c308f9a18b51f02ec87562cb226ea34a",
+      "genuine-root-one-receipt.json": "3e4d2bba65b0cfe7181e90d4760df99a6325877fa9392099173eee736fbd0d8e",
+      "genuine-root-one.log": "c20d50c870a94c5e335cfebaef49c22335200a587cbd0d72b820b364611b0ec2",
+      "genuine-root-one-analysis.json": "2d01dfc30a26ac4f9839afec9a15999fda199a1ed8221996c274b59491510743",
+      "genuine-root-typed-invocation-freeze.json": "d04cad608e31fe8c7d3f18217b24d6bc16fb98355ac22ce0e5fc8d042d680af4",
+      "genuine-root-typed-attempt-ledger.json": "708482e7615c9be469d9645fa6918e5cb223f35099a0ba20360a5c54a85f8d71",
+      "genuine-root-typed-one-receipt.json": "d5f8a463fb675f4d8c52abfce145d94f6c7ce5bbf3f51d3523270651b1fd3aea",
+      "genuine-root-typed-one.log": "7989ca62c968f74c63b942d86b0a76a0009451a6d11dc4754f71874fd493f111",
+      "genuine-root-typed-one-analysis.json": "6f75e32161bb6f624ab961646cba55fd02074e71ad7fc4f2249c30f045464194",
+      "genuine-root-typed-parent-cleanup.json": "9737bfd2175e5f7c18ea9a8a1a584bf5f34c2ed115acce7ab7838423c66626c3",
+      "genuine-root-network-invocation-freeze.json": "44c496c752c53516745c1e87d35e2cfd3c3cc48fb32ca30e17b9d856cf1a8398",
+      "genuine-root-network-attempt-ledger.json": "4d0126fc14517905f881806bc97698201dfb7c66a460cc961d633eda62a642e3",
+      "genuine-root-network-one-receipt.json": "028e59f5dc1854e7fcf0569fb45db749a38373127ed22a7b3bf5a28ecc312f51",
+      "genuine-root-network-one.log": "9dee560219de158fdc60ff554723e5d119f27ab67381469664de68248d37e8d3",
+      "genuine-root-network-one-analysis.json": "d944d027a27159ad5131cc1da3a8dac984465e3eba2dcfdec4c7e296ca76ffef",
+      "genuine-root-network-parent-cleanup.json": "e278a895e04a9b6b9e6f7d11ebf1caf74e14a14ffba29c54811f639ae229667c",
+      "genuine-root-disk-invocation-freeze.json": "4f9a9b27156986445605c427d7d91ac4b0466437481574b47d0d1daa459f792e",
+      "genuine-root-disk-attempt-ledger.json": "766a38eff60f346bca26897e70897b8f1e301d45aa0d8d4008c89145256dd151",
+      "genuine-root-disk-one-receipt.json": "61e9ae01db0dd7bd502f28e2b118245ad43c5eb988d5c5a90e79af1657ba29cc",
+      "genuine-root-disk-one.log": "9dee560219de158fdc60ff554723e5d119f27ab67381469664de68248d37e8d3",
+      "genuine-root-disk-one-analysis.json": "e9d00359404745edd4b9df0a1cd5dcc1969577d89a4de891b650551d94ba368a",
+      "genuine-root-disk-raw-records.json": "189d1a57b2eb2d42540edfd673fae67071e49c6ed023623c108e0818b93eeb5f",
+      "genuine-root-disk-parent-cleanup.json": "ba5aebb6ab05cf266ed53ea02bb569494a5b553b6b857fa77bc8d4f50ab9e4bc",
+      "genuine-root-disk-terminal-record-audit.md": "59eb5ca42f01fc1115b834fa3632afea80b2acc66d17f776804700f9d08d260b",
+      "genuine-root-disk-terminal-supervisor-review.md": "3ce30a31ff3cdd6ee933bb7e358a3fa00abbbc454562ade3f59a338b8001afcf",
+      "genuine-root-disk-terminal-frontier-review.md": "4423d0c7f09bb475f393b98521c9d7ca9cdb10be91e48681b855ef62709471aa"
+    },
+    "output_paths_absent": [
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-invocation-freeze.json",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-attempt-ledger.json",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one-receipt.json",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one.log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one-analysis.json",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-raw-records.json"
+    ],
+    "reviewed_draft_sha256": "0632399b56b45a622050ed79ecbd3740e7a208beb1d8fbf801eac85316f9d6e6"
+  },
+  "ledger": {
+    "schema": 1,
+    "freeze_sha256": "3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d",
+    "global_actual_attempt": 5,
+    "new_contract_attempt": 1,
+    "state": "TERMINAL_NO_RETRY",
+    "command": [
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor.py",
+      "--stage-parent",
+      "/tmp/slug-wp899-quiescent-parent-6c8y_7qc",
+      "--receipt",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one-receipt.json",
+      "--log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-quiescent-one.log",
+      "--",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "--ignored",
+      "--exact",
+      "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "prelaunch_source_prereq_review_spent_artifact_python_input6_parent_outputs_clean_no_overlap_verified": true,
+    "wrapper_exit_code": 1,
+    "wrapper_elapsed_seconds": 1.6164552129921503,
+    "supervisor_stdout_bytes": 0,
+    "supervisor_stderr_bytes": 0
+  },
+  "supervisor_terminal": {
+    "schema": 1,
+    "limit_kind": "RLIMIT_AS",
+    "address_space_limit_bytes": 4294967296,
+    "address_space_limit_verified": true,
+    "parent_death_signal_verified": true,
+    "sampled_rss_limit_bytes": 4294967296,
+    "sampled_disk_limit_bytes": 6442450944,
+    "sampled_rss_peak_bytes": 75767808,
+    "sampled_swap_peak_bytes": 0,
+    "sampled_disk_peak_bytes": 4096,
+    "sampled_logical_disk_peak_bytes": 3340,
+    "samples": 68,
+    "poll_interval_seconds": 0.02,
+    "census_deadline_seconds": 0.1,
+    "census_cycle_attempts": 68,
+    "census_cycle_completions": 68,
+    "census_cycle_total_ns": 167439745,
+    "census_cycle_max_ns": 3972449,
+    "census_resume_failures": 0,
+    "elapsed_seconds": 1.573573539,
+    "work_seconds": 27.0,
+    "cleanup_seconds": 3.0,
+    "terminal_seconds": 3.0,
+    "unexpected_descendants": 0,
+    "child_exit_code": 101,
+    "refusal": "child_exit_nonzero",
+    "term_sent": false,
+    "kill_sent": false,
+    "joined": true,
+    "stage_removed": true,
+    "diagnostic_log_bytes": 3340,
+    "diagnostic_log_preserved": true,
+    "diagnostic_log_limit_bytes": 1048576,
+    "terminal_cleanup_exhausted": false,
+    "supervision_ok": false,
+    "source_gate_verified": false,
+    "disk_failure_site": 0,
+    "disk_failure_origin": 0,
+    "disk_failure_errno": null,
+    "kernel_rss_quota": false,
+    "swap_disabled": false,
+    "disk_quota": false
+  },
+  "ordered_terminal_log": "\nrunning 1 test\ntest runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission ... SLUG_SOURCE_ADMISSION schema=1\nSLUG_SOURCE_ADMISSION work_deadline_monotonic_ns=306244380299822\nSLUG_SOURCE_ADMISSION cleanup_deadline_monotonic_ns=306247380299822\nSLUG_SOURCE_ADMISSION full_runtime_closure_proved=0\nSLUG_SOURCE_ADMISSION process_execution_proved=0\nSLUG_SOURCE_ADMISSION historical_memory_attribution_proved=0\nSLUG_SOURCE_ADMISSION progress_rounds=0\nSLUG_SOURCE_ADMISSION owner_refreshes=0\nSLUG_SOURCE_ADMISSION reached_capture=0\nSLUG_SOURCE_ADMISSION completed_capture=0\nSLUG_SOURCE_ADMISSION stage_containment_proved=0\nSLUG_SOURCE_ADMISSION stage_paths_observed=0\nSLUG_SOURCE_ADMISSION no_containment_violation_observed=1\nSLUG_SOURCE_ADMISSION snapshot_restoration_proved=1\nSLUG_SOURCE_ADMISSION raw_restoration_proved=1\nSLUG_SOURCE_ADMISSION engine_retired=1\nSLUG_SOURCE_ADMISSION first_poison_code=7\nSLUG_SOURCE_ADMISSION poison_observation_before_close=1\nSLUG_SOURCE_ADMISSION source_counters_sampled=1\nSLUG_SOURCE_ADMISSION registry_attempts=128\nSLUG_SOURCE_ADMISSION registry_bytes=234593\nSLUG_SOURCE_ADMISSION source_attempts=0\nSLUG_SOURCE_ADMISSION transferred_bytes=0\nSLUG_SOURCE_ADMISSION decoded_bytes=0\nSLUG_SOURCE_ADMISSION written_bytes=0\nSLUG_SOURCE_ADMISSION live_source_buffer_bytes=0\nSLUG_SOURCE_ADMISSION source_buffer_peak_bytes=9961961\nSLUG_SOURCE_ADMISSION descriptor_phase_sample_lower_bound=0\nSLUG_SOURCE_ADMISSION outer_error_code=4\nSLUG_SOURCE_ADMISSION nested_owner_error_observed=1\nSLUG_SOURCE_ADMISSION nested_owner_error_category=5\nSLUG_SOURCE_ADMISSION nested_owner_refusal_site=2\nSLUG_SOURCE_ADMISSION nested_refusal_termination=1\nSLUG_SOURCE_ADMISSION nested_variant_path_complete=1\nSLUG_SOURCE_ADMISSION nested_variant_code_count=7\nSLUG_SOURCE_ADMISSION nested_variant_code=6\nSLUG_SOURCE_ADMISSION nested_variant_code=12\nSLUG_SOURCE_ADMISSION nested_variant_code=17\nSLUG_SOURCE_ADMISSION nested_variant_code=42\nSLUG_SOURCE_ADMISSION nested_variant_code=54\nSLUG_SOURCE_ADMISSION nested_variant_code=66\nSLUG_SOURCE_ADMISSION nested_variant_code=167\nSLUG_SOURCE_ADMISSION nested_native_detail_observed=1\nSLUG_SOURCE_ADMISSION nested_native_cause_present=1\nSLUG_SOURCE_ADMISSION nested_native_site=20\nSLUG_SOURCE_ADMISSION nested_native_detail_kind=4\nSLUG_SOURCE_ADMISSION nested_native_io_kind=0\nSLUG_SOURCE_ADMISSION nested_native_errno_present=0\nSLUG_SOURCE_ADMISSION nested_native_errno_negative=0\nSLUG_SOURCE_ADMISSION nested_native_errno_magnitude=0\nSLUG_SOURCE_ADMISSION nested_native_status_present=0\nSLUG_SOURCE_ADMISSION nested_native_status=0\nSLUG_SOURCE_ADMISSION nested_native_protocol=0\nSLUG_SOURCE_ADMISSION nested_native_scope=7\nSLUG_SOURCE_ADMISSION nested_native_scope_counter_present=1\nSLUG_SOURCE_ADMISSION nested_native_scope_counter=1\nSLUG_SOURCE_ADMISSION nested_frontier_proof_missing=0\nSLUG_SOURCE_ADMISSION descriptor_reserved_highwater_bytes=442387\nSLUG_SOURCE_ADMISSION descriptor_reserved_highwater_settled=1\nSLUG_SOURCE_ADMISSION descriptor_exact_peak_proved=1\nSLUG_SOURCE_ADMISSION status=0\nError: \"actual source admission refused\"\nFAILED\n\nfailures:\n\nfailures:\n    runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission\n\ntest result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 721 filtered out; finished in 1.55s\n\n",
+  "ordered_numeric_records": {
+    "schema": 1,
+    "log_sha256": "2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de",
+    "known_exact_heading_stripped": true,
+    "records": [
+      {
+        "line": 3,
+        "key": "schema",
+        "value": "1"
+      },
+      {
+        "line": 4,
+        "key": "work_deadline_monotonic_ns",
+        "value": "306244380299822"
+      },
+      {
+        "line": 5,
+        "key": "cleanup_deadline_monotonic_ns",
+        "value": "306247380299822"
+      },
+      {
+        "line": 6,
+        "key": "full_runtime_closure_proved",
+        "value": "0"
+      },
+      {
+        "line": 7,
+        "key": "process_execution_proved",
+        "value": "0"
+      },
+      {
+        "line": 8,
+        "key": "historical_memory_attribution_proved",
+        "value": "0"
+      },
+      {
+        "line": 9,
+        "key": "progress_rounds",
+        "value": "0"
+      },
+      {
+        "line": 10,
+        "key": "owner_refreshes",
+        "value": "0"
+      },
+      {
+        "line": 11,
+        "key": "reached_capture",
+        "value": "0"
+      },
+      {
+        "line": 12,
+        "key": "completed_capture",
+        "value": "0"
+      },
+      {
+        "line": 13,
+        "key": "stage_containment_proved",
+        "value": "0"
+      },
+      {
+        "line": 14,
+        "key": "stage_paths_observed",
+        "value": "0"
+      },
+      {
+        "line": 15,
+        "key": "no_containment_violation_observed",
+        "value": "1"
+      },
+      {
+        "line": 16,
+        "key": "snapshot_restoration_proved",
+        "value": "1"
+      },
+      {
+        "line": 17,
+        "key": "raw_restoration_proved",
+        "value": "1"
+      },
+      {
+        "line": 18,
+        "key": "engine_retired",
+        "value": "1"
+      },
+      {
+        "line": 19,
+        "key": "first_poison_code",
+        "value": "7"
+      },
+      {
+        "line": 20,
+        "key": "poison_observation_before_close",
+        "value": "1"
+      },
+      {
+        "line": 21,
+        "key": "source_counters_sampled",
+        "value": "1"
+      },
+      {
+        "line": 22,
+        "key": "registry_attempts",
+        "value": "128"
+      },
+      {
+        "line": 23,
+        "key": "registry_bytes",
+        "value": "234593"
+      },
+      {
+        "line": 24,
+        "key": "source_attempts",
+        "value": "0"
+      },
+      {
+        "line": 25,
+        "key": "transferred_bytes",
+        "value": "0"
+      },
+      {
+        "line": 26,
+        "key": "decoded_bytes",
+        "value": "0"
+      },
+      {
+        "line": 27,
+        "key": "written_bytes",
+        "value": "0"
+      },
+      {
+        "line": 28,
+        "key": "live_source_buffer_bytes",
+        "value": "0"
+      },
+      {
+        "line": 29,
+        "key": "source_buffer_peak_bytes",
+        "value": "9961961"
+      },
+      {
+        "line": 30,
+        "key": "descriptor_phase_sample_lower_bound",
+        "value": "0"
+      },
+      {
+        "line": 31,
+        "key": "outer_error_code",
+        "value": "4"
+      },
+      {
+        "line": 32,
+        "key": "nested_owner_error_observed",
+        "value": "1"
+      },
+      {
+        "line": 33,
+        "key": "nested_owner_error_category",
+        "value": "5"
+      },
+      {
+        "line": 34,
+        "key": "nested_owner_refusal_site",
+        "value": "2"
+      },
+      {
+        "line": 35,
+        "key": "nested_refusal_termination",
+        "value": "1"
+      },
+      {
+        "line": 36,
+        "key": "nested_variant_path_complete",
+        "value": "1"
+      },
+      {
+        "line": 37,
+        "key": "nested_variant_code_count",
+        "value": "7"
+      },
+      {
+        "line": 38,
+        "key": "nested_variant_code",
+        "value": "6"
+      },
+      {
+        "line": 39,
+        "key": "nested_variant_code",
+        "value": "12"
+      },
+      {
+        "line": 40,
+        "key": "nested_variant_code",
+        "value": "17"
+      },
+      {
+        "line": 41,
+        "key": "nested_variant_code",
+        "value": "42"
+      },
+      {
+        "line": 42,
+        "key": "nested_variant_code",
+        "value": "54"
+      },
+      {
+        "line": 43,
+        "key": "nested_variant_code",
+        "value": "66"
+      },
+      {
+        "line": 44,
+        "key": "nested_variant_code",
+        "value": "167"
+      },
+      {
+        "line": 45,
+        "key": "nested_native_detail_observed",
+        "value": "1"
+      },
+      {
+        "line": 46,
+        "key": "nested_native_cause_present",
+        "value": "1"
+      },
+      {
+        "line": 47,
+        "key": "nested_native_site",
+        "value": "20"
+      },
+      {
+        "line": 48,
+        "key": "nested_native_detail_kind",
+        "value": "4"
+      },
+      {
+        "line": 49,
+        "key": "nested_native_io_kind",
+        "value": "0"
+      },
+      {
+        "line": 50,
+        "key": "nested_native_errno_present",
+        "value": "0"
+      },
+      {
+        "line": 51,
+        "key": "nested_native_errno_negative",
+        "value": "0"
+      },
+      {
+        "line": 52,
+        "key": "nested_native_errno_magnitude",
+        "value": "0"
+      },
+      {
+        "line": 53,
+        "key": "nested_native_status_present",
+        "value": "0"
+      },
+      {
+        "line": 54,
+        "key": "nested_native_status",
+        "value": "0"
+      },
+      {
+        "line": 55,
+        "key": "nested_native_protocol",
+        "value": "0"
+      },
+      {
+        "line": 56,
+        "key": "nested_native_scope",
+        "value": "7"
+      },
+      {
+        "line": 57,
+        "key": "nested_native_scope_counter_present",
+        "value": "1"
+      },
+      {
+        "line": 58,
+        "key": "nested_native_scope_counter",
+        "value": "1"
+      },
+      {
+        "line": 59,
+        "key": "nested_frontier_proof_missing",
+        "value": "0"
+      },
+      {
+        "line": 60,
+        "key": "descriptor_reserved_highwater_bytes",
+        "value": "442387"
+      },
+      {
+        "line": 61,
+        "key": "descriptor_reserved_highwater_settled",
+        "value": "1"
+      },
+      {
+        "line": 62,
+        "key": "descriptor_exact_peak_proved",
+        "value": "1"
+      },
+      {
+        "line": 63,
+        "key": "status",
+        "value": "0"
+      }
+    ],
+    "singleton_numeric": {
+      "schema": 1,
+      "work_deadline_monotonic_ns": 306244380299822,
+      "cleanup_deadline_monotonic_ns": 306247380299822,
+      "full_runtime_closure_proved": 0,
+      "process_execution_proved": 0,
+      "historical_memory_attribution_proved": 0,
+      "progress_rounds": 0,
+      "owner_refreshes": 0,
+      "reached_capture": 0,
+      "completed_capture": 0,
+      "stage_containment_proved": 0,
+      "stage_paths_observed": 0,
+      "no_containment_violation_observed": 1,
+      "snapshot_restoration_proved": 1,
+      "raw_restoration_proved": 1,
+      "engine_retired": 1,
+      "first_poison_code": 7,
+      "poison_observation_before_close": 1,
+      "source_counters_sampled": 1,
+      "registry_attempts": 128,
+      "registry_bytes": 234593,
+      "source_attempts": 0,
+      "transferred_bytes": 0,
+      "decoded_bytes": 0,
+      "written_bytes": 0,
+      "live_source_buffer_bytes": 0,
+      "source_buffer_peak_bytes": 9961961,
+      "descriptor_phase_sample_lower_bound": 0,
+      "outer_error_code": 4,
+      "nested_owner_error_observed": 1,
+      "nested_owner_error_category": 5,
+      "nested_owner_refusal_site": 2,
+      "nested_refusal_termination": 1,
+      "nested_variant_path_complete": 1,
+      "nested_variant_code_count": 7,
+      "nested_native_detail_observed": 1,
+      "nested_native_cause_present": 1,
+      "nested_native_site": 20,
+      "nested_native_detail_kind": 4,
+      "nested_native_io_kind": 0,
+      "nested_native_errno_present": 0,
+      "nested_native_errno_negative": 0,
+      "nested_native_errno_magnitude": 0,
+      "nested_native_status_present": 0,
+      "nested_native_status": 0,
+      "nested_native_protocol": 0,
+      "nested_native_scope": 7,
+      "nested_native_scope_counter_present": 1,
+      "nested_native_scope_counter": 1,
+      "nested_frontier_proof_missing": 0,
+      "descriptor_reserved_highwater_bytes": 442387,
+      "descriptor_reserved_highwater_settled": 1,
+      "descriptor_exact_peak_proved": 1,
+      "status": 0
+    },
+    "ordered_variant_codes": [
+      6,
+      12,
+      17,
+      42,
+      54,
+      66,
+      167
+    ]
+  },
+  "interpretation": {
+    "schema": 1,
+    "global_actual_attempt": 5,
+    "new_contract_attempt": 1,
+    "result": "ACTUAL_SELECTED_REGISTRY_SCOPE_LIMIT_REFUSAL_UNACCEPTED_NO_RETRY",
+    "harness_records_count": 61,
+    "unique_keys": 55,
+    "frozen_source_decoding": {
+      "outer": "Computation",
+      "owner": "SourceSelection",
+      "owner_site": "MappingSemantic",
+      "termination": "Classified",
+      "variant_path_complete": true,
+      "ordered_variant_codes": [
+        6,
+        12,
+        17,
+        42,
+        54,
+        66,
+        167
+      ],
+      "ordered_variant_labels": [
+        "RootMappingPredecessor",
+        "ExtensionMappingsRoutes",
+        "RoutesGraph",
+        "GraphDiscoveryLeaf",
+        "DiscoverySourcePreparation",
+        "ModuleSourceRegistryFile",
+        "RegistryFileTransport"
+      ],
+      "native": {
+        "site_code": 20,
+        "site": "Scope",
+        "detail_code": 4,
+        "detail": "Scope",
+        "scope_code": 7,
+        "scope": "Limit",
+        "counter_present": true,
+        "counter_code": 1,
+        "counter": "RegistryAttempts",
+        "errno": null,
+        "http_status": null
+      },
+      "first_scope_poison": "Limit (7), counter identity supplied by selected actual native cause, not poison-only inference",
+      "attempt_identity_cardinality_duplicate_status": "unobserved; counters alone cannot identify genuine unique demand versus repeated/redirected work"
+    },
+    "restoration": {
+      "accepted_snapshot": true,
+      "all7_raw_request_values": true,
+      "actual_engine_arc_retired": true
+    },
+    "descriptor_reservation_evidence": {
+      "exact_settled": true,
+      "peak_bytes": 442387,
+      "peak_kib": 432.0185546875,
+      "scope": "Actual same diagnostic bank lifetime admitted reservation credits; includes headers/capacity/conversion overlap/receipt; not heap or RSS",
+      "final_used_zero_not_claimed": true
+    },
+    "source_positive_gates": {
+      "admitted_capture": false,
+      "stage_containment": false,
+      "query_shape": false,
+      "actual_current_source_identity": false,
+      "clone_reads_last_drop": false
+    },
+    "source_counters": {
+      "registry_attempts": 128,
+      "registry_bytes": 234593,
+      "source_attempts": 0,
+      "transferred_bytes": 0,
+      "decoded_bytes": 0,
+      "written_bytes": 0,
+      "live_source_buffer_bytes": 0,
+      "source_buffer_peak_bytes": 9961961
+    },
+    "source_capture_reached": false,
+    "source_capture_completed": false,
+    "sampled_peak_rss_mib": 72.2578125,
+    "sampled_peaks_scope": "68complete samples of refused preparatory workload, not full workload/40GB/sourcefit",
+    "quiescent_census_complete": true,
+    "whole_wp899_accepted": false,
+    "historical_40gb_attributed": false,
+    "automatic_retry": false,
+    "older_terminal_reclassification": false,
+    "next_action": "source-owned cardinality/charge/redirect/graph demand audit before selecting any correction; no cap growth or automatic retry"
+  },
+  "parent_cleanup": {
+    "schema": 1,
+    "parent": "/tmp/slug-wp899-quiescent-parent-6c8y_7qc",
+    "device": 54,
+    "inode": 793160,
+    "uid": 1000,
+    "mode": "0o700",
+    "joined_before_cleanup": true,
+    "stage_removed_before_cleanup": true,
+    "all3_terminal_reviews_checked": {
+      "genuine-root-quiescent-terminal-record-audit.md": "a21fd592ec5c522739ebaf588531e1561d4ce82c86bd5d6d21dfb416a8650405",
+      "genuine-root-quiescent-terminal-supervisor-review.md": "7824c2126bcd7edf204edfe860bb3f062dd454bae851279cfe9c2f069d189103",
+      "genuine-root-quiescent-terminal-frontier-review.md": "d27ab81c764e53be7e1bef64be2ea701719b54060b12cceb32a751168362eb9c"
+    },
+    "empty_only_removed": true
+  },
+  "independent_terminal_reviews": {
+    "genuine-root-quiescent-terminal-record-audit.md": "# WP899 global5 quiescent observation \u2014 terminal records FINAL ACCEPT\n\n**FINAL ACCEPT for the literal ordered terminal evidence and unchanged caller/input/source association only.** Global5/newcontract1 is TERMINAL_NO_RETRY; source admission and fullWP899 remain UNACCEPTED. No old DNS/accounting cause is retrospectively classified, and no future attempt/cap change is authorized.\n\n## Immutable association and parser check\n\nFrozen invocation SHA3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d binds independently reviewed draft0632399b56b45a622050ed79ecbd3740e7a208beb1d8fbf801eac85316f9d6e6, exact caller/current104-source map, six inputs, artifact76de8b..., Python1643dac..., 56 prerequisites,27 old spent references and three eligibility reviews. All were rehashed with zero differences; live input lengths/digests remain exact. No env/config values were inspected. Ledger SHAb08ad3901f11bfec8903ed6e3d3e1b9c245af7a127bb2a621944b94f532fae4c matches frozen command, global5/local1 and TERMINAL_NO_RETRY, wrapper exit1/1.616455213s; stdout/stderr0B outside preserved child log.\n\nLog SHA2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de is3340B. Independent literal parser removes ONLY exact libtest-heading prefix on line3, then retains every numeric SLUG_SOURCE_ADMISSION key=value record in order and with original line number. Exactly61 records/55 keys; sole repeated key nested_variant_code occurs seven times, order6,12,17,42,54,66,167. All other numeric keys occur once. Parsed list equals raw-records SHA f6ed0a1a6e0f642121a2b4c6182f677744db41bf6d9ceeb8e51bc0e684702290 and analysis ordered list exactly. Analysis SHAa8788d1dea74b7aa0de2c1aea748417683f32d0b78574cc69c83c6c4a0fa433f evidence hashes/supervisor also match; raw log SHA matches. Failure footer literal0passed/1failed/0ignored,1.55s, follows status0, not success.\n\n## Actual selected owner/native failure, not coincident poison\n\nFrozen codebook in selected_source_refusal.rs:73\u201384,109\u2013133,234 decodes complete seven-row predecessor path as RootMappingPredecessor\u2192ExtensionMappingsRoutes\u2192RoutesGraph\u2192GraphDiscoveryLeaf\u2192DiscoverySourcePreparation\u2192ModuleSourceRegistryFile\u2192RegistryFileTransport. Outer4 is Computation; owner category5 is SourceSelection, site2 MappingSemantic; termination1 Classified, path-complete1/count7. RegistryRefusalSite::Scope code20 (registry_dice/refusal.rs:131); detail-kind4 Scope, scope-code7 Limit, counter-present1/code1 RegistryAttempts (:186,207,220). Native IO-kind/errno/status/protocol zeros are absent/unselected, **not DNS/IO success or errno0**. The typed cause belongs to the actually retained selected transport error, not an unrelated earlier trace. SourceTransportFailure::scope in Core source_service/failure.rs:44\u201351 and scope_failure:143+ preserve Limit(counter) exactly.\n\nSourceServiceScope::charge at scope.rs:231\u2013255 refuses next>maximum before updating counter. Registry default ceiling128 at:30\u201341; ScopedRegistryIo read_exact/read_local_exact (:102\u2013144) charge before address/open/HTTP. Thus128 is successfully admitted logical registry-IO entry charges; at least one further attempt charge was rejected with selected Limit(RegistryAttempts). This is not128 distinct requests,128 successful MODULEs,128 connections or proof of a duplicate loop. The counter alone does not identify request/address/status; subsequent poisoned operations may carry the same first limit cause.\n\nFirstpoison7/source-counters-sampled1/poison-observation-before-close1 corroborate actual scope state, but poison7 alone would not identify the counter; the selected typed cause supplies RegistryAttempts. RegistryBytes234593 counts admitted buffer append bytes, not proof that every result became an accepted complete module. SourceAttempts0, transfer/decode/write0 show no archive/generated/selected acquisition charged; **registry reads did occur**, so this is not a blanket no-source-IO claim. Live owned temporary buffer0 at sample, peak9961961B; no full-RSS/binary payload/source-fit interpretation.\n\n## Lifecycle and bounded resource observations\n\nSnapshot restoration1, all7 raw restoration1, engine-retired1 are observed on this failure path. Progress-rounds/owner-refreshes/captures/stage-path-visits0; no-containment-violation1 is vacuous with zero visits, while stage-containment-proved correctly0. Query/normal retained source identity/clone-read/lastDrop/full runtime/process/historical-memory proofs remain absent. Descriptor highwater442387B with settled1/exact-peak1 is actual service-bank admitted reservation-credit lifetime evidence, not heap/RSS; final budget-used-zero is not claimed.\n\nSupervisor receipt SHA604d30c2c7ce3385611465127ea888015182fa66b98c02ac8b3e23b3138c8fc1: child101, no TERM/KILL, refusal child_exit_nonzero, supervision/sourcegate false. Guard+hard4GiBAS verified;68/68 fresh census cycles, zero resume failures/descendants/accounting detail, total167.439745ms/max3.972449ms, elapsed1.573573539s. Actual root joined and private stage removed; log preserved without truncation. SampledRSS75767808B=72.2578125MiB, swap0, allocated private disk4096B/logical3340B across68 complete samples are this refused preparatory workload only. No hardRSS/no-swap/diskquota, whole-build peak fit or historical40GB conclusion follows.\n\nExact operational parent remains canonical /tmp/slug-wp899-quiescent-parent-6c8y_7qc, dev54/inode793160/UID1000/0700 and empty at review. No cleanup was performed here; Root retains parent until all three terminal reviews, then may remove only that exact empty owner. All old27 references unchanged. Reviewer ran only literal source/hash/JSON/parent metadata reads, not Cargo, runtime/network/source acquisition, env/config capture, tests, retry or cleanup.\n\n## Next concrete source hypothesis\n\nCompanion registry-attempt-demand-audit.md finds162 non-absent distinct MODULE version hash rows in the pinned lock; selected graph discovers requested versions before resolution, deduplicating full keys. Legitimate discovery cardinality beyond128 is therefore plausible, not proved for this run; duplicate/request identity remains unobserved. No implementation fix or limit increase is justified solely by this terminal. Next discriminating source-owner work must separate full normal requested module/version identity from repeats/transport entry calls without bypassing normal registry/checksum/owner semantics. The spent actual contract cannot be reused.\n",
+    "genuine-root-quiescent-terminal-supervisor-review.md": "# FINAL terminal supervisor review \u2014 global5/local1\n\nACCEPT terminal evidence integrity, observed bounded supervision, actual join and child-stage cleanup only. The ONE attempt is spent: TERMINAL_NO_RETRY. WP899, source-fit, full runtime/query/generate/bootstrap and historical40GB attribution remain unaccepted. No further execution, acquisition, cleanup or source mutation was performed by this reviewer.\n\nExact freeze SHA256 `3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d` reconciles reviewed draft `0632399b56b45a622050ed79ecbd3740e7a208beb1d8fbf801eac85316f9d6e6` and all three independent eligibility reviews. Independently reread/hash-checked104 source pins,56 prerequisites,27 prior spent references, exact Python1643/Core76de artifact, and terminal evidence hashes. No mismatches. Ledger command remains the exact selected ignored test under the reviewed supervisor, global5/local1/budget1; wrapper1, child101. Prior spent observations remain unchanged, without cause reclassification.\n\nSupervisor receipt: elapsed1.573573539s (wrapper1.616455213s),68 attempts/68 completed censuses, zero resume failures, total167439745ns/max3972449ns census time. No TERM/KILL, no observed descendants, actual joined=true and stage_removed=true. Verified RLIMIT_AS4294967296B and parent-death guard; sampled peaks RSS75767808B (72.2578125MiB), swap0, allocated disk4096B/logical3340B. Diagnostic log3340B preserved under1MiB. No accounting failure detail, no terminal-cleanup exhaustion. Inherited27+3+3 clocks,20ms polling,100ms stop/scan/resume bound and6GiB sampled disk limit remain unchanged. Quiescence source retains fresh consumed stop acknowledgment/CONT obligation, first-refusal preservation, and join-before-FD cleanup. These successful cycles establish this observation's census completion, not generic syscall transparency or kernel RSS/disk/swap quotas.\n\nThe pinned operational parent remains an actual non-symlink empty0700 directory, dev54/ino793160/UID1000, at `/tmp/slug-wp899-quiescent-parent-6c8y_7qc`. No parent removal by reviewer. Root may remove only this exact pinned empty parent after all terminal audits.\n\nActual log/raw records retain61 ordered numeric records (55 unique keys; ordered repeated variant codes preserved). Child reports status0, outerComputation4, selected complete SourceSelection\u2192RegistryFileTransport path, native Scope20/detailScope4/Limit7/counterRegistryAttempts1, first poison7 observed before close.128 admitted registry-attempt charges and234593 registry bytes; source attempts/transfer/decode/write0 and no capture reached/completed. Buffer reservation highwater9961961B/live0. Accepted snapshot and all seven raw values restored; engine retired. Settled exact descriptor reservation highwater442387B is admitted-credit accounting, not heap/RSS. Source identity/query roles/containment/captured clone reads/lastDrop positive gates remain unproved. Neither low sampled RSS nor healthy census can turn the refused preparatory workload into full-workload memory fit.\n\nTerminal hashes: ledger `b08ad3901f11bfec8903ed6e3d3e1b9c245af7a127bb2a621944b94f532fae4c`; receipt `604d30c2c7ce3385611465127ea888015182fa66b98c02ac8b3e23b3138c8fc1`; log `2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de`; raw `f6ed0a1a6e0f642121a2b4c6182f677744db41bf6d9ceeb8e51bc0e684702290`; analysis `a8788d1dea74b7aa0de2c1aea748417683f32d0b78574cc69c83c6c4a0fa433f`.\n",
+    "genuine-root-quiescent-terminal-frontier-review.md": "# WP899 global5 quiescent actual terminal \u2014 independent FINAL frontier\n\n**ACCEPT the bounded terminal interpretation; whole WP899 remains unaccepted.** Global actual attempt5/local attempt1 is spent under immutable freeze SHA256 `3985001b6aa101b3fa5133c2025583b9e1d978768ffbefa69e7762fa23c64f4d` and `TERMINAL_NO_RETRY`. This is not source-admission success, memory fit, a repair authorization or another invocation. No execution, tests, Cargo, network, source/config/environment inspection, implementation edit or cleanup occurred in this review.\n\nThe frozen source hashes still match all104 files. The analysis's five linked evidence hashes match the actual freeze, ledger, receipt, log and raw records. Log SHA256 is `2997559344897d63b4eb36a2787e3822dd2cb283b977089c290cb0322bed08de`, size3340 bytes. Independent saved-data extraction strips only the exact frozen selector heading and reproduces all61 ordered records at their original line positions, with55 distinct keys; the sole repeated key is the seven `nested_variant_code` rows. Numeric values are complete unsigned decimal u64, not parsed from libtest refusal text. Schema/status and other singleton cardinalities are valid. Parent remains the exact empty non-symlink0700 directory dev54/ino793160/UID1000; it was not removed by this reviewer.\n\n## Reached actual semantic/native frontier\n\nStatus0 and outer4 identify the actual Computation error. The frozen `refusal_receipt::emit` follows the returned bounded anyhow chain to the retained `SelectedPreparationOwnerError`, not a transport side log or timing inference. Owner observed1/category5/site2 is SourceSelection at MappingSemantic. Termination1/Classified, path-complete1 and frontier-proof-missing0 agree with the producer-owned projection.\n\nOrdered path `6,12,17,42,54,66,167` decodes to RootMappingPredecessor \u2192 ExtensionMappingsRoutes \u2192 RoutesGraph \u2192 GraphDiscoveryLeaf \u2192 DiscoverySourcePreparation \u2192 ModuleSourceRegistryFile \u2192 RegistryFileTransport. The owning borrowed projection matches preserve each selected child in this order. Seven is within the16-code bound; this is not Unknown, DepthLimit or an opaque terminal masquerading as a complete native cause.\n\nThe actual transported optional cause is present1, native site20/Scope, detail4/Scope, scope7/Limit, counter-present1/counter1/RegistryAttempts and detail-observed1. Its counter identity is supplied by the selected typed cause, not inferred from first_poison7 or registry_attempts128. Unrelated IO/status/protocol fields are zero with errno/status presence0: no native errno, HTTP status, DNS failure, permission restriction or network actor is observed here. Sticky first scope poison7 is an independent observed Limit marker consistent with this cause.\n\nThe observed source counters are128 admitted registry attempt charges and234593 admitted registry bytes; source_attempts, transferred/decoded/written source bytes and live temporary-buffer credit are0. Temporary-buffer reservation peak is9,961,961 bytes. The fixed registry charge implementation admits an increment only when next<=128 and preserves the last admitted count on refusal; therefore128 is admitted work, not the number of completed HTTP requests or exact total invocation attempts including denied calls. Existing poison can also propagate through later calls. The terminal does not identify unique URLs/modules, retries, duplicates, redirects, call-site cardinality, successful-versus404/failed distributions or which concurrent request first exceeded the budget. Those require a source-owned request/charge audit before any correction; counts do not justify raising limits or memoizing failures.\n\n## Restoration and metric evidence\n\nSnapshot-restoration1, raw-restoration1 and engine-retired1 are positive observations from the reviewed observer. Its exact prior accepted fields/idle state and seven raw caller producers are checked; raw transaction drop and wait_for_idle precede engine retirement. This evidence does not imply a prepared view existed.\n\nDescriptor highwater442387 bytes (432.0185546875KiB), settled1 and legacy exact-peak-proved1 support the actual diagnostic bank's settled lifetime maximum of admitted reservation credits. The source sets settlement after raw drain/Weak engine retirement, reads the same bank after `run` locals and synchronous readers return, and the atomic successful-reservation maximum is not reset. Lower-bound phase sample0 does not contradict a nonzero exact peak; no capture hook ran. The metric includes conservative fixed headers, capacity/conversion overlap and the live receipt reservation. It is not physical allocation, RSS, a baseline-subtracted workload heap or proof of final used0. The temporary source-buffer bank and descriptor bank are different owners; neither represents all baseline parser/DICE/HTTP/kernel memory.\n\nBefore/after capture markers0, stage paths observed0 and stage-containment0 are explicit. `no_containment_violation_observed=1` is vacuous here and supplies no containment proof. No success-role groups, source identity/query/full-caller success fields, producer containment, capture-sharing certificate, retained clone read or lastDrop proof were emitted. No actual source endpoint was admitted.\n\n## Supervisory evidence and residuals\n\nThe wrapper exits1 in1.616455213s; the child exits101 normally without TERM/KILL. Supervisor refusal is child_exit_nonzero, not an accounting failure. Hard4GiB AS and parent-death guard are verified;68/68 complete bounded censuses, zero resume failures/unexpected descendants, actual join and owned stage removal are recorded. Cycle sum167.439745ms/max3.972449ms measures this diagnostic intervention only. Sampled RSS peak75,767,808 bytes (72.2578125MiB), swap0, allocated disk4096 bytes and logical3340 bytes cover this refused preparatory workload's complete samples. They do not establish all instantaneous peaks, full-build fit, hard RSS/disk quotas or historical40GB attribution. `supervision_ok=false` and `source_gate_verified=false` remain correct.\n\nThe new run reaches a classified registry-attempt resource frontier under the quiescent controller; it does not explain older terminals. Global3's prior missing accounting cause and global4's observed PROC_FD_LINK/OS_ERROR/ENOENT still have no proved FD/target/access/actor. The fullruntime/process/query/generate/bootstrap and successful actual-source/private-view/read/lastDrop gates remain missing. Preserve the terminal and all earlier freezes; no automatic retry follows. After the other independent terminal reviews, Root may remove only the exact empty reviewed parent according to the frozen cleanup contract.\n"
+  },
+  "source_audits": {
+    "registry-attempt-charge-audit.md": "# Registry attempt source-owner audit \u2014 no execution\n\nFinding: no demonstrated double charge in the scoped RegistryIo\u2192HTTP path. Existing128 admission stays unchanged. Actual terminal proves the selected registry-attempt Limit; it does not identify URLs, distinct requests, repeat cardinality, statuses, redirects or retries. No correction or new actual attempt is authorized by this audit.\n\n`app/slug_core_v2/src/runtime/source_service/registry.rs:104\u2013134`: each scoped `read_exact` first charges RegistryAttempts1 at109, before URL validation or source I/O. File URLs call private `read_local` directly; HTTP/HTTPS call `request_scoped_typed` once. `read_local_exact` overrides the trait default at135\u2013145 and charges once at141 before private `read_local`; it does NOT call `read_exact`. Thus the two entrypoint sites are mutually exclusive for one natural invocation, not nested charges. Invalid-address, missing-file and transport failures may consume an admitted charge without successful bytes or HTTP submission. The trait default at Bzlmod registry_dice.rs399\u2013405 delegates local to remote only for implementations that do not override it; ScopedRegistryIo does override.\n\n`source_service/http.rs:178\u2013303` checks scope, bounds/validates URL, resolves up to64 addresses and tries TCP addresses sequentially. It contains no RegistryAttempts charge, pool, redirect loop or HTTP-request retry. Multiple connection-address attempts can occur within ONE charged RegistryIo invocation. `request_on_io`306\u2013369 sends one GET and drives one owned connection. Scoped registry response148\u2013195 treats404 as NotFound, other non-success statuses as typed errors, consumes successful body and disposes once; it does not follow Location. Archive capture has a separate redirect loop (`repository_archive_http/scoped.rs:59\u201395`): initial and redirected candidates charge SourceAttempts, not RegistryAttempts. Actual source_attempts0 supplies no archive-capture evidence.\n\nNatural Bzlmod dispatch: registry_dice.rs820\u2013878 selects local or remote branch. Remote fetch1044\u20131096 calls `io.read_exact` exactly once at1057; local1115\u20131145 calls `io.read_local_exact` once at1127. Recorded absence/reject paths1026\u20131039 perform no I/O. Request-generation dependency calls on absence/error do not themselves retry the transport in these functions. RegistryFileObservationKey905\u2013925 is normal/full completed-result equality, including errors; changes of dependencies/generation or other graph consumers can lead to later invocations. This source audit alone does not prove one graph evaluation/URL, dedup across every lower family, or absence of recomputation. Any claim of duplicated graph work requires a bounded actual natural-owner discriminator.\n\n`source_service/scope.rs:31\u201340,231\u2013252`: default maximum128, one short locked checked increment, commit counter only if next<=maximum. A rejecting129th increment would poison Limit(RegistryAttempts) while leaving snapshot128; subsequent calls return the first poison before increment. Overflow behaves likewise. Scope counters are admitted charges, not rejected calls or unique identities; the selected cause may propagate sticky poison initiated by another concurrent request. Charge failure occurs before source I/O. Existing source_scope_inclusive_counters_first_poison_and_no_refund tests26\u201353 and natural local adapter test458\u2013492 discriminate inclusive/rejected/no-refund behavior and three local calls\u2192three charges; no tests were rerun here.\n\nActual terminal: count128 plus selected LimitRegistryAttempts establishes exhausted admission and a refused further increment, NOT128 unique network requests or successful transfers; registry_bytes234593 does not disclose object/cardinality boundaries. No selected errno/status. No cap increase, automatic retry, heuristic URL guessing, byte/log/environment collection or policy change is justified. Smallest next design if needed: exact fixture at the existing adapter boundary proving1 call\u21921 charge, local override and redirect/connection behavior, followed by a separately reviewed bounded normal-graph identity-count discriminator using source-owned keys. Do not derive or log actual request identity from aggregate counters, and do not launch the spent workload again.\n",
+    "registry-attempt-demand-audit.md": "# WP899 registry attempt/cardinality source audit\n\nSource-only follow-up to spent global5. No source edit, network, acquisition, tests, Cargo, runtime, env/config capture, cap change or actual retry. Current actual log does not contain registry request identities; unique demand/repeated call cardinality remains unobserved. **No proven implementation bug or justified cap increase follows from the count alone.**\n\n## Concrete finite input facts\n\nPinned MODULE.bazel SHA109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c declares two root bazel_dep entries (rules_rust0.73.0,platforms1.1.0), dev dependencies retained by the actual None/false command policy. That count is not a bound on transitive discovery.\n\nPinned MODULE.bazel.lock58371B SHAbcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302 has192 DISTINCT registryFileHashes URLs, all sole host bcr.bazel.build and all digest strings (zero recorded absence):162 MODULE.bazel rows,29 source.json,1 bazel_registry.json. MODULE rows represent162 distinct(module name,version) pairs across34 names;23 names have multiple versions, maximum18 versions for one name. These aggregate counts were parsed from the actual lock without acquisition or URL/env logging.\n\nThis is a bounded lock-recorded address set, **not proof the current normal root needs all192/162**, not a lower bound on this run's calls, and not proof the lock is a complete/current graph topology (hash history can retain unused addresses). It does establish that128 is smaller than the lock's recorded multiple-version MODULE set; guessing a34-module or2-root-dependency upper bound would be wrong.\n\n## Normal semantic owner and discovery ordering\n\n- selected_graph.rs:626\u2013655 next_horizon checks full HostGraphModuleKey, excludes Root, deduplicates queued and seen full keys. Same name at different requested versions remains distinct; name-only dedup would change resolution semantics.\n- :671\u2013709 discovered_leaf computes normal HostDiscoveredModule[Observation]Key with checked NonrootModuleKey name+normalized version. :809\u2013854 discover_round uses compute_join for one horizon, waits/merges full results before seen insertion, retains exact complete graph/source provenance.\n- :870\u2013912 discover_fixed_point restarts traversal to include newly allowed nodep names, stops when full key set converges. :1255\u20131270 completes that fixed-point discovery BEFORE select_graph chooses/re-writes highest versions. Hence several obsolete/requested versions may legitimately have MODULE reads even when final selected graph contains far fewer names/versions. Fixed-point rounds by themselves are not evidence of native re-fetch.\n- source_preparation.rs:1353\u20131390 maps each discovered full key to normal ModuleSourcePreparation[Observation]Key. :7684\u20137737 routes one computed workspace+URL RegistryFile[Observation]Key and full observed frontier; :7949\u20138008 iterates configured registries, retains ordered not-found attempts, returns on first Found or semantic Err. Actual request is sole default BCR; no command/root override was supplied. No same-request retry loop exists in this module-source loop.\n- registry_dice.rs:577\u2013603 full key identity is workspace+RegistryFileUrl, observation wrapper Eq/Hash includes the concrete underlying key. :905\u2013924 observed result is normal DICE complete/full frontier; complete_eq/complete validity apply. :1044\u20131095 makes one RegistryIo read for that compute, checks whole SHA256 before returning Found, and preserves actual typed Transport error. Missing-generation `?` would supersede an earlier transport, preserving selected-primary correctness.\n\nDICE can share the same full registry-file key across graph horizons/fixed-point recomputation; ordinary complete facts should avoid redundant native fetch when their dependencies remain current. Legacy and observed registry-key families are distinct, so mixed callers or changed dependency/request-generation state could cause extra native calls legitimately; this selected complete path proves the observed family only, not absence of every other concurrent owner. We cannot infer an actual repeat bug without owner/request association. Actual progress_rounds0/owner_refreshes0 rules out blaming the OUTER native Need-retry loop for these128 calls; the failure occurs inside the initial normal owner discovery, before source capture.\n\n## What the physical counter measures\n\nCore source_service/registry.rs:102\u2013144 charges RegistryAttempts exactly once at entry to read_exact/read_local_exact, BEFORE URL admission/file/HTTP; no additional attempt charge per body frame or DNS address. Source-service HTTP leaf http.rs:1+,185+ is one fresh nonpooled owned connection, no redirect-follow/retry implementation; non-success HTTP status (including redirect) returns typed status from registry.rs:149\u2013164, not another implicit RegistryIo read. Multiple address-connect tries inside one HTTP request, if present, do not create separate RegistryAttempts. Therefore counter is logical native RegistryIo entries, not unique URLs, successful requests, redirects or TCP connects.\n\nscope.rs:30\u201341 sets128 max attempts,128MiB admitted registry bytes,1MiB/object,16MiB temporary-buffer bank. :231\u2013255 accepts <=max, refuses next>max before counter mutation and latches cancellation/first Limit(counter). Global5 counter128 plus actual selected Scope::Limit(RegistryAttempts) proves a further logical charge was refused; it does not prove128 successful MODULEs or exactly129 total concurrently attempted calls. registry_bytes234593 is cumulative append admission before semantic checksum/parsing; returned complete bytes may be a subset. source_attempts0 is archive/generated/selected-source counter, not absence of registry reads.\n\nOnce poisoned, actual selected transport can propagate the SAME typed limit via health/postchecks. First_poison7 alone has no counter detail; selected native cause's RegistryAttempts code1 makes this terminal precise. No DNS/EAI/errno/permission/proxy/cache diagnosis follows.\n\n## Concrete next hypothesis and minimum discriminator\n\n**Primary hypothesis:** legitimate requested-version discovery can exceed the chosen128 entry-admission class even before graph selection/source.json or any archive.162 non-absent lock MODULE rows plus pre-selection discovery ordering make this source-grounded. **Alternative:** repeat native entries for equal full registry-file demands (different normal owner family/changed dependencies or a real scheduling bug). This actual log cannot choose between them.\n\nSmallest useful source-owner gate, before any new actual observation: instrument an ordinary genuine normal selected-module graph fixture's RegistryIo test adapter with exact(full workspace+URL) call counts, including a diamond, multiple requested versions and nodep fixed-point revisit. It must prove each distinct requested version is retained and evaluated, equal registry demands share normal DICE work when inputs stay current, selected final version does not suppress required pre-selection discovery, and current-input/generation change still re-fetches. Exercise the EXISTING128 scope at128/129 separate logical reads so failed charge stays128, no subsequent IO/body publication and exact typed Limit survives restoration. This checks correctness without new cap/source authority or relying on string-based runtime cause inference; fixture success cannot satisfy the actual-root gate.\n\nFor actual-cardinality evidence, Root would need separately reviewed bounded producer-owned request association (not an unbounded URL cache or raw URL/env logging) tied to the same full current normal error/owner, or a reviewed immutable source-closure derivation. That is new diagnostic design, not authorization here. A hash-only count cannot weaken request equality or establish collision-free identity. Distinct vs repeat must be discriminated before selecting a correction. If genuine distinct demand exceeds the current admission class, that is a documented bounded-profile prerequisite; skipping older versions, bypassing lock checks, silently widening128 or replaying old cache roots is not a correctness fix.\n\nThe spent global5 ledger remains TERMINAL_NO_RETRY; Root selects any successor after these source facts. FullWP899/query/locked-generate/runtime fit and historical40GB attribution remain unproved.\n"
+  },
+  "selected_next_action": "Design independently reviewed optional bounded producer-owned exact actual registry request association; no execution/cap increase selected.",
+  "full_wp899_accepted": false,
+  "source_fit_proved": false,
+  "historical_40gb_attributed": false,
+  "normal_owner_counting_gate": {
+    "compatibility": "cfgtest assertions only, production owners unchanged",
+    "source": "app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs",
+    "source_sha256": "64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907",
+    "implementation": {
+      "status": "SOURCE_FROZEN_UNEXECUTED",
+      "baseline": "1329ca995be0dade5c5b46f6c02b9822097c5aac",
+      "changed_files": [
+        "app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs"
+      ],
+      "source_sha256": "64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907",
+      "selectors": [
+        "source_preparation::tests::observation_tests::observed_selected_graph_diamond_cycle_nodep_rounds_are_exact"
+      ],
+      "new_selectors": [],
+      "phase_expected_reads": {
+        "setup": 0,
+        "cold_observed_each_of_four_urls": 1,
+        "same_transaction_warm_each": 1,
+        "identical_current_committed_transaction_each": 1,
+        "deliberate_legacy_family_each": 2,
+        "root_comment_full_observed_frontier_each": 3,
+        "generation_only_991_unrecorded_each": 4,
+        "generation991_warm_each": 4
+      },
+      "identity_assertions": "full unpruned Root,a/1,b/1,b/2,c/1; resolved Root,a/1,b/2,c/1; retained nodep explicitly b/2; absent_nodep excluded by exact URL multiset and protected dependency assertions",
+      "frontier_refetch_justification": {
+        "source": "app/slug_bzlmod_v2/src/registry_dice.rs",
+        "anchors": [
+          "275-323 observed policy retains full root frontier",
+          "347-362 policy complete_eq",
+          "748-774 observed file consumes policy",
+          "1044-1096 native read direct; generation binding depends on plan"
+        ]
+      },
+      "preserved": "all original topology names/order, print batch order, nodep pruning/dependency rows, legacy result/events/family ordering, exact selected frontier, changed-root full-wrapper inequality; strengthened nodep version",
+      "formatting": "pinned nightly-2025-09-14 rustfmt --edition 2024 --config skip_children=true; restored exact untouched prefix/suffix after formatting single owned test",
+      "checks": {
+        "git_diff_check": 0,
+        "cargo_or_tests_executed": false
+      },
+      "growth": "165 insertions/20 deletions within one existing test; net145 includes canonical formatting in that test; no production/adapter/key/fixture growth",
+      "lower_gates_to_reuse": [
+        "unrecorded_remote_outcomes_retry_only_after_generation_changes",
+        "known_sha_failure_acquires_generation_but_verified_success_drops_it",
+        "known_sha_transport_failure_retries_after_generation_changes",
+        "checksum_mismatch_is_typed_and_stable_for_the_same_expectation"
+      ],
+      "limits": "assertions are expected semantics, not executed evidence; no actual-root request attribution, cap increase, retry, source authority, source fit or full WP899 acceptance"
+    },
+    "compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "cwd": "/run/media/system/Colossus/dev/slug",
+      "explicit_build_settings": {
+        "CARGO_BUILD_JOBS": "1",
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc"
+      },
+      "exit_code": 0,
+      "elapsed_seconds": 38.74229863198707,
+      "peak_compiler_rss_kib": 2486624,
+      "source_sha256": "64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907",
+      "compiler_memory_is_not_runtime": true
+    },
+    "test": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+        "--exact",
+        "source_preparation::tests::observation_tests::observed_selected_graph_diamond_cycle_nodep_rounds_are_exact",
+        "--test-threads=1",
+        "--nocapture"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.019068188033998013,
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2#0.1.0",
+        "manifest_path": "/run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "slug_bzlmod_v2",
+          "src_path": "/run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3"
+        ],
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+        "fresh": false
+      },
+      "artifact_sha256": "5f458ef4cf480baab90fd0f317df1da66ed366613bcb36eca66ee5b722e2240f",
+      "source_sha256": "64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907",
+      "preflight_command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+        "--exact",
+        "source_preparation::tests::observation_tests::observed_selected_graph_diamond_cycle_nodep_rounds_are_exact"
+      ],
+      "preflight_exit_code": 0,
+      "test_log_sha256": "a6e4e1df3b0f384aaa60642f974864aacfac8ef5ffd93a8bce9a3c7dfbe0e1b4",
+      "peak_preflight_or_test_child_rss_kib": 260520,
+      "peak_rss_scope": "RUSAGE_CHILDREN maximum across preflight helper/listing children and exact test, not isolated test or actual Slug workload",
+      "selected": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "test_log": "\nrunning 1 test\ntest source_preparation::tests::observation_tests::observed_selected_graph_diamond_cycle_nodep_rounds_are_exact ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 702 filtered out; finished in 0.02s\n\n",
+    "independent_final": "# WP899 registry counting delta \u2014 independent FINAL\n\n**FINAL ACCEPT for the bounded test/evidence delta.** Frozen test file SHA256 `64287df7d9bef698834807e2c27b5e37a55ec744e71238ab81e6b5cf0ef60907`, baseline HEAD1329ca995. No Cargo, tests, fixtures, network, configuration/environment inspection, source edit or cleanup by this reviewer. This accepts neither whole WP899 nor actual-root request-cardinality attribution.\n\nThe sole Rust delta is inside the existing normal observed graph diamond/cycle/nodep fixture. I independently verified every byte outside that fixture matches HEAD. No production key/value/equality/authority/cap changes occur. The existing adapter Arc is retained and its actual calls are counted by full URLs within its fixed workspace, under a short synchronous lock with no await. Comparing an exact complete histogram also rejects unexpected URLs and unnecessary absent_nodep calls. Concurrent physical call order is not treated as semantic order.\n\nExpected multiplicities are explicit per phase: initially0; observed cold1 per each of a1/b1/b2/c1; same-key warm and same-current committed transaction remain1; the separately computed legacy family becomes2; changed observed root-byte frontier becomes3; unrecorded generation991 becomes4; warm at991 remains4. Full unpruned versions include b1+b2 and resolved output selects b2. Existing topology, event/dependency order, normal complete/current-frontier assertions are retained and nodep version identity is strengthened. Warm tracker batches require no fresh event batches.\n\nThe comment phase legitimately changes the full observed registry policy. `registry_dice.rs:275\u2013323` computes RootModuleFilesObservationKey and retains its observations; policy complete equality at362 includes the full frontier. RegistryFileObservationKey can therefore refetch unchanged URL bodies at generation990 when that tracked policy wrapper changes. The test records that exact phase, not a claim that all semantic-equal graphs must avoid native reads. No production optimization is selected. Generation991 is separately injected without a root frontier edit, and FetchUnverified tracks it; identical returned facts retain wrapper equality and avoid evaluation-event replay. Legacy's distinct key family is separately counted, not misidentified as observed duplication.\n\nThe earlier DESIGN wording about new observed controls is clarified: existing lower lifecycle controls can satisfy the pinned-SHA/refusal matrix; no redundant observed-SHA fixture is required. The four integration selectors cited in DESIGN are source anchors, not claimed fresh executions. Executed evidence is instead reused from the accepted70 lib-selector receipt/log `shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.json/.log` on historical artifact SHA `4bf1f2a6098eddc7676b480a2c8e77b8c7670217c636f7860d3c6b2adbad0926`. Its four selected pass lines were inspected: `remote_bridge_retained_retry_and_stickiness_are_exact` proves Transport/same-generation1 call, generation repair2, unverified next-generation3, then verified404\u2192repair and no later-generation fetch, plus stable checksum mismatch; `remote_hash_mode_expectation_matrix_and_error_equality_are_exact` owns the plan/expectation/error matrix; `observed_registry_file_remote_plans_keep_policy_prefix_and_event_ownership` proves recorded absence/unrecorded Error zero-I/O, mismatch, and observed policy/event ownership; `observed_registry_file_terminals_need_cancel_and_remote_recovery_are_exact` proves Need zero-I/O, observed generation dependencies, current frontier and remote recovery. Their source/production owners are unchanged. This is historical gate reuse, not a fresh70-test run or relabeling of old artifact bytes.\n\nDurable global5 receipt and compact canonical/manifest wording are source/evidence ACCEPT. Every linked evidence hash in `wp899-quiescent-root-terminal-2026-10-03.json` matches. It preserves61 ordered records, actual selected Scope Limit RegistryAttempts, exact settled reservation accounting, restored accepted/all7 raw inputs and retired engine, plus joined/stage-removed/three-reviewed exact empty-parent cleanup. It correctly records status/refusal and keeps fullWP899/source-fit/historical40GB false. Sampled72.258MiB covers only the refused branch; the lock's162 module-version rows are not claimed as the actual demanded closure. Registry counting is a next bounded source-owner proof, not a production repair, cap increase, automatic retry or complete actual-cardinality finding.\n\nFresh executed close is proved by `registry-counting-compile.json`: exit0 in38.742298632s, pinned compiler, command-only owner opt0/debug0, offline serial no-run under60s. Compiler peak2,486,624KiB is preparation, not workload runtime memory. `registry-counting-test.json` and its exact preflight/log prove1 selected nonignored test/1 pass, exit0 in0.019068188s under30s. Current artifact SHA `5f458ef4cf480baab90fd0f317df1da66ed366613bcb36eca66ee5b722e2240f`, source SHA above and log SHA `a6e4e1df3b0f384aaa60642f974864aacfac8ef5ffd93a8bce9a3c7dfbe0e1b4` independently match actual bytes. The reused filename15691 now contains these new bytes; no old evidence is claimed current merely from its path. All asserted phases, including four legitimate comment-frontier rereads, passed. Fresh changed-selector proof plus unchanged lower-owner historical matrix closes this assertion-only slice.\n\nGrowth is165 additions/20 removals (net145) confined to one existing fixture, including its local formatting. New responsibilities are exact URL histograms, version identities, warm/committed/legacy/comment/generation phases and existing event controls; no adapter/production/fixture expansion or new semantic abstraction. No remaining material blocker.\n",
+    "historical_lower_matrix_receipt": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-9ebdf6c7ac9da84e",
+        "--exact",
+        "guest_namespace_policy::tests::current_transaction_requires_full_policy_workspace_and_actual_service",
+        "guest_namespace_policy::tests::exact_limit_ceilings_and_small_negative_policies_are_explicit",
+        "guest_namespace_policy::tests::explicit_policy_identity_owns_all_credentials_metadata_and_limits",
+        "guest_namespace_policy::tests::issued_label_data_opt_in_limits_and_current_identity",
+        "guest_namespace_policy::tests::normal_raw_absence_a_b_a_restore_and_history_keep_policy_inline",
+        "guest_namespace_policy::tests::transaction_precharge_repairs_and_clones_retain_until_actual_last_drop",
+        "guest_namespace_policy::tests::uniform_linux_policy_rejects_privileged_and_unrepresentable_fields",
+        "registry_dice::bridge_tests::bridge_order_missing_precedence_values_and_dependencies_are_exact",
+        "registry_dice::bridge_tests::local_bridge_typed_retry_stickiness_and_dependencies_are_exact",
+        "registry_dice::bridge_tests::registry_request_facade_installs_canonical_host_inputs",
+        "registry_dice::bridge_tests::remote_bridge_retained_retry_and_stickiness_are_exact",
+        "registry_dice::bridge_tests::remote_hash_mode_expectation_matrix_and_error_equality_are_exact",
+        "registry_dice::policy_observation_tests::generation_refusal_supersedes_native_cause_for_remote_and_local",
+        "registry_dice::policy_observation_tests::normal_registry_file_retains_current_typed_cause_and_equal_errors_cut_off",
+        "registry_dice::policy_observation_tests::observed_registry_file_identity_reducers_and_arc_projection_are_exact",
+        "registry_dice::policy_observation_tests::observed_registry_file_local_family_events_and_lifecycle_are_exact",
+        "registry_dice::policy_observation_tests::observed_registry_file_remote_plans_keep_policy_prefix_and_event_ownership",
+        "registry_dice::policy_observation_tests::observed_registry_file_terminals_need_cancel_and_remote_recovery_are_exact",
+        "registry_dice::policy_observation_tests::observed_registry_policy_identity_and_root_control_flow_are_exact",
+        "registry_dice::policy_observation_tests::observed_registry_policy_preserves_family_epoch_events_and_lifecycle",
+        "registry_dice::policy_observation_tests::observed_registry_policy_stops_on_inputs_need_and_cancellation_then_recovers",
+        "registry_dice::refusal_tests::cause_is_inline_and_scalar_codes_are_stable",
+        "registry_dice::refusal_tests::optional_cause_changes_equality_but_preserves_established_debug_bytes",
+        "repository_label_path::tests::address_is_mapping_free_and_value_identity_includes_namespace",
+        "repository_label_path::tests::constructors_and_package_dispositions_fail_closed",
+        "repository_label_path::tests::external_roots_namespaces_needs_builtin_and_a_b_a_are_owned",
+        "repository_label_path::tests::root_uses_selected_package_root_without_observing_target",
+        "runtime_source_declaration::tests::component_overlap_rejects_workspace_host_and_reserved_guest_boundaries",
+        "runtime_source_declaration::tests::current_transaction_checks_full_policy_and_actual_foreign_budget",
+        "runtime_source_declaration::tests::declaration_limits_have_exact_boundary_and_one_over_refusals",
+        "runtime_source_declaration::tests::empty_and_original_policy_history_retains_credit_until_engine_drop",
+        "runtime_source_declaration::tests::empty_policy_is_present_current_and_has_no_declarations",
+        "runtime_source_declaration::tests::normal_raw_none_policy_a_b_a_and_revocation_invalidate_dependencies",
+        "runtime_source_declaration::tests::ordered_policy_preserves_selector_mapping_limits_and_finite_fact_tier",
+        "runtime_source_declaration::tests::original_mapping_and_equal_explicit_spelling_have_distinct_identity",
+        "runtime_source_declaration::tests::original_mapping_whole_input_and_resolved_prefix_precharge_are_bounded",
+        "runtime_source_declaration::tests::physical_precharge_repair_and_cloned_policy_last_drop_keep_paths_charged",
+        "runtime_source_declaration::tests::raw_policy_history_credit_retires_only_at_actual_engine_last_drop",
+        "runtime_source_declaration::tests::strict_literals_and_whole_borrowed_admission_precede_owned_allocation",
+        "selected_extension_scratch::tests::external_tokens_root_spelling_and_literal_operands_preserve_identity",
+        "selected_extension_scratch::tests::geometric_descriptor_growth_fits_tight_service_and_retires_all_blocks",
+        "selected_extension_scratch::tests::historical_prefix_payload_retains_credit_until_engine_last_drop",
+        "selected_extension_scratch::tests::ordered_overwrite_and_modes_are_structural_a_b_a",
+        "selected_extension_scratch::tests::physical_limits_foreign_services_empty_headers_and_inherited_pins",
+        "selected_extension_scratch::tests::policy_limits_precede_payload_and_descriptor_growth",
+        "selected_extension_scratch::tests::process_limits_include_inherited_environment_and_precede_allocation",
+        "selected_extension_scratch::tests::shared_download_pin_counts_occurrences_but_payload_once",
+        "selected_extension_scratch::tests::tree_collisions_and_occurrence_overwrites_cannot_reset_limits",
+        "selected_extension_tool_sources::tests::all_label_transaction_authorizes_complete_profile_without_scratch_cells",
+        "selected_extension_tool_sources::tests::batch_precharges_union_before_legacy_merge_and_retains_credit_until_last_drop",
+        "selected_extension_tool_sources::tests::compact_key_and_demand_catalogue_do_not_pin_blob_payload",
+        "selected_extension_tool_sources::tests::direct_raw_lookup_mints_current_need_replays_and_rejects_foreign_authorization",
+        "selected_extension_tool_sources::tests::finite_policy_identity_and_bounds_are_structural",
+        "selected_extension_tool_sources::tests::raw_value_and_normal_history_keep_payload_credit_until_actual_engine_retirement",
+        "selected_extension_tool_sources::tests::same_digest_does_not_erase_prefix_provenance_and_result_binding",
+        "selected_extension_tool_sources::tests::typed_selection_uses_final_overwrite_and_refuses_literal_directory_missing_and_mode",
+        "selected_label_source::tests::external_normal_materialization_need_and_current_namespace_a_b_a",
+        "selected_label_source::tests::foreign_missing_and_exhausted_budget_are_invalid_and_repairable",
+        "selected_label_source::tests::label_freshness_and_missing_package_have_owned_dependencies",
+        "selected_label_source::tests::long_origin_and_mapping_id_are_shared_and_history_keeps_actual_credit",
+        "selected_label_source::tests::origin_parent_resets_transforms_without_recloning_credited_origin",
+        "selected_label_source::tests::producer_path_and_descriptor_limits_precede_selector_growth",
+        "selected_label_source::tests::recipe_identity_limits_and_origin_clones_are_bounded",
+        "selected_label_source::tests::root_need_replay_keeps_origin_transforms_and_label_frontier",
+        "selected_label_source::tests::scope_escape_is_refused_at_consumption_and_local_is_not_workspace_laundered",
+        "selected_repo_spec::tests::selected_source_refusal_depth_unknown_and_observation_do_not_invent_detail",
+        "selected_repo_spec::tests::selected_source_refusal_preserves_only_selected_typed_registry_cause",
+        "selected_repo_spec::tests::selected_source_refusal_successful_predecessor_is_not_a_failure_path",
+        "source_preparation::canonical_repository_source::tests::immutable_rule_preflight_preserves_complete_label_identity",
+        "source_preparation::canonical_repository_source::tests::immutable_source_preflight_is_borrowed_and_not_authority",
+        "--test-threads=1"
+      ],
+      "exit": 0,
+      "selected": 70,
+      "passed": 70,
+      "failed": 0,
+      "elapsed_seconds": 0.04174227797193453,
+      "executable_sha256": "4bf1f2a6098eddc7676b480a2c8e77b8c7670217c636f7860d3c6b2adbad0926",
+      "artifact": {
+        "reason": "compiler-artifact",
+        "package_id": "path+file:///run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2#0.1.0",
+        "manifest_path": "/run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2/Cargo.toml",
+        "target": {
+          "kind": [
+            "lib"
+          ],
+          "crate_types": [
+            "lib"
+          ],
+          "name": "slug_bzlmod_v2",
+          "src_path": "/run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2/src/lib.rs",
+          "edition": "2024",
+          "doc": true,
+          "doctest": true,
+          "test": true
+        },
+        "profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "features": [],
+        "filenames": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-9ebdf6c7ac9da84e"
+        ],
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-9ebdf6c7ac9da84e",
+        "fresh": false
+      },
+      "serial": true,
+      "baseline_receipt": "bzlmod-tests.json"
+    },
+    "old_artifact_filename_now_reused": true,
+    "historical_source_bytes_outside_changed_fixture_match": true,
+    "acceptance": "bounded source-owner counting slice accepted; no actual-root cardinality finding, cap increase or memory-fit claim"
+  }
+}
