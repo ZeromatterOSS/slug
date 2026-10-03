@@ -185,14 +185,16 @@ pub(super) fn observe_command_paths(
             return Err(image_error("foreign image observation"));
         }
     }
+    command.check_source_scope()?;
     let credit = image_batch_credit(command, &demands)?;
     // The legacy source() deadline check follows whole-batch admission, before
     // the observer's cancellation callback. Open one retained source per batch.
     let sources = retain_image_sources(command, declarations, &demands, None)?;
     observe_authorized_image_paths(command, declarations, &sources, demands, credit, &|| {
-        declarations
-            .iter()
-            .all(|request| std::time::Instant::now() < request.deadline)
+        command.check_source_scope().is_ok()
+            && declarations
+                .iter()
+                .all(|request| std::time::Instant::now() < request.deadline)
             && command
                 .runtime
                 .repository_materializer

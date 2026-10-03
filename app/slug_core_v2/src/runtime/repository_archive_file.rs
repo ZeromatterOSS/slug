@@ -1,4 +1,9 @@
 use std::path::PathBuf;
+use std::sync::Arc;
+
+use super::repository_io::source_service::SourceCounter;
+use super::repository_io::source_service::SourceServiceScope;
+use super::repository_io::source_service::{self};
 
 /// The selected-BCR file subset is deliberately narrower than URL parsing.
 /// Inspect raw spelling first: url normalizes dot segments before to_file_path.
@@ -64,7 +69,9 @@ pub(super) fn capture_file(
     _limit: u64,
     _subject: &str,
     _active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, String> {
+    let _ = scope;
     Err("BCR file capture is supported only on Linux".into())
 }
 
@@ -76,6 +83,7 @@ pub(super) fn capture_file(
     limit: u64,
     subject: &str,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, String> {
     use std::fs::OpenOptions;
     use std::io::Read;
@@ -88,6 +96,7 @@ pub(super) fn capture_file(
     use sha2::Sha256;
 
     let check_active = || {
+        source_service::check(scope)?;
         if active() {
             Ok(())
         } else {
@@ -132,12 +141,19 @@ pub(super) fn capture_file(
     }
     // Regular-file syscalls need responsive local storage; O_NONBLOCK cannot
     // interrupt a stuck filesystem. Cancellation is cooperative between reads.
+    let _buffer_credit = source_service::buffer(scope, 64 * 1024)?;
     let mut buffer = [0u8; 64 * 1024];
     let mut total = 0u64;
     let mut hasher = Sha256::new();
     loop {
         check_active()?;
-        let count = match input.read(&mut buffer) {
+        let count = match source_service::read_counted(
+            &mut input,
+            &mut buffer,
+            active,
+            scope,
+            SourceCounter::TransferBytes,
+        ) {
             Ok(count) => count,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(error) => return Err(format!("reading BCR {subject} file: {error}")),
@@ -149,8 +165,7 @@ pub(super) fn capture_file(
             .checked_add(count as u64)
             .filter(|total| *total <= limit)
             .ok_or_else(oversized)?;
-        capture
-            .write_all(&buffer[..count])
+        source_service::write_counted(&mut capture, &buffer[..count], active, scope)
             .map_err(|error| format!("writing capture: {error}"))?;
         hasher.update(&buffer[..count]);
     }

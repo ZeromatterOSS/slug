@@ -1,0 +1,178 @@
+{
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "date": "2026-10-03",
+  "status": "PRESERVATION_ONLY_UNACCEPTED",
+  "branch": "review/wp899-request-source-profile",
+  "parent_candidate": "125003cf7960dd9f01e601804996e4d3266e80cc",
+  "accepted_memory_base": "1fe253f63f9bf831aad70ae239555715aacb0e80",
+  "compatibility": "Slug-native operational admission for a fresh consumed diagnostic runtime; normal None semantics and exact semantic identities preserved",
+  "observable_checkpoint": "Bounded source-service implementation and owned-process supervisor have independently reviewed portable evidence; no genuine-root run or original40GB attribution",
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/dice.rs": "30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a",
+    "app/slug_core_v2/src/runtime/input_image_bridge.rs": "5690b0710b54e57f522512ace214ba6503a29f01c5d916b5bff4e3f31598e2ef",
+    "app/slug_core_v2/src/runtime/registry_io.rs": "3b428547da2286c81f349d2c24097387435f7d56b06a3ee4436bb08fedfe51fa",
+    "app/slug_core_v2/src/runtime/repository_archive.rs": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561",
+    "app/slug_core_v2/src/runtime/repository_archive_file.rs": "0614efe0db9a9490bddfc206d9c69f2ab728121c797227bde0a74e3f6bcf5027",
+    "app/slug_core_v2/src/runtime/repository_archive_http.rs": "19790b239e26d0c7740bd89628c227ca4aaad9b78511a357b6a83ed20e13f274",
+    "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "a7ea07667f0f6d98c9db535dbe60743a148134064393728f7a4ef694ea042a6f",
+    "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "561af5f1e6e398d04671f39d1039717a0697d14bc186324b6e5241192d99cc72",
+    "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "f1768713fb592b267c3b6b9e925f91079351f2b2d212c376c716d8ae043b66d2",
+    "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "e6525fcf83fb9cd09826bd030186d8be9325f40efa89fd8cd6eefbb61cfbb708",
+    "app/slug_core_v2/src/runtime/repository_io.rs": "e95682a4d832010c42c6803c6765332b905fb4c9ce08e746b80b162d84b24c59",
+    "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "f50491495f6450774bc281cc8b74704f3705da2e1a41d0aed9aad548daedc52f",
+    "app/slug_core_v2/src/runtime/repository_io/source_service_tests.rs": "d066e5cb4c41381cccb67e245716138bcf6b0b6f19f26c066e181b52ee5f4517",
+    "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "85f5f77c36e69d8060829f75ec7b2670709467c00720f50bac5666ed8a14075c",
+    "app/slug_core_v2/src/runtime/source_preparation.rs": "4b654232f2d3176b59d85d6a0f9394ef0c6cd414880a7cba87cc54fa358fd63b",
+    "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "166663f44eee230dfd01ea42b854976295cd052c7959dc23eadf0d5799dad2f7",
+    "app/slug_core_v2/src/runtime/source_service.rs": "0c51f3512f2d8d5503167bc26057a681ac08d74b6d5cee7115ed016b407aeab9",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "f7535201ab61b4f1a764a0af8cb796c40d18b17aa439b6c88e6ad0f9168a101f",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "1dfa0463d01306a1b2080e97ef559f26e2ab6c9c1ae5c9fb6b9ac291d81ca359",
+    "app/slug_core_v2/src/runtime/source_service/http.rs": "e079e0d39d34fc24fcac8c6b4b02ac58dd63e2609131fb4ee7f968c290b75977",
+    "app/slug_core_v2/src/runtime/source_service/registry.rs": "8254620ee2ddeed6878c88fe7b91166e8d6025bae28ef0283646a095c7059cf3",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "2b60238b9ca8bc26698b3b361077915b8b93366551c5cdf09f6a4e62a6806f2c",
+    "app/slug_core_v2/src/runtime/source_service/tests.rs": "c64b453468587ef29012aff98778e5418bac079d5f2598b13801d715f28c3f40",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "2465fff9e1467faeebd6a7902fdb99b5864b2ef2f25ce9ec9bac1c3cbf607ed2",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs": "adae1975f1a15a61385bd2239357992149126d8db3c29b658c8f3a2b7f4d559e",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "16820d42a9ecaa9a8088a6ea5c5e52b1bd541533b9ade1946f57afdb414da557",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "a35a3d6c8c922f27631786bce6c34e25bb415af1c9e4d57da2a56a3fd81d21d1",
+    "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "4646cf1654b0ad7b91487cd4bcfa9c66d6ea588f75389fb97c87929c79573029",
+    "scripts/v2_source_admission_supervisor.py": "89dc7c9f4a6656d088ee294fe4942210896233a44086be7794f7cb2e229deaaa",
+    "scripts/v2_source_admission_supervisor_tests.py": "f4070e6bc69baf8dfe41ccb23e2a419620e0e70b245c0d900aa43097fd3e01f5"
+  },
+  "rust_validation": {
+    "toolchain": {
+      "path": "target/wp899/toolchain.json",
+      "sha256": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07"
+    },
+    "focused_compile": {
+      "exit": 0,
+      "elapsed_seconds": 4.09,
+      "peak_rss_kib": 2149020
+    },
+    "focused_compile_command": {
+      "path": "target/wp899/core-source-service-valid404-command.json",
+      "sha256": "88cbce8ec6349a3146eaa9b1e746eccef0ac587323893dfdd090ac1aa0088042"
+    },
+    "core": {
+      "exit": 0,
+      "selected": 206,
+      "passed": 206,
+      "elapsed_seconds": 9.194641800015233,
+      "executable_sha256": "ab1c10d8fd7bdcb923e7c18f320789635f4765b585e3e63f2a22d9c00102dffd"
+    },
+    "core_receipt": {
+      "path": "target/wp899/core-source-service-tests.json",
+      "sha256": "74eefa9f40a96b7d189ff97a04036aa81e2e6bb9dd9f5c4a3170a1ad0fd0727e"
+    },
+    "core_log": {
+      "path": "target/wp899/core-source-service-tests.log",
+      "sha256": "85230cf61bdfe08c1c588a2faa2667582ce97b72273ebf8b8088d86cfeffbad0"
+    },
+    "core_preflight": {
+      "path": "target/wp899/core-source-service-preflight.log",
+      "sha256": "c0c66a3ac8a78840d07c207b13204841451330e4298ce66740333bcc25784155"
+    },
+    "core_test_command": {
+      "path": "target/wp899/core-source-service-test-command.json",
+      "sha256": "cb4b39eb6891ea477eef1db81378d579d5633c8965a764c3ad3d453c61feb8a0"
+    },
+    "coverage": "All protected150 Core selectors plus20 new source-service selectors and36 affected ordinary selectors. Exactly206 selected/pass. No ignored probe.",
+    "default_all_targets": {
+      "exit": 0,
+      "elapsed_seconds": 36.53,
+      "peak_rss_kib": 1446112
+    },
+    "default_all_targets_command": {
+      "path": "target/wp899/source-service-default-all-targets-command.json",
+      "sha256": "ed0866714f1f3138d6d078de7a2abc524ee800a73ce1f8c334b91e450eab44dc"
+    },
+    "inherited": "Shared51, Loading115, Workspace83 receipts retained from wp899-candidate-checkpoint-2026-10-03.json; corresponding21 recorded source hashes unchanged. Those tests were not rerun for this Core-only change.",
+    "format": "Changed30 Rust files pass pinned rustfmt check with skip_children=true. Unchanged selected_tool_source/tests.rs baseline formatting preserved.",
+    "checks": "git diff --check, plan-status and V1 archive checks pass",
+    "caps": "Serial offline/jobs1 compile60s TERM/KILL3; focused test30s TERM/KILL3; no cap raises"
+  },
+  "supervisor": {
+    "sanity": "13/13 PASS2.394s; small actual processes only, no Slug acquisition",
+    "sanity_log": {
+      "path": "target/wp899/supervisor-sanity-3.log",
+      "sha256": "79867c0cd9974e1a55be89247687e88ad5f87b0ac39071a1ae0e0e05f95128f9"
+    },
+    "final_review": {
+      "path": "target/wp899/source-admission-supervisor-final-review.md",
+      "sha256": "c5755fc6e01b6fa00862ca9465cb45a0a08d761893a04f354dfeaab1e56b6e13"
+    },
+    "controls": "Hard inherited/readback RLIMIT_AS4GiB; sampled RSS>=4GiB/anyswap/private allocated disk>=6GiB/accounting-loss/ANY descendant refuses; owned pidfd/subreaper termination and actualjoin before cleanup",
+    "clock": "One immutable CLOCK_MONOTONIC work27s/cleanup<=work+3s, terminal allowance<=3s. Same deadlines must be consumed before Rust scope/runtime construction.",
+    "limitations": "No kernel RSS quota, no-swap guarantee or filesystem quota; census can miss transient peaks/forks; unjoined process stage is retained"
+  },
+  "source_service_contract": {
+    "limits": "Registry128attempts/1MiBobject/128MiBcumulative; source64attempts/2GiBtransfer/2GiBdecode/2GiBwrite; temporaryownedbytebuffers16MiB; inheritedstricterlimits remain",
+    "owner": "One exact Arc scope installed before DICE/HTTP; same scope/workspace at source/materializer/publication; no scope key/cache/new semantic identity",
+    "lifecycle": "Acquisition cancellation sticky; immutable deadline pre/post checks; cleanup permits cancellation but never expired polling; concrete completed primary error retained; full prior restoration; engine actualDrop before export; captured reader/clone/lastDrop independent of acquisitionclose",
+    "transport": "Owned manually driven HTTP1 with64KiB/128headers; no spawnedpool;404statusfirst/immediatebodydrop; all diagnostic parsererrors sticky unsupported; ordinary503/nonparsefallback healthy; pinnedlocalregularfile/no specialdataopen",
+    "accounting": "Precharge allocations and conversion peaks, actual ownershipDrop before credit; actual decode/read/write/orderedreplacement effects counted; lateSHA/foreign/poison zero publication; unsupported Git/general fallback refuses beforeIO",
+    "not_total_rss": "16MiB buffer bank excludes AST/DICE metadata, TLS/Hyper/kernel/DNS/liblzma baseline; outer supervisor is required"
+  },
+  "preserved_failures": {
+    "first210": {
+      "path": "target/wp899/core-source-service-tests-failed.json",
+      "sha256": "b06c4b05e89b412bdd0fbb3e78647183d499b8ac9d2dafc03715a760cae2628c"
+    },
+    "first210_log": {
+      "path": "target/wp899/core-source-service-tests-failed.log",
+      "sha256": "4179a319fe626f1a2140dc516c7c4b5c0b4fd5b1d2954e32322a4f68cdf3410c"
+    },
+    "fixture_correction": "u64MAX Content-Length uses Hyper reserved values; valid1TiB replaces it without status-first/bodyless/EOF/admission assertion changes",
+    "environment_gates": {
+      "path": "target/wp899/source-service-environment-gates.json",
+      "sha256": "7370cb4893deb4a78586b3964f6feb15d386251c81205dcdf74758a34951a5d8"
+    },
+    "unproved_supplemental_selectors": [
+      "runtime::repository_archive_file::tests::nonregular_sources_are_rejected_before_data_open",
+      "runtime::repository_archive_http::tests::selected_extension_capture_redacts_url_and_cleans_on_cancellation",
+      "runtime::repository_archive_http::tests::selected_extension_capture_rejects_declared_http_oversize_without_bytes",
+      "runtime::repository_archive_http::tests::selected_extension_redirect_capture_is_single_url_and_checksum_pinned"
+    ],
+    "environment": "Four supplemental existing sockets failed EPERM atbind before scenario; not protected150/predecessor362, not included in206PASS. No retries/workarounds/waivers.",
+    "other_history": "Compile-only failures and supervisor initial failures remain under target/wp899; corrected availableHyper is_parse API, clock/signals/logbounds/accounting race per reviews"
+  },
+  "required_remaining_gates": [
+    "Author and freeze genuine actual MODULE slug_crates normal source/preparation ignored harness with complete semantic caller/profile/config, source ownership and immutable supervisor clock transport before runtime construction",
+    "Independent final source/harness/supervisor/config/clock review before ONE separately supervised actual source/admission invocation; no automatic retries or cap growth",
+    "Typed actual source/ELF/image/private-lease completed outcome and restoration/owner accounting; fixtures, cached historical roots, scoped construction or child exit0 cannot substitute",
+    "Full coupled packet FINAL integration review after genuine-root evidence"
+  ],
+  "exclusions": [
+    "No genuine-root acquisition/network/source-fit run",
+    "No ordinary CLI/process/query/locked-generate/bootstrap activation; latestCLI notlinked/restarted",
+    "Historical40GB process/workload still unattributed; unique payload history and generic whole-body reads remain"
+  ],
+  "memory_repair": "Accepted independent fixes unchanged: per-demand injection/scanner streaming/prior row consumption and equal-payload reuse. Controlled repeated32x1MiB repair reducesmeanRSS74.2%; not wholeworkload40GB proof.",
+  "goal_status": "Active; substantial candidate preserved, source-service/supervisor portable prerequisites advanced, genuine-root and historical memory attribution remain open",
+  "independent_component_final_reviews": {
+    "native-source-service-final-review.md": {
+      "path": "target/wp899/native-source-service-final-review.md",
+      "sha256": "f457f10b0d64ef8189d51109ea67a86681d0b41db7592ed2bb7dac380657c75b",
+      "verdict": "Component FINAL ACCEPT against actual source and206 portable gates; fullWP899 remains UNACCEPTED"
+    },
+    "diagnostic-source-service-final-review.md": {
+      "path": "target/wp899/diagnostic-source-service-final-review.md",
+      "sha256": "3efc5d667fe09d9725096f21cc98d4ee946bf7f40bd5325602875cbf90f688af",
+      "verdict": "Component FINAL ACCEPT against actual source and206 portable gates; fullWP899 remains UNACCEPTED"
+    },
+    "scoped-registry-source-service-final-review.md": {
+      "path": "target/wp899/scoped-registry-source-service-final-review.md",
+      "sha256": "21405ecda7505ad829b86f16c9733bd7479a2635e3b71c85cd39fcd93814e4f4",
+      "verdict": "Component FINAL ACCEPT against actual source and206 portable gates; fullWP899 remains UNACCEPTED"
+    }
+  },
+  "design_evidence": {
+    "source-service-api.md": "bd848bbdf88755c1a9fb12b490e38983e294849da8cb4655ff8e3562f9b95175",
+    "source-service-signatures.md": "10126c4e60ae1ef9d8a6c30e073e739bea3bfb28a044d6c48c93f10364747dcb",
+    "source-service-design-review.md": "c5999be0ad3f75abb1d91b82a410cc8a826a532f42642e6d8b90094ea12bc66c",
+    "source-service-signature-design-review.md": "a0f3741317ee9b42e99e6ac26eabfda8fb09e199cf3620678d460eaf810c7f66",
+    "root-supervisor-prerequisite.md": "15ffbcf6acc7eb0b9a4c4170f8f71de921edd41c88b54a0f255f0e7842eff383"
+  }
+}

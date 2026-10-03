@@ -31,6 +31,10 @@ use super::repository_archive::SelectedBcrArchive;
 use super::repository_archive::SelectedBcrOverlay;
 use super::repository_archive::SelectedBcrPatch;
 use super::repository_io::ArchiveMaterializationError;
+use super::repository_io::source_service::SourceCounter;
+use super::repository_io::source_service::SourceServiceScope;
+use super::repository_io::source_service::{self};
+mod scoped;
 
 const CAPTURE_LIMIT: u64 = 128 * 1024 * 1024;
 const MODULE_CAPTURE_LIMIT: u64 = 1024 * 1024;
@@ -287,7 +291,19 @@ pub(super) fn capture_selected_bcr(
     plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    if let Some(scope) = scope {
+        return scoped::capture_urls(
+            &plan.urls,
+            plan.integrity,
+            CAPTURE_LIMIT,
+            "archive",
+            runtime,
+            active,
+            scope,
+        );
+    }
     let environment = NativeEnvironment::new();
     capture_selected_bcr_with(plan, runtime, active, &environment)
 }
@@ -299,7 +315,19 @@ pub(super) fn capture_selected_generated_archive(
     sha256: [u8; 32],
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    if let Some(scope) = scope {
+        return scoped::capture_urls(
+            urls,
+            sha256,
+            CAPTURE_LIMIT,
+            "generated archive",
+            runtime,
+            active,
+            scope,
+        );
+    }
     let environment = NativeEnvironment::new();
     capture_urls(
         urls,
@@ -333,7 +361,19 @@ pub(super) fn capture_selected_bcr_module(
     plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    if let Some(scope) = scope {
+        return scoped::capture_urls(
+            std::slice::from_ref(&plan.module_url),
+            plan.module_integrity,
+            MODULE_CAPTURE_LIMIT,
+            "MODULE",
+            runtime,
+            active,
+            scope,
+        );
+    }
     let environment = NativeEnvironment::new();
     capture_urls(
         std::slice::from_ref(&plan.module_url),
@@ -350,7 +390,19 @@ pub(super) fn capture_selected_bcr_overlay(
     overlay: &SelectedBcrOverlay,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    if let Some(scope) = scope {
+        return scoped::capture_urls(
+            &overlay.urls,
+            overlay.integrity,
+            OVERLAY_CAPTURE_LIMIT,
+            "overlay",
+            runtime,
+            active,
+            scope,
+        );
+    }
     let environment = NativeEnvironment::new();
     capture_urls(
         &overlay.urls,
@@ -367,7 +419,19 @@ pub(super) fn capture_selected_bcr_patch(
     patch: &SelectedBcrPatch,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    if let Some(scope) = scope {
+        return scoped::capture_urls(
+            std::slice::from_ref(&patch.url),
+            patch.integrity,
+            PATCH_CAPTURE_LIMIT,
+            "patch",
+            runtime,
+            active,
+            scope,
+        );
+    }
     let environment = NativeEnvironment::new();
     capture_urls(
         std::slice::from_ref(&patch.url),
@@ -388,7 +452,21 @@ pub(super) fn capture_selected_extension_artifact(
     sha256: [u8; 32],
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Arc<[u8]>, String> {
+    if let Some(scope) = scope {
+        let capture = scoped::capture_one(
+            url,
+            sha256,
+            SELECTED_EXTENSION_CAPTURE_LIMIT,
+            "selected extension artifact",
+            runtime,
+            active,
+            scope,
+        )
+        .map_err(selected_extension_capture_error)?;
+        return transfer_selected_capture(capture, sha256, active, Some(scope));
+    }
     let environment = NativeEnvironment::new();
     capture_selected_extension_artifact_with(url, sha256, runtime, active, &environment)
 }
@@ -403,7 +481,7 @@ fn capture_selected_extension_artifact_with(
     if !active() {
         return Err("selected extension artifact capture cancelled".into());
     }
-    let mut capture = capture_one(
+    let capture = capture_one(
         url,
         sha256,
         SELECTED_EXTENSION_CAPTURE_LIMIT,
@@ -413,6 +491,16 @@ fn capture_selected_extension_artifact_with(
         environment,
     )
     .map_err(selected_extension_capture_error)?;
+    transfer_selected_capture(capture, sha256, active, None)
+}
+
+fn transfer_selected_capture(
+    mut capture: tempfile::NamedTempFile,
+    sha256: [u8; 32],
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<Arc<[u8]>, String> {
+    source_service::check(scope)?;
     let size = capture
         .as_file()
         .metadata()
@@ -425,10 +513,30 @@ fn capture_selected_extension_artifact_with(
         .as_file_mut()
         .rewind()
         .map_err(|_| "selected extension artifact capture unreadable")?;
-    let mut bytes = Vec::with_capacity(size as usize);
+    let _vec_credit = source_service::buffer(scope, size as usize)?;
+    let _scratch_credit = source_service::buffer(scope, 64 * 1024)?;
+    let mut bytes = if scope.is_none() {
+        Vec::with_capacity(size as usize)
+    } else {
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(size as usize).map_err(|_| {
+            scope
+                .unwrap()
+                .poison(source_service::SourceServiceError::Allocation)
+                .to_string()
+        })?;
+        if bytes.capacity() > size as usize {
+            return Err(scope
+                .unwrap()
+                .poison(source_service::SourceServiceError::Allocation)
+                .to_string());
+        }
+        bytes
+    };
     let mut buffer = [0u8; 64 * 1024];
     let mut hasher = Sha256::new();
     loop {
+        source_service::check(scope)?;
         if !active() {
             return Err("selected extension artifact capture cancelled".into());
         }
@@ -445,6 +553,13 @@ fn capture_selected_extension_artifact_with(
             .checked_add(count)
             .filter(|size| *size as u64 <= SELECTED_EXTENSION_CAPTURE_LIMIT)
             .ok_or("selected extension artifact exceeds 33554432 byte capture limit")?;
+        if let Some(scope) = scope {
+            if next > size as usize {
+                return Err(scope
+                    .poison(source_service::SourceServiceError::BufferLimit)
+                    .to_string());
+            }
+        }
         bytes.extend_from_slice(&buffer[..count]);
         debug_assert_eq!(bytes.len(), next);
         hasher.update(&buffer[..count]);
@@ -455,7 +570,23 @@ fn capture_selected_extension_artifact_with(
     if hasher.finalize().as_slice() != sha256 {
         return Err("selected extension artifact SHA-256 mismatch".into());
     }
-    Ok(Arc::from(bytes))
+    source_service::check(scope)?;
+    if scope.is_some() && bytes.len() != size as usize {
+        return Err("selected extension artifact capture changed length".into());
+    }
+    let _arc_credit = source_service::buffer(
+        scope,
+        bytes
+            .len()
+            .checked_add(64)
+            .ok_or("capture allocation overflow")?,
+    )?;
+    let result = Arc::from(bytes);
+    source_service::check(scope)?;
+    if !active() {
+        return Err("selected extension artifact capture cancelled".into());
+    }
+    Ok(result)
 }
 
 // The transport may have seen a URL query or file pathname. Do not propagate
@@ -530,6 +661,7 @@ fn capture_one(
             capture_limit,
             subject,
             active,
+            None,
         );
     }
     let mut url = url::Url::parse(original).map_err(|error| error.to_string())?;

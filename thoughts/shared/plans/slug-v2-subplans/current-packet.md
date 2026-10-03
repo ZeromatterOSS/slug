@@ -272,3 +272,113 @@ missing gates, selected/pass/artifact/source identity, timings where measured an
 scope; actual40GB/full-build RSS still unmeasured. REPLAN for contradicted ownership,
 unsupported required source owner or resource prerequisite; correct invocation/source
 errors in the same contract without raising caps. Full objective remains active.
+
+## Reviewed bounded source-service implementation extension
+
+Root authorizes implementation from candidate125003cf7960dd9f01e601804996e4d3266e80cc,
+under target/wp899/{source-service-api,source-service-signatures,source-service-design-review,
+source-service-signature-design-review,root-supervisor-prerequisite}.md. Slug-native
+diagnostic operational admission only; normal Native/None behavior and all exact
+semantic source/SHA/request/DICE owners remain unchanged. Fresh consumed isolated
+runtime installs one immutable Arc scope before DICE/transport. No scoped mutable
+current service, public endpoint, new key/cache/history GC or Cargo changes.
+
+Exact added Rust allowlist under app/slug_core_v2/src/runtime/: source_service.rs
+and cohesive source_service/{scope,http,registry,diagnostic,tests}.rs children;
+registry_io.rs install_scoped only; dice.rs constructor/field/registration/progress
+glue; source_preparation.rs effective deadline/finalization; selected_scratch_source.rs
+active; repository_archive_http.rs async scoped transport/counters; repository_archive_file.rs
+counted writes; repository_io.rs scoped materializer/publication; repository_generated_archive.rs
+counted decode/write; repository_archive_realize.rs and repository_archive_patch.rs
+counted realization/patch/copy; repository_archive.rs bounded scoped dispatch.
+Existing private owner tests receive explicit None migrations without assertion
+weakening. Cohesive private tests inside these owners are permitted. Scripts:
+scripts/v2_source_admission_supervisor.py and its private sanity-test sibling only.
+
+Frontier worker owns source_service facade/scope/http/registry/tests and registry_io
+adapter registration. Supervisor worker owns native repository/archive files and
+private tests. Input-audit worker owns Python supervisor and sanity gates. Root owns
+dice/diagnostic/preparation/active glue, serial Cargo and native fixture execution.
+Independent final review swaps owners after implementation; no worker accepts its
+own source. Parents above2000lines get narrow glue only; cohesive child helpers own
+counting/transport. Estimate source scope/transport~800 production lines, native
+counting~400, diagnostic glue~150, supervisor~350, discriminators~700; growth triggers
+responsibility review. Command/service scalar state and bounded async buffers have
+explicit lastDrop; existing registry result/history ownership stays DICE-retained.
+
+Freeze128 registry attempts/1MiB object/128MiB admitted and16MiB temporary buffers;
+64 source attempts/2GiB each transfer/decode/write, preserving stricter inherited
+caps. One actual work deadline27s and cleanup<=work+3s. All retained optional scope
+plumbing uses Option<&Arc<Scope>>, pointer identity; pure no-retention helpers may
+borrow &Scope. Publication checks before IO/cached return and under existing lock
+use matching_validated_active, never session_is_active inside its lock. Unreviewed
+Git/general source fallback refuses before IO. Registry404 status-first, pinned
+regular local reads including nonUTF8/symlink positives, no special-file data opens.
+Manual HTTP1 owns socket/connection/body without pool/spawn;64KiB parser/128 headers,
+shared cancellation/deadline; OS resolver worker stays explicitly outer-supervised.
+
+Require exact/one-over counters/conversion peak/refund-after-poison;404/length/
+multi-frame/trickle; local regular/nonUTF8/symlink versus special zero-read; whole
+deadline across addresses/redirects/fallback; foreign/poison zero-IO and late-SHA
+zero-publication; all BCR/generated ordered effects counted; unsupported fallback
+zero-IO; full caller/same-command Need/current frontier/restoration; actual engine
+drop before export, reads after acquisition close/clone/lastDrop. Preserve399
+portable/protected selectors, fresh default all-target dependents and independent
+FINAL actual diff review. Compile60s/focused30s TERM/KILL3s remain unchanged.
+
+Available-control supervisor is hard RLIMIT_AS4GiB before exec plus sampled
+RSS>=4GiB/any-swap/allocated private disk>=6GiB/accounting-loss/ANY descendant refusal,
+owned pidfd/subreaper termination and actual join before owned cleanup. No kernel
+RSS/no-swap or filesystem quota claim. Mandatory small real ENOMEM/limit readback,
+unlinked-FD/inode dedup/equality refusal/accounting failure, unexpected session-escape
+descendant/adoption/join and common immutable-clock/continuous-cleanup sanity gates.
+No genuine-root acquisition in this extension implementation checkpoint. Root must
+review/freeze source/harness/supervisor/config/clock after sanity gates before the
+separate ONE genuine source/admission attempt; failures never authorize cap growth
+or automatic retries. Full WP899 and historical40GB attribution remain unaccepted.
+
+Cohesive approved native child splits: repository_io/source_service.rs and repository_archive_http/scoped.rs own counted helper/transport logic. Existing runtime/tests/repository_archive*_tests.rs and repository_generated_archive_tests.rs may receive None argument-only migrations, no assertion edits. Root may adjust selected_tool_source/prepare.rs existing finalizer to use the same runtime source_cleanup absolute deadline, preserving None behavior and primary failure.
+
+HTTP diagnostic address admission additionally refuses URL encoded spelling above8192bytes before URI/header clone/connect; parser bookkeeping carries that bounded copy. Exact/one-over pre-connect discriminator required; ordinary URL semantics unchanged. Root diagnostic tests child source_service/diagnostic_tests.rs is cohesive lifecycle coverage within source_service owner.
+
+Root input_image_bridge.rs adds only actual command scope check before retained source open and within existing baseline observer active callback; ordinary None retains existing session/deadline checks. Path results recheck scope before raw epoch installation.
+
+Approved private native test split repository_io/source_service_tests.rs; four existing fixture helpers may receive cfgtest pub(super) visibility for exact shared request/writer controls. No production visibility or assertion changes. Supervisor grows above estimate (~560lines) but retains separate process identity, metadata census, immutable clock and lifecycle owners; root reviews actual responsibilities and signal/error paths before acceptance.
+
+## Reviewed private HTTP parser admission correction
+
+Pinned Hyper1.11 exposes is_parse_too_large only with server+http1; current
+client-only features cannot call it. No dependency/feature change is authorized.
+Independent DESIGN ACCEPT selects public is_parse() and treats ALL HTTP parser
+errors as sticky SourceServiceError::UnsupportedSourceOwner in diagnostic Some
+mode, including oversized or malformed headers/protocol/status/URI. Ordinary503
+and nonparse transport IO remain eligible inherited fallback; None unchanged.
+This conservative operational admission has grouped oversized/malformed parser
+negatives and healthy503 controls. It supersedes the uncompiled narrow taxonomy.
+
+## Source-service candidate preservation checkpoint 2026-10-03
+
+Bounded diagnostic acquisition/runtime, counted native writers and owned-process
+supervisor are implemented and independently reviewed. Fresh Core206/206 pass
+in9.19s includes all protected150,20 new service gates and36 affected ordinary
+controls. Fresh default Shared/Loading/Core/Workspace/CLI all-target check passes
+in36.53s; supervisor13/13 small sanity controls pass. Build peak1446112KiB is
+compiler memory, not a Slug workload measurement. Shared51/Loading115/Workspace83
+prior results retain matching source identity; changed Rust formatting/diff checks
+and plan/archive checks pass. Exact sources, commands, artifacts, failures,
+independent reviews and unresolved gates are recorded in
+wp899-source-service-checkpoint-2026-10-03.json.
+
+Four supplemental existing Unix/TCP socket controls failed EPERM before their
+scenarios and remain explicitly UNPROVED; they are outside protected150/362 and
+the206 passing claim. The first210 failure record is preserved. Its separate
+invalid-u64MAX Content-Length fixture was corrected to valid1TiB and retains
+status-first, zero body admission and immediate EOF assertions.
+
+This is substantial candidate preservation on the review branch, not full WP899
+acceptance. The genuine actual MODULE slug_crates ignored harness, complete normal
+request/profile/config and shared immutable CLOCK_MONOTONIC transport still require
+authoring/freezing and independent review before ONE supervised source/admission
+attempt. No actualRoot acquisition/network, CLI linking/restart, backend/query,
+locked-generate or bootstrap activation has occurred. Accepted memory repairs
+remain accepted independently; historical40GB/full-workload RSS remains unattributed.

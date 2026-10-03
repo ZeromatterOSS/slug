@@ -31,6 +31,7 @@ fn capture(
         limit,
         "archive",
         active,
+        None,
     )
 }
 
@@ -209,6 +210,7 @@ fn unread_mutation_truncation_and_growth_cannot_bypass_sri_or_cap() {
                 }
                 true
             },
+            None,
         );
         let error = result.unwrap_err();
         assert!(
@@ -265,6 +267,7 @@ fn cancellation_at_every_boundary_releases_capture_and_source_descriptors() {
                 }
                 calls.get() != stop
             },
+            None,
         );
         assert!(result.unwrap_err().contains("no longer active"));
         assert!(!output_path.exists());

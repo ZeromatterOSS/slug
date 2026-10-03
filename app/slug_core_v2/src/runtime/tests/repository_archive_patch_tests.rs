@@ -16,7 +16,7 @@ fn applies_rules_shell_shape_multiple_files_and_hunks() {
     );
     std::fs::write(root.path().join("other.txt"), b"one\ntwo\nthree\n").unwrap();
     let patch = b"===================================================================\n--- a/MODULE.bazel\n+++ b/MODULE.bazel\n@@ -1,7 +1,7 @@\n module(\n     name = \"rules_shell\",\n-    version = \"0.0.0\",\n+    version = \"0.6.1\",\n )\n \n bazel_dep(name = \"bazel_features\", version = \"1.18.0\")\n bazel_dep(name = \"bazel_skylib\", version = \"1.6.1\")\n--- a/other.txt\n+++ b/other.txt\n@@ -1,1 +1,1 @@\n-one\n+ONE\n@@ -3,1 +3,1 @@\n-three\n+THREE\n";
-    apply_selected_bcr_patch(root.path(), patch, 1, &|| true).unwrap();
+    apply_selected_bcr_patch(root.path(), patch, 1, &|| true, None).unwrap();
     assert_eq!(
         std::fs::read(root.path().join("MODULE.bazel")).unwrap(),
         b"module(\n    name = \"rules_shell\",\n    version = \"0.6.1\",\n)\n\nbazel_dep(name = \"bazel_features\", version = \"1.18.0\")\nbazel_dep(name = \"bazel_skylib\", version = \"1.6.1\")\n"
@@ -47,21 +47,21 @@ fn rejects_unsupported_paths_shapes_context_and_cancellation() {
     ];
     for (patch, expected) in cases {
         let root = root_file("file", b"x\n");
-        let error = apply_selected_bcr_patch(root.path(), patch, 1, &|| true).unwrap_err();
+        let error = apply_selected_bcr_patch(root.path(), patch, 1, &|| true, None).unwrap_err();
         assert!(error.message.contains(expected), "{error:?}");
     }
 
     let root = root_file("file", b"x\n");
     let mismatch = b"--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-z\n+y\n";
     assert!(
-        apply_selected_bcr_patch(root.path(), mismatch, 1, &|| true)
+        apply_selected_bcr_patch(root.path(), mismatch, 1, &|| true, None)
             .unwrap_err()
             .message
             .contains("context does not match")
     );
     let patch = b"--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-x\n+y\n";
     assert!(
-        apply_selected_bcr_patch(root.path(), patch, 1, &|| false)
+        apply_selected_bcr_patch(root.path(), patch, 1, &|| false, None)
             .unwrap_err()
             .message
             .contains("no longer active")

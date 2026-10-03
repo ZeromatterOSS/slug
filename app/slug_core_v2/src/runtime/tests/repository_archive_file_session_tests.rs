@@ -191,6 +191,7 @@ fn selected_bcr_file_session_materializes_transforms_and_reuses_deleted_sources(
             request.clone(),
             RepositoryMaterializationGeneration(1),
             &runtime,
+            None,
         )
         .unwrap();
     let (root, instance) = selected_bcr_file_session_success(&materializer, "local_file");
@@ -243,6 +244,7 @@ fn selected_bcr_file_session_materializes_transforms_and_reuses_deleted_sources(
             request,
             RepositoryMaterializationGeneration(2),
             &runtime,
+            None,
         )
         .unwrap();
     assert_eq!(
@@ -267,6 +269,7 @@ fn selected_bcr_file_session_sri_a_b_a_reuses_the_original_root() {
             a.clone(),
             RepositoryMaterializationGeneration(1),
             &runtime,
+            None,
         )
         .unwrap();
     let first = selected_bcr_file_session_success(&materializer, "revision");
@@ -283,7 +286,13 @@ fn selected_bcr_file_session_sri_a_b_a_reuses_the_original_root() {
     let b = selected_bcr_file_session_request(&workspace, "revision", changed);
     let token = begin_empty(&materializer);
     materializer
-        .materialize_native_with_runtime(token, b, RepositoryMaterializationGeneration(2), &runtime)
+        .materialize_native_with_runtime(
+            token,
+            b,
+            RepositoryMaterializationGeneration(2),
+            &runtime,
+            None,
+        )
         .unwrap();
     let second = selected_bcr_file_session_success(&materializer, "revision");
     assert_ne!(second.0, first.0);
@@ -303,7 +312,13 @@ fn selected_bcr_file_session_sri_a_b_a_reuses_the_original_root() {
     }
     let token = begin_empty(&materializer);
     materializer
-        .materialize_native_with_runtime(token, a, RepositoryMaterializationGeneration(3), &runtime)
+        .materialize_native_with_runtime(
+            token,
+            a,
+            RepositoryMaterializationGeneration(3),
+            &runtime,
+            None,
+        )
         .unwrap();
     assert_eq!(
         selected_bcr_file_session_success(&materializer, "revision"),
@@ -322,7 +337,7 @@ fn selected_bcr_file_session_missing_create_mismatch_repair_retry_newer_generati
     let request = selected_bcr_file_session_request(&workspace, "repair", fixture.spec.clone());
     let materialize = |token, generation| {
         materializer
-            .materialize_native_with_runtime(token, request.clone(), generation, &runtime)
+            .materialize_native_with_runtime(token, request.clone(), generation, &runtime, None)
             .unwrap();
     };
     std::fs::remove_file(&fixture.archive).unwrap();
@@ -384,7 +399,7 @@ fn selected_bcr_file_session_stale_real_capture_drops_root_and_allows_replacemen
                 else {
                     unreachable!("fixture must remain on selected BCR path")
                 };
-                let captured = materialize_selected_bcr_capture(&plan, &runtime, active)?;
+                let captured = materialize_selected_bcr_capture(&plan, &runtime, active, None)?;
                 let Materialized::AssociatedImmutable { root, .. } = &captured else {
                     unreachable!("native selected BCR capture is associated immutable")
                 };
@@ -410,6 +425,7 @@ fn selected_bcr_file_session_stale_real_capture_drops_root_and_allows_replacemen
             selected_bcr_file_session_request(&workspace, "replacement", fixture.spec),
             RepositoryMaterializationGeneration(5),
             &runtime,
+            None,
         )
         .unwrap();
     let (root, instance) = selected_bcr_file_session_success(&materializer, "replacement");

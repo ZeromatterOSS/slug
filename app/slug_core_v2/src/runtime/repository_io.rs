@@ -54,6 +54,11 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 
 mod local_request;
+pub(super) mod source_service;
+#[cfg(test)]
+mod source_service_tests;
+use source_service::SourceServiceError;
+use source_service::SourceServiceScope;
 mod source_generations;
 pub(super) use source_generations::NativeSourceGenerations;
 
@@ -137,6 +142,7 @@ pub(super) enum RepositorySessionError {
     InvalidRetainedRoot(PathBuf),
     NativeObservation(super::path_observation::PathObservationKernelError),
     InvalidImageAuthority,
+    SourceService(SourceServiceError),
 }
 
 #[allow(dead_code)]
@@ -209,6 +215,7 @@ struct RepositoryMaterializerState {
 
 #[allow(dead_code)]
 pub(super) struct RepositoryMaterializer {
+    source_scope: Option<Arc<SourceServiceScope>>,
     workspace: NormalizedAbsolutePath,
     state: Mutex<RepositoryMaterializerState>,
 }
@@ -256,6 +263,7 @@ enum RepositoryMaterializationAttempt {
 impl RepositoryMaterializer {
     pub(super) fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self {
+            source_scope: None,
             workspace,
             state: Mutex::new(RepositoryMaterializerState {
                 next_token: 1,
@@ -265,6 +273,27 @@ impl RepositoryMaterializer {
                 accepted_roots: Vec::new(),
             }),
         }
+    }
+
+    pub(super) fn new_scoped(
+        workspace: NormalizedAbsolutePath,
+        scope: Arc<SourceServiceScope>,
+    ) -> Result<Self, SourceServiceError> {
+        if scope.workspace() != &workspace {
+            return Err(SourceServiceError::ForeignScope);
+        }
+        scope.check()?;
+        let mut materializer = Self::new(workspace);
+        materializer.source_scope = Some(scope);
+        Ok(materializer)
+    }
+
+    fn check_source_scope(
+        &self,
+        supplied: Option<&Arc<SourceServiceScope>>,
+    ) -> Result<(), RepositorySessionError> {
+        source_service::check_identity(self.source_scope.as_ref(), supplied)
+            .map_err(RepositorySessionError::SourceService)
     }
 
     pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
@@ -344,6 +373,7 @@ impl RepositoryMaterializer {
         ),
         RepositorySessionError,
     > {
+        self.check_source_scope(self.source_scope.as_ref())?;
         let mut state = self
             .state
             .lock()
@@ -367,10 +397,12 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         reusable: Vec<AcceptedRepository>,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.check_source_scope(self.source_scope.as_ref())?;
         let mut state = self
             .state
             .lock()
             .expect("repository materializer mutex poisoned");
+        self.check_source_scope(self.source_scope.as_ref())?;
         let active = matching_active_mut(&mut state, token)?;
         for accepted in &reusable {
             upsert_epoch_entry(
@@ -465,14 +497,28 @@ impl RepositoryMaterializer {
         generation: RepositoryMaterializationGeneration,
         materialize: impl FnOnce() -> RepositoryMaterializationAttempt,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.materialize_with_scope(token, request, generation, None, materialize)
+    }
+
+    fn materialize_with_scope(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        scope: Option<&Arc<SourceServiceScope>>,
+        materialize: impl FnOnce() -> RepositoryMaterializationAttempt,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.check_source_scope(scope)?;
         if request.id.workspace != self.workspace {
             return Err(RepositorySessionError::WrongWorkspace);
         }
         {
+            self.check_source_scope(scope)?;
             let mut state = self
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
+            self.check_source_scope(scope)?;
             let active = matching_validated_active_mut(&mut state, token)?;
             if let Some(existing) = active
                 .entries
@@ -559,6 +605,8 @@ impl RepositoryMaterializer {
             .state
             .lock()
             .expect("repository materializer mutex poisoned");
+        matching_validated_active(&state, token)?;
+        self.check_source_scope(scope)?;
         let active = matching_validated_active(&state, token)?;
         let mut inherited = None;
         if let Some(existing) = active
@@ -590,6 +638,11 @@ impl RepositoryMaterializer {
                     root,
                 },
             ) => {
+                if let Err(error) = self.check_source_scope(scope) {
+                    drop(state);
+                    drop(root);
+                    return Err(error);
+                }
                 let mut candidate = state.next_instance;
                 let observation_instance = match allocate_observation_instance(&mut candidate) {
                     Ok(observation_instance) => observation_instance,
@@ -599,6 +652,11 @@ impl RepositoryMaterializer {
                         return Err(RepositorySessionError::InstanceExhausted);
                     }
                 };
+                if let Err(error) = self.check_source_scope(scope) {
+                    drop(state);
+                    drop(root);
+                    return Err(error);
+                }
                 state.next_instance = candidate;
                 let generation_root = root.path().to_path_buf();
                 matching_validated_active_mut(&mut state, token)?
@@ -622,6 +680,11 @@ impl RepositoryMaterializer {
                     root,
                 },
             ) => {
+                if let Err(error) = self.check_source_scope(scope) {
+                    drop(state);
+                    drop(root);
+                    return Err(error);
+                }
                 let mut candidate = state.next_instance;
                 let observation_instance = match allocate_observation_instance(&mut candidate) {
                     Ok(observation_instance) => observation_instance,
@@ -631,6 +694,11 @@ impl RepositoryMaterializer {
                         return Err(RepositorySessionError::InstanceExhausted);
                     }
                 };
+                if let Err(error) = self.check_source_scope(scope) {
+                    drop(state);
+                    drop(root);
+                    return Err(error);
+                }
                 state.next_instance = candidate;
                 let generation_root = root.path().to_path_buf();
                 matching_validated_active_mut(&mut state, token)?
@@ -654,6 +722,7 @@ impl RepositoryMaterializer {
             request: request.clone(),
             result,
         };
+        self.check_source_scope(scope)?;
         let active = matching_validated_active_mut(&mut state, token)?;
         if let Some(index) = inherited {
             active.reusable.remove(index);
@@ -699,13 +768,27 @@ impl RepositoryMaterializer {
         request: Arc<RepositoryMaterializationRequest>,
         generation: RepositoryMaterializationGeneration,
         runtime: &tokio::runtime::Runtime,
+        scope: Option<&Arc<SourceServiceScope>>,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.check_source_scope(scope)?;
+        {
+            let state = self
+                .state
+                .lock()
+                .expect("repository materializer mutex poisoned");
+            matching_validated_active(&state, token)?;
+        }
+        validate_native_request(&self.workspace, &request)?;
         let workspace = self.workspace.as_path();
         let request_for_io = request.clone();
-        self.materialize_native_with(token, request, generation, || {
-            materialize_native_attempt_with_runtime(workspace, &request_for_io, runtime, &|| {
-                self.session_is_active(token)
-            })
+        self.materialize_with_scope(token, request, generation, scope, || {
+            materialize_native_attempt_with_runtime(
+                workspace,
+                &request_for_io,
+                runtime,
+                &|| self.session_is_active(token) && source_service::check(scope).is_ok(),
+                scope,
+            )
         })
     }
 
@@ -786,6 +869,7 @@ impl RepositoryMaterializer {
             &slug_bzlmod_v2::RepositoryMaterialization,
         )>,
     ) -> Result<super::input_image::ScopedImageSource, RepositorySessionError> {
+        self.check_source_scope(self.source_scope.as_ref())?;
         let pin = {
             let state = self
                 .state
@@ -900,11 +984,13 @@ impl RepositoryMaterializer {
         selected: &[Arc<RepositoryMaterializationRequest>],
         validation: Vec<RepositoryValidation>,
     ) -> Result<(), RepositorySessionError> {
+        self.check_source_scope(self.source_scope.as_ref())?;
         let released = {
             let mut state = self
                 .state
                 .lock()
                 .expect("repository materializer mutex poisoned");
+            self.check_source_scope(self.source_scope.as_ref())?;
             let active = matching_validated_active(&state, token)?;
             let accepted = selected_acceptance(active, selected, validation)?;
             let selected_instances = accepted
@@ -1776,8 +1862,10 @@ fn materialize_generated_repository_archive_effects(
     plan: &GeneratedRepositoryFileEffectPlan,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
-    if !plan.has_archives()
+    source_service::check(scope).map_err(ArchiveMaterializationError::materialization)?;
+    if (scope.is_none() && !plan.has_archives())
         || plan.has_symlinks()
         || !generated_repository_file_effect_paths_are_valid(plan)
     {
@@ -1815,6 +1903,7 @@ fn materialize_generated_repository_archive_effects(
                     archive.sha256(),
                     runtime,
                     active,
+                    scope,
                 )?;
                 super::repository_generated_archive::extract_selected_generated_archive(
                     capture.as_file(),
@@ -1822,6 +1911,7 @@ fn materialize_generated_repository_archive_effects(
                     archive.strip_prefix(),
                     active,
                     &mut aggregate_decoded,
+                    scope,
                 )?;
                 capture.close().map_err(|error| {
                     ArchiveMaterializationError::materialization(format!(
@@ -1861,11 +1951,13 @@ fn materialize_generated_repository_archive_effects(
                             "writing generated file: {error}"
                         ))
                     })?;
-                output.write_all(file.content()).map_err(|error| {
-                    ArchiveMaterializationError::materialization(format!(
-                        "writing generated file bytes: {error}"
-                    ))
-                })?;
+                source_service::write_counted(&mut output, file.content(), active, scope).map_err(
+                    |error| {
+                        ArchiveMaterializationError::materialization(format!(
+                            "writing generated file bytes: {error}"
+                        ))
+                    },
+                )?;
                 output.flush().map_err(|error| {
                     ArchiveMaterializationError::materialization(format!(
                         "flushing generated file: {error}"
@@ -1936,12 +2028,13 @@ fn materialize_native_attempt_with_runtime(
     request: &RepositoryMaterializationRequest,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> RepositoryMaterializationAttempt {
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind
-        && plan.has_archives()
+        && (plan.has_archives() || scope.is_some())
     {
         return materialized_attempt(materialize_generated_repository_archive_effects(
-            plan, runtime, active,
+            plan, runtime, active, scope,
         ));
     }
     if request.repo_spec.rule_id.bzl_file.to_string()
@@ -1952,7 +2045,17 @@ fn materialize_native_attempt_with_runtime(
             &request.repo_spec,
             runtime,
             active,
+            scope,
         ));
+    }
+    if let Some(scope) = scope {
+        // Local validation does no acquisition; all other uninstrumented
+        // general/Git families refuse before their native fallback can run.
+        if matches!(request.kind, RepositoryMaterializationKind::Local { .. }) {
+            return materialize_native_attempt(workspace, request);
+        }
+        let error = scope.poison(SourceServiceError::UnsupportedSourceOwner);
+        return RepositoryMaterializationAttempt::TransportError(error.to_string());
     }
     materialize_native_attempt(workspace, request)
 }
@@ -2107,13 +2210,23 @@ fn materialize_archive_plan_with_capture(
     repo_spec: &RepoSpec,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     match super::repository_archive::parse_archive_plan(repo_spec) {
         Ok(super::repository_archive::ArchivePlan::LocalTar) => {
+            if let Some(scope) = scope {
+                return Err(ArchiveMaterializationError::transport(
+                    scope
+                        .poison(SourceServiceError::UnsupportedSourceOwner)
+                        .to_string(),
+                ));
+            }
             super::repository_archive::materialize_local_tar(repo_spec)
         }
         Ok(super::repository_archive::ArchivePlan::SelectedBcrTarGz(plan)) => {
-            super::repository_archive::materialize_selected_bcr_capture(&plan, runtime, active)
+            super::repository_archive::materialize_selected_bcr_capture(
+                &plan, runtime, active, scope,
+            )
         }
         Err(error) => Err(ArchiveMaterializationError::spec(error)),
     }
@@ -2394,7 +2507,7 @@ mod tests {
 
     use super::*;
 
-    fn generated_plan(
+    pub(super) fn generated_plan(
         effects: impl IntoIterator<Item = (&'static str, &'static [u8], bool)>,
     ) -> GeneratedRepositoryFileEffectPlan {
         GeneratedRepositoryFileEffectPlan::build(effects.into_iter().map(
@@ -2502,7 +2615,8 @@ mod tests {
             .build()
             .unwrap();
         let materialized =
-            materialize_generated_repository_archive_effects(&plan, &runtime, &|| true).unwrap();
+            materialize_generated_repository_archive_effects(&plan, &runtime, &|| true, None)
+                .unwrap();
         let Materialized::AssociatedImmutable {
             source_identity,
             root,
@@ -2564,6 +2678,7 @@ mod tests {
             &wrong_sha.finish(),
             &runtime,
             &|| true,
+            None,
         )
         .err()
         .expect("mismatched SHA must fail before publication");
@@ -3375,7 +3490,7 @@ mod tests {
         }
     }
 
-    fn native_request(
+    pub(super) fn native_request(
         workspace: &NormalizedAbsolutePath,
         repo: &str,
         repo_spec: RepoSpec,
@@ -3391,7 +3506,7 @@ mod tests {
         })
     }
 
-    fn materialization_request(
+    pub(super) fn materialization_request(
         workspace: &NormalizedAbsolutePath,
         repo: &str,
         salt: &str,
@@ -3407,7 +3522,7 @@ mod tests {
         })
     }
 
-    fn begin_empty(materializer: &RepositoryMaterializer) -> RepositorySessionToken {
+    pub(super) fn begin_empty(materializer: &RepositoryMaterializer) -> RepositorySessionToken {
         begin_validated(materializer, |_, _| {
             panic!("empty accepted state must not observe")
         })

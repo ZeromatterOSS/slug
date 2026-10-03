@@ -1,7 +1,10 @@
 use std::io::Write;
 use std::path::Path;
+use std::sync::Arc;
 
 use super::repository_io::ArchiveMaterializationError;
+use super::repository_io::source_service::SourceServiceScope;
+use super::repository_io::source_service::{self};
 
 const PATCH_FILE_LIMIT: usize = 256;
 const PATCH_HUNK_LIMIT: usize = 4096;
@@ -12,6 +15,7 @@ pub(super) fn apply_selected_bcr_patch(
     bytes: &[u8],
     strip: usize,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     if bytes.contains(&b'\r') || bytes.contains(&0) || !bytes.ends_with(b"\n") {
         return Err(materialization(
@@ -79,7 +83,7 @@ pub(super) fn apply_selected_bcr_patch(
         if hunks.is_empty() {
             return Err(materialization("selected BCR patch file has no hunks"));
         }
-        apply_file(root, &old, &hunks, active)?;
+        apply_file(root, &old, &hunks, active, scope)?;
     }
     if files == 0 {
         return Err(materialization(
@@ -102,6 +106,7 @@ fn apply_file(
     relative: &str,
     hunks: &[(HunkHeader, &[&str])],
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     let target = root.join(relative);
     let metadata = std::fs::symlink_metadata(&target).map_err(|error| {
@@ -114,11 +119,37 @@ fn apply_file(
             "selected BCR patch target must be an existing regular file",
         ));
     }
-    let bytes = std::fs::read(&target).map_err(|error| {
-        materialization(format!(
-            "reading selected BCR patch target {relative}: {error}"
-        ))
-    })?;
+    let _buffer = scope
+        .map(|s| {
+            s.reserve_buffer(
+                usize::try_from(metadata.len())
+                    .map_err(|_| materialization("patch target size overflow"))?,
+            )
+            .map_err(|e| materialization(e.to_string()))
+        })
+        .transpose()?;
+    // The copy into this Vec is not a filesystem write, but its fixed scratch
+    // remains an owned source-service buffer until the copy has returned.
+    let _copy_scratch_credit = source_service::buffer(scope, 64 * 1024).map_err(materialization)?;
+    let bytes = if scope.is_some() {
+        let mut input = std::fs::File::open(&target).map_err(|e| materialization(e.to_string()))?;
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        source_service::copy_counted(
+            &mut input,
+            &mut bytes,
+            metadata.len(),
+            &|| active() && source_service::check(scope).is_ok(),
+            None,
+        )
+        .map_err(|e| materialization(e.to_string()))?;
+        bytes
+    } else {
+        std::fs::read(&target).map_err(|error| {
+            materialization(format!(
+                "reading selected BCR patch target {relative}: {error}"
+            ))
+        })?
+    };
     if bytes.contains(&b'\r')
         || bytes.contains(&0)
         || (!bytes.is_empty() && !bytes.ends_with(b"\n"))
@@ -188,11 +219,13 @@ fn apply_file(
         ))
     })?;
     for line in output {
-        staged.write_all(line.as_bytes()).map_err(|error| {
-            materialization(format!(
-                "writing selected BCR patched file {relative}: {error}"
-            ))
-        })?;
+        source_service::write_counted(&mut staged, line.as_bytes(), active, scope).map_err(
+            |error| {
+                materialization(format!(
+                    "writing selected BCR patched file {relative}: {error}"
+                ))
+            },
+        )?;
     }
     staged
         .as_file()

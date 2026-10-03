@@ -248,7 +248,7 @@ fn native_local_file_payload_is_verified() {
     source.write_all(b"verified local payload").unwrap();
     let url = url::Url::from_file_path(source.path()).unwrap().to_string();
     let plan = plan(vec![url], b"verified local payload");
-    let mut captured = capture_selected_bcr(&plan, &runtime(), &|| true).unwrap();
+    let mut captured = capture_selected_bcr(&plan, &runtime(), &|| true, None).unwrap();
     captured.rewind().unwrap();
     let mut bytes = String::new();
     captured.read_to_string(&mut bytes).unwrap();
@@ -274,8 +274,8 @@ fn all_native_file_roles_keep_sri_caps_and_tls_uninitialized() {
         source.rewind().unwrap();
         source.write_all(b"local").unwrap();
         let run = || match role {
-            "archive" => capture_selected_bcr(&plan, &runtime, &|| true),
-            "MODULE" => capture_selected_bcr_module(&plan, &runtime, &|| true),
+            "archive" => capture_selected_bcr(&plan, &runtime, &|| true, None),
+            "MODULE" => capture_selected_bcr_module(&plan, &runtime, &|| true, None),
             "patch" => capture_selected_bcr_patch(
                 &SelectedBcrPatch {
                     url: url.clone(),
@@ -283,6 +283,7 @@ fn all_native_file_roles_keep_sri_caps_and_tls_uninitialized() {
                 },
                 &runtime,
                 &|| true,
+                None,
             ),
             _ => capture_selected_bcr_overlay(
                 &SelectedBcrOverlay {
@@ -292,6 +293,7 @@ fn all_native_file_roles_keep_sri_caps_and_tls_uninitialized() {
                 },
                 &runtime,
                 &|| true,
+                None,
             ),
         };
         let mut captured = run().unwrap();
@@ -438,8 +440,8 @@ fn selected_extension_file_capture_retains_only_verified_bytes() {
     assert_eq!(&*bytes, b"generator bytes");
     assert_captures_deleted(&environment);
 
-    let error =
-        capture_selected_extension_artifact(&file, [0; 32], &runtime(), &|| true).unwrap_err();
+    let error = capture_selected_extension_artifact(&file, [0; 32], &runtime(), &|| true, None)
+        .unwrap_err();
     assert_eq!(error, "selected extension artifact SHA-256 mismatch");
 
     source
@@ -447,7 +449,7 @@ fn selected_extension_file_capture_retains_only_verified_bytes() {
         .set_len(SELECTED_EXTENSION_CAPTURE_LIMIT + 1)
         .unwrap();
     let error =
-        capture_selected_extension_artifact(&file, digest, &runtime(), &|| true).unwrap_err();
+        capture_selected_extension_artifact(&file, digest, &runtime(), &|| true, None).unwrap_err();
     assert_eq!(
         error,
         "selected extension artifact exceeds 33554432 byte capture limit"

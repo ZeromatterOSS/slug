@@ -391,6 +391,7 @@ pub(super) fn active(
     command: &NativeDemandCommand<'_>,
     deadline: Instant,
 ) -> Result<(), NativeDemandSessionError> {
+    command.check_source_scope()?;
     if Instant::now() >= deadline
         || !command
             .runtime

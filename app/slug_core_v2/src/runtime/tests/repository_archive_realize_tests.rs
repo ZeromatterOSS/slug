@@ -153,9 +153,13 @@ fn selected_bcr_preserves_relative_file_symlink_text_after_prefix_and_file_order
         finish(&mut raw);
         for prefix in [None, Some("pkg")] {
             let root = tempfile::tempdir().unwrap();
-            extract(capture(&gzip(&raw)).as_file(), root.path(), prefix, &|| {
-                true
-            })
+            extract(
+                capture(&gzip(&raw)).as_file(),
+                root.path(),
+                prefix,
+                &|| true,
+                None,
+            )
             .unwrap();
             let link = root
                 .path()
@@ -270,10 +274,16 @@ fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_trans
     finish(&mut raw);
     let calls = Cell::new(0);
     let root = tempfile::tempdir().unwrap();
-    extract(capture(&gzip(&raw)).as_file(), root.path(), None, &|| {
-        calls.set(calls.get() + 1);
-        true
-    })
+    extract(
+        capture(&gzip(&raw)).as_file(),
+        root.path(),
+        None,
+        &|| {
+            calls.set(calls.get() + 1);
+            true
+        },
+        None,
+    )
     .unwrap();
     let final_call = calls.get();
     let cutoff = Cell::new(0);
@@ -286,7 +296,8 @@ fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_trans
             &|| {
                 cutoff.set(cutoff.get() + 1);
                 cutoff.get() < final_call
-            }
+            },
+            None
         )
         .unwrap_err()
         .message
@@ -297,7 +308,8 @@ fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_trans
         b"ordinary\n"
     );
     assert!(std::fs::symlink_metadata(cancelled.path().join("link")).is_err());
-    let overlay = place_overlay(capture(b"overlay"), root.path(), "link", &|| true).unwrap_err();
+    let overlay =
+        place_overlay(capture(b"overlay"), root.path(), "link", &|| true, None).unwrap_err();
     assert!(overlay.message.contains("not a regular file"));
     let patch = b"--- a/link\n+++ b/link\n@@ -1,1 +1,1 @@\n-ordinary\n+changed\n";
     assert!(
@@ -305,7 +317,8 @@ fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_trans
             root.path(),
             patch,
             1,
-            &|| true
+            &|| true,
+            None
         )
         .is_err()
     );
@@ -324,6 +337,7 @@ fn selected_bcr_checks_session_before_link_installation_and_rejects_linked_trans
         vec![],
         module,
         &|| true,
+        None,
     )
     .err()
     .unwrap();
@@ -347,6 +361,7 @@ fn selected_bcr_realizes_complete_rules_jvm_external_archive() {
         root.path(),
         Some("rules_jvm_external-6.7"),
         &|| true,
+        None,
     )
     .unwrap();
     let link = root
@@ -365,9 +380,15 @@ fn selected_bcr_realizes_complete_rules_jvm_external_archive() {
 
 fn extraction_error(raw: &[u8]) -> String {
     let root = tempfile::tempdir().unwrap();
-    extract(capture(&gzip(raw)).as_file(), root.path(), None, &|| true)
-        .unwrap_err()
-        .message
+    extract(
+        capture(&gzip(raw)).as_file(),
+        root.path(),
+        None,
+        &|| true,
+        None,
+    )
+    .unwrap_err()
+    .message
 }
 
 #[test]
@@ -400,7 +421,16 @@ fn selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module() {
     let Materialized::AssociatedImmutable {
         source_identity,
         root,
-    } = realize_selected_bcr(&plan, archive, Vec::new(), Vec::new(), module, &|| true).unwrap()
+    } = realize_selected_bcr(
+        &plan,
+        archive,
+        Vec::new(),
+        Vec::new(),
+        module,
+        &|| true,
+        None,
+    )
+    .unwrap()
     else {
         panic!("selected BCR must be associated immutable")
     };
@@ -487,7 +517,14 @@ fn selected_bcr_admits_regular_0640_without_changing_bytes_mode_or_mtime() {
     append(&mut raw, b"file", b'0', 0o640, 123, b"probe bytes");
     finish(&mut raw);
     let root = tempfile::tempdir().unwrap();
-    extract(capture(&gzip(&raw)).as_file(), root.path(), None, &|| true).unwrap();
+    extract(
+        capture(&gzip(&raw)).as_file(),
+        root.path(),
+        None,
+        &|| true,
+        None,
+    )
+    .unwrap();
     let path = root.path().join("file");
     assert_eq!(std::fs::read(&path).unwrap(), b"probe bytes");
     let metadata = std::fs::metadata(path).unwrap();
@@ -536,6 +573,7 @@ fn selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mt
         Vec::new(),
         capture(MODULE),
         &|| true,
+        None,
     )
     .unwrap()
     else {
@@ -580,9 +618,13 @@ fn selected_bcr_admits_directory_0750_with_native_normalization_and_prefix() {
     finish(&mut raw);
     for prefix in [None, Some("pkg")] {
         let root = tempfile::tempdir().unwrap();
-        extract(capture(&gzip(&raw)).as_file(), root.path(), prefix, &|| {
-            true
-        })
+        extract(
+            capture(&gzip(&raw)).as_file(),
+            root.path(),
+            prefix,
+            &|| true,
+            None,
+        )
         .unwrap();
         let directory = root.path().join(if prefix.is_some() {
             "nested"
@@ -623,6 +665,7 @@ fn selected_bcr_prefix_overlay_patch_module_order_and_modes_are_exact() {
         vec![capture(patch)],
         capture(b"registry module\n"),
         &|| true,
+        None,
     )
     .unwrap() else {
         panic!("selected BCR transform must publish an immutable root")
@@ -664,7 +707,8 @@ fn selected_bcr_prefix_overlay_patch_module_order_and_modes_are_exact() {
             capture(&gzip(&raw)).as_file(),
             missing.path(),
             Some("missing"),
-            &|| true
+            &|| true,
+            None
         )
         .unwrap_err()
         .message
@@ -690,7 +734,14 @@ fn selected_bcr_consumes_only_well_formed_global_pax_comment_metadata() {
     append(&mut raw, b"file", b'0', 0o664, 1, b"bytes");
     finish(&mut raw);
     let root = tempfile::tempdir().unwrap();
-    extract(capture(&gzip(&raw)).as_file(), root.path(), None, &|| true).unwrap();
+    extract(
+        capture(&gzip(&raw)).as_file(),
+        root.path(),
+        None,
+        &|| true,
+        None,
+    )
+    .unwrap();
     assert_eq!(std::fs::read(root.path().join("file")).unwrap(), b"bytes");
 
     let mut malformed_length = pax_record("comment", "x");
@@ -744,6 +795,7 @@ fn selected_bcr_consumes_only_well_formed_global_pax_comment_metadata() {
             root.path(),
             None,
             &active,
+            None,
         )
         .unwrap_err()
         .message
@@ -871,6 +923,7 @@ fn selected_bcr_enforces_physical_decompressed_entry_and_payload_limits() {
     let mut reader = BoundedTarReader {
         reader: Cursor::new([1u8]),
         active: &|| true,
+        scope: None,
         read: DECOMPRESSED_LIMIT,
     };
     assert!(
@@ -894,10 +947,16 @@ fn selected_bcr_active_cutoff_and_source_association_are_session_semantic() {
     };
     let root = tempfile::tempdir().unwrap();
     assert!(
-        extract(capture(&gzip(&raw)).as_file(), root.path(), None, &active)
-            .unwrap_err()
-            .message
-            .contains("no longer active")
+        extract(
+            capture(&gzip(&raw)).as_file(),
+            root.path(),
+            None,
+            &active,
+            None
+        )
+        .unwrap_err()
+        .message
+        .contains("no longer active")
     );
 
     let a = plan([1; 32], [2; 32]);
@@ -986,6 +1045,7 @@ fn selected_bcr_cancellation_between_transforms_drops_every_capture() {
             vec![patch],
             module,
             &active,
+            None,
         );
         let Err(error) = result else {
             panic!("cancellation at transform boundary must reject publication")
@@ -1014,6 +1074,7 @@ fn selected_bcr_module_and_cancellation_failures_drop_captures() {
         Vec::new(),
         cancelled_module,
         &|| false,
+        None,
     );
     let Err(error) = result else {
         panic!("MODULE transport failure must reject realization")
@@ -1032,6 +1093,7 @@ fn selected_bcr_module_and_cancellation_failures_drop_captures() {
         Vec::new(),
         module,
         &|| true,
+        None,
     );
     let Err(error) = result else {
         panic!("oversized MODULE must reject realization")
@@ -1060,9 +1122,16 @@ fn selected_bcr_disposable_artifact_matches_bazel_manifest() {
             .try_into()
             .unwrap(),
     );
-    let Materialized::AssociatedImmutable { root, .. } =
-        realize_selected_bcr(&plan, archive, Vec::new(), Vec::new(), module, &|| true).unwrap()
-    else {
+    let Materialized::AssociatedImmutable { root, .. } = realize_selected_bcr(
+        &plan,
+        archive,
+        Vec::new(),
+        Vec::new(),
+        module,
+        &|| true,
+        None,
+    )
+    .unwrap() else {
         panic!("selected BCR must be associated immutable")
     };
     let mut rows = Vec::new();
@@ -1129,5 +1198,62 @@ fn audit_manifest(root: &Path, directory: &Path, rows: &mut Vec<String>) {
         } else {
             panic!("special filesystem entry at {relative}");
         }
+    }
+}
+
+#[test]
+fn scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements() {
+    use std::time::Duration;
+    use std::time::Instant;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+    use crate::runtime::dice::source_service::SourceServiceScope;
+    let mut raw = Vec::new();
+    append(&mut raw, b"file", b'0', 0o644, 1, b"old\n");
+    finish(&mut raw);
+    let patch = b"--- a/file\n+++ b/file\n@@ -1,1 +1,1 @@\n-one\n+two\n";
+    let module = b"module\n";
+    let mut plan = transform_plan("", &[[2; 32]], &[("file", [3; 32])], 1);
+    plan.strip_prefix = None;
+    for cap in [19, 18] {
+        let work = Instant::now() + Duration::from_secs(2);
+        let scope = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            work,
+            work + Duration::from_secs(1),
+            SourceServiceLimits {
+                written_bytes: cap,
+                ..SourceServiceLimits::default()
+            },
+        )
+        .unwrap();
+        let result = realize_selected_bcr(
+            &plan,
+            capture(&gzip(&raw)),
+            vec![capture(b"one\n")],
+            vec![capture(patch)],
+            capture(module),
+            &|| true,
+            Some(&scope),
+        );
+        assert_eq!(result.is_ok(), cap == 19);
+        assert_eq!(
+            scope.snapshot().decoded_bytes,
+            raw.len() as u64,
+            "headers/padding/end blocks all count"
+        );
+        if let Ok(Materialized::AssociatedImmutable { root, .. }) = result {
+            assert_eq!(std::fs::read(root.path().join("file")).unwrap(), b"two\n");
+            assert_eq!(
+                std::fs::read(root.path().join("MODULE.bazel")).unwrap(),
+                module
+            );
+            assert_eq!(scope.snapshot().written_bytes, 19);
+        } else {
+            assert!(scope.check().is_err());
+        }
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
     }
 }

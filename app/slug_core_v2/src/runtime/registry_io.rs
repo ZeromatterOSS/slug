@@ -150,6 +150,16 @@ pub(crate) fn install(builder: &mut DiceDataBuilder) {
     install_registry_io(builder, Arc::new(HyperRegistryIo::new()));
 }
 
+pub(in crate::runtime) fn install_scoped(
+    builder: &mut DiceDataBuilder,
+    scope: Arc<super::dice::source_service::SourceServiceScope>,
+) {
+    install_registry_io(
+        builder,
+        Arc::new(super::dice::source_service::ScopedRegistryIo::new(scope)),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use tokio::io::AsyncReadExt;

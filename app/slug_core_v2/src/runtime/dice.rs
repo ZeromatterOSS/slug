@@ -501,10 +501,13 @@ mod selected_scratch_source;
 mod selected_tool_source;
 #[path = "source_preparation.rs"]
 mod source_preparation;
+#[path = "source_service.rs"]
+pub(super) mod source_service;
 
 /// The sole DICE owner for one canonical workspace identity.
 pub struct WorkspaceRuntime {
     workspace: PathBuf,
+    source_scope: Option<Arc<source_service::SourceServiceScope>>,
     image_resources: super::input_image::WorkspaceImageResources,
     scratch_resources: slug_bzlmod_v2::SelectedScratchResources,
     // Retained now so the request-projection packet cannot accidentally create
@@ -859,6 +862,7 @@ enum NativeDemandSessionError {
     LeaseTokenExhausted,
     StaleLease,
     Repository(super::repository_io::RepositorySessionError),
+    SourceService(source_service::SourceServiceError),
     ConflictingRepository(slug_identity_v2::CanonicalRepoName),
     RepositoryInternalNonProgress,
     EnvironmentInternalNonProgress,
@@ -904,6 +908,7 @@ impl fmt::Display for NativeDemandSessionError {
             Self::LeaseTokenExhausted => f.write_str("workspace command lease tokens exhausted"),
             Self::StaleLease => f.write_str("workspace command lease is stale"),
             Self::Repository(_) => f.write_str("repository session failed"),
+            Self::SourceService(error) => write!(f, "source service failed: {error}"),
             Self::ConflictingRepository(repository) => {
                 write!(f, "conflicting repository requests for {repository}")
             }
@@ -6078,15 +6083,44 @@ impl WorkspaceRuntime {
         workspace: impl Into<PathBuf>,
         process_host: Arc<super::ProcessHostOwner>,
     ) -> anyhow::Result<Self> {
+        Self::new_with_source_services(
+            workspace,
+            process_host,
+            source_service::WorkspaceSourceServices::Native,
+        )
+    }
+
+    fn new_with_source_services(
+        workspace: impl Into<PathBuf>,
+        process_host: Arc<super::ProcessHostOwner>,
+        services: source_service::WorkspaceSourceServices,
+    ) -> anyhow::Result<Self> {
+        let source_scope = match services {
+            source_service::WorkspaceSourceServices::Native => None,
+            source_service::WorkspaceSourceServices::Diagnostic(scope) => {
+                scope.check()?;
+                Some(scope)
+            }
+        };
         let workspace = workspace.into();
         let workspace = workspace
             .canonicalize()
             .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
         let normalized_workspace = NormalizedAbsolutePath::new(workspace.clone())
             .context("normalizing retained workspace")?;
-        let repository_materializer = Arc::new(super::repository_io::RepositoryMaterializer::new(
-            normalized_workspace.clone(),
-        ));
+        if let Some(scope) = &source_scope {
+            scope.check()?;
+            if scope.workspace() != &normalized_workspace {
+                return Err(source_service::SourceServiceError::ForeignScope.into());
+            }
+        }
+        let repository_materializer = Arc::new(match &source_scope {
+            Some(scope) => super::repository_io::RepositoryMaterializer::new_scoped(
+                normalized_workspace.clone(),
+                scope.clone(),
+            )?,
+            None => super::repository_io::RepositoryMaterializer::new(normalized_workspace.clone()),
+        });
         let configured_output = Arc::new(super::configured_output::ConfiguredOutputOwner::new(
             workspace.clone(),
         ));
@@ -6096,7 +6130,10 @@ impl WorkspaceRuntime {
             .build()
             .context("creating workspace DICE runtime")?;
         let mut dice_builder = Dice::builder();
-        super::registry_io::install(&mut dice_builder);
+        match &source_scope {
+            Some(scope) => super::registry_io::install_scoped(&mut dice_builder, scope.clone()),
+            None => super::registry_io::install(&mut dice_builder),
+        }
         super::repository_io::install(&mut dice_builder);
         let dice = dice_builder.build(DetectCycles::Enabled);
         let native_demand_sessions = NativeDemandSessionOwner::new(normalized_workspace.clone());
@@ -6115,7 +6152,11 @@ impl WorkspaceRuntime {
             slug_bzlmod_v2::SelectedScratchPayloadBudget::new(256 * 1024 * 1024),
             image_resources.descriptor_budget().clone(),
         );
+        if let Some(scope) = &source_scope {
+            scope.check()?;
+        }
         Ok(Self {
+            source_scope,
             image_resources,
             scratch_resources,
             workspace,
@@ -7642,6 +7683,7 @@ impl NativeDemandCommand<'_> {
         &mut self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
+        self.validate_source_progress(needs)?;
         let mut repository_needs = needs
             .repository_materializations()
             .values()
@@ -7686,8 +7728,10 @@ impl NativeDemandCommand<'_> {
                         request.clone(),
                         self.inputs.generations.repository,
                         &self.runtime.runtime,
+                        self.runtime.source_scope(),
                     )
                     .map_err(NativeDemandSessionError::Repository)?;
+                self.check_source_scope()?;
                 self.reusable_requests.shift_remove(&request.id);
                 self.issued_requests.insert(request.id.clone(), request);
             }
@@ -7768,12 +7812,15 @@ impl NativeDemandCommand<'_> {
                             .repository_materializer
                             .session_is_active(self.repository_session)
                     },
+                    self.runtime.source_scope(),
                 )
                 .map_err(NativeDemandSessionError::DownloadCapture)?;
+                self.check_source_scope()?;
                 let verified = SelectedExtensionDownloadVerified::new(request.clone(), bytes)
                     .map_err(|error| {
                         NativeDemandSessionError::DownloadCapture(error.to_string())
                     })?;
+                self.check_source_scope()?;
                 self.download_results
                     .insert(owner.clone(), Arc::new(verified));
                 self.issued_downloads.insert(owner.clone(), request);
@@ -7796,6 +7843,7 @@ impl NativeDemandCommand<'_> {
                 .collect::<Vec<_>>();
             if !new_demands.is_empty() {
                 let observed = input_image_bridge::observe_command_paths(self, new_demands)?;
+                self.check_source_scope()?;
                 let merged = self
                     .path_observations
                     .observations()
@@ -7896,9 +7944,7 @@ impl NativeDemandCommand<'_> {
     }
 
     fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
-        self.runtime
-            .runtime
-            .block_on(self.runtime.dice.wait_for_idle());
+        self.runtime.wait_source_idle()?;
         #[cfg(test)]
         if self
             .runtime
@@ -7910,82 +7956,84 @@ impl NativeDemandCommand<'_> {
             )));
         }
         let prior = self.prior.clone();
-        self.runtime.runtime.block_on(async {
-            let mut data = self
-                .runtime
-                .user_computation_data_with_repository_host_inputs(
-                    None,
-                    prior.inputs.request.repository_environment.clone(),
-                    prior.repository_environment_frontier.clone(),
+        self.runtime
+            .runtime
+            .block_on(self.runtime.source_cleanup(async {
+                let mut data = self
+                    .runtime
+                    .user_computation_data_with_repository_host_inputs(
+                        None,
+                        prior.inputs.request.repository_environment.clone(),
+                        prior.repository_environment_frontier.clone(),
+                    )
+                    .map_err(|error| {
+                        NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
+                    })?;
+                install_selected_extension_download_transaction(
+                    &mut data,
+                    &self.runtime.workspace,
+                    &prior.download_results,
                 )
-                .map_err(|error| {
-                    NativeDemandSessionError::Restoration(anyhow::anyhow!(error.to_string()))
-                })?;
-            install_selected_extension_download_transaction(
-                &mut data,
-                &self.runtime.workspace,
-                &prior.download_results,
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            runtime_sources::install_declaration_transaction(
-                &mut data,
-                self.runtime,
-                prior.inputs.request.runtime_sources.as_ref(),
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            guest_namespace::install_transaction(
-                &mut data,
-                self.runtime,
-                prior.inputs.request.guest_namespace,
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            let mut updater = self.runtime.dice.updater_with_data(data);
-            inject_native_demand_snapshot(
-                &mut updater,
-                self.runtime,
-                &prior.inputs,
-                prior.repository_results,
-                prior.path_observations,
-                &self.path_input_ledger,
-                &prior.repository_environment_frontier,
-                &self.repository_environment_frontier,
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            inject_selected_extension_downloads(
-                &mut updater,
-                &self.runtime.workspace,
-                &prior.download_results,
-                &self.download_results,
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            if let Some(state) = &self.scratch_metadata {
-                state.inject(&mut updater, true)?;
-            }
-            inject_repository_execute_epoch(
-                &mut updater,
-                &self.runtime.workspace,
-                RepositoryExecuteEpoch::revoked(),
-            )
-            .map_err(NativeDemandSessionError::Restoration)?;
-            #[allow(unused_mut)]
-            let mut transaction = self.runtime.request_revision.commit(updater).await;
-            #[cfg(test)]
-            {
-                self.restoration_host_inputs = Some(
-                    transaction
-                        .compute(&RepositoryHostRestorationProbeKey(self.lease.0))
-                        .await
-                        .map_err(|error| {
-                            NativeDemandSessionError::Restoration(anyhow::anyhow!(
-                                error.to_string()
-                            ))
-                        })?,
-                );
-            }
-            drop(transaction);
-            self.runtime.dice.wait_for_idle().await;
-            Ok::<_, NativeDemandSessionError>(())
-        })?;
+                .map_err(NativeDemandSessionError::Restoration)?;
+                runtime_sources::install_declaration_transaction(
+                    &mut data,
+                    self.runtime,
+                    prior.inputs.request.runtime_sources.as_ref(),
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                guest_namespace::install_transaction(
+                    &mut data,
+                    self.runtime,
+                    prior.inputs.request.guest_namespace,
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                let mut updater = self.runtime.dice.updater_with_data(data);
+                inject_native_demand_snapshot(
+                    &mut updater,
+                    self.runtime,
+                    &prior.inputs,
+                    prior.repository_results,
+                    prior.path_observations,
+                    &self.path_input_ledger,
+                    &prior.repository_environment_frontier,
+                    &self.repository_environment_frontier,
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                inject_selected_extension_downloads(
+                    &mut updater,
+                    &self.runtime.workspace,
+                    &prior.download_results,
+                    &self.download_results,
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                if let Some(state) = &self.scratch_metadata {
+                    state.inject(&mut updater, true)?;
+                }
+                inject_repository_execute_epoch(
+                    &mut updater,
+                    &self.runtime.workspace,
+                    RepositoryExecuteEpoch::revoked(),
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
+                #[allow(unused_mut)]
+                let mut transaction = self.runtime.request_revision.commit(updater).await;
+                #[cfg(test)]
+                {
+                    self.restoration_host_inputs = Some(
+                        transaction
+                            .compute(&RepositoryHostRestorationProbeKey(self.lease.0))
+                            .await
+                            .map_err(|error| {
+                                NativeDemandSessionError::Restoration(anyhow::anyhow!(
+                                    error.to_string()
+                                ))
+                            })?,
+                    );
+                }
+                drop(transaction);
+                self.runtime.dice.wait_for_idle().await;
+                Ok::<_, NativeDemandSessionError>(())
+            }))?;
         self.runtime
             .repository_materializer
             .discard(self.repository_session)

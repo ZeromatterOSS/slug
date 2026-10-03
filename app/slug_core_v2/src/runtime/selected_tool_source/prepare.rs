@@ -111,7 +111,7 @@ impl WorkspaceRuntime {
                         .await
                         .map_err(|_| refusal("source owner preparation cancelled"))?
                     });
-                    self.runtime.block_on(self.dice.wait_for_idle());
+                    self.wait_source_idle()?;
                     match fresh? {
                         attempt::Attempt::Need(need) => {
                             #[cfg(test)]
@@ -177,7 +177,7 @@ impl WorkspaceRuntime {
                     .await
                     .map_err(|_| refusal("tool preparation cancelled"))?
                 });
-                self.runtime.block_on(self.dice.wait_for_idle());
+                self.wait_source_idle()?;
                 let (plan, mut plan_demands) = match plan_attempt? {
                     attempt::Attempt::Need(need) => {
                         #[cfg(test)]
@@ -248,7 +248,7 @@ impl WorkspaceRuntime {
                         .await
                         .map_err(|_| refusal("data preparation cancelled"))?
                     });
-                    self.runtime.block_on(self.dice.wait_for_idle());
+                    self.wait_source_idle()?;
                     match next? {
                         attempt::Attempt::Need(need) => {
                             #[cfg(test)]
@@ -380,7 +380,7 @@ impl WorkspaceRuntime {
                     .await
                     .map_err(|_| refusal("tool preparation cancelled"))?
                 });
-                self.runtime.block_on(self.dice.wait_for_idle());
+                self.wait_source_idle()?;
                 validate_plan(guard.command(), &key, &plan, &plan_demands, deadline)?;
                 match outcome? {
                     attempt::Attempt::Need(need) => {
@@ -507,26 +507,39 @@ fn finalize_with_hook<T>(
         Ok(()) => {
             guard.phase = NativeDemandAbortPhase::Closed;
             guard.command = None;
-            runtime.runtime.block_on(runtime.dice.wait_for_idle());
+            let drained = runtime.wait_source_idle();
             #[cfg(test)]
             let after = match (hook, stages) {
                 (Some(hook), Some(stages)) => hook(ToolPhase::AfterRestore(stages)),
                 _ => Ok(()),
             };
+            // Scoped cleanup is attempted even after acquisition failure. The
+            // primary refusal remains authoritative if cleanup also fails.
+            if runtime.source_scope().is_some() && result.is_err() {
+                return result;
+            }
+            drained?;
             suppression?;
             #[cfg(test)]
             {
                 before?;
                 after?;
             }
-            if Instant::now() >= deadline {
-                return Err(refusal("tool preparation cancelled"));
+            if result.is_ok() || runtime.source_scope().is_none() {
+                runtime.check_source_scope()?;
+                if Instant::now() >= deadline {
+                    return Err(refusal("tool preparation cancelled"));
+                }
             }
             result
         }
         Err(error) => {
             guard.phase = NativeDemandAbortPhase::FailClosed;
-            runtime.runtime.block_on(runtime.dice.wait_for_idle());
+            let drained = runtime.wait_source_idle();
+            if runtime.source_scope().is_some() && result.is_err() {
+                return result;
+            }
+            drained?;
             Err(error)
         }
     }

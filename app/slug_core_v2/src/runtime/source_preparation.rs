@@ -76,7 +76,8 @@ impl WorkspaceRuntime {
             &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
         >,
     ) -> Result<PreparedSelectedSourceView, NativeDemandSessionError> {
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+        let deadline = self
+            .source_work_deadline(std::time::Instant::now() + std::time::Duration::from_secs(60))?;
         let runtime_policy = request
             .inputs
             .runtime_sources
@@ -121,7 +122,7 @@ impl WorkspaceRuntime {
                     .await
                     .map_err(|_| refusal("source owner preparation cancelled"))?
                 });
-                self.runtime.block_on(self.dice.wait_for_idle());
+                self.wait_source_idle()?;
                 match outcome? {
                     selected_tool_source::attempt::Attempt::Need(need) => {
                         selected_tool_source::progress_baseline(&mut guard, &need, deadline)?;
@@ -178,6 +179,7 @@ impl WorkspaceRuntime {
         let selected_tool_source::PreparedLease::Namespace(view) = lease else {
             return Err(refusal("source preparation produced wrong lease"));
         };
+        self.check_source_scope()?;
         credit
             .freeze(PreparedSourceOwner {
                 view,

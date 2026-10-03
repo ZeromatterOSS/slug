@@ -19,6 +19,9 @@ use super::repository_archive::SelectedBcrArchive;
 use super::repository_archive::SelectedBcrArchiveFormat;
 use super::repository_io::ArchiveMaterializationError;
 use super::repository_io::Materialized;
+use super::repository_io::source_service::SourceCounter;
+use super::repository_io::source_service::SourceServiceScope;
+use super::repository_io::source_service::{self};
 
 const BLOCK: usize = 512;
 const DECOMPRESSED_LIMIT: u64 = 256 * 1024 * 1024;
@@ -38,6 +41,7 @@ pub(super) fn realize_selected_bcr(
     patches: Vec<tempfile::NamedTempFile>,
     module: tempfile::NamedTempFile,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     if overlays.len() != plan.overlays.len() || patches.len() != plan.patches.len() {
         return Err(materialization(
@@ -51,23 +55,38 @@ pub(super) fn realize_selected_bcr(
         root.path(),
         plan.strip_prefix.as_deref(),
         active,
+        scope,
     )?;
     archive
         .close()
         .map_err(|error| materialization(format!("deleting verified archive capture: {error}")))?;
     for (overlay, capture) in plan.overlays.iter().zip(overlays) {
-        place_overlay(capture, root.path(), &overlay.destination, active)?;
+        place_overlay(capture, root.path(), &overlay.destination, active, scope)?;
     }
     for capture in patches {
-        let bytes = read_capture(capture, "patch", 8 * 1024 * 1024, active)?;
+        let _buffer = scope
+            .map(|s| {
+                let size = capture
+                    .as_file()
+                    .metadata()
+                    .map_err(|e| materialization(e.to_string()))?
+                    .len();
+                s.reserve_buffer(
+                    usize::try_from(size).map_err(|_| materialization("patch size overflow"))?,
+                )
+                .map_err(|e| materialization(e.to_string()))
+            })
+            .transpose()?;
+        let bytes = read_capture(capture, "patch", 8 * 1024 * 1024, active, scope)?;
         super::repository_archive_patch::apply_selected_bcr_patch(
             root.path(),
             &bytes,
             plan.patch_strip,
             active,
+            scope,
         )?;
     }
-    place_module(module, root.path(), active)?;
+    place_module(module, root.path(), active, scope)?;
     if !active() {
         return Err(materialization("repository session is no longer active"));
     }
@@ -119,6 +138,7 @@ fn extract(
     root: &Path,
     strip_prefix: Option<&str>,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     let mut capture = capture
         .try_clone()
@@ -127,7 +147,9 @@ fn extract(
         .seek(SeekFrom::Start(0))
         .map_err(|error| materialization(format!("seeking verified archive capture: {error}")))?;
     let decoder = MultiGzDecoder::new(capture);
-    let mut tar = BoundedTarReader::new(decoder, active);
+    let _decoder_buffer_credit =
+        source_service::buffer(scope, 64 * 1024 + 1024).map_err(materialization)?;
+    let mut tar = BoundedTarReader::new(decoder, active, scope);
     let mut namespace = HashMap::<String, EntryKind>::new();
     let mut symlinks = Vec::new();
     let mut pending_longname: Option<String> = None;
@@ -589,6 +611,7 @@ fn read_capture(
     subject: &str,
     limit: u64,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Vec<u8>, ArchiveMaterializationError> {
     let size = capture
         .as_file()
@@ -607,11 +630,34 @@ fn read_capture(
         .as_file_mut()
         .seek(SeekFrom::Start(0))
         .map_err(|error| materialization(format!("seeking verified {subject} capture: {error}")))?;
-    let mut bytes = Vec::with_capacity(size as usize);
-    capture
-        .as_file_mut()
-        .read_to_end(&mut bytes)
-        .map_err(|error| materialization(format!("reading verified {subject} capture: {error}")))?;
+    // This copy only fills an already admitted Vec, so it deliberately does
+    // not count WrittenBytes. Its fixed scratch still belongs to this scope.
+    let _copy_scratch_credit = source_service::buffer(scope, 64 * 1024).map_err(materialization)?;
+    let capacity = if scope.is_some() {
+        usize::try_from(size).map_err(|_| materialization("verified capture size overflow"))?
+    } else {
+        size as usize
+    };
+    let mut bytes = Vec::with_capacity(capacity);
+    if scope.is_none() {
+        capture
+            .as_file_mut()
+            .read_to_end(&mut bytes)
+            .map_err(|e| materialization(e.to_string()))?;
+    } else {
+        let copied = source_service::copy_counted(
+            capture.as_file_mut(),
+            &mut bytes,
+            size,
+            &|| active() && source_service::check(scope).is_ok(),
+            None,
+        )
+        .map_err(|e| materialization(e.to_string()))?;
+        source_service::check(scope).map_err(materialization)?;
+        if copied != size {
+            return Err(materialization("verified capture size changed"));
+        }
+    }
     capture.close().map_err(|error| {
         materialization(format!("deleting verified {subject} capture: {error}"))
     })?;
@@ -623,8 +669,20 @@ fn place_overlay(
     root: &Path,
     destination: &str,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
-    let bytes = read_capture(capture, "overlay", 64 * 1024 * 1024, active)?;
+    let mut captured = Some(capture);
+    let bytes = if scope.is_none() {
+        Some(read_capture(
+            captured.take().unwrap(),
+            "overlay",
+            64 * 1024 * 1024,
+            active,
+            None,
+        )?)
+    } else {
+        None
+    };
     let target = root.join(destination);
     let parent = target
         .parent()
@@ -639,11 +697,30 @@ fn place_overlay(
             "staging selected BCR overlay {destination}: {error}"
         ))
     })?;
-    staged.as_file_mut().write_all(&bytes).map_err(|error| {
-        materialization(format!(
-            "writing selected BCR overlay {destination}: {error}"
-        ))
-    })?;
+    if let Some(bytes) = bytes {
+        staged.as_file_mut().write_all(&bytes).map_err(|error| {
+            materialization(format!(
+                "writing selected BCR overlay {destination}: {error}"
+            ))
+        })?;
+    } else {
+        let mut capture = captured.take().unwrap();
+        capture
+            .as_file_mut()
+            .seek(SeekFrom::Start(0))
+            .map_err(|e| materialization(e.to_string()))?;
+        source_service::copy_counted(
+            capture.as_file_mut(),
+            staged.as_file_mut(),
+            64 * 1024 * 1024,
+            active,
+            scope,
+        )
+        .map_err(|e| materialization(e.to_string()))?;
+        capture
+            .close()
+            .map_err(|e| materialization(e.to_string()))?;
+    }
     staged.as_file_mut().flush().map_err(|error| {
         materialization(format!(
             "flushing selected BCR overlay {destination}: {error}"
@@ -681,6 +758,7 @@ fn place_module(
     mut capture: tempfile::NamedTempFile,
     root: &Path,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     capture
         .as_file_mut()
@@ -699,8 +777,19 @@ fn place_module(
     if !active() {
         return Err(materialization("repository session is no longer active"));
     }
-    std::io::copy(capture.as_file_mut(), staged.as_file_mut())
-        .map_err(|error| materialization(format!("copying verified registry MODULE: {error}")))?;
+    if scope.is_none() {
+        std::io::copy(capture.as_file_mut(), staged.as_file_mut())
+            .map_err(|e| materialization(e.to_string()))?;
+    } else {
+        source_service::copy_counted(
+            capture.as_file_mut(),
+            staged.as_file_mut(),
+            MODULE_LIMIT,
+            active,
+            scope,
+        )
+        .map_err(|e| materialization(e.to_string()))?;
+    }
     set_mode(staged.path(), 0o644)?;
     capture
         .close()
@@ -769,14 +858,20 @@ fn is_zero(block: &[u8; BLOCK]) -> bool {
 struct BoundedTarReader<'a, R> {
     reader: R,
     active: &'a dyn Fn() -> bool,
+    scope: Option<&'a Arc<SourceServiceScope>>,
     read: u64,
 }
 
 impl<'a, R: Read> BoundedTarReader<'a, R> {
-    fn new(reader: R, active: &'a dyn Fn() -> bool) -> Self {
+    fn new(
+        reader: R,
+        active: &'a dyn Fn() -> bool,
+        scope: Option<&'a Arc<SourceServiceScope>>,
+    ) -> Self {
         Self {
             reader,
             active,
+            scope,
             read: 0,
         }
     }
@@ -803,10 +898,14 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                 ));
             }
             let allowed = bytes.len().min(remaining as usize).min(64 * 1024);
-            let read = self
-                .reader
-                .read(&mut bytes[..allowed])
-                .map_err(|error| materialization(format!("{operation}: {error}")))?;
+            let read = source_service::read_counted(
+                &mut self.reader,
+                &mut bytes[..allowed],
+                self.active,
+                self.scope,
+                SourceCounter::DecodedBytes,
+            )
+            .map_err(|error| materialization(format!("{operation}: {error}")))?;
             if read == 0 {
                 return Err(materialization(format!(
                     "{operation}: unexpected end of stream"
@@ -828,9 +927,10 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
         while remaining != 0 {
             let length = buffer.len().min(remaining as usize);
             self.read_exact(&mut buffer[..length], "reading tar file payload")?;
-            output.write_all(&buffer[..length]).map_err(|error| {
-                materialization(format!("writing selected BCR file {path}: {error}"))
-            })?;
+            source_service::write_counted(output, &buffer[..length], self.active, self.scope)
+                .map_err(|error| {
+                    materialization(format!("writing selected BCR file {path}: {error}"))
+                })?;
             remaining -= length as u64;
         }
         Ok(())
@@ -850,7 +950,13 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
             }
             if self.read == DECOMPRESSED_LIMIT {
                 let mut extra = [0u8; 1];
-                return match self.reader.read(&mut extra) {
+                return match source_service::read_counted(
+                    &mut self.reader,
+                    &mut extra,
+                    self.active,
+                    self.scope,
+                    SourceCounter::DecodedBytes,
+                ) {
                     Ok(0) => Ok(()),
                     Ok(_) => Err(materialization(
                         "selected BCR tar exceeds decompressed limit",
@@ -859,10 +965,14 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                 };
             }
             let allowed = buffer.len().min((DECOMPRESSED_LIMIT - self.read) as usize);
-            let read = self
-                .reader
-                .read(&mut buffer[..allowed])
-                .map_err(|error| materialization(format!("finishing gzip stream: {error}")))?;
+            let read = source_service::read_counted(
+                &mut self.reader,
+                &mut buffer[..allowed],
+                self.active,
+                self.scope,
+                SourceCounter::DecodedBytes,
+            )
+            .map_err(|error| materialization(format!("finishing gzip stream: {error}")))?;
             if read == 0 {
                 return Ok(());
             }

@@ -41,7 +41,14 @@ fn extract(
     strip_prefix: &str,
     aggregate: &mut u64,
 ) -> Result<(), super::ArchiveMaterializationError> {
-    extract_selected_generated_archive(capture.as_file(), root, strip_prefix, &|| true, aggregate)
+    extract_selected_generated_archive(
+        capture.as_file(),
+        root,
+        strip_prefix,
+        &|| true,
+        aggregate,
+        None,
+    )
 }
 
 #[test]
@@ -229,6 +236,7 @@ fn aggregate_cap_and_cancellation_stop_extraction() {
         "component",
         &|| false,
         &mut 0,
+        None,
     )
     .unwrap_err();
     assert!(error.message.contains("no longer active"));
@@ -294,6 +302,7 @@ fn per_call_decoded_cap_counts_tar_headers_before_payload() {
             per_call: 512,
             aggregate: super::AGGREGATE_DECODED_LIMIT,
         },
+        None,
     )
     .unwrap_err();
     assert!(error.message.contains("per-call decoded limit"));
@@ -344,4 +353,60 @@ fn oversized_xz_dictionary_is_rejected_before_extracting_a_tar_header() {
     assert!(error.message.contains("memory limit reached"), "{error:?}");
     assert_eq!(aggregate, 0);
     assert!(!root.path().join("file").exists());
+}
+
+#[test]
+fn scoped_generated_archives_count_ordered_replacements_and_all_decoded_bytes() {
+    use std::time::Instant;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+    use crate::runtime::dice::source_service::SourceServiceScope;
+    let first = archive(|tar| append_entry(tar, "a/file", tar::EntryType::Regular, 0o644, b"one"));
+    let second = archive(|tar| append_entry(tar, "b/file", tar::EntryType::Regular, 0o755, b"two"));
+    for cap in [6, 5] {
+        let work = Instant::now() + Duration::from_secs(2);
+        let scope = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            work,
+            work + Duration::from_secs(1),
+            SourceServiceLimits {
+                written_bytes: cap,
+                ..SourceServiceLimits::default()
+            },
+        )
+        .unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let mut aggregate = 0;
+        extract_selected_generated_archive(
+            first.as_file(),
+            root.path(),
+            "a",
+            &|| true,
+            &mut aggregate,
+            Some(&scope),
+        )
+        .unwrap();
+        let result = extract_selected_generated_archive(
+            second.as_file(),
+            root.path(),
+            "b",
+            &|| true,
+            &mut aggregate,
+            Some(&scope),
+        );
+        assert_eq!(result.is_ok(), cap == 6);
+        assert_eq!(scope.snapshot().decoded_bytes, aggregate);
+        assert!(
+            aggregate >= 4 * 512,
+            "physical headers and end markers cannot be skipped"
+        );
+        if cap == 6 {
+            assert_eq!(scope.snapshot().written_bytes, 6);
+            assert_eq!(fs::read(root.path().join("file")).unwrap(), b"two");
+        } else {
+            assert!(scope.check().is_err());
+        }
+    }
 }

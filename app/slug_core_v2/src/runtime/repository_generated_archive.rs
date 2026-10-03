@@ -15,6 +15,7 @@ use std::io::SeekFrom;
 use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
@@ -23,6 +24,9 @@ use xz2::stream::CONCATENATED;
 use xz2::stream::Stream;
 
 use super::repository_io::ArchiveMaterializationError;
+use super::repository_io::source_service::SourceCounter;
+use super::repository_io::source_service::SourceServiceScope;
+use super::repository_io::source_service::{self};
 
 const BLOCK: usize = 512;
 const CALL_DECODED_LIMIT: u64 = 512 * 1024 * 1024;
@@ -57,6 +61,7 @@ pub(super) fn extract_selected_generated_archive(
     strip_prefix: &str,
     active: &dyn Fn() -> bool,
     aggregate_decoded: &mut u64,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     extract_with_limits(
         capture,
@@ -65,6 +70,7 @@ pub(super) fn extract_selected_generated_archive(
         active,
         aggregate_decoded,
         SELECTED_DECODE_LIMITS,
+        scope,
     )
 }
 
@@ -75,6 +81,7 @@ fn extract_with_limits(
     active: &dyn Fn() -> bool,
     aggregate_decoded: &mut u64,
     limits: DecodeLimits,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
     validate_strip_prefix(strip_prefix)?;
     let root_metadata = fs::symlink_metadata(root)
@@ -105,7 +112,9 @@ fn extract_with_limits(
     let stream = Stream::new_stream_decoder(XZ_DECODER_MEMORY_LIMIT, CONCATENATED)
         .map_err(|error| materialization(format!("initializing bounded xz decoder: {error}")))?;
     let decoder = XzDecoder::new_stream(capture, stream);
-    let mut tar = BoundedTarReader::new(decoder, active, aggregate_decoded, limits);
+    let _decoder_buffer_credit =
+        source_service::buffer(scope, 64 * 1024 + 1024).map_err(materialization)?;
+    let mut tar = BoundedTarReader::new(decoder, active, aggregate_decoded, limits, scope);
     let mut physical_headers = 0usize;
     let mut pending_longname: Option<String> = None;
     let mut prefix_found = false;
@@ -427,6 +436,7 @@ fn is_zero(block: &[u8; BLOCK]) -> bool {
 struct BoundedTarReader<'a, R> {
     reader: R,
     active: &'a dyn Fn() -> bool,
+    scope: Option<&'a Arc<SourceServiceScope>>,
     call_decoded: u64,
     aggregate_decoded: &'a mut u64,
     limits: DecodeLimits,
@@ -438,10 +448,12 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
         active: &'a dyn Fn() -> bool,
         aggregate_decoded: &'a mut u64,
         limits: DecodeLimits,
+        scope: Option<&'a Arc<SourceServiceScope>>,
     ) -> Self {
         Self {
             reader,
             active,
+            scope,
             call_decoded: 0,
             aggregate_decoded,
             limits,
@@ -464,10 +476,14 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
             if allowed == 0 {
                 return Err(self.limit_error());
             }
-            let count = self
-                .reader
-                .read(&mut bytes[..allowed])
-                .map_err(|error| materialization(format!("{operation}: {error}")))?;
+            let count = source_service::read_counted(
+                &mut self.reader,
+                &mut bytes[..allowed],
+                self.active,
+                self.scope,
+                SourceCounter::DecodedBytes,
+            )
+            .map_err(|error| materialization(format!("{operation}: {error}")))?;
             if count == 0 {
                 return Err(materialization(format!(
                     "{operation}: unexpected end of stream"
@@ -489,9 +505,10 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
         while remaining != 0 {
             let length = buffer.len().min(remaining as usize);
             self.read_exact(&mut buffer[..length], "reading generated tar payload")?;
-            output.write_all(&buffer[..length]).map_err(|error| {
-                materialization(format!("writing generated file {subject}: {error}"))
-            })?;
+            source_service::write_counted(output, &buffer[..length], self.active, self.scope)
+                .map_err(|error| {
+                    materialization(format!("writing generated file {subject}: {error}"))
+                })?;
             remaining -= length as u64;
         }
         Ok(())
@@ -514,7 +531,13 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                 // At the exact cap, distinguish a valid EOF from one extra
                 // decoded byte. The probe itself is never retained or written.
                 let mut extra = [0u8; 1];
-                return match self.reader.read(&mut extra) {
+                return match source_service::read_counted(
+                    &mut self.reader,
+                    &mut extra,
+                    self.active,
+                    self.scope,
+                    SourceCounter::DecodedBytes,
+                ) {
                     Ok(0) => Ok(()),
                     Ok(_) => Err(self.limit_error()),
                     Err(error) => Err(materialization(format!(
@@ -522,9 +545,14 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                     ))),
                 };
             }
-            let count = self.reader.read(&mut buffer[..allowed]).map_err(|error| {
-                materialization(format!("finishing generated xz stream: {error}"))
-            })?;
+            let count = source_service::read_counted(
+                &mut self.reader,
+                &mut buffer[..allowed],
+                self.active,
+                self.scope,
+                SourceCounter::DecodedBytes,
+            )
+            .map_err(|error| materialization(format!("finishing generated xz stream: {error}")))?;
             if count == 0 {
                 return Ok(());
             }

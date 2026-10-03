@@ -644,3 +644,71 @@ fn request_failed_real_label_capture_retains_partial_and_unused_stages_during_re
     drop(repaired);
     assert_eq!(f.runtime.image_resources.logical_bytes_used(), 0);
 }
+
+#[test]
+fn scoped_cancel_at_restoration_preserves_full_prior_some_and_drops_captured_images() {
+    use crate::runtime::dice::source_service::SourceServiceError;
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+    use crate::runtime::dice::source_service::SourceServiceScope;
+    use crate::runtime::dice::source_service::WorkspaceSourceServices;
+    let mut f = Fixture::new(&scratch_program(1));
+    let work = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let scope = SourceServiceScope::new_for_test(
+        f.runtime.repository_materializer.workspace().dupe(),
+        work,
+        work + std::time::Duration::from_secs(3),
+        SourceServiceLimits::default(),
+    )
+    .unwrap();
+    f.runtime = WorkspaceRuntime::new_with_source_services(
+        f.workspace.path(),
+        crate::runtime::ProcessHostOwner::native(),
+        WorkspaceSourceServices::Diagnostic(scope.clone()),
+    )
+    .unwrap();
+    let name = ApparentRepoName::new("proof").unwrap();
+    let mut prior_inputs = NativeDemandRequestInputBundle::normalized_initial();
+    prior_inputs.runtime_sources = Some(policy(&f, &[]));
+    prior_inputs.guest_namespace = Some(guest());
+    prior_inputs.lockfile_mode = LockfileMode::Off;
+    prior_inputs.command_policy = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        Some("unused@1.0"),
+        true,
+        f.workspace.path(),
+        ["platforms=platforms"],
+    )
+    .unwrap();
+    seed_prior(&f, &prior_inputs, &name);
+    let prior = snapshot(&f.runtime);
+    let before_restore = Cell::new(false);
+    let after_restore = Cell::new(false);
+    let mut inputs = prior_inputs.clone();
+    inputs.lockfile_mode = LockfileMode::Update;
+    let hook = |phase: selected_tool_source::ToolPhase<'_>| {
+        match phase {
+            selected_tool_source::ToolPhase::BeforeRestore(_) => {
+                before_restore.set(true);
+                assert!(f.runtime.image_resources.logical_bytes_used() > 0);
+                scope.cancel();
+            }
+            selected_tool_source::ToolPhase::AfterRestore(_) => {
+                after_restore.set(true);
+                assert!(f.runtime.image_resources.logical_bytes_used() > 0);
+            }
+            _ => {}
+        }
+        Ok(())
+    };
+    let result = f
+        .runtime
+        .prepare_selected_source_view_inner(request(&f, &name, &inputs), Some(&hook));
+    assert!(matches!(
+        result,
+        Err(NativeDemandSessionError::SourceService(
+            SourceServiceError::Cancelled
+        ))
+    ));
+    assert!(before_restore.get() && after_restore.get());
+    assert_restored(&f.runtime, &prior);
+    assert_eq!(f.runtime.image_resources.logical_bytes_used(), 0);
+}

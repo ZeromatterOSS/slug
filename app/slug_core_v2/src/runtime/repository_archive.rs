@@ -5,6 +5,7 @@ use std::ops::Range;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use base64::Engine;
 use sha2::Digest;
@@ -19,6 +20,7 @@ use super::repository_io::local_file_uri;
 use super::repository_io::optional_string;
 use super::repository_io::reject_extra_attributes;
 use super::repository_io::required_string;
+use super::repository_io::source_service::SourceServiceScope;
 
 const BCR_REQUIRED_KEYS: &[&str] = &[
     "urls",
@@ -146,26 +148,32 @@ pub(super) fn materialize_selected_bcr_capture(
     plan: &SelectedBcrArchive,
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
-    let archive = super::repository_archive_http::capture_selected_bcr(plan, runtime, active)?;
+    let archive =
+        super::repository_archive_http::capture_selected_bcr(plan, runtime, active, scope)?;
     let overlays = plan
         .overlays
         .iter()
         .map(|overlay| {
-            super::repository_archive_http::capture_selected_bcr_overlay(overlay, runtime, active)
+            super::repository_archive_http::capture_selected_bcr_overlay(
+                overlay, runtime, active, scope,
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
     let patches = plan
         .patches
         .iter()
         .map(|patch| {
-            super::repository_archive_http::capture_selected_bcr_patch(patch, runtime, active)
+            super::repository_archive_http::capture_selected_bcr_patch(
+                patch, runtime, active, scope,
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
     let module =
-        super::repository_archive_http::capture_selected_bcr_module(plan, runtime, active)?;
+        super::repository_archive_http::capture_selected_bcr_module(plan, runtime, active, scope)?;
     super::repository_archive_realize::realize_selected_bcr(
-        plan, archive, overlays, patches, module, active,
+        plan, archive, overlays, patches, module, active, scope,
     )
 }
 
