@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready to freeze an observation with precise disk-accounting refusal evidence
+Status: ready to freeze an actual observation under reviewed quiescent disk census
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -47,6 +47,24 @@ IndexError. [Network recovery receipt](wp899-network-recovery-2026-10-03.json)
 preserves the spent observation, supplemental4/4 and diagnostic source/test/review
 evidence. A next actual observation requires its own contract/review/freeze; no
 automatic retry or fullWP899/source-fit/40GB acceptance follows.
+
+The separately frozen global4 observation now identifies actual PROC_FD_LINK
+readlink ENOENT after regular-file stat, before target/access classification. It
+emitted no Slug numeric schema; source/restoration/credit/fit remain unobserved.
+Three independent terminal reviews accept this limited result, and Root removed
+only the pinned empty parent after actual child join/stage cleanup. The selected
+repair is a complete bounded stopped-child census, independently DESIGN accepted
+under `target/wp899/disk-census-quiescence-contract.md`: fresh consumed pidfd
+thread-group stop acknowledgment, one100ms stop/scan/resume deadline, verified
+SIGKILL parent-death guard and explicit nontransparent interruption boundary.
+Existing strict census/caps/join controls stay; no row skip or retry. Independent
+FINAL accepts this component:25 gates covered as24 unchanged batch passes plus one
+strengthened current TERM pass;17 protected tests unchanged. Pinned Tokio socket/
+timer/cancellation fixture completes16 fresh cycles with actual joins/cleanup.
+Deadline reasons follow the selected bound to its producer; quota reason stays
+original. [Receipt](wp899-disk-census-repair-2026-10-03.json) preserves failed initial
+batch and final source/test/review evidence. A later actual observation needs its
+own reviewed contract/freeze; fullWP899/source-fit/40GB remain unaccepted.
 
 ## Observable result and authority
 

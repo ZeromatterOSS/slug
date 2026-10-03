@@ -223,15 +223,164 @@ class OwnedProcess:
     def exited(self) -> bool:
         return bool(select.select([self.pidfd], [], [], 0)[0])
 
-    def signal(self, sig: int) -> None:
+    def signal(self, sig: int) -> bool:
         try:
             signal.pidfd_send_signal(self.pidfd, sig, None, 0)
+            return True
         except OSError as exc:
             if exc.errno != errno.ESRCH:
                 raise AccountingError("owned_signal_failed") from exc
+            return False
 
     def close(self) -> None:
         os.close(self.pidfd)
+
+
+def ordinary_executable(path: str) -> None:
+    """Trusted same-credential exec only; no privileged guard-clearing exec."""
+    try:
+        executable = Path(path).resolve(strict=True)
+        info = executable.stat()
+        if (not stat.S_ISREG(info.st_mode) or not info.st_mode & 0o111
+                or info.st_mode & (stat.S_ISUID | stat.S_ISGID)):
+            raise AccountingError("ordinary_executable_required")
+        try:
+            os.getxattr(executable, "security.capability")
+        except OSError as exc:
+            if exc.errno != errno.ENODATA:
+                raise AccountingError("executable_capability_unavailable") from None
+        else:
+            raise AccountingError("privileged_executable_refused")
+    except (OSError, ValueError):
+        raise AccountingError("ordinary_executable_unavailable") from None
+
+
+def parent_death_guard(parent_pid: int) -> int:
+    libc = ctypes.CDLL(None, use_errno=True)
+    actual = ctypes.c_int()
+    if (libc.prctl(1, signal.SIGKILL, 0, 0, 0)
+            or libc.prctl(2, ctypes.byref(actual), 0, 0, 0)
+            or actual.value != signal.SIGKILL or os.getppid() != parent_pid):
+        raise AccountingError("parent_death_guard_unverified")
+    return actual.value
+
+
+@dataclass
+class CensusCycles:
+    attempts: int = 0
+    completions: int = 0
+    duration_ns: int = 0
+    max_duration_ns: int = 0
+    resume_failures: int = 0
+
+
+def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
+                        interrupted, cycles: CensusCycles, *,
+                        deadline_reason: str = "disk_census_bound") -> DiskSample:
+    """One consumed group-stop event; one absolute stop/scan/resume budget.
+
+    Only our trusted ordinary direct child qualifies. This is not an atomic
+    snapshot of unrelated writers or asynchronous kernel I/O. Never reap here.
+    """
+    if (type(deadline_reason) is not str
+            or deadline_reason not in ("disk_census_bound", "outer_deadline")):
+        raise ValueError("invalid census deadline reason")
+    started = time.monotonic_ns()
+    cycles.attempts += 1
+    possibly_stopped = False
+    primary = False
+
+    def active() -> None:
+        if interrupted():
+            raise AccountingError("census_interrupted")
+        if time.monotonic_ns() >= deadline_ns:
+            raise AccountingError(deadline_reason)
+
+    def identity(stopped: bool) -> None:
+        try:
+            current = process_stat(owner.identity.pid)
+            if (current.starttime != owner.identity.starttime
+                    or current.ppid != os.getpid() or current.pgid != current.pid):
+                raise AccountingError("census_owner_changed")
+            if stopped:
+                if current.state != "T":
+                    raise AccountingError("census_stop_lost")
+            elif current.state in ("T", "t"):
+                raise AccountingError("census_prior_stop")
+            status = Path(f"/proc/{current.pid}/status").read_text()
+            tracer = next(int(row.split()[1]) for row in status.splitlines()
+                          if row.startswith("TracerPid:"))
+            if tracer:
+                raise AccountingError("census_traced_child")
+        except (OSError, ValueError, IndexError, StopIteration):
+            raise AccountingError("census_identity_unavailable") from None
+
+    def event(options):
+        return os.waitid(os.P_PIDFD, owner.pidfd, options | os.WNOHANG)
+
+    try:
+        active()
+        if owner.exited():
+            result = census([], deadline_ns, deadline_reason=deadline_reason)
+        else:
+            identity(False)
+            if event(os.WSTOPPED) is not None:
+                raise AccountingError("census_prior_stop")
+            # Consume the previous own CONT notification before this new STOP.
+            event(os.WCONTINUED)
+            active()
+            possibly_stopped = True  # Arm cleanup even if dispatch raises.
+            owner.signal(signal.SIGSTOP)
+            while True:
+                active()
+                if owner.exited():
+                    result = census([], deadline_ns, deadline_reason=deadline_reason)
+                    break
+                acknowledged = event(os.WSTOPPED)
+                if acknowledged is not None:
+                    if (acknowledged.si_pid != owner.identity.pid
+                            or acknowledged.si_code != os.CLD_STOPPED
+                            or acknowledged.si_status != signal.SIGSTOP):
+                        raise AccountingError("census_stop_unverified")
+                    identity(True)
+                    discover()
+                    active()
+                    result = _complete_disk_census(
+                        lambda pids: census(pids, deadline_ns,
+                                            deadline_reason=deadline_reason),
+                        [owner.identity.pid], lambda _pid: owner.exited())
+                    if not owner.exited():
+                        identity(True)
+                        if event(os.WCONTINUED) is not None:
+                            raise AccountingError("census_stop_lost")
+                        discover()
+                    active()
+                    break
+                # pidfd readiness means exit, not stop. Nonblocking stop waits
+                # and this bounded yield cannot consume/reap an exit event.
+                select.select([owner.pidfd], [], [],
+                              min(0.001, max(0, (deadline_ns-time.monotonic_ns())/1e9)))
+    except BaseException:
+        primary = True
+        raise
+    finally:
+        try:
+            if possibly_stopped:
+                try:
+                    if not owner.signal(signal.SIGCONT) and not owner.exited():
+                        raise AccountingError("census_resume_failed")
+                except (AccountingError, OSError):
+                    cycles.resume_failures += 1
+                    if not primary:
+                        raise AccountingError("census_resume_failed") from None
+            if not primary:
+                active()  # A ready scan/resume cannot cross the same bound.
+        finally:
+            elapsed = time.monotonic_ns() - started
+            cycles.duration_ns += elapsed
+            cycles.max_duration_ns = max(cycles.max_duration_ns, elapsed)
+    cycles.completions += 1
+    return result
 
 
 def memory_sample(owner: OwnedProcess, address_limit: int) -> tuple[int, int]:
@@ -277,7 +426,8 @@ class DiskSample:
 
 
 def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
-                expected_root: tuple[int, int] | None = None) -> DiskSample:
+                expected_root: tuple[int, int] | None = None, *,
+                deadline_reason: str = "disk_census_bound") -> DiskSample:
     """Metadata-only, no-follow tree plus owned regular FDs; inode dedup.
 
     External read-only input files are not owned staged disk. External writable
@@ -285,6 +435,9 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
     Open-unlinked private files and anonymous memfds are included. A raced or
     inaccessible census refuses; it never reports a partial successful total.
     """
+    if (type(deadline_reason) is not str
+            or deadline_reason not in ("disk_census_bound", "outer_deadline")):
+        raise ValueError("invalid census deadline reason")
     seen: set[tuple[int, int]] = set()
     allocated = logical = 0
     visited = 0
@@ -292,8 +445,10 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
     def account(info: os.stat_result) -> None:
         nonlocal allocated, logical, visited
         visited += 1
-        if visited > 1_000_000 or time.monotonic_ns() >= deadline_ns:
+        if visited > 1_000_000:
             raise AccountingError("disk_census_bound")
+        if time.monotonic_ns() >= deadline_ns:
+            raise AccountingError(deadline_reason)
         key = (info.st_dev, info.st_ino)
         if key not in seen:
             seen.add(key)
@@ -345,7 +500,7 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
             with _disk_call(DiskSite.PROC_FD_OPEN, os.scandir, f"/proc/{pid}/fd") as fds:
                 for entry in _disk_entries(fds, DiskSite.PROC_FD_NEXT):
                     if time.monotonic_ns() >= deadline_ns:
-                        raise AccountingError("disk_census_bound")
+                        raise AccountingError(deadline_reason)
                     info = _disk_call(DiskSite.PROC_FD_STAT, os.stat, entry.path)
                     if not stat.S_ISREG(info.st_mode):
                         continue
@@ -500,6 +655,9 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
         raise AccountingError("supervisor_not_isolated")
     if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
         raise AccountingError("pidfd_unavailable")
+    if not hasattr(os, "P_PIDFD"):
+        raise AccountingError("pidfd_stop_wait_unavailable")
+    ordinary_executable(command[0])
     install_subreaper()
     stage_parent = stage_parent.resolve(strict=True)
     stage = Path(tempfile.mkdtemp(prefix="slug-source-admission-", dir=stage_parent))
@@ -516,6 +674,9 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     peak_rss = peak_swap = peak_disk = peak_logical = 0
     samples = 0
     actual_limit = None
+    actual_guard = None
+    cycles = CensusCycles()
+    parent_pid = os.getpid()
     log_preserved = False
     log_bytes = None
     deadline = Deadlines.from_start(time.monotonic_ns(), limits)
@@ -526,9 +687,10 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     prior_handlers = {}
 
     def child_limit() -> None:
+        guard = parent_death_guard(parent_pid)
         resource.setrlimit(resource.RLIMIT_AS, (limits.address_bytes, limits.address_bytes))
         soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-        os.write(handshake_w, struct.pack("!QQ", soft, hard))
+        os.write(handshake_w, struct.pack("!QQQ", soft, hard, guard))
         os.close(handshake_w)
 
     def refuse(why: str, detail: DiskFailure | None = None) -> None:
@@ -623,11 +785,19 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             refuse("child_exit_nonzero")
         return True
 
-    def census(pids: Sequence[int]) -> DiskSample:
+    def census(pids: Sequence[int], census_ns: int | None = None, *,
+               deadline_reason: str = "disk_census_bound") -> DiskSample:
         return disk_sample(stage, pids,
+                           census_ns if census_ns is not None else
                            min(deadline.terminal_ns, time.monotonic_ns()
                                + int(limits.census_seconds * 1e9)),
-                           (root_info.st_dev, root_info.st_ino))
+                           (root_info.st_dev, root_info.st_ino),
+                           deadline_reason=deadline_reason)
+
+    def sole_child() -> None:
+        discover()
+        if reason is not None or set(owners) != {process.pid}:
+            raise AccountingError("census_interrupted")
 
     # External TERM/INT must latch refusal, not kill the supervisor and orphan
     # the child in its fresh session. A signal never refreshes a deadline.
@@ -652,11 +822,13 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             owners[process.pid] = OwnedProcess.pin(process.pid, {os.getpid()})
             os.close(handshake_w)
             handshake_w = -1
-            data = os.read(handshake_r, 16)
-            if len(data) != 16 or struct.unpack("!QQ", data) != (limits.address_bytes,) * 2:
-                refuse("address_limit_unverified")
+            data = os.read(handshake_r, 24)
+            if (len(data) != 24 or struct.unpack("!QQQ", data) !=
+                    (limits.address_bytes, limits.address_bytes, signal.SIGKILL)):
+                refuse("child_guards_unverified")
             else:
                 actual_limit = limits.address_bytes
+                actual_guard = signal.SIGKILL
             # Root is our known child even if it already became a zombie.
             if owners[process.pid].identity.pgid != process.pid:
                 refuse("root_session_unverified")
@@ -674,8 +846,20 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                             rss += r
                             swap += s
                             live.append(pid)
-                        disk = _complete_disk_census(
-                            census, live, lambda pid: owners[pid].exited())
+                        if reason is None:
+                            local_end = time.monotonic_ns() + int(limits.census_seconds * 1e9)
+                            phase_end = min(deadline.cleanup_ns, deadline.terminal_ns)
+                            census_ns = min(phase_end, local_end)
+                            deadline_reason = ("outer_deadline" if phase_end <= local_end
+                                               else "disk_census_bound")
+                            disk = stopped_disk_census(
+                                owners[process.pid], census, sole_child, census_ns,
+                                lambda: reason is not None, cycles,
+                                deadline_reason=deadline_reason)
+                        else:
+                            # Refused/descendant cleanup never invokes STOP.
+                            disk = _complete_disk_census(
+                                census, live, lambda pid: owners[pid].exited())
                         samples += 1
                         peak_rss = max(peak_rss, rss)
                         peak_swap = max(peak_swap, swap)
@@ -811,6 +995,7 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     return {"schema": 1, "limit_kind": "RLIMIT_AS",
             "address_space_limit_bytes": limits.address_bytes,
             "address_space_limit_verified": actual_limit == limits.address_bytes,
+            "parent_death_signal_verified": actual_guard == signal.SIGKILL,
             "sampled_rss_limit_bytes": limits.rss_bytes,
             "sampled_disk_limit_bytes": limits.disk_bytes,
             "sampled_rss_peak_bytes": peak_rss, "sampled_swap_peak_bytes": peak_swap,
@@ -818,6 +1003,11 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             "sampled_logical_disk_peak_bytes": peak_logical,
             "samples": samples, "poll_interval_seconds": limits.poll_seconds,
             "census_deadline_seconds": limits.census_seconds,
+            "census_cycle_attempts": cycles.attempts,
+            "census_cycle_completions": cycles.completions,
+            "census_cycle_total_ns": cycles.duration_ns,
+            "census_cycle_max_ns": cycles.max_duration_ns,
+            "census_resume_failures": cycles.resume_failures,
             "elapsed_seconds": (time.monotonic_ns() - deadline.start_ns) / 1e9,
             "work_seconds": limits.work_seconds,
             "cleanup_seconds": limits.cleanup_seconds,

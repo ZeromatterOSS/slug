@@ -8,6 +8,7 @@ launch this file concurrently with another native fixture owner.
 from __future__ import annotations
 
 import errno
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -44,6 +46,420 @@ class SupervisorTests(unittest.TestCase):
             self.assertTrue(result["stage_removed"], result)
             self.assertFalse(any(p.is_dir() for p in parent.iterdir()))
             return result, output
+
+    @contextmanager
+    def census_child(self, churn=False):
+        """Actual direct fresh-session child; every assertion path owns its join."""
+        with tempfile.TemporaryDirectory(prefix="slug-stopped-census-") as temp:
+            root = Path(temp)
+            (root / "regular").write_bytes(b"a" * 8192)
+            os.link(root / "regular", root / "hardlink")
+            code = r'''
+import os, sys, threading
+root = sys.argv[1]
+held = open(os.path.join(root, "erased"), "w+b")
+held.write(b"b" * 4096); held.flush()
+os.unlink(held.name)
+running = threading.Event(); running.set()
+count = [0]
+def churn(index):
+    path = os.path.join(root, "volatile" + str(index))
+    while running.is_set():
+        fd = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
+        duplicate = os.dup(fd)
+        os.unlink(path)
+        os.close(duplicate); os.close(fd)
+        count[0] += 1
+threads = []
+if sys.argv[2] == "1":
+    threads = [threading.Thread(target=churn, args=(i,)) for i in range(2)]
+    for thread in threads: thread.start()
+print(held.fileno(), flush=True)
+while True:
+    command = sys.stdin.buffer.read(1)
+    if command == b"P": print(count[0], flush=True)
+    elif command == b"E": os._exit(0)
+    else: break
+running.clear()
+for thread in threads: thread.join()
+held.close()
+'''
+            parent_pid = os.getpid()
+            probe = subprocess.Popen(
+                [sys.executable, "-I", "-c", code, str(root), "1" if churn else "0"],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL, start_new_session=True,
+                preexec_fn=lambda: s.parent_death_guard(parent_pid))
+            owner = None
+            try:
+                self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                held_fd = int(probe.stdout.readline(32))
+                owner = s.OwnedProcess.pin(probe.pid, {os.getpid()})
+                yield probe, owner, root, held_fd
+            finally:
+                if owner is not None:
+                    owner.signal(signal.SIGCONT)
+                try:
+                    probe.communicate(b"Q", timeout=2)
+                except subprocess.TimeoutExpired:
+                    probe.kill()  # Still-unreaped direct test child only.
+                    probe.communicate(timeout=2)
+                if owner is not None:
+                    owner.close()
+                self.assertEqual(s.children(os.getpid()), set())
+
+    def test_stopped_multithread_census_fresh_cycles_exact_totals_and_progress(self):
+        with self.census_child(True) as (probe, owner, root, held_fd):
+            cycles = s.CensusCycles()
+            def progress():
+                probe.stdin.write(b"P"); probe.stdin.flush()
+                self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                return int(probe.stdout.readline(32))
+            previous = progress()
+            for _ in range(2):
+                scans = []
+                def census(pids, deadline, *, deadline_reason):
+                    self.assertEqual(s.process_stat(probe.pid).state, "T")
+                    self.assertEqual(pids, [probe.pid])
+                    self.assertIsNone(os.waitid(os.P_PIDFD, owner.pidfd,
+                                               os.WSTOPPED | os.WNOHANG))
+                    expected = (root.stat().st_blocks
+                                + (root / "regular").stat().st_blocks
+                                + os.stat(f"/proc/{probe.pid}/fd/{held_fd}").st_blocks) * 512
+                    scans.append(deadline)
+                    actual = s.disk_sample(root, pids, deadline,
+                                           deadline_reason=deadline_reason)
+                    self.assertEqual(actual.allocated_bytes, expected)
+                    self.assertEqual(actual.logical_bytes, 8192 + 4096)
+                    return actual
+                deadline = time.monotonic_ns() + 100_000_000
+                s.stopped_disk_census(owner, census,
+                                      lambda: self.assertEqual(s.children(probe.pid), set()),
+                                      deadline, lambda: False, cycles)
+                self.assertEqual(scans, [deadline])
+                until = time.monotonic_ns() + 2_000_000_000
+                now = progress()
+                while now <= previous:
+                    self.assertLess(time.monotonic_ns(), until)
+                    now = progress()
+                previous = now
+            self.assertEqual((cycles.attempts, cycles.completions, cycles.resume_failures),
+                             (2, 2, 0))
+            self.assertGreater(cycles.duration_ns, 0)
+            self.assertLessEqual(cycles.max_duration_ns, cycles.duration_ns)
+
+    def test_stopped_absent_wrong_prior_and_expired_ack_never_scan(self):
+        for case in ("absent", "wrong", "prior", "expired"):
+            with self.subTest(case=case), self.census_child() as (probe, owner, root, _):
+                cycles = s.CensusCycles()
+                calls = []
+                real_wait = os.waitid
+                def wait(kind, fd, flags):
+                    result = real_wait(kind, fd, flags)
+                    if flags & os.WSTOPPED:
+                        if case == "absent": return None
+                        if case == "wrong" and result is not None:
+                            return SimpleNamespace(si_pid=probe.pid,
+                                                   si_code=os.CLD_TRAPPED,
+                                                   si_status=signal.SIGSTOP)
+                    return result
+                if case == "prior":
+                    owner.signal(signal.SIGSTOP)
+                    until = time.monotonic_ns() + 100_000_000
+                    while real_wait(os.P_PIDFD, owner.pidfd,
+                                    os.WSTOPPED | os.WNOHANG | os.WNOWAIT) is None:
+                        self.assertLess(time.monotonic_ns(), until)
+                deadline = time.monotonic_ns() + (0 if case == "expired" else 100_000_000)
+                with patch.object(s.os, "waitid", side_effect=wait):
+                    with self.assertRaises(s.AccountingError) as caught:
+                        s.stopped_disk_census(owner,
+                                              lambda *_: calls.append(1), lambda: None,
+                                              deadline, lambda: False, cycles)
+                self.assertIn(str(caught.exception),
+                              ("census_prior_stop", "census_stop_unverified", "disk_census_bound"))
+                self.assertEqual(calls, [])
+                self.assertEqual(cycles.completions, 0)
+                if case == "prior":
+                    owner.signal(signal.SIGCONT)
+                probe.stdin.write(b"P"); probe.stdin.flush()
+                self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                self.assertEqual(probe.stdout.readline(32), b"0\n")
+
+    def test_stopped_scan_failure_resume_failure_and_term_preserve_primary(self):
+        first = s.DiskFailure(s.DiskSite.ROOT_OPEN, s.DiskOrigin.OS_ERROR, errno.ENOENT)
+        for case in ("scan", "resume", "term", "late"):
+            with self.subTest(case=case):
+                real_disk = s.disk_sample
+                real_signal = s.OwnedProcess.signal
+                triggered = []
+                def census(root, pids, deadline, expected, *, deadline_reason):
+                    if pids and not triggered:
+                        triggered.append(True)
+                        self.assertEqual(s.process_stat(pids[0]).state, "T")
+                        if case == "term":
+                            os.kill(os.getpid(), signal.SIGTERM)
+                        elif case == "late":
+                            # A ready operation crossing the SAME bound cannot
+                            # be admitted; do not reset it on return/resume.
+                            while time.monotonic_ns() < deadline:
+                                os.sched_yield()
+                        else:
+                            return real_disk(root / "missing", pids, deadline, expected,
+                                             deadline_reason=deadline_reason)
+                    return real_disk(root, pids, deadline, expected,
+                                     deadline_reason=deadline_reason)
+                def sent(owner, sig):
+                    if case == "resume" and sig == signal.SIGCONT and triggered:
+                        raise s.AccountingError("forced_resume_boundary")
+                    return real_signal(owner, sig)
+                with patch.object(s, "disk_sample", side_effect=census), \
+                        patch.object(s.OwnedProcess, "signal", new=sent):
+                    result, _ = self.run_child("import time; time.sleep(20)")
+                self.assertEqual(len(triggered), 1)
+                self.assertFalse(result["supervision_ok"])
+                self.assertEqual(result["census_cycle_completions"], 0)
+                if case in ("scan", "resume"):
+                    self.assertEqual(result["refusal"], "disk_accounting_unavailable")
+                    self.assertEqual((result["disk_failure_site"], result["disk_failure_origin"],
+                                      result["disk_failure_errno"]),
+                                     (int(first.site), int(first.origin), first.errno))
+                else:
+                    self.assertEqual(result["refusal"], "supervisor_interrupted" if
+                                     case == "term" else "disk_census_bound")
+                self.assertEqual(result["census_resume_failures"], int(case == "resume"))
+                if case == "resume": self.assertTrue(result["kill_sent"])
+                if case == "term":
+                    self.assertTrue(result["term_sent"])
+                    self.assertFalse(result["kill_sent"])
+                    self.assertEqual(result["child_exit_code"], -signal.SIGTERM)
+
+    def test_stopped_actual_exit_is_unreaped_complete_stage_only(self):
+        with self.census_child() as (probe, owner, root, _):
+            real_signal = owner.signal
+            def exit_before_stop(sig):
+                if sig == signal.SIGSTOP:
+                    probe.stdin.write(b"E"); probe.stdin.flush()
+                    self.assertTrue(select.select([owner.pidfd], [], [], .08)[0])
+                return real_signal(sig)
+            scans = []
+            def census(pids, deadline, *, deadline_reason):
+                scans.append(pids)
+                self.assertIsNone(probe.returncode)
+                return s.disk_sample(root, pids, deadline,
+                                     deadline_reason=deadline_reason)
+            cycles = s.CensusCycles()
+            with patch.object(owner, "signal", side_effect=exit_before_stop):
+                actual = s.stopped_disk_census(owner, census, lambda: None,
+                                               time.monotonic_ns()+100_000_000,
+                                               lambda: False, cycles)
+            self.assertEqual(scans, [[]])
+            self.assertEqual(actual.logical_bytes, 8192)
+            self.assertEqual(cycles.completions, 1)
+            self.assertIsNone(probe.returncode)
+
+    def test_disk_leaf_deadline_producer_reason_and_invalid_code_before_io(self):
+        with tempfile.TemporaryDirectory(prefix="slug-census-deadline-") as temp:
+            root = Path(temp)
+            for reason in (None, "disk_census_bound", "outer_deadline"):
+                with self.subTest(reason=reason), self.assertRaises(s.AccountingError) as caught:
+                    if reason is None:
+                        s.disk_sample(root, [], 0)
+                    else:
+                        s.disk_sample(root, [], 0, deadline_reason=reason)
+                self.assertEqual(str(caught.exception), reason or "disk_census_bound")
+                self.assertIsNone(caught.exception.detail)
+            # Preserve a primary native source failure; never remap it later
+            # merely because the chosen clock is also past.
+            with self.assertRaises(s.AccountingError) as caught:
+                s.disk_sample(root / "missing", [], 0, deadline_reason="outer_deadline")
+            self.assertEqual(caught.exception.detail,
+                             s.DiskFailure(s.DiskSite.ROOT_OPEN,
+                                           s.DiskOrigin.OS_ERROR, errno.ENOENT))
+            for invalid in (None, True, 1, "wrong"):
+                cycles = s.CensusCycles()
+                with patch.object(s.os, "open", side_effect=AssertionError("unexpected IO")) as opened:
+                    with self.assertRaises(ValueError):
+                        s.disk_sample(root, [], 0, deadline_reason=invalid)
+                    with self.assertRaises(ValueError):
+                        s.stopped_disk_census(None, None, None, 0, None, cycles,
+                                               deadline_reason=invalid)
+                    opened.assert_not_called()
+                self.assertEqual(cycles.attempts, 0)
+
+    def test_guard_setup_and_ordinary_executable_boundaries_fail_closed(self):
+        healthy, output = self.run_child(
+            "import ctypes; value=ctypes.c_int(); "
+            "assert ctypes.CDLL(None).prctl(2,ctypes.byref(value),0,0,0)==0; "
+            "print(value.value, flush=True)")
+        self.assertTrue(healthy["parent_death_signal_verified"])
+        self.assertTrue(healthy["supervision_ok"], healthy)
+        self.assertEqual(int(output), signal.SIGKILL)
+        with tempfile.TemporaryDirectory(prefix="slug-exec-admission-") as temp:
+            path = Path(temp) / "ordinary"
+            path.write_bytes(b"not executed")
+            path.chmod(0o4755)
+            with self.assertRaises(s.AccountingError) as caught:
+                s.ordinary_executable(str(path))
+            self.assertEqual(str(caught.exception), "ordinary_executable_required")
+            path.chmod(0o2755)
+            with self.assertRaises(s.AccountingError): s.ordinary_executable(str(path))
+            path.chmod(0o755)
+            with patch.object(s.os, "getxattr", return_value=b"capability"):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.ordinary_executable(str(path))
+            self.assertEqual(str(caught.exception), "privileged_executable_refused")
+            with patch.object(s.os, "getxattr", side_effect=OSError(errno.EACCES, "secret")):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.ordinary_executable(str(path))
+            self.assertEqual(str(caught.exception), "executable_capability_unavailable")
+            with self.assertRaises(s.AccountingError):
+                s.ordinary_executable(str(path / "absent"))
+        parent = os.getpid()
+        for case in ("install", "readback", "parent"):
+            def prctl(option, argument, *_):
+                if option == 1: return -1 if case == "install" else 0
+                argument._obj.value = 0 if case == "readback" else signal.SIGKILL
+                return 0
+            with self.subTest(case=case), \
+                    patch.object(s.ctypes, "CDLL", return_value=SimpleNamespace(prctl=prctl)), \
+                    patch.object(s.os, "getppid", return_value=parent + int(case == "parent")):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.parent_death_guard(parent)
+                self.assertEqual(str(caught.exception), "parent_death_guard_unverified")
+        # A real preexec refusal must not launch a child workload or leave it.
+        with patch.object(s, "parent_death_guard",
+                          side_effect=s.AccountingError("forced_guard_setup")):
+            result, output = self.run_child("print('must-not-execute', flush=True)")
+        self.assertEqual(output, "")
+        self.assertFalse(result["parent_death_signal_verified"])
+        self.assertEqual(result["census_cycle_attempts"], 0)
+        self.assertFalse(result["supervision_ok"])
+
+    def test_first_resume_failure_refuses_then_actually_kills_and_joins(self):
+        real_signal = s.OwnedProcess.signal
+        def sent(owner, sig):
+            if sig == signal.SIGCONT:
+                raise s.AccountingError("forced_resume_boundary")
+            return real_signal(owner, sig)
+        with patch.object(s.OwnedProcess, "signal", new=sent):
+            result, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(result["refusal"], "census_resume_failed")
+        self.assertEqual(result["census_resume_failures"], 1)
+        self.assertEqual(result["census_cycle_completions"], 0)
+        self.assertEqual(result["disk_failure_site"], 0)
+        self.assertTrue(result["kill_sent"])
+        self.assertTrue(result["joined"])
+
+    def test_fatal_stopped_supervisor_parent_guard_outer_join_before_cleanup(self):
+        # Dedicated outer subreaper joins both its supervisor and the adopted
+        # stopped root. The ordinary supervisor cannot claim fatal cleanup.
+        outer = r'''
+import json, os, pathlib, select, signal, subprocess, sys, time
+sys.path.insert(0, sys.argv[1])
+import v2_source_admission_supervisor as s
+s.install_subreaper()
+parent = pathlib.Path(sys.argv[2])
+outer_pid = os.getpid()
+report_r, report_w = os.pipe2(os.O_CLOEXEC)
+inner_code = r"""
+import os, pathlib, sys
+sys.path.insert(0, sys.argv[1])
+import v2_source_admission_supervisor as s
+parent = pathlib.Path(sys.argv[2]); report = int(sys.argv[3])
+real = s.disk_sample
+def scan(root, pids, deadline, expected, *, deadline_reason):
+    if pids:
+        os.write(report, str(pids[0]).encode() + b"\n")
+        # Actual barrier was acknowledged before this hook. No fake stop.
+        import select
+        select.select([], [], [], 20)
+    return real(root, pids, deadline, expected, deadline_reason=deadline_reason)
+s.disk_sample = scan
+result = s.supervise([sys.executable, '-I', '-c', 'import time; time.sleep(20)'],
+                     stage_parent=parent, log=parent/'preserved.log')
+(parent/'must-not-publish.json').write_text(str(result))
+"""
+inner = subprocess.Popen([sys.executable, '-I', '-c', inner_code,
+                          sys.argv[1], str(parent), str(report_w)],
+                         pass_fds=(report_w,), stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         preexec_fn=lambda: s.parent_death_guard(outer_pid))
+os.close(report_w)
+inner_fd = os.pidfd_open(inner.pid)
+root_owner = None
+try:
+    assert select.select([report_r], [], [], 3)[0]
+    root_pid = int(os.read(report_r, 32))
+    root_owner = s.OwnedProcess.pin(root_pid, {inner.pid})
+    assert s.process_stat(root_pid).state == 'T'
+    stages = list(parent.glob('slug-source-admission-*'))
+    assert len(stages) == 1
+    stage = stages[0]; metadata = stage.lstat()
+    identity = (metadata.st_dev, metadata.st_ino)
+    signal.pidfd_send_signal(inner_fd, signal.SIGKILL)
+    assert inner.wait(timeout=2) == -signal.SIGKILL
+    assert stage.exists()  # No fatal-finally stage-cleanup claim.
+    assert select.select([root_owner.pidfd], [], [], 2)[0]
+    joined, status = os.waitpid(root_pid, 0)
+    assert joined == root_pid and os.WIFSIGNALED(status)
+    assert os.WTERMSIG(status) == signal.SIGKILL
+    assert not s.children(os.getpid())
+    assert not (parent/'must-not-publish.json').exists()
+    s.remove_owned_stage(stage, identity, time.monotonic_ns()+1_000_000_000)
+    assert not stage.exists()
+    print(json.dumps({'guard_killed': True, 'outer_joined': True,
+                      'retained_until_join': True, 'test_stage_removed': True}))
+finally:
+    if inner.returncode is None:
+        signal.pidfd_send_signal(inner_fd, signal.SIGKILL)
+        inner.wait(timeout=2)
+    if root_owner is not None:
+        root_owner.signal(signal.SIGKILL)
+        assert select.select([root_owner.pidfd], [], [], 2)[0]
+        try: os.waitpid(root_owner.identity.pid, 0)
+        except ChildProcessError: pass
+        root_owner.close()
+    # A setup/assertion failure before pinning may still have adopted a root.
+    # Every such PID is now our actual child, not a numeric/user PID target.
+    until = time.monotonic_ns()+2_000_000_000
+    for pid in s.children(os.getpid()):
+        owned = s.OwnedProcess.pin(pid, {os.getpid()})
+        try:
+            owned.signal(signal.SIGKILL)
+            assert select.select([owned.pidfd], [], [],
+                                 max(0, (until-time.monotonic_ns())/1e9))[0]
+            os.waitpid(pid, 0)
+        finally: owned.close()
+    os.close(inner_fd); os.close(report_r)
+'''
+        with tempfile.TemporaryDirectory(prefix="slug-fatal-census-") as temp:
+            self.assertEqual(s.children(os.getpid()), set())
+            s.install_subreaper()
+            caller = os.getpid()
+            probe = subprocess.Popen([sys.executable, "-I", "-c", outer,
+                                      str(Path(s.__file__).resolve().parent), temp],
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                     preexec_fn=lambda: s.parent_death_guard(caller))
+            try:
+                stdout, stderr = probe.communicate(timeout=8)
+            except subprocess.TimeoutExpired:
+                probe.kill(); probe.communicate(timeout=2)
+                until = time.monotonic_ns()+2_000_000_000
+                for pid in s.children(os.getpid()):
+                    owned = s.OwnedProcess.pin(pid, {os.getpid()})
+                    try:
+                        owned.signal(signal.SIGKILL)
+                        self.assertTrue(select.select([owned.pidfd], [], [],
+                            max(0, (until-time.monotonic_ns())/1e9))[0])
+                        os.waitpid(pid, 0)
+                    finally:
+                        owned.close()
+                self.fail("fatal fixture exceeded its bounded ownership interval")
+            self.assertEqual(probe.returncode, 0, stderr)
+            self.assertEqual(json.loads(stdout),
+                             {"guard_killed": True, "outer_joined": True,
+                              "retained_until_join": True, "test_stage_removed": True})
+            self.assertEqual(s.children(os.getpid()), set())
 
     def test_hard_address_readback_enomem_and_shared_clock(self):
         before = time.monotonic_ns()

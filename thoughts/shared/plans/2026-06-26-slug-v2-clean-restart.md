@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready to freeze an observation with precise disk-accounting refusal evidence
+Status: ready to freeze an actual observation under reviewed quiescent disk census
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
@@ -67,6 +67,15 @@ limits/join/cleanup. Four prior socket-permission focused gates separately pass4
 [Recovery receipt](slug-v2-subplans/wp899-network-recovery-2026-10-03.json).
 The next actual observation requires a new contract/review/freeze; no automatic
 retry or fullWP899/source-fit/historical40GB acceptance follows.
+
+A separately frozen observation identifies PROC_FD_LINK readlink ENOENT after
+regular stat; FD identity/access/actor and all Slug source-fit evidence remain
+unknown. The bounded stopped-child census repair has independent DESIGN ACCEPT:
+fresh pidfd stop confirmation, unchanged100ms census/deadlines, parent-death guard
+and explicit interruption semantics. Independent FINAL accepts the component:
+25 gates covered (24 preserved+1 strengthened),17 protected tests unchanged, and
+pinned Tokio progresses through16 fresh cycles. Actual source fit stays unproved;
+a new reviewed contract/freeze is required, with no automatic actual-root retry. [Receipt](slug-v2-subplans/wp899-disk-census-repair-2026-10-03.json).
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent
