@@ -649,6 +649,15 @@ impl InjectedGraphNode {
             None => {}
         };
 
+        // Restoring an injected input often alternates A -> absent -> A. Reuse
+        // the penultimate equal backing value without scanning all history.
+        // This is still a change from the latest value: the new version range
+        // and invalidation below must remain independent of the historical A.
+        let value = match self.values.values().rev().nth(1) {
+            Some(previous) if previous.value.equality(&value) => previous.value.dupe(),
+            _ => value,
+        };
+
         self.values
             .insert(version, Self::new_node_data(value, version));
         self.invalidation_paths
@@ -791,5 +800,65 @@ mod tests {
 
         assert!(entry.is_verified_at(VersionNumber::new(0)));
         assert!(entry.is_verified_at(VersionNumber::new(1)));
+    }
+
+    #[test]
+    fn injected_recurrence_shares_value_but_preserves_ranges_and_invalidation() {
+        use crate::api::key::InvalidationSourcePriority;
+        use crate::impls::core::graph::nodes::InjectedGraphNode;
+        use crate::impls::core::graph::nodes::InvalidateResult;
+        use crate::impls::value::MaybeValidDiceValue;
+
+        let value = |n| DiceValidValue::testing_new(DiceKeyValue::<K>::new(n));
+        let version = VersionNumber::new;
+        let key = DiceKey { index: 1335 };
+        let dependent = DiceKey { index: 5 };
+        let priority = InvalidationSourcePriority::Normal;
+        let first = value(1);
+        let absent = value(0);
+        let mut entry = InjectedGraphNode::new(key, version(1), first.dupe(), priority);
+        assert!(matches!(
+            entry.on_injected(version(2), absent.dupe(), priority),
+            InvalidateResult::Changed(_)
+        ));
+        entry.add_rdep_at(version(2), dependent);
+        match entry.on_injected(version(3), value(1), priority) {
+            InvalidateResult::Changed(Some(dependents)) => {
+                assert_eq!(dependents.collect::<Vec<_>>(), vec![dependent]);
+            }
+            _ => panic!("historical equality must invalidate the latest dependency"),
+        }
+        assert_eq!(entry.values.len(), 3);
+        assert!(MaybeValidDiceValue::valid(entry.latest().value.dupe()).instance_equal(&first));
+        let original = entry.data_at(version(1)).unwrap().1;
+        assert!(original.valid_versions.contains(version(1)));
+        assert!(!original.valid_versions.contains(version(2)));
+        assert!(!original.valid_versions.contains(version(3)));
+        let revoked = entry.data_at(version(2)).unwrap().1;
+        assert!(MaybeValidDiceValue::valid(revoked.value.dupe()).instance_equal(&absent));
+        assert!(revoked.valid_versions.contains(version(2)));
+        assert!(!revoked.valid_versions.contains(version(3)));
+        assert_eq!(entry.latest().first_valid_version, version(3));
+        assert!(entry.latest().valid_versions.contains(version(3)));
+        assert!(!entry.latest().valid_versions.contains(version(1)));
+        assert_eq!(
+            entry.invalidation_paths,
+            TrackedInvalidationPaths::new(priority, key, version(3))
+        );
+
+        entry.add_rdep_at(version(3), dependent);
+        assert!(matches!(
+            entry.on_injected(version(4), value(1), priority),
+            InvalidateResult::NoChange
+        ));
+        assert_eq!(entry.values.len(), 3);
+        assert_eq!(entry.rdeps.drain().collect::<Vec<_>>(), vec![dependent]);
+        assert!(matches!(
+            entry.on_injected(version(5), value(2), priority),
+            InvalidateResult::Changed(_)
+        ));
+        assert_eq!(entry.values.len(), 4);
+        assert_eq!(entry.latest().value.downcast_ref::<usize>(), Some(&2));
+        assert!(!MaybeValidDiceValue::valid(entry.latest().value.dupe()).instance_equal(&first));
     }
 }

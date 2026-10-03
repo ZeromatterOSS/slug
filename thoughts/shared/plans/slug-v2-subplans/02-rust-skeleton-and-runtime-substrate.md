@@ -47,8 +47,22 @@ seeded from prior accepted observations. It survives discarded/failing updaters;
 attempt, selected acceptance and abort restoration inject desired Some plus removed
 None atomically. Its synchronous Mutex never spans await, compute or commit.
 Source-change finalization uses the same per-demand keyset. No DICE GC, engine
-reset, semantic cache, interner, donor or dependency is added. Actual changed
-payload/revocation history retains its existing engine lifetime.
+reset, semantic cache, interner, donor or dependency is added. Distinct changed
+payloads and per-version metadata retain their existing engine lifetime.
+
+The equal-payload follow-up reuses only the penultimate injected DiceValidValue
+Arc after full same-key equality, preserving a NEW version range, latest-range
+closure and dependency invalidation. A -> None -> freshly read equal A retains
+one payload allocation while None still yields Need and old transactions remain
+isolated. Lookup adds at most one equality comparison; byte comparison may scan
+payload size. Longer recurrence/unique values and version metadata remain unbounded.
+All115 DICE and83 Workspace tests plus default dependent/CLI compilation pass.
+Identical32x1MiB regular-file A/B/B/A probes retain32 versus1 payload owners after
+all transactions drain; mean peak41150 to10616KiB (74.2% lower), then all owners
+retire at engine-lastDrop. The initially rejected weak-byte-array probe and the
+corrected small-wrapper controls are recorded in
+[receipt](memory-payload-reuse-2026-10-03.json). This accepts only physical memory
+sharing, without WP899 activation, a new linked CLI or historical40GB attribution.
 
 The [acceptance receipt](memory-repair-2026-10-02.json) records independent FINAL,
 DICE 17/Workspace 81/Core 140 passes, default production compile and supervised RSS
