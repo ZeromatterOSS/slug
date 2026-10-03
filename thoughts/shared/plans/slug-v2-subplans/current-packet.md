@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: scoped single-payload transfer repair validated; actual source admission next; full WP899 unaccepted
+Status: global9 child-accounting refusal preserved; bounded supervisor attribution next; full WP899 unaccepted
 
 The [bounded profile amendment](wp899-bounded-registry-profile.md) keeps Default128
 and selects explicit256 only for the Linux actual-root diagnostic. Its allowance-sized
@@ -21,6 +21,14 @@ socket passes) and default Core+CLI compile pass; three FINALs accept the compon
 [Receipt](wp899-single-payload-transfer-2026-10-03.json). Global8 exact creator stays
 unproved. Next actual observation needs a new independently reviewed contract/freeze;
 no automatic retry, complete source-fit or historical40GB claim follows.
+
+The independently frozen global9 observation stopped on supervisor
+`child_accounting_unavailable` before any Slug result record.497/497 censuses,
+actual TERM/join/stage cleanup and exact empty-parent removal pass; three terminal
+FINALs accept only this limited evidence. [Receipt](wp899-child-accounting-frontier-2026-10-03.json).
+Next owner is supervisor `children()`: task enumeration/read/parse and exact errno
+remain unknown. Use bounded local discriminators before a separately reviewed
+observation; no identical retry, accounting skip or inferred thread-exit race.
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
