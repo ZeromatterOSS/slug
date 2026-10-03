@@ -224,6 +224,10 @@ impl SourceServiceScope {
     pub(in crate::runtime) fn snapshot(&self) -> SourceServiceCounters {
         self.state().counters
     }
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn first_error_for_test(&self) -> Option<SourceServiceError> {
+        self.state().first
+    }
     pub(in crate::runtime) fn charge(
         &self,
         counter: SourceCounter,

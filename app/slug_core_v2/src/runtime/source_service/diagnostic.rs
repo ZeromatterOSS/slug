@@ -1,5 +1,7 @@
 //! A consumed diagnostic engine: acquisition cannot escape into ordinary commands.
 use std::future::Future;
+#[cfg(test)]
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -28,6 +30,15 @@ pub(in crate::runtime::dice) struct ScopedPreparedSourceViewLease {
     // The captured owner is destroyed before its accounting pin.
     view: PreparedSelectedSourceView,
     scope: Arc<SourceServiceScope>,
+}
+
+#[cfg(test)]
+pub(in crate::runtime::dice) trait DiagnosticObserver {
+    fn after_restore<'a>(
+        &'a self,
+        runtime: &'a WorkspaceRuntime,
+        prepared: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>>;
 }
 
 impl SourcePreparationDiagnosticRuntime {
@@ -74,20 +85,71 @@ impl SourcePreparationDiagnosticRuntime {
             .descriptor_budget()
     }
 
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn inspect_for_test<T>(
+        &self,
+        inspect: impl FnOnce(&WorkspaceRuntime, &Arc<SourceServiceScope>) -> T,
+    ) -> T {
+        inspect(
+            self.runtime.as_ref().expect("unconsumed diagnostic"),
+            &self.scope,
+        )
+    }
+
     pub(in crate::runtime::dice) fn prepare_once(
+        self,
+        request: SelectedSourcePreparationRequest<'_>,
+    ) -> Result<ScopedPreparedSourceViewLease, NativeDemandSessionError> {
+        self.prepare_once_inner(
+            request,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    #[cfg(test)]
+    pub(in crate::runtime::dice) fn prepare_once_observed(
+        self,
+        request: SelectedSourcePreparationRequest<'_>,
+        hook: &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
+        observer: &dyn DiagnosticObserver,
+    ) -> Result<ScopedPreparedSourceViewLease, NativeDemandSessionError> {
+        self.prepare_once_inner(request, Some((hook, observer)))
+    }
+
+    fn prepare_once_inner(
         mut self,
         request: SelectedSourcePreparationRequest<'_>,
+        #[cfg(test)] observation: Option<(
+            &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
+            &dyn DiagnosticObserver,
+        )>,
     ) -> Result<ScopedPreparedSourceViewLease, NativeDemandSessionError> {
         self.scope
             .check()
             .map_err(NativeDemandSessionError::SourceService)?;
         // No executor owned by this runtime may call this synchronous boundary.
         // The full existing driver owns one command and its restoration guard.
-        let prepared = self
-            .runtime
-            .as_ref()
-            .expect("unconsumed diagnostic")
-            .prepare_selected_source_view(request);
+        let runtime = self.runtime.as_ref().expect("unconsumed diagnostic");
+        #[cfg(not(test))]
+        let prepared = runtime.prepare_selected_source_view(request);
+        #[cfg(test)]
+        let prepared = match observation {
+            None => runtime.prepare_selected_source_view(request),
+            Some((hook, observer)) => {
+                let prepared = runtime.prepare_selected_source_view_observed(request, hook);
+                // The callback awaits raw-only restoration reads directly in
+                // this executor. It never nests another block_on invocation.
+                let checked = runtime
+                    .runtime
+                    .block_on(runtime.source_cleanup(observer.after_restore(runtime, &prepared)));
+                match (prepared, checked) {
+                    (Err(primary), _) => Err(primary),
+                    (Ok(view), Ok(())) => Ok(view),
+                    (Ok(_), Err(error)) => Err(error),
+                }
+            }
+        };
         let outcome = prepared.and_then(|view| {
             self.scope
                 .close_acquisition()

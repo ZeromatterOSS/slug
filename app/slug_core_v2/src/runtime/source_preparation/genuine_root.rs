@@ -1,0 +1,1048 @@
+//! Ignored, supervised actual-checkout source admission; never executes tools.
+use std::cell::Cell;
+use std::collections::BTreeMap;
+use std::fmt::Write as _;
+use std::fs::File;
+use std::future::Future;
+use std::io::Read;
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
+use std::pin::Pin;
+use std::sync::Weak;
+
+use sha2::Digest;
+use sha2::Sha256;
+use slug_bzlmod_v2::GuestLabelDataPolicy;
+use slug_bzlmod_v2::GuestNamespaceLimits;
+use slug_bzlmod_v2::GuestNamespacePolicy;
+use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+use slug_bzlmod_v2::RuntimeSourceDeclarationPolicy;
+use slug_bzlmod_v2::RuntimeSourceLimits;
+use slug_bzlmod_v2::SelectedScratchOperand;
+use slug_bzlmod_v2::SelectedToolOperand;
+use slug_bzlmod_v2::SelectedToolRole;
+use slug_bzlmod_v2::SelectedToolSourcesPolicy;
+use slug_workspace_v2::ElfMetadataOutcome;
+use slug_workspace_v2::ElfMetadataPolicy;
+use slug_workspace_v2::ImageChargedPath;
+use slug_workspace_v2::ImageDescriptorBudget;
+use slug_workspace_v2::ImageDescriptorReservation;
+
+use super::harness_clock::HarnessClockStage;
+use super::*;
+use crate::runtime::dice::source_service::DiagnosticObserver;
+use crate::runtime::dice::source_service::SourcePreparationDiagnosticRuntime;
+use crate::runtime::dice::source_service::SourceServiceCounters;
+use crate::runtime::dice::source_service::SourceServiceError;
+use crate::runtime::dice::source_service::SourceServiceLimits;
+use crate::runtime::dice::source_service::SourceServiceScope;
+use crate::runtime::input_image;
+
+const WORKSPACE: &str = "/run/media/system/Colossus/dev/slug";
+const RECEIPT_BYTES: usize = 64 * 1024;
+const INPUTS: [(&str, u64, &str); 6] = [
+    (
+        "MODULE.bazel",
+        2316,
+        "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c",
+    ),
+    (
+        "MODULE.bazel.lock",
+        58371,
+        "bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302",
+    ),
+    (
+        "Cargo.toml",
+        12155,
+        "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    ),
+    (
+        "Cargo.lock",
+        119614,
+        "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    ),
+    (
+        "Cargo.Bazel.lock",
+        793783,
+        "a0074e7ea15887124b22aefac681c2728dcef7430364fa9f7390eacac0e53d93",
+    ),
+    (
+        ".bazelversion",
+        6,
+        "1b9487d55bea47fea50d226cc9c53bc548877ad2a318bac8fbc8b320f429e5c5",
+    ),
+];
+
+// Owner before credit, including early receipt refusal.
+struct Receipt {
+    text: String,
+    _credit: ImageDescriptorReservation,
+}
+impl Receipt {
+    fn new(budget: &ImageDescriptorBudget) -> Result<Self, &'static str> {
+        let credit = budget
+            .try_reserve(RECEIPT_BYTES + 256)
+            .map_err(|_| "receipt resource refusal")?;
+        let mut text = String::new();
+        text.try_reserve_exact(RECEIPT_BYTES)
+            .map_err(|_| "receipt allocation refusal")?;
+        if text.capacity() > RECEIPT_BYTES {
+            return Err("receipt allocation capacity refusal");
+        }
+        Ok(Self {
+            text,
+            _credit: credit,
+        })
+    }
+    fn number(&mut self, key: &'static str, value: u64) -> Result<(), &'static str> {
+        if !key
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit())
+            || self
+                .text
+                .len()
+                .checked_add(key.len() + 64)
+                .is_none_or(|n| n > RECEIPT_BYTES)
+        {
+            return Err("receipt schema refusal");
+        }
+        writeln!(self.text, "SLUG_SOURCE_ADMISSION {key}={value}")
+            .map_err(|_| "receipt schema refusal")
+    }
+    fn hex(&mut self, key: &'static str, bytes: &[u8]) -> Result<(), &'static str> {
+        if bytes.len() > 4096
+            || !key
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b == b'_' || b.is_ascii_digit())
+            || bytes
+                .len()
+                .checked_mul(2)
+                .and_then(|n| n.checked_add(key.len() + 32))
+                .and_then(|n| n.checked_add(self.text.len()))
+                .is_none_or(|n| n > RECEIPT_BYTES)
+        {
+            return Err("receipt schema refusal");
+        }
+        write!(self.text, "SLUG_SOURCE_ADMISSION {key}=").map_err(|_| "receipt schema refusal")?;
+        for byte in bytes {
+            write!(self.text, "{byte:02x}").map_err(|_| "receipt schema refusal")?;
+        }
+        self.text.push('\n');
+        Ok(())
+    }
+    fn counters(&mut self, c: SourceServiceCounters) -> Result<(), &'static str> {
+        for (key, value) in [
+            ("registry_attempts", c.registry_attempts),
+            ("registry_bytes", c.registry_admitted_bytes),
+            ("source_attempts", c.source_attempts),
+            ("transferred_bytes", c.transferred_bytes),
+            ("decoded_bytes", c.decoded_bytes),
+            ("written_bytes", c.written_bytes),
+            ("live_source_buffer_bytes", c.live_buffer_bytes as u64),
+            ("source_buffer_peak_bytes", c.peak_buffer_bytes as u64),
+        ] {
+            self.number(key, value)?;
+        }
+        Ok(())
+    }
+}
+
+fn pin_inputs(workspace: &Path, deadline: std::time::Instant) -> Result<(), &'static str> {
+    let mut buffer = [0u8; 64 * 1024];
+    for (relative, length, expected) in INPUTS {
+        if std::time::Instant::now() >= deadline {
+            return Err("input pin deadline refusal");
+        }
+        let path = workspace.join(relative);
+        let named = std::fs::symlink_metadata(&path).map_err(|_| "input pin refusal")?;
+        if !named.file_type().is_file() || named.len() != length {
+            return Err("input pin refusal");
+        }
+        let mut file = File::open(&path).map_err(|_| "input pin refusal")?;
+        let opened = file.metadata().map_err(|_| "input pin refusal")?;
+        if named.dev() != opened.dev() || named.ino() != opened.ino() {
+            return Err("input pin refusal");
+        }
+        let mut hash = Sha256::new();
+        let mut count = 0u64;
+        loop {
+            if std::time::Instant::now() >= deadline {
+                return Err("input pin deadline refusal");
+            }
+            let n = file.read(&mut buffer).map_err(|_| "input pin refusal")?;
+            if n == 0 {
+                break;
+            }
+            count = count.checked_add(n as u64).ok_or("input pin refusal")?;
+            if count > length {
+                return Err("input pin refusal");
+            }
+            hash.update(&buffer[..n]);
+        }
+        let digest: [u8; 32] = hash.finalize().into();
+        let after = file.metadata().map_err(|_| "input pin refusal")?;
+        let named_after = std::fs::symlink_metadata(&path).map_err(|_| "input pin refusal")?;
+        if count != length
+            || !digest_hex_matches(&digest, expected)
+            || opened.dev() != after.dev()
+            || opened.ino() != after.ino()
+            || opened.len() != after.len()
+            || opened.mtime_nsec() != after.mtime_nsec()
+            || opened.mtime() != after.mtime()
+            || opened.ctime() != after.ctime()
+            || opened.ctime_nsec() != after.ctime_nsec()
+            || after.dev() != named_after.dev()
+            || after.ino() != named_after.ino()
+        {
+            return Err("input pin refusal");
+        }
+    }
+    Ok(())
+}
+fn digest_hex_matches(bytes: &[u8; 32], expected: &str) -> bool {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    expected.len() == 64
+        && bytes.iter().enumerate().all(|(i, b)| {
+            expected.as_bytes()[2 * i] == HEX[(b >> 4) as usize]
+                && expected.as_bytes()[2 * i + 1] == HEX[(b & 15) as usize]
+        })
+}
+
+fn environment() -> Result<RepositoryEnvironmentSnapshot, &'static str> {
+    let mut rows = BTreeMap::new();
+    let mut bytes = 0usize;
+    // No second ambient read, and no name/value appears in a refusal.
+    for (name, value) in std::env::vars_os() {
+        let name = name
+            .into_string()
+            .map_err(|_| "environment unicode refusal")?;
+        let value = value
+            .into_string()
+            .map_err(|_| "environment unicode refusal")?;
+        bytes = bytes
+            .checked_add(name.len())
+            .and_then(|n| n.checked_add(value.len()))
+            .ok_or("environment bound refusal")?;
+        if rows.len() >= 1024 || bytes > 256 * 1024 {
+            return Err("environment bound refusal");
+        }
+        if rows.insert(name, Arc::<str>::from(value)).is_some() {
+            return Err("environment canonical refusal");
+        }
+    }
+    RepositoryEnvironmentSnapshot::from_canonical(Arc::from(
+        rows.into_iter()
+            .map(|(name, value)| RepositoryEnvironmentEntry::new(name, value))
+            .collect::<Vec<_>>(),
+    ))
+    .map_err(|_| "environment canonical refusal")
+}
+
+fn query_shape<'a>(length: usize, mut operand: impl FnMut(usize) -> (u8, &'a str)) -> bool {
+    if length != 12 {
+        return false;
+    }
+    for (i, text) in [
+        (1, "query"),
+        (2, "--lockfile"),
+        (4, "--config"),
+        (6, "--splicing-manifest"),
+        (8, "--cargo"),
+        (10, "--rustc"),
+    ] {
+        if operand(i) != (0, text) {
+            return false;
+        }
+    }
+    // 0 is source-bound scratch or Label, data lock is Label, serialized inputs
+    // are scratch, and both host tools are normal external Label operands.
+    matches!(operand(0).0, 1 | 2)
+        && operand(3).0 == 2
+        && operand(5).0 == 1
+        && operand(7).0 == 1
+        && operand(9).0 == 2
+        && operand(11).0 == 2
+}
+fn operand_kind(operand: &SelectedScratchOperand) -> u8 {
+    match operand {
+        SelectedScratchOperand::Literal(_) => 0,
+        SelectedScratchOperand::Scratch(_) => 1,
+        SelectedScratchOperand::ExternalPath(_) => 2,
+    }
+}
+
+struct Observer {
+    prior: AcceptedNativeDemandSnapshot,
+    engine: Weak<Dice>,
+    scope: Weak<SourceServiceScope>,
+    images: input_image::WorkspaceImageResources,
+    resources: slug_bzlmod_v2::SelectedScratchResources,
+    restored: Cell<bool>,
+    raw_restored: Cell<bool>,
+    before_capture: Cell<bool>,
+    after_capture: Cell<bool>,
+    progress: Cell<u64>,
+    refreshes: Cell<u64>,
+    stage_contained: Cell<bool>,
+    stage_paths_observed: Cell<u64>,
+    source_samples_observed: Cell<bool>,
+    descriptor_sample: Cell<usize>,
+    counters: Cell<SourceServiceCounters>,
+    poison: Cell<Option<SourceServiceError>>,
+}
+impl Observer {
+    fn new(runtime: &WorkspaceRuntime, scope: &Arc<SourceServiceScope>) -> Self {
+        Self {
+            prior: runtime
+                .native_demand_sessions
+                .state
+                .lock()
+                .unwrap()
+                .accepted
+                .clone(),
+            engine: Arc::downgrade(&runtime.dice),
+            scope: Arc::downgrade(scope),
+            images: runtime.image_resources.clone(),
+            resources: runtime.scratch_resources.clone(),
+            restored: Cell::new(false),
+            raw_restored: Cell::new(false),
+            before_capture: Cell::new(false),
+            after_capture: Cell::new(false),
+            progress: Cell::new(0),
+            refreshes: Cell::new(0),
+            stage_contained: Cell::new(true),
+            stage_paths_observed: Cell::new(0),
+            source_samples_observed: Cell::new(false),
+            descriptor_sample: Cell::new(0),
+            counters: Cell::new(SourceServiceCounters::default()),
+            poison: Cell::new(None),
+        }
+    }
+    fn hook(
+        &self,
+        phase: selected_tool_source::ToolPhase<'_>,
+        stage: &Path,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.descriptor_sample.set(
+            self.descriptor_sample
+                .get()
+                .max(self.images.descriptor_budget().used_bytes()),
+        );
+        match phase {
+            selected_tool_source::ToolPhase::BeforeCapture => self.before_capture.set(true),
+            selected_tool_source::ToolPhase::AfterCapture => self.after_capture.set(true),
+            selected_tool_source::ToolPhase::BeforeProgress(_) => {
+                self.progress.set(self.progress.get() + 1)
+            }
+            selected_tool_source::ToolPhase::OwnerRefreshed(_, _) => {
+                self.refreshes.set(self.refreshes.get() + 1)
+            }
+            selected_tool_source::ToolPhase::CaptureActivity(path) => {
+                self.stage_paths_observed
+                    .set(self.stage_paths_observed.get() + 1);
+                if !path.starts_with(stage) {
+                    self.stage_contained.set(false);
+                    return Err(refusal("capture stage refusal"));
+                }
+            }
+            selected_tool_source::ToolPhase::BeforeRestore(stages)
+            | selected_tool_source::ToolPhase::AfterRestore(stages) => {
+                let mut valid = true;
+                stages.visit_stage_paths(&mut |path| {
+                    self.stage_paths_observed
+                        .set(self.stage_paths_observed.get() + 1);
+                    valid &= path.starts_with(stage);
+                });
+                if !valid {
+                    self.stage_contained.set(false);
+                    return Err(refusal("capture stage refusal"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+impl DiagnosticObserver for Observer {
+    fn after_restore<'a>(
+        &'a self,
+        runtime: &'a WorkspaceRuntime,
+        _: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>> {
+        Box::pin(async move {
+            if let Some(scope) = runtime.source_scope() {
+                self.counters.set(scope.snapshot());
+                self.poison.set(scope.first_error_for_test());
+                self.source_samples_observed.set(true);
+            }
+            {
+                let state = runtime.native_demand_sessions.state.lock().unwrap();
+                let now = &state.accepted;
+                let before = &self.prior;
+                let equal = now.inputs == before.inputs
+                    && now.repository_results == before.repository_results
+                    && now.path_observations == before.path_observations
+                    && now.repository_environment_frontier
+                        == before.repository_environment_frontier
+                    && now.download_results == before.download_results
+                    && now.selected == before.selected
+                    && now.events == before.events
+                    && matches!(state.phase, NativeDemandLeasePhase::Idle);
+                self.restored.set(equal);
+                if !equal {
+                    return Err(refusal("snapshot restoration refusal"));
+                }
+            }
+            // Only existing caller raw producers; no owner, source, progress or
+            // injection. Root runs this future under the SAME cleanup deadline.
+            let mut tx = runtime.dice.updater().commit().await;
+            let workspace = runtime.workspace.clone();
+            let prior = &self.prior.inputs.request;
+            macro_rules! raw {
+                ($key:expr, $expected:expr) => {
+                    if tx
+                        .compute(&$key)
+                        .await
+                        .map_err(|_| refusal("raw restoration refusal"))?
+                        != $expected
+                    {
+                        return Err(refusal("raw restoration refusal"));
+                    }
+                };
+            }
+            raw!(
+                RootModuleCommandPolicyKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleCommandPolicy::from(prior.command_policy.clone())
+            );
+            raw!(
+                RootModuleEnvironmentPolicyKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(prior.environment_policy.clone())
+            );
+            raw!(
+                RootModuleLockfileModeKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleLockfileMode::from(prior.lockfile_mode.clone())
+            );
+            raw!(
+                RootModuleRegistryUrlsKey {
+                    workspace: workspace.clone()
+                },
+                slug_bzlmod_v2::RootModuleRegistryUrls::from(prior.registry_urls.clone())
+            );
+            let normalized = runtime.repository_materializer.workspace().clone();
+            raw!(
+                slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey::new(normalized.clone()),
+                prior.repository_environment.clone()
+            );
+            raw!(
+                slug_bzlmod_v2::RuntimeSourceDeclarationPolicyKey::new(normalized.clone()),
+                prior.runtime_sources.clone()
+            );
+            raw!(
+                slug_bzlmod_v2::RawGuestNamespacePolicyKey::new(normalized),
+                prior.guest_namespace
+            );
+            drop(tx);
+            runtime.dice.wait_for_idle().await;
+            self.raw_restored.set(true);
+            Ok(())
+        })
+    }
+}
+
+// Default zero fields are not observations. A vacuous containment predicate
+// cannot certify stage ownership before any actual retained path was visited.
+fn observation_flags(sampled: bool, paths: u64, contained: bool) -> (u64, u64) {
+    (u64::from(sampled), u64::from(paths > 0 && contained))
+}
+
+fn poison_code(error: Option<SourceServiceError>) -> u64 {
+    match error {
+        None => 0,
+        Some(SourceServiceError::InvalidLimits) => 1,
+        Some(SourceServiceError::ForeignScope) => 2,
+        Some(SourceServiceError::AcquisitionClosed) => 3,
+        Some(SourceServiceError::Cancelled) => 4,
+        Some(SourceServiceError::WorkDeadline) => 5,
+        Some(SourceServiceError::CleanupDeadline) => 6,
+        Some(SourceServiceError::Limit(_)) => 7,
+        Some(SourceServiceError::Overflow(_)) => 8,
+        Some(SourceServiceError::BufferLimit) => 9,
+        Some(SourceServiceError::Allocation) => 10,
+        Some(SourceServiceError::UnsupportedSourceOwner) => 11,
+    }
+}
+fn outer_code(error: &NativeDemandSessionError) -> u64 {
+    match error {
+        NativeDemandSessionError::SourceService(_) => 1,
+        NativeDemandSessionError::Repository(_) => 2,
+        NativeDemandSessionError::InputImage(_) => 3,
+        NativeDemandSessionError::Computation(_) => 4,
+        NativeDemandSessionError::DownloadCapture(_) => 5,
+        NativeDemandSessionError::Restoration(_) => 6,
+        NativeDemandSessionError::Injection(_) => 7,
+        _ => 8,
+    }
+}
+
+fn emit_success(
+    view: &source_service::ScopedPreparedSourceViewLease,
+    inputs: &NativeDemandRequestInputBundle,
+    receipt: &mut Receipt,
+    stage: &Path,
+) -> Result<(), &'static str> {
+    if view.inputs() != inputs || !view.view().is_valid() {
+        return Err("full caller proof refusal");
+    }
+    let facts = view.view().facts();
+    let profile = facts.profile();
+    let sources = profile.tool_sources();
+    let observed = sources.prefix();
+    let prefix = observed.prefix();
+    let arguments = prefix.process().arguments();
+    if !query_shape(arguments.len(), |i| {
+        (operand_kind(&arguments[i]), arguments[i].spelling())
+    }) || prefix.process().inherited_environment() != &inputs.repository_environment
+        || prefix.owner() != view.selected().owner()
+        || view.selected().owner().kind()
+            != slug_bzlmod_v2::HostSelectedExtensionOwnerKind::ModuleExtension
+    {
+        return Err("actual query proof refusal");
+    }
+    let (definition, name, _, _) = observed.inputs().request().parts();
+    if name != "crate"
+        || definition.package().package().as_str() != "crate_universe"
+        || definition.target().as_str() != "extensions.bzl"
+    {
+        return Err("actual owner proof refusal");
+    }
+    if profile.images().len() != 0
+        || profile.requests().requests().len() != 0
+        || view.view().sources().test_captured_count() != 0
+        || view.view().sources().test_stage_count() != 0
+    {
+        return Err("empty runtime proof refusal");
+    }
+    receipt.hex(
+        "canonical_repository_hex",
+        view.selected().requested().as_str().as_bytes(),
+    )?;
+    receipt.hex(
+        "owner_hex",
+        view.selected().owner().unique_name().as_str().as_bytes(),
+    )?;
+    receipt.number("query_shape_proved", 1)?;
+    receipt.number("full_caller_proved", 1)?;
+    receipt.number(
+        "owner_frontier_rows",
+        view.selected().observations().observations().len() as u64,
+    )?;
+    receipt.number("scratch_operations", prefix.operations().len() as u64)?;
+    receipt.number("scratch_final_entries", prefix.entries().len() as u64)?;
+    receipt.number(
+        "scratch_semantic_occurrence_bytes",
+        prefix.occurrence_bytes() as u64,
+    )?;
+    receipt.number(
+        "scratch_semantic_descriptor_bytes",
+        prefix.descriptor_bytes() as u64,
+    )?;
+    receipt.number("guest_deduplicated_nodes", facts.nodes().len() as u64)?;
+    receipt.number("extra_runtime_images", 0)?;
+    let mut image_occurrences = 0u64;
+    let mut image_bytes = 0u64;
+    let mut image_identity = [None; 3];
+    let tools = view.view().sources().tools();
+    for (index, (source, expected)) in sources
+        .sources()
+        .zip(inputs_tool_policy()?.operands())
+        .enumerate()
+    {
+        if source.operand() != *expected
+            || !matches!(source.metadata().outcome(), ElfMetadataOutcome::Parsed(_))
+        {
+            return Err("tool role proof refusal");
+        }
+        let digest = source.metadata().digest();
+        receipt.number("tool_role", index as u64)?;
+        receipt.number(
+            "tool_argument_index",
+            source.operand().argument_index.into(),
+        )?;
+        receipt.hex("tool_sha256", digest.sha256())?;
+        receipt.number("tool_size", digest.size_bytes())?;
+        if let Some(result) = source.scratch_result() {
+            let request = result.request();
+            if request.expected_digest() != digest || request.prefix() != prefix {
+                return Err("scratch proof refusal");
+            }
+            let download = request
+                .blob()
+                .download()
+                .ok_or("actual generator download proof refusal")?;
+            if download.request().sha256() != digest.sha256()
+                || !observed
+                    .download_requests()
+                    .iter()
+                    .any(|r| r == download.request())
+            {
+                return Err("actual generator download proof refusal");
+            }
+            receipt.number("tool_source_kind", 1)?;
+            receipt.number("scratch_tool_entry", request.entry_index() as u64)?;
+        } else {
+            let selected = source.label_selection().ok_or("Label proof refusal")?;
+            let image = source
+                .label_metadata()
+                .ok_or("Label ELF proof refusal")?
+                .image();
+            record_label_materialization(selected, image, stage, receipt)?;
+            image_occurrences += image.entries().len() as u64;
+            image_bytes = image_bytes
+                .checked_add(image.total_file_bytes())
+                .ok_or("image count refusal")?;
+            image_identity[index] = Some(
+                tools
+                    .with_image_root(index, |file, actual| {
+                        if actual != image {
+                            return Err("capture binding refusal");
+                        }
+                        let stat = file.metadata().map_err(|_| "capture binding refusal")?;
+                        Ok((stat.dev(), stat.ino()))
+                    })
+                    .ok_or("capture binding refusal")??,
+            );
+            receipt.number(
+                "tool_materialization_namespace",
+                u64::from(matches!(
+                    image.namespace(),
+                    slug_workspace_v2::PathObservationNamespace::Materialization(_)
+                )),
+            )?;
+        }
+    }
+    record_capture_equivalence(sources, image_identity, receipt)?;
+    receipt.number("tool_image_occurrence_entries", image_occurrences)?;
+    receipt.number("tool_image_occurrence_bytes", image_bytes)?;
+    Ok(())
+}
+
+// Bind honest producer storage, not merely our later output capture, to the
+// actual normal immutable result and its exact current image namespace/anchor.
+fn record_label_materialization(
+    selected: &slug_bzlmod_v2::ObservedSelectedLabelSource,
+    image: &slug_workspace_v2::ObservedInputImage,
+    stage: &Path,
+    receipt: &mut Receipt,
+) -> Result<(), &'static str> {
+    let (request, materialized) = selected
+        .repository()
+        .ok_or("materialization proof refusal")?;
+    let slug_bzlmod_v2::RepositoryMaterialization::Immutable {
+        canonical_repo,
+        repo_spec,
+        generation_root,
+        observation_instance,
+        ..
+    } = materialized
+    else {
+        return Err("immutable producer proof refusal");
+    };
+    let root =
+        NormalizedAbsolutePath::new(generation_root).map_err(|_| "producer root proof refusal")?;
+    if !root.as_path().starts_with(stage)
+        || root.as_path() == stage
+        || image.anchor_root() != &root
+        || image.namespace()
+            != slug_workspace_v2::PathObservationNamespace::Materialization(*observation_instance)
+        || canonical_repo != &request.id.canonical_repo
+        || repo_spec != &request.repo_spec
+    {
+        return Err("producer binding proof refusal");
+    }
+    let slug_bzlmod_v2::RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind
+    else {
+        return Err("actual host tools proof refusal");
+    };
+    receipt.number("tool_source_kind", 2)?;
+    for effect in plan.ordered_effects() {
+        if let slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef::Archive(archive) = effect {
+            receipt.hex("tool_archive_sha256", &archive.sha256())?;
+        }
+    }
+    Ok(())
+}
+
+fn record_capture_equivalence(
+    sources: &slug_loading_v2::ObservedSelectedExtensionToolSources,
+    image_identity: [Option<(u64, u64)>; 3],
+    receipt: &mut Receipt,
+) -> Result<(), &'static str> {
+    if sources.sources().len() != 3 || image_identity[1].is_none() || image_identity[2].is_none() {
+        return Err("three role proof refusal");
+    }
+    let full_images_equal = sources
+        .sources()
+        .nth(1)
+        .unwrap()
+        .label_metadata()
+        .unwrap()
+        .image()
+        == sources
+            .sources()
+            .nth(2)
+            .unwrap()
+            .label_metadata()
+            .unwrap()
+            .image();
+    let cargo = image_identity[1].unwrap();
+    let rustc = image_identity[2].unwrap();
+    if !capture_equivalence(full_images_equal, cargo, rustc) {
+        return Err("shared capture provenance refusal");
+    }
+    let shared = cargo == rustc;
+    receipt.number(
+        "producer_materializations_checked",
+        image_identity.iter().flatten().count() as u64,
+    )?;
+    receipt.number("producer_containment_proved", 1)?;
+    receipt.number("full_image_capture_equivalence_proved", 1)?;
+    receipt.number("cargo_rustc_shared_capture", u64::from(shared))?;
+    Ok(())
+}
+
+fn capture_equivalence(full_images_equal: bool, cargo: (u64, u64), rustc: (u64, u64)) -> bool {
+    full_images_equal == (cargo == rustc)
+}
+
+fn inputs_tool_policy() -> Result<SelectedToolSourcesPolicy, &'static str> {
+    SelectedToolSourcesPolicy::new(
+        &[
+            SelectedToolOperand {
+                role: SelectedToolRole::Generator,
+                argument_index: 0,
+            },
+            SelectedToolOperand {
+                role: SelectedToolRole::Cargo,
+                argument_index: 9,
+            },
+            SelectedToolOperand {
+                role: SelectedToolRole::Rustc,
+                argument_index: 11,
+            },
+        ],
+        ElfMetadataPolicy::default(),
+    )
+    .map_err(|_| "tool policy refusal")
+}
+
+fn request_inputs(
+    diagnostic: &SourcePreparationDiagnosticRuntime,
+) -> Result<(NativeDemandRequestInputBundle, ImageChargedPath), &'static str> {
+    let repository_environment = environment()?;
+    let environment_policy = BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
+        repository_environment
+            .get("BZLMOD_ALLOW_YANKED_VERSIONS")
+            .map(|value| value.as_ref()),
+    )
+    .map_err(|_| "environment policy refusal")?;
+    let pin = ImageChargedPath::pin_existing(
+        diagnostic.workspace().clone(),
+        diagnostic.descriptor_budget(),
+    )
+    .map_err(|_| "workspace policy resource refusal")?;
+    let inputs = NativeDemandRequestInputBundle {
+        runtime_sources: Some(
+            RuntimeSourceDeclarationPolicy::new(
+                &pin,
+                &[],
+                RuntimeSourceLimits::default(),
+                diagnostic.descriptor_budget(),
+            )
+            .map_err(|_| "runtime policy refusal")?,
+        ),
+        guest_namespace: Some(
+            GuestNamespacePolicy::new(
+                1001,
+                1002,
+                1001,
+                1002,
+                9,
+                7,
+                8,
+                0o755,
+                GuestNamespaceLimits::default(),
+            )
+            .and_then(|p| {
+                p.with_label_data(GuestLabelDataPolicy::IssuedFileLeaves { max_witnesses: 64 })
+            })
+            .map_err(|_| "guest policy refusal")?,
+        ),
+        command_policy: BzlmodCommandPolicyKey::from_flags(None, false)
+            .map_err(|_| "command policy refusal")?,
+        environment_policy,
+        lockfile_mode: LockfileMode::Error,
+        registry_urls: RegistryUrls::default_bazel_registry(),
+        repository_environment,
+    };
+    Ok((inputs, pin))
+}
+
+fn run(
+    receipt: &mut Receipt,
+    clock: &HarnessClockStage,
+    diagnostic: SourcePreparationDiagnosticRuntime,
+) -> Result<(), &'static str> {
+    let observer = diagnostic.inspect_for_test(Observer::new);
+    let baseline_descriptor = diagnostic.descriptor_budget().used_bytes();
+    let baseline_payload = diagnostic.resources().payload_budget().used_bytes();
+    let (inputs, pin) = request_inputs(&diagnostic)?;
+    let name = ApparentRepoName::new("slug_crates").map_err(|_| "import refusal")?;
+    clock
+        .revalidate_before_runtime()
+        .map_err(|_| "setup revalidation refusal")?;
+    let outcome = diagnostic.prepare_once_observed(
+        SelectedSourcePreparationRequest {
+            apparent_repository: &name,
+            inputs: &inputs,
+            scratch_policy: SelectedScratchPolicy::plain(),
+            tool_policy: inputs_tool_policy()?,
+        },
+        &|phase| observer.hook(phase, clock.stage_path()),
+        &observer,
+    );
+    receipt.number("progress_rounds", observer.progress.get())?;
+    receipt.number("owner_refreshes", observer.refreshes.get())?;
+    receipt.number("reached_capture", u64::from(observer.before_capture.get()))?;
+    receipt.number("completed_capture", u64::from(observer.after_capture.get()))?;
+    receipt.number(
+        "stage_containment_proved",
+        observation_flags(
+            observer.source_samples_observed.get(),
+            observer.stage_paths_observed.get(),
+            observer.stage_contained.get(),
+        )
+        .1,
+    )?;
+    receipt.number("stage_paths_observed", observer.stage_paths_observed.get())?;
+    receipt.number(
+        "no_containment_violation_observed",
+        u64::from(observer.stage_contained.get()),
+    )?;
+    receipt.number(
+        "snapshot_restoration_proved",
+        u64::from(observer.restored.get()),
+    )?;
+    receipt.number(
+        "raw_restoration_proved",
+        u64::from(observer.raw_restored.get()),
+    )?;
+    receipt.number(
+        "engine_retired",
+        u64::from(observer.engine.upgrade().is_none()),
+    )?;
+    receipt.number("first_poison_code", poison_code(observer.poison.get()))?;
+    let source_sampled = observation_flags(
+        observer.source_samples_observed.get(),
+        observer.stage_paths_observed.get(),
+        observer.stage_contained.get(),
+    )
+    .0;
+    receipt.number("poison_observation_before_close", source_sampled)?;
+    receipt.number("source_counters_sampled", source_sampled)?;
+    receipt.counters(observer.counters.get())?;
+    receipt.number(
+        "descriptor_phase_sample_lower_bound",
+        observer.descriptor_sample.get() as u64,
+    )?;
+    receipt.number("descriptor_exact_peak_proved", 0)?;
+    if let Err(error) = &outcome {
+        receipt.number("outer_error_code", outer_code(error))?;
+        receipt.number("nested_frontier_proof_missing", 1)?;
+    }
+    let view = outcome.map_err(|_| "actual source admission refused")?;
+    if !observer.restored.get()
+        || !observer.raw_restored.get()
+        || observer.engine.upgrade().is_some()
+        || !observer.stage_contained.get()
+        || observer.stage_paths_observed.get() == 0
+        || !observer.source_samples_observed.get()
+    {
+        return Err("restoration or retirement proof refusal");
+    }
+    emit_success(&view, &inputs, receipt, clock.stage_path())?;
+    // A clone retains only the actual verified view; acquisition engine is gone.
+    let clone = view.clone();
+    drop(view);
+    let node = clone.view().facts().nodes().iter().find(|node| matches!(node.binding(), slug_loading_v2::GuestNamespaceBinding::DataLeaf { .. })
+        && matches!(node.kind(), slug_loading_v2::GuestNamespaceNodeKind::RegularFile(d) if d.size_bytes() <= 1 << 20))
+        .ok_or("issued data read proof refusal")?;
+    let slug_loading_v2::GuestNamespaceNodeKind::RegularFile(expected) = node.kind() else {
+        return Err("issued data read proof refusal");
+    };
+    let mut hash = Sha256::new();
+    let mut read_bytes = 0u64;
+    clone
+        .view()
+        .stream_regular_for_test(
+            node.path(),
+            &mut |chunk| {
+                hash.update(chunk);
+                read_bytes += chunk.len() as u64;
+            },
+            &|| std::time::Instant::now() < clock.cleanup_deadline(),
+        )
+        .map_err(|_| "issued data read proof refusal")?;
+    let digest: [u8; 32] = hash.finalize().into();
+    if read_bytes != expected.size_bytes()
+        || digest != *expected.sha256()
+        || !clone.view().is_valid()
+    {
+        return Err("issued data read proof refusal");
+    }
+    receipt.hex("retained_data_read_sha256", &digest)?;
+    receipt.number("retained_data_read_bytes", read_bytes)?;
+    receipt.number("retained_clone_read_proved", 1)?;
+    drop(clone);
+    drop(inputs);
+    drop(pin);
+    if observer.images.logical_bytes_used() != 0
+        || observer.resources.payload_budget().used_bytes() != baseline_payload
+        || observer.images.descriptor_budget().used_bytes() != baseline_descriptor
+        || observer.scope.upgrade().is_some()
+    {
+        return Err("last drop proof refusal");
+    }
+    receipt.number("last_drop_proved", 1)?;
+    clock
+        .revalidate_stage()
+        .map_err(|_| "final stage identity refusal")?;
+    pin_inputs(Path::new(WORKSPACE), clock.cleanup_deadline())?;
+    receipt.number("input_pins_unchanged", 1)?;
+    if std::time::Instant::now() >= clock.cleanup_deadline() {
+        return Err("final cleanup deadline refusal");
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "ONE separately reviewed and supervised actual-root source-admission attempt"]
+fn actual_slug_crates_source_admission() -> Result<(), &'static str> {
+    let emitted = Cell::new(false);
+    let outcome = actual_source_admission(&emitted);
+    if !emitted.get() {
+        println!(
+            "SLUG_SOURCE_ADMISSION schema=1\nSLUG_SOURCE_ADMISSION status=0\nSLUG_SOURCE_ADMISSION setup_refusal=1"
+        );
+    }
+    outcome
+}
+
+fn actual_source_admission(emitted: &Cell<bool>) -> Result<(), &'static str> {
+    let clock =
+        HarnessClockStage::from_environment().map_err(|_| "clock or stage setup refused")?;
+    pin_inputs(Path::new(WORKSPACE), clock.work_deadline())?;
+    clock
+        .revalidate_before_runtime()
+        .map_err(|_| "clock or stage setup refused")?;
+    let workspace = NormalizedAbsolutePath::new(WORKSPACE).map_err(|_| "workspace refused")?;
+    let diagnostic = SourcePreparationDiagnosticRuntime::new(
+        workspace,
+        crate::runtime::ProcessHostOwner::native(),
+        clock.work_deadline(),
+        clock.cleanup_deadline(),
+        SourceServiceLimits::default(),
+    )
+    .map_err(|_| "diagnostic constructor refused")?;
+    let mut receipt = Receipt::new(diagnostic.descriptor_budget())?;
+    receipt.number("schema", 1)?;
+    receipt.number(
+        "work_deadline_monotonic_ns",
+        clock.work_deadline_monotonic_ns(),
+    )?;
+    receipt.number(
+        "cleanup_deadline_monotonic_ns",
+        clock.cleanup_deadline_monotonic_ns(),
+    )?;
+    receipt.number("full_runtime_closure_proved", 0)?;
+    receipt.number("process_execution_proved", 0)?;
+    receipt.number("historical_memory_attribution_proved", 0)?;
+    let outcome = run(&mut receipt, &clock, diagnostic);
+    receipt.number("status", u64::from(outcome.is_ok()))?;
+    print!("{}", receipt.text);
+    emitted.set(true);
+    outcome
+}
+
+#[test]
+fn genuine_receipt_schema_excludes_dynamic_errors_and_bounds_values() {
+    let budget = ImageDescriptorBudget::new(128 * 1024);
+    let mut receipt = Receipt::new(&budget).unwrap();
+    receipt.number("outer_error_code", 4).unwrap();
+    receipt
+        .number(
+            "first_poison_code",
+            poison_code(Some(SourceServiceError::BufferLimit)),
+        )
+        .unwrap();
+    assert!(receipt.number("credential=value", 1).is_err());
+    assert!(receipt.hex("identity", &[0; 4097]).is_err());
+    assert!(!receipt.text.contains("credential"));
+    assert!(
+        receipt
+            .text
+            .lines()
+            .all(|line| line.starts_with("SLUG_SOURCE_ADMISSION "))
+    );
+    assert!(receipt.text.len() <= RECEIPT_BYTES);
+    drop(receipt);
+    assert_eq!(budget.used_bytes(), 0);
+}
+
+#[test]
+fn genuine_query_shape_requires_literal_flags_and_typed_source_slots() {
+    let mut args = [
+        (1, "generator"),
+        (0, "query"),
+        (0, "--lockfile"),
+        (2, "lock"),
+        (0, "--config"),
+        (1, "config"),
+        (0, "--splicing-manifest"),
+        (1, "splicing"),
+        (0, "--cargo"),
+        (2, "cargo"),
+        (0, "--rustc"),
+        (2, "rustc"),
+    ];
+    assert!(query_shape(args.len(), |i| args[i]));
+    args[9].0 = 0;
+    assert!(!query_shape(args.len(), |i| args[i]));
+    args[9].0 = 2;
+    args[1].1 = "generate";
+    assert!(!query_shape(args.len(), |i| args[i]));
+    assert!(!query_shape(11, |i| args[i]));
+}
+
+#[test]
+fn genuine_zero_observations_never_certify_default_samples_or_containment() {
+    assert_eq!(observation_flags(false, 0, true), (0, 0));
+    assert_eq!(observation_flags(true, 0, true), (1, 0));
+    assert_eq!(observation_flags(true, 3, false), (1, 0));
+    assert_eq!(observation_flags(true, 3, true), (1, 1));
+}
+
+#[test]
+fn genuine_capture_sharing_requires_full_image_equality_in_both_directions() {
+    let a = (11, 22);
+    let b = (11, 23);
+    assert!(capture_equivalence(true, a, a));
+    assert!(capture_equivalence(false, a, b));
+    assert!(!capture_equivalence(true, a, b));
+    assert!(!capture_equivalence(false, a, a));
+}

@@ -97,6 +97,25 @@ impl fmt::Debug for PreparedGuestNamespaceViewLease {
             .finish_non_exhaustive()
     }
 }
+#[cfg(test)]
+impl PreparedGuestNamespaceViewLease {
+    pub(in crate::runtime::dice) fn stream_regular_for_test(
+        &self,
+        path: &str,
+        sink: &mut dyn FnMut(&[u8]),
+        active: &dyn Fn() -> bool,
+    ) -> Result<(), ()> {
+        self.read_regular(
+            path,
+            &mut |chunk| {
+                sink(chunk);
+                Ok(())
+            },
+            active,
+        )
+        .map_err(|_| ())
+    }
+}
 impl WorkspaceRuntime {
     pub(super) fn prepare_selected_guest_namespace_view(
         &self,

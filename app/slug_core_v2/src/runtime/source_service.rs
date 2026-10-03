@@ -13,6 +13,8 @@ mod scope;
 #[path = "source_service/tests.rs"]
 mod tests;
 
+#[cfg(test)]
+pub(in crate::runtime::dice) use diagnostic::DiagnosticObserver;
 pub(in crate::runtime::dice) use diagnostic::ScopedPreparedSourceViewLease;
 pub(in crate::runtime::dice) use diagnostic::SourcePreparationDiagnosticRuntime;
 pub(in crate::runtime) use diagnostic::WorkspaceSourceServices;

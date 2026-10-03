@@ -14,9 +14,13 @@ remain accepted, without actual40GB/whole-build RSS attribution. M7A stays parti
 Candidate-only checkpoint on the review branch: [receipt](wp899-candidate-checkpoint-2026-10-03.json)
 pins all399 portable ordinary gates (including all362 protected predecessor
 selectors), final component reviews and default Shared/Loading/Core/Workspace/CLI
-all-target compilation. Full WP899 remains UNACCEPTED: bounded source-service and
-supervisor implementation/discriminators, genuine actualRoot source/admission and
-coupled integration FINAL review remain mandatory. No CLI/process activation.
+all-target compilation. The later [genuine harness checkpoint](wp899-genuine-harness-checkpoint-2026-10-03.json)
+adds reviewed clock/observer/actual-root harness,216 ordinary passes and ONE frozen
+supervised attempt. That actual attempt refused with outer Computation after two
+registry attempts/zero admitted bytes, before source/capture. Full WP899 remains
+UNACCEPTED: precise nested refusal evidence, successful actual source admission,
+exact descriptor highwater and coupled integration FINAL remain mandatory. No
+CLI/process activation and no automatic second attempt under the spent freeze.
 
 ## Observable result and authority
 
@@ -382,3 +386,86 @@ authoring/freezing and independent review before ONE supervised source/admission
 attempt. No actualRoot acquisition/network, CLI linking/restart, backend/query,
 locked-generate or bootstrap activation has occurred. Accepted memory repairs
 remain accepted independently; historical40GB/full-workload RSS remains unattributed.
+
+## Genuine harness implementation extension
+
+Continue from source-service candidate5b16dd27f. Root adopts the complete explicit
+profile in target/wp899/genuine-harness-config.md: actual slug_crates, no command
+overrides, yanked environment policy from the same full opaque snapshot,
+LockfileMode::Error, default BCR, Some(empty) extra runtime roots and explicit
+UniformLinuxV1/IssuedFileLeaves64 metadata, scratch plain and query roles0/9/11.
+Normal evaluation must authenticate the actual query checkpoint; ambient repin or
+other checkpoint is a prerequisite terminal, not authority to alter environment.
+
+Root owns integrated design/invocation/observer and authorizes cohesive cfgtest
+Linux children source_preparation/{genuine_root,harness_clock}.rs, registration in
+source_preparation.rs, source_service.rs cfgtest trait reexport, and cfgtest-only
+diagnostic.rs observation glue. Input worker
+may implement the reviewed clock/stage child after independent DESIGN ACCEPT;
+Frontier may implement the reviewed harness child after integrated DESIGN ACCEPT.
+No production key/representation/dependency/source-service/None behavior change.
+Estimates/helper boundaries and discriminators are genuine-harness-design.md and
+independent clock/evidence audits; same serial60s compile/30s test caps apply.
+
+The observation seam inspects the existing accepted snapshot and may read only
+existing raw injected keys in one fresh transaction under the same cleanup clock
+AFTER normal restoration; no owner/source selection, new injection or second
+preparation command. It drops/drains before engine retirement. Exact descriptor
+peak currently lacks instrumentation: current/phase budget samples and semantic
+counts are explicitly not a peak. Record that precise missing proof if unresolved;
+source buffer-bank highwater is a separate real metric. No purported peak gate
+acceptance from samples. No actualRoot/network attempt is authorized by helper
+implementation: source/harness/config/clock/supervisor/artifact must pass FINAL
+review and be frozen before the separate ONE supervised admission invocation.
+
+Failure observation permits one cfgtest scalar-only SourceServiceScope::
+first_error_for_test getter in source_service/scope.rs. It reads the short scalar
+lock without calling check or creating a later deadline poison; no production
+API/state/ownership change. Root may add cohesive diagnostic_tests.rs observer
+success/primary-error integration gates using existing genuine normal fixture.
+
+Actual retained reader is private to guest_namespace. Root permits cfgtest-only
+stream_regular_for_test forwarding glue in guest_namespace.rs using the existing
+regular reader and provisional chunk sink; no FD/path authority or production
+visibility change. Harness hashes bounded normal issued data chunks, publishes
+its digest only after the reader succeeds, and never collects payload bytes.
+Receipt sample-valid markers must distinguish uncalled observers/unvisited stage
+checks from genuine measured zero; no completed evidence from default flags.
+
+
+Root reconciles the separate ONE invocation after fresh216/216 ordinary gates,
+default all-target check, exactly1 ignored list-only selection and independent
+clock/observer/harness/handoff/invocation FINAL acceptance. Concrete immutable
+command/source/artifact/Python/config/clock/stage/control freeze is
+target/wp899/genuine-root-invocation-freeze.json. Execute only that direct-binary
+supervised diagnostic once; no automatic retry, source substitution, cap growth
+or ordinary CLI/tool process activation. This decision closes implementation
+prerequisites only. Exact descriptor highwater, precise nested refusal frontier,
+actual source outcome, full runtime and historical40GB attribution stay unwaived.
+
+## Genuine harness preservation and ONE terminal 2026-10-03
+
+Source/harness/config/clock/observer and exact invocation have independent FINAL
+acceptance for their bounded prerequisites. Fresh Core216/216 pass9.222s includes
+all prior206 plus ten new clock/harness/observer controls; default five-crate
+all-target check passes15.38s. Compiler peaks are not runtime measurements. Initial
+214/216 failure is preserved: two valid temp-directory fixtures needed explicit
+0700, matching supervisor mkdtemp; the production0700 check and0755 negative stay.
+
+ONE actual ignored selector executed from the exact frozen artifact. Supervisor
+verified inherited hard RLIMIT_AS4GiB, sampled59.238MiB RSS/zero swap/zero descendants,
+joined child101 and removed its owned stage. Child reports status0 and outer
+Computation4 after registry attempts2/admitted bytes0, source attempts0/capture0/
+progress0. Full accepted/raw prior restoration and actual engine retirement are
+observed. No scope poison was present in the real preclose sample. Precise nested
+error site is not known; no DNS/socket/HTTP/lock/network reason or actual source fit
+is inferred. The refused branch RSS is not the historical40GB/full workload.
+
+Durable exact source/compile/test/review/freeze/ordered terminal evidence and
+remaining gates are in wp899-genuine-harness-checkpoint-2026-10-03.json. The spent
+attempt ledger prevents an automatic retry; further actual execution requires a
+new concrete reviewed evidence contract/freeze, never cap growth or caller input
+changes. Four prior supplemental EPERM socket controls remain unproved. Exact
+descriptor highwater, nested refusal frontier, source/private-lease/clone-read/
+lastDrop, full runtime/process/bootstrap and original40GB attribution remain open.
+This is review-branch candidate preservation; full goal remains active.

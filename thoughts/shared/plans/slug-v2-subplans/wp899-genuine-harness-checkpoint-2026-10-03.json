@@ -1,0 +1,465 @@
+{
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "date": "2026-10-03",
+  "status": "PRESERVATION_ONLY_UNACCEPTED",
+  "branch": "review/wp899-request-source-profile",
+  "parent_candidate": "5b16dd27f3070144db96673005c78a42daa4975a",
+  "accepted_memory_base": "1fe253f63f9bf831aad70ae239555715aacb0e80",
+  "compatibility": "Slug-native cfgtest Linux diagnostic operational admission; one unchanged normal driver; ordinary None semantics and exact semantic identity preserved",
+  "observable_checkpoint": "Reviewed actual-checkout harness and common clock/stage transport;216 ordinary gates pass; ONE frozen actualRoot attempt executed and refused before source capture; fullWP899 and40GB attribution remain unaccepted",
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/dice.rs": "30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a",
+    "app/slug_core_v2/src/runtime/guest_namespace.rs": "79adbfe155c3436df6b5d45ed85dd7e352cc380129b5e4951019e7e98d703e24",
+    "app/slug_core_v2/src/runtime/input_image_bridge.rs": "5690b0710b54e57f522512ace214ba6503a29f01c5d916b5bff4e3f31598e2ef",
+    "app/slug_core_v2/src/runtime/registry_io.rs": "3b428547da2286c81f349d2c24097387435f7d56b06a3ee4436bb08fedfe51fa",
+    "app/slug_core_v2/src/runtime/repository_archive.rs": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561",
+    "app/slug_core_v2/src/runtime/repository_archive_file.rs": "0614efe0db9a9490bddfc206d9c69f2ab728121c797227bde0a74e3f6bcf5027",
+    "app/slug_core_v2/src/runtime/repository_archive_http.rs": "19790b239e26d0c7740bd89628c227ca4aaad9b78511a357b6a83ed20e13f274",
+    "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "a7ea07667f0f6d98c9db535dbe60743a148134064393728f7a4ef694ea042a6f",
+    "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "561af5f1e6e398d04671f39d1039717a0697d14bc186324b6e5241192d99cc72",
+    "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "f1768713fb592b267c3b6b9e925f91079351f2b2d212c376c716d8ae043b66d2",
+    "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "e6525fcf83fb9cd09826bd030186d8be9325f40efa89fd8cd6eefbb61cfbb708",
+    "app/slug_core_v2/src/runtime/repository_io.rs": "e95682a4d832010c42c6803c6765332b905fb4c9ce08e746b80b162d84b24c59",
+    "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "f50491495f6450774bc281cc8b74704f3705da2e1a41d0aed9aad548daedc52f",
+    "app/slug_core_v2/src/runtime/repository_io/source_service_tests.rs": "d066e5cb4c41381cccb67e245716138bcf6b0b6f19f26c066e181b52ee5f4517",
+    "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "85f5f77c36e69d8060829f75ec7b2670709467c00720f50bac5666ed8a14075c",
+    "app/slug_core_v2/src/runtime/source_preparation.rs": "55c7fced51be8d5ea0eb60a9660ef9186b842784bf620b0216f963795f8779f7",
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "1574ba7255890c38379834d22fe76cce367fef01af1448c133e8a46b176d296b",
+    "app/slug_core_v2/src/runtime/source_preparation/harness_clock.rs": "ddca8674a50e793d21c6b91df24f95de849bbc95ccb933de77fac4eda95caeb3",
+    "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "166663f44eee230dfd01ea42b854976295cd052c7959dc23eadf0d5799dad2f7",
+    "app/slug_core_v2/src/runtime/source_service.rs": "4c179855ad59add242c00a63dc10fbbfcf42fb5aede8968d3a45ffa5ed455422",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "ce1566cce9e7db2861745d7e133e4bd1678de1bade203da1a342a11630725be6",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "3f1af2af0d555a166bd8b63daf4a3bf10aaa5eb4705e9ba9a3b0ae472b20655b",
+    "app/slug_core_v2/src/runtime/source_service/http.rs": "e079e0d39d34fc24fcac8c6b4b02ac58dd63e2609131fb4ee7f968c290b75977",
+    "app/slug_core_v2/src/runtime/source_service/registry.rs": "8254620ee2ddeed6878c88fe7b91166e8d6025bae28ef0283646a095c7059cf3",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "a8a28481c79be7cbcb8492be1e98e247b196c00b5ae34c8b24ee8e0cef44f2a3",
+    "app/slug_core_v2/src/runtime/source_service/tests.rs": "c64b453468587ef29012aff98778e5418bac079d5f2598b13801d715f28c3f40",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "2465fff9e1467faeebd6a7902fdb99b5864b2ef2f25ce9ec9bac1c3cbf607ed2",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs": "adae1975f1a15a61385bd2239357992149126d8db3c29b658c8f3a2b7f4d559e",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "16820d42a9ecaa9a8088a6ea5c5e52b1bd541533b9ade1946f57afdb414da557",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "a35a3d6c8c922f27631786bce6c34e25bb415af1c9e4d57da2a56a3fd81d21d1",
+    "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "4646cf1654b0ad7b91487cd4bcfa9c66d6ea588f75389fb97c87929c79573029",
+    "scripts/v2_source_admission_supervisor.py": "89dc7c9f4a6656d088ee294fe4942210896233a44086be7794f7cb2e229deaaa",
+    "scripts/v2_source_admission_supervisor_tests.py": "f4070e6bc69baf8dfe41ccb23e2a419620e0e70b245c0d900aa43097fd3e01f5"
+  },
+  "architecture": "Clock helper validates immutable Linux transport and private stage before runtime; complete adopted caller snapshot/config; one normal prepare driver; async raw-only observer after restoration in same cleanup clock; concrete primary error wins; engineDrop before export. Private reader bridge streams existing retained authority. No new semantic key, dependency, cache, ordinary CLI endpoint or tool execution.",
+  "rust_validation": {
+    "focused_compile": {
+      "exit": 0,
+      "elapsed_seconds": 6.35,
+      "peak_rss_kib": 2143980
+    },
+    "focused_command": {
+      "path": "target/wp899/core-genuine-harness-private-stage-command.json",
+      "sha256": "285e138e46a90efcced913595db149c7cb2851420495cc60aed6f41b05086ca7"
+    },
+    "core": {
+      "exit": 0,
+      "selected": 216,
+      "passed": 216,
+      "elapsed_seconds": 9.22212223598035,
+      "executable_sha256": "fb458ec69dcf4de921ae5cc879a7daa3370c3444e2e3d751be2376fb091e6438",
+      "protected_base": 206,
+      "new_tests": [
+        "runtime::dice::source_preparation::genuine_root::genuine_capture_sharing_requires_full_image_equality_in_both_directions",
+        "runtime::dice::source_preparation::genuine_root::genuine_query_shape_requires_literal_flags_and_typed_source_slots",
+        "runtime::dice::source_preparation::genuine_root::genuine_receipt_schema_excludes_dynamic_errors_and_bounds_values",
+        "runtime::dice::source_preparation::genuine_root::genuine_zero_observations_never_certify_default_samples_or_containment",
+        "runtime::dice::source_preparation::harness_clock::tests::clock_translation_before_base_consumes_latency_and_never_restarts",
+        "runtime::dice::source_preparation::harness_clock::tests::missing_transport_and_invalid_stage_do_not_invoke_constructor",
+        "runtime::dice::source_preparation::harness_clock::tests::stage_pin_real_clock_and_constructor_order_without_environment_mutation",
+        "runtime::dice::source_preparation::harness_clock::tests::strict_stage_spelling_link_mode_file_and_replacement_refuse",
+        "runtime::dice::source_preparation::harness_clock::tests::strict_transport_integer_and_exact_envelope_boundaries",
+        "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error"
+      ]
+    },
+    "core_receipt": {
+      "path": "target/wp899/genuine-harness-tests.json",
+      "sha256": "9fd5def46db62d232a3e97db0bf751bdd00e98f50f58afd41e7285d0d5d8a323"
+    },
+    "core_log": {
+      "path": "target/wp899/genuine-harness-tests.log",
+      "sha256": "6181310d5a86834a9870a35765bfe95462f5f80c00e562ca4d7fff2fd7a3ab48"
+    },
+    "core_preflight": {
+      "path": "target/wp899/genuine-harness-preflight.log",
+      "sha256": "fbc905cd053cb0254580af336f1e1f41ddb4234d1a4f155b59e281dd5c771b37"
+    },
+    "default_all_targets": {
+      "exit": 0,
+      "elapsed_seconds": 15.38,
+      "peak_rss_kib": 1448216
+    },
+    "default_command": {
+      "path": "target/wp899/genuine-harness-default-all-targets-command.json",
+      "sha256": "c635b98b48855828c8479289daaa29fddde5af2997f8e1e7b2ea720746a15235"
+    },
+    "ignored_selection": {
+      "command": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-4e1dd18e90b064d1",
+        "--ignored",
+        "--exact",
+        "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+        "--list"
+      ],
+      "exit": 0,
+      "selected": 1,
+      "stdout": "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission: test\n\n1 test, 0 benchmarks\n",
+      "executed": false,
+      "executable_sha256": "fb458ec69dcf4de921ae5cc879a7daa3370c3444e2e3d751be2376fb091e6438"
+    },
+    "format": {
+      "path": "target/wp899/genuine-harness-format.json",
+      "sha256": "f55145dd5f6e40e4c3587ac3b67d94de43ac07fcc2ec98acd8e09637973c0dc7"
+    },
+    "toolchain": {
+      "path": "target/wp899/toolchain.json",
+      "sha256": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07"
+    },
+    "caps": "Serial offline/jobs1 compile60s TERM/KILL3, ordinary tests30s TERM/KILL3. Default all-target profile has no overrides. Compiler peak is not Slug runtime memory.",
+    "coverage": "Prior206 Core gates (150protected+20source-service+36affected controls) plus5clock,4harness and1normal observer/primary-error gate. Four old supplemental socket selectors remain unproved; no repeats/waivers."
+  },
+  "preserved_failures": {
+    "first_compile": {
+      "path": "target/wp899/core-genuine-harness.json",
+      "sha256": "e2ce22174e0bafc1da29fdc84e8520727cb8782f8bb7a9e07e4f7e6b279998fa"
+    },
+    "first_compile_errors": "Six compiler errors fixed with imports, explicit path type, higher-ranked phase-hook annotation and reviewed cfgtest private reader forwarder. No assertion waivers.",
+    "first216": {
+      "path": "target/wp899/genuine-harness-tests-failed.json",
+      "sha256": "96adc1db2333c882133071999287e539b8513b2cb2cb724e386bcca8b61ed27e"
+    },
+    "first216_log": {
+      "path": "target/wp899/genuine-harness-tests-failed.log",
+      "sha256": "c373a0a03985c2ff9d6096b3f89eb8de153b7c02f828d5acb30c2455738fd28a"
+    },
+    "first216_result": "214passed/2clock fixture failures: valid tempfile fixtures had no explicit0700 mode. Corrected ONLY positive fixtures to0700 matching supervisor mkdtemp; productionprivate-stage check and0755 negative unchanged.",
+    "unproved_supplemental": [
+      "runtime::repository_archive_file::tests::nonregular_sources_are_rejected_before_data_open",
+      "runtime::repository_archive_http::tests::selected_extension_capture_redacts_url_and_cleans_on_cancellation",
+      "runtime::repository_archive_http::tests::selected_extension_capture_rejects_declared_http_oversize_without_bytes",
+      "runtime::repository_archive_http::tests::selected_extension_redirect_capture_is_single_url_and_checksum_pinned"
+    ]
+  },
+  "independent_final_reviews": {
+    "genuine-harness-clock-final-review.md": {
+      "path": "target/wp899/genuine-harness-clock-final-review.md",
+      "sha256": "5754097dc2d62cd11517a40c98ecc089bd5ba2adfa702224704b01066a02ec72"
+    },
+    "genuine-harness-observer-final-review.md": {
+      "path": "target/wp899/genuine-harness-observer-final-review.md",
+      "sha256": "8a602e46fec313e02b7aa05cd052975f423788d01ce1081f555a1731b25309a9"
+    },
+    "genuine-harness-receipt-review.md": {
+      "path": "target/wp899/genuine-harness-receipt-review.md",
+      "sha256": "7b2c6df588007cfe9fdb1d83546ebe7491624b2df50db28e656c1e512b37e51c"
+    },
+    "genuine-harness-final-review.md": {
+      "path": "target/wp899/genuine-harness-final-review.md",
+      "sha256": "50976dcb4494bbb723aa939d6fd9bc6ed15cf69df2481c6da07eda41f4f28060"
+    },
+    "genuine-harness-handoff-review.md": {
+      "path": "target/wp899/genuine-harness-handoff-review.md",
+      "sha256": "07fe9a917f215776ba8f432bd42cc4eb838577667ba72304afe0ddc731cc85d4"
+    },
+    "genuine-harness-invocation-review.md": {
+      "path": "target/wp899/genuine-harness-invocation-review.md",
+      "sha256": "47e51fb34db4dfa20cde8d855c24d4c3f9bc10e4a7f347a4596404c2de732c01"
+    },
+    "genuine-root-terminal-review.md": {
+      "path": "target/wp899/genuine-root-terminal-review.md",
+      "sha256": "8f1474cef5c38f5bf00e1959da7638cf16c8e5cdf0a7ae11f812c83b54ae970f"
+    },
+    "genuine-root-terminal-receipt-audit.md": {
+      "path": "target/wp899/genuine-root-terminal-receipt-audit.md",
+      "sha256": "d7aab1fe601c4980743dfb08327959dc441c6187edef038fafac747698925b87"
+    }
+  },
+  "configuration": {
+    "path": "target/wp899/genuine-harness-config.md",
+    "sha256": "7827b9d2316b57061583614be8943bf4a663e20f16b5eb4a9ef132ed301bf60e"
+  },
+  "input_pins": {
+    "path": "target/wp899/genuine-harness-input-pins.json",
+    "sha256": "82d080002035f958ef5f0bc446d4e5f7e25e24e82e2421972bb26451cf4f5a50"
+  },
+  "frozen_one_invocation": {
+    "receipt": {
+      "path": "target/wp899/genuine-root-invocation-freeze.json",
+      "sha256": "d0eeb0ee779e39781d6b8d05f81bc53995d8f0423f36cf0c5aff03e2de21b476"
+    },
+    "reviewed_draft_sha256": "f7e0080bbb306f0ef48268ccdeeb3ac3979f46d036a7572542980645de6b0105",
+    "command": [
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor.py",
+      "--stage-parent",
+      "/tmp/slug-wp899-parent-g7kvpou1",
+      "--receipt",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-one-receipt.json",
+      "--log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-one.log",
+      "--",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-4e1dd18e90b064d1",
+      "--ignored",
+      "--exact",
+      "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-4e1dd18e90b064d1",
+      "sha256": "fb458ec69dcf4de921ae5cc879a7daa3370c3444e2e3d751be2376fb091e6438"
+    },
+    "python": {
+      "path": "/usr/bin/python3.12",
+      "sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+      "version": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]"
+    },
+    "stage_parent": {
+      "path": "/tmp/slug-wp899-parent-g7kvpou1",
+      "device": 54,
+      "inode": 772199,
+      "uid": 1000,
+      "mode": "0o700"
+    },
+    "controls": {
+      "hard_address_space_bytes": 4294967296,
+      "sampled_rss_refusal_bytes": 4294967296,
+      "sampled_allocated_stage_disk_refusal_bytes": 6442450944,
+      "any_swap_or_descendant_or_accounting_loss_refuses": true,
+      "work_seconds": 27,
+      "cleanup_seconds": 3,
+      "terminal_seconds": 3,
+      "log_bytes": 1048576,
+      "same_immutable_deadlines_transport": true,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false
+    },
+    "attempt_budget": 1,
+    "automatic_retries": false,
+    "prelaunch_checks": "All35 source hashes, prerequisite/finalreview hashes, Python/artifact, ownedstage devino/mode and output absence rechecked before launch; no subsequent Cargo"
+  },
+  "actual_one_terminal": {
+    "ledger": {
+      "path": "target/wp899/genuine-root-attempt-ledger.json",
+      "sha256": "ac325f638dbb642664f058f25707ef39c308f9a18b51f02ec87562cb226ea34a"
+    },
+    "analysis": {
+      "path": "target/wp899/genuine-root-one-analysis.json",
+      "sha256": "2d01dfc30a26ac4f9839afec9a15999fda199a1ed8221996c274b59491510743"
+    },
+    "supervisor_receipt": {
+      "path": "target/wp899/genuine-root-one-receipt.json",
+      "sha256": "3e4d2bba65b0cfe7181e90d4760df99a6325877fa9392099173eee736fbd0d8e"
+    },
+    "log": {
+      "path": "target/wp899/genuine-root-one.log",
+      "sha256": "c20d50c870a94c5e335cfebaef49c22335200a587cbd0d72b820b364611b0ec2"
+    },
+    "wrapper_elapsed_seconds": 0.07256425195373595,
+    "test_execution": {
+      "exact_selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "ignored_selected_was_executed": true,
+      "child_exit": 101
+    },
+    "ordered_harness_records": [
+      [
+        "schema",
+        "1"
+      ],
+      [
+        "work_deadline_monotonic_ns",
+        "282945022950988"
+      ],
+      [
+        "cleanup_deadline_monotonic_ns",
+        "282948022950988"
+      ],
+      [
+        "full_runtime_closure_proved",
+        "0"
+      ],
+      [
+        "process_execution_proved",
+        "0"
+      ],
+      [
+        "historical_memory_attribution_proved",
+        "0"
+      ],
+      [
+        "progress_rounds",
+        "0"
+      ],
+      [
+        "owner_refreshes",
+        "0"
+      ],
+      [
+        "reached_capture",
+        "0"
+      ],
+      [
+        "completed_capture",
+        "0"
+      ],
+      [
+        "stage_containment_proved",
+        "0"
+      ],
+      [
+        "stage_paths_observed",
+        "0"
+      ],
+      [
+        "no_containment_violation_observed",
+        "1"
+      ],
+      [
+        "snapshot_restoration_proved",
+        "1"
+      ],
+      [
+        "raw_restoration_proved",
+        "1"
+      ],
+      [
+        "engine_retired",
+        "1"
+      ],
+      [
+        "first_poison_code",
+        "0"
+      ],
+      [
+        "poison_observation_before_close",
+        "1"
+      ],
+      [
+        "source_counters_sampled",
+        "1"
+      ],
+      [
+        "registry_attempts",
+        "2"
+      ],
+      [
+        "registry_bytes",
+        "0"
+      ],
+      [
+        "source_attempts",
+        "0"
+      ],
+      [
+        "transferred_bytes",
+        "0"
+      ],
+      [
+        "decoded_bytes",
+        "0"
+      ],
+      [
+        "written_bytes",
+        "0"
+      ],
+      [
+        "live_source_buffer_bytes",
+        "0"
+      ],
+      [
+        "source_buffer_peak_bytes",
+        "393216"
+      ],
+      [
+        "descriptor_phase_sample_lower_bound",
+        "0"
+      ],
+      [
+        "descriptor_exact_peak_proved",
+        "0"
+      ],
+      [
+        "outer_error_code",
+        "4"
+      ],
+      [
+        "nested_frontier_proof_missing",
+        "1"
+      ],
+      [
+        "status",
+        "0"
+      ]
+    ],
+    "supervisor": {
+      "schema": 1,
+      "limit_kind": "RLIMIT_AS",
+      "address_space_limit_bytes": 4294967296,
+      "address_space_limit_verified": true,
+      "sampled_rss_limit_bytes": 4294967296,
+      "sampled_disk_limit_bytes": 6442450944,
+      "sampled_rss_peak_bytes": 62115840,
+      "sampled_swap_peak_bytes": 0,
+      "sampled_disk_peak_bytes": 4096,
+      "sampled_logical_disk_peak_bytes": 1876,
+      "samples": 2,
+      "poll_interval_seconds": 0.02,
+      "census_deadline_seconds": 0.1,
+      "elapsed_seconds": 0.042031096,
+      "work_seconds": 27.0,
+      "cleanup_seconds": 3.0,
+      "terminal_seconds": 3.0,
+      "unexpected_descendants": 0,
+      "child_exit_code": 101,
+      "refusal": "child_exit_nonzero",
+      "term_sent": false,
+      "kill_sent": false,
+      "joined": true,
+      "stage_removed": true,
+      "diagnostic_log_bytes": 1876,
+      "diagnostic_log_preserved": true,
+      "diagnostic_log_limit_bytes": 1048576,
+      "terminal_cleanup_exhausted": false,
+      "supervision_ok": false,
+      "source_gate_verified": false,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false
+    },
+    "interpretation": "Actual normal driver ended with typed outer Computation refusal after2 registry attempts/0 admitted registry bytes, before source/capture/progress. Full accepted and raw restoration and actual engine retirement were observed. No sticky scope poison sampled. Exact nested failure site is intentionally unproved; do not infer DNS/socket/HTTP/lock/network reason or source fit. Sampled59.24MiB on this rejected branch is not actual source/fullworkload memory fit or historical40GB attribution.",
+    "source_fit_accepted": false,
+    "freeze_spent_no_retry": true
+  },
+  "supervisor_sanity": "Inherited13/13 PASS2.394s and independentFINAL; script/test hashes unchanged. Actual terminal hardAS4GiBverified, childjoined/stage removed; monitoredRSS/swap/disk are sampled, no kernelRSS/no-swap/diskquota claim.",
+  "required_remaining_gates": [
+    "Precise nested Computation/registry refusal frontier",
+    "Actual selected source capture/ELF/current image/private lease/clone read/lastDrop",
+    "Exact descriptor budget highwater",
+    "Full runtime/process/query/generate/bootstrap",
+    "Original40GB process/workload",
+    "Full coupled packet independent FINAL integration after successful genuine evidence",
+    "Any further actual attempt needs new concrete independently reviewed evidence contract/freeze; never automatic retry/cap growth from this spent terminal"
+  ],
+  "memory_repair": "Accepted independent fixes unchanged: per-demand injection avoids aggregate quadratic maps (~370->10MiB controlled), metadata-only scanner and consumed prior rows (262672->133204KiB controlled), equal injected payload sharing (41150->10616KiB meanRSS,74.2%/32owners->1). None attributes original40GB or proves fullworkload fit.",
+  "exclusions": [
+    "No ordinary CLI relink/restart, tool execution, query/locked-generate/bootstrap activation",
+    "No source capture/private view/clone-read/lastDrop evidence from refused actual branch",
+    "No inferred DNS/socket/HTTP/lock/network reason from outerComputation",
+    "No exact descriptor highwater claim from phase samples",
+    "Latest accepted payload-reuse repair not newly linked into installed CLI"
+  ],
+  "goal_status": "Active; meaningful implementation/portable/actual-refusal lifecycle evidence advanced. Full source/runtime/bootstrap and historical memory attribution remain open.",
+  "checks": "Pinned scoped Rust format, gitdiffcheck, planstatus and V1archive checks pass",
+  "operational_parent_cleanup": {
+    "private_parent_removed_after_independent_terminal_review": true,
+    "identity_verified_before_removal": true,
+    "no_payload_or_other_parent_removal": true
+  }
+}

@@ -12,6 +12,12 @@ use super::*;
 
 #[path = "source_preparation/attempt.rs"]
 pub(super) mod attempt;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_preparation/genuine_root.rs"]
+mod genuine_root;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_preparation/harness_clock.rs"]
+mod harness_clock;
 #[path = "source_preparation/request.rs"]
 mod request;
 #[cfg(all(test, target_os = "linux"))]
@@ -58,6 +64,15 @@ fn refusal(text: &'static str) -> NativeDemandSessionError {
 }
 
 impl WorkspaceRuntime {
+    #[cfg(test)]
+    pub(super) fn prepare_selected_source_view_observed(
+        &self,
+        request: SelectedSourcePreparationRequest<'_>,
+        hook: &dyn Fn(selected_tool_source::ToolPhase<'_>) -> Result<(), NativeDemandSessionError>,
+    ) -> Result<PreparedSelectedSourceView, NativeDemandSessionError> {
+        self.prepare_selected_source_view_inner(request, Some(hook))
+    }
+
     pub(super) fn prepare_selected_source_view(
         &self,
         request: SelectedSourcePreparationRequest<'_>,

@@ -229,3 +229,123 @@ fn absolute_cleanup_expiry_never_polls_ready_work_and_keeps_primary_error() {
         matches!(result, Err(NativeDemandSessionError::Computation(ref e)) if e.to_string() == "primary restoration refusal")
     );
 }
+
+#[test]
+fn observed_single_driver_awaits_raw_restoration_and_preserves_primary_error() {
+    use std::cell::Cell;
+
+    struct Observer {
+        prior: AcceptedNativeDemandSnapshot,
+        calls: Cell<usize>,
+        reject: bool,
+    }
+    impl DiagnosticObserver for Observer {
+        fn after_restore<'a>(
+            &'a self,
+            runtime: &'a WorkspaceRuntime,
+            prepared: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
+        ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>> {
+            Box::pin(async move {
+                self.calls.set(self.calls.get() + 1);
+                {
+                    let state = runtime.native_demand_sessions.state.lock().unwrap();
+                    assert!(matches!(state.phase, NativeDemandLeasePhase::Idle));
+                    let actual = &state.accepted;
+                    assert_eq!(actual.inputs, self.prior.inputs);
+                    assert_eq!(actual.repository_results, self.prior.repository_results);
+                    assert_eq!(actual.path_observations, self.prior.path_observations);
+                    assert_eq!(actual.download_results, self.prior.download_results);
+                    assert_eq!(actual.selected, self.prior.selected);
+                    assert_eq!(actual.events, self.prior.events);
+                    assert_eq!(
+                        actual.repository_environment_frontier,
+                        self.prior.repository_environment_frontier
+                    );
+                }
+                // Direct awaits inside the one enclosing cleanup executor;
+                // no observer calls block_on or selects another source owner.
+                let workspace = runtime.repository_materializer.workspace();
+                let mut transaction = runtime.dice.updater().commit().await;
+                let raw_runtime = transaction
+                    .compute(&slug_bzlmod_v2::RuntimeSourceDeclarationPolicyKey::new(
+                        workspace.dupe(),
+                    ))
+                    .await
+                    .unwrap();
+                let raw_guest = transaction
+                    .compute(&slug_bzlmod_v2::RawGuestNamespacePolicyKey::new(
+                        workspace.dupe(),
+                    ))
+                    .await
+                    .unwrap();
+                assert_eq!(raw_runtime, self.prior.inputs.request.runtime_sources);
+                assert_eq!(raw_guest, self.prior.inputs.request.guest_namespace);
+                drop(transaction);
+                runtime.dice.wait_for_idle().await;
+                assert_eq!(prepared.is_err(), self.reject);
+                if self.reject {
+                    Err(NativeDemandSessionError::Computation(anyhow::anyhow!(
+                        "observer rejection"
+                    )))
+                } else {
+                    Ok(())
+                }
+            })
+        }
+    }
+
+    for reject in [false, true] {
+        let (f, diagnostic, inputs) = fixture();
+        let (engine, images, prior) = diagnostic.inspect_for_test(|runtime, _| {
+            (
+                Arc::downgrade(&runtime.dice),
+                runtime.image_resources.clone(),
+                runtime
+                    .native_demand_sessions
+                    .state
+                    .lock()
+                    .unwrap()
+                    .accepted
+                    .clone(),
+            )
+        });
+        let observer = Observer {
+            prior,
+            calls: Cell::new(0),
+            reject,
+        };
+        let hook = |phase: selected_tool_source::ToolPhase<'_>| {
+            if reject && matches!(phase, selected_tool_source::ToolPhase::BeforeCapture) {
+                Err(NativeDemandSessionError::Computation(anyhow::anyhow!(
+                    "primary source refusal"
+                )))
+            } else {
+                Ok(())
+            }
+        };
+        let name = ApparentRepoName::new("proof").unwrap();
+        let outcome = diagnostic.prepare_once_observed(
+            SelectedSourcePreparationRequest {
+                apparent_repository: &name,
+                inputs: &inputs,
+                scratch_policy: *f.key.policy(),
+                tool_policy: selected_tool_source::tests::key(&f).policy(),
+            },
+            &hook,
+            &observer,
+        );
+        assert_eq!(observer.calls.get(), 1);
+        assert!(engine.upgrade().is_none());
+        if reject {
+            assert!(
+                matches!(outcome, Err(NativeDemandSessionError::Computation(ref e)) if e.to_string() == "primary source refusal")
+            );
+        } else {
+            let view = outcome.unwrap();
+            assert_eq!(view.inputs(), &inputs);
+            assert!(view.view().is_valid());
+            drop(view);
+        }
+        assert_eq!(images.logical_bytes_used(), 0);
+    }
+}
