@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: timeout provenance accepted; actual timing observation pending
+Status: actual distinct registry frontier accepted as evidence; bounded capacity decision next; full WP899 unaccepted
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -169,6 +169,21 @@ selected leaf identity stays0. [Checkpoint](wp899-timeout-provenance-checkpoint-
 preserves both failures, DESIGN amendments, source bridge and FINAL. Next is one
 separately contracted source-matched actual timeout observation after eligibility
 reviews; no actual launch/cap increase or fullWP899/40GB acceptance follows here.
+
+The separately frozen global7 observation is spent with complete95 ordered rows.
+Its selected cause is Scope::Limit(RegistryAttempts),128 admitted distinct/0repeat,
+first new unretained identity129 and paired first exhaustion. No timeout origin
+was present; global6 remains unclassified. Full all7 raw/snapshot restoration,
+engine retirement and settled442387-byte descriptor credit pass. Supervisor joins
+child101, completes49/49 censuses and removes its stage; three independent terminal
+FINALs precede exact empty-parent removal. [Frontier receipt](wp899-distinct-registry-frontier-2026-10-03.json)
+preserves child0/1 failure, wrapper1 and sampled refused-branch RSS80883712B.
+No source capture/fit or fullWP899 acceptance follows. Next design must budget the
+legitimate pre-selection registry demand without deleting versions, inventing cache
+facts or changing byte/memory/time safeguards.129 is a lower bound, not full closure.
+Current default128 is also its validation maximum; a higher immutable caller
+profile needs an explicit bounded ceiling decision, not an invalid override.
+No new actual attempt or cap change is selected by this evidence alone.
 
 ## Observable result and authority
 

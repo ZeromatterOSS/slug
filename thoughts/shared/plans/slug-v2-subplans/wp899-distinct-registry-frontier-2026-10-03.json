@@ -1,0 +1,88 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "status": "SPENT_ACTUAL_REFUSAL_FULL_WP899_UNACCEPTED",
+  "source_component_commit": "4520ceea9883a20e55308d335c24bbbe57cf177f",
+  "global_actual_attempt": 7,
+  "new_contract_attempt": 1,
+  "analysis": {
+    "schema": 1,
+    "disposition": "REFUSED_REGISTRY_ATTEMPT_LIMIT_NO_RETRY",
+    "global_actual_attempt": 7,
+    "new_contract_attempt": 1,
+    "source_gate_accepted": false,
+    "child_exit": 101,
+    "supervisor_wrapper_exit": 1,
+    "ordered_records": 95,
+    "frontier": {
+      "actual_native_scope": "Limit(RegistryAttempts)",
+      "admitted_distinct": 128,
+      "admitted_repeated": 0,
+      "first_limit_call": 129,
+      "first_limit_relation": "new unretained identity",
+      "prospective_unique": 129,
+      "attempted_entries": 137,
+      "refused_entries": 9,
+      "sticky_refusals": 8,
+      "registry_bytes": 234593,
+      "source_capture": false
+    },
+    "timeout": {
+      "settled_installed_armed": true,
+      "origin_present": false,
+      "first_error_is_work_deadline": false,
+      "paired": false,
+      "selected_leaf_identity_proved": false
+    },
+    "lifetime": {
+      "snapshot_and_all7_raw_restored": true,
+      "engine_retired": true,
+      "descriptor_reserved_highwater_bytes": 442387,
+      "descriptor_highwater_settled": true,
+      "actual_child_joined": true,
+      "stage_removed": true,
+      "empty_parent_removal": "exact pinned empty parent removed after3 independent terminal FINAL"
+    },
+    "sampled_refused_branch": {
+      "rss_peak_bytes": 80883712,
+      "swap_peak_bytes": 0,
+      "census_cycles_complete": 49,
+      "elapsed_seconds": 1.106195016,
+      "not_historical40GB_or_full_source_fit": true
+    },
+    "next_decision": "Registry profile attempts must cover genuine distinct pre-selection demands; 129 is a witnessed lower bound, not full closure count. No duplicate-demand repair justified. Preserve memory/byte/time safeguards and review bounded natural profile decision before changing current caps.",
+    "evidence_sha256": {
+      "genuine-root-timeout-invocation-freeze.json": "40a5e11404b012cdaa078597797bfb2d5858422fee697d61658e481aebd5dec6",
+      "genuine-root-timeout-attempt-ledger.json": "054a040906ed43356053458e718f4932493211aad8ca6156b6bb56ff0ca29c40",
+      "genuine-root-timeout-one-receipt.json": "a2b44f3c7ed095d4c1599a5007fbcf76266fe5d38437ce04987e3576a2742d7d",
+      "genuine-root-timeout-one.log": "ea6ccc2c5f67fed3751e190e30294a0d01e7c5b63c82c656c913979f47bc2b8a",
+      "genuine-root-timeout-raw-records.json": "1a3917c8a658a287f7add354f998979babf2e867baa7f63879c19d35c5786f0b"
+    },
+    "independent_terminal_final": {
+      "source": "bb8c456676d1f8bd5eac139c342848dd195fc76e03f622fad7583daef56e16d5",
+      "supervisor": "ed306739be1af00db4d1737e1265d2c0db19ea51852dcfc233b65077d5d0e3fe",
+      "evidence": "28e0e9ae649ddefa475f9b3fbdb42a1af02faf3ff34cd56551978d702715caa4"
+    },
+    "parent_cleanup_sha256": "047ae690c4485371297ced08a5bd296638311009b9aad4c9984354e27ee49414"
+  },
+  "evidence_sha256": {
+    "genuine-root-timeout-contract.md": "da6d68d2e00bf735bc496b93d85b5c869d6817a058ec4f1b3540e9b8c59875fd",
+    "genuine-root-timeout-invocation-draft.json": "47907363758e3080a39abba3429754488240e78f96a32e49dd4e32f2c050bcee",
+    "genuine-root-timeout-invocation-freeze.json": "40a5e11404b012cdaa078597797bfb2d5858422fee697d61658e481aebd5dec6",
+    "genuine-root-timeout-attempt-ledger.json": "054a040906ed43356053458e718f4932493211aad8ca6156b6bb56ff0ca29c40",
+    "genuine-root-timeout-one-receipt.json": "a2b44f3c7ed095d4c1599a5007fbcf76266fe5d38437ce04987e3576a2742d7d",
+    "genuine-root-timeout-one.log": "ea6ccc2c5f67fed3751e190e30294a0d01e7c5b63c82c656c913979f47bc2b8a",
+    "genuine-root-timeout-raw-records.json": "1a3917c8a658a287f7add354f998979babf2e867baa7f63879c19d35c5786f0b",
+    "genuine-root-timeout-one-analysis.json": "c14816cc77324aaea77dc570b03359273ba570faf1445475b76d125586544955",
+    "genuine-root-timeout-parent-cleanup.json": "047ae690c4485371297ced08a5bd296638311009b9aad4c9984354e27ee49414",
+    "genuine-root-timeout-eligibility-caller.md": "a920e5d5e7ee96fa6d425d32ba6c347ff27dd8cedbbf3e09facc6de249d1b2ca",
+    "genuine-root-timeout-eligibility-supervisor.md": "6cbd4fc99b5a3ac5aee3885bbeeec9904d2af88225c1afd14bb83050f0b1c759",
+    "genuine-root-timeout-eligibility-evidence.md": "bd8c9d8483abfa59de63ff9cfa6e6aa78f5f7654deaa27306f5efa8ba3870253",
+    "genuine-root-timeout-terminal-source-review.md": "bb8c456676d1f8bd5eac139c342848dd195fc76e03f622fad7583daef56e16d5",
+    "genuine-root-timeout-terminal-supervisor-review.md": "ed306739be1af00db4d1737e1265d2c0db19ea51852dcfc233b65077d5d0e3fe",
+    "genuine-root-timeout-terminal-evidence-review.md": "28e0e9ae649ddefa475f9b3fbdb42a1af02faf3ff34cd56551978d702715caa4"
+  },
+  "eligibility_and_terminal": "three independent FINALs before freeze/launch and three before exact empty-parent removal",
+  "full_goal": "active; no source admission/fit, runtime/query/bootstrap or historical40GB closure",
+  "next": "bounded natural registry-profile capacity decision; default128 cannot admit witnessed129 distinct demand; do not skip versions or claim exact full closure"
+}
