@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready
+Status: waiting on native resolution for genuine source admission
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -18,9 +18,16 @@ all-target compilation. The later [genuine harness checkpoint](wp899-genuine-har
 adds reviewed clock/observer/actual-root harness,216 ordinary passes and ONE frozen
 supervised attempt. That actual attempt refused with outer Computation after two
 registry attempts/zero admitted bytes, before source/capture. Full WP899 remains
-UNACCEPTED: precise nested refusal evidence, successful actual source admission,
-exact descriptor highwater and coupled integration FINAL remain mandatory. No
-CLI/process activation and no automatic second attempt under the spent freeze.
+UNACCEPTED: successful actual source admission and coupled integration FINAL
+remain mandatory. The later [typed terminal receipt](wp899-typed-root-terminal-2026-10-03.json)
+records one separately frozen actual observation: the selected registry failure
+occurs at DNS resolution with IO Unknown and no errno, before source capture.
+The settled descriptor reservation maximum is exactly442387 bytes, not heap/RSS.
+The underlying DNS reason and actual source fit remain unproved; source audit
+establishes no implementation correction. Native resolution for the unchanged
+normal requests is the next prerequisite. Both spent attempts remain immutable;
+any future observation needs a new concrete contract and independently reviewed
+freeze after a relevant state change. No automatic retry or CLI/process activation.
 
 ## Observable result and authority
 
@@ -594,3 +601,22 @@ historical40GB attribution. FullWP899 remains unaccepted; next actualRoot attemp
 requires its own concrete evidence contract/review/freeze, not an automatic retry.
 Ordinary demanded FileBytes/registry whole-response bytes and distinct version
 history remain possible large owners; scoped diagnostics do not cap those paths.
+
+
+Completed evidence action under
+`target/wp899/genuine-root-typed-contract.md`: ONE new separately reviewed/frozen
+actualRoot source-admission diagnostic using validated typed chosen-error/settled
+reservation evidence. Globalactualattempt2, newfreezeattempt1; all prior
+freeze/ledger/terminal evidence immutable. Unchanged caller construction, actual
+semantic inputpins, source scopes/policies and resource ceilings; operational
+clock/stage values are fresh and join the one opaque snapshot. No environment
+equality between attempts is inferred. Independent caller/receipt/supervisor
+DESIGN/FINAL audits preceded exact Rootfreeze reconciliation/launch. Independent
+terminal reviews accept only the selected DNS-stage refusal and exact settled
+reservation accounting. Child exit101, supervisor wrapper1; all61 ordered records
+are preserved, full snapshot/all7 raw inputs restored and actual engine retired.
+Actual child joined, child stage removed, then the exact empty pinned operational
+parent removed after review. No source capture or actual source-fit success.
+Source-only next-action audit finds no proven production defect or ready substitute
+for this missing gate. See the durable typed terminal receipt above. No automatic
+retry or scope/CLI/process/query/generate/bootstrap/historical40GB claim.

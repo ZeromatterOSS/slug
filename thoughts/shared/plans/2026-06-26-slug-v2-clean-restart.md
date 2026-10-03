@@ -35,11 +35,11 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: ready
+Status: waiting on native resolution for genuine source admission
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
-provenance-certified covered captures. Independent DESIGN ACCEPT; implementation ready, contract in
+provenance-certified covered captures. Independent DESIGN ACCEPT; candidate implementation preserved, contract in
 [current-packet.md](slug-v2-subplans/current-packet.md). Full normal fixture reads
 and genuine-root first-query source/admission evidence are required. A typed missing
 source/alias/fit terminal cannot accept complete actual runtime-profile proof.
@@ -49,6 +49,12 @@ User memory steering accepted independent physical sharing1fe253f63: repeated
 equal input payloads32->1, controlled32x1MiB peak RSS74.2% lower;115 DICE/83
 Workspace gates and default dependent/CLI compile pass. [Receipt](slug-v2-subplans/memory-payload-reuse-2026-10-03.json).
 WP899 and historical40GB attribution remain unaccepted/unproved.
+The separately frozen actual-root observation selected a DNS-stage registry IO
+failure (Unknown kind, no errno), before source capture. Exact settled descriptor
+reservation credit peaked at442387 bytes; this is not heap/RSS or full source fit.
+Native resolution for the unchanged normal requests is a prerequisite; the
+underlying failure reason and a code correction are unproved. Both spent attempts
+stay immutable, with no automatic retry. [Typed terminal receipt](slug-v2-subplans/wp899-typed-root-terminal-2026-10-03.json).
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

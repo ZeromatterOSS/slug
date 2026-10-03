@@ -1,0 +1,757 @@
+{
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "b8ccf5200",
+  "state": "REVIEWED_TYPED_ACTUAL_ROOT_REFUSAL_UNACCEPTED_NO_RETRY",
+  "previous_goal_turn": "PROGRESS: b8ccf5200 validated500 focused gates/default5crate check; not wholeWP899 acceptance",
+  "observable_progress": "Actual selected DNS-stage IO Unknown/absenterrno exposed through normal retained error lineage; exact settled reservation-credit maximum442387bytes. Full actualsource admission not achieved.",
+  "compatibility": "Slug-native evidence-only; no Rust/config/source policy/resource/semantic inputs changed",
+  "attempts": {
+    "global_actual": 2,
+    "new_freeze": 1,
+    "budget": 1,
+    "automatic_retry": false
+  },
+  "freeze": {
+    "path": "target/wp899/genuine-root-typed-invocation-freeze.json",
+    "sha256": "d04cad608e31fe8c7d3f18217b24d6bc16fb98355ac22ce0e5fc8d042d680af4",
+    "reviewed_draft_sha256": "9a97e6de10eb9c65add2510136ecaae2077b6dec0b9b63a7f5e3bfcfb7096979",
+    "command": [
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor.py",
+      "--stage-parent",
+      "/tmp/slug-wp899-typed-parent-lcj3zs_5",
+      "--receipt",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-one-receipt.json",
+      "--log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-one.log",
+      "--",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "--ignored",
+      "--exact",
+      "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "sha256": "76de8b42175cdb1191a554cb90e9abaaee292517748fa5a75f2a93cf259670a5"
+    },
+    "python": {
+      "path": "/usr/bin/python3.12",
+      "sha256": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+      "version": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]"
+    },
+    "source_hashes": {
+      "app/slug_bzlmod_v2/src/host_registry.rs": "ae3f4b292bf0d2fee0d4e669d7295c658b160a8df7c60ab89daa0f565f1c36c6",
+      "app/slug_bzlmod_v2/src/lib.rs": "f55b2798561ac8ab83357b3f7c7f12bc84ff108676d0717e0ae5859c22054c6d",
+      "app/slug_bzlmod_v2/src/registry_dice.rs": "c8a5e4eb64db3d675b7e099b5bf5fff6949698dad5a88f447ec89ccece641615",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal.rs": "20ebf70ddf5ed4b16e60a83f946fea4d0ea6d1562d75f172309fb5d00bd72eb5",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_debug.rs": "dde980c91e29098ce232228f37662e5d35dfe81cca10e1b2448cdc1e43a5be24",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_observation_tests.rs": "923888af63eaed2002f5801f6d79a5c99f2b5fb068b8ec544392b5e24510c15d",
+      "app/slug_bzlmod_v2/src/registry_dice/refusal_tests.rs": "5ee63392672280dfec1d73c549872fbcf3e48184078baa37d501ee68a3685132",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration.rs": "f2e9a99739cd008bd0d3cc3458e3cb08f6917894afc5926867a58b9df569f1d4",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/policy.rs": "525e71ccce1f6020a402ac9206d29d447281d67a537eb857672a72b289eaa0ed",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/tests.rs": "fa1a9ea064964894313fc0c3178009aad56404da42b72d696977d6e5b5e97129",
+      "app/slug_bzlmod_v2/src/runtime_source_declaration/types.rs": "5aa2b419049d6539bffc7e0e03cda7d3926e90884b3250e02388943b0485698f",
+      "app/slug_bzlmod_v2/src/selected_graph.rs": "50fbcee5eacad1653665fce91a9cffdd852cacd7078fd63ad720fc51eb8f33c2",
+      "app/slug_bzlmod_v2/src/selected_repo_spec.rs": "10934c864be64f55e2c66a05f3fffbeb583c674b31bc5bbaa275d59771b87bc9",
+      "app/slug_bzlmod_v2/src/selected_repo_spec/selected_extension_demand.rs": "cce13e872d5581d979a113a7423c9ba1d7cf695ec67c0043b2f8e618be434d74",
+      "app/slug_bzlmod_v2/src/selected_source_refusal.rs": "ea05ee0ec13a301bd195f64958d26281e4a3671ae02480d191143d5e50c562c3",
+      "app/slug_bzlmod_v2/src/selected_source_refusal/tests.rs": "b8a8b40b2fa5a38212fb79f5b1ea18bf59f6894045dff05f8ec577283246494b",
+      "app/slug_bzlmod_v2/src/source_preparation.rs": "58ca0a535437c46a5e02e49ba11966744ec9c482eabc92133fecc576b502930f",
+      "app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs": "0e1e427b118c9dee1d4d341e1c64481fb7ad0d6f4e5f3af2fc9f652a4158dcee",
+      "app/slug_bzlmod_v2/tests/registry_dice.rs": "f0a481a315547dee551d10df70d3e5acbfd0fc549c50e4fb56396edb6abe0beb",
+      "app/slug_bzlmod_v2/tests/source_preparation_dice.rs": "fc72349f563f1e9f940270a96dd2d2a960b6adfce78bdcce90e943181fb1a06d",
+      "app/slug_core_v2/src/runtime/dice.rs": "30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a",
+      "app/slug_core_v2/src/runtime/guest_namespace.rs": "79adbfe155c3436df6b5d45ed85dd7e352cc380129b5e4951019e7e98d703e24",
+      "app/slug_core_v2/src/runtime/guest_namespace/attempt.rs": "6fd42a42cbd67ab20ced36cb8ba8ecb9707bc43d2b5326c259c3c37f68386e1a",
+      "app/slug_core_v2/src/runtime/guest_namespace/tests.rs": "ce7a961ca36552f509f53633432f2a551e0ab7594ef1375c02427a6a5b331abe",
+      "app/slug_core_v2/src/runtime/guest_namespace/tests/data.rs": "64dede16dbd47862b1e94be6ad72f00faa7c5e2799529e2e07700a5444943c2c",
+      "app/slug_core_v2/src/runtime/input_image.rs": "5955b8a8c400ef3232248bca4d0980749a70674709c3ad163e6e3339936afe84",
+      "app/slug_core_v2/src/runtime/input_image/capture.rs": "33ed25486eee2c6abd4f0c534f88958601ac3083254c4961f90670f0c6e10fdf",
+      "app/slug_core_v2/src/runtime/input_image/file_capture.rs": "84c22424bed8e75f39fe4f0c9223cc441143c417b10d3022cb9975efdc39fe06",
+      "app/slug_core_v2/src/runtime/input_image/tests.rs": "b4ef37988a7d06bdd3289f83f66c7259cff18522e485fff7763f464401538255",
+      "app/slug_core_v2/src/runtime/input_image_bridge.rs": "5690b0710b54e57f522512ace214ba6503a29f01c5d916b5bff4e3f31598e2ef",
+      "app/slug_core_v2/src/runtime/input_image_bridge/label_tests.rs": "ce330f894e758e24af004320505189a353a0f6a75dbaf895aa6fca55b95f0b56",
+      "app/slug_core_v2/src/runtime/registry_io.rs": "31a1d6ac177d6764f07c86937be4559ea69677484c31f9213ace782b3e58c457",
+      "app/slug_core_v2/src/runtime/repository_archive.rs": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561",
+      "app/slug_core_v2/src/runtime/repository_archive_file.rs": "0614efe0db9a9490bddfc206d9c69f2ab728121c797227bde0a74e3f6bcf5027",
+      "app/slug_core_v2/src/runtime/repository_archive_http.rs": "19790b239e26d0c7740bd89628c227ca4aaad9b78511a357b6a83ed20e13f274",
+      "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "a7ea07667f0f6d98c9db535dbe60743a148134064393728f7a4ef694ea042a6f",
+      "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "561af5f1e6e398d04671f39d1039717a0697d14bc186324b6e5241192d99cc72",
+      "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "f1768713fb592b267c3b6b9e925f91079351f2b2d212c376c716d8ae043b66d2",
+      "app/slug_core_v2/src/runtime/repository_generated_archive.rs": "e6525fcf83fb9cd09826bd030186d8be9325f40efa89fd8cd6eefbb61cfbb708",
+      "app/slug_core_v2/src/runtime/repository_io.rs": "e95682a4d832010c42c6803c6765332b905fb4c9ce08e746b80b162d84b24c59",
+      "app/slug_core_v2/src/runtime/repository_io/local_request.rs": "01bf25bdbbb7fc654bfca44ec632b5d200cb334c8728fa5506371d63c809ec5b",
+      "app/slug_core_v2/src/runtime/repository_io/local_request/tests.rs": "3bc04d5f85f3f6b3cc8039e0ffe14ce84c9289f7391202dbbf5d378979ea8291",
+      "app/slug_core_v2/src/runtime/repository_io/source_service.rs": "f50491495f6450774bc281cc8b74704f3705da2e1a41d0aed9aad548daedc52f",
+      "app/slug_core_v2/src/runtime/repository_io/source_service_tests.rs": "d066e5cb4c41381cccb67e245716138bcf6b0b6f19f26c066e181b52ee5f4517",
+      "app/slug_core_v2/src/runtime/runtime_sources.rs": "6ece7ff8decb64617364707596a43cfe1cd8900c64b07a03a83d73f05f45ba03",
+      "app/slug_core_v2/src/runtime/runtime_sources/attempt.rs": "e008b01c0dfc92c9188a8f96bcd6fbd0971ff6dc22e95069d900391580eac7e9",
+      "app/slug_core_v2/src/runtime/runtime_sources/catalogue.rs": "3f02af4ad0152d239695338975186ee11ab29b99cc578bf916552649516a949f",
+      "app/slug_core_v2/src/runtime/runtime_sources/factory.rs": "aa1d4fc035813aed52c450bc36874c160152f09ae7b204c900d3d63873e6ec03",
+      "app/slug_core_v2/src/runtime/runtime_sources/prepare.rs": "6caf17a0a1b08825d3480e3f16395ae29d19930f9354f09c69dd71da79295f6d",
+      "app/slug_core_v2/src/runtime/runtime_sources/tests.rs": "cb29f8efcb16504ab45ddc1d1e05837322e45f381b4988de3deda9a66374d502",
+      "app/slug_core_v2/src/runtime/selected_label_data.rs": "b074bc22550d3578b23f2c85dbf4c24250e028109e385aec55f2b58e8d158048",
+      "app/slug_core_v2/src/runtime/selected_label_data/catalogue.rs": "53935c5f9de2ab37942c8734d83e51dcce00bdf8d2b46f08157d7c39bcab637d",
+      "app/slug_core_v2/src/runtime/selected_label_data/prepare.rs": "fe9dd8a3bf046582771570ed7ded54dd090dcb62b9da07df151799f206b9c1e2",
+      "app/slug_core_v2/src/runtime/selected_label_data/tests.rs": "c97f6a976b290b032a3d75d24842b1e71e44010cadcb8550dc30992f2ba18ca6",
+      "app/slug_core_v2/src/runtime/selected_scratch_source.rs": "666c00d98bde59db41dc18c66126f044507249ab613ae419a14f15c6e6d8cb21",
+      "app/slug_core_v2/src/runtime/selected_scratch_source/tests.rs": "10478aab4c2aadb55127c0dfc3da8606d16f636c09f681a771300c9496529b1f",
+      "app/slug_core_v2/src/runtime/selected_tool_source.rs": "1d54edbf5e1894132606547e97c0f673c5fb1ff324b513b87225a987710b1e27",
+      "app/slug_core_v2/src/runtime/selected_tool_source/attempt.rs": "eb1d2f6310ce4c5e06c6ba658b35781a6dbe4ddd38200ab6288999e0bcedef78",
+      "app/slug_core_v2/src/runtime/selected_tool_source/declarations.rs": "624d5e998ca8663436573cd50c22c1a4cda97c67e66d2cab42a175551499f02f",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "85f5f77c36e69d8060829f75ec7b2670709467c00720f50bac5666ed8a14075c",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare/capture.rs": "8e5158190153d2ee74be78bb5cb5748cc4752f3151aa238c8fc4074632592c88",
+      "app/slug_core_v2/src/runtime/selected_tool_source/prepare/setup.rs": "b101848a9724c21adcad63971c89e5f3322f04ac0e5c1dbdd959c80f2777a984",
+      "app/slug_core_v2/src/runtime/selected_tool_source/tests.rs": "853af0600981093c004f442592a5caf0492bb7571f14f5b075b48519f925f35a",
+      "app/slug_core_v2/src/runtime/source_preparation.rs": "55c7fced51be8d5ea0eb60a9660ef9186b842784bf620b0216f963795f8779f7",
+      "app/slug_core_v2/src/runtime/source_preparation/attempt.rs": "3706dc28c7d41901805a4b6c1f8082f7a0d900f983fe9bc388fbc42633145267",
+      "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "c7cc4011733f05c01de68841e6dc1fb5295bc2a564b62ace867125da07cc0a90",
+      "app/slug_core_v2/src/runtime/source_preparation/harness_clock.rs": "ddca8674a50e793d21c6b91df24f95de849bbc95ccb933de77fac4eda95caeb3",
+      "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "1433745fd6dbf90b24cf9efc00444b7efe639d1d1e2b92e7a25bcf1c0a837206",
+      "app/slug_core_v2/src/runtime/source_preparation/request.rs": "1c95c6ab0af8a3058b5467db90c786129d497700c29558624972aacaa243c6da",
+      "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "166663f44eee230dfd01ea42b854976295cd052c7959dc23eadf0d5799dad2f7",
+      "app/slug_core_v2/src/runtime/source_service.rs": "e10674cfeb03eb6c0c6fe7e64d244d50f001806891518ab8536859aa59a4ce68",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "ce1566cce9e7db2861745d7e133e4bd1678de1bade203da1a342a11630725be6",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5c4f59952fb78b15a206eee7ad3260179df12776a44e28c53b2f84af76279630",
+      "app/slug_core_v2/src/runtime/source_service/failure.rs": "2de74ac11a738e890598945d7b5bfe4063664bf2281ee0b34b319a9b785e9870",
+      "app/slug_core_v2/src/runtime/source_service/failure/tests.rs": "6879c38c3c296af786b2d051e55b400642b1fa0811ae832e7d190012b34247df",
+      "app/slug_core_v2/src/runtime/source_service/http.rs": "704504187ee3d5574aed0e95531c563929fcae0cbaf3f46342f40f41d5cc4d6a",
+      "app/slug_core_v2/src/runtime/source_service/registry.rs": "014b040ca940d37d086f5ff6546dcabf5d18780fb6b16867c5ba345268d24515",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs": "a8a28481c79be7cbcb8492be1e98e247b196c00b5ae34c8b24ee8e0cef44f2a3",
+      "app/slug_core_v2/src/runtime/source_service/tests.rs": "a6daf392a53d05ee515931b26b4c0fa4e26c241c6b2ef65002cc7370b3c810a5",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "2465fff9e1467faeebd6a7902fdb99b5864b2ef2f25ce9ec9bac1c3cbf607ed2",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_http_tests.rs": "adae1975f1a15a61385bd2239357992149126d8db3c29b658c8f3a2b7f4d559e",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "16820d42a9ecaa9a8088a6ea5c5e52b1bd541533b9ade1946f57afdb414da557",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "a35a3d6c8c922f27631786bce6c34e25bb415af1c9e4d57da2a56a3fd81d21d1",
+      "app/slug_core_v2/src/runtime/tests/repository_generated_archive_tests.rs": "4646cf1654b0ad7b91487cd4bcfa9c66d6ea588f75389fb97c87929c79573029",
+      "app/slug_loading_v2/src/dependency_cycle.rs": "6506dbb40b11ed29bf260d9f54676381ef738c3d7ac9b4e175764803977a01a0",
+      "app/slug_loading_v2/src/dependency_cycle/mixed_bzl_tests.rs": "26cc7057034732234d113c846210b8191270c90dc9b7385efdaecc8acc579ea2",
+      "app/slug_loading_v2/src/dependency_cycle/tests.rs": "e126f9197b91d9af82bf290f48b96a7542947174cd30b914817d3dc9420ae29f",
+      "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+      "app/slug_loading_v2/src/module_extension.rs": "17c14557c46a84195c73d47d0b0cfb5ad44ef1b00313e42df2e2ae339a45d279",
+      "app/slug_loading_v2/src/module_extension/guest_namespace/compose.rs": "4baf52c3e48da6399e9852745dd99099b95ad365380b8a461e17e80e09442e11",
+      "app/slug_loading_v2/src/module_extension/runtime_sources.rs": "0a05ecce2c90b736fc619a0e39fb7f7571325fe406f1808f45d113293552d1b8",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/covered_tool.rs": "6e642a2a2dab1ef01173d3d4438e4d3ee8776b422c0ca0f3a6915b111ce16788",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/profile.rs": "5aa89f48f3695ed6e81e0dbe6c18d99ba7fdc5f891a58e450f96a72095ccf920",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/requests.rs": "15e3b4b7e431edc6cae9c3c3afcbe2a1abae2ba668e2b77ba6df31dced66ca69",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/test_fixture.rs": "e999fba1cfb7d87de610e16f0b732bf157b6a9688ed088cd0246a6891bc4b91a",
+      "app/slug_loading_v2/src/module_extension/runtime_sources/tests.rs": "020a6217c5af1aeded7591f8b372ba2e5d1e84875399e1618979e035395b6e23",
+      "app/slug_loading_v2/src/module_extension/selected_source_preparation.rs": "ef0ce72bc3c55b4f13b3dae1a968f5ed8e6e3499273572e2839b057e97c3067f",
+      "app/slug_loading_v2/src/module_extension/selected_source_preparation/tests.rs": "0bb30d0e519eb5cdf797cf42f9c2471bcae44a782fa296f0341fe14f96829b1b",
+      "app/slug_workspace_v2/src/input_image/budget.rs": "3143cf41463a68cc3cbefaf1a626675994d6809488832f07a364d309e4972fcb",
+      "app/slug_workspace_v2/src/input_image/budget/tests.rs": "cc2d3590a35b603a1dabf14d27436fd3dd33af07a92db5fd0a0a488338292035",
+      "app/slug_workspace_v2/src/input_image/tests.rs": "8b40dd9c7f68d374798e7cee27ebb4f4b10bf04fa6e7b53e4b61e155c8e2c7ea",
+      "scripts/v2_source_admission_supervisor.py": "89dc7c9f4a6656d088ee294fe4942210896233a44086be7794f7cb2e229deaaa",
+      "scripts/v2_source_admission_supervisor_tests.py": "f4070e6bc69baf8dfe41ccb23e2a419620e0e70b245c0d900aa43097fd3e01f5"
+    },
+    "controls": {
+      "hard_address_space_bytes": 4294967296,
+      "sampled_rss_refusal_bytes": 4294967296,
+      "sampled_allocated_stage_disk_refusal_bytes": 6442450944,
+      "any_swap_or_descendant_or_accounting_loss_refuses": true,
+      "work_seconds": 27,
+      "cleanup_seconds": 3,
+      "terminal_seconds": 3,
+      "log_bytes": 1048576,
+      "same_immutable_deadlines_transport": true,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false
+    },
+    "prerequisite_hashes": {
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-contract.md": "8cd2a403a43957a3a5eb343a62ace41bfdda9e1dcc29973c63e138c6660d5ba6",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-config.md": "7827b9d2316b57061583614be8943bf4a663e20f16b5eb4a9ef132ed301bf60e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-input-pins.json": "82d080002035f958ef5f0bc446d4e5f7e25e24e82e2421972bb26451cf4f5a50",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-design.md": "056bed20499b06f17fe14cd33876a9b2ea825c9931277b78f16c6aaa08087fef",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-review.md": "ab26ec905d4d6657e30520e79c45f0cb83f9f5db0eacdff19cb7eb4bcb4f780e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-harness-clock-final-review.md": "5754097dc2d62cd11517a40c98ecc089bd5ba2adfa702224704b01066a02ec72",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-ignored-selection.json": "f32e3165b83baa7c1f98913edd9f8d237e0352ab0cb1cf6082457ff657650ee0",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-current-source.json": "f3a4fce3ec1d087009de0245be4f725e4e6e46b49792fce06d2de743be3d6846",
+      "/run/media/system/Colossus/dev/slug/target/wp899/descriptor-workspace-tests.json": "6d9f37489ef48201f61a2b389b49384e1a53843fa852523a003ee4a7e1342742",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.json": "44d2da61bfa8ffe7628cd9039881166552951a8010ac5fd1f6bd8227f3367160",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-child-corrected-tests.log": "c8dfc0fed97bf35283736aa461c09f858e7700a9f69472a6acf152504b5f859e",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.json": "3dec95436651b3d4d6653ce2e71c449ddd2b07195532e8f60328182f1dae8abe",
+      "/run/media/system/Colossus/dev/slug/target/wp899/core-typed-refusal-lifecycle-corrected-tests.log": "b0f64927e4776fce2a2310607595810f23cc2dac272dddc801dd576daac6d3fb",
+      "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_bzlmod_v2-tests.json": "fdad80300e7e0ddb9d439cffd27330bb6454a1dbfa4c2af4c776f2275428de93",
+      "/run/media/system/Colossus/dev/slug/target/wp899/shared-loading-typed-refusal-child-corrected-slug_loading_v2-tests.json": "362a1f0471fe4d3cac50fc35d953b70dbe853743ac26a24c6b0453b3b545252b",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-receipt.json": "0faf35bc0b3892b57f2d2d1f7f028f4d65637316be910305ca95e658dadb1180",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-default-all-targets-prepared-command.json": "047908f0991c2e6a501b41009a0fdcbec6e9f95ad8be2dffd0426589590cb7ad",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-evidence-review.md": "c17629b406b38a24e1dd526edabc27a536a1f7afc8277e7b69365a134cddcedf",
+      "/run/media/system/Colossus/dev/slug/target/wp899/typed-refusal-final-format.json": "edb35ab45ea190401c1de16edd14fd65c4fb71aeb9d352f39fb30f418def3702",
+      "/run/media/system/Colossus/dev/slug/target/wp899/refusal-frontier-lifecycle-delta-review.md": "c5aa22a724d2b736bab6b6f6a8b2fd29484664657dfe0212265bc882e8aa8e7d",
+      "/run/media/system/Colossus/dev/slug/target/wp899/source-admission-supervisor-final-review.md": "c5755fc6e01b6fa00862ca9465cb45a0a08d761893a04f354dfeaab1e56b6e13",
+      "/run/media/system/Colossus/dev/slug/target/wp899/supervisor-sanity-3.log": "79867c0cd9974e1a55be89247687e88ad5f87b0ac39071a1ae0e0e05f95128f9",
+      "/run/media/system/Colossus/dev/slug/target/wp899/toolchain.json": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07",
+      "/run/media/system/Colossus/dev/slug/thoughts/shared/plans/slug-v2-subplans/wp899-typed-accounting-checkpoint-2026-10-03.json": "eb1fe71cdeb1a0f6068e3b560e8fd4aacd4aca2405d6b86ff23d363a3c0de155"
+    },
+    "independent_final_reviews": {
+      "target/wp899/genuine-root-typed-supervisor-review.md": "a6742c3bc98145698e174c0393cd8c7906eaa5f2962d0eaeff6a761404c6e086",
+      "target/wp899/genuine-root-typed-caller-review.md": "b9571bf3c8e4ee7fe5277489d78419ce2c47727ed626025d0d41e5f085c20252",
+      "target/wp899/genuine-root-typed-receipt-review.md": "fa0797e743927a53482d860fe06d930a2e2b56cb6ccedc73bb69e916f3002dfd"
+    }
+  },
+  "contract": {
+    "path": "target/wp899/genuine-root-typed-contract.md",
+    "sha256": "8cd2a403a43957a3a5eb343a62ace41bfdda9e1dcc29973c63e138c6660d5ba6"
+  },
+  "caller_configuration": {
+    "path": "target/wp899/genuine-harness-config.md",
+    "sha256": "7827b9d2316b57061583614be8943bf4a663e20f16b5eb4a9ef132ed301bf60e"
+  },
+  "actual_semantic_input_pins": [
+    {
+      "path": "MODULE.bazel",
+      "bytes": 2316,
+      "sha256": "109585b7b40d274ea912d32c73f54c25cc4bef1bc5e60526e18ac9bfe48d210c"
+    },
+    {
+      "path": "MODULE.bazel.lock",
+      "bytes": 58371,
+      "sha256": "bcdda78dd82aab5fd7ab1796985a78322b50178dceed7669c1b20173c2634302"
+    },
+    {
+      "path": "Cargo.toml",
+      "bytes": 12155,
+      "sha256": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b"
+    },
+    {
+      "path": "Cargo.lock",
+      "bytes": 119614,
+      "sha256": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314"
+    },
+    {
+      "path": "Cargo.Bazel.lock",
+      "bytes": 793783,
+      "sha256": "a0074e7ea15887124b22aefac681c2728dcef7430364fa9f7390eacac0e53d93"
+    },
+    {
+      "path": ".bazelversion",
+      "bytes": 6,
+      "sha256": "1b9487d55bea47fea50d226cc9c53bc548877ad2a318bac8fbc8b320f429e5c5"
+    }
+  ],
+  "ignored_selector_evidence": {
+    "path": "target/wp899/genuine-root-typed-ignored-selection.json",
+    "sha256": "f32e3165b83baa7c1f98913edd9f8d237e0352ab0cb1cf6082457ff657650ee0"
+  },
+  "prior_spent_evidence_immutable": {
+    "genuine-root-invocation-freeze.json": "d0eeb0ee779e39781d6b8d05f81bc53995d8f0423f36cf0c5aff03e2de21b476",
+    "genuine-root-attempt-ledger.json": "ac325f638dbb642664f058f25707ef39c308f9a18b51f02ec87562cb226ea34a",
+    "genuine-root-one-receipt.json": "3e4d2bba65b0cfe7181e90d4760df99a6325877fa9392099173eee736fbd0d8e",
+    "genuine-root-one.log": "c20d50c870a94c5e335cfebaef49c22335200a587cbd0d72b820b364611b0ec2",
+    "genuine-root-one-analysis.json": "2d01dfc30a26ac4f9839afec9a15999fda199a1ed8221996c274b59491510743"
+  },
+  "ledger": {
+    "path": "target/wp899/genuine-root-typed-attempt-ledger.json",
+    "sha256": "708482e7615c9be469d9645fa6918e5cb223f35099a0ba20360a5c54a85f8d71",
+    "attempt": 1,
+    "global_actual_attempt": 2,
+    "state": "TERMINAL_NO_RETRY",
+    "freeze_sha256": "d04cad608e31fe8c7d3f18217b24d6bc16fb98355ac22ce0e5fc8d042d680af4",
+    "command": [
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor.py",
+      "--stage-parent",
+      "/tmp/slug-wp899-typed-parent-lcj3zs_5",
+      "--receipt",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-one-receipt.json",
+      "--log",
+      "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-typed-one.log",
+      "--",
+      "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "--ignored",
+      "--exact",
+      "runtime::dice::source_preparation::genuine_root::actual_slug_crates_source_admission",
+      "--test-threads=1",
+      "--nocapture"
+    ],
+    "prelaunch_hash_input_and_stage_checks": "PASS",
+    "wrapper_exit": 1,
+    "wrapper_elapsed_seconds": 0.07245421898551285,
+    "supervisor_stdout_bytes": 0,
+    "supervisor_stderr_bytes": 0
+  },
+  "analysis": {
+    "path": "target/wp899/genuine-root-typed-one-analysis.json",
+    "sha256": "6f75e32161bb6f624ab961646cba55fd02074e71ad7fc4f2249c30f045464194",
+    "schema": 1,
+    "global_actual_attempt": 2,
+    "new_contract_attempt": 1,
+    "result": "REFUSED_UNACCEPTED_NO_RETRY",
+    "ordered_records": [
+      {
+        "line": 3,
+        "key": "schema",
+        "value": "1"
+      },
+      {
+        "line": 4,
+        "key": "work_deadline_monotonic_ns",
+        "value": "288384230343075"
+      },
+      {
+        "line": 5,
+        "key": "cleanup_deadline_monotonic_ns",
+        "value": "288387230343075"
+      },
+      {
+        "line": 6,
+        "key": "full_runtime_closure_proved",
+        "value": "0"
+      },
+      {
+        "line": 7,
+        "key": "process_execution_proved",
+        "value": "0"
+      },
+      {
+        "line": 8,
+        "key": "historical_memory_attribution_proved",
+        "value": "0"
+      },
+      {
+        "line": 9,
+        "key": "progress_rounds",
+        "value": "0"
+      },
+      {
+        "line": 10,
+        "key": "owner_refreshes",
+        "value": "0"
+      },
+      {
+        "line": 11,
+        "key": "reached_capture",
+        "value": "0"
+      },
+      {
+        "line": 12,
+        "key": "completed_capture",
+        "value": "0"
+      },
+      {
+        "line": 13,
+        "key": "stage_containment_proved",
+        "value": "0"
+      },
+      {
+        "line": 14,
+        "key": "stage_paths_observed",
+        "value": "0"
+      },
+      {
+        "line": 15,
+        "key": "no_containment_violation_observed",
+        "value": "1"
+      },
+      {
+        "line": 16,
+        "key": "snapshot_restoration_proved",
+        "value": "1"
+      },
+      {
+        "line": 17,
+        "key": "raw_restoration_proved",
+        "value": "1"
+      },
+      {
+        "line": 18,
+        "key": "engine_retired",
+        "value": "1"
+      },
+      {
+        "line": 19,
+        "key": "first_poison_code",
+        "value": "0"
+      },
+      {
+        "line": 20,
+        "key": "poison_observation_before_close",
+        "value": "1"
+      },
+      {
+        "line": 21,
+        "key": "source_counters_sampled",
+        "value": "1"
+      },
+      {
+        "line": 22,
+        "key": "registry_attempts",
+        "value": "2"
+      },
+      {
+        "line": 23,
+        "key": "registry_bytes",
+        "value": "0"
+      },
+      {
+        "line": 24,
+        "key": "source_attempts",
+        "value": "0"
+      },
+      {
+        "line": 25,
+        "key": "transferred_bytes",
+        "value": "0"
+      },
+      {
+        "line": 26,
+        "key": "decoded_bytes",
+        "value": "0"
+      },
+      {
+        "line": 27,
+        "key": "written_bytes",
+        "value": "0"
+      },
+      {
+        "line": 28,
+        "key": "live_source_buffer_bytes",
+        "value": "0"
+      },
+      {
+        "line": 29,
+        "key": "source_buffer_peak_bytes",
+        "value": "393216"
+      },
+      {
+        "line": 30,
+        "key": "descriptor_phase_sample_lower_bound",
+        "value": "0"
+      },
+      {
+        "line": 31,
+        "key": "outer_error_code",
+        "value": "4"
+      },
+      {
+        "line": 32,
+        "key": "nested_owner_error_observed",
+        "value": "1"
+      },
+      {
+        "line": 33,
+        "key": "nested_owner_error_category",
+        "value": "5"
+      },
+      {
+        "line": 34,
+        "key": "nested_owner_refusal_site",
+        "value": "2"
+      },
+      {
+        "line": 35,
+        "key": "nested_refusal_termination",
+        "value": "1"
+      },
+      {
+        "line": 36,
+        "key": "nested_variant_path_complete",
+        "value": "1"
+      },
+      {
+        "line": 37,
+        "key": "nested_variant_code_count",
+        "value": "7"
+      },
+      {
+        "line": 38,
+        "key": "nested_variant_code",
+        "value": "6"
+      },
+      {
+        "line": 39,
+        "key": "nested_variant_code",
+        "value": "12"
+      },
+      {
+        "line": 40,
+        "key": "nested_variant_code",
+        "value": "17"
+      },
+      {
+        "line": 41,
+        "key": "nested_variant_code",
+        "value": "42"
+      },
+      {
+        "line": 42,
+        "key": "nested_variant_code",
+        "value": "54"
+      },
+      {
+        "line": 43,
+        "key": "nested_variant_code",
+        "value": "66"
+      },
+      {
+        "line": 44,
+        "key": "nested_variant_code",
+        "value": "167"
+      },
+      {
+        "line": 45,
+        "key": "nested_native_detail_observed",
+        "value": "1"
+      },
+      {
+        "line": 46,
+        "key": "nested_native_cause_present",
+        "value": "1"
+      },
+      {
+        "line": 47,
+        "key": "nested_native_site",
+        "value": "2"
+      },
+      {
+        "line": 48,
+        "key": "nested_native_detail_kind",
+        "value": "1"
+      },
+      {
+        "line": 49,
+        "key": "nested_native_io_kind",
+        "value": "21"
+      },
+      {
+        "line": 50,
+        "key": "nested_native_errno_present",
+        "value": "0"
+      },
+      {
+        "line": 51,
+        "key": "nested_native_errno_negative",
+        "value": "0"
+      },
+      {
+        "line": 52,
+        "key": "nested_native_errno_magnitude",
+        "value": "0"
+      },
+      {
+        "line": 53,
+        "key": "nested_native_status_present",
+        "value": "0"
+      },
+      {
+        "line": 54,
+        "key": "nested_native_status",
+        "value": "0"
+      },
+      {
+        "line": 55,
+        "key": "nested_native_protocol",
+        "value": "0"
+      },
+      {
+        "line": 56,
+        "key": "nested_native_scope",
+        "value": "0"
+      },
+      {
+        "line": 57,
+        "key": "nested_native_scope_counter_present",
+        "value": "0"
+      },
+      {
+        "line": 58,
+        "key": "nested_native_scope_counter",
+        "value": "0"
+      },
+      {
+        "line": 59,
+        "key": "nested_frontier_proof_missing",
+        "value": "0"
+      },
+      {
+        "line": 60,
+        "key": "descriptor_reserved_highwater_bytes",
+        "value": "442387"
+      },
+      {
+        "line": 61,
+        "key": "descriptor_reserved_highwater_settled",
+        "value": "1"
+      },
+      {
+        "line": 62,
+        "key": "descriptor_exact_peak_proved",
+        "value": "1"
+      },
+      {
+        "line": 63,
+        "key": "status",
+        "value": "0"
+      }
+    ],
+    "harness_records_count": 61,
+    "unique_keys": 55,
+    "frozen_source_decoding": {
+      "outer": "Computation",
+      "owner": "SourceSelection",
+      "owner_site": "MappingSemantic",
+      "termination": "Classified",
+      "variant_path_complete": true,
+      "ordered_variant_codes": [
+        6,
+        12,
+        17,
+        42,
+        54,
+        66,
+        167
+      ],
+      "ordered_variant_labels": [
+        "RootMappingPredecessor",
+        "ExtensionMappingsRoutes",
+        "RoutesGraph",
+        "GraphDiscoveryLeaf",
+        "DiscoverySourcePreparation",
+        "ModuleSourceRegistryFile",
+        "RegistryFileTransport"
+      ],
+      "native": {
+        "site": "Dns",
+        "detail": "Io",
+        "kind": "Unknown",
+        "errno": null,
+        "kind_code": 21
+      },
+      "native_reason_detail": "Actual borrowed IO kind falls outside explicit stable mappings; errno absent. OS/resolver/EAI/server/networkpermission cause not established."
+    },
+    "descriptor_reservation_evidence": {
+      "exact_settled": true,
+      "peak_bytes": 442387,
+      "peak_kib": 432.0185546875,
+      "scope": "Actual same diagnostic bank lifetime admitted reservation credits; includes headers/capacity/conversion overlap/receipt; not heap or RSS",
+      "final_used_zero_not_claimed": true
+    },
+    "source_positive_gates": {
+      "admitted_capture": false,
+      "stage_containment": false,
+      "query_shape": false,
+      "actual_current_source_identity": false,
+      "clone_reads_last_drop": false
+    },
+    "restoration": {
+      "accepted_snapshot": true,
+      "all7_raw_request_values": true,
+      "actual_engine_arc_retired": true
+    },
+    "test_execution": {
+      "exact_selected": 1,
+      "passed": 0,
+      "failed": 1,
+      "ignored_selected_was_executed": true,
+      "child_exit": 101
+    },
+    "supervisor": {
+      "schema": 1,
+      "limit_kind": "RLIMIT_AS",
+      "address_space_limit_bytes": 4294967296,
+      "address_space_limit_verified": true,
+      "sampled_rss_limit_bytes": 4294967296,
+      "sampled_disk_limit_bytes": 6442450944,
+      "sampled_rss_peak_bytes": 61673472,
+      "sampled_swap_peak_bytes": 0,
+      "sampled_disk_peak_bytes": 4096,
+      "sampled_logical_disk_peak_bytes": 3332,
+      "samples": 2,
+      "poll_interval_seconds": 0.02,
+      "census_deadline_seconds": 0.1,
+      "elapsed_seconds": 0.042573882,
+      "work_seconds": 27.0,
+      "cleanup_seconds": 3.0,
+      "terminal_seconds": 3.0,
+      "unexpected_descendants": 0,
+      "child_exit_code": 101,
+      "refusal": "child_exit_nonzero",
+      "term_sent": false,
+      "kill_sent": false,
+      "joined": true,
+      "stage_removed": true,
+      "diagnostic_log_bytes": 3332,
+      "diagnostic_log_preserved": true,
+      "diagnostic_log_limit_bytes": 1048576,
+      "terminal_cleanup_exhausted": false,
+      "supervision_ok": false,
+      "source_gate_verified": false,
+      "kernel_rss_quota": false,
+      "swap_disabled": false,
+      "disk_quota": false
+    },
+    "sampled_peak_rss_mib": 58.81640625,
+    "receipt_and_path_validation": "61 ordered source-authoritative records,55 unique keys; only7 repeatedvariant rows; allsingleton/numeric/boolean/union/semantic adjacency and frozen typed codes independently audited",
+    "next_required_condition": "Working native DNS resolution for admitted registry URLs in the actual execution context before genuine source admission can advance. No cause beyond the DNS-stage IO Unknown/absenterrno is proved; no implementation fix justified solely by this terminal. No reattempt without a new concrete hypothesis/evidence contract/external-state change.",
+    "proof_gaps": [
+      "Actual admitted source bytes/ELF/current roots/private lease/clone-read/lastDrop",
+      "Underlying DNS failure reason",
+      "Full loader/runtime/process/query/generate/bootstrap",
+      "Original40GB PID/command/workload attribution"
+    ],
+    "log_sha256": "7989ca62c968f74c63b942d86b0a76a0009451a6d11dc4754f71874fd493f111",
+    "freeze_sha256": "d04cad608e31fe8c7d3f18217b24d6bc16fb98355ac22ce0e5fc8d042d680af4",
+    "automatic_retry": false,
+    "older_terminal_reclassification": false
+  },
+  "ordered_raw_receipt": {
+    "path": "target/wp899/genuine-root-typed-raw-records.json",
+    "sha256": "55f476c5b7b857a2e3d78cfa7bedfb2c9ce602e1a2a6b7b335b8bfb366a30196"
+  },
+  "supervisor_receipt": {
+    "path": "target/wp899/genuine-root-typed-one-receipt.json",
+    "sha256": "d5f8a463fb675f4d8c52abfce145d94f6c7ce5bbf3f51d3523270651b1fd3aea"
+  },
+  "preserved_log": {
+    "path": "target/wp899/genuine-root-typed-one.log",
+    "sha256": "7989ca62c968f74c63b942d86b0a76a0009451a6d11dc4754f71874fd493f111"
+  },
+  "independent_terminal_reviews": {
+    "genuine-root-typed-terminal-supervisor-review.md": {
+      "path": "target/wp899/genuine-root-typed-terminal-supervisor-review.md",
+      "sha256": "7ceaa089e3824529e03e25936b66a0a6d3b8db395f622f81966f1066e45fa263"
+    },
+    "genuine-root-typed-terminal-frontier-review.md": {
+      "path": "target/wp899/genuine-root-typed-terminal-frontier-review.md",
+      "sha256": "492ef57d85060a065465c11402e1df93c0d2e9d51da0e57c2e45f59f6347188a"
+    },
+    "genuine-root-typed-terminal-record-audit.md": {
+      "path": "target/wp899/genuine-root-typed-terminal-record-audit.md",
+      "sha256": "b6360850f9abc021aa6330ea48238af83336a436c3e71bb9ff8adb123f3eabd6"
+    }
+  },
+  "operational_parent_cleanup": {
+    "path": "target/wp899/genuine-root-typed-parent-cleanup.json",
+    "sha256": "9737bfd2175e5f7c18ea9a8a1a584bf5f34c2ed115acce7ab7838423c66626c3",
+    "parent": {
+      "path": "/tmp/slug-wp899-typed-parent-lcj3zs_5",
+      "device": 54,
+      "inode": 790559,
+      "uid": 1000,
+      "mode": "0o700",
+      "empty": true
+    },
+    "removed": true,
+    "recursive": false,
+    "after_independent_terminal_reviews": {
+      "genuine-root-typed-terminal-supervisor-review.md": "7ceaa089e3824529e03e25936b66a0a6d3b8db395f622f81966f1066e45fa263",
+      "genuine-root-typed-terminal-frontier-review.md": "492ef57d85060a065465c11402e1df93c0d2e9d51da0e57c2e45f59f6347188a",
+      "genuine-root-typed-terminal-record-audit.md": "b6360850f9abc021aa6330ea48238af83336a436c3e71bb9ff8adb123f3eabd6"
+    },
+    "actual_child_join_and_stage_removal_verified": true,
+    "owner_inode_mode_fd_relative_empty_check": "PASS"
+  },
+  "goal_disposition": "Active and not complete. Current turn is progress from new authoritative actual terminal/typed cause/accounting. No Goal blocked call: three-consecutive-turn impasse threshold not established. Full objective and every missing actual source/runtime/process/bootstrap/memory gate preserved.",
+  "next_condition": "Native DNS lookup must succeed in the actual execution context for unchanged admitted registry requests. The reason for failure remains unproved; no implementation correction, alternate source, permission/proxy workaround or retry follows from this terminal.",
+  "no_new_compile_or_ordinary_test_execution": "Reuse pinned unchanged source/artifact and validated500/default dependent checks. Current turn runs only one separately reviewed actual ignored diagnostic. No CLI link/activation.",
+  "next_action_audit": {
+    "path": "target/wp899/genuine-root-typed-next-action-audit.md",
+    "sha256": "aef5c16a6f0ec73a0d747fb57cf3b18b6d6a515efef477370cb6c76c8d25a583",
+    "result": "No proven native host/port, scope or chosen-error defect; no justified Rust correction or ready substitute for genuine source-fit evidence. Native resolution for unchanged normal requests remains a prerequisite; no retry follows."
+  },
+  "scheduling_status": "waiting on native resolution for genuine source admission; active goal remains incomplete"
+}
