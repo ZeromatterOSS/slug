@@ -1,42 +1,28 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded child-accounting attribution validated; actual accounting observation next; full WP899 unaccepted
+Status: post-transfer BufferLimit frontier preserved; first buffer-creator provenance next; full WP899 unaccepted
 
-The [bounded profile amendment](wp899-bounded-registry-profile.md) keeps Default128
-and selects explicit256 only for the Linux actual-root diagnostic. Its allowance-sized
-identity slab and fixed256 metadata are fully charged to the existing16MiB bank;
-all byte/time/supervisor limits stay unchanged. Fresh44/44 focused controls and
-default Core+CLI all-target compilation pass. [Receipt](wp899-bounded-registry-profile-2026-10-03.json).
-The separately frozen global8 observation now admits192 distinct registry requests
-with zero repeats/refusals and16 source attempts, then selects outer DownloadCapture
-with first Scope BufferLimit. The exact failed reservation/producer remains unproved.
-Restore/raw/engine,582/582 censuses, actual join/stage cleanup and exact empty-parent
-removal are proved after three terminal FINALs. [Receipt](wp899-buffer-frontier-2026-10-03.json).
-Independent source audit and real10MiB normal-file regression now establish the
-scoped Vec-to-Arc conversion overlap. The [single-payload amendment](wp899-single-payload-transfer.md)
-replaces that overlap with one precharged directly initialized Arc, preserving
-unscoped behavior and all limits.55 unique controls (52 initial passes+3 corrected
-socket passes) and default Core+CLI compile pass; three FINALs accept the component.
-[Receipt](wp899-single-payload-transfer-2026-10-03.json). Global8 exact creator stays
-unproved. Next actual observation needs a new independently reviewed contract/freeze;
-no automatic retry, complete source-fit or historical40GB claim follows.
+The separately frozen global10 observation emitted89 Slug records:192 distinct
+registry admissions/zero repeats or refusals,16 source attempts, then first Scope
+BufferLimit with outer DownloadCapture. Peak charged credit15221766B and live
+4211111B do not identify the failed allocation. Restore/raw/engine and591/591
+censuses pass; child101, actual join/stage and exact parent cleanup are proved
+after three terminal FINALs. [Receipt](wp899-post-transfer-buffer-frontier-2026-10-03.json).
+Source admission remains failed. Next bounded owner is first BufferLimit creation
+under the Scope mutex: discriminate reservation versus explicit bound, finite
+producer site and requested/live/ceiling/overflow facts before choosing a repair.
+No cap change or identical actual retry is selected.
 
-The independently frozen global9 observation stopped on supervisor
-`child_accounting_unavailable` before any Slug result record.497/497 censuses,
-actual TERM/join/stage cleanup and exact empty-parent removal pass; three terminal
-FINALs accept only this limited evidence. [Receipt](wp899-child-accounting-frontier-2026-10-03.json).
-Next owner is supervisor `children()`: task enumeration/read/parse and exact errno
-remain unknown. Use bounded local discriminators before a separately reviewed
-observation; no identical retry, accounting skip or inferred thread-exit race.
-
-The bounded supervisor attribution component now retains finite first-selected
-child site/context/owner/origin/errno, separately from disk detail; all accounting
-loss remains fatal and all lifecycle/clocks/caps are unchanged. A real local
-worker-retirement fixture proves its own children-read ENOENT, without attributing
-global9.29/29 controls pass in3.441s, including25 unchanged protected methods;
-three independent FINALs accept only the component. [Receipt](wp899-child-accounting-attribution-2026-10-03.json).
-Next gate is one new independently reviewed actual freeze using these fields.
+Accepted components remain protected: [bounded registry profile](wp899-bounded-registry-profile-2026-10-03.json),
+[single-payload transfer](wp899-single-payload-transfer-2026-10-03.json) with55 unique
+controls and defaultcheck, and [child attribution](wp899-child-accounting-attribution-2026-10-03.json)
+with29/29 controls including25 unchanged protected methods. Global9 emitted no
+Slug records ([terminal](wp899-child-accounting-frontier-2026-10-03.json)); its
+exact operation remains unknown. The absence of a child accounting failure in global10
+establishes neither a repair nor a historical cause. Global8 exact buffer creator also remains unknown
+([terminal](wp899-buffer-frontier-2026-10-03.json)). All resource limits and spent
+freezes remain unchanged; fullWP899/M7A/source-fit/historical40GB stay unaccepted.
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the

@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded child-accounting attribution validated; actual accounting observation next; full WP899 unaccepted
+Status: post-transfer BufferLimit frontier preserved; first buffer-creator provenance next; full WP899 unaccepted
 
 The reviewed bounded profile keeps Default128 and selects explicit diagnostic256,
 with fully charged allowance-sized storage in the unchanged16MiB bank. Fresh44/44
