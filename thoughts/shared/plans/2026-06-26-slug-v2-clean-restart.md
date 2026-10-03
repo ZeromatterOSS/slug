@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded actual registry-request association design
+Status: registry association validated; actual request-cardinality observation pending
 
 WP899 implements the accepted WP898 full-caller request, normal apparent imported
 owner in ONE preparation command, explicit zero extra roots/original mappings and
@@ -82,8 +82,12 @@ The new independently frozen global5 observation completes68/68 censuses and
 selects Scope::Limit(RegistryAttempts) at128 charges/234593 admitted bytes, before
 capture. Restoration/engine retirement and child join/stage/empty-parent cleanup
 are proved; sampled72.258MiB RSS is only this refused branch. Next work reuses normal
-graph counting fixtures to distinguish legitimate multiple-version discovery from
-repeated requests; no cap increase or actual retry is selected. [Terminal receipt](slug-v2-subplans/wp899-quiescent-root-terminal-2026-10-03.json).
+graph counting fixtures; exact sharing/version/frontier controls pass. Optional
+Linux cfgtest registry association now has independent FINAL and34 unique gates
+(33 preserved+1 strengthened), plus default Core+CLI compilation. Its fixed2MiB
+identity slab remains charged in the same bank; Scope holds only Weak. Next is a
+separately contracted and reviewed actual cardinality observation, without cap
+growth or automatic retry. [Component checkpoint](slug-v2-subplans/wp899-registry-association-checkpoint-2026-10-03.json). [Terminal receipt](slug-v2-subplans/wp899-quiescent-root-terminal-2026-10-03.json).
 
 WP897 75621a809 accepts normal ordered issued Label file sources through one
 restored guest view;362 focused gates, default owner/CLI checks and independent

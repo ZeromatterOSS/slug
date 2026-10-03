@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded actual registry-request association design
+Status: registry association validated; actual request-cardinality observation pending
 
 Original baseline: clean d3392be459186b22eca800d3fe833988eb1048c2; accepted memory
 baseline 1fe253f63 contains the reviewed equal-payload DICE sharing repair after the
@@ -102,6 +102,37 @@ requests; separate legacy, root-frontier and generation phases are proved. Next
 design is optional bounded producer-owned actual request association, with full
 identity, charged memory and explicit selected-leaf identity limits. No new actual
 observation is authorized by the portable fixture.
+
+Root selects optional Linux cfgtest implementation under
+`target/wp899/registry-request-association-root-contract.md` SHA3721c61d and
+independent DESIGN ACCEPT `registry-request-association-design-review.md` SHA731ee276.
+Full identities include immutable scope workspace, route, literal URL and supplied
+Local OS path. The harness pins a bounded recorder; scope retains only Weak,
+avoiding the existing SourceBufferReservation Arc cycle. Fixed128 rows plus2MiB
+slab/header storage are precharged against the same16MiB bank; overhead changes
+diagnostic pressure and remains counted. No production semantic key/cache/identity
+or cap changes. Both charge entrypoints preserve one original locked charge owner;
+first limit creation is distinguished atomically from sticky propagation.
+Call ordinal and distinct-row ordinal stay separate; incomplete/gapped/oversized
+history cannot certify uniqueness. This supports exact admitted repeats/distinct
+requests and first exhaustion origin, never the selected leaf's own caller identity.
+
+Exact allowlist: Core runtime/source_service.rs cfgtest registration/reexport;
+source_service/{scope,registry}.rs narrow attachment/one charge-helper glue;
+new source_service/registry_association.rs and registry_association/tests.rs;
+Root source_preparation/{genuine_root,refusal_receipt}.rs numeric observation;
+source_service/diagnostic_tests.rs reuse of natural selected-owner lifecycle.
+Supervisor owns service/helper unit gates, Input owns natural diagnostic fixture,
+Root owns actual harness/receipt and serial Cargo. Independent FINAL accepts the bounded component against all8 final source pins.
+Current34 unique gates are33 preserved batch passes plus one strengthened current
+pass; default Core+CLI all-target compile covers unchanged non-test/helper bytes.
+[Checkpoint](wp899-registry-association-checkpoint-2026-10-03.json) preserves DESIGN/FINAL,
+failed initial compile/correction, exact preflight/execution and source bridge.
+Next gate is one separately contracted, source-matched actual request-cardinality
+observation after independent freeze review. Existing60s compile/30s focused
+execution and all source/RSS/disk/time ceilings persist. No actual launch follows
+from this component; prior global1–5 freezes remain spent. FullWP899 and reported
+40GB attribution remain open; selected leaf own-call identity stays unproved.
 
 ## Observable result and authority
 

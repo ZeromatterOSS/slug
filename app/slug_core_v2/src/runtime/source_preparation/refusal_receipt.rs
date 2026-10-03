@@ -11,7 +11,7 @@ use super::Receipt;
 pub(super) fn emit(
     error: &NativeDemandSessionError,
     receipt: &mut Receipt,
-) -> Result<(), &'static str> {
+) -> Result<Option<RegistryRefusalCause>, &'static str> {
     // Existing plain anyhow::Error::new has no contexts. Bound future context
     // traversal too; unknown errors never supply a guessed semantic/native cause.
     let owner = match error {
@@ -85,7 +85,7 @@ pub(super) fn emit(
     }
     emit_native(native, receipt)?;
     receipt.number("nested_frontier_proof_missing", u64::from(missing))?;
-    Ok(())
+    Ok(native)
 }
 
 fn emit_native(
@@ -167,7 +167,7 @@ fn unknown_error_never_infers_owner_or_native_cause_from_message() {
     let error = NativeDemandSessionError::Computation(anyhow::anyhow!(
         "secret-url-password source DNS lookup failed SourceSelection RegistryFile Transport"
     ));
-    emit(&error, &mut receipt).unwrap();
+    assert_eq!(emit(&error, &mut receipt).unwrap(), None);
     assert!(receipt.text.contains("nested_owner_error_observed=0\n"));
     assert!(receipt.text.contains("nested_native_cause_present=0\n"));
     assert!(receipt.text.contains("nested_frontier_proof_missing=1\n"));

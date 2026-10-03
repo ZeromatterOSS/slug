@@ -34,6 +34,8 @@ use slug_workspace_v2::ImageDescriptorReservation;
 use super::harness_clock::HarnessClockStage;
 use super::*;
 use crate::runtime::dice::source_service::DiagnosticObserver;
+use crate::runtime::dice::source_service::RegistryAssociationSnapshot;
+use crate::runtime::dice::source_service::RegistryLimitRelation;
 use crate::runtime::dice::source_service::SourcePreparationDiagnosticRuntime;
 use crate::runtime::dice::source_service::SourceServiceCounters;
 use crate::runtime::dice::source_service::SourceServiceError;
@@ -492,6 +494,118 @@ fn outer_code(error: &NativeDemandSessionError) -> u64 {
     }
 }
 
+fn emit_registry_association(
+    snapshot: RegistryAssociationSnapshot,
+    settled: bool,
+    installed_scope: bool,
+    first_poison: Option<SourceServiceError>,
+    selected_native: Option<slug_bzlmod_v2::RegistryRefusalCause>,
+    receipt: &mut Receipt,
+) -> Result<(), &'static str> {
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeCounter;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+
+    let complete = settled
+        && installed_scope
+        && snapshot.complete
+        && snapshot.scope_admitted_entries == snapshot.admitted_entries
+        && snapshot
+            .admitted_distinct
+            .checked_add(snapshot.admitted_repeated)
+            == Some(snapshot.admitted_entries);
+    let (relation, row, prior_count, prospective_unique) = match snapshot.first_limit_relation {
+        RegistryLimitRelation::Unknown => (0, 0, 0, 0),
+        RegistryLimitRelation::ExistingRow {
+            row_ordinal,
+            prior_admitted_count,
+        } => (1, row_ordinal, prior_admitted_count, 0),
+        RegistryLimitRelation::NewDistinctUnretained { unique_ordinal } => {
+            (2, 0, 0, unique_ordinal)
+        }
+    };
+    // Fresh runtime wiring and complete first-poison observation pair the causal
+    // first exhaustion. They do not identify the selected leaf's own call.
+    let paired = complete
+        && relation != 0
+        && snapshot.first_limit_call_ordinal.is_some()
+        && first_poison
+            == Some(SourceServiceError::Limit(
+                source_service::SourceCounter::RegistryAttempts,
+            ))
+        && matches!(
+            selected_native,
+            Some(slug_bzlmod_v2::RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Limit(
+                    RegistryRefusalScopeCounter::RegistryAttempts
+                )),
+            })
+        );
+    for (key, value) in [
+        ("registry_association_settled", u64::from(settled)),
+        (
+            "registry_association_installed_scope",
+            u64::from(installed_scope),
+        ),
+        ("registry_identity_counts_complete", u64::from(complete)),
+        (
+            "registry_association_attempted_entries",
+            snapshot.attempted_entries,
+        ),
+        (
+            "registry_association_admitted_entries",
+            snapshot.admitted_entries,
+        ),
+        (
+            "registry_association_scope_admitted_entries",
+            snapshot.scope_admitted_entries,
+        ),
+        (
+            "registry_association_refused_entries",
+            snapshot.refused_entries,
+        ),
+        (
+            "registry_association_sticky_refusals",
+            snapshot.sticky_refused_entries,
+        ),
+        (
+            "registry_association_distinct_rows",
+            snapshot.admitted_distinct,
+        ),
+        (
+            "registry_association_repeated_entries",
+            snapshot.admitted_repeated,
+        ),
+        ("registry_association_retained_rows", snapshot.retained_rows),
+        (
+            "registry_association_charged_bytes",
+            snapshot.charged_bytes as u64,
+        ),
+        (
+            "registry_first_limit_call_present",
+            u64::from(snapshot.first_limit_call_ordinal.is_some()),
+        ),
+        (
+            "registry_first_limit_call_ordinal",
+            snapshot.first_limit_call_ordinal.unwrap_or(0),
+        ),
+        ("registry_first_limit_relation", relation),
+        ("registry_first_limit_existing_row", row),
+        ("registry_first_limit_prior_admissions", prior_count),
+        (
+            "registry_first_limit_prospective_unique",
+            prospective_unique,
+        ),
+        ("registry_first_exhaustion_origin_paired", u64::from(paired)),
+        ("registry_selected_leaf_call_identity_proved", 0),
+    ] {
+        receipt.number(key, value)?;
+    }
+    Ok(())
+}
+
 fn emit_success(
     view: &source_service::ScopedPreparedSourceViewLease,
     inputs: &NativeDemandRequestInputBundle,
@@ -806,6 +920,21 @@ fn run(
     let baseline_payload = diagnostic.resources().payload_budget().used_bytes();
     let (inputs, pin) = request_inputs(&diagnostic)?;
     let name = ApparentRepoName::new("slug_crates").map_err(|_| "import refusal")?;
+    let association = diagnostic
+        .inspect_for_test(|runtime, scope| {
+            if !runtime
+                .source_scope()
+                .is_some_and(|installed| Arc::ptr_eq(installed, scope))
+            {
+                return Err(SourceServiceError::ForeignScope);
+            }
+            let association = scope.arm_registry_association_for_test()?;
+            if !association.same_scope(scope) {
+                return Err(SourceServiceError::ForeignScope);
+            }
+            Ok(association)
+        })
+        .map_err(|_| "registry association setup refused")?;
     clock
         .revalidate_before_runtime()
         .map_err(|_| "setup revalidation refusal")?;
@@ -867,10 +996,30 @@ fn run(
         "descriptor_phase_sample_lower_bound",
         observer.descriptor_sample.get() as u64,
     )?;
-    if let Err(error) = &outcome {
+    let selected_native = if let Err(error) = &outcome {
         receipt.number("outer_error_code", outer_code(error))?;
-        refusal_receipt::emit(error, receipt)?;
-    }
+        refusal_receipt::emit(error, receipt)?
+    } else {
+        None
+    };
+    let settled = observer.restored.get()
+        && observer.raw_restored.get()
+        && observer.engine.upgrade().is_none();
+    let first_poison = observer
+        .scope
+        .upgrade()
+        .and_then(|scope| scope.first_error_for_test());
+    emit_registry_association(
+        association.snapshot(),
+        settled,
+        true,
+        first_poison,
+        selected_native,
+        receipt,
+    )?;
+    // The recorder pins only this scope/bank. Retire it before the existing
+    // exported-view/clone/last-Drop controls and on the refused path as well.
+    drop(association);
     let view = outcome.map_err(|_| "actual source admission refused")?;
     if !observer.restored.get()
         || !observer.raw_restored.get()
@@ -1000,6 +1149,141 @@ fn actual_source_admission(emitted: &Cell<bool>) -> Result<(), &'static str> {
     print!("{}", receipt.text);
     emitted.set(true);
     outcome
+}
+
+#[test]
+fn genuine_registry_association_receipt_requires_complete_settled_same_scope_origin() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeCounter;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let snapshot = RegistryAssociationSnapshot {
+        complete: true,
+        attempted_entries: 130,
+        admitted_entries: 128,
+        scope_admitted_entries: 128,
+        admitted_distinct: 1,
+        admitted_repeated: 127,
+        refused_entries: 2,
+        sticky_refused_entries: 1,
+        retained_rows: 1,
+        first_limit_call_ordinal: Some(129),
+        first_limit_relation: RegistryLimitRelation::NewDistinctUnretained { unique_ordinal: 2 },
+        charged_bytes: 2 << 20,
+    };
+    let native = Some(RegistryRefusalCause {
+        site: RegistryRefusalSite::Scope,
+        detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Limit(
+            RegistryRefusalScopeCounter::RegistryAttempts,
+        )),
+    });
+    let poison = Some(SourceServiceError::Limit(
+        source_service::SourceCounter::RegistryAttempts,
+    ));
+    let wrong_counter = Some(RegistryRefusalCause {
+        site: RegistryRefusalSite::Scope,
+        detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Limit(
+            RegistryRefusalScopeCounter::SourceAttempts,
+        )),
+    });
+    let wrong_site = native.map(|cause| RegistryRefusalCause {
+        site: RegistryRefusalSite::LocalRead,
+        ..cause
+    });
+    let wrong_poison = Some(SourceServiceError::Limit(
+        source_service::SourceCounter::SourceAttempts,
+    ));
+    let absent_call = RegistryAssociationSnapshot {
+        first_limit_call_ordinal: None,
+        ..snapshot
+    };
+    let unknown_relation = RegistryAssociationSnapshot {
+        first_limit_relation: RegistryLimitRelation::Unknown,
+        ..snapshot
+    };
+    let budget = ImageDescriptorBudget::new(128 * 1024);
+    let mut receipt = Receipt::new(&budget).unwrap();
+    emit_registry_association(snapshot, true, true, poison, native, &mut receipt).unwrap();
+    assert!(
+        receipt
+            .text
+            .contains("registry_first_exhaustion_origin_paired=1\n")
+    );
+    assert!(
+        receipt
+            .text
+            .contains("registry_first_limit_call_ordinal=129\n")
+    );
+    assert!(
+        receipt
+            .text
+            .contains("registry_first_limit_prospective_unique=2\n")
+    );
+    assert!(
+        receipt
+            .text
+            .contains("registry_selected_leaf_call_identity_proved=0\n")
+    );
+    for (sample, settled, installed, first, selected) in [
+        (snapshot, false, true, poison, native),
+        (snapshot, true, false, poison, native),
+        (
+            RegistryAssociationSnapshot {
+                complete: false,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            RegistryAssociationSnapshot {
+                scope_admitted_entries: 129,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (
+            RegistryAssociationSnapshot {
+                admitted_repeated: 126,
+                ..snapshot
+            },
+            true,
+            true,
+            poison,
+            native,
+        ),
+        (snapshot, true, true, None, native),
+        (snapshot, true, true, poison, None),
+        (snapshot, true, true, poison, wrong_counter),
+        (snapshot, true, true, poison, wrong_site),
+        (snapshot, true, true, wrong_poison, native),
+        (absent_call, true, true, poison, native),
+        (unknown_relation, true, true, poison, native),
+    ] {
+        receipt.text.clear();
+        emit_registry_association(sample, settled, installed, first, selected, &mut receipt)
+            .unwrap();
+        assert!(
+            receipt
+                .text
+                .contains("registry_first_exhaustion_origin_paired=0\n")
+        );
+        assert!(
+            receipt
+                .text
+                .lines()
+                .all(|line| line.starts_with("SLUG_SOURCE_ADMISSION ")
+                    && line.rsplit_once('=').unwrap().1.parse::<u64>().is_ok())
+        );
+    }
+    drop(receipt);
+    assert_eq!(budget.used_bytes(), 0);
 }
 
 #[test]

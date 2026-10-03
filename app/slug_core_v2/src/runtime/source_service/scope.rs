@@ -128,6 +128,8 @@ pub(in crate::runtime) struct SourceServiceScope {
     limits: SourceServiceLimits,
     cancelled: tokio::sync::watch::Sender<bool>,
     state: Mutex<ScopeState>,
+    #[cfg(all(test, target_os = "linux"))]
+    registry_association: std::sync::OnceLock<std::sync::Weak<super::RegistryRequestAssociation>>,
 }
 impl SourceServiceScope {
     pub(super) fn new(
@@ -155,6 +157,8 @@ impl SourceServiceScope {
             limits,
             cancelled: tokio::sync::watch::channel(false).0,
             state: Mutex::new(ScopeState::default()),
+            #[cfg(all(test, target_os = "linux"))]
+            registry_association: std::sync::OnceLock::new(),
         }))
     }
     #[cfg(test)]
@@ -234,7 +238,15 @@ impl SourceServiceScope {
         amount: u64,
     ) -> Result<(), SourceServiceError> {
         let mut state = self.state();
-        self.check_locked(&mut state, false)?;
+        self.charge_locked(&mut state, counter, amount)
+    }
+    fn charge_locked(
+        &self,
+        state: &mut ScopeState,
+        counter: SourceCounter,
+        amount: u64,
+    ) -> Result<(), SourceServiceError> {
+        self.check_locked(state, false)?;
         let old = *state.counters.slot(counter);
         let Some(next) = old.checked_add(amount) else {
             let e = SourceServiceError::Overflow(counter);
@@ -250,6 +262,66 @@ impl SourceServiceScope {
         }
         *state.counters.slot(counter) = next;
         Ok(())
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn arm_registry_association_for_test(
+        self: &Arc<Self>,
+    ) -> Result<Arc<super::RegistryRequestAssociation>, SourceServiceError> {
+        self.arm_registry_association_with_hook(|| {})
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn arm_registry_association_with_hook(
+        self: &Arc<Self>,
+        before_attachment: impl FnOnce(),
+    ) -> Result<Arc<super::RegistryRequestAssociation>, SourceServiceError> {
+        {
+            let mut state = self.state();
+            self.check_locked(&mut state, false)?;
+            if state.counters.registry_attempts != 0 || self.registry_association.get().is_some() {
+                return Err(SourceServiceError::ForeignScope);
+            }
+        }
+        // Allocate/reserve outside the state lock. Revalidate before publication.
+        let association = super::RegistryRequestAssociation::new(self)?;
+        before_attachment(); // Deterministic private test boundary, never under a lock.
+        let mut state = self.state();
+        self.check_locked(&mut state, false)?;
+        if state.counters.registry_attempts != 0 || self.registry_association.get().is_some() {
+            drop(state);
+            return Err(SourceServiceError::ForeignScope);
+        }
+        let attached = self.registry_association.set(Arc::downgrade(&association));
+        drop(state);
+        attached.map_err(|_| SourceServiceError::ForeignScope)?;
+        Ok(association)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn charge_registry_request_for_test(
+        &self,
+        request: super::registry_association::RegistryRequestRef<'_>,
+    ) -> Result<(), SourceServiceError> {
+        let Some(association) = self
+            .registry_association
+            .get()
+            .and_then(std::sync::Weak::upgrade)
+        else {
+            return self.charge(SourceCounter::RegistryAttempts, 1);
+        };
+        association.charge(request, || {
+            let mut state = self.state();
+            let before = state.counters.registry_attempts;
+            let had_poison = state.first.is_some();
+            let result = self.charge_locked(&mut state, SourceCounter::RegistryAttempts, 1);
+            let created_limit = !had_poison
+                && state.first == Some(SourceServiceError::Limit(SourceCounter::RegistryAttempts));
+            super::registry_association::RegistryChargeObservation {
+                before,
+                after: state.counters.registry_attempts,
+                created_limit,
+                result,
+            }
+            // State guard drops before the possibly last association Arc/credit.
+        })
     }
     pub(in crate::runtime) fn remaining(
         &self,
@@ -358,6 +430,15 @@ impl SourceServiceScope {
 pub(in crate::runtime) struct SourceBufferReservation {
     scope: Arc<SourceServiceScope>,
     bytes: usize,
+}
+#[cfg(all(test, target_os = "linux"))]
+impl SourceBufferReservation {
+    pub(super) fn same_scope(&self, scope: &Arc<SourceServiceScope>) -> bool {
+        Arc::ptr_eq(&self.scope, scope)
+    }
+    pub(super) fn registry_attempts(&self) -> u64 {
+        self.scope.snapshot().registry_attempts
+    }
 }
 impl Drop for SourceBufferReservation {
     fn drop(&mut self) {

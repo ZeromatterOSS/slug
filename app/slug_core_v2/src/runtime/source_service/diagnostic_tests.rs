@@ -27,6 +27,16 @@ fn diagnostic_fixture(
     SourcePreparationDiagnosticRuntime,
     NativeDemandRequestInputBundle,
 ) {
+    diagnostic_fixture_with_limits(f, SourceServiceLimits::default())
+}
+
+fn diagnostic_fixture_with_limits(
+    f: &selected_tool_source::tests::Fixture,
+    limits: SourceServiceLimits,
+) -> (
+    SourcePreparationDiagnosticRuntime,
+    NativeDemandRequestInputBundle,
+) {
     let workspace = f.runtime.repository_materializer.workspace().clone();
     let work = Instant::now() + Duration::from_secs(10);
     let diagnostic = SourcePreparationDiagnosticRuntime::new(
@@ -34,7 +44,7 @@ fn diagnostic_fixture(
         crate::runtime::ProcessHostOwner::native(),
         work,
         work + Duration::from_secs(3),
-        SourceServiceLimits::default(),
+        limits,
     )
     .unwrap();
     let mut inputs = NativeDemandRequestInputBundle::normalized_initial();
@@ -511,6 +521,209 @@ fn actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_
         await_descriptor_retirement(&descriptors);
         assert_eq!(descriptors.peak_reserved_bytes(), peak);
     }
+}
+
+#[test]
+fn normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeCounter;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    use slug_bzlmod_v2::SelectedSourceRefusalTermination;
+    use slug_loading_v2::SelectedPreparationOwnerError;
+
+    use crate::runtime::dice::source_service::RegistryLimitRelation;
+
+    struct FullRawObserver(RestoredDiagnosticObserver, Cell<bool>);
+    impl DiagnosticObserver for FullRawObserver {
+        fn after_restore<'a>(
+            &'a self,
+            runtime: &'a WorkspaceRuntime,
+            prepared: &'a Result<PreparedSelectedSourceView, NativeDemandSessionError>,
+        ) -> Pin<Box<dyn Future<Output = Result<(), NativeDemandSessionError>> + 'a>> {
+            Box::pin(async move {
+                // The existing helper checks every accepted field and Runtime/Guest raw cells.
+                let checked = self.0.after_restore(runtime, prepared).await;
+                let prior = &self.0.prior.inputs.request;
+                let workspace = runtime.workspace.clone();
+                let mut tx = runtime.dice.updater().commit().await;
+                macro_rules! raw {
+                    ($key:expr, $expected:expr) => {
+                        assert_eq!(tx.compute(&$key).await.unwrap(), $expected);
+                    };
+                }
+                raw!(
+                    RootModuleCommandPolicyKey {
+                        workspace: workspace.clone()
+                    },
+                    slug_bzlmod_v2::RootModuleCommandPolicy::from(prior.command_policy.clone())
+                );
+                raw!(
+                    RootModuleEnvironmentPolicyKey {
+                        workspace: workspace.clone()
+                    },
+                    slug_bzlmod_v2::RootModuleEnvironmentPolicy::from(
+                        prior.environment_policy.clone()
+                    )
+                );
+                raw!(
+                    RootModuleLockfileModeKey {
+                        workspace: workspace.clone()
+                    },
+                    slug_bzlmod_v2::RootModuleLockfileMode::from(prior.lockfile_mode.clone())
+                );
+                raw!(
+                    RootModuleRegistryUrlsKey { workspace },
+                    slug_bzlmod_v2::RootModuleRegistryUrls::from(prior.registry_urls.clone())
+                );
+                raw!(
+                    slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey::new(
+                        runtime.repository_materializer.workspace().clone()
+                    ),
+                    prior.repository_environment.clone()
+                );
+                drop(tx);
+                runtime.dice.wait_for_idle().await;
+                self.1.set(true);
+                checked
+            })
+        }
+    }
+
+    let f =
+        selected_tool_source::tests::Fixture::new(&selected_tool_source::tests::scratch_program(1));
+    let module = f.workspace.path().join("MODULE.bazel");
+    let mut root = std::fs::read_to_string(&module).unwrap();
+    root.push_str("\nbazel_dep(name='association_probe',version='1.0')\n");
+    std::fs::write(&module, root).unwrap();
+    let registry = f.workspace.path().join("association_registry");
+    let parent = registry.join("modules/association_probe/1.0");
+    let child = registry.join("modules/association_child/1.0");
+    std::fs::create_dir_all(&parent).unwrap();
+    std::fs::create_dir_all(&child).unwrap();
+    let source = "module(name='association_probe',version='1.0')\nbazel_dep(name='association_child',version='1.0')\n";
+    std::fs::write(parent.join("MODULE.bazel"), source).unwrap();
+    std::fs::write(
+        child.join("MODULE.bazel"),
+        "module(name='association_child',version='1.0')\n",
+    )
+    .unwrap();
+    let (diagnostic, mut inputs) = diagnostic_fixture_with_limits(
+        &f,
+        SourceServiceLimits {
+            registry_attempts: 1,
+            ..SourceServiceLimits::default()
+        },
+    );
+    inputs.registry_urls =
+        RegistryUrls::new([url::Url::from_directory_path(&registry).unwrap().as_str()]);
+    let (engine, images, prior, recorder) = diagnostic.inspect_for_test(|runtime, scope| {
+        (
+            Arc::downgrade(&runtime.dice),
+            runtime.image_resources.clone(),
+            runtime
+                .native_demand_sessions
+                .state
+                .lock()
+                .unwrap()
+                .accepted
+                .clone(),
+            scope.arm_registry_association_for_test().unwrap(),
+        )
+    });
+    let scope = diagnostic.scope.clone();
+    let scope_weak = Arc::downgrade(&scope);
+    assert!(recorder.same_scope(&scope));
+    let observer = FullRawObserver(
+        RestoredDiagnosticObserver {
+            prior,
+            calls: Cell::new(0),
+            reject: true,
+        },
+        Cell::new(false),
+    );
+    let result = diagnostic.prepare_once_observed(
+        SelectedSourcePreparationRequest {
+            apparent_repository: &ApparentRepoName::new("proof").unwrap(),
+            inputs: &inputs,
+            scratch_policy: *f.key.policy(),
+            tool_policy: selected_tool_source::tests::key(&f).policy(),
+        },
+        &|_| Ok(()),
+        &observer,
+    );
+    assert_eq!(observer.0.calls.get(), 1);
+    assert!(observer.1.get());
+    assert!(engine.upgrade().is_none());
+    let Err(NativeDemandSessionError::Computation(error)) = result else {
+        panic!("normal selected owner must retain the registry limit as primary");
+    };
+    let owner = error
+        .downcast_ref::<SelectedPreparationOwnerError>()
+        .unwrap();
+    let SelectedPreparationOwnerError::SourceSelection { classification, .. } = owner else {
+        panic!("registry limit must follow the chosen source predecessor");
+    };
+    assert_eq!(
+        classification.termination(),
+        SelectedSourceRefusalTermination::Classified
+    );
+    assert!(classification.variant_path_complete() && classification.native_detail_observed());
+    assert_eq!(
+        classification.native_cause(),
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::Scope,
+            detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::Limit(
+                RegistryRefusalScopeCounter::RegistryAttempts
+            )),
+        })
+    );
+    assert_eq!(
+        scope.first_error_for_test(),
+        Some(SourceServiceError::Limit(SourceCounter::RegistryAttempts))
+    );
+    let counters = scope.snapshot();
+    assert_eq!(counters.registry_attempts, 1);
+    assert_eq!(counters.registry_admitted_bytes, source.len() as u64);
+    assert_eq!(counters.source_attempts, 0);
+    let observed = recorder.snapshot();
+    assert!(observed.complete);
+    assert_eq!(observed.admitted_entries, 1);
+    assert_eq!(observed.scope_admitted_entries, counters.registry_attempts);
+    assert_eq!(observed.admitted_distinct, 1);
+    assert_eq!(observed.admitted_repeated, 0);
+    assert_eq!(observed.retained_rows, 1);
+    assert_eq!(observed.first_limit_call_ordinal, Some(2));
+    assert_eq!(
+        observed.first_limit_relation,
+        RegistryLimitRelation::NewDistinctUnretained { unique_ordinal: 2 }
+    );
+    assert_eq!(observed.attempted_entries, 2);
+    assert_eq!(observed.refused_entries, 1);
+    assert_eq!(observed.sticky_refused_entries, 0);
+    assert!(recorder.same_scope(&scope));
+    assert_eq!(
+        observed.attempted_entries,
+        observed.admitted_entries + observed.refused_entries
+    );
+    assert_eq!(counters.live_buffer_bytes, observed.charged_bytes);
+    drop(error);
+    drop(scope);
+    assert!(
+        scope_weak.upgrade().is_some(),
+        "recorder owns its charged scope pin"
+    );
+    drop(recorder);
+    assert!(
+        scope_weak.upgrade().is_none(),
+        "no Scope/recorder strong cycle"
+    );
+    assert_eq!(images.logical_bytes_used(), 0);
+    let descriptors = images.descriptor_budget().clone();
+    drop(inputs);
+    drop(observer);
+    await_descriptor_retirement(&descriptors);
 }
 
 fn await_descriptor_retirement(budget: &slug_workspace_v2::ImageDescriptorBudget) {

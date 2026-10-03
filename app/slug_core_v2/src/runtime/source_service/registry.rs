@@ -105,8 +105,15 @@ impl RegistryIo for ScopedRegistryIo {
         &self,
         url: &RegistryFileUrl,
     ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        #[cfg(not(all(test, target_os = "linux")))]
         self.scope
             .charge(SourceCounter::RegistryAttempts, 1)
+            .map_err(error)?;
+        #[cfg(all(test, target_os = "linux"))]
+        self.scope
+            .charge_registry_request_for_test(super::registry_association::RegistryRequestRef::Url(
+                url,
+            ))
             .map_err(error)?;
         if url.as_str().len() > 8192 {
             return Err(error(self.scope.poison(SourceServiceError::BufferLimit)));
@@ -137,8 +144,15 @@ impl RegistryIo for ScopedRegistryIo {
         _url: &RegistryFileUrl,
         path: &Path,
     ) -> Result<RegistryIoOutcome, RegistryTransportError> {
+        #[cfg(not(all(test, target_os = "linux")))]
         self.scope
             .charge(SourceCounter::RegistryAttempts, 1)
+            .map_err(error)?;
+        #[cfg(all(test, target_os = "linux"))]
+        self.scope
+            .charge_registry_request_for_test(
+                super::registry_association::RegistryRequestRef::Local { url: _url, path },
+            )
             .map_err(error)?;
         // Preserve the supplied typed path, including non-UTF8 and symlinks.
         read_local(&self.scope, path)

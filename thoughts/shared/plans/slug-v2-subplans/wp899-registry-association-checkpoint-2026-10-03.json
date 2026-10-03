@@ -1,0 +1,565 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "eb0246c790b35865c1691644f1365d113e4ccae6",
+  "status": "independently accepted bounded optional registry association component; full WP899 unaccepted",
+  "compatibility": "Slug-native Linux cfg(test) nonsemantic diagnostic",
+  "final_source_sha256": {
+    "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+    "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+    "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+    "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa",
+    "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+  },
+  "contract": {
+    "path": "target/wp899/registry-request-association-root-contract.md",
+    "sha256": "3721c61dc1db3400eb902c7ab6eca340c77ea9f63b4ceb154af86df10e6785f1",
+    "text": "# WP899 optional actual registry association \u2014 Root design contract\n\nBaseline eb0246c790b35865c1691644f1365d113e4ccae6. Slug-native cfgtest-only\nnonsemantic diagnostic. This selects implementation design, not a new actual-root\ninvocation. Prior global1\u20135 freezes remain spent. Full source-fit/40GB/wholeWP899\nremain open. User workload clarification is pending; independent work continues.\n\nAdopt proposal registry-request-association-design-proposal.md SHA6104ac7252071c6a4e752eeb023eba3eadba817ba49d9ec1300a75dbda471204\nand input audit SHA5e75854ff2e57b3d0464e668ddc483e60c046cb13a67829048ddbca8f1191cea,\nwith the refinements below. Independent DESIGN remains required before edits.\n\nNatural ownership: both ScopedRegistryIo charge entrypoints and the consumed\nSourceServiceScope. No DICE key/value/equality, transport error payload, HTTP\nimplementation, semantic cache, request normalization or registry/source policy\nchanges. Optional cfgtest association is armed once through existing inspect_for_test\nbefore command; the harness pins its Arc and scope stores only Weak. The handle's\nstorage precedes its SourceBufferReservation, avoiding a strong reference cycle.\nWeak upgrades and synchronous association->scope-state locks end before IO/await;\nno locking across DICE. Factor original charge body once into a locked helper,\nwithout altering checks, first poison, no-refund arithmetic, counters or return.\n\nExact association uses immutable scope workspace + route kind + literal full URL,\nand the actual supplied OS path for Local. Fixed128 rows and precharged2MiB slab\nwith checked header/row/Arc overhead, URL<=8192/path<=8192, no new129th allocation.\nPreserve ordinary charge before URL transport validation. Unsupported instrumentation\nidentity follows the existing source/IO path, marks evidence incomplete and cannot\ncertify unique counts or later first-rejection distinctness. Missing/gapped charge\ncoverage similarly prohibits exact certification. Scalar overflow marks incomplete;\nnever replace the returned primary transport/scope error. Scope constructor/API\nlimits128/16MiB/27+3 remain unchanged. Allocation or bank failure while arming\nrefuses the diagnostic before command and releases temporary storage/credit.\nRecorder's real same-bank memory/highwater remains measured, not subtracted.\nNo fit assumption from the prior9.96MiB highwater.\n\nWithin the same original charge lock, distinguish this call creating the first\nLimit(RegistryAttempts) from later sticky propagation; never infer creation from\nan equal error seen later. Retain exact accepted distinct/repeat counts and bounded\nper-row admission counts. For the first creator, compare borrowed request to all\ncomplete existing rows without cloning it. Record ExistingRow ordinal/prior count\nor NewDistinctUnretained unique ordinal=distinct+1. Call ordinal=129 is a separate\ndomain and must not be substituted for a row ordinal. Later sticky calls do not\nreplace first origin. Generic/unobserved prior registry charges mark coverage\nincomplete. No raw URL/path/environment/credential/hash/length vectors are emitted.\n\nReceipt may pair the recorded first exhaustion with selected typed Scope Limit\nonly after proving the actual fresh diagnostic engine uses this one installed\nscope, complete association and exact first poison+selected counter. Same error\nEq alone is insufficient. This supports causal first exhaustion, not identity of\nthe selected leaf's own call (a later concurrent caller can see sticky poison).\nThat stronger selected-leaf identity stays unproved. Snapshot after normal\nrestoration and worker drain, while handle alive; then drop recorder before\nexisting scope Weak/lastDrop controls. Engine retirement remains separately real.\nNo provisional snapshot is labeled settled/exact.\n\nImplementation allowlist: Core runtime/source_service.rs private cfgtest registration;\nsource_service/{scope,registry}.rs narrow charge/attachment glue; new cohesive\nsource_service/registry_association.rs and registry_association/tests.rs; Root\nsource_preparation/{genuine_root,refusal_receipt}.rs finite redacted observation;\nsource_service/diagnostic_tests.rs only genuine fixture reuse/lifecycle control.\nNo diagnostic constructor change. Source scope helper estimate180\u2013260 lines plus\n200\u2013300 tests; Root glue <=100 lines. Inspect final growth/responsibilities rather\nthan copy existing large fixture families. No donor data structure/new interner.\n\nGates: unarmed old results/counters/zero association credit; exact repeated and\nsame-URL/different-local-path identities/nonUTF8;128 admissions then actual rejected\n129th repeated/distinct with no storage/counter/body/open progression; concurrent\ncharge ordering/firstcreator vs sticky selectedcaller; exact8192/one-over incomplete\nhandling; precharge pressure/failed arm/latearm/no cycle/clone lastDrop. A real\nowned local source must positively demonstrate source-open observation before its\nrefused sentinel; no purely mock completed graph. Reuse normal graph fixture and\nnatural selected-owner diagnostic restoration/engine/cause controls for coupled\nproof; do not create a new semantic observer. Compile60s separately, preflight all\nselected ordinary selectors, execute serial bounded30s. Default direct-dependent\ncompile covers narrow non-test charge factoring. Independent FINAL against final\nsources and actual evidence before any separately contracted actual observation.\n"
+  },
+  "design_proposal": {
+    "path": "target/wp899/registry-request-association-design-proposal.md",
+    "sha256": "6104ac7252071c6a4e752eeb023eba3eadba817ba49d9ec1300a75dbda471204",
+    "text": "# DESIGN proposal: exact diagnostic registry-request association\n\nWP899 / HEAD1329ca995. Source-only proposal; no implementation, executions, acquisition or new actual-root authorization. Preserve128 RegistryAttempts,27+3+3 clocks, all source policy/transport/semantic behavior and source/buffer limits. The purpose is to distinguish exact admitted repeats from distinct natural RegistryIo invocations, not to promote source facts or claim unique HTTP requests.\n\n## Chosen owner and API\n\nUse optional **Core cfg(test) only**, consumed-scope-local association at the existing scoped registry charge boundary (registry.rs109/141). Keep normal DICE keys/cache/errors unchanged. A generic RegistryIo decorator is smaller textually but cannot atomically identify the first limit-producing request under concurrent calls; it would need serialization across await or could associate the wrong call. Neither is acceptable. HTTP leaf does not charge RegistryAttempts; no instrumentation there or duplicate HTTP implementation.\n\nProposed private child `runtime/source_service/registry_association.rs` (+private tests), cfgtest registration/reexport in source_service.rs; narrow cfgtest glue in scope.rs and registry.rs; genuine_root.rs owned by Root for numeric emission only. Existing diagnostic.rs/constructor need no new seam: before `prepare_once_observed`, call existing `inspect_for_test` to arm the scope and retain the returned handle. Exact proposed names:\n\n```rust\n// Core-private, cfg(test), no public semantic API.\nenum RegistryRequestRef<'a> { Url(&'a RegistryFileUrl), Local { url: &'a RegistryFileUrl, path: &'a Path } }\nstruct RegistryRequestAssociation; // opaque, no Debug exposing storage\nstruct RegistryAssociationSnapshot; // Copy; fixed numeric fields only\nimpl SourceServiceScope {\n    fn arm_registry_association_for_test(self: &Arc<Self>)\n        -> Result<Arc<RegistryRequestAssociation>, SourceServiceError>;\n    fn charge_registry_request_for_test(&self, request: RegistryRequestRef<'_>)\n        -> Result<(), SourceServiceError>;\n}\nimpl RegistryRequestAssociation {\n    fn snapshot(&self) -> RegistryAssociationSnapshot;\n}\n```\n\nUnarmed cfgtest method delegates exactly `charge(RegistryAttempts,1)`. Non-test registry code retains that existing call. Armed method upgrades a cfgtest-only `OnceLock<Weak<RegistryRequestAssociation>>`, then holds association lock\u2192scope-state lock for one synchronous bounded compare/check/increment/record. Refactor the existing charge body into a private locked helper if needed; one ordinary charge implementation, unchanged return value/first poison/commit semantics. No lock across URL parse, IO, await or DICE. No attach mutation/rearm after command entry; arm once in exclusive precommand state, require attempts0/no poison/open. Missing/dropped handle marks association unavailable, never fabricates a complete snapshot. Snapshot only after transaction drop/drain/actual restoration, before dropping the handle.\n\n**Ownership cycle prohibition:** SourceBufferReservation contains Arc<Scope>. Never put a strong association containing that reservation in ScopeState. The harness owns the association Arc; scope holds Weak only. Association fields place owned storage before its reservation, which pins the actual existing16MiB bank. Temporary adapter upgrades live only during charge, never across await. Drop harness association after taking fixed snapshot and before ScopeWeak/lastDrop assertions; it is an intentional additional scope pin. Failed initialization drops storage before credit and retains no attachment. No actor/global/thread-local registry or semantic interner.\n\n## Exact request relation and finite storage\n\nWorkspace is the actual immutable scope workspace, checked once when arming and retained by its existing owner. Identity is **full** literal URL bytes, route kind, and for `read_local_exact`, actual supplied Path OS bytes (Linux nonUTF8 preserved); scope equality supplies the workspace component. No URL/path normalization, hashes, string parsing of errors, guessed resolved location or URI equivalence. `read_exact` URL alone determines its selected parsed file path; it is not falsely equated with the Local supplied-path route. The Local override does not call Url route. Immutable copies only for newly admitted distinct identities; repeated calls compare borrowed incoming bytes against recorded rows. Record rows in first-admission order with counts; at most128 owned distinct requests.\n\nPrecharge a fixed slab for128*(8192 URL bytes+8192 optional local-path bytes), fixed128 row metadata and headers (checked size_of arithmetic) against the existing bank **before** allocation. One checked-capacity Vec/slab and fixed row array avoid per-row growth/copy replacement/interner overhead. URL/local bytes copied only after full bounds and the normal charge admission; no owned129th request. Exact linear comparison is bounded by128 rows; worst admission sequence O(128\u00b2*16384) byte comparisons, finite but can perturb timing. Slab2MiB plus rows/headers stays live until handleDrop, adds real RSS and same-bank highwater, reduces available16MiB service capacity and may cause earlier operational BufferLimit. Existing9961961B measured peak is not a guarantee of fit with this recorder. Do not increase any cap or subtract the recorder from measured peak. Receipt exposes actual association charged bytes/highwater and complete/missing status. Precharge failure is an honest operational diagnostic failure; no retry.\n\nAddress>8192 is already unsupported at scoped Url entrypoint AFTER charge. Local path currently has no such diagnostic length bound. To avoid silently adding source admission semantics, an oversized identity should preserve the ordinary charge/error/IO path, set association_complete=0, count unassociated admitted/refused calls, and never publish exact unique counts. Do not reject the source merely to fit instrumentation. This rule also applies to initialization/unavailable storage if Root chooses a non-failing arming API; either choice must be frozen explicitly. Recommended arming allocation failure refuses the diagnostic before command, while unsupported per-call identity makes evidence incomplete without changing transport behavior.\n\n## Charge/first-poison association\n\nWithin the same charge critical section, separately count admitted entries, refused entries, admitted distinct identities/repeats, and sticky refusals. Keep ordinary counters unchanged: a limit-producing further+1 leaves registry_attempts128. Capture **only the first limit creator**, with request relation `ExistingRow{ordinal, prior_admitted_count}` or `NewDistinctUnretained{ordinal:129}` established by full comparison of the borrowed incoming request against every recorded row. No owned clone is needed for the new129th identity. This is a one-time exact distinctness classification; after its bytes are gone it is NOT a retained comparable request or source capability. Later sticky refusals may increment finite counters but do not replace first creator or spend memory on further request identities. Other initial poison/ordinary precharging/unsupported identity leaves creator association explicitly missing. Checked diagnostic scalar overflow marks incomplete rather than changing the primary transport error.\n\nReceipt can report admitted_distinct/repeated, refused_entries, first_limit_relation/ordinal/prior_admitted_count, sticky_refused_entries, retained_row_count<=128, observation_complete and credit bytes. No raw URL, actual local path, source/env/credential content or digest, request-length vectors, per-row payload, exception Debug, or path-derived labels are emitted.\n\n**Selected-error pairing has a precise limitation.** Existing selected SourceSelection carries the actual copied typed Scope LimitRegistryAttempts, and Scope preserves its first poison. At final observation verify exact same scope, first_error==LimitRegistryAttempts, actual selected cause==that fixed limit, and creator association complete. Then assert paired_first_limit_origin=1. This associates the causal first exhaustion request with the chosen sticky error; it does **not** identify the selected RegistryFile leaf's own URL/call ordinal, which may be a later concurrent caller returning the same poison. Existing public RegistryTransportError/cause payload has no call token. Proving that different stronger relationship would require a reviewed cross-crate retained typed field/propagation change; a Core cfgtest side map or matching errors by Eq cannot supply it. Recommended next contract needs first-exhaustion cause + admitted distinct/repeat counts, leaving selected-leaf identity explicitly unproved. Root must confirm that suffices before implementation.\n\n## Required bounded discriminators\n\n1. Unarmed path keeps old counters/results/errors and no additional bank charge; ordinary None/runtime unchanged.\n2. Real scoped Local adapter calls: same full URL+path repeated\u2192one exact row/two admitted entries; same URL/different actual path\u2192two rows; different URL/same file\u2192distinct; raw nonUTF8 path preserved. Positive real source-read control and blocked+1 control prove no IO/body/buffer allocation after rejection.\n3.128 admitted calls then129th repeated existing row versus129th distinct borrowed identity: counter stays128, exact relation/counts, no129th storage, first poison typed/counter correct. Later cleanup/cancel/sticky call cannot overwrite creator.\n4. Concurrent barrier-controlled natural charges: admission/creator ordering follows the actual charge lock, successful byte consumption can finish in another order, no awaitlock; selected later sticky cause is not mislabeled its own identity.\n5. Exact8192/one-over URL and local OS-byte identity: complete evidence only in bound; unsupported evidence never changes ordinary transport admission/error. Precharge pressure, failed initialization, clone pins/owner-before-creditDrop and post-drain strict retirement; no cycle.\n6. Existing genuine normal diamond fixture, not completed-result injection: shared child one adapter call; genuine generation change repeats exact identity and exposes count; controlled normal failure\u2192Core downcast pairs first limit origin, restoration and engineDrop. Reuse old snapshot/reader/primary tests. No new actual-root attempt from portable gates alone.\n\nEstimate ~180\u2013260 cohesive cfgtest production lines plus ~200\u2013300 fixture lines; exact whole-bank/cycle/lock requirements warrant review if growth increases. All source files named above need manifest authorization and independent DESIGN before edits. Remaining decision is explicit acceptance of first-limit-origin association rather than stronger selected-leaf identity, and freeze of evidence-incomplete handling for unsupported Local bytes. No cap growth, semantic dedup, request retry, actual-root launch, or40GB/full-fit conclusion follows.\n"
+  },
+  "input_design_audit": {
+    "path": "target/wp899/registry-request-association-input-audit.md",
+    "sha256": "5e75854ff2e57b3d0464e668ddc483e60c046cb13a67829048ddbca8f1191cea",
+    "text": "# Registry request association \u2014 input/ownership audit\n\nSource-only at HEAD1329ca995. Proposal inspected: `target/wp899/registry-request-association-design-proposal.md`, SHA6104ac7252071c6a4e752eeb023eba3eadba817ba49d9ec1300a75dbda471204. No implementation/execution/acquisition/cap change or actual-root retry. Root's counting-test compile is independent.\n\n## Finding\n\nThe proposed optional cfg(test) scope-local association is coherent for **exact admitted RegistryIo invocation identity counts and the first exhaustion origin**. It does not prove the selected RegistryFile error leaf's own invocation identity, unique HTTP connections, unique valid modules, or a duplicate-fetch defect. Preserve that weaker precise claim. No extra production key, source authority, DICE trace marker or strong Scope\u2194ledger cycle is required.\n\nTwo small precision corrections should enter the frozen contract before implementation:\n\n1. Separate attempted-call ordinal (first failing increment is entry129 under this cap) from retained distinct-row index / first-admission ordinal. With repeats, a new distinct129th call may be only the second distinct request; never emit129 as a distinct-row identity. Use explicitly named finite scalar fields/codes.\n2. An oversized/unassociated admitted identity makes the whole distinct/repeat and first-limit comparison incomplete. Even a later in-bound129th request cannot be certified NewDistinct against ALL prior admitted calls when some were not retained. Emit unavailable/unknown and complete0; any partial row statistics must be labelled partial. Unsupported instrumentation size must not alter the ordinary charge/transport/IO outcome. Apply the same rule to unavailable handle or diagnostic counter overflow. Keep original first poison and selected native error unchanged.\n\nThese are evidence completeness/field-meaning requirements, not an authorization to reject extra source operations or increase caps. Supervisor was messaged with both corrections.\n\n## Actual source relation and coverage\n\n- `source_service/registry.rs:102\u2013132` `read_exact` charges RegistryAttempts BEFORE URL-length validation, parse or IO. Full literal URL identifies its Url route. A file URL is parsed then delegated directly to private read_local without another charge. Do not add a second association at that helper.\n- `:135\u2013145` `read_local_exact` charges once, then reads its actual supplied Path. Identity must include this route tag, full original RegistryFileUrl and the supplied OS path bytes (nonUTF8 preserved), not a rendered/normalized path. Same URL/different supplied path and different URL/same path are distinct natural inputs.\n- Grep of live runtime finds only these two ordinary RegistryAttempts charge sites; remaining direct charges are existing cfgtest scope controls. No HTTP charge/retry instrumentation is needed. Both cfgtest replacements must delegate the same ordinary charge logic, not maintain competing counters.\n- `scope.rs:130\u2013177` fixes one actual normalized workspace and immutable deadlines/limits. `dice.rs:6097\u20136121` canonicalizes runtime workspace and checks exact scope workspace equality before installation. `registry_io::install_scoped` installs this same scope's adapter. The ledger may borrow the scope-owned workspace component; it need not clone a per-row workspace path. A different workspace/scope is a separate observation, never folded together.\n- `scope.rs:231\u2013255` checks sticky error/deadline/closed state and charge under its single state mutex; successful+1 increments, failed129 leaves128 and selects the first Limit. Recording the borrowed129th relation under that SAME charge critical section associates the actual exhaustion creator. A separate before/after observer lock would allow another concurrent caller to poison first and misassociate the identity.\n- Fixed association\u2192scope lock order is acceptable only for synchronous bounded copy/compare/check/record, with no IO/URL parse/await/DICE/alloc while locked. Scope code must never acquire association while already holding the state lock. The snapshot must be after actual transaction drop/cancellation drain/restoration so admitted/refused counts have settled; a concurrent snapshot is only a partial observation.\n\n## Lifecycle and memory\n\n`SourceBufferReservation` (scope.rs:358\u2013370) retains Arc<Scope>. Proposed harness-owned Arc<Association> with storage declared before this reservation, and Scope holding ONLY OnceLock<Weak<Association>>, has no strong cycle. Scope attachment may upgrade only during a charge; no upgrade crosses async transport. Harness clones pin the recorder and its complete precharged storage; failed initialization leaves no attachment and releases storage before credit. Arm once before command/source work with attempts0/no poison/open, never rearm during the command.\n\nThe approximately2MiB fixed identity slab plus checked128-row/header capacities uses the ACTUAL existing16MiB service bank, precharged before allocation and held until association lastDrop. If allocator capacity exceeds the charged slab/header capacity, refuse evidence construction before publication rather than silently use spare memory. Exact literal comparisons avoid hash-only equality; at most128 rows and bounded16384 input bytes per row make retained memory and work finite. Count repeated calls without allocating duplicates, and do not own any129th identity. The new instrumentation can legitimately cause earlier BufferLimit or deadline failure; the prior9961961-byte peak does not prove new fit. Include its real reservation/live/peak and do not subtract it from normal accounting or claim lower memory/RSS.\n\nExisting genuine_root::Observer stores Weak<Scope> (:280), samples counters/poison in after_restore (:375\u2013378), and later requires actual engine/scope retirement. Arming/retaining a ledger intentionally adds a Scope pin through its reservation. Take only a Copy scalar snapshot after joined work, then DROP every ledger strong handle before the existing ScopeWeak/lastDrop checks; no returned receipt/certificate may retain it. No emitted URL/path/hash/credential/Debug/per-row length vector is allowed.\n\n## What future evidence would and would not establish\n\nIf all128 admitted identities are captured exactly, `distinct + repeat == admitted ==128`, and the borrowed first-failing call is fully compared, an in-bound new relation proves at least129 distinct natural RegistryIo identities were attempted in this scope. An existing-row relation proves that call was a repeat of a specified retained row, with a bounded prior admission count. Sticky later callers cannot replace the first creator. Pairing with actual selected Scope::Limit(RegistryAttempts) and identical scope first poison proves selected sticky-cause origin, **not** that the selected leaf itself requested the first-exhaustion identity.\n\nRepeated URLs can be legitimate across separate legacy/observed owner families, full observed-policy frontier invalidations, current generation changes, or failed acquisition recovery. Counts alone cannot classify them as a cache bug. The ordinary normal diamond/current/generation gates provide controlled semantics, not the actual-root closure. Different versions remain distinct literal URLs and must not be suppressed merely to fit128.\n\nMinimum discriminators from the proposal are material: both actual adapter routes and nonUTF8 supplied path; exact+one-over identity bounds with transport unchanged;128/129 existing and new relations including prior repeats; concurrent first-creator/late sticky return; unknown prior identity prevents false NewDistinct; no IO after failed admission; bank pressure/allocation/clone-lastDrop and weak-cycle retirement; actual selected normal owner failure/restore pairing. No new source run follows automatically from these controls. Root must freeze first-origin versus stronger selected-leaf claim before authorization.\n\n## Source pins / commands\n\n- `app/slug_core_v2/src/runtime/source_service/registry.rs`: `014b040ca940d37d086f5ff6546dcabf5d18780fb6b16867c5ba345268d24515`.\n- `app/slug_core_v2/src/runtime/source_service/scope.rs`: `a8a28481c79be7cbcb8492be1e98e247b196c00b5ae34c8b24ee8e0cef44f2a3`.\n- `app/slug_core_v2/src/runtime/source_service/diagnostic.rs`: `ce1566cce9e7db2861745d7e133e4bd1678de1bade203da1a342a11630725be6`.\n- `app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs`: `c7cc4011733f05c01de68841e6dc1fb5295bc2a564b62ace867125da07cc0a90`.\n- `app/slug_core_v2/src/runtime/dice.rs`: `30ea4f59c81e92150fff01417ebe896d5814ed8274c25dd148f079251622801a`.\n\nRead-only sed/rg commands exit0, and the proposal's exact SHA was checked in this receipt. No ambient environment/home/config/credential reads. Sole write is this private audit receipt. Full WP899 actual source admission, process/runtime fit and historical40GB attribution remain unproved.\n"
+  },
+  "design_review": {
+    "path": "target/wp899/registry-request-association-design-review.md",
+    "sha256": "731ee2764b1fbb6c7bfc7e28654a44f0d8fc8aa5abca7a7baca3de56eb395f1a",
+    "text": "# WP899 registry request association \u2014 independent DESIGN\n\n**DESIGN ACCEPT the integrated Root contract**, SHA256 `3721c61dc1db3400eb902c7ab6eca340c77ea9f63b4ceb154af86df10e6785f1`, with the implementation precision requirements below. It reconciles proposal SHA256 `6104ac7252071c6a4e752eeb023eba3eadba817ba49d9ec1300a75dbda471204` and input ownership audit SHA256 `5e75854ff2e57b3d0464e668ddc483e60c046cb13a67829048ddbca8f1191cea`; current clean HEAD is `eb0246c790b35865c1691644f1365d113e4ccae6`. No implementation, tests, Cargo, actual source acquisition, network, configuration/environment reads or cleanup occurred. This freezes a diagnostic association owner, not an actual-root run, semantic repair, cap increase or whole WP899.\n\nThe outcome is explicitly **admitted RegistryIo identity counts plus the first registry-limit creator's request relation**. That is sufficient to distinguish admitted unique/repeated logical reads in this scope and the creator relation at exhaustion. It does not identify the chosen RegistryFile leaf's own request; a later concurrent leaf can return the same sticky limit. No discarded side trace/error-message/Eq match can strengthen that claim. The actual chosen typed limit, same scope first poison and complete creator observation may establish paired-first-limit-origin only, under the fresh diagnostic engine's sole installed scoped RegistryIo owner. A foreign engine/service, unrelated first poison or absent native cause keeps pairing unproved.\n\n## Identity, ordinals and completeness\n\nIdentity is the actual fixed scope workspace plus route tag, full literal URL bytes and, for Local supplied-path reads, the original OS path bytes. Both natural entrypoints are instrumented exactly once; the private file helper and HTTP leaf are not charged again. No normalization, URI equivalence, semantic key/hash change, suppression or completed-result injection occurs.\n\n**Call ordinal and distinct row ordinal are different fields.** At128 admitted charges the first limit-producing next charge is attempted entry129. If that request is a new identity after prior repeats, it may be only the second distinct identity. The integrated contract correctly separates `attempted_call_ordinal=129` from `NewDistinctUnretained`'s prospective unique ordinal `distinct+1`. The latter describes the proven borrowed identity's position in complete distinct history; it does not grant an owned/stored row or comparable retained identity after the call returns. ExistingRow records its actual first-admission row ordinal and prior admitted multiplicity separately. A hypothetical smaller test limit follows limit+1 rather than hardcoding129.\n\nAny earlier unassociated admitted identity invalidates whole-history distinct/repeat completeness and any later NewDistinct comparison. Oversized URL/local path, unavailable handle, diagnostic scalar overflow or an identity gap yields explicit incomplete/unknown, never an exact new-row conclusion against only the retained subset. Partial row statistics must be labelled partial; exact distinct+repeat=admitted is published only when every admitted identity was retained. A fully matched existing row may be reported as an observed relation while whole-history completeness remains false, but must not be called complete first-origin proof. No instrumentation-bound failure changes ordinary charge/transport/IO outcomes. URL>8192 retains its original post-charge BufferLimit semantics; Local path>8192 does not acquire a new source rejection.\n\n## Synchronization and lifecycle\n\nAssociation lock\u2192scope-state lock is one synchronous, bounded charge/compare/copy/record operation. Factor one ordinary locked charge helper; all unarmed/non-test paths keep its original check, checked increment, first poison, cancellation and last admitted count. Capture whether this call actually created the first registry limit while still holding the same state lock; returned Err alone cannot distinguish a creator from an earlier sticky refusal. Later sticky calls never replace that creator. No IO, URL parse, allocator growth, await or DICE computation occurs under either lock. Scope must never acquire association from an already-held state lock. Drop the scope-state guard before dropping a possibly last association Arc: its reservation Drop also locks the scope.\n\nArming is once, before command entry, with open/healthy scope and zero registry attempts. Allocate/precharge outside any recursively acquired scope lock, then revalidate and attach only after fully constructed storage. A concurrent charge/poison/close between checks rejects attachment, rather than silently treating a partially observed history as complete. OnceLock prevents late rearm/replacement. Failed initialization leaves no attachment and drops storage before credit; conservative allocation failure refuses the diagnostic before command. This differs from per-call oversized identities, which preserve source behavior and make evidence incomplete.\n\nScope stores only Weak<Association>; harness retains the strong handle. The association's owned slab/rows precede its actual SourceBufferReservation, so owner destruction precedes credit release and the reservation's Arc<Scope> creates no cycle. Precharge checked128-row/header/Arc/lock bookkeeping plus the fixed2MiB maximum byte slab before allocating; reported capacity beyond charged capacity is refused before publication. No per-row growth, duplicated repeated identity or owned failing129th request is needed. Scope workspace is already owned and immutable; per-row clones are unnecessary.\n\nThe added reservation stays in the same16MiB bank, contributes to real live/highwater/RSS and may cause earlier BufferLimit or deadline failure. Prior9,961,961-byte peak does not prove it fits. No ceiling increase, subtraction, measured-fit assumption or new allocation outside the stated owner is permitted. The bounded linear full-byte comparison has finite but observable cost; record timing without claiming negligible overhead.\n\nSnapshot only after actual transaction drop, cancelled worker drain and restoration. It returns fixed Copy scalars, never URLs/paths/length vectors/digests/Debug/storage. Drop every ledger strong handle before existing ScopeWeak/clone/lastDrop gates; otherwise the credit intentionally pins the scope. Successful exported source views/receipts must not retain the ledger. Concurrent/live snapshots cannot claim settled exact totals.\n\n## Discriminating implementation gates\n\nRetain unarmed old counters/errors/no additional bank allocation. Exercise both real adapter routes, same URL+path repeats, changed supplied nonUTF8 path and different URL/same file identities, with genuine read control. At existing128 limit, test both repeated and new borrowed entry129 after prior repeated identities, no129th owned copy, counter remains128 and no source-open/read/body admission after rejection. Race controlled charge entrants so the actual lock winner is the creator and later sticky return cannot replace it; do not impose completion/network order.\n\nTest exact8192/one-over identity bounds, prior unrecorded identity followed by an in-bound exhaustion request, dropped/unavailable handle, late/concurrent arming, checked diagnostic overflow and failed initialization. Show ordinary per-call source outcomes unchanged. Credit pressure/actual capacities, owner-before-credit destruction, shared handle pinning and strict post-drain zero retirement must prove no cycle. Finally use a genuine normally computed owner refusal and its actual Core downcast to pair first-origin with restoration/engine retirement; no hand-built complete owner certificate or selected-leaf identity assertion. Reuse unchanged normal graph/generation and lower lifecycle controls.\n\nNo smaller authoritative replacement was found: an async RegistryIo decorator can count calls but cannot atomically associate the first scope-limit creator under concurrency; serializing its await would change scheduling. A static lock address set cannot establish current actual demand, and hash-only instrumentation cannot give collision-free exact identity. The selected weak, bounded optional owner addresses the missing observation without production semantic keys or new authority. These portable gates alone authorize no actual-root retry; a later observation requires a new source-matched contract/freeze and still may terminate incomplete or earlier due instrumentation overhead.\n"
+  },
+  "final_review": {
+    "path": "target/wp899/registry-request-association-final-review.md",
+    "sha256": "ada51c2a7d4a89c8c3b02f21c852020dbbe3a4e88dc8f6c6e520958408abfd69",
+    "text": "# Registry request association \u2014 independent FINAL\n\n**FINAL ACCEPT this bounded component.** Reviewed against baseline `eb0246c790b35865c1691644f1365d113e4ccae6`, integrated contract SHA256 `3721c61dc1db3400eb902c7ab6eca340c77ea9f63b4ceb154af86df10e6785f1` and DESIGN receipt `731ee2764b1fbb6c7bfc7e28654a44f0d8fc8aa5abca7a7baca3de56eb395f1a`. No remaining material source or required component evidence gap found. This verdict covers the optional cfg(test, Linux) recorder and ordinary non-test charge factoring, not a new actual-root invocation or full WP899.\n\n## Source invariants\n\n`scope.rs:235\u2013264` factors the original check/checked-add/maximum/first-poison/cancellation/counter-update body into one private locked helper. The non-test call holds the same state lock for the same operations. No source policy, limits, DICE keys/equality, transport error or normalization changes occur. Both actual ScopedRegistryIo entrypoints have exactly one instrumented charge before their old parse/source paths; direct file/HTTP helpers do not double-charge. `_url` to `url: _url` is a routine cfg(test) field binding correction, with the original signature retained.\n\nThe recorder owns fixed128 rows plus a fixed2MiB byte slab. `registry_association.rs:119\u2013144` checks/precharges slab, fixed state/header/construction overlap before allocation, uses try_reserve_exact and refuses excess capacity before publication. Storage fields precede the scope-holding reservation. Repeated identities compare full literal URL and optional supplied OS-path bytes, preserving Url-vs-Local and nonUTF8 distinctions, without allocating under either lock. Scope workspace is immutable by recorder ownership; no extra workspace clone is required. Refused requests receive no new row or byte copy. This adds real same-bank pressure and measurable cost; it does not subtract recorder usage from peaks or establish actual workload fit.\n\n`scope.rs:273\u2013296` allocates outside the state lock, then rechecks healthy/open/zero-attempt/unattached state before publishing a Weak once. Failed/raced attachment drops state guard before owner/credit. Scope stores no strong recorder reference. `:299\u2013324` takes association then scope-state lock, captures original before/after and first-limit creation atomically, and releases the state guard before a potentially last recorder Drop. No IO/parse/await/DICE occurs under these locks; no opposite scope-to-association path exists. Snapshot follows the same lock order and independently rereads the actual scope admitted counter.\n\n`registry_association.rs:164\u2013251` records admitted-only identities and multiplicities, separates attempted call ordinal from ExistingRow/prospective distinct ordinal, preserves the first creator across later sticky callers, and returns the original charge result. Oversized identities, generic charge gaps or checked scalar overflow make completeness false without rejecting a source operation that the original path permits. Snapshot turns first relation Unknown when admitted totals do not agree. Partial numeric statistics are explicitly uncertified; they cannot prove complete unique/repeated counts.\n\nRoot `genuine_root.rs` verifies the actual installed scope pointer before arming. It snapshots only after accepted/raw restoration and real engine Weak retirement, uses the selected cause returned by the existing chosen-error projection, and drops the recorder before retained-reader/clone/scope-lastDrop controls. `refusal_receipt::emit` now returns its already computed Copy cause; it adds no lookup or trace inference. Pairing requires settled, installed, complete, checked distinct+repeat partition, actual scope count equality, a present first-limit call/nonunknown relation, exact first poison and exact selected native Scope/Limit/RegistryAttempts. Every emitted field is fixed numeric data; selected leaf call identity is always0. RAII covers early failures without exporting the recorder.\n\n## Executed discriminators and evidence freshness\n\nThe five cohesive recorder tests cover real adapter URL/Local/nonUTF8/repeat distinctions and unarmed zero association credit; real inotify positive OPEN/ACCESS followed by actual128 admissions and refused129th repeat/new with no further source IO/bytes/storage/peak; concurrent first creator versus sticky return; exact8192/one-over plus gaps/scalar overflow; bank failure, arm revalidation/cancel/race, unavailable handle, shared credit pinning and strict scope lastDrop. These discriminate the actual charge owner rather than fabricated completed values.\n\nThe natural diagnostic gate computes a real selected owner from actual module/registry bytes with a child dependency and test-only attempt limit1. It requires the actual returned SourceSelection downcast, Classified/full path/native detail, exact registry-limit cause and first poison, real first MODULE byte count, second-call distinct relation, all accepted fields plus seven raw-input restoration, idle/engine retirement, recorder-only remaining buffer credit and final Scope/descriptor retirement. The observer's deliberate rejection does not replace the actual primary source error.\n\nThe strengthened Root pure table discriminates present wrong native counter/site, present wrong first poison, absent call and Unknown relation in addition to prior incomplete/unsettled/uninstalled/partition/absence negatives. All keep paired0 and numeric-only output. The positive distinguishes attempted129 from prospective distinct2 and still emits selected-leaf identity0.\n\nFresh corrected compile exited0 in36.334133s; exact preflight and batch passed34/34 in0.876368s, log SHA256 `2513257d2ae8c97f38d8ab0c03fffc81595e98cdfbc47655998e4bc2596ad166`, historical batch artifact `7dac66ebaf32bc73afcf273421d2ffa3146729315aa8294e9e1422a03db3dfa6`. After only the Root pure test was strengthened, fresh compile exited0 in8.447962s and exact preflight/test passed1/1 in0.003698s, log `15a8c6c6fb958904471f9f8bf33c5aa350a46d075e296fd0d417e3bc9a0809dc`. Current artifact rehash matches `a66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047`; current Root source is `8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa`.\n\nIndependently rehashed all8 current files against strengthened receipt, both logs against their receipts, and current executable. Independently compared exact bytes outside the strengthened test to the preserved prior Root file. Current coverage is **33 unchanged initial passes plus1 strengthened current pass**, not a new34-test batch. Initial E0423 failure remains preserved. Default offline Core+CLI all-target check exited0 in19.015176s with no profile overrides; its non-test/helper bytes are unchanged by the test-only strengthening. No reviewer Cargo, test, actual source/network operation, fixture/source mutation or cleanup occurred.\n\n## Cohesion and limits\n\nGrowth is coherent: the258-line child owns bounded identity/storage/aggregation, narrow scope/adapter glue owns attachment and atomic charge integration,451 unit-test lines own real IO/concurrency/credit discriminators,211 natural fixture lines own returned-error/restoration/retirement association, and293 Root lines own fixed receipt projection and its negative table. The existing charge body is factored once; semantic graph/source-service logic is not duplicated. Increased estimates warrant this responsibility review, not omission of discriminating tests.\n\nNo actual ignored Root selector was executed. Prior global5's unique/repeat cardinality and first-origin relation remain unobserved; selected leaf own-call identity remains unproved even with this recorder. Caps and spent freezes are unchanged. This component does not prove source admission, full bootstrap/runtime/backend readiness, exact workload RSS fit, or attribution/remediation of the reported40GB process. Any later actual observation needs its separate source-matched eligibility contract.\n"
+  },
+  "coupling_correction_final_review": {
+    "path": "target/wp899/registry-association-coupling-final-review.md",
+    "sha256": "91f9084ff574894dde178fdf4b84f00dfe519b9b37a6e89aec8482a2355564d3",
+    "text": "# Registry association coupling \u2014 FINAL evidence review\n\n**FINAL ACCEPT the targeted coupling/executed-evidence and Root finite-projection slice.** Root corrected the five missing negative controls; fresh execution closes the bounded gap. This is not full WP899 or actual-root acceptance. This worker's authored fixture still receives independent source FINAL in Frontier's separate lane.\n\n## Correction-only final evidence\n\nCurrent Root source SHA8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa differs from preserved95ecd only inside `genuine_registry_association_receipt_requires_complete_settled_same_scope_origin`. I independently compared exact prefix/suffix around that function; they are byte-identical. The other seven source hashes match both the old34 batch and fresh1 gate. No production/helper change occurred.\n\nThe SAME existing negative table now includes present ScopeLimit(SourceAttempts), present wrong LocalRead site, present first-poison Limit(SourceAttempts), absent first-call ordinal, and Unknown relation. Every row asserts paired0 and numeric-only output. Positive call129 versus prospective unique2 and selected-leaf identity0 remain unchanged. No prior assertion was weakened.\n\nRoot's fresh compile-strengthened exits0 in8.447961720987223s. Exact preflight selects1 nonignored test, exit0; fresh artifact SHAa66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047 was independently rehashed and matches. Focused command exits0,1 selected/1 passed/0 failed, elapsed0.003698226995766163s; literal log SHA15a8c6c6fb958904471f9f8bf33c5aa350a46d075e296fd0d417e3bc9a0809dc prints that exact selector `... ok` and1pass/0fail/0ignored. All eight current sources match this fresh receipt. Current34 unique coverage is **33 unchanged preserved batch passes +1 current strengthened pass**, not a new34 batch.\n\nDefault Core+CLI offline all-target check exits0 in19.015176040004008s, no profile overrides. It predates the test-only strengthening; exact outside-function equality keeps its production/helper source proof valid, but its full cfgtest source hash is NOT asserted identical to current. Compiler RSS is not runtime RSS.\n\n- `target/wp899/registry-association-strengthened-test.json`: `25fd51841994b85f98312d4ca094e2c46fa7c44b248438f432947a2671f68ef7`.\n- `target/wp899/registry-association-strengthening-bridge.json`: `e11f9e6f3419f77094a9f533a5b0f39d982868820aa17389529008a431c48e13`.\n- `target/wp899/registry-association-default-check.json`: `c9cb6817db8706ee78d2558f8af4acce7c75e7e4b9feafade46d13d5cd899c69`.\n- `target/wp899/registry-association-compile-strengthened.json`: `d8b0e866cd213cc6402f508534dba010f7f2c365d999df0893bb3e1fdcc0694c`.\n\nThe earlier narrow REVISE and initial34 evidence below are retained as historical context, not the current verdict.\n\nThis worker authored the new natural fixture. The review here verifies Root's independent fresh execution/artifact evidence and Root-owned finite projection, not an independent acceptance of this worker's own fixture authorship; Frontier's independent source FINAL remains required. Contract3721c61d / independent DESIGN731ee276, baselineeb0246c79.\n\n## Fresh executed association\n\n`registry-association-tests.json` SHAcbd49582c702cd0e0b86d4a6b8c7d936c7272cd88cb7560b19ef802ed956afb4 records exit0,34 selected/passed,0 failed, wrapper0.8763677339884453s. Log SHA2513257d2ae8c97f38d8ab0c03fffc81595e98cdfbc47655998e4bc2596ad166 literally contains34 distinct `... ok` records in the exact command order, and `34 passed;0 failed;0 ignored;...finished in0.87s`. Exact preflight exited0. All8 current source hashes match the receipt. At the initial review, the actual compiler-artifact executable rehash matched7dac66ebaf32bc73afcf273421d2ffa3146729315aa8294e9e1422a03db3dfa6. No executable/test/listing was invoked by this reviewer. Root records initial compile36.334s; default Core+CLI was active at that initial assignment and is now accepted for its unchanged production/helper scope above.\n\nThe selector `runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder` passed against unchanged diagnostic test SHA5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3. Its proof is:\n\n- diagnostic_tests.rs:594\u2013620 uses the real normal selected-tool fixture/root extension/platform override, adds an ordinary module dependency, writes an actual local registry MODULE that depends on a child, and lowers only the test's registry_attempts to1. No completed semantic owner/source/certificate is injected.\n- :621\u2013658 arms the actual fresh diagnostic scope before source work, compares exact recorder Scope pointer, then calls the one consumed normal preparation driver. Existing RestoredDiagnosticObserver checks every accepted snapshot field and Idle phase; the local raw-only wrapper (:538\u2013591) adds Command/Environment/Lockfile/RegistryURLs/RepositoryEnvironment to the prior Runtime/Guest checks, directly awaits all seven, drops transactions and waits idle. Observer count1/checked flag and real engine Weak retirement are asserted.\n- :659\u2013685 requires the ACTUAL returned Computation error downcast to SelectedPreparationOwnerError::SourceSelection, Classified/full variant path/native detail, exact native Scope/Limit/RegistryAttempts, and identical current scope first poison. The observer's own deliberate rejection does not supersede that primary error. No error-string classification or successful fallback is used.\n- :686\u2013710 requires one admitted RegistryIo entry, exactly the real first MODULE's byte length, source_attempts0, complete exact association, distinct1/repeat0/retainedRows1, actual admitted counter agreement, failing call ordinal2 and prospective unique ordinal2, attempted2/refused1/sticky0. Thus the small natural chain distinguishes exact source consumption from fabricated counting rows. It does not identify the selected leaf's own call. Supervisor's separately passed128/129 no-open and concurrent gates own the larger matrix; this receipt does not rereview their implementation.\n- :710\u2013726 verifies post-drain live service credit equals only the recorder charge. After dropping the primary error and explicit Scope, Weak remains live via the recorder reservation. Recorder lastDrop then makes ScopeWeak unavailable, excluding a strong Scope\u2194recorder cycle. Logical image use is0; caller/observer destruction is followed by the existing bounded strict descriptor-history0 gate. An inaccessible retired Scope is not falsely read as a live counter0; actual Weak retirement and reservation ownership supply the lastDrop evidence.\n\nThe private limits helper preserves default behavior: existing diagnostic_fixture delegates with unchanged default limits; its original body is identical except the supplied limits argument. The implementation receipt's exact inverse-delta byte check reconstructs the baseline whole file, protecting every earlier assertion/helper/test. No production constructor or new source authority exists.\n\n## Root finite projection \u2014 initial missing discriminator (now closed)\n\nRoot source hashes are genuine_root.rs95ecd32f6b80a35bf65af35c171952eb82ac44a7e94148702c58ef58b0384d20 and refusal_receipt.rs58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258.\n\n`genuine_root.rs:923\u2013937` verifies installed runtime Scope Arc identity and recorder same_scope before arming the actual command. `:999\u20131022` consumes only the native cause returned by the existing borrowed chosen-error projection, requires accepted/raw restoration plus engine retirement before settled sampling, and drops the recorder before success-reader/clone/ScopeWeak controls. Failed emission/early return also drops the local handle by RAII. The existing error path remains primary; no new actual attempt is authorized.\n\n`emit_registry_association` (:497+) correctly requires settled+installed+complete, observed counter agreement, checked distinct+repeat==admitted, a nonunknown relation and present first-limit ordinal, exact first poison Limit(RegistryAttempts), and exact chosen native Scope/Limit(RegistryAttempts) before paired1. Call and row/prospective-unique ordinals are separate. Every output is a fixed scalar; selected_leaf_call_identity_proved is unconditionally0. Counts read with complete0 are uncertified partial fields, not exact uniqueness proof.\n\nThe passed ordinary helper selector proves positive call129/unique2 and partial/unsettled/uninstalled/counter/sum/absent poison/absent native negatives. **Initial missing controls (now closed by correction above):** a nonabsent mismatched native counter/site or nonabsent mismatched first poison. Existing absence controls would not distinguish an accidental `Some(_)` pairing implementation. Add to the SAME existing table: native ScopeLimit(SourceAttempts), a non-Scope native site, first_poison Limit(SourceAttempts), absent call ordinal, and Unknown relation; each must keep paired0 and numeric-only output. The code already enforces these cases, so only this bounded cfgtest correction/reexecution is needed; do not edit production/source/caps or weaken any old control. Root was notified. Source hash/evidence must be refreshed for the affected test artifact if corrected.\n\n## Boundaries\n\nThis verifies one genuine ordinary normal-owner coupling and finite projection. No actual-root association was executed. The global5 request identities remain unknown, selected-leaf identity stays unproved, all spent freezes remain spent, added recorder pressure remains real same-bank memory, and no cap increase/semantic dedup/source bypass follows. Batch peak83680KiB is the maximum of preflight/test children, not actual-root workload RSS or historical40GB attribution. The full source-admission/runtime/process/bootstrap/WP899 gates remain open.\n\nRead-only diff/source/hash/JSON/log checks completed; one first verification script exited1 for an incorrect JSON field name (`executable` is inside `artifact`), then the corrected script exited0 and checked every pin/bridge. No evidence or source was altered by that read error. Sole write is this review receipt; no Cargo, fixtures, network, source changes or cleanup.\n"
+  },
+  "natural_fixture_implementation": {
+    "path": "target/wp899/registry-association-natural-fixture-implementation.json",
+    "sha256": "0b511fe69ef018aad06c24c7bf37c8898886f010b4f21e221b239548fa24e0f3",
+    "data": {
+      "status": "SOURCE_FROZEN_UNEXECUTED",
+      "baseline": "eb0246c790b35865c1691644f1365d113e4ccae6",
+      "changed_file": "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs",
+      "sha256": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+      "selector": "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+      "new_selectors": 1,
+      "protected_equivalence": {
+        "exact_inverse_delta_equals_baseline_bytes": true,
+        "baseline_sha256": "5c4f59952fb78b15a206eee7ad3260179df12776a44e28c53b2f84af76279630",
+        "helper": "existing diagnostic_fixture delegates default; body moved unchanged except supplied limits; test-only, same source/policy/budget construction"
+      },
+      "matrix": [
+        "real normal root extension + platforms override; adds registry module dependency without completed semantic injection",
+        "actual scoped local MODULE Found exactly source.len bytes, then normal child request2 rejected at test-only lower RegistryAttempts1",
+        "actual Computation -> SelectedPreparationOwnerError::SourceSelection -> full Classified native Scope/Limit/RegistryAttempts; no selected leaf call identity claim",
+        "same actual scope complete association; admitted1 distinct1 repeat0 retainedRows1; callOrdinal2 uniqueOrdinal2; attempted2 refused1 sticky0; exact actual counters match",
+        "existing accepted snapshot fields and Runtime/Guest restoration helper plus five additional raw producers cover all seven inputs; every transaction dropped and idle drained",
+        "engine Weak gone before snapshot; same-bank live source credit equals recorder charge; dropping normal error and explicit Scope still leaves recorder pin; recorder lastDrop releases actual Scope; logical image0 and bounded descriptor history0"
+      ],
+      "growth": "one cohesive new ordinary test (~205 formatted lines including local raw-only observer) +10-line private limits helper; exceeds150 estimate because five raw input checks and actual full typed cause/lifetime controls were kept, no fixture-family copy or production seam",
+      "checks": {
+        "pinned_rustfmt": "nightly-2025-09-14 --edition2024 skip_children=true",
+        "git_diff_check": 0,
+        "executed": false
+      },
+      "residual": "Supervisor owns actual128/129/no-open/concurrency unit gates; no actual-root attempt, network, source-fit or fullWP899 acceptance"
+    }
+  },
+  "validation": {
+    "registry-association-compile-initial.json": {
+      "path": "target/wp899/registry-association-compile-initial.json",
+      "sha256": "56ac77ad71af1937d098bb43022abf242f23167afd43aa79d1e1045ef1798388",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_core_v2",
+          "--lib",
+          "--no-run",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "explicit_build_settings": {
+          "CARGO_BUILD_JOBS": "1",
+          "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc"
+        },
+        "exit_code": 101,
+        "elapsed_seconds": 16.909739004971925,
+        "peak_compiler_rss_kib": 1784088,
+        "source_sha256": {
+          "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+          "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+          "app/slug_core_v2/src/runtime/source_service/registry.rs": "445d9919e6e3c969b1312db043abf6be8418bd0702f89e6d19aa2fd9b5a062cd",
+          "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+          "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+          "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+          "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "95ecd32f6b80a35bf65af35c171952eb82ac44a7e94148702c58ef58b0384d20",
+          "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+        },
+        "compiler_memory_is_not_runtime": true
+      }
+    },
+    "registry-association-compile.json": {
+      "path": "target/wp899/registry-association-compile.json",
+      "sha256": "82385f64a6e97729d4b45820fd325b552f32346f56eb99e5b81b4eae47763875",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_core_v2",
+          "--lib",
+          "--no-run",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "explicit_build_settings": {
+          "CARGO_BUILD_JOBS": "1",
+          "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 36.33413343899883,
+        "peak_compiler_rss_kib": 2347024,
+        "source_sha256": {
+          "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+          "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+          "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+          "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+          "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+          "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+          "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "95ecd32f6b80a35bf65af35c171952eb82ac44a7e94148702c58ef58b0384d20",
+          "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+        },
+        "compiler_memory_is_not_runtime": true
+      }
+    },
+    "registry-association-tests.json": {
+      "path": "target/wp899/registry-association-tests.json",
+      "sha256": "cbd49582c702cd0e0b86d4a6b8c7d936c7272cd88cb7560b19ef802ed956afb4",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "30s",
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "--exact",
+          "runtime::dice::source_preparation::genuine_root::genuine_capture_sharing_requires_full_image_equality_in_both_directions",
+          "runtime::dice::source_preparation::genuine_root::genuine_query_shape_requires_literal_flags_and_typed_source_slots",
+          "runtime::dice::source_preparation::genuine_root::genuine_receipt_schema_excludes_dynamic_errors_and_bounds_values",
+          "runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin",
+          "runtime::dice::source_preparation::genuine_root::genuine_zero_observations_never_certify_default_samples_or_containment",
+          "runtime::dice::source_preparation::genuine_root::refusal_receipt::native_numeric_schema_keeps_signed_errno_status_and_absence_distinct",
+          "runtime::dice::source_preparation::genuine_root::refusal_receipt::unknown_error_never_infers_owner_or_native_cause_from_message",
+          "runtime::dice::source_service::diagnostic::tests::absolute_cleanup_expiry_never_polls_ready_work_and_keeps_primary_error",
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::cancelled_scope_no_export_engine_and_image_release",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::differently_spelled_workspace_refuses_before_dice_or_sources",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error",
+          "runtime::dice::source_service::failure::tests::io_projection_retains_kind_and_optional_signed_errno_without_message",
+          "runtime::dice::source_service::failure::tests::scope_projection_is_total_and_retains_exact_counter_and_message",
+          "runtime::dice::source_service::http::refusal_tests::parse_projection_is_bounded_before_scope_postcheck_selects_poison",
+          "runtime::dice::source_service::registry_association::tests::concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order",
+          "runtime::dice::source_service::registry_association::tests::exact_registry_routes_repeats_supplied_non_utf8_paths_and_unarmed_controls",
+          "runtime::dice::source_service::registry_association::tests::registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_bytes",
+          "runtime::dice::source_service::registry_association::tests::registry_association_credit_pressure_weak_attachment_and_clone_last_drop",
+          "runtime::dice::source_service::registry_association::tests::registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_history",
+          "runtime::dice::source_service::tests::scoped_http_header_cap_cancellation_and_buffer_disposal",
+          "runtime::dice::source_service::tests::scoped_registry_404_huge_trickle_is_status_first_and_closes_socket",
+          "runtime::dice::source_service::tests::scoped_registry_owned_http_fragmented_body_status_and_object_limit",
+          "runtime::dice::source_service::tests::scoped_registry_pinned_non_utf8_symlink_regular_special_and_object_limit",
+          "runtime::dice::source_service::tests::source_scope_buffer_peak_history_last_drop_and_closed_export",
+          "runtime::dice::source_service::tests::source_scope_inclusive_counters_first_poison_and_no_refund",
+          "runtime::dice::source_service::tests::source_scope_validates_finite_limits_and_url_before_io",
+          "runtime::dice::source_service::tests::source_scope_watch_cancellation_and_single_cleanup_clock",
+          "runtime::dice::source_service::tests::typed_http_parse_keeps_selected_sticky_scope_refusal",
+          "runtime::dice::source_service::tests::typed_local_refusal_uses_actual_io_and_keeps_missing_successful",
+          "runtime::dice::source_service::tests::typed_registry_status_and_body_are_selected_without_string_matching",
+          "runtime::dice::source_service::tests::typed_status_primary_survives_cleanup_expiry_but_success_returns_cleanup",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.8763677339884453,
+        "selected": 34,
+        "passed": 34,
+        "failed": 0,
+        "source_sha256": {
+          "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+          "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+          "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+          "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+          "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+          "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+          "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "95ecd32f6b80a35bf65af35c171952eb82ac44a7e94148702c58ef58b0384d20",
+          "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+        },
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///run/media/system/Colossus/dev/slug/app/slug_core_v2#0.1.0",
+          "manifest_path": "/run/media/system/Colossus/dev/slug/app/slug_core_v2/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "slug_core_v2",
+            "src_path": "/run/media/system/Colossus/dev/slug/app/slug_core_v2/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [
+            "default"
+          ],
+          "filenames": [
+            "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e"
+          ],
+          "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "fresh": false
+        },
+        "artifact_sha256": "7dac66ebaf32bc73afcf273421d2ffa3146729315aa8294e9e1422a03db3dfa6",
+        "preflight_command": [
+          "python3",
+          "scripts/v2_test_preflight.py",
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "--exact",
+          "runtime::dice::source_preparation::genuine_root::genuine_capture_sharing_requires_full_image_equality_in_both_directions",
+          "runtime::dice::source_preparation::genuine_root::genuine_query_shape_requires_literal_flags_and_typed_source_slots",
+          "runtime::dice::source_preparation::genuine_root::genuine_receipt_schema_excludes_dynamic_errors_and_bounds_values",
+          "runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin",
+          "runtime::dice::source_preparation::genuine_root::genuine_zero_observations_never_certify_default_samples_or_containment",
+          "runtime::dice::source_preparation::genuine_root::refusal_receipt::native_numeric_schema_keeps_signed_errno_status_and_absence_distinct",
+          "runtime::dice::source_preparation::genuine_root::refusal_receipt::unknown_error_never_infers_owner_or_native_cause_from_message",
+          "runtime::dice::source_service::diagnostic::tests::absolute_cleanup_expiry_never_polls_ready_work_and_keeps_primary_error",
+          "runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners",
+          "runtime::dice::source_service::diagnostic::tests::cancelled_scope_no_export_engine_and_image_release",
+          "runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop",
+          "runtime::dice::source_service::diagnostic::tests::differently_spelled_workspace_refuses_before_dice_or_sources",
+          "runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder",
+          "runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error",
+          "runtime::dice::source_service::failure::tests::io_projection_retains_kind_and_optional_signed_errno_without_message",
+          "runtime::dice::source_service::failure::tests::scope_projection_is_total_and_retains_exact_counter_and_message",
+          "runtime::dice::source_service::http::refusal_tests::parse_projection_is_bounded_before_scope_postcheck_selects_poison",
+          "runtime::dice::source_service::registry_association::tests::concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order",
+          "runtime::dice::source_service::registry_association::tests::exact_registry_routes_repeats_supplied_non_utf8_paths_and_unarmed_controls",
+          "runtime::dice::source_service::registry_association::tests::registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_bytes",
+          "runtime::dice::source_service::registry_association::tests::registry_association_credit_pressure_weak_attachment_and_clone_last_drop",
+          "runtime::dice::source_service::registry_association::tests::registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_history",
+          "runtime::dice::source_service::tests::scoped_http_header_cap_cancellation_and_buffer_disposal",
+          "runtime::dice::source_service::tests::scoped_registry_404_huge_trickle_is_status_first_and_closes_socket",
+          "runtime::dice::source_service::tests::scoped_registry_owned_http_fragmented_body_status_and_object_limit",
+          "runtime::dice::source_service::tests::scoped_registry_pinned_non_utf8_symlink_regular_special_and_object_limit",
+          "runtime::dice::source_service::tests::source_scope_buffer_peak_history_last_drop_and_closed_export",
+          "runtime::dice::source_service::tests::source_scope_inclusive_counters_first_poison_and_no_refund",
+          "runtime::dice::source_service::tests::source_scope_validates_finite_limits_and_url_before_io",
+          "runtime::dice::source_service::tests::source_scope_watch_cancellation_and_single_cleanup_clock",
+          "runtime::dice::source_service::tests::typed_http_parse_keeps_selected_sticky_scope_refusal",
+          "runtime::dice::source_service::tests::typed_local_refusal_uses_actual_io_and_keeps_missing_successful",
+          "runtime::dice::source_service::tests::typed_registry_status_and_body_are_selected_without_string_matching",
+          "runtime::dice::source_service::tests::typed_status_primary_survives_cleanup_expiry_but_success_returns_cleanup"
+        ],
+        "preflight_exit_code": 0,
+        "peak_preflight_or_test_child_rss_kib": 83680,
+        "peak_rss_scope": "maximum of listing/preflight/test children, not actual-root workload",
+        "test_log_sha256": "2513257d2ae8c97f38d8ab0c03fffc81595e98cdfbc47655998e4bc2596ad166",
+        "actual_root_executed": false
+      }
+    },
+    "registry-association-default-check.json": {
+      "path": "target/wp899/registry-association-default-check.json",
+      "sha256": "c9cb6817db8706ee78d2558f8af4acce7c75e7e4b9feafade46d13d5cd899c69",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "check",
+          "-p",
+          "slug_core_v2",
+          "-p",
+          "slug_cli_v2",
+          "--all-targets",
+          "--offline",
+          "--message-format=json"
+        ],
+        "explicit_build_settings": {
+          "CARGO_BUILD_JOBS": "1",
+          "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 19.015176040004008,
+        "peak_compiler_rss_kib": 1479652,
+        "profile_overrides": false,
+        "compiler_memory_is_not_runtime": true
+      }
+    },
+    "registry-association-strengthening-bridge.json": {
+      "path": "target/wp899/registry-association-strengthening-bridge.json",
+      "sha256": "e11f9e6f3419f77094a9f533a5b0f39d982868820aa17389529008a431c48e13",
+      "data": {
+        "schema": 1,
+        "old_source_sha256": "95ecd32f6b80a35bf65af35c171952eb82ac44a7e94148702c58ef58b0384d20",
+        "new_source_sha256": "8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa",
+        "only_strengthened_test_changed": true,
+        "outside_test_bytes_equal": true,
+        "coverage": "33 unchanged initial batch passes plus strengthened current test; not new34 batch",
+        "default_check_scope": "non-test/helper code unchanged after prior default Core+CLI all-target success"
+      }
+    },
+    "registry-association-compile-strengthened.json": {
+      "path": "target/wp899/registry-association-compile-strengthened.json",
+      "sha256": "d8b0e866cd213cc6402f508534dba010f7f2c365d999df0893bb3e1fdcc0694c",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "60s",
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_core_v2",
+          "--lib",
+          "--no-run",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0",
+          "--offline",
+          "--message-format=json"
+        ],
+        "explicit_build_settings": {
+          "CARGO_BUILD_JOBS": "1",
+          "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+          "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 8.447961720987223,
+        "peak_compiler_rss_kib": 1864100,
+        "source_sha256": {
+          "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+          "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+          "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+          "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+          "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+          "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+          "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa",
+          "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+        },
+        "compiler_memory_is_not_runtime": true
+      }
+    },
+    "registry-association-strengthened-test.json": {
+      "path": "target/wp899/registry-association-strengthened-test.json",
+      "sha256": "25fd51841994b85f98312d4ca094e2c46fa7c44b248438f432947a2671f68ef7",
+      "data": {
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "30s",
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "--exact",
+          "runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin",
+          "--test-threads=1"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.003698226995766163,
+        "selected": 1,
+        "passed": 1,
+        "failed": 0,
+        "source_sha256": {
+          "app/slug_core_v2/src/runtime/source_service.rs": "4bdae6584101415f0bdb610bcdcff80da0b8d0822ebe18b43c5e2739ab6d4bb4",
+          "app/slug_core_v2/src/runtime/source_service/scope.rs": "44cf62bc633c098ab052f0f18eaaf2be26f0ce3b915b1a8265bc78dee5f33e62",
+          "app/slug_core_v2/src/runtime/source_service/registry.rs": "3175fb53809d3cba9b570989771a090b29e8a1721b44db7e0879360a5002a727",
+          "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "ee69e475ed024f06ee5a06cf73a0aab94ee191dfc9492445633fa2b51aa0bf2d",
+          "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "d25c41caefc881a17c8c0aa373ce7ec1eaf5ec9afec2e9234192f1ce08045e81",
+          "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "5402e00c0785b3001f0a2ce2d2bcc65ff768d1cd52075140da20c713a75938f3",
+          "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "8d90f35a522ab309f904f02236f8de26da60b6acef1d2b605b6d5f40bdd00eaa",
+          "app/slug_core_v2/src/runtime/source_preparation/refusal_receipt.rs": "58440c8260c2f4f829af5e16d3938efa498a5571854398b573e08ec40a9b6258"
+        },
+        "artifact": {
+          "reason": "compiler-artifact",
+          "package_id": "path+file:///run/media/system/Colossus/dev/slug/app/slug_core_v2#0.1.0",
+          "manifest_path": "/run/media/system/Colossus/dev/slug/app/slug_core_v2/Cargo.toml",
+          "target": {
+            "kind": [
+              "lib"
+            ],
+            "crate_types": [
+              "lib"
+            ],
+            "name": "slug_core_v2",
+            "src_path": "/run/media/system/Colossus/dev/slug/app/slug_core_v2/src/lib.rs",
+            "edition": "2024",
+            "doc": true,
+            "doctest": true,
+            "test": true
+          },
+          "profile": {
+            "opt_level": "0",
+            "debuginfo": 0,
+            "debug_assertions": true,
+            "overflow_checks": true,
+            "test": true
+          },
+          "features": [
+            "default"
+          ],
+          "filenames": [
+            "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e"
+          ],
+          "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "fresh": false
+        },
+        "artifact_sha256": "a66c60bb5761cf711f32a8f278d20870214753c4545f859e810630209df3b047",
+        "preflight_command": [
+          "python3",
+          "scripts/v2_test_preflight.py",
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+          "--exact",
+          "runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin"
+        ],
+        "preflight_exit_code": 0,
+        "test_log_sha256": "15a8c6c6fb958904471f9f8bf33c5aa350a46d075e296fd0d417e3bc9a0809dc",
+        "actual_root_executed": false
+      }
+    }
+  },
+  "preserved_logs": {
+    "registry-association-compile-initial.stderr": {
+      "path": "target/wp899/registry-association-compile-initial.stderr",
+      "sha256": "dea55be83d1c9aa40ffe1f82541d30b0fcf322bbb35265c64cafa9f85a9ca0eb",
+      "text": "warning: Patch `perf-event v0.4.8 (https://github.com/Nero5023/perf-event.git?rev=6dae86b6d4807acec081e6dc0a53167f57f8c0f4#6dae86b6)` was not used in the crate graph.\nPatch `perf-event-open-sys v5.0.0 (https://github.com/Nero5023/perf-event.git?rev=6dae86b6d4807acec081e6dc0a53167f57f8c0f4#6dae86b6)` was not used in the crate graph.\nCheck that the patched package version and available features are compatible\nwith the dependency requirements. If the patch has a different version from\nwhat is locked in the Cargo.lock file, run `cargo update` to use the new\nversion. This may also occur with an optional dependency that is not enabled.\n   Compiling slug_core_v2 v0.1.0 (/run/media/system/Colossus/dev/slug/app/slug_core_v2)\nerror: could not compile `slug_core_v2` (lib test) due to 1 previous error; 7 warnings emitted\n"
+    },
+    "registry-association-preflight.log": {
+      "path": "target/wp899/registry-association-preflight.log",
+      "sha256": "2a9f479fff7fc9d295e5a4684a0d42a02f6f0bcc8534c0e4ca6392ab291351da",
+      "text": "Verified 34 exact nonignored test(s); no tests executed.\n"
+    },
+    "registry-association-tests.log": {
+      "path": "target/wp899/registry-association-tests.log",
+      "sha256": "2513257d2ae8c97f38d8ab0c03fffc81595e98cdfbc47655998e4bc2596ad166",
+      "text": "\nrunning 34 tests\ntest runtime::dice::source_preparation::genuine_root::genuine_capture_sharing_requires_full_image_equality_in_both_directions ... ok\ntest runtime::dice::source_preparation::genuine_root::genuine_query_shape_requires_literal_flags_and_typed_source_slots ... ok\ntest runtime::dice::source_preparation::genuine_root::genuine_receipt_schema_excludes_dynamic_errors_and_bounds_values ... ok\ntest runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin ... ok\ntest runtime::dice::source_preparation::genuine_root::genuine_zero_observations_never_certify_default_samples_or_containment ... ok\ntest runtime::dice::source_preparation::genuine_root::refusal_receipt::native_numeric_schema_keeps_signed_errno_status_and_absence_distinct ... ok\ntest runtime::dice::source_preparation::genuine_root::refusal_receipt::unknown_error_never_infers_owner_or_native_cause_from_message ... ok\ntest runtime::dice::source_service::diagnostic::tests::absolute_cleanup_expiry_never_polls_ready_work_and_keeps_primary_error ... ok\ntest runtime::dice::source_service::diagnostic::tests::actual_local_registry_refusal_retains_cause_and_fresh_policy_repair_releases_owners ... ok\ntest runtime::dice::source_service::diagnostic::tests::cancelled_scope_no_export_engine_and_image_release ... ok\ntest runtime::dice::source_service::diagnostic::tests::consumed_scope_full_caller_normal_need_engine_drop_and_reader_last_drop ... ok\ntest runtime::dice::source_service::diagnostic::tests::differently_spelled_workspace_refuses_before_dice_or_sources ... ok\ntest runtime::dice::source_service::diagnostic::tests::normal_selected_owner_registry_limit_pairs_first_origin_and_retires_recorder ... ok\ntest runtime::dice::source_service::diagnostic::tests::observed_single_driver_awaits_raw_restoration_and_preserves_primary_error ... ok\ntest runtime::dice::source_service::failure::tests::io_projection_retains_kind_and_optional_signed_errno_without_message ... ok\ntest runtime::dice::source_service::failure::tests::scope_projection_is_total_and_retains_exact_counter_and_message ... ok\ntest runtime::dice::source_service::http::refusal_tests::parse_projection_is_bounded_before_scope_postcheck_selects_poison ... ok\ntest runtime::dice::source_service::registry_association::tests::concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order ... ok\ntest runtime::dice::source_service::registry_association::tests::exact_registry_routes_repeats_supplied_non_utf8_paths_and_unarmed_controls ... ok\ntest runtime::dice::source_service::registry_association::tests::registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_bytes ... ok\ntest runtime::dice::source_service::registry_association::tests::registry_association_credit_pressure_weak_attachment_and_clone_last_drop ... ok\ntest runtime::dice::source_service::registry_association::tests::registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_history ... ok\ntest runtime::dice::source_service::tests::scoped_http_header_cap_cancellation_and_buffer_disposal ... ok\ntest runtime::dice::source_service::tests::scoped_registry_404_huge_trickle_is_status_first_and_closes_socket ... ok\ntest runtime::dice::source_service::tests::scoped_registry_owned_http_fragmented_body_status_and_object_limit ... ok\ntest runtime::dice::source_service::tests::scoped_registry_pinned_non_utf8_symlink_regular_special_and_object_limit ... ok\ntest runtime::dice::source_service::tests::source_scope_buffer_peak_history_last_drop_and_closed_export ... ok\ntest runtime::dice::source_service::tests::source_scope_inclusive_counters_first_poison_and_no_refund ... ok\ntest runtime::dice::source_service::tests::source_scope_validates_finite_limits_and_url_before_io ... ok\ntest runtime::dice::source_service::tests::source_scope_watch_cancellation_and_single_cleanup_clock ... ok\ntest runtime::dice::source_service::tests::typed_http_parse_keeps_selected_sticky_scope_refusal ... ok\ntest runtime::dice::source_service::tests::typed_local_refusal_uses_actual_io_and_keeps_missing_successful ... ok\ntest runtime::dice::source_service::tests::typed_registry_status_and_body_are_selected_without_string_matching ... ok\ntest runtime::dice::source_service::tests::typed_status_primary_survives_cleanup_expiry_but_success_returns_cleanup ... ok\n\ntest result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 695 filtered out; finished in 0.87s\n\n"
+    },
+    "registry-association-strengthened-preflight.log": {
+      "path": "target/wp899/registry-association-strengthened-preflight.log",
+      "sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+      "text": "Verified 1 exact nonignored test(s); no tests executed.\n"
+    },
+    "registry-association-strengthened-test.log": {
+      "path": "target/wp899/registry-association-strengthened-test.log",
+      "sha256": "15a8c6c6fb958904471f9f8bf33c5aa350a46d075e296fd0d417e3bc9a0809dc",
+      "text": "\nrunning 1 test\ntest runtime::dice::source_preparation::genuine_root::genuine_registry_association_receipt_requires_complete_settled_same_scope_origin ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 728 filtered out; finished in 0.00s\n\n"
+    }
+  },
+  "initial_compile_correction": "E0423 in Local cfgtest request binding: changed url to url: _url; signature and original charge semantics preserved. Initial failed compile remains historical.",
+  "current_gate_coverage": "34 unique ordinary gates =33 unchanged original batch passes +1 strengthened current pass, not a new34-pass batch. Exact preflight succeeded before each execution.",
+  "default_check_scope": "Default offline Core+CLI all-target check passed before pure test strengthening; exact outside-function bridge preserves non-test/helper source proof, not whole cfgtest file identity.",
+  "memory_ownership": {
+    "storage": "fixed128 rows plus2MiB identity slab and checked header/Arc/construction overlap, precharged in existing16MiB bank",
+    "identity": "immutable Scope workspace, route, literal URL and supplied Local OS path; exact bytes, no normalization/hash shortcut",
+    "lifetime": "harness strong Arc; Scope OnceLock Weak; storage drops before SourceBufferReservation; no strong cycle; no locks across IO/await/DICE",
+    "claim": "reservation credit is not physical heap or workload RSS. Real recorder pressure stays counted; may refuse earlier. No cap growth or fit assumption."
+  },
+  "origin_contract": "complete settled fresh same-scope charge history plus actual first poison and chosen native RegistryAttempts limit pairs the first exhaustion origin; selected leaf own-call identity always unproved0. Unsupported/gapped/overflow histories cannot certify distinctness.",
+  "growth_review": "Independent FINAL reviewed258-line association owner,451 unit-test lines,211 natural fixture lines,293 Root projection/test lines and narrow service glue. The existing original charge body is factored once. Root run stays cohesive as one consumed harness lifecycle; pure projection has separate owner. No production file exceeds2000 lines due to this delta.",
+  "delegation": "Supervisor authored service/helper gates; Input authored natural fixture and audited Root coupling evidence; Root integrated harness and serial validation; Frontier independently reviewed whole8-file component.",
+  "time_scope": "Compilation16.910s failed +36.334s corrected +8.448s strengthened; default compilation19.015s; focused execution0.876s +0.004s. Review/total packet elapsed not independently measured.",
+  "actual_root_executed": false,
+  "residual": [
+    "global5 distinct/repeated actual request identities still unknown",
+    "same RegistryIo identity is not full DICE semantic request equivalence",
+    "selected leaf own-call identity remains unknown",
+    "full source capture and WP899 integration remain unaccepted",
+    "historical40GB command and RSS attribution remain unknown; user clarification pending"
+  ],
+  "next_gate": "A separately source-matched contract and independently reviewed freeze for ONE actual cardinality observation under unchanged ceilings; component acceptance itself grants no actual run eligibility.",
+  "final_structure_checks": {
+    "pinned_rustfmt_eight_sources": 0,
+    "git_diff_check": 0,
+    "v2_plan_status": 0,
+    "v2_archive_status": 0
+  }
+}

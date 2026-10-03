@@ -9,6 +9,9 @@ mod failure;
 mod http;
 #[path = "source_service/registry.rs"]
 mod registry;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_service/registry_association.rs"]
+mod registry_association;
 #[path = "source_service/scope.rs"]
 mod scope;
 #[cfg(test)]
@@ -25,6 +28,12 @@ pub(in crate::runtime) use http::SourceHttpAdmission;
 pub(in crate::runtime) use http::request_scoped;
 pub(super) use http::request_scoped_typed;
 pub(in crate::runtime) use registry::ScopedRegistryIo;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use registry_association::RegistryAssociationSnapshot;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use registry_association::RegistryLimitRelation;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use registry_association::RegistryRequestAssociation;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceServiceCounters;
