@@ -2143,3 +2143,38 @@ mod tests {
         }
     }
 }
+
+// Pure borrowed refusal projection; no diagnostic payload changes owner behavior.
+impl HostRegistryFunctionError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::LockfileModeInput { .. } => Code::RegistryPolicyLockfileModeInput,
+            Self::VendorDirectoryInput { .. } => Code::RegistryPolicyVendorDirectoryInput,
+            Self::RefreshTokenInput { .. } => Code::RegistryPolicyRefreshTokenInput,
+            Self::VisibleLockfile { .. } => Code::RegistryPolicyVisibleLockfile,
+            Self::ModuleMirrorsInput { .. } => Code::RegistryPolicyModuleMirrorsInput,
+            Self::InvalidPrimaryRegistryUri { .. } => Code::RegistryPolicyInvalidPrimaryRegistryUri,
+            Self::InvalidModuleMirrorUri { .. } => Code::RegistryPolicyInvalidModuleMirrorUri,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::LockfileModeInput { .. }
+            | Self::RefreshTokenInput { .. }
+            | Self::ModuleMirrorsInput { .. }
+            | Self::InvalidPrimaryRegistryUri { .. }
+            | Self::InvalidModuleMirrorUri { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::VendorDirectoryInput { .. } | Self::VisibleLockfile { .. } => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}

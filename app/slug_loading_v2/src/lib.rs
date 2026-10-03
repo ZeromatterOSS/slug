@@ -297,6 +297,8 @@ pub use module_extension::selected_source_preparation::SelectedPreparationOwnerE
 #[doc(hidden)]
 pub use module_extension::selected_source_preparation::SelectedPreparationOwnerKey;
 #[doc(hidden)]
+pub use module_extension::selected_source_preparation::SelectedPreparationOwnerRefusalSite;
+#[doc(hidden)]
 pub use module_extension::selected_tools::ObservedSelectedExtensionToolSourceRequests;
 #[doc(hidden)]
 pub use module_extension::selected_tools::ObservedSelectedExtensionToolSources;

@@ -406,6 +406,7 @@ impl RegistryIo for FakeRegistryIo {
             Some(FakeRegistryResponse::NotFound) | None => Ok(RegistryIoOutcome::NotFound),
             Some(FakeRegistryResponse::Error(message)) => Err(RegistryTransportError {
                 message: message.into(),
+                cause: None,
             }),
         }
     }
@@ -4207,7 +4208,7 @@ async fn registry_preparation_falls_through_only_not_found_and_preserves_raw_byt
     assert_eq!(prior_not_found_attempts[0].sha256, None);
     assert!(matches!(
         error,
-        RegistryFileError::Transport { url, message }
+        RegistryFileError::Transport { url, message, .. }
             if url.as_str() == second && message.as_str() == "fatal transport"
     ));
     assert_eq!(io.calls(), [first, second]);

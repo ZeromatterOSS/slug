@@ -6389,6 +6389,7 @@ impl crate::RegistryIo for ModuleSourceRegistryIo {
             Some(ModuleSourceRegistryResponse::Error(message)) => {
                 Err(crate::RegistryTransportError {
                     message: message.into(),
+                    cause: None,
                 })
             }
         }

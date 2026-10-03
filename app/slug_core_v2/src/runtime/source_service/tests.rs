@@ -526,3 +526,207 @@ async fn scoped_registry_pinned_non_utf8_symlink_regular_special_and_object_limi
     assert_eq!(owner.snapshot().registry_admitted_bytes, 0);
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 }
+
+#[tokio::test]
+async fn typed_registry_status_and_body_are_selected_without_string_matching() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let owner = scope(SourceServiceLimits::default());
+    let result = duplex_response(
+        &owner,
+        b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n",
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(
+        result.cause,
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::HttpStatus,
+            detail: RegistryRefusalDetail::Status(503)
+        })
+    );
+    assert_eq!(
+        result.message,
+        "scoped registry returned HTTP 503 Service Unavailable"
+    );
+    owner.check().unwrap();
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    let owner = scope(SourceServiceLimits::default());
+    assert_eq!(
+        duplex_response(
+            &owner,
+            b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n"
+        )
+        .await
+        .unwrap(),
+        RegistryIoOutcome::NotFound
+    );
+    let owner = scope(SourceServiceLimits::default());
+    let failure = duplex_response(
+        &owner,
+        b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\nnot-a-chunk\r\n",
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        failure.cause,
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::HttpBody | RegistryRefusalSite::HttpConnection,
+            ..
+        })
+    ));
+    assert!(matches!(
+        failure.cause.unwrap().detail,
+        RegistryRefusalDetail::Io {
+            kind: slug_bzlmod_v2::RegistryRefusalIoKind::InvalidInput,
+            errno: None
+        }
+    ));
+    owner.check().unwrap();
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+}
+
+#[tokio::test]
+async fn typed_http_parse_keeps_selected_sticky_scope_refusal() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let owner = scope(SourceServiceLimits::default());
+    let (client, mut server) = tokio::io::duplex(1024);
+    let url = url::Url::parse("http://test.invalid/secret-query?credential=sentinel").unwrap();
+    let consumer = super::http::request_test_io_typed(&owner, &url, client);
+    let writer = async {
+        let mut request = [0; 1024];
+        server.read(&mut request).await.unwrap();
+        let _ = server.write_all(b"NOT-HTTP\r\n\r\n").await;
+    };
+    let failure = match tokio::join!(consumer, writer).0 {
+        Err(error) => error,
+        Ok(_) => panic!("malformed protocol was admitted"),
+    };
+    // Scope::during's established post-check selects its parse poison; do not
+    // relabel that final error with the discarded inner Hyper failure.
+    assert_eq!(
+        failure.cause(),
+        RegistryRefusalCause {
+            site: RegistryRefusalSite::Scope,
+            detail: RegistryRefusalDetail::Scope(
+                RegistryRefusalScopeFailure::UnsupportedSourceOwner
+            )
+        }
+    );
+    assert!(!format!("{failure:?}").contains("sentinel"));
+    assert!(!format!("{failure:?}").contains("test.invalid"));
+    assert_eq!(
+        owner.check(),
+        Err(SourceServiceError::UnsupportedSourceOwner)
+    );
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+}
+
+#[tokio::test]
+async fn typed_status_primary_survives_cleanup_expiry_but_success_returns_cleanup() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    for status in [503, 404] {
+        let work = Instant::now() + Duration::from_millis(100);
+        let cleanup = work + Duration::from_millis(20);
+        let owner = SourceServiceScope::new(
+            NormalizedAbsolutePath::new("/typed-cleanup").unwrap(),
+            work,
+            cleanup,
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let (client, mut server) = tokio::io::duplex(1024);
+        let url = url::Url::parse("http://test.invalid/exact").unwrap();
+        let consumer = super::http::request_test_io_typed(&owner, &url, client);
+        let writer = async {
+            let mut request = [0; 1024];
+            server.read(&mut request).await.unwrap();
+            server
+                .write_all(
+                    format!("HTTP/1.1 {status} Reason\r\nContent-Length: 0\r\n\r\n").as_bytes(),
+                )
+                .await
+                .unwrap();
+        };
+        let response = match tokio::join!(consumer, writer).0 {
+            Ok(response) => response,
+            Err(error) => panic!("response setup failed: {error:?}"),
+        };
+        tokio::time::sleep_until(cleanup.into()).await;
+        let error = super::registry::read_response(&owner, response)
+            .await
+            .unwrap_err();
+        let expected = if status == 503 {
+            RegistryRefusalCause {
+                site: RegistryRefusalSite::HttpStatus,
+                detail: RegistryRefusalDetail::Status(503),
+            }
+        } else {
+            RegistryRefusalCause {
+                site: RegistryRefusalSite::Scope,
+                detail: RegistryRefusalDetail::Scope(RegistryRefusalScopeFailure::CleanupDeadline),
+            }
+        };
+        assert_eq!(error.cause, Some(expected));
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn typed_local_refusal_uses_actual_io_and_keeps_missing_successful() {
+    use slug_bzlmod_v2::RegistryRefusalCause;
+    use slug_bzlmod_v2::RegistryRefusalDetail;
+    use slug_bzlmod_v2::RegistryRefusalScopeFailure;
+    use slug_bzlmod_v2::RegistryRefusalSite;
+    let directory = tempfile::tempdir().unwrap();
+    let leaf = directory.path().join("private-sentinel");
+    std::fs::write(&leaf, b"content").unwrap();
+    let owner = scope(SourceServiceLimits::default());
+    let adapter = ScopedRegistryIo::new(Arc::clone(&owner));
+    let url = RegistryFileUrl::new("file:///credential-sentinel");
+    let error = adapter
+        .read_local_exact(&url, &leaf.join("child"))
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.cause,
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::LocalPin,
+            detail: RegistryRefusalDetail::Io {
+                errno: Some(libc::ENOTDIR),
+                ..
+            }
+        })
+    ));
+    assert_eq!(error.message, "scoped registry inode pin failed");
+    assert!(!format!("{:?}", error.cause).contains("sentinel"));
+    assert_eq!(
+        adapter
+            .read_local_exact(&url, &directory.path().join("missing"))
+            .await
+            .unwrap(),
+        RegistryIoOutcome::NotFound
+    );
+    let error = adapter
+        .read_local_exact(&url, directory.path())
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.cause,
+        Some(RegistryRefusalCause {
+            site: RegistryRefusalSite::Scope,
+            detail: RegistryRefusalDetail::Scope(
+                RegistryRefusalScopeFailure::UnsupportedSourceOwner
+            )
+        })
+    );
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+}

@@ -3,6 +3,8 @@
 
 #[path = "source_service/diagnostic.rs"]
 mod diagnostic;
+#[path = "source_service/failure.rs"]
+mod failure;
 #[path = "source_service/http.rs"]
 mod http;
 #[path = "source_service/registry.rs"]
@@ -18,8 +20,10 @@ pub(in crate::runtime::dice) use diagnostic::DiagnosticObserver;
 pub(in crate::runtime::dice) use diagnostic::ScopedPreparedSourceViewLease;
 pub(in crate::runtime::dice) use diagnostic::SourcePreparationDiagnosticRuntime;
 pub(in crate::runtime) use diagnostic::WorkspaceSourceServices;
+pub(super) use failure::SourceTransportFailure;
 pub(in crate::runtime) use http::SourceHttpAdmission;
 pub(in crate::runtime) use http::request_scoped;
+pub(super) use http::request_scoped_typed;
 pub(in crate::runtime) use registry::ScopedRegistryIo;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;

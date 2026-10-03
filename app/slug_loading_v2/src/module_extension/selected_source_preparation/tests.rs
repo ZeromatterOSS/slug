@@ -3,6 +3,139 @@ use slug_bzlmod_v2::HostSelectedExtensionDemandObservationKey as OwnerTestDemand
 
 use super::selected_source_preparation as owner_test_api;
 
+#[test]
+fn selected_preparation_owner_refusal_is_transient_with_unchanged_formatting() {
+    use owner_test_api::SelectedPreparationOwnerError as Error;
+    use owner_test_api::SelectedPreparationOwnerKey as OwnerKey;
+    use owner_test_api::SelectedPreparationOwnerRefusalSite as Site;
+
+    for site in [
+        Site::MappingObservation,
+        Site::MappingSemantic,
+        Site::MappingView,
+        Site::DemandObservation,
+        Site::DemandSemantic,
+    ] {
+        let error = Error::SourceSelection {
+            site,
+            classification: slug_bzlmod_v2::SelectedSourceRefusal::default(),
+        };
+        assert!(error.is_transient());
+        assert_eq!(
+            error.source_selection(),
+            Some((site, slug_bzlmod_v2::SelectedSourceRefusal::default()))
+        );
+        assert_eq!(format!("{error:?}"), "SourceSelection");
+        assert_eq!(
+            error.to_string(),
+            "selected source owner refused: SourceSelection"
+        );
+        let value = SourcePreparationOutcome::Complete(Err(error));
+        assert!(!OwnerKey::validity(&value));
+        assert!(!OwnerKey::equality(&value, &value));
+    }
+    for (error, name) in [
+        (Error::InvalidSelector, "InvalidSelector"),
+        (Error::MissingImport, "MissingImport"),
+        (Error::NotGenerated, "NotGenerated"),
+        (Error::WrongOwnerFamily, "WrongOwnerFamily"),
+        (Error::Operational, "Operational"),
+    ] {
+        assert_eq!(format!("{error:?}"), name);
+        assert_eq!(error.source_selection(), None);
+    }
+}
+
+#[tokio::test]
+async fn selected_preparation_owner_normal_refusal_repair_need_and_success_equality() {
+    use owner_test_api::SelectedPreparationOwnerError as Error;
+    use owner_test_api::SelectedPreparationOwnerKey as OwnerKey;
+    use owner_test_api::SelectedPreparationOwnerRefusalSite as Site;
+
+    let source = tool_test_source(true, true, "");
+    let (dice, mut tx, _, resources, tracker) = tool_test_fixture(&source).await;
+    let key = owner_test_key("proof", &resources);
+    let original = crate::compute_selected_preparation_owner(&mut tx, &key)
+        .await
+        .unwrap();
+    assert!(matches!(
+        original,
+        SourcePreparationOutcome::Complete(Ok(_))
+    ));
+    assert!(OwnerKey::validity(&original) && OwnerKey::equality(&original, &original));
+    let epoch = tx.compute(&PathObservationEpochKey).await.unwrap();
+    let mut known = epoch.observations().iter().map(|(d, _)| d.dupe()).collect();
+    let missing = PathObservationEpoch::from_shared(
+        epoch
+            .observations()
+            .iter()
+            .filter(|(d, _)| {
+                !(d.namespace() == PathObservationNamespace::Host
+                    && d.path().as_path()
+                        == std::path::Path::new(REPO_RULE_WORKSPACE).join("MODULE.bazel")
+                    && d.operation() == PathObservationOperation::FileBytes)
+            })
+            .map(|(d, v)| (d.dupe(), v.dupe())),
+    )
+    .unwrap();
+    tx = data_test_observations(tx, &missing, &mut known).await;
+    let need = crate::compute_selected_preparation_owner(&mut tx, &key)
+        .await
+        .unwrap();
+    assert!(
+        matches!(need, SourcePreparationOutcome::Need(_)),
+        "normal empty frontier must Need"
+    );
+    assert!(!OwnerKey::validity(&need) && !OwnerKey::equality(&need, &need));
+
+    // Malformed actual root input travels through the normal mapping producer,
+    // not an injected completed owner/error. The diagnostic payload is opaque
+    // precisely where the existing evaluator has already retained only text.
+    tx = data_test_observations(tx, &selected_factor_epoch("module(", &source), &mut known).await;
+    let refused = crate::compute_selected_preparation_owner(&mut tx, &key)
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Err(Error::SourceSelection {
+        site,
+        classification,
+    })) = &refused
+    else {
+        panic!("normal malformed root must return the typed source refusal");
+    };
+    assert_eq!(*site, Site::MappingSemantic);
+    assert!(!classification.codes().is_empty());
+    assert!(classification.variant_path_complete());
+    assert_eq!(
+        classification.termination(),
+        slug_bzlmod_v2::SelectedSourceRefusalTermination::OpaqueLeaf
+    );
+    assert!(classification.native_cause().is_none() && !classification.native_detail_observed());
+    assert!(!OwnerKey::validity(&refused) && !OwnerKey::equality(&refused, &refused));
+    tx = data_test_observations(tx, &epoch, &mut known).await;
+    // A fresh normal transaction retains the original service/activation owner.
+    tx = scratch_test_inputs(
+        tx,
+        tracker,
+        &resources,
+        RepositoryEnvironmentSnapshot::empty(),
+        None,
+    )
+    .await;
+    let repaired = crate::compute_selected_preparation_owner(&mut tx, &key)
+        .await
+        .unwrap();
+    assert!(OwnerKey::validity(&repaired));
+    assert!(OwnerKey::equality(&original, &repaired));
+    assert!(OwnerKey::equality(
+        &repaired,
+        &crate::compute_selected_preparation_owner(&mut tx, &key)
+            .await
+            .unwrap()
+    ));
+    drop(tx);
+    dice.wait_for_idle().await;
+}
+
 fn owner_test_key(
     name: &str,
     r: &runtime_test_bzl::SelectedScratchResources,

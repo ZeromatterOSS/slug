@@ -29,6 +29,18 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 
+mod refusal;
+mod refusal_debug;
+pub use refusal::RegistryRefusalCause;
+pub use refusal::RegistryRefusalDetail;
+pub use refusal::RegistryRefusalIoKind;
+pub use refusal::RegistryRefusalProtocolFailure;
+pub use refusal::RegistryRefusalScopeCounter;
+pub use refusal::RegistryRefusalScopeFailure;
+pub use refusal::RegistryRefusalSite;
+#[cfg(test)]
+mod refusal_tests;
+
 use crate::LockfileMode;
 use crate::RegistryFileExpectation;
 use crate::SourcePreparationOutcome;
@@ -371,9 +383,10 @@ pub enum RegistryIoOutcome {
     NotFound,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct RegistryTransportError {
     pub message: CompactString,
+    pub cause: Option<RegistryRefusalCause>,
 }
 
 #[async_trait]
@@ -419,7 +432,7 @@ pub enum RegistryFileValue {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub enum RegistryFileError {
     InvalidFileUrl(RegistryFileUrl),
     UnsupportedUrl(RegistryFileUrl),
@@ -434,6 +447,7 @@ pub enum RegistryFileError {
     Transport {
         url: RegistryFileUrl,
         message: CompactString,
+        cause: Option<RegistryRefusalCause>,
     },
     ChecksumMismatch {
         url: RegistryFileUrl,
@@ -443,6 +457,7 @@ pub enum RegistryFileError {
     LocalRead {
         path: PathBuf,
         message: CompactString,
+        cause: Option<RegistryRefusalCause>,
     },
     InvalidLockfileExpectation {
         url: RegistryFileUrl,
@@ -450,7 +465,7 @@ pub enum RegistryFileError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum RegistryRemoteError {
     InvalidRemoteHashesMode {
         url: RegistryFileUrl,
@@ -474,6 +489,7 @@ pub(crate) enum RegistryRemoteError {
     Transport {
         url: RegistryFileUrl,
         message: CompactString,
+        cause: Option<RegistryRefusalCause>,
     },
     ChecksumMismatch {
         url: RegistryFileUrl,
@@ -482,7 +498,7 @@ pub(crate) enum RegistryRemoteError {
     },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[derive(Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum RegistryLocalError {
     MissingRequestGeneration {
         workspace: PathBuf,
@@ -496,6 +512,7 @@ pub(crate) enum RegistryLocalError {
         url: RegistryFileUrl,
         path: PathBuf,
         message: CompactString,
+        cause: Option<RegistryRefusalCause>,
     },
 }
 
@@ -513,7 +530,15 @@ impl From<RegistryRemoteError> for RegistryFileError {
             RegistryRemoteError::InvalidLockfileExpectation { url, message } => {
                 Self::InvalidLockfileExpectation { url, message }
             }
-            RegistryRemoteError::Transport { url, message } => Self::Transport { url, message },
+            RegistryRemoteError::Transport {
+                url,
+                message,
+                cause,
+            } => Self::Transport {
+                url,
+                message,
+                cause,
+            },
             RegistryRemoteError::ChecksumMismatch {
                 url,
                 expected,
@@ -534,7 +559,16 @@ impl From<RegistryLocalError> for RegistryFileError {
                 Self::MissingRequestGeneration(message)
             }
             RegistryLocalError::MissingIoCapability { .. } => Self::MissingIoCapability,
-            RegistryLocalError::Read { path, message, .. } => Self::LocalRead { path, message },
+            RegistryLocalError::Read {
+                path,
+                message,
+                cause,
+                ..
+            } => Self::LocalRead {
+                path,
+                message,
+                cause,
+            },
         }
     }
 }
@@ -1056,6 +1090,7 @@ async fn fetch_remote_registry_file(
             Err(RegistryRemoteError::Transport {
                 url: url.dupe(),
                 message: error.message,
+                cause: error.cause,
             })
         }
     }
@@ -1108,6 +1143,7 @@ pub(crate) async fn read_local_registry_file(
                 url: url.dupe(),
                 path: path.to_path_buf(),
                 message: error.message,
+                cause: error.cause,
             })
         }
     }
@@ -1300,7 +1336,10 @@ mod bridge_tests {
             match self.response.lock().unwrap().clone() {
                 Response::Found(bytes) => Ok(RegistryIoOutcome::Found(bytes)),
                 Response::NotFound => Ok(RegistryIoOutcome::NotFound),
-                Response::Transport(message) => Err(RegistryTransportError { message }),
+                Response::Transport(message) => Err(RegistryTransportError {
+                    message,
+                    cause: None,
+                }),
             }
         }
 
@@ -1820,6 +1859,7 @@ mod bridge_tests {
         let transport = RegistryRemoteError::Transport {
             url: RegistryFileUrl::new(REMOTE_URL),
             message: "offline".into(),
+            cause: None,
         };
         assert_eq!(
             tx.compute(&key).await.unwrap().as_ref(),
@@ -1830,6 +1870,7 @@ mod bridge_tests {
             RegistryRemoteError::Transport {
                 url: RegistryFileUrl::new(REMOTE_URL),
                 message: CompactString::new("offline"),
+                cause: None,
             }
         );
         io.set(found(b"recovered"));
@@ -1963,12 +2004,14 @@ mod bridge_tests {
                 url: RegistryFileUrl::new("file:///registry-bridge/error"),
                 path: PathBuf::from("/registry-bridge/error"),
                 message: "must stay sticky".into(),
+                cause: None,
             })
         );
         let separately_allocated = RegistryLocalError::Read {
             url: RegistryFileUrl::new("file:///registry-bridge/error"),
             path: PathBuf::from("/registry-bridge/error"),
             message: CompactString::new("must stay sticky"),
+            cause: None,
         };
         assert_eq!(error.as_ref().as_ref().unwrap_err(), &separately_allocated);
         io.set(found(b"repaired"));
@@ -2750,7 +2793,10 @@ mod policy_observation_tests {
             match self.response.lock().unwrap().clone() {
                 FileResponse::Found(bytes) => Ok(RegistryIoOutcome::Found(bytes)),
                 FileResponse::NotFound => Ok(RegistryIoOutcome::NotFound),
-                FileResponse::Error(message) => Err(RegistryTransportError { message }),
+                FileResponse::Error(message) => Err(RegistryTransportError {
+                    message,
+                    cause: None,
+                }),
             }
         }
     }
@@ -3161,6 +3207,7 @@ mod policy_observation_tests {
                     &Err(RegistryFileError::LocalRead {
                         path: PathBuf::from("/policy-observation/registry/file"),
                         message: "local offline".into(),
+                        cause: None,
                     })
                 ),
             }
@@ -3418,4 +3465,5 @@ mod policy_observation_tests {
         assert_eq!((found.observations(), calls), (&epoch, 1));
         assert_remote_row(&rows, true);
     }
+    include!("registry_dice/refusal_observation_tests.rs");
 }

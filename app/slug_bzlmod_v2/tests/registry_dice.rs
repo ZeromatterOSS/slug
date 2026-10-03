@@ -82,6 +82,7 @@ impl RegistryIo for FakeRegistryIo {
             FakeResponse::NotFound => Ok(RegistryIoOutcome::NotFound),
             FakeResponse::Transport(message) => Err(RegistryTransportError {
                 message: message.into(),
+                cause: None,
             }),
         }
     }

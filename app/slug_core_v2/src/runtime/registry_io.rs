@@ -66,6 +66,7 @@ impl RegistryIo for HyperRegistryIo {
             Self::Ready(client) => client,
             Self::InitializationFailed(message) => {
                 return Err(RegistryTransportError {
+                    cause: None,
                     message: message.as_ref().into(),
                 });
             }
@@ -74,12 +75,14 @@ impl RegistryIo for HyperRegistryIo {
             .as_str()
             .parse::<Uri>()
             .map_err(|error| RegistryTransportError {
+                cause: None,
                 message: format!("invalid registry URL {}: {error}", url.as_str()).into(),
             })?;
         let response = client
             .get(uri)
             .await
             .map_err(|error| RegistryTransportError {
+                cause: None,
                 message: format!("registry GET {} failed: {error}", url.as_str()).into(),
             })?;
         let status = response.status();
@@ -88,6 +91,7 @@ impl RegistryIo for HyperRegistryIo {
         }
         if !status.is_success() {
             return Err(RegistryTransportError {
+                cause: None,
                 message: format!("registry GET {} returned HTTP {status}", url.as_str()).into(),
             });
         }
@@ -96,6 +100,7 @@ impl RegistryIo for HyperRegistryIo {
             .collect()
             .await
             .map_err(|error| RegistryTransportError {
+                cause: None,
                 message: format!(
                     "reading registry response body from {}: {error}",
                     url.as_str()
@@ -120,11 +125,13 @@ async fn read_local_file(
 ) -> Result<RegistryIoOutcome, RegistryTransportError> {
     let Some(path) = url.as_str().strip_prefix("file://") else {
         return Err(RegistryTransportError {
+            cause: None,
             message: format!("invalid local registry URL {}", url.as_str()).into(),
         });
     };
     if !path.starts_with('/') {
         return Err(RegistryTransportError {
+            cause: None,
             message: format!("invalid local registry URL {}", url.as_str()).into(),
         });
     }
@@ -141,6 +148,7 @@ async fn read_local_path(
             Ok(RegistryIoOutcome::NotFound)
         }
         Err(error) => Err(RegistryTransportError {
+            cause: None,
             message: format!("reading local registry file {}: {error}", url.as_str()).into(),
         }),
     }

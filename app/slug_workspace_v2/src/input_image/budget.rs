@@ -33,6 +33,7 @@ impl std::error::Error for ImageDescriptorBudgetError {}
 struct BudgetInner {
     limit: usize,
     used: AtomicUsize,
+    peak_reserved: AtomicUsize,
 }
 
 #[derive(Clone, Dupe, Allocative)]
@@ -52,6 +53,7 @@ impl ImageDescriptorBudget {
         Self(Arc::new(BudgetInner {
             limit: limit_bytes,
             used: AtomicUsize::new(0),
+            peak_reserved: AtomicUsize::new(0),
         }))
     }
 
@@ -63,6 +65,14 @@ impl ImageDescriptorBudget {
     }
     pub fn used_bytes(&self) -> usize {
         self.0.used.load(AtomicOrdering::Acquire)
+    }
+
+    /// Lifetime high-water of admitted reservation credits, not allocated bytes.
+    /// Live reads can lag an in-flight `try_grow`; the exact final maximum
+    /// requires all reservation mutations to settle. It is never reset.
+    #[doc(hidden)]
+    pub fn peak_reserved_bytes(&self) -> usize {
+        self.0.peak_reserved.load(AtomicOrdering::Acquire)
     }
 
     pub fn try_reserve(
@@ -106,6 +116,12 @@ impl ImageDescriptorReservation {
             ) {
                 Ok(_) => {
                     self.charged = charged;
+                    // Record the admitted overlap, even if another owner drops
+                    // before this publication. Callers allocate only on return.
+                    self.budget
+                        .0
+                        .peak_reserved
+                        .fetch_max(next, AtomicOrdering::AcqRel);
                     return Ok(());
                 }
                 Err(actual) => previous = actual,
@@ -380,3 +396,6 @@ pub(crate) fn reserve_vec_slot<T>(
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

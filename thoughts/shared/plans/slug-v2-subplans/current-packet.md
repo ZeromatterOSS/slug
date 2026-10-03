@@ -469,3 +469,128 @@ changes. Four prior supplemental EPERM socket controls remain unproved. Exact
 descriptor highwater, nested refusal frontier, source/private-lease/clone-read/
 lastDrop, full runtime/process/bootstrap and original40GB attribution remain open.
 This is review-branch candidate preservation; full goal remains active.
+
+## Reviewed refusal and accounting evidence extension
+
+Continue candidate4fcb684a9. The previous goal turn is progress: reviewed harness,
+216 portable gates and ONE real refusal/cleanup terminal changed the authoritative
+state. Its freeze is spent. Root now selects producer-owned typed refusal evidence
+and exact settled descriptor reservation highwater, preserving all semantic source
+owners, transient failure validity, success/Need/equality and current boundaries.
+No further actual attempt is authorized by implementation of this extension.
+
+Independent descriptor DESIGN ACCEPT is target/wp899/descriptor-highwater-design
+{,-review}.md. Exact allowlist: Workspace input_image/budget.rs plus cohesive private
+input_image/budget/tests.rs; input_image/tests.rs path/empty_epoch/user_data receive
+only cfgtest pub(super) fixture visibility to reuse the real normal producer; narrow Core cfgtest genuine_root.rs and existing
+diagnostic_tests.rs lifecycle controls; current manifest/Stage9 and compact receipt.
+Add one same-Arc AtomicUsize lifetime maximum updated from successful admission CAS
+values before grow returns, and public doc-hidden peak_reserved_bytes for the normal
+Workspace dependency. No reset/new key/cache/feature/limits/Eq/Hash/debug-shape change.
+This is reserved credit, including conservative headers/capacity/conversion overlap,
+not physical heap or RSS. Exactness requires reservation mutations settled; phase
+reads remain lower bounds. Failed admission does not contribute, admitted credit
+later cancelled/dropped does. One scalar per service and one atomic max per grow;
+no performance or memory-reduction claim. Supervisor worker owns Workspace helper/
+tests after design review; Root owns Core final observer/receipt glue and serial
+validation. Preserve protected83 Workspace/216 Core controls and default direct
+dependents;60s preparation/30s focused TERM/KILL3 caps unchanged.
+
+Typed refusal API/signature scope remains DESIGN-only until the semantic and
+transport owners establish actual end-to-end association. Existing unit Loading
+SourceSelection and String-only registry transport erase the cause; coincident
+trace/counts or error-string parsing cannot replace typed producer lineage. A new
+producer-owned finite error payload must stay transient, borrow existing failures
+without new IO/commands, preserve primary/superseded-error choice, and output only
+fixed redacted codes. Root will freeze its exact allowlist and independent design
+before implementation. New code/evidence cannot classify the spent terminal or
+authorize retry, cap growth, caller changes, source fallback or CLI/process activation.
+
+
+Root freezes typed refusal implementation under target/wp899/refusal-frontier-
+{transport-design,semantic-design,semantic-signatures,integrated-design-review,
+semantic-component-review}.md and their independent DESIGN ACCEPT. Exact APIs
+are RegistryRefusalCause{site,detail} with fixed Copy/Eq/Allocative site/detail/
+IO-kind/protocol/scope/counter enums, and optional cause moved through existing
+RegistryTransportError, Remote::Transport, Local::Read and File::{Transport,LocalRead}.
+Cause participates in cacheable failed-value fullEq; this is a conservative error
+representation/equality extension, not unchanged failed-value equality. All ordinary
+constructors get None. Custom Debug retains baseline fields/bytes and hides cause.
+Generation lookup failure discards earlier unselected transport cause exactly as
+before; success,404absence,checksums,keys,Need,frontiers and dependencies stay.
+
+SelectedSourceRefusal is inline<=128B, fixed16 variant codes, explicit termination/
+path completeness and optional actual selected native cause. A Default/unknown
+constructor is permitted for MissingMappingView; it initializes incomplete/no-cause
+data only, never a semantic wrapper/source authority. Borrowed producer methods
+follow only the retained selected predecessor, reject successful/depth/unknown
+children and never parse Strings. Loading SourceSelection{site,classification}
+remains transient/invalid for every payload; custom Debug/Display preserve its
+old unit bytes. Core downcasts actual returned Computation and emits finite codes;
+unknown or opaque leaves stay explicit. No new key/cache/side trace or Scope state.
+
+Frontier exact files: Bzlmod selected_source_refusal.rs and child tests.rs;
+selected_repo_spec.rs, selected_repo_spec/selected_extension_demand.rs, selected_graph.rs,
+source_preparation.rs and host_registry.rs borrowed projections only; lib.rs sole
+registration/reexport writer (including agreed RegistryRefusal types). Loading
+module_extension/selected_source_preparation.rs and its tests.rs, lib.rs site export.
+Large parent modules get narrow glue; cohesive child helpers own classifications.
+
+Input exact files: Bzlmod registry_dice.rs field/conversion/migrations and children
+registry_dice/{refusal,refusal_debug}.rs with cohesive private tests;
+source_preparation_observation_tests.rs, tests/{registry_dice,source_preparation_dice}.rs
+explicitNone/pattern migrations. Core registry_io.rs eight None-only constructors;
+source_service.rs private registration/reexports; source_service/{http,registry,tests,
+failure}.rs and cohesive failure/tests.rs. ONE typed HTTP request/body/dispose
+implementation, old archive String wrappers delegate; no archive edits/duplicate
+HTTP path. Scope projection is pure in failure.rs, no ScopeState or scope.rs change.
+Root exact files: cfgtest source_preparation/genuine_root.rs and cohesive
+source_preparation/refusal_receipt.rs; diagnostic_tests.rs and diagnostic.rs
+only if a small fixture-driven observer/constructor seam is necessary for actual
+normal RegistryFile→owner→Core error/repair proof (design review before new seam).
+
+Estimates: typed transport/types/formatting~500 net production plus~350tests;
+semantic projections~350–550production/~300–500tests; Core receipt/glue~150/~150.
+Inline cause<=64B/summary<=128B, no dynamic evidence payload/source copies, extra
+I/O/compute/commands or installed mutable observer. Existing error/DICE bookkeeping
+owns the fixed payload; credit bank is not total RSS. Preserve message/None Debug,
+primary/disposal precedence, all cacheable cause equality and ALL transient owner
+errors; require real normal generation-supersession, cause-change cutoff, guarded
+owner error/repair/restoration/engineDrop, native duplex/local and redaction/absence
+gates. Root serial compilation/tests/default dependents, existing caps unchanged.
+Workspace87 alreadypass0.083s against exact frozen counter source. Initial Core
+compile60s timeout and different-unit-graph dependency preparation60s timeout are
+preserved; no fresh Core test artifact and no stale executable execution. Prepare
+next fresh test artifact with explicitly recorded opt0/debug0 analysis support
+profile if needed, never raised time/resource ceilings. No actual second attempt
+is authorized; spent freeze/terminal evidence stays immutable.
+
+Root final typed compile corrected heterogeneous Rust match bindings only and
+added the literal pre-cause stopped/depth guard; independent semantic review
+resamples final hashes. Core60s no-run with explicit Analysisopt0/debug0 completed
+all four changed support artifacts (Bzlmod,Loading,Query,Analysis), then timed out
+at Core test codegen. Root now splits the remaining Core artifact preparation
+using exactly that completed unit graph and same60s cap; no stale execution or
+resource-cap growth. Input/Root source FINAL ACCEPT remains conditional onfresh
+executed gates/default direct-dependent checks; fullWP899 not accepted.
+
+
+Validated accounting/refusal component checkpoint (2026-10-03): independent
+integrated FINAL ACCEPT at target/wp899/typed-refusal-final-evidence-review.md;
+32 final Rust sources frozen. Workspace87/Shared70/Loading117 pass; Core226 unique
+gates covered by preserved224 pass plus corrected2/2 on fresh artifact, explicitly
+NOT one226/226 run. Core correction preserves strict descriptor0 with existing2s
+bounded deferred-history retirement and expects Cancelled on refused acquisition,
+AcquisitionClosed on fresh successful repair. Real ELOOP selected-owner downcast,
+full restored snapshot/rawRuntime+Guest, actual clone read/engine/scope/credit
+retirement pass. Default5crate all-target check succeeds55.98s without overrides;
+31 changed Rust files formatter-clean, oneNone-only10389-line fixture migration
+canonically formatted with unrelated baseline formatting preserved/proved.
+[Durable checkpoint](wp899-typed-accounting-checkpoint-2026-10-03.json) retains
+all source/artifact/command/review hashes, preparation timeouts/compiler failures,
+actual failed226 batch, repairs and limits. No second actualRoot invocation, CLI
+link/activation, actualRoot admitted-source fit, full runtime/process/bootstrap or
+historical40GB attribution. FullWP899 remains unaccepted; next actualRoot attempt
+requires its own concrete evidence contract/review/freeze, not an automatic retry.
+Ordinary demanded FileBytes/registry whole-response bytes and distinct version
+history remain possible large owners; scoped diagnostics do not cap those paths.

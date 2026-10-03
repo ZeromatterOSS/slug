@@ -49,6 +49,7 @@ mod selected_extension_tool_sources;
 mod selected_graph;
 mod selected_label_source;
 mod selected_repo_spec;
+mod selected_source_refusal;
 pub mod source_preparation;
 
 pub use builtin_repository::BuiltinBazelToolsRouteIdentity;
@@ -530,6 +531,20 @@ pub use selected_repo_spec::HostRootRepositoryMappingObservationKey;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostRootRepositoryMapping;
 #[doc(hidden)]
+pub use registry_dice::RegistryRefusalCause;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalDetail;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalIoKind;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalProtocolFailure;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalScopeCounter;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalScopeFailure;
+#[doc(hidden)]
+pub use registry_dice::RegistryRefusalSite;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;
@@ -613,6 +628,12 @@ pub use selected_repo_spec::ObservedHostSelectedExtensionEvaluationInputRequests
 pub use selected_repo_spec::ObservedHostSelectedExtensionOwnerInputs;
 #[doc(hidden)]
 pub use selected_repo_spec::ObservedHostSelectedInnateRepositoryOwnerInputs;
+#[doc(hidden)]
+pub use selected_source_refusal::SelectedSourceRefusal;
+#[doc(hidden)]
+pub use selected_source_refusal::SelectedSourceRefusalCode;
+#[doc(hidden)]
+pub use selected_source_refusal::SelectedSourceRefusalTermination;
 #[doc(hidden)]
 pub use source_preparation::HostCanonicalRepositorySourceInput;
 #[doc(hidden)]

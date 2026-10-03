@@ -2271,3 +2271,69 @@ mod tests {
         ));
     }
 }
+
+// Pure borrowed refusal projection; no diagnostic payload changes owner behavior.
+impl DemandError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Mappings(..) => Code::DemandMappings,
+            Self::Missing { .. } => Code::DemandMissing,
+            Self::Ambiguous { .. } => Code::DemandAmbiguous,
+            Self::Inconsistent { .. } => Code::DemandInconsistent,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Mappings(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::Missing { .. } | Self::Ambiguous { .. } | Self::Inconsistent { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+        }
+    }
+}
+
+impl DemandObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Mappings(..) => Code::DemandObservationMappings,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Mappings(error) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl HostSelectedExtensionDemandError {
+    #[doc(hidden)]
+    pub fn selected_source_refusal(&self) -> crate::SelectedSourceRefusal {
+        let mut builder = crate::selected_source_refusal::SelectedSourceRefusalBuilder::new();
+        self.0.append_source_refusal(&mut builder);
+        builder.finish()
+    }
+}
+
+impl HostSelectedExtensionDemandObservationError {
+    #[doc(hidden)]
+    pub fn selected_source_refusal(&self) -> crate::SelectedSourceRefusal {
+        let mut builder = crate::selected_source_refusal::SelectedSourceRefusalBuilder::new();
+        self.0.append_source_refusal(&mut builder);
+        builder.finish()
+    }
+}

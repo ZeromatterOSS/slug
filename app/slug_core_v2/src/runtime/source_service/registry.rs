@@ -5,6 +5,9 @@ use async_trait::async_trait;
 use slug_bzlmod_v2::RegistryFileUrl;
 use slug_bzlmod_v2::RegistryIo;
 use slug_bzlmod_v2::RegistryIoOutcome;
+use slug_bzlmod_v2::RegistryRefusalCause;
+use slug_bzlmod_v2::RegistryRefusalDetail;
+use slug_bzlmod_v2::RegistryRefusalSite;
 use slug_bzlmod_v2::RegistryTransportError;
 
 use super::SourceBufferReservation;
@@ -12,7 +15,8 @@ use super::SourceCounter;
 use super::SourceHttpAdmission;
 use super::SourceServiceError;
 use super::SourceServiceScope;
-use super::request_scoped;
+use super::SourceTransportFailure;
+use super::request_scoped_typed;
 
 pub(in crate::runtime) struct ScopedRegistryIo {
     scope: Arc<SourceServiceScope>,
@@ -22,10 +26,11 @@ impl ScopedRegistryIo {
         Self { scope }
     }
 }
-fn error(message: impl ToString) -> RegistryTransportError {
-    RegistryTransportError {
-        message: message.to_string().into(),
-    }
+fn error(error: SourceServiceError) -> RegistryTransportError {
+    SourceTransportFailure::scope(error).into_registry()
+}
+fn opaque(site: RegistryRefusalSite, message: &'static str) -> RegistryTransportError {
+    SourceTransportFailure::opaque(site, message).into_registry()
 }
 
 // Value before its reservation, including on every early return. Registry raw
@@ -37,7 +42,12 @@ struct RegistryBuffer {
 }
 impl RegistryBuffer {
     fn new(scope: &Arc<SourceServiceScope>) -> Result<Self, RegistryTransportError> {
-        let maximum = usize::try_from(scope.limits().registry_object_bytes).map_err(error)?;
+        let maximum = usize::try_from(scope.limits().registry_object_bytes).map_err(|_| {
+            opaque(
+                RegistryRefusalSite::InternalState,
+                "out of range integral type conversion attempted",
+            )
+        })?;
         let credit = scope
             .reserve_buffer(maximum + std::mem::size_of::<Vec<u8>>())
             .map_err(error)?;
@@ -102,17 +112,24 @@ impl RegistryIo for ScopedRegistryIo {
             return Err(error(self.scope.poison(SourceServiceError::BufferLimit)));
         }
         let _address_credit = self.scope.reserve_buffer(64 * 1024).map_err(error)?;
-        let parsed =
-            url::Url::parse(url.as_str()).map_err(|_| error("invalid scoped registry URL"))?;
+        let parsed = url::Url::parse(url.as_str()).map_err(|_| {
+            opaque(
+                RegistryRefusalSite::AddressValidation,
+                "invalid scoped registry URL",
+            )
+        })?;
         if parsed.scheme() == "file" {
-            let path = parsed
-                .to_file_path()
-                .map_err(|_| error("invalid scoped local registry URL"))?;
+            let path = parsed.to_file_path().map_err(|_| {
+                opaque(
+                    RegistryRefusalSite::AddressValidation,
+                    "invalid scoped local registry URL",
+                )
+            })?;
             return read_local(&self.scope, &path);
         }
-        let response = request_scoped(&self.scope, &parsed, SourceHttpAdmission::Registry)
+        let response = request_scoped_typed(&self.scope, &parsed, SourceHttpAdmission::Registry)
             .await
-            .map_err(error)?;
+            .map_err(SourceTransportFailure::into_registry)?;
         read_response(&self.scope, response).await
     }
     async fn read_local_exact(
@@ -138,7 +155,14 @@ pub(super) async fn read_response(
             return Ok(RegistryIoOutcome::NotFound);
         }
         if !status.is_success() {
-            return Err(error(format!("scoped registry returned HTTP {status}")));
+            return Err(SourceTransportFailure::new(
+                format!("scoped registry returned HTTP {status}"),
+                RegistryRefusalCause {
+                    site: RegistryRefusalSite::HttpStatus,
+                    detail: RegistryRefusalDetail::Status(status.as_u16()),
+                },
+            )
+            .into_registry());
         }
         if let Some(length) = response.headers().get(hyper::header::CONTENT_LENGTH) {
             if let Ok(length) = length.to_str().unwrap_or("").parse::<u64>() {
@@ -150,17 +174,21 @@ pub(super) async fn read_response(
             }
         }
         let mut buffer = RegistryBuffer::new(scope)?;
-        while let Some(chunk) = response.next_data().await.map_err(error)? {
+        while let Some(chunk) = response
+            .next_data_typed()
+            .await
+            .map_err(SourceTransportFailure::into_registry)?
+        {
             buffer.append(scope, &chunk)?;
         }
         buffer.finish(scope)
     }
     .await;
-    let disposed = response.dispose().await;
+    let disposed = response.dispose_typed().await;
     match result {
         Err(primary) => Err(primary),
         Ok(value) => {
-            disposed.map_err(error)?;
+            disposed.map_err(SourceTransportFailure::into_registry)?;
             scope.check().map_err(error)?;
             Ok(value)
         }
@@ -188,11 +216,23 @@ fn read_local(
             scope.check().map_err(error)?;
             return Ok(RegistryIoOutcome::NotFound);
         }
-        Err(_) => return Err(error("scoped registry inode pin failed")),
+        Err(e) => {
+            return Err(SourceTransportFailure::io(
+                RegistryRefusalSite::LocalPin,
+                &e,
+                "scoped registry inode pin failed",
+            )
+            .into_registry());
+        }
     };
-    let before = pin
-        .metadata()
-        .map_err(|_| error("scoped registry pinned stat failed"))?;
+    let before = pin.metadata().map_err(|e| {
+        SourceTransportFailure::io(
+            RegistryRefusalSite::LocalStat,
+            &e,
+            "scoped registry pinned stat failed",
+        )
+        .into_registry()
+    })?;
     if !before.is_file() {
         return Err(error(
             scope.poison(SourceServiceError::UnsupportedSourceOwner),
@@ -208,7 +248,14 @@ fn read_local(
         .read(true)
         .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
         .open(format!("/proc/self/fd/{}", pin.as_raw_fd()))
-        .map_err(|_| error("scoped registry data reopen failed"))?;
+        .map_err(|e| {
+            SourceTransportFailure::io(
+                RegistryRefusalSite::LocalReopen,
+                &e,
+                "scoped registry data reopen failed",
+            )
+            .into_registry()
+        })?;
     let identity = |m: &std::fs::Metadata| {
         (
             m.dev(),
@@ -221,33 +268,52 @@ fn read_local(
             m.ctime_nsec(),
         )
     };
-    if identity(
-        &input
-            .metadata()
-            .map_err(|_| error("scoped registry data stat failed"))?,
-    ) != identity(&before)
+    if identity(&input.metadata().map_err(|e| {
+        SourceTransportFailure::io(
+            RegistryRefusalSite::LocalStat,
+            &e,
+            "scoped registry data stat failed",
+        )
+        .into_registry()
+    })?) != identity(&before)
     {
-        return Err(error("scoped registry pinned identity changed"));
+        return Err(opaque(
+            RegistryRefusalSite::LocalIdentity,
+            "scoped registry pinned identity changed",
+        ));
     }
     let mut buffer = RegistryBuffer::new(scope)?;
     let _read_credit = scope.reserve_buffer(64 * 1024).map_err(error)?;
     let mut chunk = [0u8; 64 * 1024];
     loop {
         scope.check().map_err(error)?;
-        let read = input
-            .read(&mut chunk)
-            .map_err(|_| error("scoped registry local read failed"))?;
+        let read = input.read(&mut chunk).map_err(|e| {
+            SourceTransportFailure::io(
+                RegistryRefusalSite::LocalRead,
+                &e,
+                "scoped registry local read failed",
+            )
+            .into_registry()
+        })?;
         scope.check().map_err(error)?;
         if read == 0 {
             break;
         }
         buffer.append(scope, &chunk[..read])?;
     }
-    let after = input
-        .metadata()
-        .map_err(|_| error("scoped registry final stat failed"))?;
+    let after = input.metadata().map_err(|e| {
+        SourceTransportFailure::io(
+            RegistryRefusalSite::LocalStat,
+            &e,
+            "scoped registry final stat failed",
+        )
+        .into_registry()
+    })?;
     if identity(&after) != identity(&before) || buffer.bytes.len() as u64 != before.len() {
-        return Err(error("scoped registry inode changed while reading"));
+        return Err(opaque(
+            RegistryRefusalSite::LocalIdentity,
+            "scoped registry inode changed while reading",
+        ));
     }
     buffer.finish(scope)
 }

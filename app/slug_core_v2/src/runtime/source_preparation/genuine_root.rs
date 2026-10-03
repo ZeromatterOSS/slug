@@ -1,4 +1,6 @@
 //! Ignored, supervised actual-checkout source admission; never executes tools.
+#[path = "refusal_receipt.rs"]
+mod refusal_receipt;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
@@ -797,6 +799,7 @@ fn run(
     receipt: &mut Receipt,
     clock: &HarnessClockStage,
     diagnostic: SourcePreparationDiagnosticRuntime,
+    descriptor_settled: &Cell<bool>,
 ) -> Result<(), &'static str> {
     let observer = diagnostic.inspect_for_test(Observer::new);
     let baseline_descriptor = diagnostic.descriptor_budget().used_bytes();
@@ -816,6 +819,10 @@ fn run(
         &|phase| observer.hook(phase, clock.stage_path()),
         &observer,
     );
+    // Raw restoration drains the last observation transaction before engine
+    // retirement. All later retained reads below finish synchronously before
+    // this function returns; only then may the outer receipt certify highwater.
+    descriptor_settled.set(observer.raw_restored.get() && observer.engine.upgrade().is_none());
     receipt.number("progress_rounds", observer.progress.get())?;
     receipt.number("owner_refreshes", observer.refreshes.get())?;
     receipt.number("reached_capture", u64::from(observer.before_capture.get()))?;
@@ -860,10 +867,9 @@ fn run(
         "descriptor_phase_sample_lower_bound",
         observer.descriptor_sample.get() as u64,
     )?;
-    receipt.number("descriptor_exact_peak_proved", 0)?;
     if let Err(error) = &outcome {
         receipt.number("outer_error_code", outer_code(error))?;
-        receipt.number("nested_frontier_proof_missing", 1)?;
+        refusal_receipt::emit(error, receipt)?;
     }
     let view = outcome.map_err(|_| "actual source admission refused")?;
     if !observer.restored.get()
@@ -972,7 +978,24 @@ fn actual_source_admission(emitted: &Cell<bool>) -> Result<(), &'static str> {
     receipt.number("full_runtime_closure_proved", 0)?;
     receipt.number("process_execution_proved", 0)?;
     receipt.number("historical_memory_attribution_proved", 0)?;
-    let outcome = run(&mut receipt, &clock, diagnostic);
+    let descriptor_budget = diagnostic.descriptor_budget().clone();
+    let descriptor_settled = Cell::new(false);
+    let outcome = run(&mut receipt, &clock, diagnostic, &descriptor_settled);
+    // The run's locals and operation-local reader credits have now retired.
+    // This lifetime maximum includes conservative receipt/policy/header and
+    // conversion reservations; it is neither physical heap usage nor RSS.
+    receipt.number(
+        "descriptor_reserved_highwater_bytes",
+        descriptor_budget.peak_reserved_bytes() as u64,
+    )?;
+    receipt.number(
+        "descriptor_reserved_highwater_settled",
+        u64::from(descriptor_settled.get()),
+    )?;
+    receipt.number(
+        "descriptor_exact_peak_proved",
+        u64::from(descriptor_settled.get()),
+    )?;
     receipt.number("status", u64::from(outcome.is_ok()))?;
     print!("{}", receipt.text);
     emitted.set(true);

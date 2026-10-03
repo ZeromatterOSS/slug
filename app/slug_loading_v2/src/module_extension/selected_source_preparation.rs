@@ -9,6 +9,7 @@ use slug_bzlmod_v2::HostSelectedExtensionOwnerKind;
 use slug_bzlmod_v2::ObservedHostRootRepositoryMapping;
 use slug_bzlmod_v2::ObservedHostSelectedExtensionDemand;
 use slug_bzlmod_v2::SelectedScratchResources;
+use slug_bzlmod_v2::SelectedSourceRefusal;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::BudgetedImageBlock;
@@ -69,18 +70,55 @@ impl fmt::Display for SelectedPreparationOwnerKey {
     }
 }
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+#[derive(Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub enum SelectedPreparationOwnerError {
     InvalidSelector,
     MissingImport,
     NotGenerated,
     WrongOwnerFamily,
-    SourceSelection,
+    SourceSelection {
+        site: SelectedPreparationOwnerRefusalSite,
+        classification: SelectedSourceRefusal,
+    },
     Operational,
 }
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+pub enum SelectedPreparationOwnerRefusalSite {
+    MappingObservation,
+    MappingSemantic,
+    MappingView,
+    DemandObservation,
+    DemandSemantic,
+}
+// Keep the established user-facing unit error bytes. Structured evidence is
+// accessible only through the borrowed typed projection, never formatting.
+impl fmt::Debug for SelectedPreparationOwnerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::InvalidSelector => "InvalidSelector",
+            Self::MissingImport => "MissingImport",
+            Self::NotGenerated => "NotGenerated",
+            Self::WrongOwnerFamily => "WrongOwnerFamily",
+            Self::SourceSelection { .. } => "SourceSelection",
+            Self::Operational => "Operational",
+        })
+    }
+}
 impl SelectedPreparationOwnerError {
+    pub fn source_selection(
+        &self,
+    ) -> Option<(SelectedPreparationOwnerRefusalSite, SelectedSourceRefusal)> {
+        match self {
+            Self::SourceSelection {
+                site,
+                classification,
+            } => Some((*site, *classification)),
+            _ => None,
+        }
+    }
     pub fn is_transient(&self) -> bool {
-        matches!(self, Self::SourceSelection | Self::Operational)
+        matches!(self, Self::SourceSelection { .. } | Self::Operational)
     }
     pub(crate) fn operational() -> Self {
         Self::Operational
@@ -174,16 +212,25 @@ async fn compute(
     {
         SourcePreparationOutcome::Need(need) => return Ok(SourcePreparationOutcome::Need(need)),
         SourcePreparationOutcome::Complete(value) => {
-            value.map_err(|_| SelectedPreparationOwnerError::SourceSelection)?
+            value.map_err(|error| SelectedPreparationOwnerError::SourceSelection {
+                site: SelectedPreparationOwnerRefusalSite::MappingObservation,
+                classification: error.selected_source_refusal(),
+            })?
         }
     };
     let view = mapping
         .result()
         .as_ref()
         .as_ref()
-        .map_err(|_| SelectedPreparationOwnerError::SourceSelection)?
+        .map_err(|error| SelectedPreparationOwnerError::SourceSelection {
+            site: SelectedPreparationOwnerRefusalSite::MappingSemantic,
+            classification: error.selected_source_refusal(),
+        })?
         .view()
-        .ok_or(SelectedPreparationOwnerError::SourceSelection)?;
+        .ok_or_else(|| SelectedPreparationOwnerError::SourceSelection {
+            site: SelectedPreparationOwnerRefusalSite::MappingView,
+            classification: SelectedSourceRefusal::default(),
+        })?;
     let requested = view
         .mapping()
         .find(|(name, _)| *name == key.apparent())
@@ -216,14 +263,20 @@ async fn compute(
     let demand = match outcome {
         SourcePreparationOutcome::Need(need) => return Ok(SourcePreparationOutcome::Need(need)),
         SourcePreparationOutcome::Complete(value) => {
-            value.map_err(|_| SelectedPreparationOwnerError::SourceSelection)?
+            value.map_err(|error| SelectedPreparationOwnerError::SourceSelection {
+                site: SelectedPreparationOwnerRefusalSite::DemandObservation,
+                classification: error.selected_source_refusal(),
+            })?
         }
     };
     let selected = demand.result().as_ref().as_ref().map_err(|e| {
         if e.disposition() == HostSelectedExtensionDemandErrorDisposition::Missing {
             SelectedPreparationOwnerError::NotGenerated
         } else {
-            SelectedPreparationOwnerError::SourceSelection
+            SelectedPreparationOwnerError::SourceSelection {
+                site: SelectedPreparationOwnerRefusalSite::DemandSemantic,
+                classification: e.selected_source_refusal(),
+            }
         }
     })?;
     if selected.owner().kind() != HostSelectedExtensionOwnerKind::ModuleExtension {

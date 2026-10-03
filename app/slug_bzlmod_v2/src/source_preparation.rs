@@ -17428,3 +17428,372 @@ mod tests {
         include!("source_preparation_observation_tests.rs");
     }
 }
+
+// Pure borrowed refusal projection; no diagnostic payload changes owner behavior.
+impl HostDiscoveredModuleError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::RootModuleFiles(..) => Code::DiscoveryRootModuleFiles,
+            Self::ExplicitBuiltinOverride => Code::DiscoveryExplicitBuiltinOverride,
+            Self::InvalidBuiltinVersion { .. } => Code::DiscoveryInvalidBuiltinVersion,
+            Self::MissingVersion { .. } => Code::DiscoveryMissingVersion,
+            Self::SourcePreparationCompute(..) => Code::DiscoverySourcePreparationCompute,
+            Self::SourcePreparation(..) => Code::DiscoverySourcePreparation,
+            Self::InvalidNonRegistryVersion { .. } => Code::DiscoveryInvalidNonRegistryVersion,
+            Self::NonRegistryClosureCompute(..) => Code::DiscoveryNonRegistryClosureCompute,
+            Self::NonRegistryClosure(..) => Code::DiscoveryNonRegistryClosure,
+            Self::NonRegistryCycle { .. } => Code::DiscoveryNonRegistryCycle,
+            Self::NonRegistryUnsupported { .. } => Code::DiscoveryNonRegistryUnsupported,
+            Self::BuiltinCompute(..) => Code::DiscoveryBuiltinCompute,
+            Self::Builtin(..) => Code::DiscoveryBuiltin,
+            Self::Evaluation(..) => Code::DiscoveryEvaluation,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::RootModuleFiles(..)
+            | Self::SourcePreparationCompute(..)
+            | Self::NonRegistryClosureCompute(..)
+            | Self::BuiltinCompute(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::ExplicitBuiltinOverride
+            | Self::InvalidBuiltinVersion { .. }
+            | Self::MissingVersion { .. }
+            | Self::InvalidNonRegistryVersion { .. }
+            | Self::NonRegistryUnsupported { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::SourcePreparation(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::NonRegistryClosure(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::NonRegistryCycle { .. } | Self::Builtin(..) | Self::Evaluation(..) => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}
+
+impl ModuleSourcePreparationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::RootModuleFiles(..) => Code::ModuleSourceRootModuleFiles,
+            Self::RegistryPolicy(..) => Code::ModuleSourceRegistryPolicy,
+            Self::RegistryFileCompute { .. } => Code::ModuleSourceRegistryFileCompute,
+            Self::RegistryFile { .. } => Code::ModuleSourceRegistryFile,
+            Self::RegistryPolicyCompute(..) => Code::ModuleSourceRegistryPolicyCompute,
+            Self::Source(..) => Code::ModuleSourceSource,
+            Self::SourceCompute(..) => Code::ModuleSourceSourceCompute,
+            Self::InvalidPatchPath { .. } => Code::ModuleSourceInvalidPatchPath,
+            Self::PatchMissing { .. } => Code::ModuleSourcePatchMissing,
+            Self::PatchWrongKind { .. } => Code::ModuleSourcePatchWrongKind,
+            Self::PatchResolution(..) => Code::ModuleSourcePatchResolution,
+            Self::PatchResolutionCompute { .. } => Code::ModuleSourcePatchResolutionCompute,
+            Self::PatchFileObservation { .. } => Code::ModuleSourcePatchFileObservation,
+            Self::PatchFileInconsistentState { .. } => Code::ModuleSourcePatchFileInconsistentState,
+            Self::PatchFileCompute { .. } => Code::ModuleSourcePatchFileCompute,
+            Self::Patch(..) => Code::ModuleSourcePatch,
+            Self::MissingVersion => Code::ModuleSourceMissingVersion,
+            Self::ModuleNotFound { .. } => Code::ModuleSourceModuleNotFound,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::RootModuleFiles(..)
+            | Self::RegistryFileCompute { .. }
+            | Self::RegistryPolicyCompute(..)
+            | Self::SourceCompute(..)
+            | Self::PatchResolutionCompute { .. }
+            | Self::PatchFileCompute { .. }
+            | Self::Patch(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::RegistryPolicy(error) | Self::RegistryFile { error, .. } => {
+                builder.registry_file(error);
+            }
+            Self::Source(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::InvalidPatchPath { .. }
+            | Self::PatchMissing { .. }
+            | Self::PatchWrongKind { .. }
+            | Self::PatchFileInconsistentState { .. }
+            | Self::MissingVersion
+            | Self::ModuleNotFound { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::PatchResolution(..) | Self::PatchFileObservation { .. } => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}
+
+impl HostNonregistryModuleClosureError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::RootModuleFiles(..) => Code::NonRegistryRootModuleFiles,
+            Self::NonregistryOverrideRequired(..) => Code::NonRegistryNonregistryOverrideRequired,
+            Self::MaterializationCompute(..) => Code::NonRegistryMaterializationCompute,
+            Self::Materialization(..) => Code::NonRegistryMaterialization,
+            Self::RootSourceCompute(..) => Code::NonRegistryRootSourceCompute,
+            Self::RootSource(..) => Code::NonRegistryRootSource,
+            Self::RootAbsent => Code::NonRegistryRootAbsent,
+            Self::RootValidation { .. } => Code::NonRegistryRootValidation,
+            Self::BadLabel { .. } => Code::NonRegistryBadLabel,
+            Self::Package { .. } => Code::NonRegistryPackage,
+            Self::Fragment { .. } => Code::NonRegistryFragment,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::RootModuleFiles(..)
+            | Self::NonregistryOverrideRequired(..)
+            | Self::MaterializationCompute(..)
+            | Self::RootSourceCompute(..)
+            | Self::RootValidation { .. }
+            | Self::BadLabel { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::Materialization(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RootSource(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RootAbsent => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::Package { .. } | Self::Fragment { .. } => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}
+
+impl RepositoryMaterializationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::RootModuleFiles(..) => Code::MaterializationRootModuleFiles,
+            Self::MissingOverride(..) => Code::MaterializationMissingOverride,
+            Self::UnsupportedOverride(..) => Code::MaterializationUnsupportedOverride,
+            Self::InvalidCanonicalRepository(..) => Code::MaterializationInvalidCanonicalRepository,
+            Self::InvalidWorkspace(..) => Code::MaterializationInvalidWorkspace,
+            Self::ResultCompute(..) => Code::MaterializationResultCompute,
+            Self::MissingGeneration(..) => Code::MaterializationMissingGeneration,
+            Self::Spec(..) => Code::MaterializationSpec,
+            Self::Transport(..) => Code::MaterializationTransport,
+            Self::Materialization(..) => Code::MaterializationMaterialization,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::RootModuleFiles(..)
+            | Self::MissingOverride(..)
+            | Self::UnsupportedOverride(..)
+            | Self::InvalidCanonicalRepository(..)
+            | Self::InvalidWorkspace(..)
+            | Self::ResultCompute(..)
+            | Self::MissingGeneration(..)
+            | Self::Spec(..)
+            | Self::Transport(..)
+            | Self::Materialization(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+        }
+    }
+}
+
+impl RepositorySourceFileError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::InvalidRepoRelativePath { .. } => Code::RepositorySourceInvalidRepoRelativePath,
+            Self::MaterializationCompute { .. } => Code::RepositorySourceMaterializationCompute,
+            Self::Materialization { .. } => Code::RepositorySourceMaterialization,
+            Self::InvalidMaterializedPath { .. } => Code::RepositorySourceInvalidMaterializedPath,
+            Self::Observation { .. } => Code::RepositorySourceObservation,
+            Self::InconsistentState { .. } => Code::RepositorySourceInconsistentState,
+            Self::WrongKind { .. } => Code::RepositorySourceWrongKind,
+            Self::Cycle { .. } => Code::RepositorySourceCycle,
+            Self::InfiniteExpansion { .. } => Code::RepositorySourceInfiniteExpansion,
+            Self::ResolutionCompute { .. } => Code::RepositorySourceResolutionCompute,
+            Self::FileCompute { .. } => Code::RepositorySourceFileCompute,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::InvalidRepoRelativePath { .. }
+            | Self::InvalidMaterializedPath { .. }
+            | Self::InconsistentState { .. }
+            | Self::WrongKind { .. }
+            | Self::Cycle { .. }
+            | Self::InfiniteExpansion { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::MaterializationCompute { .. }
+            | Self::ResolutionCompute { .. }
+            | Self::FileCompute { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::Materialization { error, .. } => {
+                error.append_source_refusal(builder);
+            }
+            Self::Observation { .. } => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}
+
+impl HostDiscoveredModuleObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::EffectiveFrontier(..) => Code::DiscoveryObservationEffectiveFrontier,
+            Self::ClosureFrontier(..) => Code::DiscoveryObservationClosureFrontier,
+            Self::PreparationFrontier(..) => Code::DiscoveryObservationPreparationFrontier,
+            Self::MergeFrontier(..) => Code::DiscoveryObservationMergeFrontier,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::EffectiveFrontier(error)
+            | Self::PreparationFrontier(error)
+            | Self::MergeFrontier(error) => {
+                builder.path_frontier(error);
+            }
+            Self::ClosureFrontier(HostDiscoveredModuleClosureFrontier(error)) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl HostNonregistryModuleClosureObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::EffectiveFrontier(..) => Code::ClosureObservationEffectiveFrontier,
+            Self::EffectiveCompute(..) => Code::ClosureObservationEffectiveCompute,
+            Self::MaterializationFrontier(..) => Code::ClosureObservationMaterializationFrontier,
+            Self::RootSourceFrontier(..) => Code::ClosureObservationRootSourceFrontier,
+            Self::PreparationFrontier(..) => Code::ClosureObservationPreparationFrontier,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::EffectiveFrontier(error)
+            | Self::MaterializationFrontier(error)
+            | Self::RootSourceFrontier(error) => {
+                builder.path_frontier(error);
+            }
+            Self::EffectiveCompute(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::PreparationFrontier(error) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl NonregistryPreparationFrontierError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Path(..) => Code::PreparationObservationPath,
+            Self::Package(..) => Code::PreparationObservationPackage,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Path(error) => {
+                builder.path_frontier(error);
+            }
+            Self::Package(error) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl HostNonregistryPackagePreflightObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::EffectiveFrontier(..) => Code::PreflightObservationEffectiveFrontier,
+            Self::EffectiveCompute(..) => Code::PreflightObservationEffectiveCompute,
+            Self::PolicyCompute(..) => Code::PreflightObservationPolicyCompute,
+            Self::IgnoreFrontier(..) => Code::PreflightObservationIgnoreFrontier,
+            Self::IgnoreCompute(..) => Code::PreflightObservationIgnoreCompute,
+            Self::MarkerFrontier { .. } => Code::PreflightObservationMarkerFrontier,
+            Self::MarkerCompute { .. } => Code::PreflightObservationMarkerCompute,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::EffectiveFrontier(error)
+            | Self::IgnoreFrontier(error)
+            | Self::MarkerFrontier { error, .. } => {
+                builder.path_frontier(error);
+            }
+            Self::EffectiveCompute(..)
+            | Self::PolicyCompute(..)
+            | Self::IgnoreCompute(..)
+            | Self::MarkerCompute { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+        }
+    }
+}

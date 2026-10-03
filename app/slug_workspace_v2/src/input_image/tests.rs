@@ -9,11 +9,11 @@ use crate::PathDirectoryEntryKind;
 use crate::PathDirectoryName;
 use crate::PathObservationEpochKey;
 
-fn path(value: &str, budget: &ImageDescriptorBudget) -> ImageChargedPath {
+pub(super) fn path(value: &str, budget: &ImageDescriptorBudget) -> ImageChargedPath {
     ImageChargedPath::pin_existing(NormalizedAbsolutePath::new(value).unwrap(), budget).unwrap()
 }
 
-fn empty_epoch(
+pub(super) fn empty_epoch(
     key: &ObservedInputImageKey,
     budget: &ImageDescriptorBudget,
     freshness: i64,
@@ -61,7 +61,7 @@ fn empty_epoch(
     PathObservationEpoch::new(rows).unwrap()
 }
 
-fn user_data(budget: &ImageDescriptorBudget) -> UserComputationData {
+pub(super) fn user_data(budget: &ImageDescriptorBudget) -> UserComputationData {
     let mut data = UserComputationData::default();
     data.data.set(budget.dupe());
     data

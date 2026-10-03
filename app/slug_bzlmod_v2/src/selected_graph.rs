@@ -2492,3 +2492,69 @@ mod tests {
         );
     }
 }
+
+// Pure borrowed refusal projection; no diagnostic payload changes owner behavior.
+impl HostSelectedModuleGraphError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Input { .. } => Code::GraphInput,
+            Self::DiscoveryCompute { .. } => Code::GraphDiscoveryCompute,
+            Self::DiscoveryLeaf { .. } => Code::GraphDiscoveryLeaf,
+            Self::IncompatibleNeeds(..) => Code::GraphIncompatibleNeeds,
+            Self::UnusedOverride { .. } => Code::GraphUnusedOverride,
+            Self::AllowedVersionMissing { .. } => Code::GraphAllowedVersionMissing,
+            Self::MultipleVersionNoCeiling { .. } => Code::GraphMultipleVersionNoCeiling,
+            Self::MissingSelectedModule { .. } => Code::GraphMissingSelectedModule,
+            Self::DuplicateDependency { .. } => Code::GraphDuplicateDependency,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Input { .. } | Self::DiscoveryCompute { .. } | Self::IncompatibleNeeds(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::DiscoveryLeaf { error, .. } => {
+                error.append_source_refusal(builder);
+            }
+            Self::UnusedOverride { .. }
+            | Self::AllowedVersionMissing { .. }
+            | Self::MultipleVersionNoCeiling { .. }
+            | Self::MissingSelectedModule { .. }
+            | Self::DuplicateDependency { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+        }
+    }
+}
+
+impl HostSelectedModuleGraphObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Root(..) => Code::GraphObservationRoot,
+            Self::Effective(..) => Code::GraphObservationEffective,
+            Self::Discovery(..) => Code::GraphObservationDiscovery,
+            Self::Merge(..) => Code::GraphObservationMerge,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Root(error) | Self::Effective(error) | Self::Merge(error) => {
+                builder.path_frontier(error);
+            }
+            Self::Discovery(error) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}

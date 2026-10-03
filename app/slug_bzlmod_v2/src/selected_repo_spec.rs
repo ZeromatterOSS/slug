@@ -16208,4 +16208,363 @@ inject_repo(three, injected = "target")
             }
         }
     }
+    include!("selected_source_refusal/tests.rs");
+}
+
+// Pure borrowed refusal projection; no diagnostic payload changes owner behavior.
+impl PrivateRootRepositoryMappingError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Predecessor(..) => Code::RootMappingPredecessor,
+            Self::Compute(..) => Code::RootMappingCompute,
+            Self::Invalid { .. } => Code::RootMappingInvalid,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Predecessor(value) => match value.as_ref() {
+                Err(error) => error.append_source_refusal(builder),
+                Ok(_) => builder.terminal(Termination::UnexpectedSuccess),
+            },
+            Self::Compute(..) => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::Invalid { reason, .. } => {
+                reason.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl RootMappingInvalid {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Missing => Code::RootInvalidMissing,
+            Self::Duplicate { .. } => Code::RootInvalidDuplicate,
+            Self::Context { .. } => Code::RootInvalidContext,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Missing | Self::Duplicate { .. } | Self::Context { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+        }
+    }
+}
+
+impl HostSelectedExtensionMappingsError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Routes(..) => Code::ExtensionMappingsRoutes,
+            Self::RoutesCompute(..) => Code::ExtensionMappingsRoutesCompute,
+            Self::RootFiles(..) => Code::ExtensionMappingsRootFiles,
+            Self::RootFilesCompute(..) => Code::ExtensionMappingsRootFilesCompute,
+            Self::Invalid { .. } => Code::ExtensionMappingsInvalid,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Routes(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RoutesCompute(..)
+            | Self::RootFiles(..)
+            | Self::RootFilesCompute(..)
+            | Self::Invalid { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+        }
+    }
+}
+
+impl HostSelectedModuleRoutesError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Graph(..) => Code::RoutesGraph,
+            Self::GraphCompute(..) => Code::RoutesGraphCompute,
+            Self::RepoSpecs(..) => Code::RoutesRepoSpecs,
+            Self::RepoSpecsCompute(..) => Code::RoutesRepoSpecsCompute,
+            Self::Invalid { .. } => Code::RoutesInvalid,
+            Self::CanonicalCollision { .. } => Code::RoutesCanonicalCollision,
+            Self::RegistryMismatch { .. } => Code::RoutesRegistryMismatch,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Graph(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RepoSpecs(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::GraphCompute(..)
+            | Self::RepoSpecsCompute(..)
+            | Self::Invalid { .. }
+            | Self::RegistryMismatch { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::CanonicalCollision { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+        }
+    }
+}
+
+impl HostSelectedRegistryRepoSpecsError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        use crate::selected_source_refusal::SelectedSourceRefusalTermination as Termination;
+        let code = match self {
+            Self::Graph(..) => Code::RepoSpecsGraph,
+            Self::GraphCompute(..) => Code::RepoSpecsGraphCompute,
+            Self::RegistryPolicy { .. } => Code::RepoSpecsRegistryPolicy,
+            Self::RegistryPolicyCompute { .. } => Code::RepoSpecsRegistryPolicyCompute,
+            Self::RegistryFile { .. } => Code::RepoSpecsRegistryFile,
+            Self::RegistryFileCompute { .. } => Code::RepoSpecsRegistryFileCompute,
+            Self::MissingRegistryFile { .. } => Code::RepoSpecsMissingRegistryFile,
+            Self::Json { .. } => Code::RepoSpecsJson,
+            Self::Projection { .. } => Code::RepoSpecsProjection,
+            Self::EffectiveOverride { .. } => Code::RepoSpecsEffectiveOverride,
+            Self::EffectiveOverrideCompute { .. } => Code::RepoSpecsEffectiveOverrideCompute,
+            Self::IncompatibleNeeds(..) => Code::RepoSpecsIncompatibleNeeds,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Graph(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RegistryPolicy { error, .. } => {
+                error.append_source_refusal(builder);
+            }
+            Self::GraphCompute(..)
+            | Self::RegistryPolicyCompute { .. }
+            | Self::RegistryFileCompute { .. }
+            | Self::Json { .. }
+            | Self::Projection { .. }
+            | Self::EffectiveOverrideCompute { .. } => {
+                builder.terminal(Termination::OpaqueLeaf);
+            }
+            Self::RegistryFile { error, .. } => {
+                builder.registry_file(error);
+            }
+            Self::MissingRegistryFile { .. } => {
+                builder.terminal(Termination::Classified);
+            }
+            Self::EffectiveOverride { .. } | Self::IncompatibleNeeds(..) => {
+                builder.terminal(Termination::Unknown);
+            }
+        }
+    }
+}
+
+impl RootRepositoryMappingObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Mappings(..) => Code::RootObservationMappings,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Mappings(error) => {
+                error.append_source_refusal(builder);
+            }
+        }
+    }
+}
+
+impl ExtensionMappingsObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Routes(..) => Code::ExtensionObservationRoutes,
+            Self::RootFiles(..) => Code::ExtensionObservationRootFiles,
+            Self::Merge { .. } => Code::ExtensionObservationMerge,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Routes(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RootFiles(error) => {
+                builder.path_frontier(error);
+            }
+            Self::Merge { stage, error } => {
+                if !builder.push(match stage {
+                    ExtensionMappingsObservationStage::Routes => Code::ExtensionStageRoutes,
+                    ExtensionMappingsObservationStage::RootFiles => Code::ExtensionStageRootFiles,
+                }) {
+                    return;
+                }
+                builder.path_frontier(error);
+            }
+        }
+    }
+}
+
+impl HostSelectedModuleRoutesObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Graph(..) => Code::RoutesObservationGraph,
+            Self::Mappings(..) => Code::RoutesObservationMappings,
+            Self::RepoSpecs(..) => Code::RoutesObservationRepoSpecs,
+            Self::Merge { .. } => Code::RoutesObservationMerge,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Graph(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::Mappings(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::RepoSpecs(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::Merge { stage, error } => {
+                if !builder.push(match stage {
+                    RouteObservationStage::Graph => Code::RoutesStageGraph,
+                    RouteObservationStage::RepoSpecs => Code::RoutesStageRepoSpecs,
+                }) {
+                    return;
+                }
+                builder.path_frontier(error);
+            }
+        }
+    }
+}
+
+impl HostSelectedRepositoryMappingsObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Graph(..) => Code::MappingsObservationGraph,
+            Self::Root(..) => Code::MappingsObservationRoot,
+            Self::Merge(..) => Code::MappingsObservationMerge,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Graph(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::Root(error) | Self::Merge(error) => {
+                builder.path_frontier(error);
+            }
+        }
+    }
+}
+
+impl HostSelectedRegistryRepoSpecsObservationError {
+    pub(crate) fn append_source_refusal(
+        &self,
+        builder: &mut crate::selected_source_refusal::SelectedSourceRefusalBuilder,
+    ) {
+        use crate::selected_source_refusal::SelectedSourceRefusalCode as Code;
+        let code = match self {
+            Self::Graph(..) => Code::RepoSpecsObservationGraph,
+            Self::HostRegistry { .. } => Code::RepoSpecsObservationHostRegistry,
+            Self::RegistryFile { .. } => Code::RepoSpecsObservationRegistryFile,
+            Self::EffectiveOverride { .. } => Code::RepoSpecsObservationEffectiveOverride,
+            Self::Merge { .. } => Code::RepoSpecsObservationMerge,
+        };
+        if !builder.push(code) {
+            return;
+        }
+        match self {
+            Self::Graph(error) => {
+                error.append_source_refusal(builder);
+            }
+            Self::HostRegistry { error, .. }
+            | Self::RegistryFile { error, .. }
+            | Self::EffectiveOverride { error, .. } => {
+                builder.path_frontier(error);
+            }
+            Self::Merge { stage, error, .. } => {
+                if !builder.push(match stage {
+                    RepoSpecObservationStage::Graph => Code::RepoSpecsStageGraph,
+                    RepoSpecObservationStage::HostRegistry => Code::RepoSpecsStageHostRegistry,
+                    RepoSpecObservationStage::SourceRegistryFile => {
+                        Code::RepoSpecsStageSourceRegistryFile
+                    }
+                    RepoSpecObservationStage::RegistryMetadataFile => {
+                        Code::RepoSpecsStageRegistryMetadataFile
+                    }
+                    RepoSpecObservationStage::EffectiveOverride => {
+                        Code::RepoSpecsStageEffectiveOverride
+                    }
+                }) {
+                    return;
+                }
+                builder.path_frontier(error);
+            }
+        }
+    }
+}
+
+impl HostRootRepositoryMappingError {
+    #[doc(hidden)]
+    pub fn selected_source_refusal(&self) -> crate::SelectedSourceRefusal {
+        let mut builder = crate::selected_source_refusal::SelectedSourceRefusalBuilder::new();
+        self.inner.append_source_refusal(&mut builder);
+        builder.finish()
+    }
+}
+
+impl HostRootRepositoryMappingObservationError {
+    #[doc(hidden)]
+    pub fn selected_source_refusal(&self) -> crate::SelectedSourceRefusal {
+        let mut builder = crate::selected_source_refusal::SelectedSourceRefusalBuilder::new();
+        self.0.append_source_refusal(&mut builder);
+        builder.finish()
+    }
 }
