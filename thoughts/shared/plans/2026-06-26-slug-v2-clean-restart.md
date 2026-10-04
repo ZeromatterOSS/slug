@@ -35,7 +35,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Controlled heap accounting accepted; finite repeated-heap discriminator next; full WP899 unaccepted
+Status: Finite heap sequence accepted; scoped archive allocation audit next; full WP899 unaccepted
+
+The fixed64-round controlled heap sequence passes all semantic/clone/drop checks
+and384 snapshots. Frozen heap portions remain329,088B; Rust-global postdrop bytes
+are nonmonotonic, maximum1,233,418B, with57 observations at1,200,650B. Internal
+VmSize stays at/below20,340,736B; this finite workload does not reproduce multiGiB
+virtual demand. Three FINALs accept25/25censuses, join/stage/exact-parent cleanup.
+[Receipt](slug-v2-subplans/wp899-starlark-heap-repeated-2026-10-04.json). Next is the scoped archive fallible-
+allocation audit: infallible Vec capacity paths remain despite admitted scope
+credit. No actual owner/history/source-fit inference, allocator policy change or
+actual retry selected. FullWP899/source admission remains open.
 
 The controlled normal Starlark parse/evaluate/freeze/clone/drop probe passes two
 rounds with2048 exact strings, stable frozen heap portion accounting329,088B and
@@ -43,9 +53,8 @@ normal final drop. Postdrop Rust-global requested-live observations904,714B then
 1,166,858B are distinct from public heap and process memory; they establish no
 cache owner, physical backing or unbounded growth. Three terminal FINALs accept
 join/stage/exact-parent cleanup. [Receipt](slug-v2-subplans/wp899-starlark-heap-controlled-2026-10-04.json).
-Root selects a fixed64-identical-round controlled discriminator with the same
-resource/time ceilings and per-round observations, to distinguish warmup from
-finite repeated growth. No actual replay or production allocator change selected.
+The fixed64-round controlled discriminator is accepted above; no actual replay or
+production allocator change selected.
 FullWP899/source admission remains open.
 
 The spent global15 two-worker profile observation emitted zero Slug records:
