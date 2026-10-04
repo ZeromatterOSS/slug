@@ -188,56 +188,8 @@ fn apply_file_with_reserve(
     }
     let source = std::str::from_utf8(&bytes)
         .map_err(|_| materialization("selected BCR patch target is not valid UTF-8"))?;
-    let source = source.split_inclusive('\n').collect::<Vec<_>>();
-    let mut output = Vec::with_capacity(source.len());
-    let mut source_cursor = 0usize;
-    for (header, lines) in hunks {
-        if !active() {
-            return Err(materialization("repository session is no longer active"));
-        }
-        let old_index = range_index(header.old_start, header.old_count)?;
-        let new_index = range_index(header.new_start, header.new_count)?;
-        if old_index < source_cursor
-            || old_index > source.len()
-            || new_index != output.len() + old_index - source_cursor
-        {
-            return Err(materialization(
-                "selected BCR patch hunk ranges are inconsistent",
-            ));
-        }
-        output.extend_from_slice(&source[source_cursor..old_index]);
-        source_cursor = old_index;
-        let mut old_seen = 0usize;
-        let mut new_seen = 0usize;
-        for line in *lines {
-            let (kind, text) = line.split_at(1);
-            match kind {
-                " " => {
-                    require_source_line(&source, source_cursor, text)?;
-                    output.push(source[source_cursor]);
-                    source_cursor += 1;
-                    old_seen += 1;
-                    new_seen += 1;
-                }
-                "-" => {
-                    require_source_line(&source, source_cursor, text)?;
-                    source_cursor += 1;
-                    old_seen += 1;
-                }
-                "+" => {
-                    output.push(text);
-                    new_seen += 1;
-                }
-                _ => unreachable!("validated patch hunk line kind"),
-            }
-        }
-        if old_seen != header.old_count || new_seen != header.new_count {
-            return Err(materialization(
-                "selected BCR patch hunk line counts do not match its header",
-            ));
-        }
-    }
-    output.extend_from_slice(&source[source_cursor..]);
+    // Validate the complete file before creating staging state or charging writes.
+    validate_hunks(source, hunks, active)?;
     let parent = target
         .parent()
         .ok_or_else(|| materialization("selected BCR patch target has no parent"))?;
@@ -246,15 +198,15 @@ fn apply_file_with_reserve(
             "staging selected BCR patched file {relative}: {error}"
         ))
     })?;
-    for line in output {
+    visit_patched_lines(source, hunks, |line| {
         source_service::write_counted(&mut staged, line.as_bytes(), active, scope).map_err(
             |error| {
                 materialization(format!(
                     "writing selected BCR patched file {relative}: {error}"
                 ))
             },
-        )?;
-    }
+        )
+    })?;
     staged
         .as_file()
         .set_permissions(metadata.permissions())
@@ -282,15 +234,105 @@ fn apply_file_with_reserve(
     Ok(())
 }
 
-fn require_source_line(
-    source: &[&str],
-    index: usize,
-    expected: &str,
+// Source and patch text remain immutable and owned by the caller for both passes.
+fn validate_hunks(
+    source: &str,
+    hunks: &[(HunkHeader, &[&str])],
+    active: &dyn Fn() -> bool,
 ) -> Result<(), ArchiveMaterializationError> {
-    if source.get(index).copied() != Some(expected) {
-        return Err(materialization(
-            "selected BCR patch context does not match source",
-        ));
+    let mut source_lines = source.split_inclusive('\n');
+    let mut source_cursor = 0usize;
+    let mut output_count = 0usize;
+    for (header, lines) in hunks {
+        if !active() {
+            return Err(materialization("repository session is no longer active"));
+        }
+        let old_index = range_index(header.old_start, header.old_count)?;
+        let new_index = range_index(header.new_start, header.new_count)?;
+        let gap = old_index
+            .checked_sub(source_cursor)
+            .ok_or_else(|| materialization("selected BCR patch hunk ranges are inconsistent"))?;
+        output_count = output_count
+            .checked_add(gap)
+            .ok_or_else(|| materialization("selected BCR patch hunk ranges are inconsistent"))?;
+        if new_index != output_count {
+            return Err(materialization(
+                "selected BCR patch hunk ranges are inconsistent",
+            ));
+        }
+        for _ in 0..gap {
+            if source_lines.next().is_none() {
+                return Err(materialization(
+                    "selected BCR patch hunk ranges are inconsistent",
+                ));
+            }
+        }
+        source_cursor = old_index;
+        let mut old_seen = 0usize;
+        let mut new_seen = 0usize;
+        for line in *lines {
+            let (kind, text) = line.split_at(1);
+            match kind {
+                " " | "-" => {
+                    if source_lines.next() != Some(text) {
+                        return Err(materialization(
+                            "selected BCR patch context does not match source",
+                        ));
+                    }
+                    source_cursor += 1;
+                    old_seen += 1;
+                    new_seen += usize::from(kind == " ");
+                }
+                "+" => new_seen += 1,
+                _ => unreachable!("validated patch hunk line kind"),
+            }
+        }
+        if old_seen != header.old_count || new_seen != header.new_count {
+            return Err(materialization(
+                "selected BCR patch hunk line counts do not match its header",
+            ));
+        }
+        output_count = output_count
+            .checked_add(new_seen)
+            .ok_or_else(|| materialization("selected BCR patch hunk ranges are inconsistent"))?;
+    }
+    Ok(())
+}
+
+// Called only after validate_hunks succeeds for these same immutable inputs.
+// Emits lines in the old output-vector order, without a second activity check.
+fn visit_patched_lines(
+    source: &str,
+    hunks: &[(HunkHeader, &[&str])],
+    mut emit: impl FnMut(&str) -> Result<(), ArchiveMaterializationError>,
+) -> Result<(), ArchiveMaterializationError> {
+    let mut source_lines = source.split_inclusive('\n');
+    let mut source_cursor = 0usize;
+    for (header, lines) in hunks {
+        let old_index =
+            range_index(header.old_start, header.old_count).expect("validated hunk start");
+        for line in source_lines.by_ref().take(old_index - source_cursor) {
+            emit(line)?;
+        }
+        source_cursor = old_index;
+        for line in *lines {
+            let (kind, text) = line.split_at(1);
+            match kind {
+                " " => {
+                    emit(source_lines.next().expect("validated context line"))?;
+                    source_cursor += 1;
+                }
+                "-" => {
+                    source_lines.next().expect("validated deletion line");
+                    source_cursor += 1;
+                }
+                "+" => emit(text)?,
+                _ => unreachable!("validated patch hunk line kind"),
+            }
+        }
+    }
+    for line in source_lines {
+        emit(line)?;
     }
     Ok(())
 }

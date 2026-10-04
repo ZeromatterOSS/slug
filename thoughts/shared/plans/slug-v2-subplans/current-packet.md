@@ -1,7 +1,18 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Scoped archive fallible reservations accepted; source admission investigation next; full WP899 unaccepted
+Status: Archive patch line tables removed; source admission investigation continues; full WP899 unaccepted
+
+Three FINALs accept the Slug-native patch target line-table removal. Two forward
+passes validate all per-file hunks before staging, then stream the unchanged
+per-line output; target/source reference tables no longer scale with line count.
+Fresh12/12 production controls cover exact short-line bytes/mode, late refusal
+before writes, quotas, cancellation, cleanup and per-file commits; default
+Core/CLI all-target checks pass. [Receipt](wp899-patch-line-stream-2026-10-04.json).
+This removes one phase-scratch amplification path; measured whole-workload RSS,
+original40GB attribution and full source admission remain unproved. Existing
+patch-input/hunk metadata and selected Arc allocation remain separate owners.
+Source-owned investigation continues; no actual retry or ceiling change selected.
 
 Root accepts a Slug-native robustness repair at the two existing scoped archive
 byte-buffer producers: verified patch capture read and patch-target read. Reuse

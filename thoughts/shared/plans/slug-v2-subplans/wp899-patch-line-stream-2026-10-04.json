@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "657c4a57c",
+  "disposition": "ACCEPTED_SLUG_NATIVE_PATCH_LINE_STREAM_COMPONENT",
+  "observable_outcome": "Patch target validation and output use two advancing borrowed cursors instead of source/output Vec<&str> tables. Per-file complete validation precedes staging and per-line WrittenBytes; exact file bytes/mode/refusal/counter/cleanup semantics preserved.",
+  "memory_ownership": "Phase-local immutable target byte buffer remains; per-line reference metadata drops from O(line_count) to O(1) cursor scratch. Patch parser/hunk/path arrays remain separate owners. No cache, retained representation, DICE key, allocator policy or resource ceiling change.",
+  "growth": {
+    "production_insertions": 103,
+    "production_deletions": 61,
+    "production_net": 42,
+    "test_insertions": 177,
+    "new_production_tests": 5
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "6732fcfc6246f7644ec5ccf39fe7365de983bfc444425e8b38b8f0c5e3b81160",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "13c65ede06374ac18e0a925b298a1154a4a76644b405a796f10f99fb9a2f94df"
+  },
+  "independent_design_reviews": {
+    "resume-patch-line-stream-source-review.md": "7a6d792609de102e5a6abfc774a0f249628f7ef37223d09dbb91132fe9e89d24",
+    "resume-patch-line-stream-evidence-review.md": "bf40e49ba6b60fa63a8e5e26f16d8f430ce17841b1bf81709c771e65163fb4fb",
+    "resume-patch-line-stream-lifecycle-review.md": "20185a124f362c76eba2edb27937ff3eb688fea0f1f354178259a7a3cf7ebfc3"
+  },
+  "independent_final_reviews": {
+    "resume-patch-line-stream-source-integrated-final.md": "b4f6640b52f3d43425f676d878f934b34765898d230ff427add8891ce439ad69",
+    "resume-patch-line-stream-evidence-final.md": "20a9ee3a21eb3c8fbcde3c7ec418daca2b75e4e1dc22c817ee7ae94297cac8af",
+    "resume-patch-line-stream-lifecycle-final.md": "1295dbdd1e60b64133a73a24d2176a87f827a14aa8fa6ee0bb3e4196ba6b8806"
+  },
+  "validation": {
+    "fresh_core_test_compile": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.9074674639850855,
+      "source_sha256": {
+        "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "6732fcfc6246f7644ec5ccf39fe7365de983bfc444425e8b38b8f0c5e3b81160",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "13c65ede06374ac18e0a925b298a1154a4a76644b405a796f10f99fb9a2f94df"
+      },
+      "source_unchanged": true,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "c3d1b1a1cfc13de84cf3aa9c7d04e631a1f5f26f6b71bd150864006aa9c676a7",
+      "stderr_sha256": "d2e97df238d2f0b8294abb47e7999db4dcf6596df88a15b12c713e75828cf579"
+    },
+    "preflight_selected": 12,
+    "production_focused": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+        "--test-threads=1",
+        "--exact",
+        "runtime::repository_archive_patch::tests::applies_rules_shell_shape_multiple_files_and_hunks",
+        "runtime::repository_archive_patch::tests::cancellation_in_final_validation_hunk_precedes_all_writes",
+        "runtime::repository_archive_patch::tests::invalid_final_hunk_never_stages_or_charges_earlier_output",
+        "runtime::repository_archive_patch::tests::later_file_refusal_preserves_earlier_file_commit",
+        "runtime::repository_archive_patch::tests::rejects_unsupported_paths_shapes_context_and_cancellation",
+        "runtime::repository_archive_patch::tests::scoped_patch_fallible_reservation_preserves_target_poison_and_cleanup",
+        "runtime::repository_archive_patch::tests::short_line_stream_preserves_shifted_hunks_suffix_mode_and_exact_quota",
+        "runtime::repository_archive_patch::tests::streamed_write_quota_preserves_per_line_admission_and_original_on_failure",
+        "runtime::repository_archive_realize::tests::scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup",
+        "runtime::repository_archive_realize::tests::scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements",
+        "runtime::repository_archive_realize::tests::selected_bcr_cancellation_between_transforms_drops_every_capture",
+        "runtime::repository_archive_realize::tests::selected_bcr_module_and_cancellation_failures_drop_captures"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.013662732962984592,
+      "selected": 12,
+      "passed": 12,
+      "names": [
+        "runtime::repository_archive_patch::tests::applies_rules_shell_shape_multiple_files_and_hunks",
+        "runtime::repository_archive_patch::tests::cancellation_in_final_validation_hunk_precedes_all_writes",
+        "runtime::repository_archive_patch::tests::invalid_final_hunk_never_stages_or_charges_earlier_output",
+        "runtime::repository_archive_patch::tests::later_file_refusal_preserves_earlier_file_commit",
+        "runtime::repository_archive_patch::tests::rejects_unsupported_paths_shapes_context_and_cancellation",
+        "runtime::repository_archive_patch::tests::scoped_patch_fallible_reservation_preserves_target_poison_and_cleanup",
+        "runtime::repository_archive_patch::tests::short_line_stream_preserves_shifted_hunks_suffix_mode_and_exact_quota",
+        "runtime::repository_archive_patch::tests::streamed_write_quota_preserves_per_line_admission_and_original_on_failure",
+        "runtime::repository_archive_realize::tests::scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup",
+        "runtime::repository_archive_realize::tests::scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements",
+        "runtime::repository_archive_realize::tests::selected_bcr_cancellation_between_transforms_drops_every_capture",
+        "runtime::repository_archive_realize::tests::selected_bcr_module_and_cancellation_failures_drop_captures"
+      ],
+      "passed_names": [
+        "runtime::repository_archive_patch::tests::applies_rules_shell_shape_multiple_files_and_hunks",
+        "runtime::repository_archive_patch::tests::cancellation_in_final_validation_hunk_precedes_all_writes",
+        "runtime::repository_archive_patch::tests::invalid_final_hunk_never_stages_or_charges_earlier_output",
+        "runtime::repository_archive_patch::tests::later_file_refusal_preserves_earlier_file_commit",
+        "runtime::repository_archive_patch::tests::rejects_unsupported_paths_shapes_context_and_cancellation",
+        "runtime::repository_archive_patch::tests::scoped_patch_fallible_reservation_preserves_target_poison_and_cleanup",
+        "runtime::repository_archive_patch::tests::short_line_stream_preserves_shifted_hunks_suffix_mode_and_exact_quota",
+        "runtime::repository_archive_patch::tests::streamed_write_quota_preserves_per_line_admission_and_original_on_failure",
+        "runtime::repository_archive_realize::tests::scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements",
+        "runtime::repository_archive_realize::tests::scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup",
+        "runtime::repository_archive_realize::tests::selected_bcr_cancellation_between_transforms_drops_every_capture",
+        "runtime::repository_archive_realize::tests::selected_bcr_module_and_cancellation_failures_drop_captures"
+      ],
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "c3d1b1a1cfc13de84cf3aa9c7d04e631a1f5f26f6b71bd150864006aa9c676a7",
+      "source_sha256": {
+        "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "6732fcfc6246f7644ec5ccf39fe7365de983bfc444425e8b38b8f0c5e3b81160",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "13c65ede06374ac18e0a925b298a1154a4a76644b405a796f10f99fb9a2f94df"
+      },
+      "source_unchanged": true,
+      "log_sha256": "36f1931b59b8c21e3fdfd179403da935da9e384b1822cbe92473bb6aa467f13c"
+    },
+    "default_core_cli_all_targets": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--all-targets",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.008976523997262,
+      "source_sha256": {
+        "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "6732fcfc6246f7644ec5ccf39fe7365de983bfc444425e8b38b8f0c5e3b81160",
+        "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "13c65ede06374ac18e0a925b298a1154a4a76644b405a796f10f99fb9a2f94df"
+      },
+      "source_unchanged": true,
+      "stdout_sha256": "40774b9fd96832b8e38692d057dd0c54712c0a2b1b98eba45bc3dc209b5b90cf",
+      "stderr_sha256": "c48e5e7974262f3c10060839cb277ea21303c70eb0c3793bdde577708bd08c7d"
+    },
+    "isolated_algorithm": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "target/wp899/resume-patch-line-stream-algorithm-tests",
+        "--test-threads=1",
+        "--exact",
+        "short_lines_shifted_hunks_preserve_exact_output_and_suffix",
+        "finite_baseline_differential_checks_ranges_context_counts_and_empty_insertions",
+        "late_invalid_hunk_or_cancellation_precedes_any_emission",
+        "replay_preserves_per_line_order_and_first_writer_failure",
+        "zero_count_eof_delete_and_replay_add_no_activity_checks"
+      ],
+      "address_space_limit_bytes": 536870912,
+      "exit_code": 0,
+      "elapsed_seconds": 0.007296602998394519,
+      "selected": 5,
+      "passed": 5,
+      "passed_names": [
+        "finite_baseline_differential_checks_ranges_context_counts_and_empty_insertions",
+        "late_invalid_hunk_or_cancellation_precedes_any_emission",
+        "replay_preserves_per_line_order_and_first_writer_failure",
+        "short_lines_shifted_hunks_preserve_exact_output_and_suffix",
+        "zero_count_eof_delete_and_replay_add_no_activity_checks"
+      ],
+      "artifact_sha256": "689e0c4876066c984124f2ab65d7abf086c5da44def58d1849523b95f37e5975",
+      "source_sha256": "4ff45d02a902c2a332d1ab417e64ac9dd41541a5ea119d7179519afca4483fcd",
+      "candidate_sha256": "6732fcfc6246f7644ec5ccf39fe7365de983bfc444425e8b38b8f0c5e3b81160",
+      "log_sha256": "874ec97b32a0335401b2d4ef2f5d164d3e325f327a01fbecda124bfd8d4af5b1",
+      "scope": "Five isolated algorithm/type gates including5184 baseline differential cases; not whole production patch invocation, Core/scoped counters/files/modes or measured memory."
+    },
+    "archive_status": {
+      "command": [
+        "sh",
+        "scripts/v2_archive_status.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.028482400986831635,
+      "log_sha256": "f75f6a5499482befb14370c963371d4a209a76822bdd74399bad19e3b8ab53cb"
+    }
+  },
+  "fixture": "32KiB/16384two-byteLF-lines; context/deletion/insertion/shiftedlaterhunk/suffix; exactquota/mode; lateinvalidcontext/count/range/activity refuses before per-file writes; oneunderquota retains exact10Bprefix at11Bbudget; earlierfilecommit surviveslaterfilefailure.",
+  "metric_limit": "Source elimination of two line tables is established; no before/after RSS/native allocator measurement or original40GB attribution claimed. Phase scratch is not a demonstrated retained-memory/hot-path representation; measured performance remains separate.",
+  "integration_chronology": "Shared owner fallible-Vec edits preserved as isolated candidate; after prerequisite657c landed and main clean/byteidenticalbaseline, Root applied exact independently-designed candidate. Initial formatter child-resolution failure happened before compilation; corrected skip_children. Preformat preparation digest preserved as superseded; fresh compile/tests pin final source.",
+  "full_wp899_accepted": false,
+  "actual_root_source_fit_proved": false,
+  "historical_40gb_attribution_proved": false,
+  "actual_source_retry_selected": false
+}

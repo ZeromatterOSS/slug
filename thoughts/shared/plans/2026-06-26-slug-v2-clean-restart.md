@@ -35,7 +35,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Scoped archive fallible reservations accepted; source admission investigation next; full WP899 unaccepted
+Status: Archive patch line tables removed; source admission investigation continues; full WP899 unaccepted
+
+Three FINALs accept the Slug-native patch target line-table removal. Two forward
+passes validate all per-file hunks before staging, then stream the unchanged
+per-line output; target/source reference tables no longer scale with line count.
+Fresh12/12 production controls cover exact short-line bytes/mode, late refusal
+before writes, quotas, cancellation, cleanup and per-file commits; default
+Core/CLI all-target checks pass. [Receipt](slug-v2-subplans/wp899-patch-line-stream-2026-10-04.json).
+This removes one phase-scratch amplification path; measured whole-workload RSS,
+original40GB attribution and full source admission remain unproved. Existing
+patch-input/hunk metadata and selected Arc allocation remain separate owners.
+Source-owned investigation continues; no actual retry or ceiling change selected.
 
 Three FINALs accept scoped archive fallible Vec reservations: sticky refusal before
 copy/publication, temp/credit retirement and unchanged unscoped bytes.71 unique
