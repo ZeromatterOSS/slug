@@ -1,7 +1,23 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Byte-based growth accepted; source observation awaits network approval; full WP899 unaccepted
+Status: Approved source observation failed allocation/census; owner audit next; full WP899 unaccepted
+
+The explicitly approved source test ran once under the guarded R2 freeze, after
+fresh automatic approval accepted actual selected-closure/payload evidence.
+Global attempt 16 is now spent: zero Slug records, a reported 4,696,589-byte
+allocation failure and an independent STOP_WAIT/DEADLINE disk_census_bound.
+681 of 682 censuses completed. Peak VM (4,293,894,144 bytes), peak RSS
+(240,046,080 bytes) and peak thread count (5) are separate observations.
+TERM/KILL, actual process join, stage and exact owned parent cleanup pass three
+terminal FINALs. [Terminal receipt](wp899-byte-growth-source-terminal-2026-10-04.json).
+The accepted controlled growth repair does not establish this allocation's owner,
+allocation-time state, causal ordering or actual source fit. Restoration/engine/
+clone/lastDrop are unobserved. Next is a source-owned allocation mechanism audit;
+no automatic retry, ceiling growth or ordinary activation. Full WP899 remains open.
+The earlier network readiness block is historical: two precreation rejections
+were resolved through explicit approval and new selected-source evidence, never
+an alternate execution route or environment filtering.
 
 The next actual source observation has three eligibility ACCEPTs, fresh76/76
 controls and one exact ignored selector. Automatic approval review rejected its
