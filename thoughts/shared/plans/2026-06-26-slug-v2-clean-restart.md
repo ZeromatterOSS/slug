@@ -35,14 +35,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded diagnostic payload bank accepted; one reviewed actual observation next; full WP899 unaccepted
+Status: actual allocation/census terminal preserved; bounded supervisor attribution next; full WP899 unaccepted
 
-The bounded Linux cfgtest actual profile now selects40MiB, preserving Default16MiB
-and every non-test/non-Linux, other source and supervisor ceiling. Three FINALs,
-fresh63/63 including normal32MiB file capture/transfer and default Core+CLI checks
-pass. [Receipt](slug-v2-subplans/wp899-payload-bank-profile-2026-10-04.json). Next is ONE separately reviewed
-frozen actual observation with the explicit bank recorded; source admission and
-coupled WP899 acceptance remain open.
+The spent global13 observation emitted zero Slug records: allocation failure for
+4,732,227 bytes and childSIGABRT coexist with supervisor disk_census_bound after
+655/656 completed censuses. Their ordering, allocator owner, virtual-address state
+and source fit are unproved. Three terminal FINALs accept join/stage/exact-parent
+cleanup and immutable evidence. [Receipt](slug-v2-subplans/wp899-allocation-census-frontier-2026-10-04.json). Next is bounded
+supervisor VmSize/VmPeak/thread and exact census producer attribution, with controlled
+discriminators and unchanged caps; no actual replay is selected.
+
+The accepted Linux cfgtest actual profile remains40MiB, Default/non-test/non-Linux16MiB.
+All other source and supervisor limits remain. Fresh63/63 normal32MiB transfer and
+default Core+CLI checks remain accepted. Source admission and fullWP899 remain open.
 
 The spent global12 observation proves first SelectedPayload reservation refusal:
 19,234,400B requested +4,211,303B live exceeds the16,777,216B bank before Arc
