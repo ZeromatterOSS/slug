@@ -35,14 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: TLS handshake frontier preserved; bounded handshake diagnosis next; full WP899 unaccepted
+Status: actual payload credit refusal proved; bounded diagnostic bank design next; full WP899 unaccepted
+
+The spent global12 observation proves first SelectedPayload reservation refusal:
+19,234,400B requested +4,211,303B live exceeds the16,777,216B bank before Arc
+allocation or scratch reservation. Native pairing/leaf identity remain0. [Receipt](slug-v2-subplans/wp899-payload-credit-frontier-2026-10-04.json).
+Verified direct OpenSSL and pinned native TLS were separately accepted prerequisites
+([health](slug-v2-subplans/wp899-tls-current-health-2026-10-04.json)); they explain no historical failure.
+Three terminal FINALs accept107 ordered records,590/590 censuses and actual
+join/stage/exact-parent cleanup. Next is a bounded explicit diagnostic-bank DESIGN
+for the existing32MiB admitted payload plus recorder/scratch, preserving Default16MiB
+and supervisor ceilings. Full source admission and coupled WP899 acceptance remain open.
 
 The spent global11 observation paired first Scope WorkDeadline with the natural
 TLS handshake Step/Timer/Deadline wait after56 distinct registry admissions and
 zero source attempts. Buffer origin is absent, so global10 creator remains unknown.
 [Terminal receipt](slug-v2-subplans/wp899-tls-handshake-frontier-2026-10-03.json) preserves114 ordered records,685/685 censuses,
 restoration/engine retirement and actual join/stage/exact-parent cleanup after three
-FINALs. Next is bounded handshake progress diagnosis; no identical actual retry,
+FINALs. The later health gates and global12 observation are preserved above; no identical actual retry,
 cap growth, source-fit or fullWP899 acceptance is selected.
 
 The optional first-BufferLimit POD is accepted after three FINAL reviews, fresh62/62
