@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "base": "70205a7446fb289451e87416c88fa7e6814153d4",
+  "status": "accepted Linux-test-only actual-root diagnostic component; fullWP899/source admission open",
+  "compatibility": "Slug-native cfg(all(test,target_os=linux)); production/Windows unchanged",
+  "decision": "SourceServiceLimits.blocking_threads optionalNone by default, Some2 in explicit actual_root; constructor validates Some1..2 before runtime construction; owned runtime Builder sets this cap only for diagnostic scope under same cfg. Applies to all blocking jobs, not just DNS.",
+  "design_sha256": "00f1a4533c2bbbb6b4c81f41903744b7e52098ce032ae6567c8e117467ef3eb4",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/dice.rs": "ee6b7e3c65ae904ef61653fbcea665020bbf5aa82c4604664aa5bd0f5182cd9f",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "1a6ab0cfef9441b5a91959473ff6dfdd1eb427e6ea810bf34bec824a4e3401b7",
+    "app/slug_core_v2/src/runtime/source_service/tests.rs": "4c8b8af62c5fc05bbcf4cc86406f980ce20708548d250d847ef0da588d535d73",
+    "app/slug_core_v2/src/runtime/source_service/diagnostic_tests.rs": "02157c64c06b7ee3dc25fa62439297a13ffb5e57fa93ce251dc3b3438c87c1c3"
+  },
+  "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+  "artifact_sha256": "81e0efa832595c4242846d463ea3f2099e2f10109322e84849e29b3869375cf3",
+  "validation": {
+    "test-compile": {
+      "exit_code": 0,
+      "elapsed_seconds": 4.9365798070211895,
+      "artifact_sha256": "81e0efa832595c4242846d463ea3f2099e2f10109322e84849e29b3869375cf3",
+      "log_sha256": "283a4aad9c1d091e5c16c82e80bc8dcc075b55ea8e7153066ad640fedddb1a69",
+      "receipt_path": "target/wp899/diagnostic-pool-cap-test-compile.json",
+      "receipt_sha256": "86ef1d0182809975af7e148f128e45810966c198c66a8917fc9917e798bbb0ac"
+    },
+    "preflight": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.026345859980210662,
+      "selected": 64,
+      "artifact_sha256": "81e0efa832595c4242846d463ea3f2099e2f10109322e84849e29b3869375cf3",
+      "log_sha256": "e80a548e8b151b5dc95ad0494f5302d6a6733f7f19fc35c2d8f91042057ecd20",
+      "receipt_path": "target/wp899/diagnostic-pool-cap-preflight.json",
+      "receipt_sha256": "40edee1a0d7cf3d6baa645e57d30556d019ccc0417ecb79ace85f33db770368b"
+    },
+    "focused": {
+      "exit_code": 0,
+      "elapsed_seconds": 1.3044514800421894,
+      "selected": 64,
+      "passed": 64,
+      "artifact_sha256": "81e0efa832595c4242846d463ea3f2099e2f10109322e84849e29b3869375cf3",
+      "log_sha256": "de98efa319abf83e64b0ff4f88243ab1a5d7e54756e00d6097f2864a227d205c",
+      "receipt_path": "target/wp899/diagnostic-pool-cap-focused.json",
+      "receipt_sha256": "f098842a6152a1a7faaa684cf4359bc8324af4bf71370ff86445110226b5fae7"
+    },
+    "default-compile": {
+      "exit_code": 0,
+      "elapsed_seconds": 2.9604583169566467,
+      "log_sha256": "df77c04e523cc59f74cb1dd326aa29ba83a81f70525a72c5d194aa078f546c4c",
+      "receipt_path": "target/wp899/diagnostic-pool-cap-default-compile.json",
+      "receipt_sha256": "9eb225e198cbf8e1da69230faf2ee4ded31da9d89368c0c031bef9b4dd15318f"
+    }
+  },
+  "new_discriminators": "Actual owned runtime default3 vs cap2 2heldjobs; literalIP bypass, invalid-port retained future pending50ms only undercap2, release before runtimeDrop on all paths, finite job-result and awaited join checks, engine retired. Profile equality preserves allotherlimits; accepts1,2/rejects0,3,MAX.",
+  "correction": "Review caught possible poisoned-mutex release panic; corrected Release to recover poison and finite job timeout to return Err instead of panic underlock. Initial compile/preflight preserved; no initial tests executed. Fresh validation uses corrected source.",
+  "growth": "159 insertions/2deletions across4files,116line existingfixture; above110estimate accepted as cohesive; no newfixtures or retained representations. Existing large constructor only localbuilderwiring.",
+  "independent_final_reviews": {
+    "source": "FINAL ACCEPT: Linux test actual-root selects validated Some(2); Default None and production unchanged. Poison-safe release and finite-result retained work resolve sole finding. Growth cohesive. Four pins/logs match; compile0,64/64 in1.30445s,defaultCore/CLI all-target0; artifact81e0efa8. Queueing can alter deadline/error selection; running OS DNS join-owned. No actual/history/fullWP899 acceptance.",
+    "supervisor": "FINAL ACCEPT against70205a744/design00f1a453. Test-only policy validation/wiring/defaultNone/actualSome2/range1..2; allothercaps/production unchanged. Poison correction preserves release/retainedlookup/awaitedjobs/normaldrop.159insertions cohesive.4pins/artifact81e0efa8/loghashes match. Compile4.937s/64unique pass1.304s/defaultCoreCLI2.960s. Noactual/history/sourcefitclaim. Read-only.",
+    "evidence": "FINAL ACCEPT: corrected4files matchdesign/Linux-testSome2/defaultNone/inclusive1..2/0,3,MAXrefusal. Owned-runtimefixture provesqueue/literalbypass/retainedinvalidport/release/join; cleanupcorrection sound.4pins/logs/artifact81e0efa832595c4242846d463ea3f2099e2f10109322e84849e29b3869375cf3 match.64unique including63protected pass1.30445s/compile4.93658s/defaultCoreCLI2.96046s. Cohesivegrowth/existingfixtures unchanged. No actualsource/memoryfit/history/productionclaim. Read-only."
+  },
+  "private_evidence_pins": {
+    "target/wp899/diagnostic-pool-cap-commands.json": "47502b90a7eed03e7871fdd64032c6dc098270a42d5654a401ec32dba4692f87",
+    "target/wp899/diagnostic-pool-cap-default-compile.json": "9eb225e198cbf8e1da69230faf2ee4ded31da9d89368c0c031bef9b4dd15318f",
+    "target/wp899/diagnostic-pool-cap-default-compile.jsonl": "df77c04e523cc59f74cb1dd326aa29ba83a81f70525a72c5d194aa078f546c4c",
+    "target/wp899/diagnostic-pool-cap-design-evidence.md": "5f417fc225915734efa3c017efc6a6d09b6d2ed00e7e2ba0f409aefe6a4bc41b",
+    "target/wp899/diagnostic-pool-cap-design-source.md": "5f417fc225915734efa3c017efc6a6d09b6d2ed00e7e2ba0f409aefe6a4bc41b",
+    "target/wp899/diagnostic-pool-cap-design-supervisor.md": "5f417fc225915734efa3c017efc6a6d09b6d2ed00e7e2ba0f409aefe6a4bc41b",
+    "target/wp899/diagnostic-pool-cap-design.md": "00f1a4533c2bbbb6b4c81f41903744b7e52098ce032ae6567c8e117467ef3eb4",
+    "target/wp899/diagnostic-pool-cap-final-evidence.md": "5e540c45ad78e3de6e0af54a809bcf299238f7932a1b061c6c9942c003d42263",
+    "target/wp899/diagnostic-pool-cap-final-source.md": "e32f58625147403d0b6c394f158225d1e40928109fddb167305e9fc7cfb3cf5a",
+    "target/wp899/diagnostic-pool-cap-final-supervisor.md": "27dd091deee9ae722c32d30f948851fbfc315864a799fb3984b44d32e38c5ff0",
+    "target/wp899/diagnostic-pool-cap-focused.json": "f098842a6152a1a7faaa684cf4359bc8324af4bf71370ff86445110226b5fae7",
+    "target/wp899/diagnostic-pool-cap-focused.log": "de98efa319abf83e64b0ff4f88243ab1a5d7e54756e00d6097f2864a227d205c",
+    "target/wp899/diagnostic-pool-cap-initial-preflight.json": "8a415669ad7c67f6898cc94b62a11390f997983f3a1a4d441ef0ff2e7f6a89ca",
+    "target/wp899/diagnostic-pool-cap-initial-preflight.log": "e80a548e8b151b5dc95ad0494f5302d6a6733f7f19fc35c2d8f91042057ecd20",
+    "target/wp899/diagnostic-pool-cap-initial-test-compile.json": "084a86ff03b428dcaae204f7733b69be55b031a6203744a26b44ec8ba937b419",
+    "target/wp899/diagnostic-pool-cap-initial-test-compile.jsonl": "7542dbbef92f6902eacee8767a8d7494e1d195c65634db469690801bb15e86ad",
+    "target/wp899/diagnostic-pool-cap-preflight.json": "40edee1a0d7cf3d6baa645e57d30556d019ccc0417ecb79ace85f33db770368b",
+    "target/wp899/diagnostic-pool-cap-preflight.log": "e80a548e8b151b5dc95ad0494f5302d6a6733f7f19fc35c2d8f91042057ecd20",
+    "target/wp899/diagnostic-pool-cap-test-compile.json": "86ef1d0182809975af7e148f128e45810966c198c66a8917fc9917e798bbb0ac",
+    "target/wp899/diagnostic-pool-cap-test-compile.jsonl": "283a4aad9c1d091e5c16c82e80bc8dcc075b55ea8e7153066ad640fedddb1a69",
+    "target/wp899/diagnostic-pool-cap-validate.py": "61de55e63e5a4e76603a9be568a4bbe46640099e98969bc397db5e6dfd165439"
+  },
+  "residuals": [
+    "Queueing may change selected deadline/error; source work clocks unchanged.",
+    "Running OS DNS remains uncancellable; normal RuntimeDrop joins and actual source run requires external supervision.",
+    "No historical allocation/thread cause, VAS/RSS fit or source admission established."
+  ],
+  "next": "Root prepares separately reviewed global15/local1 actual observation; one fresh contract/freeze, no automatic retry, unchanged source/supervisor ceilings."
+}

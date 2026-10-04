@@ -1025,3 +1025,119 @@ fn await_descriptor_retirement(budget: &slug_workspace_v2::ImageDescriptorBudget
         "actual descriptor history must retire"
     );
 }
+
+#[test]
+#[cfg(target_os = "linux")]
+fn actual_profile_bounds_owned_runtime_queue_and_joins_retained_work() {
+    use std::sync::Condvar;
+    use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    struct Release(Arc<(Mutex<bool>, Condvar)>);
+    impl Drop for Release {
+        fn drop(&mut self) {
+            *self.0.0.lock().unwrap_or_else(|error| error.into_inner()) = true;
+            self.0.1.notify_all();
+        }
+    }
+    for (limits, held) in [
+        (SourceServiceLimits::default(), 3),
+        (SourceServiceLimits::actual_root(), 2),
+    ] {
+        let f = selected_tool_source::tests::Fixture::new(
+            &selected_tool_source::tests::scratch_program(1),
+        );
+        let (diagnostic, _) = diagnostic_fixture_with_limits(&f, limits);
+        let entered = Arc::new(AtomicUsize::new(0));
+        let completed = Arc::new(AtomicUsize::new(0));
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        // Declared after the runtime so assertion failure releases before Drop.
+        let release = Release(gate.clone());
+        diagnostic.inspect_for_test(|owner, _| {
+            owner.runtime.block_on(async {
+                let end = Instant::now() + Duration::from_secs(2);
+                let jobs: Vec<_> = (0..3)
+                    .map(|_| {
+                        let (gate, entered, completed) =
+                            (gate.clone(), entered.clone(), completed.clone());
+                        tokio::task::spawn_blocking(move || {
+                            entered.fetch_add(1, Ordering::SeqCst);
+                            let (lock, ready) = &*gate;
+                            let mut open = lock.lock().unwrap();
+                            while !*open {
+                                let remaining = end.saturating_duration_since(Instant::now());
+                                if remaining.is_zero() {
+                                    return Err(());
+                                }
+                                open = ready.wait_timeout(open, remaining).unwrap().0;
+                            }
+                            completed.fetch_add(1, Ordering::SeqCst);
+                            Ok::<usize, ()>(1)
+                        })
+                    })
+                    .collect();
+                tokio::time::timeout(Duration::from_millis(500), async {
+                    while entered.load(Ordering::SeqCst) < held {
+                        tokio::task::yield_now().await;
+                    }
+                })
+                .await
+                .unwrap();
+                assert_eq!(entered.load(Ordering::SeqCst), held);
+                assert_eq!(completed.load(Ordering::SeqCst), 0);
+                let literal = tokio::time::timeout(
+                    Duration::from_millis(50),
+                    tokio::net::lookup_host(("127.0.0.1", 9)),
+                )
+                .await
+                .unwrap()
+                .unwrap();
+                assert_eq!(
+                    literal.collect::<Vec<_>>(),
+                    ["127.0.0.1:9".parse().unwrap()]
+                );
+                let mut lookup = std::pin::pin!(tokio::net::lookup_host("localhost:invalid"));
+                if held == 2 {
+                    assert!(
+                        tokio::time::timeout(Duration::from_millis(50), &mut lookup)
+                            .await
+                            .is_err()
+                    );
+                } else {
+                    let error = tokio::time::timeout(Duration::from_millis(500), &mut lookup)
+                        .await
+                        .unwrap()
+                        .err()
+                        .unwrap();
+                    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+                }
+                assert_eq!(entered.load(Ordering::SeqCst), held);
+                assert_eq!(completed.load(Ordering::SeqCst), 0);
+                drop(release);
+                if held == 2 {
+                    let error = tokio::time::timeout(Duration::from_millis(500), &mut lookup)
+                        .await
+                        .unwrap()
+                        .err()
+                        .unwrap();
+                    assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+                }
+                let mut sum = 0;
+                for job in jobs {
+                    sum += tokio::time::timeout(Duration::from_millis(500), job)
+                        .await
+                        .unwrap()
+                        .unwrap()
+                        .unwrap();
+                }
+                assert_eq!(sum, 3);
+                assert_eq!(entered.load(Ordering::SeqCst), 3);
+                assert_eq!(completed.load(Ordering::SeqCst), 3);
+            })
+        });
+        let engine = Arc::downgrade(&diagnostic.runtime.as_ref().unwrap().dice);
+        drop(diagnostic);
+        assert!(engine.upgrade().is_none());
+    }
+}

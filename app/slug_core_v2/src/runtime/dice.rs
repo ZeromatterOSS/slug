@@ -6125,8 +6125,18 @@ impl WorkspaceRuntime {
             workspace.clone(),
         ));
         let loader = BzlModuleEvaluator::new(&workspace)?;
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
+        let mut runtime_builder = tokio::runtime::Builder::new_current_thread();
+        runtime_builder.enable_all();
+        // Only the explicit Linux test diagnostic bounds the shared blocking
+        // pool. Queueing may select a deadline; running OS DNS remains join-owned.
+        #[cfg(all(test, target_os = "linux"))]
+        if let Some(threads) = source_scope
+            .as_ref()
+            .and_then(|scope| scope.limits().blocking_threads)
+        {
+            runtime_builder.max_blocking_threads(threads);
+        }
+        let runtime = runtime_builder
             .build()
             .context("creating workspace DICE runtime")?;
         let mut dice_builder = Dice::builder();

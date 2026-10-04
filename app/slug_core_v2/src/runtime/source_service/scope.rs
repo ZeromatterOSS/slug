@@ -46,6 +46,8 @@ pub(in crate::runtime) struct SourceServiceLimits {
     pub(in crate::runtime) decoded_bytes: u64,
     pub(in crate::runtime) written_bytes: u64,
     pub(in crate::runtime) live_buffer_bytes: usize,
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) blocking_threads: Option<usize>,
 }
 impl Default for SourceServiceLimits {
     fn default() -> Self {
@@ -58,6 +60,8 @@ impl Default for SourceServiceLimits {
             decoded_bytes: 2 << 30,
             written_bytes: 2 << 30,
             live_buffer_bytes: 16 << 20,
+            #[cfg(all(test, target_os = "linux"))]
+            blocking_threads: None,
         }
     }
 }
@@ -76,11 +80,16 @@ impl SourceServiceLimits {
         Self {
             registry_attempts: Self::MAX_REGISTRY_ATTEMPTS,
             live_buffer_bytes: Self::MAX_LIVE_BUFFER_BYTES,
+            blocking_threads: Some(2),
             ..Self::default()
         }
     }
 
     fn valid(self) -> bool {
+        #[cfg(all(test, target_os = "linux"))]
+        if self.blocking_threads.is_some_and(|n| !(1..=2).contains(&n)) {
+            return false;
+        }
         let max = Self::default();
         [
             (self.registry_object_bytes, max.registry_object_bytes),

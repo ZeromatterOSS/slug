@@ -28,14 +28,17 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
     let defaults = SourceServiceLimits::default();
     assert_eq!(defaults.registry_attempts, 128);
     assert_eq!(defaults.live_buffer_bytes, 16 << 20);
+    assert_eq!(defaults.blocking_threads, None);
     let profile = SourceServiceLimits::actual_root();
     assert_eq!(profile.registry_attempts, 256);
     assert_eq!(profile.live_buffer_bytes, 40 << 20);
+    assert_eq!(profile.blocking_threads, Some(2));
     assert_eq!(
         profile,
         SourceServiceLimits {
             registry_attempts: 256,
             live_buffer_bytes: 40 << 20,
+            blocking_threads: Some(2),
             ..defaults
         }
     );
@@ -76,6 +79,25 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
             limits,
         )
     };
+    for threads in [1, 2] {
+        assert!(
+            construct(SourceServiceLimits {
+                blocking_threads: Some(threads),
+                ..defaults
+            })
+            .is_ok()
+        );
+    }
+    for threads in [0, 3, usize::MAX] {
+        assert_eq!(
+            construct(SourceServiceLimits {
+                blocking_threads: Some(threads),
+                ..defaults
+            })
+            .err(),
+            Some(SourceServiceError::InvalidLimits)
+        );
+    }
     for (ceiling, set) in ceilings {
         let mut limits = defaults;
         set(&mut limits, ceiling);

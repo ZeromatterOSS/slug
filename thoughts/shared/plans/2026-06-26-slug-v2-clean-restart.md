@@ -35,7 +35,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Controlled blocking-pool discriminator accepted; diagnostic runtime cap design next; full WP899 unaccepted
+Status: Two-worker diagnostic profile accepted; bounded actual source observation next; full WP899 unaccepted
+
+The explicit Linux cfg(test) actual-root profile now bounds its owned Tokio
+blocking pool to two workers. Default/production behavior and every other source
+or supervisor ceiling remain. Three FINALs accept64/64 controls in1.304s and
+default Core/CLI checks, including normal owned-runtime queue/release/join behavior.
+[Receipt](slug-v2-subplans/wp899-diagnostic-blocking-cap-2026-10-04.json). Queueing may change deadline/error
+selection; running OS DNS still requires external containment. Root prepares one
+separately reviewed global15/local1 source observation with a fresh artifact and
+contract/freeze; no automatic retry or source-fit claim. FullWP899 remains open.
 
 The controlled native blocking-pool probe passes both modes: four held jobs with
 five workers by default, versus two held jobs and a queued invalid-port lookup with
@@ -43,9 +52,7 @@ a two-worker cap. All four jobs complete, lookup dispatch completes, workers ret
 and both processes join. Internal dispatch VmSize is351,264,768B versus143,597,568B;
 RSS remains below4MiB. These controlled observations establish queue/lifecycle
 behavior, not historical or allocator attribution. Three terminal FINALs accept
-exact parent cleanup. [Receipt](slug-v2-subplans/wp899-blocking-pool-controlled-2026-10-04.json). Root next reviews a
-diagnostic-only runtime blocking-worker cap; no production change or actual retry
-is selected. FullWP899/source admission remains open.
+exact parent cleanup. [Receipt](slug-v2-subplans/wp899-blocking-pool-controlled-2026-10-04.json). The diagnostic-only cap is accepted above; no production change is selected. FullWP899/source admission remains open.
 
 The spent global14 observation proves first Connect/Step/Timer/Deadline, paired
 only to selected ScopeWorkDeadline, after151 distinct registry admissions and zero
