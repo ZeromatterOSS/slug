@@ -35,7 +35,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Pool2 allocation terminal preserved; virtual allocation owner audit next; full WP899 unaccepted
+Status: Controlled heap accounting accepted; finite repeated-heap discriminator next; full WP899 unaccepted
+
+The controlled normal Starlark parse/evaluate/freeze/clone/drop probe passes two
+rounds with2048 exact strings, stable frozen heap portion accounting329,088B and
+normal final drop. Postdrop Rust-global requested-live observations904,714B then
+1,166,858B are distinct from public heap and process memory; they establish no
+cache owner, physical backing or unbounded growth. Three terminal FINALs accept
+join/stage/exact-parent cleanup. [Receipt](slug-v2-subplans/wp899-starlark-heap-controlled-2026-10-04.json).
+Root selects a fixed64-identical-round controlled discriminator with the same
+resource/time ceilings and per-round observations, to distinguish warmup from
+finite repeated growth. No actual replay or production allocator change selected.
+FullWP899/source admission remains open.
 
 The spent global15 two-worker profile observation emitted zero Slug records:
 reported4,696,589B allocation failure coexists with supervisor STOP_WAIT/DEADLINE
@@ -43,8 +54,8 @@ disk_census_bound. 674/675 censuses complete; observed VmSize/VmPeak4,293,820,41
 threadpeak5 and sampledRSS240,381,952B are independent maxima. Allocation owner,
 allocation-time state and causal ordering remain unknown. TERM/KILL, actual join,
 stage and exact parent cleanup pass three terminal FINALs. [Receipt](slug-v2-subplans/wp899-pool2-allocation-frontier-2026-10-04.json).
-The cap alone did not establish admission. Next is a source-owned virtual allocation/
-retention audit; no actual retry, allocator policy or ceiling change selected.
+The cap alone did not establish admission. The source audit and controlled heap discriminator are recorded above; no actual
+retry, allocator policy or ceiling change selected.
 FullWP899/source admission remains open.
 
 The explicit Linux cfg(test) actual-root profile now bounds its owned Tokio
