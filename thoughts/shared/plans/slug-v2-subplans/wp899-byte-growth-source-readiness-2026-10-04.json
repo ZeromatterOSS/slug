@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "state": "SOURCE_OBSERVATION_REVIEWED_UNLAUNCHED_NETWORK_APPROVAL_PENDING",
+  "accepted_component": "9f27930d9853011db5ed759f1c6cb1ce84b95bf1",
+  "source_gate_accepted": false,
+  "planned_global_actual_attempt": 16,
+  "attempt_claimed": false,
+  "child_started": false,
+  "fresh_controls": {
+    "selected": 76,
+    "passed": 76,
+    "elapsed_seconds": 1.3025969989830628,
+    "artifact_sha256": "e347e0ba1ddddd218ba7007be5d62f7eaec2ba6807136aa418049a0e7e1cdca3",
+    "receipt": "target/wp899/genuine-root-byte-growth-focused.json",
+    "receipt_sha256": "d79173d109288f5c171c465709fccda0be1f6d724a5ca378576af1f588b5e2a5"
+  },
+  "exact_ignored_matches": 1,
+  "freeze_base": "9f27930d9853011db5ed759f1c6cb1ce84b95bf1",
+  "freeze": "target/wp899/genuine-root-byte-growth-invocation-freeze.json",
+  "freeze_sha256": "9fae661e1c956a7db68b2343d261e392433123a1fdf6a6b8a65c8f4859d03972",
+  "contract_sha256": "11d2f7d47c0a20991667bef9818af5e14e5487e0cd4437be6eb890b8a27f4fe4",
+  "source_pins": 120,
+  "prerequisite_pins": 263,
+  "prior_spent_pins": 159,
+  "independent_eligibility_reviews": {
+    "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-byte-growth-eligibility-source.md": "25b5216438dd5f78248e25f14e345b764359dcdd937c3721f5e5ab364e791872",
+    "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-byte-growth-eligibility-input.md": "2e7dc3a12927aebd520cbb2d59fe31e9163f8f07287712b9525b6e5d890fbb8e",
+    "/run/media/system/Colossus/dev/slug/target/wp899/genuine-root-byte-growth-eligibility-evidence.md": "252c50f29a42cfb74c81029b86d64c7a27e0a12ad94f9edd32963626413197d7"
+  },
+  "automatic_approval_rejection": "The run may contact unverified registry/archive destinations and export request or environment-derived data, while the user authorized implementation but not this specific network payload and destinations.",
+  "source_audit": "GET path/query+Host+emptybody; TLSno clientauth. SoledefaultBCR/LockfileError do not close archive/redirect destination list. Authorizedmodule_ctx.getenv can feedcomputed downloadURLs. No environment values inspected; actual environment-derived URL use unknown. This audit does not resolve rejection.",
+  "parent": {
+    "path": "/tmp/slug-wp899-byte-growth-source-parent-k6osqiv0",
+    "device": 54,
+    "inode": 842202,
+    "uid": 1000,
+    "mode": "0o700"
+  },
+  "parent_canonical_empty_identity_verified": true,
+  "ledger_and_execution_outputs_absent": true,
+  "pending_record": "target/wp899/genuine-root-byte-growth-approval-pending.json",
+  "pending_record_sha256": "60fbbfe27fadca2fb37b59e163b6bf59434d9801e31780ce555d649ba0486430",
+  "next": "Await required explicit human network approval. No workaround, automatic launch or new attempt claim. This docs-only scheduling checkpoint changes HEAD: preserve original unlaunched freeze, then reconcile its base/reviews and recheck all live pins before an authorized run. Existing semantic/artifact evidence remains unchanged."
+}

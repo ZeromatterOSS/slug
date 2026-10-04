@@ -35,7 +35,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Byte-based Starlark growth repair accepted; actual source observation design next; full WP899 unaccepted
+Status: Byte-based growth accepted; source observation awaits network approval; full WP899 unaccepted
+
+The next actual source observation has three eligibility ACCEPTs, fresh76/76
+controls and one exact ignored selector. Automatic approval review rejected its
+launch before process creation: metadata/Starlark-selected destinations and
+possible environment-derived URL data are not fully verified. A source audit
+confirms empty-body GET transport but cannot close that uncertainty without
+inspecting opaque data. Required explicit human network approval is pending.
+The freeze and empty owned parent are preserved; no attempt ledger exists and
+planned global16 is unspent. [Readiness receipt](slug-v2-subplans/wp899-byte-growth-source-readiness-2026-10-04.json).
+Do not bypass the rejection. After approval, reconcile this docs-only HEAD change
+against the preserved freeze and recheck all live pins before its single launch.
+FullWP899/source admission remains open.
 
 Three DESIGNs and three component/terminal FINALs accept preferred Starlark chunk
 growth based on saturated trimmed filled bytes rather than cached chain count.
