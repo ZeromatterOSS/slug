@@ -35,7 +35,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Connect and virtual-address terminal preserved; controlled concurrency owner audit next; full WP899 unaccepted
+Status: Controlled blocking-pool discriminator accepted; diagnostic runtime cap design next; full WP899 unaccepted
+
+The controlled native blocking-pool probe passes both modes: four held jobs with
+five workers by default, versus two held jobs and a queued invalid-port lookup with
+a two-worker cap. All four jobs complete, lookup dispatch completes, workers retire
+and both processes join. Internal dispatch VmSize is351,264,768B versus143,597,568B;
+RSS remains below4MiB. These controlled observations establish queue/lifecycle
+behavior, not historical or allocator attribution. Three terminal FINALs accept
+exact parent cleanup. [Receipt](slug-v2-subplans/wp899-blocking-pool-controlled-2026-10-04.json). Root next reviews a
+diagnostic-only runtime blocking-worker cap; no production change or actual retry
+is selected. FullWP899/source admission remains open.
 
 The spent global14 observation proves first Connect/Step/Timer/Deadline, paired
 only to selected ScopeWorkDeadline, after151 distinct registry admissions and zero
@@ -43,9 +53,8 @@ source attempts. 730 validated root observations report2,949,361,664B VmSize/VmP
 42 threads and sampled82,366,464B RSS; these independent observations do not identify
 allocation-time state or global13 cause. All730 censuses complete; restoration,
 engine retirement and join/stage/exact-parent cleanup pass three terminal FINALs.
-[Receipt](slug-v2-subplans/wp899-connect-vm-frontier-2026-10-04.json). Next is a bounded controlled resolver/concurrency/
-virtual-address owner discriminator; no policy/cap/allocator change or actual retry
-is selected. FullWP899/source admission remains open.
+[Receipt](slug-v2-subplans/wp899-connect-vm-frontier-2026-10-04.json). The controlled discriminator is accepted above; no actual retry or allocator
+change is selected. FullWP899/source admission remains open.
 
 The supervisor now records validated root VmSize/VmPeak/thread observations and
 exact selected census check sites, preserving every cap and first-failure/lifecycle
