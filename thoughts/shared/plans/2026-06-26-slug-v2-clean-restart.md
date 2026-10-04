@@ -35,7 +35,13 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Finite heap sequence accepted; scoped archive allocation audit next; full WP899 unaccepted
+Status: Scoped archive fallible reservations accepted; source admission investigation next; full WP899 unaccepted
+
+Three FINALs accept scoped archive fallible Vec reservations: sticky refusal before
+copy/publication, temp/credit retirement and unchanged unscoped bytes.71 unique
+controls are covered as68+3 socket-supplement passes; Core/CLI checks pass.
+[Receipt](slug-v2-subplans/wp899-archive-fallible-2026-10-04.json). Source admission
+investigation continues; no actual retry or historical owner claim selected.
 
 The fixed64-round controlled heap sequence passes all semantic/clone/drop checks
 and384 snapshots. Frozen heap portions remain329,088B; Rust-global postdrop bytes

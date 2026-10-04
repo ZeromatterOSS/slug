@@ -608,11 +608,29 @@ fn validate_global_pax_comment(bytes: &[u8]) -> Result<(), ArchiveMaterializatio
 }
 
 fn read_capture(
+    capture: tempfile::NamedTempFile,
+    subject: &str,
+    limit: u64,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<Vec<u8>, ArchiveMaterializationError> {
+    read_capture_with_reserve(
+        capture,
+        subject,
+        limit,
+        active,
+        scope,
+        Vec::try_reserve_exact,
+    )
+}
+
+fn read_capture_with_reserve(
     mut capture: tempfile::NamedTempFile,
     subject: &str,
     limit: u64,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
+    reserve: impl FnOnce(&mut Vec<u8>, usize) -> Result<(), std::collections::TryReserveError>,
 ) -> Result<Vec<u8>, ArchiveMaterializationError> {
     let size = capture
         .as_file()
@@ -639,7 +657,27 @@ fn read_capture(
     } else {
         size as usize
     };
-    let mut bytes = Vec::with_capacity(capacity);
+    let mut bytes = if let Some(scope) = scope {
+        let mut bytes = Vec::new();
+        reserve(&mut bytes, capacity).map_err(|_| {
+            materialization(
+                scope
+                    .poison(source_service::SourceServiceError::Allocation)
+                    .to_string(),
+            )
+        })?;
+        // Spare capacity must fit the caller's existing payload credit.
+        if bytes.capacity() > capacity {
+            return Err(materialization(
+                scope
+                    .poison(source_service::SourceServiceError::Allocation)
+                    .to_string(),
+            ));
+        }
+        bytes
+    } else {
+        Vec::with_capacity(capacity)
+    };
     if scope.is_none() {
         capture
             .as_file_mut()

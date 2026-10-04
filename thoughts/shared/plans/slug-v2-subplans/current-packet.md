@@ -1,7 +1,34 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Finite heap sequence accepted; scoped archive allocation audit next; full WP899 unaccepted
+Status: Scoped archive fallible reservations accepted; source admission investigation next; full WP899 unaccepted
+
+Root accepts a Slug-native robustness repair at the two existing scoped archive
+byte-buffer producers: verified patch capture read and patch-target read. Reuse
+RegistryBuffer's fallible exact Vec reservation and over-capacity refusal, after
+existing payload/scratch credit admission. Allocation refusal selects sticky Scope
+Allocation; any earlier cause wins. Capture RAII and target staging remain owners
+of cleanup; caller-owned capture payload credit is not duplicated. Unscoped reads,
+all limits, source authority, DICE identity and later parser allocations stay.
+
+Three independent DESIGNs accept private per-call reservation seams; normal
+wrappers pass Vec::try_reserve_exact. Two tiny owner fixtures use actual capacity
+overflow (usize::MAX), over-capacity refusal, cancellation before/during reservation,
+normal successful bytes, no body-copy/publication, temp retirement and final credit
+retirement. This proves those reservation paths, not native ENOMEM, global15's
+owner or universal OOM reporting. No actual retry or allocator policy selected.
+Allowlist: repository_archive_{realize,patch}.rs and their existing tests; this
+manifest/canonical scheduling and a compact acceptance receipt. Growth is68
+production/203 test lines after format; existing patch body stays cohesive despite
+its >150-line complexity trigger, with no adjacent parser rewrite. No retained
+representation/donor/cache change; reuse Stage9 Core diagnostic accounting row.
+Three FINALs accept71 unique controls:68 fresh initial passes plus3 existing HTTP
+socket controls passing separately after sandbox EPERM fixture setup. Pinned
+no-run5.145s/default Core+CLI2.063s pass; plan/archive/diff checks pass.
+[Receipt](wp899-archive-fallible-2026-10-04.json). Full source admission remains
+unproved. Root is selecting the next source-owned investigation; no new actual
+observation is selected until a concrete relevant hypothesis is reviewed.
+
 
 The fixed64-round controlled heap sequence passes all semantic/clone/drop checks
 and384 snapshots. Frozen heap portions remain329,088B; Rust-global postdrop bytes

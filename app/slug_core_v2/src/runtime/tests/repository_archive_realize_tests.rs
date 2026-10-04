@@ -1257,3 +1257,102 @@ fn scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements() {
         assert_eq!(scope.snapshot().live_buffer_bytes, 0);
     }
 }
+
+#[test]
+fn scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup() {
+    use std::time::Instant;
+
+    use slug_workspace_v2::NormalizedAbsolutePath;
+    use source_service::SourceServiceError;
+
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+
+    let new_scope = || {
+        let work = Instant::now() + Duration::from_secs(2);
+        SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            work,
+            work + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap()
+    };
+    let payload = b"capture\0\xff\n";
+    let scope = new_scope();
+    let credit = scope
+        .reserve_buffer_at(
+            payload.len(),
+            source_service::SourceBufferSite::PatchCapture,
+        )
+        .unwrap();
+    assert_eq!(
+        read_capture(capture(payload), "patch", 1024, &|| true, Some(&scope)).unwrap(),
+        payload
+    );
+    assert_eq!(scope.check(), Ok(()));
+    assert_eq!(scope.snapshot().live_buffer_bytes, payload.len());
+    assert_eq!(scope.snapshot().written_bytes, 0);
+    drop(credit);
+    assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+
+    // Overflow is a real TryReserveError; oversizing exercises the credit guard.
+    // Cancellation before/inside reservation must retain the first cause.
+    for mode in 0..4 {
+        let scope = new_scope();
+        let credit = scope
+            .reserve_buffer_at(
+                payload.len(),
+                source_service::SourceBufferSite::PatchCapture,
+            )
+            .unwrap();
+        let mut file = capture(payload);
+        file.as_file_mut().rewind().unwrap();
+        let path = file.path().to_owned();
+        let mut observed = file.as_file().try_clone().unwrap();
+        let calls = Cell::new(0);
+        let invoked = Cell::new(false);
+        if mode == 3 {
+            scope.cancel();
+        }
+        let error = read_capture_with_reserve(
+            file,
+            "patch",
+            1024,
+            &|| {
+                calls.set(calls.get() + 1);
+                true
+            },
+            Some(&scope),
+            |bytes, capacity| {
+                invoked.set(true);
+                assert_eq!(capacity, payload.len());
+                assert!(bytes.is_empty());
+                assert_eq!(bytes.capacity(), 0);
+                assert_eq!(
+                    scope.snapshot().live_buffer_bytes,
+                    payload.len() + 64 * 1024
+                );
+                if mode == 1 {
+                    scope.cancel();
+                }
+                bytes.try_reserve_exact(if mode == 2 { capacity + 1 } else { usize::MAX })
+            },
+        )
+        .unwrap_err();
+        let expected = if mode == 1 || mode == 3 {
+            SourceServiceError::Cancelled
+        } else {
+            SourceServiceError::Allocation
+        };
+        assert!(error.message.contains(&expected.to_string()), "{error:?}");
+        assert_eq!(scope.check(), Err(expected));
+        assert_eq!(invoked.get(), mode != 3);
+        assert_eq!(calls.get(), 1, "copy never began");
+        assert_eq!(observed.stream_position().unwrap(), 0);
+        assert!(!path.exists(), "failed capture must retire");
+        assert_eq!(scope.snapshot().written_bytes, 0);
+        assert_eq!(scope.snapshot().live_buffer_bytes, payload.len());
+        drop(credit);
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+    }
+}

@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "eb3bc2c242d04271f843d3327413321e10fe5e64",
+  "compatibility": "Slug-native scoped diagnostic robustness; unchanged unscoped/exact admitted bytes; Windows deferred",
+  "outcome": "Scoped patch-capture and patch-target Vec reservations return sticky Allocation before copy/publication and retire local credits/temp state. Earlier selected poison wins.",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "2243eeb735caa5b0c07d6ec7ad7ad8899cb79a4b6e9684984127960604f4ad6e",
+    "app/slug_core_v2/src/runtime/repository_archive_patch.rs": "057b9a29e5910e46e54e19098c1294a9755657cbddf1296d7bf407ae112ae53d",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "0aada5856dec499a4954d67d88d0ee5fd9c3a314ddcee435a1e6db2775486740",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_patch_tests.rs": "dfb223ffc237e2d7fab85a4c133368054cdaca91278a3672a4c87f9951504781"
+  },
+  "evidence_sha256": {
+    "target/wp899/archive-fallible-test-compile.json": "4cbb82be09a717ca089695a4e351a6ae618647bdc6c5d84874629e8579588905",
+    "target/wp899/archive-fallible-test-compile.jsonl": "550dec2f9d7d52e4ddf01dd755b326d68caf97d46ab8eab07b464e7c0a3f5021",
+    "target/wp899/archive-fallible-preflight.json": "a79e1d3c3889b8b1efcfce3e04ad68dfd57494fd52cb8c2f82935a7cca1ee8b9",
+    "target/wp899/archive-fallible-preflight.log": "bde8be3d6c91cf852663f360a6b0abec5f96113e8480ca02e9e394007dba9965",
+    "target/wp899/archive-fallible-focused.json": "0b7d703e5077db318d75dc1e05b4eaa350188e59def0ee3d50ae12b2727701d5",
+    "target/wp899/archive-fallible-focused.log": "1325fd7f601229a5e112896d571d7a4cad1ae00ac21e4f4ef8ca7d233bf5d4fc",
+    "target/wp899/archive-fallible-focused-socket-supplement.json": "a32dbc0631509cbcccd6515394cb8ef0c5362c7c1d20580e6fdb1705dd74a714",
+    "target/wp899/archive-fallible-focused-socket-supplement.log": "c2de81b344f5fa042bd85c605c3e248251bf969e2d578895e77d7c32e1fad452",
+    "target/wp899/archive-fallible-default-compile.json": "b639af62bbeb6a0da5fda48ceefd7dc067c000a985ce73bf1f1d91bc08981d35",
+    "target/wp899/archive-fallible-default-compile.jsonl": "5681cfaa2fe1a0b73f6aacdb6894962f5457e87e69b4130bcc04d7eb303d47eb",
+    "target/wp899/archive-fallible-validate.py": "8c721b0fe2e0f14da529aa88363a3d0bc52acca3c3c130b9eb430da12df2ace6",
+    "target/wp899/archive-fallible-socket-validate.py": "0aa8a994f8b20af32a9f5479cd7f52693d53fb46a3743dc84b9a089cf5e89e3b",
+    "target/wp899/archive-fallible-commands.json": "47502b90a7eed03e7871fdd64032c6dc098270a42d5654a401ec32dba4692f87",
+    "target/wp899/archive-fallible-selectors.json": "407fe4f4354914c76e1141e4d44d6e5b3ecf6f0d77d4d23c8df23ecb139e6388"
+  },
+  "validation": {
+    "test-compile": {
+      "exit_code": 0,
+      "elapsed_seconds": 5.144598571991082,
+      "log_sha256": "550dec2f9d7d52e4ddf01dd755b326d68caf97d46ab8eab07b464e7c0a3f5021",
+      "source_unchanged": true,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "199234ef1b3ba4e0e6a2a906da7a5d8f425d22dbe53cc3cc9041c8919ec42a67"
+    },
+    "preflight": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.02511910500470549,
+      "log_sha256": "bde8be3d6c91cf852663f360a6b0abec5f96113e8480ca02e9e394007dba9965",
+      "source_unchanged": true,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "199234ef1b3ba4e0e6a2a906da7a5d8f425d22dbe53cc3cc9041c8919ec42a67",
+      "selected": 71
+    },
+    "focused": {
+      "exit_code": 101,
+      "elapsed_seconds": 1.3048698579659685,
+      "log_sha256": "1325fd7f601229a5e112896d571d7a4cad1ae00ac21e4f4ef8ca7d233bf5d4fc",
+      "source_unchanged": true,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "199234ef1b3ba4e0e6a2a906da7a5d8f425d22dbe53cc3cc9041c8919ec42a67",
+      "selected": 71,
+      "passed": 68
+    },
+    "focused-socket-supplement": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.006082658015657216,
+      "log_sha256": "c2de81b344f5fa042bd85c605c3e248251bf969e2d578895e77d7c32e1fad452",
+      "source_unchanged": true,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "artifact_sha256": "199234ef1b3ba4e0e6a2a906da7a5d8f425d22dbe53cc3cc9041c8919ec42a67",
+      "selected": 3,
+      "passed": 3
+    },
+    "default-compile": {
+      "exit_code": 0,
+      "elapsed_seconds": 2.0631812950014137,
+      "log_sha256": "5681cfaa2fe1a0b73f6aacdb6894962f5457e87e69b4130bcc04d7eb303d47eb",
+      "source_unchanged": true
+    }
+  },
+  "controls": [
+    "Normal capture arbitrary bytes and complete selected patch success",
+    "Genuine usize::MAX capacity overflow after valid metadata/payload/scratch admission",
+    "Successful over-capacity reserve rejected before copy",
+    "Cancellation inside reserve preserves earlier poison",
+    "Preselected cancellation prevents reservation callback",
+    "Capture shared FD offset0/no copy, temporary capture removed, caller credit remains until explicit drop",
+    "Patch no copy/target mutation/staging/written bytes, local credits0",
+    "64 protected source controls plus5 existing archive/patch lifecycle controls"
+  ],
+  "review_status": "Accepted component after three independent FINALs; fullWP899 unaccepted",
+  "reviews": {
+    "target/wp899/archive-fallible-final-source.md": "248a54dbf5d520ae3c5aaf1a43bef241ed0ec5aaa4d3c4a68fcb95ec436a0025",
+    "target/wp899/archive-fallible-final-input.md": "871654315f5f9134ef9c945f89cc82f059fa1833eafd4849276a0231a7a61029",
+    "target/wp899/archive-fallible-final-evidence.md": "e0db02f7a61cc8835f69eaecfd16e8e0061e7822de8bef8070060773700a13b8"
+  },
+  "growth": {
+    "production_insertions": 68,
+    "test_insertions": 203,
+    "production_deletions": 3,
+    "cohesion": "Existing private patch apply_file body exceeds150 lines; retained as one patch transformation owner, seam only at exact byte reservation. No parser rewrite."
+  },
+  "limits": "All scope/supervisor ceilings unchanged; no actual launch or allocator policy selected",
+  "residual": [
+    "CapacityOverflow verifies error propagation; native ENOMEM is not directly exercised",
+    "Later patch parser/output Vec growth, Arc allocation, third-party Starlark allocations and error formatting remain potentially infallible",
+    "No global15 owner/history/source fit or fullWP899/coupled integration acceptance"
+  ],
+  "toolchain": "nightly-2025-09-14",
+  "timing_seconds": {
+    "compile": 5.144598571991082,
+    "focused_initial": 1.3048698579659685,
+    "focused_socket_supplement": 0.006082658015657216,
+    "default_compile": 2.0631812950014137
+  },
+  "observable_gate_advanced": "Two scoped archive producer allocation/refusal cleanup paths;71unique gates covered as68+3, not one71-pass batch"
+}

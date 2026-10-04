@@ -108,6 +108,17 @@ fn apply_file(
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
+    apply_file_with_reserve(root, relative, hunks, active, scope, Vec::try_reserve_exact)
+}
+
+fn apply_file_with_reserve(
+    root: &Path,
+    relative: &str,
+    hunks: &[(HunkHeader, &[&str])],
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+    reserve: impl FnOnce(&mut Vec<u8>, usize) -> Result<(), std::collections::TryReserveError>,
+) -> Result<(), ArchiveMaterializationError> {
     let target = root.join(relative);
     let metadata = std::fs::symlink_metadata(&target).map_err(|error| {
         materialization(format!(
@@ -132,9 +143,25 @@ fn apply_file(
     // The copy into this Vec is not a filesystem write, but its fixed scratch
     // remains an owned source-service buffer until the copy has returned.
     let _copy_scratch_credit = source_service::buffer(scope, 64 * 1024).map_err(materialization)?;
-    let bytes = if scope.is_some() {
+    let bytes = if let Some(owner) = scope {
         let mut input = std::fs::File::open(&target).map_err(|e| materialization(e.to_string()))?;
-        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        let capacity = usize::try_from(metadata.len())
+            .map_err(|_| materialization("patch target size overflow"))?;
+        let mut bytes = Vec::new();
+        reserve(&mut bytes, capacity).map_err(|_| {
+            materialization(
+                owner
+                    .poison(source_service::SourceServiceError::Allocation)
+                    .to_string(),
+            )
+        })?;
+        if bytes.capacity() > capacity {
+            return Err(materialization(
+                owner
+                    .poison(source_service::SourceServiceError::Allocation)
+                    .to_string(),
+            ));
+        }
         source_service::copy_counted(
             &mut input,
             &mut bytes,
