@@ -35,15 +35,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual allocation/census terminal preserved; bounded supervisor attribution next; full WP899 unaccepted
+Status: bounded supervisor attribution accepted; one reviewed actual observation next; full WP899 unaccepted
+
+The supervisor now records validated root VmSize/VmPeak/thread observations and
+exact selected census check sites, preserving every cap and first-failure/lifecycle
+rule. Three FINALs accept fresh35/35 (all29 protected+6 new) in3.603s, including
+untouched64MiB mapping under96MiB AS with lowRSS and a caught48MiB allocation refusal.
+[Component receipt](slug-v2-subplans/wp899-supervisor-memory-census-attribution-2026-10-04.json). Next is ONE separately reviewed
+actual observation using this supervisor; the unchanged Rust artifact and63 passing
+controls remain accepted. FullWP899/source admission remains open.
 
 The spent global13 observation emitted zero Slug records: allocation failure for
 4,732,227 bytes and childSIGABRT coexist with supervisor disk_census_bound after
 655/656 completed censuses. Their ordering, allocator owner, virtual-address state
 and source fit are unproved. Three terminal FINALs accept join/stage/exact-parent
-cleanup and immutable evidence. [Receipt](slug-v2-subplans/wp899-allocation-census-frontier-2026-10-04.json). Next is bounded
-supervisor VmSize/VmPeak/thread and exact census producer attribution, with controlled
-discriminators and unchanged caps; no actual replay is selected.
+cleanup and immutable evidence. [Receipt](slug-v2-subplans/wp899-allocation-census-frontier-2026-10-04.json). The accepted bounded supervisor diagnostics above do not retrospectively classify
+this terminal; any new actual observation requires its own review/freeze.
 
 The accepted Linux cfgtest actual profile remains40MiB, Default/non-test/non-Linux16MiB.
 All other source and supervisor limits remain. Fresh63/63 normal32MiB transfer and

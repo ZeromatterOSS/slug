@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "d162e854b862d7b53df31142c76838a7fd4429c2",
+  "status": "ACCEPT_BOUNDED_SUPERVISOR_COMPONENT_FULL_WP899_UNACCEPTED",
+  "compatibility": "Slug-native Linux diagnostic",
+  "source_hashes": {
+    "scripts/v2_source_admission_supervisor.py": "c5de496dde89e8aacf6159255df5c4f1a0af90c52c400150c78bf0535400283a",
+    "scripts/v2_source_admission_supervisor_tests.py": "ef13a07276bf1e6acc8459513fd44cb6f156f92198403208b648b01ac02e7553"
+  },
+  "validation": {
+    "schema": 1,
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "30s",
+      "/usr/bin/python3.12",
+      "scripts/v2_source_admission_supervisor_tests.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 3.602637740026694,
+    "source_hashes": {
+      "scripts/v2_source_admission_supervisor.py": "c5de496dde89e8aacf6159255df5c4f1a0af90c52c400150c78bf0535400283a",
+      "scripts/v2_source_admission_supervisor_tests.py": "ef13a07276bf1e6acc8459513fd44cb6f156f92198403208b648b01ac02e7553"
+    },
+    "sources_unchanged": true,
+    "log_sha256": "601c451723766b1bf5a981a877590a844df9a2c9ad12592484ea425a44c499b4"
+  },
+  "selected_unique": 35,
+  "passed_unique": 35,
+  "protected_unique": 29,
+  "new_unique": 6,
+  "independent_final_sha256": {
+    "source": "7f1f9281c4cb1d9c2a1b7c800e840996e9d2d5a6b0db728c50742588b34440b0",
+    "supervisor": "7ef45fdcd83856f09c08a4ea72de55fe9a5526815b15f33c1011472f687fe098",
+    "evidence": "8563c1506fa012d8510abf943819bfe6420d65586476d50c2f69d9bac47edae3"
+  },
+  "evidence_sha256": {
+    "supervisor-memory-census-design.md": "a2e7be3e3b89dcba86da21954c1d3fcbc4ce35315f2330a00fe0e8f70eebf59d",
+    "supervisor-memory-census-initial-design.md": "f7e924a285162e90265df87b4b564f21a6887bc768a7719919ffe68d2a85c5cb",
+    "supervisor-memory-census-design-source.md": "aeddd1026c53df5aa9f29d08401e763effd387bbc6ecef4fe913dd7c62bab61b",
+    "supervisor-memory-census-design-supervisor.md": "3901f1a6b046ac2efc7c5fa3a8dd5306e7ac4e9a029a9c60cfe451165c16d2ba",
+    "supervisor-memory-census-design-evidence.md": "5ff9b66b7a7b00559764c514ae0ad518d3fd681cfeb25f3549aba66a484dffae",
+    "supervisor-memory-census-source-pins.json": "b799463949dbca025a55af1755723828bd2c5416aef2ef15f3bdf3114891f0fa",
+    "supervisor-memory-census-focused.json": "e78ff11e38143193a6e7b7405d3f6ebf123ed326a8d5a41f738e63d07f6a130e",
+    "supervisor-memory-census-focused.log": "601c451723766b1bf5a981a877590a844df9a2c9ad12592484ea425a44c499b4",
+    "supervisor-memory-census-initial-source-pins.json": "0d3c0c97168f4655c8bbcf7f65f8348a30c4780e73cc7017c39f8fef57fb17b1",
+    "supervisor-memory-census-initial-focused.json": "441d04bf56daf05f38c1e7cf79627343ba7d51e20639ff11fba2b2a155bbbd0a",
+    "supervisor-memory-census-initial-focused.log": "e4372e92aee1b42921049f90c99b1fba887aa7e7898f68a5fd00c7e8d362fcd6",
+    "supervisor-memory-census-final-source.md": "7f1f9281c4cb1d9c2a1b7c800e840996e9d2d5a6b0db728c50742588b34440b0",
+    "supervisor-memory-census-final-supervisor.md": "7ef45fdcd83856f09c08a4ea72de55fe9a5526815b15f33c1011472f687fe098",
+    "supervisor-memory-census-final-evidence.md": "8563c1506fa012d8510abf943819bfe6420d65586476d50c2f69d9bac47edae3"
+  },
+  "initial_failure": {
+    "receipt": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/usr/bin/python3.12",
+        "scripts/v2_source_admission_supervisor_tests.py",
+        "-v"
+      ],
+      "exit_code": 1,
+      "elapsed_seconds": 3.6466683400212787,
+      "source_hashes": {
+        "scripts/v2_source_admission_supervisor.py": "c5de496dde89e8aacf6159255df5c4f1a0af90c52c400150c78bf0535400283a",
+        "scripts/v2_source_admission_supervisor_tests.py": "70e5680e1d191ce02b0757e29b2703c17f819ef0ca1e1bb8decebb6da77bccc1"
+      },
+      "sources_unchanged": true,
+      "log_sha256": "e4372e92aee1b42921049f90c99b1fba887aa7e7898f68a5fd00c7e8d362fcd6"
+    },
+    "ran": 35,
+    "passed": 33,
+    "failures": 1,
+    "errors": 1,
+    "attribution": "Newfixture childASunlimited correctlyrefusedbyunchangedsampler; existingPythonjoin handshakecouldprecedekerneltaskdisappearance. Testonlyexplicit96MiAS/prlimit and100msactualretirementconfirmation; no productionrepair/retry/ENOENTskip. Newcycleprogress assertion nowactualP/readproof."
+  },
+  "outcome": "Root-only VmSize/VmPeak/Threads validated observations and count survive latercensusfailure; nineproducerchecks distinguishselected deadline/entrylimit. Allreasons,firstfailurepriority/STOPCONT/pidfd/absoluteclocks/caps/join/cleanup unchanged. Noextraprocreads/Rust/source/caller/envchange. Purestrictstatusparser/refusedinvalidlive/unobservedexit; actual64Mi untouchedmapping under96MiAS catches48Mi allocationfailurewithlowRSSandactualcleanup. Controlledmetricsprove distinctness only.",
+  "claims_not_proved": [
+    "historicalglobal13allocatorowner/cause/order",
+    "allocation-failure-timeVAS",
+    "actualsourcefit",
+    "whole-build memory",
+    "fullWP899/M7A/runtime/bootstrap"
+  ],
+  "growth": {
+    "implementation_added": 109,
+    "implementation_removed": 31,
+    "tests_added": 167,
+    "tests_removed": 1,
+    "review": "Cohesivefixedscalarparsing/censustagging andsixdiscriminators; noowner/key/policyexpansion."
+  },
+  "next_gate": "ONE separatelyreviewed actualsource observation with unchangedRust802artifact/caller/source/usercaps andnewvalidated supervisor; no automaticretry selectedbythisacceptance.",
+  "checks": {
+    "python_syntax": true,
+    "diff_check": true,
+    "v1_archive_status": true,
+    "plan_status": true
+  }
+}

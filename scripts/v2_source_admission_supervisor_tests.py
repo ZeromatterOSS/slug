@@ -177,6 +177,11 @@ held.close()
                                               deadline, lambda: False, cycles)
                 self.assertIn(str(caught.exception),
                               ("census_prior_stop", "census_stop_unverified", "disk_census_bound"))
+                expected = (s.CensusFailure(s.CensusSite.INITIAL, s.CensusOrigin.DEADLINE)
+                            if case == "expired" else
+                            s.CensusFailure(s.CensusSite.STOP_WAIT, s.CensusOrigin.DEADLINE)
+                            if case == "absent" else None)
+                self.assertEqual(caught.exception.detail, expected)
                 self.assertEqual(calls, [])
                 self.assertEqual(cycles.completions, 0)
                 if case == "prior":
@@ -267,7 +272,9 @@ held.close()
                     else:
                         s.disk_sample(root, [], 0, deadline_reason=reason)
                 self.assertEqual(str(caught.exception), reason or "disk_census_bound")
-                self.assertIsNone(caught.exception.detail)
+                self.assertEqual(caught.exception.detail,
+                                 s.CensusFailure(s.CensusSite.ACCOUNT_CLOCK,
+                                                 s.CensusOrigin.DEADLINE))
             # Preserve a primary native source failure; never remap it later
             # merely because the chosen clock is also past.
             with self.assertRaises(s.AccountingError) as caught:
@@ -493,6 +500,159 @@ time.sleep(.1)
         self.assertFalse(result["swap_disabled"])
         self.assertFalse(result["disk_quota"])
         self.assertEqual(result["sampled_swap_peak_bytes"], 0)
+
+    def test_memory_status_is_complete_scalar_and_independently_observed(self):
+        text = "VmRSS: 16 kB\nVmSwap: 0 kB\nVmSize: 2048 kB\nVmPeak: 1024 kB\nThreads: 2\n"
+        self.assertEqual(s._memory_status(text + "Name: private-secret\n"),
+                         s.MemorySample(16 * 1024, 0, 2048 * 1024, 1024 * 1024, 2, True))
+        for malformed in (text.replace("VmPeak: 1024 kB\n", ""),
+                          text + "VmRSS: 16 kB\n", text + "Threads: 2\n",
+                          text.replace("16 kB", "-16 kB"),
+                          text.replace("16 kB", "16 B"),
+                          text.replace("16 kB", "16"),
+                          text.replace("Threads: 2", "Threads: 0"),
+                          text.replace("Threads: 2", "Threads: ٢"),
+                          text.replace("Threads: 2", "Threads: 2 kB")):
+            with self.subTest(text=malformed), self.assertRaises((ValueError, s.AccountingError)):
+                s._memory_status(malformed)
+        for site in s.CensusSite:
+            for origin in s.CensusOrigin:
+                detail = s.CensusFailure(site, origin)
+                error = s.AccountingError("disk_census_bound", detail)
+                self.assertEqual(error.detail, detail)
+                self.assertEqual(str(error), "disk_census_bound")
+        for bad in (1, None, "private-secret", True):
+            with self.assertRaises(ValueError):
+                s.CensusFailure(bad, s.CensusOrigin.DEADLINE)
+            with self.assertRaises(ValueError):
+                s.CensusFailure(s.CensusSite.INITIAL, bad)
+
+    def test_memory_invalid_live_refuses_and_confirmed_exit_is_unobserved(self):
+        with self.census_child() as (probe, owner, _root, _fd):
+            resource.prlimit(probe.pid, resource.RLIMIT_AS, (96 * 1024 ** 2,) * 2)
+            sample = s.memory_sample(owner, s.GIB * 4)
+            self.assertTrue(sample.observed)
+            self.assertGreater(sample.vm_size_bytes, 0)
+            with patch.object(s, "_memory_status", side_effect=ValueError("finite invalid field")):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.memory_sample(owner, s.GIB * 4)
+                self.assertEqual(str(caught.exception), "memory_accounting_unavailable")
+            owner.signal(signal.SIGTERM)
+            self.assertTrue(select.select([owner.pidfd], [], [], 2)[0])
+            self.assertEqual(s.memory_sample(owner, s.GIB * 4), s.MemorySample())
+
+    def test_virtual_mapping_and_allocation_refusal_are_distinct_from_rss(self):
+        limits = s.Limits(address_bytes=96 * 1024 ** 2, rss_bytes=32 * 1024 ** 2,
+                          work_seconds=2, cleanup_seconds=.4, terminal_seconds=.5,
+                          poll_seconds=.005)
+        result, output = self.run_child(r'''
+import json, mmap, resource, time
+mapping = mmap.mmap(-1, 64 * 1024 ** 2)  # Reserve; never touch the mapped pages.
+refused = False
+try:
+    payload = bytearray(48 * 1024 ** 2)
+except MemoryError:
+    refused = True
+print(json.dumps({"mapped_bytes": len(mapping), "refused": refused,
+                  "limit": resource.getrlimit(resource.RLIMIT_AS)}), flush=True)
+time.sleep(.1)
+mapping.close()
+''', limits=limits)
+        self.assertEqual(json.loads(output), {"mapped_bytes": 64 * 1024 ** 2,
+                                             "refused": True, "limit": [96 * 1024 ** 2] * 2})
+        self.assertTrue(result["supervision_ok"], result)
+        self.assertGreater(result["root_memory_samples"], 0)
+        self.assertGreaterEqual(result["sampled_root_vm_size_peak_bytes"], 64 * 1024 ** 2)
+        self.assertGreaterEqual(result["observed_root_vm_peak_bytes"], 64 * 1024 ** 2)
+        self.assertGreaterEqual(result["sampled_root_thread_peak"], 1)
+        self.assertLess(result["sampled_rss_peak_bytes"], 32 * 1024 ** 2)
+        self.assertEqual((result["census_failure_site"], result["census_failure_origin"]), (0, 0))
+
+    def test_cycle_deadline_sites_preserve_primary_error_and_resume(self):
+        for site in (s.CensusSite.PRE_STOP, s.CensusSite.DISCOVERY_RETURN,
+                     s.CensusSite.POST_SCAN, s.CensusSite.RESUME_CHECK):
+            with self.subTest(site=site), self.census_child() as (probe, owner, root, _):
+                expired = [False]
+                real_clock, real_stat, real_signal = s.time.monotonic_ns, s.process_stat, owner.signal
+                def clock():
+                    return deadline if expired[0] else real_clock()
+                def current(pid):
+                    value = real_stat(pid)
+                    if site == s.CensusSite.PRE_STOP and pid == probe.pid:
+                        expired[0] = True
+                    return value
+                def discover():
+                    if site == s.CensusSite.DISCOVERY_RETURN:
+                        expired[0] = True
+                def census(pids, until, *, deadline_reason):
+                    value = s.disk_sample(root, pids, until, deadline_reason=deadline_reason)
+                    if site == s.CensusSite.POST_SCAN:
+                        expired[0] = True
+                    return value
+                def sent(sig):
+                    value = real_signal(sig)
+                    if site == s.CensusSite.RESUME_CHECK and sig == signal.SIGCONT:
+                        expired[0] = True
+                    return value
+                deadline = real_clock() + 100_000_000
+                cycles = s.CensusCycles()
+                with patch.object(s.time, "monotonic_ns", side_effect=clock), \
+                        patch.object(s, "process_stat", side_effect=current), \
+                        patch.object(owner, "signal", side_effect=sent):
+                    with self.assertRaises(s.AccountingError) as caught:
+                        s.stopped_disk_census(owner, census, discover, deadline,
+                                              lambda: False, cycles, deadline_reason="outer_deadline")
+                self.assertEqual(str(caught.exception), "outer_deadline")
+                self.assertEqual(caught.exception.detail, s.CensusFailure(site, s.CensusOrigin.DEADLINE))
+                self.assertEqual(cycles.completions, 0)
+                self.assertEqual(cycles.resume_failures, 0)
+                probe.stdin.write(b"P"); probe.stdin.flush()
+                self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
+                self.assertEqual(probe.stdout.readline(32), b"0\n")
+
+    def test_disk_clock_fd_clock_and_entry_ceiling_are_distinct(self):
+        with self.census_child() as (probe, _owner, root, _):
+            with patch.object(s, "MAX_CENSUS_ENTRIES", 1):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.disk_sample(root, [], time.monotonic_ns() + 100_000_000)
+                self.assertEqual(caught.exception.detail,
+                                 s.CensusFailure(s.CensusSite.ENTRY_CEILING, s.CensusOrigin.ENTRY_LIMIT))
+            real_scandir = s.os.scandir
+            expired = [False]
+            real_clock = s.time.monotonic_ns
+            deadline = real_clock() + 100_000_000
+            def scanned(path):
+                result = real_scandir(path)
+                if path == f"/proc/{probe.pid}/fd":
+                    expired[0] = True
+                return result
+            def clock():
+                return deadline if expired[0] else real_clock()
+            with patch.object(s.os, "scandir", side_effect=scanned), \
+                    patch.object(s.time, "monotonic_ns", side_effect=clock):
+                with self.assertRaises(s.AccountingError) as caught:
+                    s.disk_sample(root, [probe.pid], deadline)
+            self.assertEqual(caught.exception.detail,
+                             s.CensusFailure(s.CensusSite.FD_CLOCK, s.CensusOrigin.DEADLINE))
+
+    def test_census_detail_and_memory_observation_survive_later_refusal(self):
+        first = s.CensusFailure(s.CensusSite.ACCOUNT_CLOCK, s.CensusOrigin.DEADLINE)
+        real_disk = s.disk_sample
+        triggered = []
+        def census(root, pids, deadline, expected=None, *, deadline_reason="disk_census_bound"):
+            if pids and not triggered:
+                triggered.append(True)
+                raise s.AccountingError("disk_census_bound", first)
+            return real_disk(root, pids, deadline, expected, deadline_reason=deadline_reason)
+        with patch.object(s, "disk_sample", side_effect=census):
+            result, _ = self.run_child("import time; time.sleep(20)")
+        self.assertEqual(result["refusal"], "disk_census_bound")
+        self.assertEqual((result["census_failure_site"], result["census_failure_origin"]),
+                         (int(first.site), int(first.origin)))
+        self.assertEqual((result["disk_failure_site"], result["child_failure_site"]), (0, 0))
+        self.assertGreater(result["root_memory_samples"], 0)
+        self.assertGreater(result["sampled_root_vm_size_peak_bytes"], 0)
+        self.assertEqual(result["census_cycle_completions"], 0)
 
     def test_actual_unlinked_fd_hardlink_dedup_and_equality_refusal(self):
         with tempfile.TemporaryDirectory(prefix="slug-supervisor-disk-") as temp:
@@ -802,6 +962,12 @@ while True:
                     probe.stdin.write(b"R"); probe.stdin.flush()
                     self.assertTrue(select.select([probe.stdout], [], [], 2)[0])
                     self.assertEqual(probe.stdout.readline(32), b"retired\n")
+                    # Python join can precede Linux task-directory retirement.
+                    # Establish real disappearance before the native ENOENT read.
+                    until = time.monotonic_ns() + 100_000_000
+                    while target.exists():
+                        self.assertLess(time.monotonic_ns(), until)
+                        time.sleep(.001)
                     self.assertFalse(target.exists())  # Actual worker join, no fake ENOENT.
                     retired.append(True)
                 return real_read(path, *args, **kwargs)

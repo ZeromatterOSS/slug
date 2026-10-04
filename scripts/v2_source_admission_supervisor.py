@@ -31,6 +31,7 @@ from typing import Sequence
 
 GIB = 1024 ** 3
 MAX_LOG_BYTES = 1024 * 1024
+MAX_CENSUS_ENTRIES = 1_000_000
 WORK_ENV = "SLUG_SOURCE_ADMISSION_WORK_DEADLINE_MONOTONIC_NS"
 CLEANUP_ENV = "SLUG_SOURCE_ADMISSION_CLEANUP_DEADLINE_MONOTONIC_NS"
 STAGE_ENV = "SLUG_SOURCE_ADMISSION_STAGE_ROOT"
@@ -117,11 +118,40 @@ class ChildFailure:
             raise ValueError("invalid child diagnostic scalar")
 
 
+class CensusSite(IntEnum):
+    INITIAL = 1
+    PRE_STOP = 2
+    STOP_WAIT = 3
+    DISCOVERY_RETURN = 4
+    POST_SCAN = 5
+    RESUME_CHECK = 6
+    ACCOUNT_CLOCK = 7
+    FD_CLOCK = 8
+    ENTRY_CEILING = 9
+
+
+class CensusOrigin(IntEnum):
+    DEADLINE = 1
+    ENTRY_LIMIT = 2
+
+
+@dataclass(frozen=True)
+class CensusFailure:
+    # The check that created the error, not which operation consumed its time.
+    site: CensusSite
+    origin: CensusOrigin
+
+    def __post_init__(self) -> None:
+        if type(self.site) is not CensusSite or type(self.origin) is not CensusOrigin:
+            raise ValueError("invalid census diagnostic scalar")
+
+
 class AccountingError(Exception):
     """Fixed reason and optional scalar detail; never retain exception text."""
-    def __init__(self, reason: str, detail: DiskFailure | ChildFailure | None = None):
+    def __init__(self, reason: str,
+                 detail: DiskFailure | ChildFailure | CensusFailure | None = None):
         super().__init__(reason)
-        if detail is not None and type(detail) not in (DiskFailure, ChildFailure):
+        if detail is not None and type(detail) not in (DiskFailure, ChildFailure, CensusFailure):
             raise ValueError("invalid accounting diagnostic detail")
         self.detail = detail
 
@@ -361,11 +391,11 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
     possibly_stopped = False
     primary = False
 
-    def active() -> None:
+    def active(site: CensusSite) -> None:
         if interrupted():
             raise AccountingError("census_interrupted")
         if time.monotonic_ns() >= deadline_ns:
-            raise AccountingError(deadline_reason)
+            raise AccountingError(deadline_reason, CensusFailure(site, CensusOrigin.DEADLINE))
 
     def identity(stopped: bool) -> None:
         try:
@@ -390,7 +420,7 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
         return os.waitid(os.P_PIDFD, owner.pidfd, options | os.WNOHANG)
 
     try:
-        active()
+        active(CensusSite.INITIAL)
         if owner.exited():
             result = census([], deadline_ns, deadline_reason=deadline_reason)
         else:
@@ -399,11 +429,11 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
                 raise AccountingError("census_prior_stop")
             # Consume the previous own CONT notification before this new STOP.
             event(os.WCONTINUED)
-            active()
+            active(CensusSite.PRE_STOP)
             possibly_stopped = True  # Arm cleanup even if dispatch raises.
             owner.signal(signal.SIGSTOP)
             while True:
-                active()
+                active(CensusSite.STOP_WAIT)
                 if owner.exited():
                     result = census([], deadline_ns, deadline_reason=deadline_reason)
                     break
@@ -415,7 +445,7 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
                         raise AccountingError("census_stop_unverified")
                     identity(True)
                     discover()
-                    active()
+                    active(CensusSite.DISCOVERY_RETURN)
                     result = _complete_disk_census(
                         lambda pids: census(pids, deadline_ns,
                                             deadline_reason=deadline_reason),
@@ -425,7 +455,7 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
                         if event(os.WCONTINUED) is not None:
                             raise AccountingError("census_stop_lost")
                         discover()
-                    active()
+                    active(CensusSite.POST_SCAN)
                     break
                 # pidfd readiness means exit, not stop. Nonblocking stop waits
                 # and this bounded yield cannot consume/reap an exit event.
@@ -445,7 +475,7 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
                     if not primary:
                         raise AccountingError("census_resume_failed") from None
             if not primary:
-                active()  # A ready scan/resume cannot cross the same bound.
+                active(CensusSite.RESUME_CHECK)  # Same bound after scan/resume.
         finally:
             elapsed = time.monotonic_ns() - started
             cycles.duration_ns += elapsed
@@ -454,21 +484,52 @@ def stopped_disk_census(owner: OwnedProcess, census, discover, deadline_ns: int,
     return result
 
 
-def memory_sample(owner: OwnedProcess, address_limit: int) -> tuple[int, int]:
+@dataclass(frozen=True)
+class MemorySample:
+    rss_bytes: int = 0
+    swap_bytes: int = 0
+    vm_size_bytes: int = 0
+    vm_peak_bytes: int = 0
+    threads: int = 0
+    observed: bool = False
+
+
+def _memory_status(status: str) -> MemorySample:
+    fields = {"VmRSS:": "rss_bytes", "VmSwap:": "swap_bytes",
+              "VmSize:": "vm_size_bytes", "VmPeak:": "vm_peak_bytes",
+              "Threads:": "threads"}
+    values = {}
+    for line in status.splitlines():
+        parts = line.split()
+        if not parts or parts[0] not in fields:
+            continue
+        key = parts[0]
+        if key in values or len(parts) != (2 if key == "Threads:" else 3):
+            raise ValueError("invalid memory field")
+        value = parts[1]
+        if not value.isascii() or not value.isdecimal():
+            raise ValueError("invalid memory scalar")
+        if key != "Threads:" and parts[2] != "kB":
+            raise AccountingError("memory_units_changed")
+        number = int(value)
+        if key == "Threads:" and number == 0:
+            raise ValueError("invalid thread count")
+        values[key] = number if key == "Threads:" else number * 1024
+    if len(values) != len(fields):
+        raise ValueError("incomplete memory sample")
+    # Kernel status fields and their eventual maxima are independent observations.
+    return MemorySample(**{fields[key]: value for key, value in values.items()}, observed=True)
+
+
+def memory_sample(owner: OwnedProcess, address_limit: int) -> MemorySample:
     if owner.exited():
-        return 0, 0
+        return MemorySample()
     pid = owner.identity.pid
     try:
         before = process_stat(pid)
         if before.starttime != owner.identity.starttime:
             raise AccountingError("process_identity_changed")
-        values = {}
-        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
-            if line.startswith(("VmRSS:", "VmSwap:")):
-                key, value, unit = line.split()
-                if unit != "kB":
-                    raise AccountingError("memory_units_changed")
-                values[key] = int(value) * 1024
+        sample = _memory_status(Path(f"/proc/{pid}/status").read_text())
         limits = Path(f"/proc/{pid}/limits").read_text()
         match = re.search(r"^Max address space\s+(\d+)\s+(\d+)\s+bytes[ \t]*$",
                           limits, re.MULTILINE)
@@ -478,14 +539,14 @@ def memory_sample(owner: OwnedProcess, address_limit: int) -> tuple[int, int]:
         if after.starttime != before.starttime:
             raise AccountingError("process_identity_changed")
         if owner.exited() or after.state == "Z":
-            return 0, 0
-        return values["VmRSS:"], values["VmSwap:"]
+            return MemorySample()
+        return sample
     except (OSError, ValueError, KeyError) as exc:
         # During exit Linux can remove the mm fields shortly before pidfd exit
         # readiness. Confirm actual exit with a finite5ms wait; a still-live
         # inaccessible process remains a refusal, never a partial sample.
         if owner.exited() or select.select([owner.pidfd], [], [], 0.005)[0]:
-            return 0, 0
+            return MemorySample()
         raise AccountingError("memory_accounting_unavailable") from exc
 
 
@@ -516,10 +577,12 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
     def account(info: os.stat_result) -> None:
         nonlocal allocated, logical, visited
         visited += 1
-        if visited > 1_000_000:
-            raise AccountingError("disk_census_bound")
+        if visited > MAX_CENSUS_ENTRIES:
+            raise AccountingError("disk_census_bound",
+                                  CensusFailure(CensusSite.ENTRY_CEILING, CensusOrigin.ENTRY_LIMIT))
         if time.monotonic_ns() >= deadline_ns:
-            raise AccountingError(deadline_reason)
+            raise AccountingError(deadline_reason,
+                                  CensusFailure(CensusSite.ACCOUNT_CLOCK, CensusOrigin.DEADLINE))
         key = (info.st_dev, info.st_ino)
         if key not in seen:
             seen.add(key)
@@ -571,7 +634,8 @@ def disk_sample(root: Path, pids: Sequence[int], deadline_ns: int,
             with _disk_call(DiskSite.PROC_FD_OPEN, os.scandir, f"/proc/{pid}/fd") as fds:
                 for entry in _disk_entries(fds, DiskSite.PROC_FD_NEXT):
                     if time.monotonic_ns() >= deadline_ns:
-                        raise AccountingError(deadline_reason)
+                        raise AccountingError(deadline_reason,
+                                              CensusFailure(CensusSite.FD_CLOCK, CensusOrigin.DEADLINE))
                     info = _disk_call(DiskSite.PROC_FD_STAT, os.stat, entry.path)
                     if not stat.S_ISREG(info.st_mode):
                         continue
@@ -741,11 +805,13 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
     reason = None
     disk_failure = None
     child_failure = None
+    census_failure = None
     joined = False
     removed = False
     descendants = 0
     term_sent = kill_sent = False
     peak_rss = peak_swap = peak_disk = peak_logical = 0
+    root_vm_size_peak = root_vm_peak = root_thread_peak = root_memory_samples = 0
     samples = 0
     actual_limit = None
     actual_guard = None
@@ -767,12 +833,13 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
         os.write(handshake_w, struct.pack("!QQQ", soft, hard, guard))
         os.close(handshake_w)
 
-    def refuse(why: str, detail: DiskFailure | ChildFailure | None = None) -> None:
-        nonlocal reason, disk_failure, child_failure, terminal_ns, kill_ns
+    def refuse(why: str, detail: DiskFailure | ChildFailure | CensusFailure | None = None) -> None:
+        nonlocal reason, disk_failure, child_failure, census_failure, terminal_ns, kill_ns
         if reason is None:
             reason = why
             disk_failure = detail if type(detail) is DiskFailure else None
             child_failure = detail if type(detail) is ChildFailure else None
+            census_failure = detail if type(detail) is CensusFailure else None
             terminal_ns = min(terminal_ns, time.monotonic_ns()
                               + int(limits.terminal_seconds * 1e9))
             kill_ns = min(terminal_ns, time.monotonic_ns()
@@ -922,9 +989,14 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
                         for pid, owner in owners.items():
                             if owner.exited():
                                 continue
-                            r, s = memory_sample(owner, limits.address_bytes)
-                            rss += r
-                            swap += s
+                            memory = memory_sample(owner, limits.address_bytes)
+                            rss += memory.rss_bytes
+                            swap += memory.swap_bytes
+                            if pid == process.pid and memory.observed:
+                                root_memory_samples += 1
+                                root_vm_size_peak = max(root_vm_size_peak, memory.vm_size_bytes)
+                                root_vm_peak = max(root_vm_peak, memory.vm_peak_bytes)
+                                root_thread_peak = max(root_thread_peak, memory.threads)
                             live.append(pid)
                         if reason is None:
                             local_end = time.monotonic_ns() + int(limits.census_seconds * 1e9)
@@ -1080,6 +1152,10 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             "sampled_rss_limit_bytes": limits.rss_bytes,
             "sampled_disk_limit_bytes": limits.disk_bytes,
             "sampled_rss_peak_bytes": peak_rss, "sampled_swap_peak_bytes": peak_swap,
+            "sampled_root_vm_size_peak_bytes": root_vm_size_peak,
+            "observed_root_vm_peak_bytes": root_vm_peak,
+            "sampled_root_thread_peak": root_thread_peak,
+            "root_memory_samples": root_memory_samples,
             "sampled_disk_peak_bytes": peak_disk,
             "sampled_logical_disk_peak_bytes": peak_logical,
             "samples": samples, "poll_interval_seconds": limits.poll_seconds,
@@ -1110,6 +1186,8 @@ def supervise(command: Sequence[str], *, stage_parent: Path, log: Path,
             "child_failure_context": 0 if child_failure is None else int(child_failure.context),
             "child_failure_owner": 0 if child_failure is None else int(child_failure.owner),
             "child_failure_errno": None if child_failure is None else child_failure.errno,
+            "census_failure_site": 0 if census_failure is None else int(census_failure.site),
+            "census_failure_origin": 0 if census_failure is None else int(census_failure.origin),
             "kernel_rss_quota": False, "swap_disabled": False, "disk_quota": False}
 
 
