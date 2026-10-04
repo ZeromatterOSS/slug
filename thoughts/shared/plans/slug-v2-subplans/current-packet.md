@@ -1,16 +1,25 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: bounded supervisor attribution accepted; one reviewed actual observation next; full WP899 unaccepted
+Status: Connect and virtual-address terminal preserved; controlled concurrency owner audit next; full WP899 unaccepted
+
+The spent global14 observation proves first Connect/Step/Timer/Deadline, paired
+only to selected ScopeWorkDeadline, after151 distinct registry admissions and zero
+source attempts. 730 validated root observations report2,949,361,664B VmSize/VmPeak,
+42 threads and sampled82,366,464B RSS; these independent observations do not identify
+allocation-time state or global13 cause. All730 censuses complete; restoration,
+engine retirement and join/stage/exact-parent cleanup pass three terminal FINALs.
+[Receipt](wp899-connect-vm-frontier-2026-10-04.json). Next is a bounded controlled resolver/concurrency/
+virtual-address owner discriminator; no policy/cap/allocator change or actual retry
+is selected. FullWP899/source admission remains open.
 
 The supervisor now records validated root VmSize/VmPeak/thread observations and
 exact selected census check sites, preserving every cap and first-failure/lifecycle
 rule. Three FINALs accept35 controls (34 preserved+1 fresh strengthening; prior35/35
 in3.603s), including
 untouched64MiB mapping under96MiB AS with lowRSS and a caught48MiB allocation refusal.
-[Component receipt](wp899-supervisor-memory-census-attribution-2026-10-04.json). Next is ONE separately reviewed
-actual observation using this supervisor; the unchanged Rust artifact and63 passing
-controls remain accepted. FullWP899/source admission remains open.
+[Component receipt](wp899-supervisor-memory-census-attribution-2026-10-04.json). The separately reviewed global14 observation is spent above; the unchanged Rust
+artifact and63 passing controls remain accepted. FullWP899/source admission remains open.
 
 The spent global13 observation emitted zero Slug records: allocation failure for
 4,732,227 bytes and childSIGABRT coexist with supervisor disk_census_bound after
