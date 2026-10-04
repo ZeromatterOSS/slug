@@ -1,0 +1,179 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "state": "ACCEPTED_BOUNDED_CACHE_DEPTH_CONTROL_FULL_WP899_OPEN",
+  "base": "d710f9f90472cd40485e0597c442a5ffe3ff532e",
+  "actual_source_attempt": false,
+  "compile": {
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "60s",
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "--edition=2024",
+      "target/wp899/starlark-cache-depth.rs",
+      "-L",
+      "dependency=target/debug/deps",
+      "--extern",
+      "starlark=target/debug/deps/libstarlark-5a6082d43676e33a.rlib",
+      "-o",
+      "target/wp899/starlark-cache-depth"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.24232922296505421,
+    "source_sha256": "af6fc71700681baa71827bf75f063a2970d8b41e482555c23161e6db3ae5221d",
+    "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifact": "/run/media/system/Colossus/dev/slug/target/wp899/starlark-cache-depth",
+    "artifact_sha256": "2b67a9f010486c089fce892db5ea99bd53506cb2e8fceeaa4bfaf6f2c4bce044"
+  },
+  "evidence_sha256": {
+    "starlark-cache-depth.rs": "af6fc71700681baa71827bf75f063a2970d8b41e482555c23161e6db3ae5221d",
+    "starlark-cache-depth": "2b67a9f010486c089fce892db5ea99bd53506cb2e8fceeaa4bfaf6f2c4bce044",
+    "starlark-cache-depth-design.md": "96fa5087369827ce321dbc529c94e0b9a28475f02b23a29623a45170a76cdf91",
+    "starlark-cache-depth-compile.json": "b3091159226aee8f03486ea76a517cb7b0da132c4a26cafbf4c37178db12a4d4",
+    "starlark-cache-depth-draft.json": "1737f2632dbbbea99fb68ee9dcd76ccc7f7ee70f6e9ecc72422fcff627d73689",
+    "starlark-cache-depth-freeze.json": "486a9ac97337bcf0b82adc45039ba5511e32f6825b20ef51b7c626c6de82b2a2",
+    "starlark-cache-depth-execute.py": "df68456dc5079a3aaacb42ca26a9ebe2b6feb4b9650680b6d82028d12baf4614",
+    "starlark-cache-depth-execution.json": "a4133f9e2a1888ab2d4a27f658bb23194699213d3ba528074e45f43a5907ee66",
+    "starlark-cache-depth-mode0.log": "7aabd94e1dc243b68ebcb1359c69019a03275b80d78aa45d479bc94b94d0435e",
+    "starlark-cache-depth-mode1.log": "a88992a60fc23be563e8e44d91ed9c112f0c2658cf2ac4c6cf1d80a94c07ab21",
+    "starlark-cache-depth-outer.log": "346d3772f4c367599870cd22c8ce739af95b1c75939e2f08f03f0d1c878cacc8",
+    "starlark-cache-depth-outer.json": "ab2cfe4de3f8d21d9232425b98ecc513fddab45d07b0a4a9c643ecfa030b4e21",
+    "starlark-cache-depth-analysis.json": "5230b9a77d9f94d9093d5f7142b303d00e47fb891dcbcbc6e2925231f6908ef4",
+    "starlark-cache-depth-parent-cleanup.json": "250fba6b8fde789ce0c40bb6ac87523d6c29b2a39e12a86c19d5098441a79b68"
+  },
+  "independent_terminal_reviews": {
+    "target/wp899/starlark-cache-depth-terminal-source.md": "679910b2fc9092fb279f6f7789636c7f0d16fe8e1bd0230f519deb85ccb723a5",
+    "target/wp899/starlark-cache-depth-terminal-input.md": "95bdf37dd1cef8605d62aae98af67b54aee107a31f57af35b78d36a324f1eebc",
+    "target/wp899/starlark-cache-depth-terminal-evidence.md": "655c44cb4c03c0fdd488aed803e5e555a75fa3c645916b2f15f14793d97654ba"
+  },
+  "modes": [
+    {
+      "mode": 0,
+      "final_target_window": [
+        0,
+        0
+      ],
+      "pre_final_target_portion_available": [
+        7064,
+        2984
+      ],
+      "post_final_target_portion_available": [
+        7064,
+        2456
+      ],
+      "sealed_target_portion_available": [
+        4608,
+        0
+      ],
+      "requested_live_before_final": 19980,
+      "requested_live_after_final": 19980,
+      "requested_live_after_target_drop": 17628,
+      "requested_live_after_donors_drop": 13628,
+      "requested_live_after_worker_join": 460,
+      "max_process_vm_size_internal": 80805888,
+      "max_process_rss_internal": 6053888,
+      "semantic_strings": 31,
+      "normal_clone_drop_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.006810551,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    },
+    {
+      "mode": 1,
+      "final_target_window": [
+        16777216,
+        1
+      ],
+      "pre_final_target_portion_available": [
+        4136,
+        56
+      ],
+      "post_final_target_portion_available": [
+        16781272,
+        16776664
+      ],
+      "sealed_target_portion_available": [
+        4608,
+        0
+      ],
+      "requested_live_before_final": 17420,
+      "requested_live_after_final": 16794636,
+      "requested_live_after_target_drop": 16794332,
+      "requested_live_after_donors_drop": 16786236,
+      "requested_live_after_worker_join": 460,
+      "max_process_vm_size_internal": 97587200,
+      "max_process_rss_internal": 5955584,
+      "semantic_strings": 31,
+      "normal_clone_drop_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.006416479,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    }
+  ],
+  "wrapper": {
+    "schema": 1,
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "15s",
+      "/usr/bin/python3.12",
+      "target/wp899/starlark-cache-depth-execute.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.8558272369555198,
+    "log_sha256": "346d3772f4c367599870cd22c8ce739af95b1c75939e2f08f03f0d1c878cacc8",
+    "freeze_sha256": "486a9ac97337bcf0b82adc45039ba5511e32f6825b20ef51b7c626c6de82b2a2"
+  },
+  "cleanup": [
+    {
+      "path": "/tmp/slug-wp899-cache-depth0-parent-dpw9vjqu",
+      "device": 54,
+      "inode": 840710,
+      "uid": 1000,
+      "mode": "0o700",
+      "canonical_nofollow_fd_and_named_identity_empty_verified": true,
+      "removed": true
+    },
+    {
+      "path": "/tmp/slug-wp899-cache-depth1-parent-jp4wokdf",
+      "device": 54,
+      "inode": 840711,
+      "uid": 1000,
+      "mode": "0o700",
+      "canonical_nofollow_fd_and_named_identity_empty_verified": true,
+      "removed": true
+    }
+  ],
+  "interpretation": "Controlled order comparison only: request windows are process-wide successful Rust-global layout requests during alloc_str, public heap portions exclude physical backing/transitive heaps, processVm/RSS are independent samples. No actual-root/global15 owner, physical-memory ratio, universal growth or sourcefit.",
+  "stream_patch_reconciliation": {
+    "commit": "d710f9f90472cd40485e0597c442a5ffe3ff532e",
+    "receipt": "wp899-patch-line-stream-2026-10-04.json",
+    "root_independent_integrated_finals": {
+      "target/wp899/patch-stream-reconciled-final-source.md": "70c3fb3e3ae9579be331d21998a6cbf920307905789125708d0ac3375a87dd18",
+      "target/wp899/patch-stream-reconciled-final-input.md": "870b9a67451b05c86b6e9b45ff2ae60a3981cf511cc719bf1dce19ef3564fd40",
+      "target/wp899/patch-stream-reconciled-final-evidence.md": "afc1302ddd1ddb7cd59050a4386cdc6bbf3fdb39a261b7d6be687b76370ee7cd"
+    }
+  },
+  "next": "Review bounded byte-based preferred growth in existing Starlark allocator; no actual retry or source/supervisor ceiling change selected."
+}

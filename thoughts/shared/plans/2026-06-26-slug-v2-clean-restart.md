@@ -35,7 +35,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Archive patch line tables removed; source admission investigation continues; full WP899 unaccepted
+Status: Controlled cached-tail growth reproduced; byte-based growth repair next; full WP899 unaccepted
+
+Three independent FINALs accept the bounded public Starlark cache-depth control.
+The same31 strings seal to4608B in both allocation orders. Interleaving retained
+small donor heaps produces one16MiB final request; donors-first needs no new final
+allocation. All semantics, clone/drop, worker joins and exact parent cleanup pass.
+Process-wide requested-layout intervals, heap portions and process memory remain
+separate measures; no actual-source owner, physical-memory ratio or source-fit
+claim follows. [Receipt](slug-v2-subplans/wp899-starlark-cache-depth-2026-10-04.json).
+Next is a bounded Slug-native preferred-growth repair in the existing allocator:
+use safely rounded/clamped trimmed filled bytes rather than cached chain count,
+preserving cache-first selection, immediate required size and lifetime behavior.
+Three DESIGN reviews precede implementation, focused owner/dependent checks and a
+fixed matched-profile A/B/B/A control. No actual retry or source/supervisor ceiling
+change is selected; fullWP899 remains open.
 
 Three FINALs accept the Slug-native patch target line-table removal. Two forward
 passes validate all per-file hunks before staging, then stream the unchanged
