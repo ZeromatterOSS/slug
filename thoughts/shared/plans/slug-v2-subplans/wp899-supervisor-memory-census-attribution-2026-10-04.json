@@ -6,7 +6,7 @@
   "compatibility": "Slug-native Linux diagnostic",
   "source_hashes": {
     "scripts/v2_source_admission_supervisor.py": "c5de496dde89e8aacf6159255df5c4f1a0af90c52c400150c78bf0535400283a",
-    "scripts/v2_source_admission_supervisor_tests.py": "ef13a07276bf1e6acc8459513fd44cb6f156f92198403208b648b01ac02e7553"
+    "scripts/v2_source_admission_supervisor_tests.py": "92fecc1ab4a905a13e1ce8159c0e0c8661fe35976cb042017825f053229ce80e"
   },
   "validation": {
     "schema": 1,
@@ -101,5 +101,51 @@
     "diff_check": true,
     "v1_archive_status": true,
     "plan_status": true
+  },
+  "reconciled_test_only_strengthening": {
+    "base": "c37742f9e",
+    "provenance": "Concurrent active edit found at root cleancheck; all3assignedread-onlyreviewersdenywriting. Preserved/reconciled strongerboundedtest; noactualdraft/parent/launch hadoccurred.",
+    "validation": {
+      "schema": 1,
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/usr/bin/python3.12",
+        "scripts/v2_source_admission_supervisor_tests.py",
+        "SupervisorTests.test_census_detail_and_memory_observation_survive_later_refusal",
+        "-v"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05850683600874618,
+      "selected_unique": 1,
+      "source_hashes": {
+        "scripts/v2_source_admission_supervisor.py": "c5de496dde89e8aacf6159255df5c4f1a0af90c52c400150c78bf0535400283a",
+        "scripts/v2_source_admission_supervisor_tests.py": "92fecc1ab4a905a13e1ce8159c0e0c8661fe35976cb042017825f053229ce80e"
+      },
+      "sources_unchanged": true,
+      "log_sha256": "6365d3b397eaac313e642578d3959db1a3aac7574fabc78d46a7d71c022f3df9"
+    },
+    "exact_delta": {
+      "old_tests_sha256": "ef13a07276bf1e6acc8459513fd44cb6f156f92198403208b648b01ac02e7553",
+      "new_tests_sha256": "92fecc1ab4a905a13e1ce8159c0e0c8661fe35976cb042017825f053229ce80e",
+      "only_changed_method": "test_census_detail_and_memory_observation_survive_later_refusal",
+      "remaining_34_methods_and_all_other_file_bytes_identical": true
+    },
+    "coverage": "35unique=34byte-identicalpreserved+1freshstrengthened; notonefresh35batchon92. Original35batchsource/log remainsrecordedabove.",
+    "independent_final_sha256": {
+      "source": "84b2b36fc3c421d231a388e89c492857cec4d66fb977751277967a961ec32aac",
+      "supervisor": "cb75bfeb976f09f59ce203486e421e5b4fcb7e0f0caaeae412d786e84bfe0085",
+      "evidence": "a6084df5b29d670922f11454c05ea8f9f62fc745bd1af9fff5b0dda76ba536b1"
+    },
+    "evidence_sha256": {
+      "supervisor-memory-census-strengthened-final-evidence.md": "a6084df5b29d670922f11454c05ea8f9f62fc745bd1af9fff5b0dda76ba536b1",
+      "supervisor-memory-census-strengthened.json": "8bbd4fdc4172343f224a7ccb34c15c60576034683139a28e76748f9c80d17def",
+      "supervisor-memory-census-strengthened-final-source.md": "84b2b36fc3c421d231a388e89c492857cec4d66fb977751277967a961ec32aac",
+      "supervisor-memory-census-strengthened.log": "6365d3b397eaac313e642578d3959db1a3aac7574fabc78d46a7d71c022f3df9",
+      "supervisor-memory-census-strengthened-delta.json": "634ff01371bb8ee28eddb53a34f234dbac3d3b9651eefbe40c592985244ad61f",
+      "supervisor-memory-census-strengthened-final-supervisor.md": "cb75bfeb976f09f59ce203486e421e5b4fcb7e0f0caaeae412d786e84bfe0085"
+    }
   }
 }

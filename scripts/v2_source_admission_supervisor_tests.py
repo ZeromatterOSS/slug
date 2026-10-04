@@ -638,20 +638,33 @@ mapping.close()
     def test_census_detail_and_memory_observation_survive_later_refusal(self):
         first = s.CensusFailure(s.CensusSite.ACCOUNT_CLOCK, s.CensusOrigin.DEADLINE)
         real_disk = s.disk_sample
+        real_memory = s.memory_sample
+        captured = []
+        def memory(owner, limit):
+            sample = real_memory(owner, limit)
+            if not captured and sample.observed:
+                captured.append(sample)
+                return sample
+            # Later cleanup samples cannot mask losing the pre-census sample.
+            return s.MemorySample()
         triggered = []
         def census(root, pids, deadline, expected=None, *, deadline_reason="disk_census_bound"):
             if pids and not triggered:
                 triggered.append(True)
                 raise s.AccountingError("disk_census_bound", first)
             return real_disk(root, pids, deadline, expected, deadline_reason=deadline_reason)
-        with patch.object(s, "disk_sample", side_effect=census):
+        with patch.object(s, "disk_sample", side_effect=census), \
+                patch.object(s, "memory_sample", side_effect=memory):
             result, _ = self.run_child("import time; time.sleep(20)")
         self.assertEqual(result["refusal"], "disk_census_bound")
         self.assertEqual((result["census_failure_site"], result["census_failure_origin"]),
                          (int(first.site), int(first.origin)))
         self.assertEqual((result["disk_failure_site"], result["child_failure_site"]), (0, 0))
-        self.assertGreater(result["root_memory_samples"], 0)
-        self.assertGreater(result["sampled_root_vm_size_peak_bytes"], 0)
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(result["root_memory_samples"], 1)
+        self.assertEqual(result["sampled_root_vm_size_peak_bytes"], captured[0].vm_size_bytes)
+        self.assertEqual(result["observed_root_vm_peak_bytes"], captured[0].vm_peak_bytes)
+        self.assertEqual(result["sampled_root_thread_peak"], captured[0].threads)
         self.assertEqual(result["census_cycle_completions"], 0)
 
     def test_actual_unlinked_fd_hardlink_dedup_and_equality_refusal(self):

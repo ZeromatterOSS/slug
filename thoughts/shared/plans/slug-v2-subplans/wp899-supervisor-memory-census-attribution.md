@@ -63,3 +63,5 @@ commit. No new Cargo required: zero Rust changes, current802 artifact remains
 accepted only for unchanged Rust and oldsupervisor evidence is not fresh validation.
 
 Accepted component validation is recorded in wp899-supervisor-memory-census-attribution-2026-10-04.json. The controlled35-method batch proves the named diagnostics only; global13 remains causally unclassified.
+
+Concurrent one-test strengthening was reconciled after c37742f9e: only the first actual validated memory sample is exposed, cleanup samples are unobserved, and exact count1 plus VM/thread equality is required. Three correction FINALs and fresh1/1 in0.0585s pass. Current35 coverage is34 unchanged preserved+1 fresh, not a new35 batch. The original35 batch remains preserved in the receipt.

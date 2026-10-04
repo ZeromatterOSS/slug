@@ -39,7 +39,8 @@ Status: bounded supervisor attribution accepted; one reviewed actual observation
 
 The supervisor now records validated root VmSize/VmPeak/thread observations and
 exact selected census check sites, preserving every cap and first-failure/lifecycle
-rule. Three FINALs accept fresh35/35 (all29 protected+6 new) in3.603s, including
+rule. Three FINALs accept35 controls (34 preserved+1 fresh strengthening; prior35/35
+in3.603s), including
 untouched64MiB mapping under96MiB AS with lowRSS and a caught48MiB allocation refusal.
 [Component receipt](slug-v2-subplans/wp899-supervisor-memory-census-attribution-2026-10-04.json). Next is ONE separately reviewed
 actual observation using this supervisor; the unchanged Rust artifact and63 passing
