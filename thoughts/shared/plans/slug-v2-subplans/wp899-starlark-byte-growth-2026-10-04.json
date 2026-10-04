@@ -1,0 +1,367 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "state": "ACCEPTED_BYTE_BASED_PREFERRED_GROWTH_FULL_WP899_OPEN",
+  "base": "cedf0877932d96fe6428eab1388c8d4f446b55e9",
+  "compatibility": "Slug-native",
+  "allowlist": [
+    "starlark-rust/starlark/src/values/layout/heap/allocator/alloc/allocator.rs",
+    "starlark-rust/starlark/src/values/layout/heap/allocator/alloc/per_thread.rs",
+    "starlark-rust/starlark/src/values/layout/heap/allocator/alloc/chain.rs"
+  ],
+  "policy": "On cache miss prefer rounded power-of-two saturated filled bytes+512, preferred max2GiB; cached chunk count no longer controls growth. Cache-first and immediate request minimum, pointer/refcount/TLS paths preserved.",
+  "validation": {
+    "test-compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "starlark",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.8040663730353117,
+      "receipt": "target/wp899/starlark-byte-growth-formatted-test-compile.json",
+      "receipt_sha256": "947e795af206d60be89e2c2866b1a2836d5e468b6f68a6ac9e72aebb6cbeb2c1"
+    },
+    "preflight": {
+      "command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+        "--exact",
+        "values::layout::heap::allocator::alloc::per_thread::tests::test_release_partial",
+        "values::layout::heap::allocator::alloc::per_thread::tests::test_next_chunk_size_from_filled_bytes",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_small",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_big",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_cached_fragments_grow_from_filled_bytes",
+        "values::layout::heap::allocator::alloc::chunk::tests::test_empty",
+        "values::layout::heap::allocator::alloc::chunk::tests::test_alloc_release",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_split_at",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_split_at_zero",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_is_full",
+        "values::layout::heap::allocator::alloc::chain::tests::test_default",
+        "values::layout::heap::allocator::alloc::chain::tests::test_new_drop",
+        "values::layout::heap::allocator::alloc::chain::tests::test_new_drop_many",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at_len",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at_zero",
+        "values::layout::heap::allocator::alloc::chain::tests::test_depth"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.023074736003763974,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+      "artifact_sha256": "cbe12612170826dfe655ad02a2478cc6382778854c9d1f71cf24b9e9effec69d",
+      "selected": 17,
+      "passed": 0,
+      "receipt": "target/wp899/starlark-byte-growth-formatted-preflight.json",
+      "receipt_sha256": "0593e1a996bbc2055c9638694b04bee35987ee42dc586e69899820a82c136d9a"
+    },
+    "focused": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+        "--exact",
+        "--test-threads=1",
+        "values::layout::heap::allocator::alloc::per_thread::tests::test_release_partial",
+        "values::layout::heap::allocator::alloc::per_thread::tests::test_next_chunk_size_from_filled_bytes",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_small",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_big",
+        "values::layout::heap::allocator::alloc::allocator::tests::test_cached_fragments_grow_from_filled_bytes",
+        "values::layout::heap::allocator::alloc::chunk::tests::test_empty",
+        "values::layout::heap::allocator::alloc::chunk::tests::test_alloc_release",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_split_at",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_split_at_zero",
+        "values::layout::heap::allocator::alloc::chunk_part::tests::test_is_full",
+        "values::layout::heap::allocator::alloc::chain::tests::test_default",
+        "values::layout::heap::allocator::alloc::chain::tests::test_new_drop",
+        "values::layout::heap::allocator::alloc::chain::tests::test_new_drop_many",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at_len",
+        "values::layout::heap::allocator::alloc::chain::tests::test_split_at_zero",
+        "values::layout::heap::allocator::alloc::chain::tests::test_depth"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0020593489753082395,
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+      "artifact_sha256": "cbe12612170826dfe655ad02a2478cc6382778854c9d1f71cf24b9e9effec69d",
+      "selected": 17,
+      "passed": 17,
+      "receipt": "target/wp899/starlark-byte-growth-formatted-focused.json",
+      "receipt_sha256": "d6f29bc4652c9e2d7a0dd99f50596f884e556e7fa27d7573b72e981ad6e1c327"
+    },
+    "dependent-test-compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.831200346001424,
+      "receipt": "target/wp899/starlark-byte-growth-formatted-dependent-test-compile.json",
+      "receipt_sha256": "5bb407090f5099d8a2bb7bf8157da868cc8a5a2601b90c775f07ed969545e539"
+    },
+    "default": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--all-targets",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.859653307008557,
+      "receipt": "target/wp899/starlark-byte-growth-formatted-default.json",
+      "receipt_sha256": "7a20f091df43d0b5c261aea39b006041138ad5277e66aa27f6e5cc80c127d739"
+    },
+    "probe-compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "--edition=2024",
+        "target/wp899/starlark-byte-growth-probe.rs",
+        "-L",
+        "dependency=target/debug/deps",
+        "--extern",
+        "starlark=/run/media/system/Colossus/dev/slug/target/debug/deps/libstarlark-5a6082d43676e33a.rlib",
+        "-o",
+        "target/wp899/starlark-byte-growth-formatted-candidate"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.23875098198186606,
+      "artifact": "target/wp899/starlark-byte-growth-formatted-candidate",
+      "artifact_sha256": "2e3900c8cc835343efa44fb4c497f0fee8056fa93469045e2972df96e1fddc25",
+      "receipt": "target/wp899/starlark-byte-growth-formatted-probe-compile.json",
+      "receipt_sha256": "379776887bf3cd387d72d093b64af5171ee53838486ea1dd175ecb031b2535cc"
+    }
+  },
+  "fixed_runs": [
+    {
+      "label": "A1",
+      "variant": "A",
+      "mode": 1,
+      "final_request_window": [
+        16777216,
+        1
+      ],
+      "sealed_target_portions_available": [
+        4608,
+        0
+      ],
+      "semantic_strings": 31,
+      "clone_drop_worker_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.007927776,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    },
+    {
+      "label": "B1",
+      "variant": "B",
+      "mode": 1,
+      "final_request_window": [
+        8192,
+        1
+      ],
+      "sealed_target_portions_available": [
+        4608,
+        0
+      ],
+      "semantic_strings": 31,
+      "clone_drop_worker_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.006409969,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    },
+    {
+      "label": "B2",
+      "variant": "B",
+      "mode": 1,
+      "final_request_window": [
+        8192,
+        1
+      ],
+      "sealed_target_portions_available": [
+        4608,
+        0
+      ],
+      "semantic_strings": 31,
+      "clone_drop_worker_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.006455779,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    },
+    {
+      "label": "A2",
+      "variant": "A",
+      "mode": 1,
+      "final_request_window": [
+        16777216,
+        1
+      ],
+      "sealed_target_portions_available": [
+        4608,
+        0
+      ],
+      "semantic_strings": 31,
+      "clone_drop_worker_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.007404623,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    },
+    {
+      "label": "B-normal",
+      "variant": "B",
+      "mode": 0,
+      "final_request_window": [
+        0,
+        0
+      ],
+      "sealed_target_portions_available": [
+        4608,
+        0
+      ],
+      "semantic_strings": 31,
+      "clone_drop_worker_join": true,
+      "supervisor": {
+        "elapsed_seconds": 0.006346569,
+        "census_cycle_attempts": 1,
+        "census_cycle_completions": 1,
+        "child_exit_code": 0,
+        "joined": true,
+        "stage_removed": true,
+        "term_sent": false,
+        "kill_sent": false,
+        "refusal": null,
+        "sampled_swap_peak_bytes": 0
+      }
+    }
+  ],
+  "outer": {
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "35s",
+      "/usr/bin/python3.12",
+      "target/wp899/starlark-byte-growth-execute.py"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 1.2117942740442231,
+    "log_sha256": "19ea507961ebb2509301946d9c9dc3bf1430d8ecfcab6926769e246c87732d9a",
+    "freeze_sha256": "6dedfd188ec58270d28bcd9cd7a11abfaf948c000c968434a44b496e000d043e"
+  },
+  "evidence_sha256": {
+    "target/wp899/starlark-byte-growth-draft.json": "7e6eb40899261af63b45f4afe5417503895b979b5d3e65db468238fcc919a1ff",
+    "target/wp899/starlark-byte-growth-freeze.json": "6dedfd188ec58270d28bcd9cd7a11abfaf948c000c968434a44b496e000d043e",
+    "target/wp899/starlark-byte-growth-execute.py": "a2fbc4db2434c126a892a2ae8dac9a0db77a46f280dec9e761b57b1d4699add6",
+    "target/wp899/starlark-byte-growth-execution.json": "4977b6b9923acb4ab0074d3810cb7fd65afe16822a6670462c1301630eff0212",
+    "target/wp899/starlark-byte-growth-outer.json": "8d221ebdccfd83646af2ab44c056d04eaa094094052a33a6d516221eba197676",
+    "target/wp899/starlark-byte-growth-outer.log": "19ea507961ebb2509301946d9c9dc3bf1430d8ecfcab6926769e246c87732d9a",
+    "target/wp899/starlark-byte-growth-A1.log": "76b65ca3fbdb2aad7f02970ebff1d22bb82514cf1350d33781d38df0914b8984",
+    "target/wp899/starlark-byte-growth-B1.log": "586e48d475d53d91519e6205e55f88638a46b3c21355190e945a1c6469c1fa1a",
+    "target/wp899/starlark-byte-growth-B2.log": "4a7a30fd483ef88c2cb57062b07aa09b1b69e1d4f5f3ba0019d5209b94a7a396",
+    "target/wp899/starlark-byte-growth-A2.log": "18847378bb81dba516e223bf206e1d7760468b411feeef15e79219817c517325",
+    "target/wp899/starlark-byte-growth-B-normal.log": "b7264643b28c2971ea06c574ba07c4e9baca217214a2d171cc83ebfe65993f83",
+    "target/wp899/starlark-byte-growth-analysis.json": "eb58d8ae5f158c10e254cac78822b5b5a79834a69836abf940cb700b4da1dcd8",
+    "target/wp899/starlark-byte-growth-formatted-probe-compile.json": "379776887bf3cd387d72d093b64af5171ee53838486ea1dd175ecb031b2535cc"
+  },
+  "source_sha256": {
+    "/run/media/system/Colossus/dev/slug/starlark-rust/starlark/src/values/layout/heap/allocator/alloc/per_thread.rs": "c3553a379e572b42a7b607dbf024b7d3f2c4c717a55e0f4c13982a3201f9dbd3",
+    "/run/media/system/Colossus/dev/slug/starlark-rust/starlark/src/values/layout/heap/allocator/alloc/chunk.rs": "634e6f4d611d6bbdf6166f3be1ecc18bd124ff046e229ae12703e2d28f86631a",
+    "/run/media/system/Colossus/dev/slug/starlark-rust/starlark/src/values/layout/heap/allocator/alloc/allocator.rs": "360a8de3165abb46a748bb92ea7b427d7edc12413e126ea8d128316889d29967",
+    "/run/media/system/Colossus/dev/slug/starlark-rust/starlark/src/values/layout/heap/allocator/alloc/chain.rs": "3c68cbbdd3698f1f0191900b93b540549695cafe767e56cd9bd73646ee913c6d"
+  },
+  "final_reviews": {
+    "target/wp899/starlark-byte-growth-final-source.md": "680101e64ca3c879f737e4a11d958659d5a356df661ebd23bb129c5fb15b9bc2",
+    "target/wp899/starlark-byte-growth-final-input.md": "e9eb532ac992e4b53320c0f807912d62fbc90a50eb8135e6feaea3ad62727c53",
+    "target/wp899/starlark-byte-growth-final-evidence.md": "1706cb24fef95070065bb1c8a35b28fd97d52af6e7a264148c22bcf635749471"
+  },
+  "cleanup_receipt": "target/wp899/starlark-byte-growth-parent-cleanup.json",
+  "cleanup_sha256": "e2f15e58d339c933b60eaf5667c23c7a0118a08f58b7061c499f879434f3cc9b",
+  "cleanup_count": 5,
+  "proof_limits": "Fixed controlled process-wide temporal successful requested-layout windows: A16MiB vsB8192B in both interleaved comparisons, B-normal0, same31string semantics/sealed4608B/clone/drop/join. Public portions and VM/RSS separate; no physical ratio/speedup, actual source owner/fit or historical cause.",
+  "preformat_evidence": "Initial17 passes and compile results preserved under target/wp899/starlark-byte-growth-prereformat-*; formatting-only correction freshly recompiled/revalidated. No runtime failure or adaptive replay.",
+  "next": "One separately reviewed/frozen actual source observation may test this relevant accepted change; same source/supervisor limits, no automatic retry."
+}

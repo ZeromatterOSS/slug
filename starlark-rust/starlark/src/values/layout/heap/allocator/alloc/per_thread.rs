@@ -70,31 +70,28 @@ thread_local! {
     static PER_THREAD_ALLOCATOR: RefCell<PerThreadChunkCache> = RefCell::new(PerThreadChunkCache::default());
 }
 
-fn next_chunk_size(chunk_count_in_bump: usize) -> AlignedSize {
-    // Replicate `bumpalo` behavior: 512 in the first chunk, double each next,
-    // but not greater than 2G.
-    // TODO(nga): we should stop doubling after 1M or so.
-    let size = AlignedSize::new_bytes(
-        512u32
-            .checked_shl(chunk_count_in_bump.try_into().unwrap())
-            .unwrap() as usize,
-    );
-    if size.bytes() == 0 {
-        AlignedSize::new_bytes(1 << 31)
-    } else {
-        size
-    }
+fn next_chunk_size(filled_bytes_in_bump: usize) -> AlignedSize {
+    // Grow geometrically from filled bytes: cached fragments can add many
+    // chain parts without filling the corresponding full-sized chunks.
+    // This is a preference; a larger immediate allocation still takes precedence.
+    const MAX_PREFERRED: usize = 1 << 31;
+    let size = filled_bytes_in_bump
+        .saturating_add(512)
+        .checked_next_power_of_two()
+        .unwrap_or(MAX_PREFERRED)
+        .min(MAX_PREFERRED);
+    AlignedSize::new_bytes(size)
 }
 
 /// Allocate chunk which is large enough for given number of words.
 pub(crate) fn thread_local_alloc_at_least(
     len: AlignedSize,
-    chunk_count_in_bump: usize,
+    filled_bytes_in_bump: usize,
 ) -> ChunkPart {
     let chunk = match PER_THREAD_ALLOCATOR.with_borrow_mut(|allocator| allocator.fetch(len)) {
         Some(chunk) => chunk,
         _ => {
-            let next_chunk_size = next_chunk_size(chunk_count_in_bump) - Chunk::HEADER_SIZE;
+            let next_chunk_size = next_chunk_size(filled_bytes_in_bump) - Chunk::HEADER_SIZE;
             let len = cmp::max(len, next_chunk_size);
             ChunkPart::alloc_at_least(len)
         }
@@ -124,10 +121,30 @@ pub(crate) fn thread_local_release(chunk: ChunkPart) {
 
 #[cfg(test)]
 mod tests {
+    use super::next_chunk_size;
     use crate::values::layout::aligned_size::AlignedSize;
     use crate::values::layout::heap::allocator::alloc::chunk_part::ChunkPart;
     use crate::values::layout::heap::allocator::alloc::per_thread::PerThreadChunkCache;
     use crate::values::layout::heap::repr::AValueHeader;
+
+    #[test]
+    fn test_next_chunk_size_from_filled_bytes() {
+        for (filled, preferred) in [
+            (0, 512),
+            (1, 1024),
+            (512 - 24, 1024),
+            (1536 - 48, 2048),
+            (3584 - 72, 4096),
+            (4080, 8192),
+            (4096 - 512, 4096),
+            (4096 - 512 + 1, 8192),
+            ((1 << 31) - 512, 1 << 31),
+            ((1 << 31) - 511, 1 << 31),
+            (usize::MAX, 1 << 31),
+        ] {
+            assert_eq!(preferred, next_chunk_size(filled).bytes() as usize);
+        }
+    }
 
     #[test]
     fn test_release_partial() {

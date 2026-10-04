@@ -187,6 +187,7 @@ impl ChunkChain {
         ChunkChainIterator { next: Some(self) }
     }
 
+    #[cfg(test)]
     pub(crate) fn depth(&self) -> usize {
         self.iter().count().saturating_sub(1)
     }

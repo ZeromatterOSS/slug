@@ -35,7 +35,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Controlled cached-tail growth reproduced; byte-based growth repair next; full WP899 unaccepted
+Status: Byte-based Starlark growth repair accepted; actual source observation design next; full WP899 unaccepted
+
+Three DESIGNs and three component/terminal FINALs accept preferred Starlark chunk
+growth based on saturated trimmed filled bytes rather than cached chain count.
+Cache-first selection, immediate required size, alignment/refcounts and TLS release
+remain. Fresh17/17 owner tests and affected Core/library/defaultCoreCLI compilation
+pass. Fixed matched-profile A/B/B/A yields final requests16MiB/8192B/8192B/16MiB;
+candidate normal order remains0. All five preserve31strings, sealed4608B,
+clone/drop/worker join and exact parent cleanup. [Receipt](slug-v2-subplans/wp899-starlark-byte-growth-2026-10-04.json).
+This proves the bounded growth repair, not physical-memory ratio, speedup,
+historical owner or actual-source fit. Next is one separately reviewed/frozen
+actual source observation of this relevant accepted change, preserving all source
+and supervisor ceilings. No automatic retry or ordinary activation is selected;
+fullWP899/source admission remains open.
 
 Three independent FINALs accept the bounded public Starlark cache-depth control.
 The same31 strings seal to4608B in both allocation orders. Interleaving retained

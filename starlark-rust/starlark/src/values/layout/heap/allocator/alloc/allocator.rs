@@ -109,7 +109,10 @@ impl ChunkAllocator {
         thread_local_release(after);
 
         let required_len = len + ChunkChain::HEADER_SIZE;
-        let next_chunk = thread_local_alloc_at_least(required_len, rem_chain.depth());
+        let filled_bytes = rem_chain.iter().fold(0usize, |total, chain| {
+            total.saturating_add(chain.current_chunk_available_len().bytes() as usize)
+        });
+        let next_chunk = thread_local_alloc_at_least(required_len, filled_bytes);
 
         let next_chain = ChunkChain::new(next_chunk, rem_chain);
 
@@ -205,6 +208,7 @@ mod tests {
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
 
+    use crate::values::FrozenHeap;
     use crate::values::layout::aligned_size::AlignedSize;
     use crate::values::layout::heap::allocator::alloc::allocator::ChunkAllocator;
     use crate::values::layout::heap::allocator::alloc::chunk::Chunk;
@@ -247,6 +251,47 @@ mod tests {
         allocator.alloc(ValueAllocSize::new(
             AlignedSize::new_bytes(128 << 10) - Chunk::HEADER_SIZE,
         ));
+    }
+
+    #[test]
+    fn test_cached_fragments_grow_from_filled_bytes() {
+        std::thread::spawn(|| {
+            let target = FrozenHeap::new();
+            let mut donors = Vec::new();
+            let mut values = Vec::new();
+            for index in 0..15 {
+                let donor_text = format!("d{index:02}{}", "d".repeat(125));
+                let donor = FrozenHeap::new();
+                let value = donor.alloc_str(&donor_text).to_frozen_value();
+                donors.push((donor.into_ref(), value, donor_text));
+                let target_text = format!("t{index:02}{}", "t".repeat(253));
+                values.push((
+                    target.alloc_str(&target_text).to_frozen_value(),
+                    target_text,
+                ));
+            }
+            let final_text = format!("t15{}", "t".repeat(509));
+            values.push((target.alloc_str(&final_text).to_frozen_value(), final_text));
+            assert!(target.allocated_bytes() <= 16 * 1024);
+            let filled = target.allocated_bytes() - target.available_bytes();
+            let owner = target.into_ref();
+            assert_eq!(filled, owner.allocated_bytes());
+            let clone = owner.clone();
+            drop(owner);
+            for (value, text) in &values {
+                assert!(value.to_value().unpack_str() == Some(text.as_str()));
+            }
+            assert_eq!(filled, clone.allocated_bytes());
+            assert_eq!(0, clone.available_bytes());
+            drop(values);
+            drop(clone);
+            for (_owner, value, text) in &donors {
+                assert!(value.to_value().unpack_str() == Some(text.as_str()));
+            }
+            drop(donors);
+        })
+        .join()
+        .unwrap();
     }
 
     fn random_iteration(i: u32) {
