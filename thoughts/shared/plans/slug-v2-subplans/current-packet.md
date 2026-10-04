@@ -1,16 +1,25 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Two-worker diagnostic profile accepted; bounded actual source observation next; full WP899 unaccepted
+Status: Pool2 allocation terminal preserved; virtual allocation owner audit next; full WP899 unaccepted
+
+The spent global15 two-worker profile observation emitted zero Slug records:
+reported4,696,589B allocation failure coexists with supervisor STOP_WAIT/DEADLINE
+disk_census_bound. 674/675 censuses complete; observed VmSize/VmPeak4,293,820,416B,
+threadpeak5 and sampledRSS240,381,952B are independent maxima. Allocation owner,
+allocation-time state and causal ordering remain unknown. TERM/KILL, actual join,
+stage and exact parent cleanup pass three terminal FINALs. [Receipt](wp899-pool2-allocation-frontier-2026-10-04.json).
+The cap alone did not establish admission. Next is a source-owned virtual allocation/
+retention audit; no actual retry, allocator policy or ceiling change selected.
+FullWP899/source admission remains open.
 
 The explicit Linux cfg(test) actual-root profile now bounds its owned Tokio
 blocking pool to two workers. Default/production behavior and every other source
 or supervisor ceiling remain. Three FINALs accept64/64 controls in1.304s and
 default Core/CLI checks, including normal owned-runtime queue/release/join behavior.
 [Receipt](wp899-diagnostic-blocking-cap-2026-10-04.json). Queueing may change deadline/error
-selection; running OS DNS still requires external containment. Root prepares one
-separately reviewed global15/local1 source observation with a fresh artifact and
-contract/freeze; no automatic retry or source-fit claim. FullWP899 remains open.
+selection; running OS DNS still requires external containment. The separately frozen global15 is spent above; no automatic retry or source-fit
+claim. FullWP899 remains open.
 
 The controlled native blocking-pool probe passes both modes: four held jobs with
 five workers by default, versus two held jobs and a queued invalid-port lookup with
