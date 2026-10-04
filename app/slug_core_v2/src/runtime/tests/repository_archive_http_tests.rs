@@ -442,7 +442,9 @@ fn scoped_selected_capture_uses_one_payload_under_actual_root_bank() {
     }
     let digest = hash.finalize().into();
     let file = url::Url::from_file_path(source.path()).unwrap().to_string();
-    let limits = SourceServiceLimits::actual_root();
+    let mut limits = SourceServiceLimits::actual_root();
+    // Keep the original one-payload versus two-copy discriminator at 16 MiB.
+    limits.live_buffer_bytes = SourceServiceLimits::default().live_buffer_bytes;
     let deadline = Instant::now() + Duration::from_secs(10);
     let owner = SourceServiceScope::new_for_test(
         NormalizedAbsolutePath::new("/selected-transfer-test").unwrap(),
@@ -466,6 +468,75 @@ fn scoped_selected_capture_uses_one_payload_under_actual_root_bank() {
     assert_eq!(owner.snapshot().peak_buffer_bytes, one_payload);
     assert_eq!(owner.snapshot().live_buffer_bytes, baseline);
     assert!(owner.check().is_ok());
+    let clone = bytes.clone();
+    assert!(Arc::ptr_eq(&clone, &bytes));
+    drop(bytes);
+    let weak = Arc::downgrade(&owner);
+    drop(owner);
+    assert!(weak.upgrade().is_some());
+    drop(recorder);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(&clone[..chunk.len()], &chunk);
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn scoped_selected_maximum_payload_fits_explicit_actual_bank_and_retires_credit() {
+    use slug_workspace_v2::NormalizedAbsolutePath;
+
+    use crate::runtime::dice::source_service::SourceServiceLimits;
+
+    let mut source = tempfile::NamedTempFile::new().unwrap();
+    let chunk = [0x6b; 64 * 1024];
+    let size = usize::try_from(SELECTED_EXTENSION_CAPTURE_LIMIT).unwrap();
+    assert_eq!(size, 32 << 20);
+    let mut hash = Sha256::new();
+    for _ in 0..size / chunk.len() {
+        source.write_all(&chunk).unwrap();
+        hash.update(chunk);
+    }
+    let digest = hash.finalize().into();
+    let file = url::Url::from_file_path(source.path()).unwrap().to_string();
+    let limits = SourceServiceLimits::actual_root();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let owner = SourceServiceScope::new_for_test(
+        NormalizedAbsolutePath::new("/selected-maximum-transfer-test").unwrap(),
+        deadline,
+        deadline + Duration::from_secs(1),
+        limits,
+    )
+    .unwrap();
+    let recorder = owner.arm_registry_association_for_test().unwrap();
+    let baseline = owner.snapshot().live_buffer_bytes;
+    let expected_peak = baseline + size + 64 + chunk.len();
+    assert!(expected_peak > SourceServiceLimits::default().live_buffer_bytes);
+    assert!(expected_peak <= limits.live_buffer_bytes);
+    // Exercise the same scoped file capture and transfer callees as the normal
+    // selected helper, retaining the actual temporary path to check deletion.
+    let capture = scoped::capture_one(
+        &file,
+        digest,
+        SELECTED_EXTENSION_CAPTURE_LIMIT,
+        "selected extension artifact",
+        &runtime(),
+        &|| true,
+        &owner,
+    )
+    .unwrap();
+    let capture_path = capture.path().to_path_buf();
+    assert!(capture_path.exists());
+    assert_eq!(owner.snapshot().source_attempts, 1);
+    assert_eq!(owner.snapshot().transferred_bytes, size as u64);
+    assert_eq!(owner.snapshot().live_buffer_bytes, baseline);
+    let bytes = transfer_selected_capture(capture, digest, &|| true, Some(&owner)).unwrap();
+    assert!(!capture_path.exists());
+    assert_eq!(bytes.len(), size);
+    assert_eq!(Sha256::digest(&*bytes).as_slice(), digest);
+    assert_eq!(owner.snapshot().peak_buffer_bytes, expected_peak);
+    assert_eq!(owner.snapshot().live_buffer_bytes, baseline);
+    assert!(owner.check().is_ok());
+    assert!(!recorder.snapshot().buffer.first_error_is_buffer_limit);
+    assert!(recorder.snapshot().buffer.origin.is_none());
     let clone = bytes.clone();
     assert!(Arc::ptr_eq(&clone, &bytes));
     drop(bytes);

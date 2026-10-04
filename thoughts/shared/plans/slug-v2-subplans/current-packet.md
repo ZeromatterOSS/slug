@@ -1,7 +1,14 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: actual payload credit refusal proved; bounded diagnostic bank design next; full WP899 unaccepted
+Status: bounded diagnostic payload bank accepted; one reviewed actual observation next; full WP899 unaccepted
+
+The bounded Linux cfgtest actual profile now selects40MiB, preserving Default16MiB
+and every non-test/non-Linux, other source and supervisor ceiling. Three FINALs,
+fresh63/63 including normal32MiB file capture/transfer and default Core+CLI checks
+pass. [Receipt](wp899-payload-bank-profile-2026-10-04.json). Next is ONE separately reviewed
+frozen actual observation with the explicit bank recorded; source admission and
+coupled WP899 acceptance remain open.
 
 The spent global12 observation proves first SelectedPayload reservation refusal:
 19,234,400B requested +4,211,303B live exceeds the16,777,216B bank before Arc
@@ -9,8 +16,7 @@ allocation or scratch reservation. Native pairing/leaf identity remain0. [Receip
 Verified direct OpenSSL and pinned native TLS were separately accepted prerequisites
 ([health](wp899-tls-current-health-2026-10-04.json)); they explain no historical failure.
 Three terminal FINALs accept107 ordered records,590/590 censuses and actual
-join/stage/exact-parent cleanup. Next is a bounded explicit diagnostic-bank DESIGN
-for the existing32MiB admitted payload plus recorder/scratch, preserving Default16MiB
+join/stage/exact-parent cleanup. The bounded profile implementation is accepted above, preserving Default16MiB
 and supervisor ceilings. Full source admission and coupled WP899 acceptance remain open.
 
 The spent global11 observation paired first Scope WorkDeadline with the natural

@@ -27,12 +27,15 @@ fn scope(limits: SourceServiceLimits) -> Arc<SourceServiceScope> {
 fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() {
     let defaults = SourceServiceLimits::default();
     assert_eq!(defaults.registry_attempts, 128);
+    assert_eq!(defaults.live_buffer_bytes, 16 << 20);
     let profile = SourceServiceLimits::actual_root();
     assert_eq!(profile.registry_attempts, 256);
+    assert_eq!(profile.live_buffer_bytes, 40 << 20);
     assert_eq!(
         profile,
         SourceServiceLimits {
             registry_attempts: 256,
+            live_buffer_bytes: 40 << 20,
             ..defaults
         }
     );
@@ -85,7 +88,41 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
             );
         }
     }
-    for invalid in [0, defaults.live_buffer_bytes + 1] {
+    for allowance in [
+        1,
+        defaults.live_buffer_bytes,
+        defaults.live_buffer_bytes + 1,
+        profile.live_buffer_bytes,
+    ] {
+        assert!(
+            construct(SourceServiceLimits {
+                live_buffer_bytes: allowance,
+                ..defaults
+            })
+            .is_ok()
+        );
+    }
+    let owner = scope(profile);
+    let credit = owner.reserve_buffer(profile.live_buffer_bytes).unwrap();
+    assert_eq!(
+        owner.snapshot().live_buffer_bytes,
+        profile.live_buffer_bytes
+    );
+    assert_eq!(
+        owner.snapshot().peak_buffer_bytes,
+        profile.live_buffer_bytes
+    );
+    assert_eq!(
+        owner.reserve_buffer(1).err(),
+        Some(SourceServiceError::BufferLimit)
+    );
+    drop(credit);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    assert_eq!(
+        owner.reserve_buffer(0).err(),
+        Some(SourceServiceError::BufferLimit)
+    );
+    for invalid in [0, SourceServiceLimits::MAX_LIVE_BUFFER_BYTES + 1] {
         assert_eq!(
             construct(SourceServiceLimits {
                 live_buffer_bytes: invalid,

@@ -64,10 +64,18 @@ impl Default for SourceServiceLimits {
 impl SourceServiceLimits {
     pub(super) const MAX_REGISTRY_ATTEMPTS: u64 = 256;
 
+    // The explicit actual-root diagnostic admits one existing 32 MiB payload
+    // plus charged recorder/scratch. Production keeps the original 16 MiB cap.
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) const MAX_LIVE_BUFFER_BYTES: usize = 40 << 20;
+    #[cfg(not(all(test, target_os = "linux")))]
+    pub(super) const MAX_LIVE_BUFFER_BYTES: usize = 16 << 20;
+
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) fn actual_root() -> Self {
         Self {
             registry_attempts: Self::MAX_REGISTRY_ATTEMPTS,
+            live_buffer_bytes: Self::MAX_LIVE_BUFFER_BYTES,
             ..Self::default()
         }
     }
@@ -86,7 +94,7 @@ impl SourceServiceLimits {
         .into_iter()
         .all(|(v, m)| v > 0 && v <= m)
             && self.live_buffer_bytes > 0
-            && self.live_buffer_bytes <= max.live_buffer_bytes
+            && self.live_buffer_bytes <= Self::MAX_LIVE_BUFFER_BYTES
     }
     fn maximum(self, counter: SourceCounter) -> u64 {
         match counter {
