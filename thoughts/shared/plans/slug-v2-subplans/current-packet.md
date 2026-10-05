@@ -12,56 +12,47 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component reuses the existing StringValue for private
-one-placeholder formatting with empty surrounding segments. Direct strings and
-single-tuple percent strings avoid a mutable-heap copy. Compiler output still
-interns in its own frozen heap; other conversions/errors remain unchanged.
-This is Slug-native scratch ownership, with admitted behavior unchanged.
-Next: select a proved redundant copy or existing interner reuse at local string
-owners through a bounded design checkpoint.
+The latest accepted component copies the native nonstring format suffix directly
+into the final owned heap string. The prefix and single renderer callback remain
+unchanged; a fixed 1MiB suffix reduces observed initial scratch capacity from
+1,048,589B to 13B. This is Slug-native scratch ownership with admitted behavior
+unchanged. Next: select a proved redundant copy or existing interner reuse at
+local string owners through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Local formatter memory contract
+## Accepted formatter memory contract
 
-Accepted component: private native `format_one` and `percent_s_one` reuse
-an existing StringValue when both surrounding segments are empty. Keep remaining
-conversion/nonempty arms, tuple arity errors, parser/optimizer/fallback and normal
-heap/GC/freeze/module references unchanged. Compiler output still passes through
-its existing own frozen interner, including imported inputs.
-No helper/API/interner/cache/key/unsafe/dependency/retained representation change.
+Native `format_one` reserves prefix plus rendering slack, keeps the prefix push
+and single `collect_str` call, then uses existing `alloc_str_concat` to copy
+scratch and untouched suffix into final owned storage. String/identity arms,
+percent tuple/errors, generic formatting and compiler own frozen interning stay
+unchanged. No helper/API/interner/cache/key/unsafe/dependency or retained
+representation change. Prefix/render scratch and final output remain; larger
+renderers may grow scratch. No total peak/arena/RSS/speed/source-fit claim.
 
-Root owns edits, serial Cargo and commits. Allowlist: string `dot_format.rs` and
-`interpolation.rs` private native guards, compiler `expr.rs` test hook and sibling
-`expr/empty_format_memory_tests.rs`, compact receipt and matching Stage9 row.
-Private design/evidence stays under ignored `target/wp899/empty-format-reuse-*`.
-Three DESIGN/FINAL reviews accepted mutable/frozen/GC ownership, conversions and
-tuple errors, plus actual pointer/arena evidence; pins live in the
-[receipt](wp899-empty-format-reuse-2026-10-05.json). Join capacity audit is unselected.
+Three DESIGN/FINAL reviews accept the component. Same-test baseline semantic and
+retained/carrier controls pass2; only initial capacity assertion fails1. Candidate
+30/30 includes custom prefix/count/str-vs-repr/final-byte observations, builtin
+conversions, Unicode/NUL, tuple/errors, retained compiled functions after source
+and module drops, GC/freeze, actual carriers and protected protocol/bytecode/
+interner/empty-format controls. Default Loading/Core/CLI alltarget check passes.
+Pinned nightly-2025-09-14, serial offline preparation60s/tests30s, fresh artifact
+exact preflight; goldens CARGO_MANIFEST_DIR and regeneration absent.
 
-Direct helper controls use nonconstant long owned mutable strings and prove
-input-pointer reuse plus no additional heap.allocated_bytes. Baseline fails that
-ownership assertion; semantic controls pass. Cover one-tuple percent, nonstrings,
-nonempty/empty/static/Unicode/NUL values and exact tuple errors. Direct compiler
-constant calls keep own frozen interning while avoiding mutable allocation.
-Retained compiled functions after source/module drops, actual carrier parsing,
-ordinary GC/freeze and protected bytecode/interner controls cover lifetimes.
-Only the identity-case mutable string allocation/copy is removed; retained input,
-nonempty/nonstring buffers and interner metadata remain. No RSS/speed/source fit.
-
-Resolve pinned nightly-2025-09-14 tools via `rustup which`. Serial offline Starlark
-no-run Cargo JSON, fresh artifact exact preflight/focused execution; default
-Loading/Core/CLI alltarget check. Preparation60s/test30s caps; goldens require
-CARGO_MANIFEST_DIR and no regeneration. Format Rust, plan/archive/diff checks.
-Full WP899/M7A/source/integration remain unwaived/unaccepted.
+Root owns edits, serial Cargo and commits. Keep future changes bounded at existing
+string owners with reviewed design and focused discriminators. Join estimates
+and scope-name audits remain unselected. Full WP899/M7A/source and integration
+gates remain unwaived/unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Native nonstring formatting copies untouched suffix directly into final owned string; prefix and renderer callback preserved. Three DESIGNs/FINALs, same-test baseline 2 semantic passes/1 capacity failure, candidate 30/30 and default dependent checks. Fixed 1MiB suffix initial scratch capacity 1,048,589B→13B; render growth/final storage/peak/RSS/speed excluded | [Formatter suffix direct copy](wp899-format-suffix-direct-2026-10-05.json) |
 | Empty-segment native formatting reuses existing StringValue, including percent single-tuple delegation; compiler own frozen interning unchanged. Three DESIGNs/FINALs, baseline pointer/arena failures, candidate 23/23 and default dependent checks pass. Fixed 64KiB cases share inputs with zero arena growth; chunks/padding excluded from exact payload/RSS/speed claims | [Empty-format input reuse](wp899-empty-format-reuse-2026-10-05.json) |
 | Repository BUILD preparation transfers raw load-name Strings into existing children on both routes; original buffers/capacities preserved and one copy per child removed. Three DESIGNs/FINALs, baseline pointer failures, candidate 8/8 and default Core/CLI checks pass; no quantified memory/speed claim | [Repository child load-name transfer](wp899-repository-child-load-move-2026-10-05.json) |
 | Literal-concatenation compiler helper borrows AST fragments; two intermediate owned-copy sites removed, final String/frozen ownership unchanged. Three DESIGNs/FINALs, corrected baseline 3/3, candidate 15/15 and default dependent checks pass; no quantified memory/speed claim | [Literal concatenation borrowing](wp899-literal-concat-borrow-2026-10-05.json) |

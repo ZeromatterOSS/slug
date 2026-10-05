@@ -1,0 +1,223 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "9dadecbeb",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/dot_format.rs": "9e05ea2a9b1a2ec59fce64cabf4ed1939b08dd668cef45636cad706a1d253faa",
+    "starlark-rust/starlark/src/values/types/string/format_suffix_memory_tests.rs": "9b6572912e403e6bbced177d274f3763822ac6ad8543de0c69f34f4ef32ee6e5"
+  },
+  "design_sha256": "bdfd40d405b1321caa08c7df2085f1857c394d9a0711e0af826d2953a16bfccc",
+  "design_reviews": {
+    "target/wp899/format-suffix-direct-design-source.md": "e17509a216048c6715b898cd2851fef4a18c1db19945ad3984518273962351d5",
+    "target/wp899/format-suffix-direct-design-input.md": "1cb8cb936f1cd5a1523c14b55369908a90218d669d1165523367289f7b00c10e",
+    "target/wp899/format-suffix-direct-design-evidence.md": "4063c61470b87b0f64a11be5e5761858062b51b0a610ca9ce2d7b9519fdeb602"
+  },
+  "ownership_proof": "Entire production delta is exactly scratch capacity before.len()+10, omitted suffix push, and existing heap.alloc_str_concat(&result, after); only test hook added elsewhere. Initial prefix and one collect_str callback unchanged. Existing heap concat synchronously copies both parts into owned StringValue. Compiler-owned frozen interning, StringValue guards, tuple/errors, parser and generic formatter unchanged. Baseline/candidate test source hashes identical.",
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/format-suffix-direct-baseline-compile.json",
+      "receipt_sha256": "e38313f6f42f2e75752c82644665adcfb91cd02b9731d236558665dbdf9f44da",
+      "exit_code": 101,
+      "elapsed_seconds": 3.368725946987979,
+      "log_sha256": "2b553f9897fc337d1151926f50a034a84021efb5692e1ee7449ccb919288fe06"
+    },
+    "baseline-r1-compile": {
+      "receipt": "target/wp899/format-suffix-direct-baseline-r1-compile.json",
+      "receipt_sha256": "12fbc65190988be818a655d9012c1f75adde215d355f6e6790738d05531d96fc",
+      "exit_code": 0,
+      "elapsed_seconds": 11.13419797795359,
+      "log_sha256": "e0a5a90d2362bae281f80f68f2d8b191f7e7ee183bfe8f68f080b7c18e6c3ab0"
+    },
+    "baseline-r1-preflight": {
+      "receipt": "target/wp899/format-suffix-direct-baseline-r1-preflight.json",
+      "receipt_sha256": "ba3a5c6526dba279a91fef2df4c3a14a64da7d465caa3acede08bf02e8a04214",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022173285018652678,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r1-controls": {
+      "receipt": "target/wp899/format-suffix-direct-baseline-r1-controls.json",
+      "receipt_sha256": "95e8276bacd64727c63f07632c95782e22b30ef7dd2d550b6dff1f98c7cfe0fa",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005102034017909318,
+      "log_sha256": "97f1294ff69d14c99097a561304487fd54e64ea701ac9065788faebeab952d29"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/format-suffix-direct-candidate-compile.json",
+      "receipt_sha256": "d54798ec8df3d00da976ea212973bcde53abce591528d5a58a20374f63571a45",
+      "exit_code": 0,
+      "elapsed_seconds": 8.45448012498673,
+      "log_sha256": "1ebde809b04c66c66906c20698d6235e8cb951a216f32e04ef95ce399975ca7e"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/format-suffix-direct-candidate-preflight.json",
+      "receipt_sha256": "2e3679dc8c5163737f7b8c1605a33a11b404db61f1c6ec3ec5a0f8e74294bfcc",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02231027599191293,
+      "log_sha256": "e1a22d95630cf2dffa5a274f08bdb22ccd59f4e12fade2d0416f6874c0326365"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/format-suffix-direct-candidate-controls.json",
+      "receipt_sha256": "6033721eb90dd1fc9d3a1ad3ce50a4bddbe396bc4784cccd80b89d649703ebcd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.006044028967153281,
+      "log_sha256": "a4e99849b5f18d87ee6c4262b05813f19c4dfce61f488639fab0f2fa6712f051"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/format-suffix-direct-dependents-check.json",
+      "receipt_sha256": "9d48507be131dfe4e5fd6f46686cd6c6eb6cacdcae3b45cad9b621c2b07dcc2a",
+      "exit_code": 0,
+      "elapsed_seconds": 7.563401910010725,
+      "log_sha256": "436382d5f2dedda59d58ad54ea17e7e88ec0ff3c1b96d0816ed5cc9ddbf59d67"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "6166828a19c6d9f9b7e16485f6c8e85de8e9caac7ee0748f678a5fc3944e4a28",
+    "selectors": [
+      "values::types::string::dot_format::format_suffix_memory_tests::suffix_is_excluded_from_initial_renderer_scratch",
+      "values::types::string::dot_format::format_suffix_memory_tests::renderer_context_and_retained_compiled_results_are_preserved",
+      "values::types::string::dot_format::format_suffix_memory_tests::renderer_suffix_preserves_compiled_bazel_internal_carriers",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segments_reuse_mutable_and_frozen_inputs",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_compiler_constants_skip_mutable_roundtrip",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_semantics_and_retained_compiled_functions",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_compiled_functions_preserve_bazel_internal_carriers",
+      "values::types::string::interpolation::percent_s_memory_tests::compiled_percent_s_segments_retain_frozen_ownership",
+      "values::types::string::interpolation::tests::test_incomplete_format",
+      "values::types::string::interpolation::tests::test_unsupported_format_character",
+      "values::types::string::interpolation::tests::test_parse_percent_s_one",
+      "values::types::string::interpolation::tests::test_type_support_d",
+      "values::types::string::interpolation::tests::test_type_support_o",
+      "values::types::string::interpolation::tests::test_type_support_x",
+      "values::types::string::interpolation::tests::test_type_support_e",
+      "values::types::string::interpolation::tests::test_int_min",
+      "values::types::string::dot_format::dot_format_memory_tests::compiled_format_segments_retain_frozen_ownership",
+      "tests::bc::expr::test_format_one",
+      "tests::bc::expr::test_percent_s_one",
+      "tests::bc::expr::test_percent_s_one_format_one_eval",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::layout::value::tests::custom_string_protocol_defaults_to_repr_and_can_diverge",
+      "values::types::string::dot_format::tests::test_format_capture",
+      "values::types::string::dot_format::tests::test_format",
+      "values::types::string::dot_format::tests::test_parse_format_one"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/dot_format.rs": "9e05ea2a9b1a2ec59fce64cabf4ed1939b08dd668cef45636cad706a1d253faa",
+      "starlark-rust/starlark/src/values/types/string/format_suffix_memory_tests.rs": "9b6572912e403e6bbced177d274f3763822ac6ad8543de0c69f34f4ef32ee6e5"
+    }
+  },
+  "baseline_result": "Two semantic/retained/GC/carrier controls pass; only initial scratch capacity assertion fails (records both paths).",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "protected_controls": 27,
+    "candidate_controls": 30
+  },
+  "metrics": {
+    "baseline-r1": [
+      {
+        "percent": false,
+        "prefix_bytes": 3,
+        "suffix_bytes": 1048576,
+        "initial_scratch_capacity": 1048589,
+        "output_bytes": 1048587
+      },
+      {
+        "percent": true,
+        "prefix_bytes": 3,
+        "suffix_bytes": 1048576,
+        "initial_scratch_capacity": 1048589,
+        "output_bytes": 1048587
+      }
+    ],
+    "candidate": [
+      {
+        "percent": false,
+        "prefix_bytes": 3,
+        "suffix_bytes": 1048576,
+        "initial_scratch_capacity": 13,
+        "output_bytes": 1048587
+      },
+      {
+        "percent": true,
+        "prefix_bytes": 3,
+        "suffix_bytes": 1048576,
+        "initial_scratch_capacity": 13,
+        "output_bytes": 1048587
+      }
+    ]
+  },
+  "corrections": [
+    "Initial test compile moved a frozen function handle per iteration while Evaluator retained its borrow; changed test loop to borrow the handle array, removed unused import, then rebuilt baseline. Production unchanged during baseline."
+  ],
+  "limits": "Observed initial String capacity for fixed 1MiB suffix only; prefix/render scratch and final output remain. Renderers may grow scratch. One suffix scratch copy removed; no total peak/arena/RSS/timing/source-fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default offline Starlark and default Loading/Core/CLI alltargets; serial Cargo prep60s/test30s caps. Fresh exact artifact preflight; CARGO_MANIFEST_DIR for goldens, regeneration absent.",
+  "scope": "Local strings/basic memory only. Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/format-suffix-direct-baseline-compile.json": "e38313f6f42f2e75752c82644665adcfb91cd02b9731d236558665dbdf9f44da",
+    "target/wp899/format-suffix-direct-baseline-compile.jsonl": "2b553f9897fc337d1151926f50a034a84021efb5692e1ee7449ccb919288fe06",
+    "target/wp899/format-suffix-direct-baseline-r1-compile.json": "12fbc65190988be818a655d9012c1f75adde215d355f6e6790738d05531d96fc",
+    "target/wp899/format-suffix-direct-baseline-r1-compile.jsonl": "e0a5a90d2362bae281f80f68f2d8b191f7e7ee183bfe8f68f080b7c18e6c3ab0",
+    "target/wp899/format-suffix-direct-baseline-r1-controls.json": "95e8276bacd64727c63f07632c95782e22b30ef7dd2d550b6dff1f98c7cfe0fa",
+    "target/wp899/format-suffix-direct-baseline-r1-controls.jsonl": "97f1294ff69d14c99097a561304487fd54e64ea701ac9065788faebeab952d29",
+    "target/wp899/format-suffix-direct-baseline-r1-preflight.json": "ba3a5c6526dba279a91fef2df4c3a14a64da7d465caa3acede08bf02e8a04214",
+    "target/wp899/format-suffix-direct-baseline-r1-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/format-suffix-direct-baseline-r1-selectors.json": "6edc07349d8087eb458ddbdbf1eb8c9c8a21538905f3260a67a3a576d27cbbf3",
+    "target/wp899/format-suffix-direct-candidate-compile.json": "d54798ec8df3d00da976ea212973bcde53abce591528d5a58a20374f63571a45",
+    "target/wp899/format-suffix-direct-candidate-compile.jsonl": "1ebde809b04c66c66906c20698d6235e8cb951a216f32e04ef95ce399975ca7e",
+    "target/wp899/format-suffix-direct-candidate-controls.json": "6033721eb90dd1fc9d3a1ad3ce50a4bddbe396bc4784cccd80b89d649703ebcd",
+    "target/wp899/format-suffix-direct-candidate-controls.jsonl": "a4e99849b5f18d87ee6c4262b05813f19c4dfce61f488639fab0f2fa6712f051",
+    "target/wp899/format-suffix-direct-candidate-preflight.json": "2e3679dc8c5163737f7b8c1605a33a11b404db61f1c6ec3ec5a0f8e74294bfcc",
+    "target/wp899/format-suffix-direct-candidate-preflight.jsonl": "e1a22d95630cf2dffa5a274f08bdb22ccd59f4e12fade2d0416f6874c0326365",
+    "target/wp899/format-suffix-direct-candidate-selectors.json": "265fba532d3dd71f1ee480c8a5550c12ea30c839f42ed1ab52dcdb04f5d59bd4",
+    "target/wp899/format-suffix-direct-controls.py": "5febfc4a4eb7d4492e0f52c271126fe9e853d3f20271943e99f7d072008ab3d6",
+    "target/wp899/format-suffix-direct-dependents-check.json": "9d48507be131dfe4e5fd6f46686cd6c6eb6cacdcae3b45cad9b621c2b07dcc2a",
+    "target/wp899/format-suffix-direct-dependents-check.jsonl": "436382d5f2dedda59d58ad54ea17e7e88ec0ff3c1b96d0816ed5cc9ddbf59d67",
+    "target/wp899/format-suffix-direct-design-evidence.md": "4063c61470b87b0f64a11be5e5761858062b51b0a610ca9ce2d7b9519fdeb602",
+    "target/wp899/format-suffix-direct-design-input.md": "1cb8cb936f1cd5a1523c14b55369908a90218d669d1165523367289f7b00c10e",
+    "target/wp899/format-suffix-direct-design-source.md": "e17509a216048c6715b898cd2851fef4a18c1db19945ad3984518273962351d5",
+    "target/wp899/format-suffix-direct-design.md": "bdfd40d405b1321caa08c7df2085f1857c394d9a0711e0af826d2953a16bfccc",
+    "target/wp899/format-suffix-direct-record.py": "c001225697969738065317658bc283cfb6a8465b4c2bfff5d769b7f628d82399",
+    "target/wp899/format-suffix-direct-start.json": "5eea963992d7b5190a4525262ee3439f4824eb707ff486a08c11398b5ddbbc20"
+  },
+  "timing": {
+    "compile_seconds": 30.520805959939025,
+    "test_seconds": 0.0111460629850626,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 464.2836539745331
+  },
+  "validation_sha256": "d3720e70afcb0a124fa2dfe9bf10f50105db8d45194ed33868af8c27a8d73a5d",
+  "final_reviews": {
+    "target/wp899/format-suffix-direct-final-source.md": "245ed833b9dd6237c26a414fdb25df84c48c74e90accf47c35d58b42b0b5e1f6",
+    "target/wp899/format-suffix-direct-final-input.md": "57ede837881be5ff87b3667455513ce56bcd70bd5fd159c5a1745adf392638a1",
+    "target/wp899/format-suffix-direct-final-evidence.md": "aebb0e29ef98d4a38d79a6d32c621f77688a2c6204d2d10589a48a7b4f03ed33"
+  },
+  "hygiene": {
+    "plan-check": {
+      "receipt": "target/wp899/format-suffix-direct-plan-check.json",
+      "sha256": "5fdbee0039fb7a665981a0115101a51be336d6f01052f350b2535b03c8a73430",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/format-suffix-direct-archive-check.json",
+      "sha256": "9b33a31584204f861b13a1484264d7e8ffaa3c505b265b4d611002f08107fd24",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/format-suffix-direct-diff-check.json",
+      "sha256": "9af530e8ece7c1b28cc134b470a05137035fb1238d0fe649fa75713cea0ba661",
+      "exit_code": 0
+    },
+    "format-check": {
+      "receipt": "target/wp899/format-suffix-direct-format-check.json",
+      "sha256": "6934e06a51c704ddf40c88fcefe919c4961eb0e05aa47da0759bbcb70eb70b56",
+      "exit_code": 0
+    }
+  }
+}

@@ -79,11 +79,10 @@ pub(crate) fn format_one<'v>(
         Some(arg) if before.is_empty() && after.is_empty() => arg,
         Some(arg) => heap.alloc_str_concat3(before, &arg, after),
         None => {
-            let mut result = String::with_capacity(before.len() + after.len() + 10);
+            let mut result = String::with_capacity(before.len() + 10);
             result.push_str(before);
             arg.collect_str(&mut result);
-            result.push_str(after);
-            heap.alloc_str(&result)
+            heap.alloc_str_concat(&result, after)
         }
     }
 }
@@ -209,6 +208,10 @@ fn format_capture<'v, T: Iterator<Item = Value<'v>>>(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "format_suffix_memory_tests.rs"]
+mod format_suffix_memory_tests;
 
 #[cfg(test)]
 #[path = "dot_format_memory_tests.rs"]
