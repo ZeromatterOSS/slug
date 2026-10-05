@@ -1416,12 +1416,12 @@ impl fmt::Display for HostSourceInputError {
     }
 }
 
-fn host_source_text(source: &RootPackageSource) -> Result<Arc<String>, HostSourceInputError> {
-    String::from_utf8(source.bytes().to_vec())
-        .map(Arc::new)
-        .map_err(|_| HostSourceInputError::UnsupportedSourceEncoding {
+fn host_source_text(source: &RootPackageSource) -> Result<&str, HostSourceInputError> {
+    std::str::from_utf8(source.bytes().as_ref()).map_err(|_| {
+        HostSourceInputError::UnsupportedSourceEncoding {
             logical_path: source.logical_path().dupe(),
-        })
+        }
+    })
 }
 
 fn host_source_name(source: &RootPackageSource) -> Result<String, HostSourceInputError> {
@@ -2837,7 +2837,7 @@ async fn compute_host_bzl_module(
     };
     let ast = match AstModule::parse_with_string_encoding(
         &source_name,
-        source_text.as_ref().clone(),
+        source_text.to_owned(),
         &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {
@@ -2974,7 +2974,7 @@ async fn compute_host_bzl_module(
             workspace_path: source.logical_path().as_path().to_path_buf(),
             repository_mapping: Arc::from([]),
         },
-        digest(source_text.as_str()),
+        digest(source_text),
         loaded_modules.iter().map(|(_, module)| module),
     );
     if let Err(error) =
@@ -6033,7 +6033,7 @@ async fn compute_root_package(
         }
     };
     let source_text = match host_source_text(&source) {
-        Ok(source) => source,
+        Ok(source) => Arc::new(source.to_owned()),
         Err(error) => {
             return root_package_driver_complete(
                 Err(RootPackageLoadError::new(RootPackageLoadErrorInner::Input(
@@ -6140,6 +6140,7 @@ async fn compute_root_package(
         };
         loaded_modules.push((load, module));
     }
+    drop(ast);
     let repository_mapping =
         match load_root_runfiles_repository_mapping(key, ctx, mode, &mut observations).await {
             Ok(mapping) => mapping,

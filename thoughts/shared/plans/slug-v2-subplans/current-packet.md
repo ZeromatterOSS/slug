@@ -9,6 +9,17 @@ prefer removing redundant copies or reusing existing interners. Network-dependen
 source-admission observations and broader runtime work are deferred during this
 scope. Existing source/integration gates remain unproved; this does not waive them.
 
+Three DESIGNs and three FINALs accept borrowed Host source decoding and earlier
+root BUILD parse-tree release. The private decoder views existing immutable bytes;
+Host `.bzl` parsing still owns one String and hashes at the original late point.
+Root BUILD attempts retain their owned source; the initial load-discovery AST is
+released after its load loop, before mapping and repeated glob attempts. The
+actual-DICE pointer regression fails on baseline while the encoding/path control
+passes. Candidate coverage is 15 preserved passes plus one fresh observed Host
+edit/restore, event and retained-source check: two new and 14 protected tests.
+Default Core/CLI all-target compilation passes. Parser/raw storage remain; AST
+capacity, RSS, timing and source-fit benefits are unquantified. [Acceptance receipt](wp899-host-source-borrow-2026-10-05.json).
+
 Three DESIGNs and three FINALs accept borrowed whitespace-split scratch.
 Private forward/reverse helpers return character-boundary input slices instead
 of temporary Strings; existing consumers copy results into owned heap strings.

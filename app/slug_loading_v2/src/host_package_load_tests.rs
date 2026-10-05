@@ -12,6 +12,9 @@ use dice::ActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+#[path = "host_source_memory_tests.rs"]
+mod host_source_memory_tests;
+
 use dice::DiceTransaction;
 use dice::DynKey;
 use dice::Key;
