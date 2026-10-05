@@ -1,0 +1,260 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "6332e2129ad7e494b4d678b0ba11982ffbb11302",
+  "disposition": "ACCEPTED_LEXER_RESERVATION_COMPONENT_SOURCE_GATE_OPEN",
+  "compatibility": "Slug-native String capacity policy; existing admitted exact Bazel byte values, spans and diagnostics preserved; Unicode lexer unchanged",
+  "decision": "Grow BazelInternal string carriers from emitted literal bytes instead of preallocating the entire source suffix. No new owner, interner, cache, donor or DICE state.",
+  "source_mechanism": [
+    "Lexer::string_bazel previously reserved remainder().len() for each token.",
+    "Token::String and grammar retain the same String, including spare capacity, in the AST.",
+    "The external Loading source path selects BazelInternal and retains its AST during child loading."
+  ],
+  "source_sha256": {
+    "starlark-rust/starlark_syntax/src/lexer.rs": "ad0fee6ecfdd86d6d923cf68211ee70de71442945569349f849e1e33b46370bd",
+    "starlark-rust/starlark_syntax/src/lexer_tests.rs": "8a73658b0c6e711d3f60aab68018372fb816fe4f1bca4bb275278aec9463d12d"
+  },
+  "growth": {
+    "production_added_lines": 2,
+    "production_removed_lines": 1,
+    "test_added_lines": 75,
+    "new_fixture_assets": 0
+  },
+  "validation": {
+    "baseline_expected_failures": {
+      "count": 2,
+      "ast_capacity_bytes": 16775168,
+      "comment_suffix_capacity_bytes": 537456
+    },
+    "candidate_unique_lexer_tests": 24,
+    "initial_candidate_passes": 5,
+    "initial_candidate_fixture_setup_failures": 19,
+    "corrected_missing_golden_passes": 19,
+    "fixture_correction": "Supply the explicit CARGO_MANIFEST_DIR required by the existing golden harness; preserve all assertions and golden bytes.",
+    "protected_bazel_string_tests": 5,
+    "dependent_test_compile_passed": true,
+    "default_core_cli_all_targets_compile_passed": true,
+    "matched_core_support_profile_test_compile_passed": true,
+    "records": {
+      "baseline-owner-compile": {
+        "receipt": "target/wp899/lexer-string-growth-baseline-owner-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 1.026740598026663,
+        "log_sha256": "ecb2ec799aedf89a0f21b36227f089b682a96648d8a39cbf0e54d6766a2c4fc7"
+      },
+      "baseline-preflight": {
+        "receipt": "target/wp899/lexer-string-growth-baseline-preflight.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.019922778999898583,
+        "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+      },
+      "baseline-focused": {
+        "receipt": "target/wp899/lexer-string-growth-baseline-focused.json",
+        "exit_code": 101,
+        "elapsed_seconds": 0.006920511019416153,
+        "log_sha256": "80c854b6370d7b6101be485fec88a7ddbe9b24f8b97f6d7c4e5f90b1d751c602"
+      },
+      "candidate-owner-compile": {
+        "receipt": "target/wp899/lexer-string-growth-candidate-owner-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.9311931789852679,
+        "log_sha256": "537c5b683b2339af9d021e3e209bb0c27980d5f64b2358c272a297b5f5c711ba"
+      },
+      "candidate-preflight": {
+        "receipt": "target/wp899/lexer-string-growth-candidate-preflight.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.02009904000442475,
+        "log_sha256": "24f46c8c2cbc208303352e763695553b51b37fad0b67aeef3c7778a30329beae"
+      },
+      "candidate-focused": {
+        "receipt": "target/wp899/lexer-string-growth-candidate-focused.json",
+        "exit_code": 101,
+        "elapsed_seconds": 0.00513144297292456,
+        "log_sha256": "31914f3bb5a491b39e57b3b1cfbc86fb4609307dd572821069188f1426f605d9"
+      },
+      "golden-corrected": {
+        "receipt": "target/wp899/lexer-string-growth-golden-corrected.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.010100114974193275,
+        "log_sha256": "399521db8447fb0fa962da2cf9091cf060c57c3e33b4d7dd464b040e9f9edc18"
+      },
+      "dependent-compile": {
+        "receipt": "target/wp899/lexer-string-growth-dependent-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 5.630706460971851,
+        "log_sha256": "6dcf6cd94a844023dd325432f506897d4efad7f6af45ab5df75b1ff2cea8b6c6"
+      },
+      "dependent-preflight": {
+        "receipt": "target/wp899/lexer-string-growth-dependent-preflight.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.020362260984256864,
+        "log_sha256": "5973eb858aa5727b937d3b66f199adc893ad134aa1ab7a4e2baab7fb7fed92ae"
+      },
+      "dependent-focused": {
+        "receipt": "target/wp899/lexer-string-growth-dependent-focused.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.00501878303475678,
+        "log_sha256": "32025ec0bc4a1633283972ac9e8db17133bbb602d4b808d2d8a2d8f670e74268"
+      },
+      "default-check": {
+        "receipt": "target/wp899/lexer-string-growth-default-check.json",
+        "exit_code": 0,
+        "elapsed_seconds": 7.85018605197547,
+        "log_sha256": "065b2696da34f7e029678e0f9920491435e3157ecda265e2407ca123283aba4a"
+      },
+      "core-profile-compile": {
+        "receipt": "target/wp899/lexer-string-growth-core-profile-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 10.867393094056752,
+        "log_sha256": "5477d6d415c32d36e7a4cc9f5d913f8abba081e55be5b94ace2ca99f0a890a43"
+      },
+      "baseline-probe-compile": {
+        "receipt": "target/wp899/lexer-string-growth-baseline-probe-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.21841703995596617,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "candidate-probe-compile": {
+        "receipt": "target/wp899/lexer-string-growth-candidate-probe-compile.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.21532057999866083,
+        "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "control-outer": {
+        "receipt": "target/wp899/lexer-string-growth-control-outer.json",
+        "exit_code": 0,
+        "elapsed_seconds": 0.5591346040018834,
+        "log_sha256": "540ee5e68393dd86fa14c4a7e91c22e8f6fb67fda519e24a130997d408a4ce3d"
+      }
+    }
+  },
+  "controlled_metrics": {
+    "sequence": [
+      "A",
+      "B",
+      "B",
+      "A"
+    ],
+    "same_source_bytes": 16384,
+    "same_literal_count": 2048,
+    "same_literal_bytes": 2048,
+    "same_values_and_spans": true,
+    "retained_capacity_bytes": [
+      16775168,
+      16384,
+      16384,
+      16775168
+    ],
+    "predeclared_candidate_ceiling_bytes": 65536,
+    "predeclared_minimum_reduction_percent": 95,
+    "observed_reduction_percent": 99.90233182761568,
+    "metric": "Borrowed original AST expression-literal String capacities; excludes other AST storage, allocator backing and process memory.",
+    "library_profile": {
+      "opt_level": "1",
+      "debuginfo": 2,
+      "test": false,
+      "features": []
+    },
+    "child_address_space_limit_bytes": 268435456,
+    "child_deadline_seconds": 10,
+    "five_children_exit_zero_and_joined": true,
+    "signals_sent": false
+  },
+  "authenticated_parse_only": {
+    "source": "rules_rust 0.73.0 crate_universe/extensions.bzl",
+    "sha256": "a8b37a804cc8e29495607e9a2ecab4806c75b231256200cdd120508b259293d6",
+    "source_bytes": 72150,
+    "expression_string_literals": 425,
+    "expression_literal_bytes": 36208,
+    "expression_literal_capacity_bytes": 51912,
+    "evaluated": false,
+    "downloaded": false
+  },
+  "three_final_reviews": {
+    "target/wp899/lexer-string-growth-final-evidence.md": "518ac85d692ecca9e03cde6c7e673015bbe09d9451c17943640b582f3a02dc60",
+    "target/wp899/lexer-string-growth-final-input.md": "880292450e52aee1f7aaa1d6420cc4c3238735deec0d50d01bb301e52e96d8a7",
+    "target/wp899/lexer-string-growth-final-source.md": "6b554dfa30cd6e3da3ed540fd70ae4ece1c689d290bf4a015d947499d3850299"
+  },
+  "cleanup": {
+    "schema": 1,
+    "parent": {
+      "path": "/tmp/slug-wp899-lexer-capacity-udwwi_7e",
+      "device": 54,
+      "inode": 849646,
+      "uid": 1000,
+      "mode": "0o700"
+    },
+    "reviews": {
+      "target/wp899/lexer-string-growth-final-evidence.md": "518ac85d692ecca9e03cde6c7e673015bbe09d9451c17943640b582f3a02dc60",
+      "target/wp899/lexer-string-growth-final-input.md": "880292450e52aee1f7aaa1d6420cc4c3238735deec0d50d01bb301e52e96d8a7",
+      "target/wp899/lexer-string-growth-final-source.md": "6b554dfa30cd6e3da3ed540fd70ae4ece1c689d290bf4a015d947499d3850299"
+    },
+    "five_joins_verified": true,
+    "canonical_nofollow_fd_and_named_identity_verified": true,
+    "five_owned_log_identities_and_hashes_verified": true,
+    "owned_files_removed": 5,
+    "empty_parent_removed": true
+  },
+  "evidence_sha256": {
+    "target/wp899/lexer-string-growth-baseline-focused.json": "df202c69bd1dfa970e09d8afad3bdcac52dfc8b7c13a1e9f72ef526b8d43e411",
+    "target/wp899/lexer-string-growth-baseline-focused.jsonl": "80c854b6370d7b6101be485fec88a7ddbe9b24f8b97f6d7c4e5f90b1d751c602",
+    "target/wp899/lexer-string-growth-baseline-library.json": "2db2188fb17414ff05858417c94e585b271dd39dbede391c948ced92b59baa5e",
+    "target/wp899/lexer-string-growth-baseline-owner": "0a3bb2d27b7fdeb51f78eda5781644ab69bc994b1d8a030939d1d07745ae9444",
+    "target/wp899/lexer-string-growth-baseline-owner-artifact.json": "26f020740bab467a877c67ca0a8e9af7b8abc68d3c97868043387e5a048bfdca",
+    "target/wp899/lexer-string-growth-baseline-owner-compile.json": "c1b065f9fa68172adde9d69362fb3db1924318c15ff4e25c39c6cd9763e5f6c3",
+    "target/wp899/lexer-string-growth-baseline-owner-compile.jsonl": "ecb2ec799aedf89a0f21b36227f089b682a96648d8a39cbf0e54d6766a2c4fc7",
+    "target/wp899/lexer-string-growth-baseline-preflight.json": "94df2d8dd015bc27770a36d6a32e064c9420919a1f6b9f60f0f2eb5ee6c59bdf",
+    "target/wp899/lexer-string-growth-baseline-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/lexer-string-growth-baseline-probe": "6f41b9efd8d831062be78f4b3e41bcea0693ecd970c22852223d1047ad2acf1b",
+    "target/wp899/lexer-string-growth-baseline-probe-compile.json": "e461e86b49a3191a01fad45e9b027a2b31506f7b6b5fd54eb49b2a04ba3ea090",
+    "target/wp899/lexer-string-growth-baseline-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/lexer-string-growth-candidate-focused.json": "5ea9d22da652fd2734ebc728a002dc4039d2b7b11a842c0c1255769e1954396c",
+    "target/wp899/lexer-string-growth-candidate-focused.jsonl": "31914f3bb5a491b39e57b3b1cfbc86fb4609307dd572821069188f1426f605d9",
+    "target/wp899/lexer-string-growth-candidate-owner-artifact.json": "b4e6de7db4662f80570a94aabdb44360c5648bac0a2daacec5bb9c3f9e1351e6",
+    "target/wp899/lexer-string-growth-candidate-owner-compile.json": "e1fc54f99e361c577272877ee2396cb34b0b470080c29a7ee35ccab8be0d8a37",
+    "target/wp899/lexer-string-growth-candidate-owner-compile.jsonl": "537c5b683b2339af9d021e3e209bb0c27980d5f64b2358c272a297b5f5c711ba",
+    "target/wp899/lexer-string-growth-candidate-preflight.json": "f33447e946c255a8c23f725375c8e64c7833c5bc569afa0247c6dd217e44e907",
+    "target/wp899/lexer-string-growth-candidate-preflight.jsonl": "24f46c8c2cbc208303352e763695553b51b37fad0b67aeef3c7778a30329beae",
+    "target/wp899/lexer-string-growth-candidate-probe": "6b2ab3a3a4fc1f0c17f692e3c1838b3bc5f1a6c3cd99ef675c79db67cfd5ca33",
+    "target/wp899/lexer-string-growth-candidate-probe-compile.json": "81df4421da68ff572fb3c61b9d5abccd10e9c7f498d2bcb4f75fd5c66a92d4d6",
+    "target/wp899/lexer-string-growth-candidate-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/lexer-string-growth-cleanup.json": "cb5c3662d96e0df48d959d80e0580fd11661c189da30b417d6e86e836c2a8d44",
+    "target/wp899/lexer-string-growth-command.py": "460740ee013e2924389bf7cc35905a4ccb8da38100fce9845c11bad890f56f0c",
+    "target/wp899/lexer-string-growth-control-0.log": "3bd156ee4977cbf82840e0472c9089ad9ab87e5ce85e47140c95c78257f879d6",
+    "target/wp899/lexer-string-growth-control-1.log": "75655ed23e3ca79cd61c221dc971c62c4db79a0121b3cb4fd56f6f6de1e25cb1",
+    "target/wp899/lexer-string-growth-control-2.log": "75655ed23e3ca79cd61c221dc971c62c4db79a0121b3cb4fd56f6f6de1e25cb1",
+    "target/wp899/lexer-string-growth-control-3.log": "3bd156ee4977cbf82840e0472c9089ad9ab87e5ce85e47140c95c78257f879d6",
+    "target/wp899/lexer-string-growth-control-4.log": "2c6b62e2eb45af3516e5c32622662525369f00989a7f5177f40edc96a008b11e",
+    "target/wp899/lexer-string-growth-control-freeze.json": "aec400280351bbe255b86788586be02c7f0682d1cade93ac592e2538166506d1",
+    "target/wp899/lexer-string-growth-control-ledger.json": "5b34ec3127837295963a268110caac9872cd29a4287f502ed5f3598df9df95ec",
+    "target/wp899/lexer-string-growth-control-outer.json": "00dbb7fc04e2d7f5bb3c60ab4fa56deb9426f40a8a62da4e77d8153ecea44553",
+    "target/wp899/lexer-string-growth-control-outer.jsonl": "540ee5e68393dd86fa14c4a7e91c22e8f6fb67fda519e24a130997d408a4ce3d",
+    "target/wp899/lexer-string-growth-control-results.json": "800d507e2c5d4536f521a81b5415064125219eda7af7fa1cfe2336c823a7ba02",
+    "target/wp899/lexer-string-growth-control.py": "1a713f5a9add441d63cea6212b30453c62744277cc2d4365f090cf3e24ccd65d",
+    "target/wp899/lexer-string-growth-core-profile-compile.json": "112f6c2833df0a427bc338bd0c8f542edfd4c297bdf4660b25187b4c2919fc7c",
+    "target/wp899/lexer-string-growth-core-profile-compile.jsonl": "5477d6d415c32d36e7a4cc9f5d913f8abba081e55be5b94ace2ca99f0a890a43",
+    "target/wp899/lexer-string-growth-default-check.json": "00be76f1f035c67354def07d30130ea6b855140ce9feea0f1f987abc24ee1f90",
+    "target/wp899/lexer-string-growth-default-check.jsonl": "065b2696da34f7e029678e0f9920491435e3157ecda265e2407ca123283aba4a",
+    "target/wp899/lexer-string-growth-dependent-artifacts.json": "3768bd559b6a22993e4c610cc9ea36adec44b392a0f87919970d10a07e00e817",
+    "target/wp899/lexer-string-growth-dependent-compile.json": "c686f3fd6cef5e907a4a8922416a2636ceb4bf11ee25dcfa79d9ca7e1a925dd1",
+    "target/wp899/lexer-string-growth-dependent-compile.jsonl": "6dcf6cd94a844023dd325432f506897d4efad7f6af45ab5df75b1ff2cea8b6c6",
+    "target/wp899/lexer-string-growth-dependent-focused.json": "db8632f235206c5e63021a21891b98a8ec30e4b94413d78dc9fda4d21d6a6ecd",
+    "target/wp899/lexer-string-growth-dependent-focused.jsonl": "32025ec0bc4a1633283972ac9e8db17133bbb602d4b808d2d8a2d8f670e74268",
+    "target/wp899/lexer-string-growth-dependent-preflight.json": "a7ce875f39d229590b0e42b02486ba1c7c391c85b20cb39e3a4a999e2c34f239",
+    "target/wp899/lexer-string-growth-dependent-preflight.jsonl": "5973eb858aa5727b937d3b66f199adc893ad134aa1ab7a4e2baab7fb7fed92ae",
+    "target/wp899/lexer-string-growth-dependent-selectors.json": "d9f72bdb9ea61195c27ed2c5e9df0b1398c2b6b502f8b2c45e1eeebffd5d5f47",
+    "target/wp899/lexer-string-growth-design-evidence.md": "dfa075bdc7bd6377bfac8f0762bf803a09df2b31e56db3de44b59623e81c802b",
+    "target/wp899/lexer-string-growth-design-input.md": "61b3ff49080b83b07b1467ed3cd78e00246305c652612acd621e9411e212d072",
+    "target/wp899/lexer-string-growth-design-source.md": "165c84a315603871c87b7603179929b47f4c95ac33d20c1cdfcd4b763179c276",
+    "target/wp899/lexer-string-growth-design.md": "9ab8a6580f624a1783c799e5690ff751ec89403782b470c3ff63c68907071f91",
+    "target/wp899/lexer-string-growth-final-evidence.md": "518ac85d692ecca9e03cde6c7e673015bbe09d9451c17943640b582f3a02dc60",
+    "target/wp899/lexer-string-growth-final-input.md": "880292450e52aee1f7aaa1d6420cc4c3238735deec0d50d01bb301e52e96d8a7",
+    "target/wp899/lexer-string-growth-final-source.md": "6b554dfa30cd6e3da3ed540fd70ae4ece1c689d290bf4a015d947499d3850299",
+    "target/wp899/lexer-string-growth-golden-corrected.json": "bcb249908ccd6d920b9e5360e6ffabfad5014d7b99b8770f4b7c93a3e0c2891f",
+    "target/wp899/lexer-string-growth-golden-corrected.jsonl": "399521db8447fb0fa962da2cf9091cf060c57c3e33b4d7dd464b040e9f9edc18",
+    "target/wp899/lexer-string-growth-owner-selectors.json": "dd01a6a71b6b47d24a857683c495fee76ea79c2bb1f9e96723b20d84487def4b",
+    "target/wp899/lexer-string-growth-probe.rs": "844fcc0cc5f0b7f29e5c3c6d91e34e5e6c44a333e198a013633d4659c1110be1"
+  },
+  "limits": "Allocation remains infallible. No global16 allocation owner, allocation-time state, VAS/RSS reduction, timing speedup, historical40GB or actual-source-fit claim. The offline failure-observer proposal was suspended before implementation or execution. No actual source retry or cap change occurred.",
+  "next_decision": "Prepare one separately reviewed source observation of this relevant accepted repair, with fresh source/artifact/control pins and the existing resource and network guards. Actual source admission and coupled WP899/M7A integration remain unaccepted."
+}

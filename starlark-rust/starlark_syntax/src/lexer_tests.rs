@@ -324,6 +324,81 @@ fn test_bazel_internal_string_literals() {
 }
 
 #[test]
+fn test_bazel_internal_ast_string_capacity() {
+    use crate::dialect::StringEncoding;
+    use crate::syntax::AstModule;
+    use crate::syntax::ast::AstLiteral;
+    use crate::syntax::ast::Expr;
+
+    const COUNT: usize = 2048;
+    let source = "x = \"a\"\n".repeat(COUNT);
+    let ast = AstModule::parse_with_string_encoding(
+        "capacity.bzl",
+        source,
+        &Dialect::Bazel,
+        StringEncoding::BazelInternal,
+    )
+    .unwrap();
+    let mut count = 0;
+    let mut capacity = 0;
+    // Inspect the original strings: cloning would discard their spare capacity.
+    ast.statement().visit_expr(|expr| {
+        let Expr::Literal(AstLiteral::String(value)) = &expr.node else {
+            panic!("expected a string literal");
+        };
+        assert_eq!(value.node, "a");
+        assert_eq!(value.span.begin().get() as usize, count * 8 + 4);
+        assert_eq!(value.span.end().get() as usize, count * 8 + 7);
+        capacity += value.node.capacity();
+        count += 1;
+    });
+    assert_eq!(count, COUNT);
+    assert!(
+        capacity <= 64 * 1024,
+        "retained string capacity: {capacity}"
+    );
+}
+
+#[test]
+fn test_bazel_internal_string_capacity_ignores_source_suffix() {
+    use crate::lexer::LexerStringEncoding;
+
+    let prefix = r#"'' r'\n' """é""" '\377'
+"#
+    .repeat(16);
+    let mut previous = None;
+    for suffix in [0, 8192] {
+        let program = format!("{prefix}#{}\n", "x".repeat(suffix));
+        let codemap =
+            CodeMap::new_with_byte_column_reporting("suffix.bzl".to_owned(), program.clone());
+        let strings = Lexer::new_with_string_encoding(
+            &program,
+            &Dialect::Bazel,
+            codemap,
+            LexerStringEncoding::BazelInternal,
+        )
+        .filter_map(|token| match token.unwrap() {
+            (start, Token::String(value), end) => Some((start, value, end)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+        assert_eq!(strings.len(), 64);
+        for (index, (_, value, _)) in strings.iter().enumerate() {
+            assert_eq!(value, ["", "\\n", "\u{c3}\u{a9}", "\u{ff}"][index % 4]);
+        }
+        if let Some(previous) = &previous {
+            assert_eq!(&strings, previous, "suffix changed values or source spans");
+        }
+        let capacity: usize = strings.iter().map(|(_, value, _)| value.capacity()).sum();
+        assert!(
+            capacity <= 16 * 1024,
+            "retained string capacity: {capacity}"
+        );
+        previous = Some(strings);
+    }
+}
+
+#[test]
 fn test_bazel_internal_string_escape_errors() {
     let cases = [
         (

@@ -475,7 +475,8 @@ impl<'a> Lexer<'a> {
         let triple = bytes.starts_with(&[quote, quote]);
         let contents_start = if triple { 2 } else { 0 };
         let mut pos = contents_start;
-        let mut res = String::with_capacity(bytes.len());
+        // Grow with the decoded literal, not the remainder of the source file.
+        let mut res = String::new();
 
         while pos < bytes.len() {
             let byte = bytes[pos];

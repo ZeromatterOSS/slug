@@ -35,7 +35,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Approved source observation failed allocation/census; owner audit next; full WP899 unaccepted
+Status: Bazel string reservation repair accepted; source observation design next; full WP899 unaccepted
+
+Three independent DESIGN and FINAL reviews accept the BazelInternal lexer
+reservation repair. Previously each literal reserved the entire remaining source;
+Token::String and the AST retained that spare capacity. String growth now follows
+the decoded literal. Byte/escape/span logic, Unicode parsing and ownership stay.
+The two new regressions fail on baseline. All 24 lexer controls pass as five
+initial passes plus 19 golden passes after correcting the required fixture path;
+all five protected byte-string evaluation/freeze controls pass. Starlark, matched
+Core test-profile and default Core/CLI all-target compilation pass.
+Fixed matched-profile A/B/B/A retains 16,775,168 / 16,384 / 16,384 / 16,775,168
+bytes of original literal String capacity for the same 2,048 values and spans,
+a 99.90% capacity reduction. The authenticated rules_rust extension parses without
+invocation or network access. All five children exit zero and join; exact owned
+logs and parent are removed after three FINALs. [Acceptance receipt](slug-v2-subplans/wp899-lexer-string-growth-2026-10-05.json).
+This proves the reservation repair, not physical-memory reduction, timing speedup,
+global16 allocation ownership, historical40GB or source fit. Growth remains
+infallible. The unexecuted failure-observer proposal was suspended in favor of this
+concrete defect. Next is a separately reviewed source observation design for the
+accepted change, preserving source/resource/network guards and fresh pins. No
+actual source retry or cap change occurred here. Full WP899/M7A remains open.
+
 
 The explicitly approved source test ran once under the guarded R2 freeze, after
 fresh automatic approval accepted actual selected-closure/payload evidence.
