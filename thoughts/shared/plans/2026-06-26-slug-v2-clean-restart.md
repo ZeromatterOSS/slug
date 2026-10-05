@@ -39,12 +39,11 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: native nonstring formatting copies its suffix directly
-into the final string. Prefix/rendering context and frozen ownership remain;
-fixed 1MiB suffix initial scratch capacity falls from 1,048,589B to 13B. Next:
-select a proved redundant copy or existing interner reuse at local string owners
-through a bounded design checkpoint. No source observation, network-dependent
-retry, cap growth or runtime activation is selected.
+Latest accepted change: compiler typo matching borrows existing frozen names,
+removing per-name scratch copies while preserving candidate order and owned
+diagnostics. Next: select a proved redundant copy or existing interner reuse at
+local string owners through a bounded design checkpoint. No source observation,
+network-dependent retry, cap growth or runtime activation is selected.
 Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).

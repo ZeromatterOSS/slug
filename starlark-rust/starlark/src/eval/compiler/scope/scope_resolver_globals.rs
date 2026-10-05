@@ -37,8 +37,8 @@ impl ScopeResolverGlobals {
         }
     }
 
-    pub(crate) fn names(&self) -> Option<Vec<String>> {
+    pub(crate) fn names(&self) -> Option<Vec<&str>> {
         self.globals
-            .map(|g| g.names().map(|s| s.as_str().to_owned()).collect())
+            .map(|g| g.names().map(|s| s.as_str()).collect())
     }
 }

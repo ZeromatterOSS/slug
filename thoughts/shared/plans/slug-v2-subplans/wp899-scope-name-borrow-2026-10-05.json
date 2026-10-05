@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "0a07c23ca",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/scope.rs": "3cb55578e97d3ae611446ecf72e2497944bcbd8a0e2605ee22b7552db40b55ee",
+    "starlark-rust/starlark/src/eval/compiler/scope/scope_resolver_globals.rs": "9b5d9803de44945452c98873019d1ac01cf56c5e813f1d9f25d1f94ad52f6f73",
+    "starlark-rust/starlark/src/eval/compiler/scope/name_memory_tests.rs": "a88c43f4be231177d9b6eb39412e95558175467fc29fd15b58b10d6f11183bc2"
+  },
+  "design_sha256": "34c9692710f8bdc99fe50c5e5b785360498aa57aa9a6e62163ecec7ae313c7e9",
+  "design_reviews": {
+    "target/wp899/scope-name-borrow-design-source.md": "e46213fe4ef496ef902a7fe07057f516f2a6a6741027404c0402283eab783f26",
+    "target/wp899/scope-name-borrow-design-input.md": "7e015cb8a1f924ab111a499fd47a4ec0c701ecaa6a49e4f6b2fc26c6fac3cef1",
+    "target/wp899/scope-name-borrow-design-evidence.md": "b8613526cb654c064df48789dcedd6aa2900c345d6c97c88fff3138e84c0c7f6"
+  },
+  "ownership_proof": "Exact entire file comparison to baseline proves only two private helper Vec<&str>/as_str changes, copied consumer iterator and test hook. Ordered duplicates/global None remain. Selected suggestion and identifier remain owned before diagnostic publication; normal scope/Globals frozen heaps live during synchronous matching. Same test source baseline/candidate.",
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/scope-name-borrow-baseline-compile.json",
+      "receipt_sha256": "2452429011efa3503b71f0376a6c971b210e98e5828080143a3bafe0104d9b68",
+      "exit_code": 101,
+      "elapsed_seconds": 2.143916826986242,
+      "log_sha256": "c750a9b269cffd72ccaed95c94ad78d0fa9e0d423b368519bbab765f518c059b"
+    },
+    "baseline-r1-compile": {
+      "receipt": "target/wp899/scope-name-borrow-baseline-r1-compile.json",
+      "receipt_sha256": "9fa3a060cfb3abb1201eb7cdb38d5ac6134fc0d355eddfa2f898a03988a4c521",
+      "exit_code": 0,
+      "elapsed_seconds": 7.316421487019397,
+      "log_sha256": "f8d527846da6113fdd43ba38c19a3be65420b8e68a1cc00c9fb300f09b63e0a6"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/scope-name-borrow-baseline-r2-compile.json",
+      "receipt_sha256": "3a7588638cba6884352a0d5fae788f5fc8702e074d5e317a2062adde2d8d2ff2",
+      "exit_code": 0,
+      "elapsed_seconds": 3.7500577199971303,
+      "log_sha256": "e4ac711199608c5542048bb287c5220a0dca0dbf982e8c1560c067994a6b91f2"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/scope-name-borrow-baseline-r2-preflight.json",
+      "receipt_sha256": "13b2960e1cf0cf83f3eee2f85ec82ab69ee0ce044f8ee403c62838f3daecf522",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02201871498255059,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/scope-name-borrow-baseline-r2-controls.json",
+      "receipt_sha256": "6ec4591327ac4100dc86f4e1d4a83177014359b81a2f0e2334e304341a79271a",
+      "exit_code": 101,
+      "elapsed_seconds": 0.002142959972843528,
+      "log_sha256": "9d6bdfcd6d96bb57cff3130cd66ec380ef6b0f09e257df8727cb9ddca6ef45c3"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/scope-name-borrow-candidate-compile.json",
+      "receipt_sha256": "f57f22ade467ecc770e1f2cb787fb04b46d51696301277c36adff79b640214f0",
+      "exit_code": 0,
+      "elapsed_seconds": 5.533628255012445,
+      "log_sha256": "0ff1373712362c3004d7f19d7bd6576cedd93ae6bff68f7eeba0a1dec22ed7d7"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/scope-name-borrow-candidate-preflight.json",
+      "receipt_sha256": "45b6d0f480f98afc916c83c41dec7b72c21d364cb34d28186cc7db5bdaca7ea2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020422836998477578,
+      "log_sha256": "700a5c347283502dad6651ce66813d18b1a039d01380da205daed90569ceeda9"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/scope-name-borrow-candidate-controls.json",
+      "receipt_sha256": "125b5c2869af99fd757f1c3e42d1f9763e5ca32741a0cea082cb1d84c5ce0787",
+      "exit_code": 0,
+      "elapsed_seconds": 0.004657351993955672,
+      "log_sha256": "796c17591ca42b77aa8f524b7e9198d32016413e61a1fa83e2c4dd81849a365a"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/scope-name-borrow-dependents-check.json",
+      "receipt_sha256": "d7bbf60d9b2af242c9cd25fc642aa840f81aefb07a7d67bf77077a69c830c6ad",
+      "exit_code": 0,
+      "elapsed_seconds": 7.697208436962683,
+      "log_sha256": "67202b600633b23d3ba97d2601e1cfb3d41e512ce6b36d13e8f46de5dd0b5aa7"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "23c379e619975746e8ca86e5795dc0e8e463057eaaefba6015fb1caced2f9254",
+    "selectors": [
+      "eval::compiler::scope::name_memory_tests::global_suggestion_names_share_existing_frozen_bytes",
+      "eval::compiler::scope::name_memory_tests::nested_scope_suggestion_names_preserve_order_duplicates_and_owners",
+      "eval::compiler::scope::name_memory_tests::suggestion_ties_and_owned_diagnostics_survive_source_owner_drop",
+      "errors::did_you_mean::tests::prefixes",
+      "errors::did_you_mean::tests::typos",
+      "errors::did_you_mean::tests::best",
+      "errors::did_you_mean::tests::very_short",
+      "errors::did_you_mean::tests::earlier_variants_are_more_important",
+      "tests::uncategorized::test_globals_did_you_mean",
+      "tests::uncategorized::test_module_level_did_you_mean",
+      "tests::uncategorized::test_module_level_from_def_did_you_mean",
+      "tests::uncategorized::test_local_from_def_did_you_mean",
+      "tests::uncategorized::test_compr_did_you_mean",
+      "eval::compiler::scope::tests::basic",
+      "eval::compiler::scope::tests::module_reassignment",
+      "eval::compiler::scope::tests::reassignment_in_loop",
+      "eval::compiler::scope::tests::def_capture",
+      "eval::compiler::scope::tests::def_shadow",
+      "eval::compiler::scope::tests::def_param_bindings",
+      "eval::compiler::scope::tests::nested_def_capture",
+      "eval::compiler::scope::tests::existing_module_with_names",
+      "tests::bazel_internal_string::test_bazel_internal_invalid_escapes_and_identifier_location"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/scope.rs": "3cb55578e97d3ae611446ecf72e2497944bcbd8a0e2605ee22b7552db40b55ee",
+      "starlark-rust/starlark/src/eval/compiler/scope/scope_resolver_globals.rs": "9b5d9803de44945452c98873019d1ac01cf56c5e813f1d9f25d1f94ad52f6f73",
+      "starlark-rust/starlark/src/eval/compiler/scope/name_memory_tests.rs": "a88c43f4be231177d9b6eb39412e95558175467fc29fd15b58b10d6f11183bc2"
+    }
+  },
+  "baseline_result": "Exact ordered names and six retained diagnostic/message/span cases pass; two owner-pointer assertions fail as expected, recording0/32 global and0/14 visible matches.",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "protected_controls": 19,
+    "candidate_controls": 22
+  },
+  "metrics": {
+    "baseline-r2": {
+      "global_count": 32,
+      "global_name_content_bytes": 32768,
+      "global_owner_pointer_matches": 0,
+      "visible_count": 14,
+      "visible_owner_pointer_matches": 0
+    },
+    "candidate": {
+      "global_count": 32,
+      "global_name_content_bytes": 32768,
+      "global_owner_pointer_matches": 32,
+      "visible_count": 14,
+      "visible_owner_pointer_matches": 14
+    }
+  },
+  "corrections": [
+    "Initial compile used Globals::empty(), which returns &Globals rather than owned Globals; test now builds normal owned empty Globals.",
+    "Before baseline execution, replaced unsupported Unicode identifiers with a valid Unicode string literal preceding the missing ASCII identifier, based on lexer source. Added independent empty/unknown globals checks to semantic control. Rebuilt fresh baseline; production unchanged."
+  ],
+  "limits": "Cold diagnostic scratch only. Source/types and original-owner pointers prove removed per-name owned payload copies. Fixed global fixture32 names/32768B content now borrowed; this is not measured aggregate allocated capacity/RSS. Vector, matching work, final errors and natural frozen owners remain. No peak/RSS/timing/whole-workload/source-fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default offline Starlark and default Loading/Core/CLI alltargets; serial preparation60s/tests30s, exact fresh artifact preflight. CARGO_MANIFEST_DIR, regeneration absent.",
+  "scope": "Local string ownership/basic memory only; Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/scope-name-borrow-baseline-compile.json": "2452429011efa3503b71f0376a6c971b210e98e5828080143a3bafe0104d9b68",
+    "target/wp899/scope-name-borrow-baseline-compile.jsonl": "c750a9b269cffd72ccaed95c94ad78d0fa9e0d423b368519bbab765f518c059b",
+    "target/wp899/scope-name-borrow-baseline-r1-compile.json": "9fa3a060cfb3abb1201eb7cdb38d5ac6134fc0d355eddfa2f898a03988a4c521",
+    "target/wp899/scope-name-borrow-baseline-r1-compile.jsonl": "f8d527846da6113fdd43ba38c19a3be65420b8e68a1cc00c9fb300f09b63e0a6",
+    "target/wp899/scope-name-borrow-baseline-r2-compile.json": "3a7588638cba6884352a0d5fae788f5fc8702e074d5e317a2062adde2d8d2ff2",
+    "target/wp899/scope-name-borrow-baseline-r2-compile.jsonl": "e4ac711199608c5542048bb287c5220a0dca0dbf982e8c1560c067994a6b91f2",
+    "target/wp899/scope-name-borrow-baseline-r2-controls.json": "6ec4591327ac4100dc86f4e1d4a83177014359b81a2f0e2334e304341a79271a",
+    "target/wp899/scope-name-borrow-baseline-r2-controls.jsonl": "9d6bdfcd6d96bb57cff3130cd66ec380ef6b0f09e257df8727cb9ddca6ef45c3",
+    "target/wp899/scope-name-borrow-baseline-r2-preflight.json": "13b2960e1cf0cf83f3eee2f85ec82ab69ee0ce044f8ee403c62838f3daecf522",
+    "target/wp899/scope-name-borrow-baseline-r2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/scope-name-borrow-baseline-r2-selectors.json": "1859fe1b5b8de930cb6d2c3d81cda5050eb95c981b334821eeacbe3acc213553",
+    "target/wp899/scope-name-borrow-candidate-compile.json": "f57f22ade467ecc770e1f2cb787fb04b46d51696301277c36adff79b640214f0",
+    "target/wp899/scope-name-borrow-candidate-compile.jsonl": "0ff1373712362c3004d7f19d7bd6576cedd93ae6bff68f7eeba0a1dec22ed7d7",
+    "target/wp899/scope-name-borrow-candidate-controls.json": "125b5c2869af99fd757f1c3e42d1f9763e5ca32741a0cea082cb1d84c5ce0787",
+    "target/wp899/scope-name-borrow-candidate-controls.jsonl": "796c17591ca42b77aa8f524b7e9198d32016413e61a1fa83e2c4dd81849a365a",
+    "target/wp899/scope-name-borrow-candidate-preflight.json": "45b6d0f480f98afc916c83c41dec7b72c21d364cb34d28186cc7db5bdaca7ea2",
+    "target/wp899/scope-name-borrow-candidate-preflight.jsonl": "700a5c347283502dad6651ce66813d18b1a039d01380da205daed90569ceeda9",
+    "target/wp899/scope-name-borrow-candidate-selectors.json": "7cdbd8e751b1b676d2fbc4d1fc4fd32df8debd1fffbf429ca2ec7fca9338d4e6",
+    "target/wp899/scope-name-borrow-controls.py": "2d45cdbe089d1d4592cd1184100461d47bf879264c2085ae213192ddd686f03d",
+    "target/wp899/scope-name-borrow-dependents-check.json": "d7bbf60d9b2af242c9cd25fc642aa840f81aefb07a7d67bf77077a69c830c6ad",
+    "target/wp899/scope-name-borrow-dependents-check.jsonl": "67202b600633b23d3ba97d2601e1cfb3d41e512ce6b36d13e8f46de5dd0b5aa7",
+    "target/wp899/scope-name-borrow-design-evidence.md": "b8613526cb654c064df48789dcedd6aa2900c345d6c97c88fff3138e84c0c7f6",
+    "target/wp899/scope-name-borrow-design-input.md": "7e015cb8a1f924ab111a499fd47a4ec0c701ecaa6a49e4f6b2fc26c6fac3cef1",
+    "target/wp899/scope-name-borrow-design-source.md": "e46213fe4ef496ef902a7fe07057f516f2a6a6741027404c0402283eab783f26",
+    "target/wp899/scope-name-borrow-design.md": "34c9692710f8bdc99fe50c5e5b785360498aa57aa9a6e62163ecec7ae313c7e9",
+    "target/wp899/scope-name-borrow-record.py": "a5a3aacaf2e6569cbca022c68bfe5f693f886e951f2d1d22b2e29ac45417762d",
+    "target/wp899/scope-name-borrow-start.json": "8e07c60dca4c01565f2fcd81114007d80f875a1b40cb8f629acc23859e888dc7"
+  },
+  "timing": {
+    "compile_seconds": 26.441232725977898,
+    "test_seconds": 0.0068003119667992,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 370.12828302383423
+  },
+  "test_growth": "259-line sibling includes normal parsed scope setup, pointer observations and six distinct retained diagnostic cases; no production responsibilities split or unrelated changes.",
+  "validation_sha256": "40a2e64a615301b7ecbe7d11927a5f4eb5a236e580d3a45d5052f359aec83de5",
+  "final_reviews": {
+    "target/wp899/scope-name-borrow-final-source.md": "4df207fe6e8d413f96bb0bdb1b14232a010739f12409589f9d47ba6ca497eab5",
+    "target/wp899/scope-name-borrow-final-input.md": "8c1ea77e7b6aa44c602147884810941e0aee5e014c47185f809a3bfe2547ed82",
+    "target/wp899/scope-name-borrow-final-evidence.md": "277bfabde8b87d78f6a7842d3d6ab34c3c9d674807495763c9ab487989cc4740"
+  },
+  "hygiene": {
+    "plan-check": {
+      "receipt": "target/wp899/scope-name-borrow-plan-check.json",
+      "sha256": "c31877b21933a7eb49c87b87bdc1a75ff746b7683fa92be0e38beccc8579e845",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/scope-name-borrow-archive-check.json",
+      "sha256": "c956fc584d65ce6bdbd1b4f5fe118a5959463261f36c05625ca5cbf8d0c9f8f4",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/scope-name-borrow-diff-check.json",
+      "sha256": "f2a3c8222dab40e499e966ce1d1ed7d07ffc1f49643f84d1bb0b18acfe129650",
+      "exit_code": 0
+    },
+    "format-check": {
+      "receipt": "target/wp899/scope-name-borrow-format-check.json",
+      "sha256": "e133d20b94f957b18d07f3c15de344e5e8f33ce8740384cfcd860df2b1aeac0a",
+      "exit_code": 0
+    }
+  }
+}

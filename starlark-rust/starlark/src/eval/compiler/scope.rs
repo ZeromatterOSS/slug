@@ -19,6 +19,10 @@ pub(crate) mod payload;
 pub(crate) mod scope_resolver_globals;
 mod tests;
 
+#[cfg(test)]
+#[path = "scope/name_memory_tests.rs"]
+mod name_memory_tests;
+
 use std::collections::HashMap;
 use std::iter;
 use std::marker::PhantomData;
@@ -642,14 +646,14 @@ impl<'f> ModuleScopeBuilder<'f> {
         );
     }
 
-    fn current_scope_all_visible_names_for_did_you_mean(&self) -> Option<Vec<String>> {
+    fn current_scope_all_visible_names_for_did_you_mean(&self) -> Option<Vec<&str>> {
         // It is OK to return non-unique identifiers
-        let mut r: Vec<String> = Vec::new();
+        let mut r: Vec<&str> = Vec::new();
         for &scope_id in self.locals.iter().rev() {
             let scope = self.scope_data.get_scope(scope_id);
-            r.extend(scope.mp.keys().map(|s| s.as_str().to_owned()));
+            r.extend(scope.mp.keys().map(|s| s.as_str()));
         }
-        r.extend(self.module_bindings.keys().map(|s| s.as_str().to_owned()));
+        r.extend(self.module_bindings.keys().map(|s| s.as_str()));
         r.extend(self.globals.names()?);
         Some(r)
     }
@@ -659,10 +663,7 @@ impl<'f> ModuleScopeBuilder<'f> {
         let variants = self
             .current_scope_all_visible_names_for_did_you_mean()
             .unwrap_or_default();
-        let better = did_you_mean(
-            ident.node.ident.as_str(),
-            variants.iter().map(|s| s.as_str()),
-        );
+        let better = did_you_mean(ident.node.ident.as_str(), variants.iter().copied());
         EvalException::new(
             match better {
                 Some(better) => ScopeError::VariableNotFoundDidYouMean(

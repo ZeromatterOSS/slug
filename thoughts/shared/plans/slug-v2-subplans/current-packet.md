@@ -12,46 +12,50 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component copies the native nonstring format suffix directly
-into the final owned heap string. The prefix and single renderer callback remain
-unchanged; a fixed 1MiB suffix reduces observed initial scratch capacity from
-1,048,589B to 13B. This is Slug-native scratch ownership with admitted behavior
-unchanged. Next: select a proved redundant copy or existing interner reuse at
-local string owners through a bounded design checkpoint.
+The latest accepted component borrows existing frozen local/module/global names
+for compiler typo matching, removing per-name scratch Strings. Candidate order,
+duplicates, tie selection and final owned diagnostics remain unchanged. This is
+Slug-native scratch ownership with admitted behavior unchanged. Next: select a
+proved redundant copy or existing interner reuse at local string owners through
+a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted formatter memory contract
+## Accepted diagnostic name memory contract
 
-Native `format_one` reserves prefix plus rendering slack, keeps the prefix push
-and single `collect_str` call, then uses existing `alloc_str_concat` to copy
-scratch and untouched suffix into final owned storage. String/identity arms,
-percent tuple/errors, generic formatting and compiler own frozen interning stay
-unchanged. No helper/API/interner/cache/key/unsafe/dependency or retained
-representation change. Prefix/render scratch and final output remain; larger
-renderers may grow scratch. No total peak/arena/RSS/speed/source-fit claim.
+Both private compiler suggestion helpers borrow existing frozen local/module/
+global name bytes within self lifetimes. Synchronous matching keeps reversed
+locals, module/global order, duplicates, unknown Globals None and first ties.
+Selected suggestion and missing identifier stay owned in published errors;
+normal frozen owners remain alive during comparison. No public API/cache/interner/
+key/unsafe/dependency or retained representation change.
 
-Three DESIGN/FINAL reviews accept the component. Same-test baseline semantic and
-retained/carrier controls pass2; only initial capacity assertion fails1. Candidate
-30/30 includes custom prefix/count/str-vs-repr/final-byte observations, builtin
-conversions, Unicode/NUL, tuple/errors, retained compiled functions after source
-and module drops, GC/freeze, actual carriers and protected protocol/bytecode/
-interner/empty-format controls. Default Loading/Core/CLI alltarget check passes.
-Pinned nightly-2025-09-14, serial offline preparation60s/tests30s, fresh artifact
-exact preflight; goldens CARGO_MANIFEST_DIR and regeneration absent.
+Three DESIGN/FINAL reviews accept the component. Same-test baseline exact bytes/
+ordering and six retained diagnostic message/span cases pass, then two pointer
+assertions fail. Candidate 22/22 includes global/nested-scope pointer, unknown/
+empty globals, ties and retained errors after source/module/Globals heap drops;
+protected matching, scope/capture/comprehension and actual carrier controls pass.
+Default Loading/Core/CLI alltarget check passes. Fixed32x1024B global name content
+is borrowed: pointer matches0→32; ordered visible matches0→14. Source/type/pointers
+prove removed copies, not aggregate allocated capacity/RSS. Cold diagnostic path;
+vectors, matching work, final errors and frozen source owners remain. No peak/
+speed/whole-workload/source-fit claim.
 
-Root owns edits, serial Cargo and commits. Keep future changes bounded at existing
-string owners with reviewed design and focused discriminators. Join estimates
-and scope-name audits remain unselected. Full WP899/M7A/source and integration
-gates remain unwaived/unaccepted.
+Root owns edits, serial Cargo and commits. Pinned nightly-2025-09-14, serial offline
+Starlark no-run Cargo JSON/fresh exact preflight/focused tests; preparation60s/
+tests30s, goldens CARGO_MANIFEST_DIR and no regeneration. Format and plan/archive/
+diff checks. Keep future changes bounded at existing string owners with reviewed
+design and focused discriminators. Join estimates remain unselected. Full WP899/
+M7A/source and integration gates remain unwaived/unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Compiler typo matching borrows existing frozen names; reversed-local/module/global order, duplicates, ties and owned diagnostics preserved. Three DESIGNs/FINALs, baseline 1 semantic pass/2 pointer failures; candidate 22/22 and default dependent checks. Fixed32x1024B global payloads now borrowed, owner matches0→32 and nested visible matches0→14. Cold scratch only, vectors/matching/final errors remain | [Scope-name borrowing](wp899-scope-name-borrow-2026-10-05.json) |
 | Native nonstring formatting copies untouched suffix directly into final owned string; prefix and renderer callback preserved. Three DESIGNs/FINALs, same-test baseline 2 semantic passes/1 capacity failure, candidate 30/30 and default dependent checks. Fixed 1MiB suffix initial scratch capacity 1,048,589B→13B; render growth/final storage/peak/RSS/speed excluded | [Formatter suffix direct copy](wp899-format-suffix-direct-2026-10-05.json) |
 | Empty-segment native formatting reuses existing StringValue, including percent single-tuple delegation; compiler own frozen interning unchanged. Three DESIGNs/FINALs, baseline pointer/arena failures, candidate 23/23 and default dependent checks pass. Fixed 64KiB cases share inputs with zero arena growth; chunks/padding excluded from exact payload/RSS/speed claims | [Empty-format input reuse](wp899-empty-format-reuse-2026-10-05.json) |
 | Repository BUILD preparation transfers raw load-name Strings into existing children on both routes; original buffers/capacities preserved and one copy per child removed. Three DESIGNs/FINALs, baseline pointer failures, candidate 8/8 and default Core/CLI checks pass; no quantified memory/speed claim | [Repository child load-name transfer](wp899-repository-child-load-move-2026-10-05.json) |
