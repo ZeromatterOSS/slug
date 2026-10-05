@@ -5285,7 +5285,7 @@ fn evaluate_external_bzl_module(
     context: BzlModuleContext,
     canonical_label: CanonicalLabel,
     presentation_path: PathBuf,
-    source_text: Arc<String>,
+    source_text: &str,
     ast: AstModule,
     loads: Vec<String>,
     loaded_modules: Vec<(String, FrozenBzlModule)>,
@@ -5300,7 +5300,7 @@ fn evaluate_external_bzl_module(
             workspace_path: presentation_path.clone(),
             repository_mapping: external_repository_mapping(route),
         },
-        digest(source_text.as_str()),
+        digest(source_text),
         loaded_modules.iter().map(|(_, module)| module),
     );
     if let Err(error) =
@@ -5388,8 +5388,8 @@ async fn compute_external_bzl_module(
             }
         }
     };
-    let source_text = match String::from_utf8(source.bytes.to_vec()) {
-        Ok(source) => Arc::new(source),
+    let source_text = match std::str::from_utf8(source.bytes.as_ref()) {
+        Ok(source) => source,
         Err(_) => {
             return external_bzl_complete(
                 Err(ExternalBzlModuleError::Encoding {
@@ -5401,7 +5401,7 @@ async fn compute_external_bzl_module(
     };
     let ast = match AstModule::parse_with_string_encoding(
         &source.source_name,
-        source_text.as_ref().clone(),
+        source_text.to_owned(),
         &Dialect::Bazel,
         StringEncoding::BazelInternal,
     ) {

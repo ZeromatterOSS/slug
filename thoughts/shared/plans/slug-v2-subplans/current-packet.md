@@ -9,6 +9,15 @@ prefer removing redundant copies or reusing existing interners. Network-dependen
 source-admission observations and broader runtime work are deferred during this
 scope. Existing source/integration gates remain unproved; this does not waive them.
 
+Three DESIGNs and three FINALs accept borrowed source decoding in the external
+`.bzl` driver. Decode a UTF-8 view over the existing immutable byte Arc; allocate
+one owned parser String and retain the original late digest/error order. Exact
+source-expression controls cover seven valid/five invalid inputs per variant;
+a fixed1MiB decoded copy changes from1,048,576 distinct bytes to zero, with parser
+bytes/lifetime preserved. Eleven existing injected DICE controls and default
+Core/CLI compilation pass. Parser/raw storage remain; no RSS, speed or source-fit
+claim follows. [Acceptance receipt](wp899-bzl-source-borrow-2026-10-05.json).
+
 Three DESIGNs and three FINALs accept local `.bzl` source sharing. `ParsedBzl`
 now retains the existing workspace `Arc<String>` instead of a duplicate String;
 cloning the parse result shares that source allocation. Both parser boundaries

@@ -1,0 +1,188 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "c30119608",
+  "disposition": "ACCEPTED_LOCAL_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native scratch memory; admitted source/evaluator semantics unchanged",
+  "decision": "Borrow the UTF-8 source view from existing Arc<[u8]>, pass one owned String to AstModule, and hash borrowed view at original late evaluation location. Removes intermediate source String and Arc allocation.",
+  "ownership": "Original immutable byte owner remains alive across child awaits/evaluation; parser CodeMap owns independent String. No new helper, public API, key, cache/interner, retained value, dependency, credit policy or early hash.",
+  "invariants": [
+    "Same UTF-8 validity/Encoding classification and Encoding\u2192Parse\u2192route/load/child\u2192evaluation order",
+    "Unchanged source bytes/SHA, BazelInternal encoding, manifests, equality, observation authority/events, cycle/cancellation behavior",
+    "Owned parser diagnostics/frozen source survive temporary owner lifetimes"
+  ],
+  "source_sha256": {
+    "app/slug_loading_v2/src/bzl_module.rs": "f978e6bab4fe2cc105f19570fd9a932a9957a647010f5c9baa9f56d6d6f34b60"
+  },
+  "design_sha256": "a2885fd48066424e8ff3d1a94e796b1319d964a18df7a7ac79b6482f17616e6d",
+  "design_reviews": {
+    "target/wp899/bzl-source-borrow-design-source.md": "2d2f84f7a43acbfd221434b85d45d51105013ac9a3d58cf0f4129feaecd7ea68",
+    "target/wp899/bzl-source-borrow-design-input.md": "b6bfecfb985675cdba492066c72c392bfbdc4894d9363b48f0ea7fc37dd48e38",
+    "target/wp899/bzl-source-borrow-design-evidence.md": "21b3a276ff393a73de813a5953d948aafcb32d598ef60daa54b18d7c083bfe00"
+  },
+  "validation": {
+    "baseline-probe-compile": {
+      "receipt": "target/wp899/bzl-source-borrow-baseline-probe-compile.json",
+      "receipt_sha256": "307a41eba14fdd9b034e8f4334e2736c81a8c3f4f7c4099fe410ff241504d9fd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.07197951397392899,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "baseline-probe-run": {
+      "receipt": "target/wp899/bzl-source-borrow-baseline-probe-run.json",
+      "receipt_sha256": "293b6557099b8ea1e55aac1634a6aed90cf1a70c8bf99f213e98af4087240364",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0016292380169034004,
+      "log_sha256": "8adbafbe1ddfb59e53e55d9600629f8ccd2bbd2a3991c1605826c9c9f717f485"
+    },
+    "candidate-probe-compile": {
+      "receipt": "target/wp899/bzl-source-borrow-candidate-probe-compile.json",
+      "receipt_sha256": "f199a1b2f2351326de6d42e3db4e8e4814b2f2f9462b7620d0268a665651351f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.06457570899510756,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "candidate-probe-run": {
+      "receipt": "target/wp899/bzl-source-borrow-candidate-probe-run.json",
+      "receipt_sha256": "1ddb7e4064b6f8bb6737903c096c4b5f85f7e25db2b9f86297841938df906c73",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0014980770065449178,
+      "log_sha256": "864083f3030f9f9af25815dc5a9d245ae4099a6f415f3794c70c145e6fd14932"
+    },
+    "loading-compile": {
+      "receipt": "target/wp899/bzl-source-borrow-loading-compile.json",
+      "receipt_sha256": "7e2aa5fab37dd8e60e79f364d2bf10bc8a66cb7b8bae998fe37f448fb6fedaa9",
+      "exit_code": 0,
+      "elapsed_seconds": 6.8111483009997755,
+      "log_sha256": "b0cb9755a67f4d279a1a86414f1e12071d2fe0964e401ad479f0eadf4d26bab8"
+    },
+    "preflight": {
+      "receipt": "target/wp899/bzl-source-borrow-preflight.json",
+      "receipt_sha256": "3c2434fe4b81dfee50c2b01021bd0e8bcbf056abad22f252dbe44792a2415e01",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024585054023191333,
+      "log_sha256": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff"
+    },
+    "controls": {
+      "receipt": "target/wp899/bzl-source-borrow-controls.json",
+      "receipt_sha256": "0572ecdb57e7164ac4d64c6796d61132758034401faab9d2ff3333fb1f09d7fc",
+      "exit_code": 0,
+      "elapsed_seconds": 0.10245912498794496,
+      "log_sha256": "400d33e12f278c8f0518a7bd37dda9798f39cd387b2127ab4947025964f6a597"
+    },
+    "core-cli-check": {
+      "receipt": "target/wp899/bzl-source-borrow-core-cli-check.json",
+      "receipt_sha256": "bb3a6dc6356695a39d8976e11bd5e5fc10fcab3f01d829803e45189658786032",
+      "exit_code": 0,
+      "elapsed_seconds": 5.025519639020786,
+      "log_sha256": "1e9092acdad3817e910ddb670bce5e6271f3ccda3ebba70990c027ae8f1aea1d"
+    }
+  },
+  "probes": {
+    "baseline": {
+      "mode": "baseline",
+      "owner": "app/slug_loading_v2/src/bzl_module.rs",
+      "owner_sha256": "3cf60c8386101571022494d23245b17208efd053408cde3fda9c5052e4eef767",
+      "expressions": {
+        "decode": "String::from_utf8(source.bytes.to_vec())",
+        "success_arm": "Arc::new(source)",
+        "parser_argument": "source_text.as_ref().clone()"
+      },
+      "probe_sha256": "f671dd072afc0f296a87ca82f4ce135b78acc4a9ff54faef9c30c58421b7ec1f",
+      "artifact_sha256": "2e43cc25abcfdfc22f3479d041d444f1b31e318315a500b559b8a3dbc39be1d4",
+      "result": {
+        "valid_cases": 7,
+        "invalid_cases": 5,
+        "large_source_bytes": 1048576,
+        "large_decoded_distinct_bytes": 1048576,
+        "parser_bytes_verified_cases": 7
+      }
+    },
+    "candidate": {
+      "mode": "candidate",
+      "owner": "app/slug_loading_v2/src/bzl_module.rs",
+      "owner_sha256": "f978e6bab4fe2cc105f19570fd9a932a9957a647010f5c9baa9f56d6d6f34b60",
+      "expressions": {
+        "decode": "std::str::from_utf8(source.bytes.as_ref())",
+        "success_arm": "source",
+        "parser_argument": "source_text.to_owned()"
+      },
+      "probe_sha256": "6413629a4d29ca7db617e74bf1f670a6b6258a949cd0e7375ae42a383ae99a2d",
+      "artifact_sha256": "f8e0328e1d57489876f750a5f7003b7c97ff33e4bf7fa23a61c33cefe7231a50",
+      "result": {
+        "valid_cases": 7,
+        "invalid_cases": 5,
+        "large_source_bytes": 1048576,
+        "large_decoded_distinct_bytes": 0,
+        "parser_bytes_verified_cases": 7
+      }
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+    "artifact_sha256": "dbbf51a62aaeb6719e1de0ed64b3112ad7c485b62273fc35e38a82d8304737b5",
+    "selectors": [
+      "bzl_module::host_package_load_tests::external_bzl_module_prevalidates_loads_and_preserves_typed_terminal_equality",
+      "bzl_module::host_package_load_tests::external_bzl_module_evaluates_recursive_bazel_keyword_only_structs",
+      "bzl_module::host_package_load_tests::external_bzl_module_accepts_bazel_provider_doc_and_freezes_exports",
+      "bzl_module::host_package_load_tests::external_bzl_module_retains_canonical_manifest_lifetime_and_local_events",
+      "bzl_module::host_package_load_tests::observed_external_bzl_retains_recursive_epoch_arcs_and_local_events",
+      "bzl_module::host_package_load_tests::observed_external_bzl_terminals_keep_decisive_prefixes_and_stop_children",
+      "bzl_module::host_package_load_tests::observed_external_bzl_child_positions_collect_needs_and_stop_at_first_semantic",
+      "bzl_module::host_package_load_tests::observed_external_bzl_poll_drop_publishes_no_parent_and_recovers",
+      "bzl_module::host_package_load_tests::external_bzl_module_cycle_releases_and_recovers_with_fresh_detector",
+      "bzl_module::host_package_load_tests::observed_external_bzl_cycle_retains_all_sources_and_recovers",
+      "bzl_module::host_package_load_tests::observed_external_bzl_source_provenance_tracks_helper_revision"
+    ]
+  },
+  "pass_counts": {
+    "protected_injected_loading_tests": 11,
+    "native_valid_cases_per_variant": 7,
+    "native_invalid_cases_per_variant": 5
+  },
+  "test_profile": "Pinned nightly-2025-09-14; Loading/Bzlmod opt0/debug0 existing support profile. Native std-only probe opt1/debug2. Default Core/CLI alltargets. Offline. Preparation60s/test30s caps unchanged.",
+  "scope": "Current user scope is local strings/basic memory and offline checks. No actual source/network/Bazel/CLI runtime or Windows work.",
+  "limits": "Exact source-expression probe proves decoded backing reuse and owned parser argument bytes, not whole evaluator/process memory. One fixed1MiB decoded payload has distinct backing1048576\u21920; excludes parser/raw-input/scaffold storage and allocator overhead. Parser allocation remains infallible. No speed, RSS or source-fit claim.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/bzl-source-borrow-probe-build.py": "db791cab79fe7127cf763bd446d24d01d8caf148483956efaa81dd3169c8a043",
+    "target/wp899/bzl-source-borrow-design-input.md": "b6bfecfb985675cdba492066c72c392bfbdc4894d9363b48f0ea7fc37dd48e38",
+    "target/wp899/bzl-source-borrow-baseline-probe-compile.json": "307a41eba14fdd9b034e8f4334e2736c81a8c3f4f7c4099fe410ff241504d9fd",
+    "target/wp899/bzl-source-borrow-controls.json": "0572ecdb57e7164ac4d64c6796d61132758034401faab9d2ff3333fb1f09d7fc",
+    "target/wp899/bzl-source-borrow-baseline-probe-run.json": "293b6557099b8ea1e55aac1634a6aed90cf1a70c8bf99f213e98af4087240364",
+    "target/wp899/bzl-source-borrow-baseline-probe.json": "6205f397d412759a231ebb830a4f63132e5dcf12f558a362a9393da1a74a960a",
+    "target/wp899/bzl-source-borrow-design-source.md": "2d2f84f7a43acbfd221434b85d45d51105013ac9a3d58cf0f4129feaecd7ea68",
+    "target/wp899/bzl-source-borrow-candidate-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/bzl-source-borrow-preflight.jsonl": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff",
+    "target/wp899/bzl-source-borrow-candidate-probe.json": "ff6700300c300740b4719e0ecc165f9c54017e339963e1c9693490c773909767",
+    "target/wp899/bzl-source-borrow-candidate-probe-run.json": "1ddb7e4064b6f8bb6737903c096c4b5f85f7e25db2b9f86297841938df906c73",
+    "target/wp899/bzl-source-borrow-controls.jsonl": "400d33e12f278c8f0518a7bd37dda9798f39cd387b2127ab4947025964f6a597",
+    "target/wp899/bzl-source-borrow-preflight.json": "3c2434fe4b81dfee50c2b01021bd0e8bcbf056abad22f252dbe44792a2415e01",
+    "target/wp899/bzl-source-borrow-candidate-probe-run.jsonl": "864083f3030f9f9af25815dc5a9d245ae4099a6f415f3794c70c145e6fd14932",
+    "target/wp899/bzl-source-borrow-baseline-probe-run.jsonl": "8adbafbe1ddfb59e53e55d9600629f8ccd2bbd2a3991c1605826c9c9f717f485",
+    "target/wp899/bzl-source-borrow-candidate-probe-compile.json": "f199a1b2f2351326de6d42e3db4e8e4814b2f2f9462b7620d0268a665651351f",
+    "target/wp899/bzl-source-borrow-baseline-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/bzl-source-borrow-baseline-probe.rs": "f671dd072afc0f296a87ca82f4ce135b78acc4a9ff54faef9c30c58421b7ec1f",
+    "target/wp899/bzl-source-borrow-design.md": "a2885fd48066424e8ff3d1a94e796b1319d964a18df7a7ac79b6482f17616e6d",
+    "target/wp899/bzl-source-borrow-loading-compile.json": "7e2aa5fab37dd8e60e79f364d2bf10bc8a66cb7b8bae998fe37f448fb6fedaa9",
+    "target/wp899/bzl-source-borrow-selectors.json": "45b16f2dcd6013d67acd1160aef8ff2aa7b38fb9e1c44dc27f54f017bb45fbc4",
+    "target/wp899/bzl-source-borrow-validate.py": "594b10dc706efba53d6e9283871bcc714d5919aeab224a16afe69e3be3ca96c1",
+    "target/wp899/bzl-source-borrow-core-cli-check.jsonl": "1e9092acdad3817e910ddb670bce5e6271f3ccda3ebba70990c027ae8f1aea1d",
+    "target/wp899/bzl-source-borrow-core-cli-check.json": "bb3a6dc6356695a39d8976e11bd5e5fc10fcab3f01d829803e45189658786032",
+    "target/wp899/bzl-source-borrow-design-evidence.md": "21b3a276ff393a73de813a5953d948aafcb32d598ef60daa54b18d7c083bfe00",
+    "target/wp899/bzl-source-borrow-candidate-probe.rs": "6413629a4d29ca7db617e74bf1f670a6b6258a949cd0e7375ae42a383ae99a2d",
+    "target/wp899/bzl-source-borrow-loading-compile.jsonl": "b0cb9755a67f4d279a1a86414f1e12071d2fe0964e401ad479f0eadf4d26bab8"
+  },
+  "validation_sha256": "137707ca89e70aa53dddf7209c5c41b4c4e0565979cd35c36a55361724733010",
+  "final_reviews": {
+    "target/wp899/bzl-source-borrow-final-source.md": "14d2ef15ec39408a03a3e8781d35b45b3f3ad93cead6f607291018edcdfb9e31",
+    "target/wp899/bzl-source-borrow-final-input.md": "7d241624b15a6c1190307a1205ae6d841e4c75711016a13bc11e2db90f4dde60",
+    "target/wp899/bzl-source-borrow-final-evidence.md": "241e2c27f0664c65449760c71b420b49b7e3e899bd3c86bee90d77d357bc7703"
+  },
+  "timing": {
+    "elapsed_from_design_seconds": 379.9223909378052,
+    "compile_seconds": 11.973223162989598,
+    "test_seconds": 0.10558644001139328,
+    "review_time": "Not separately measured"
+  }
+}
