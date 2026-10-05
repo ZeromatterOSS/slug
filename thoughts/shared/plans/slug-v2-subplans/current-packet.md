@@ -1,7 +1,21 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Bazel string reservation repair accepted; source observation design next; full WP899 unaccepted
+Status: Lexer source observation spent; bounded preparation work audit next; full WP899 unaccepted
+
+The separately frozen source observation after the accepted lexer repair ran once,
+with fresh automatic network approval and all caps unchanged. Global17 is spent:
+107 ordered records, 192 distinct registry admissions and 18 source attempts;
+capture remains unreached and status0 records first ScopeWorkDeadline. Outer
+Repository2 and GenericScope/Common/ScopeCheck/Deadline provide no selected native
+cause or named wait. No allocation-abort diagnostic appears in this invocation.
+Independent peak VM613,888,000B/RSS359,649,280B/thread5 observations do not establish
+prior allocation ownership or causal repair. Restoration/raw/engine retirement,
+settled descriptor credit2,436,520B and942/942censuses are proved. Child101 joins
+naturally; stage and exact owned parent cleanup pass three terminal FINALs.
+[Terminal receipt](wp899-lexer-growth-source-terminal-2026-10-05.json). Source admission and full WP899 remain
+unaccepted. Next is a source-owned audit of bounded preparation work with local
+discriminators; no automatic retry, cap growth or ordinary activation is selected.
 
 Three independent DESIGN and FINAL reviews accept the BazelInternal lexer
 reservation repair. Previously each literal reserved the entire remaining source;
@@ -19,9 +33,8 @@ logs and parent are removed after three FINALs. [Acceptance receipt](wp899-lexer
 This proves the reservation repair, not physical-memory reduction, timing speedup,
 global16 allocation ownership, historical40GB or source fit. Growth remains
 infallible. The unexecuted failure-observer proposal was suspended in favor of this
-concrete defect. Next is a separately reviewed source observation design for the
-accepted change, preserving source/resource/network guards and fresh pins. No
-actual source retry or cap change occurred here. Full WP899/M7A remains open.
+concrete defect. The separately reviewed source observation above preserves
+source/resource/network guards and fresh pins. Full WP899/M7A remains open.
 
 
 The explicitly approved source test ran once under the guarded R2 freeze, after
