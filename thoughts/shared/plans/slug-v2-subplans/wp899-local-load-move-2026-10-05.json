@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "197b9d10a",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native scratch ownership; admitted semantics unchanged",
+  "decision": "Move the existing owned local load-name String into LoadLabelResolutionKey instead of cloning an otherwise unused local.",
+  "source_sha256": {
+    "app/slug_loading_v2/src/bzl_module.rs": "4811c9c7b1e2deab1ef20d908fb7799006ecaa58615c311d38611e5a97fa2a83"
+  },
+  "contract_sha256": "2165b428c72091e771da6732171bd7e689c0cd3025065a50876cac8a0dedc790",
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/bzl_invalidation-4642396b38012d4c",
+    "artifact_sha256": "98bab1e9c3e14863d836a727c0b3ecd183146754c93956de49f0bb5098632508",
+    "selectors": [
+      "load_label_must_point_to_bzl_file",
+      "malformed_bzl_reports_bazel_module_compilation_summary",
+      "local_loader_rejects_external_repository_before_mapping_exists",
+      "same_dice_bzl_visibility_source_and_imported_policy_invalidate_and_restore"
+    ]
+  },
+  "validation": {
+    "compile": {
+      "receipt": "target/wp899/local-load-move-compile.json",
+      "receipt_sha256": "aab6edd8b25ad9ccec4aaaf68ca378986af8f82209bdefdf705681c6cb71c1b0",
+      "exit_code": 0,
+      "elapsed_seconds": 7.509432042948902,
+      "log_sha256": "feb0ceb950d193a12ea33a4ca1540abfd24cd6e43ebddd2ca17bda726e221b6d"
+    },
+    "preflight": {
+      "receipt": "target/wp899/local-load-move-preflight.json",
+      "receipt_sha256": "7d78e684ed24bc49559289c931f816210c5c11fc6f1b921c3ee241d8eefabc46",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02402875100960955,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "controls": {
+      "receipt": "target/wp899/local-load-move-controls.json",
+      "receipt_sha256": "dc9a3b5ad081949541cd1956efd718615929e05d64c62997a7cd83783b7e2368",
+      "exit_code": 0,
+      "elapsed_seconds": 0.012498027994297445,
+      "log_sha256": "60a05694fe0e464532afa1c4163822a7e841770044d58defe1529554adc5c633"
+    },
+    "core-cli-check": {
+      "receipt": "target/wp899/local-load-move-core-cli-check.json",
+      "receipt_sha256": "770ddf607d8c953e364544897ffd0479f4c528fe093c439a853eb6fef424b4bf",
+      "exit_code": 0,
+      "elapsed_seconds": 4.53311846696306,
+      "log_sha256": "7fe3c7b99d732dc75f9d193bd3100475481fa6ba84348dfd33dff0e22574f886"
+    }
+  },
+  "pass_count": 4,
+  "coverage": "Malformed-module and same-DICE visibility/source/imported-policy edit/restore controls directly call evaluate_load. Label parsing and external-package refusal are supporting controls.",
+  "limits": "One scratch String clone removed per wrapper call. Retained key strings/returned loads remain; no memory-byte, RSS, speed or source-fit measurement.",
+  "final_review": {
+    "receipt": "target/wp899/local-load-move-final-input.md",
+    "sha256": "0b60216d563468bb417da790c62ea83483a60c366a0b55d414beb587b34e135d"
+  },
+  "validation_sha256": "d3a32ea94a9f505c5c6ef05ba9db95fca064bf4773467275c8a5ec43d95f6535",
+  "full_wp899_accepted": false,
+  "scope": "Local strings/basic memory only; offline checks; no network/Bazel/linked CLI/actual source/Windows.",
+  "timing": {
+    "elapsed_from_contract_seconds": 121.31273317337036,
+    "compile_seconds": 12.042550509911962,
+    "test_seconds": 0.012498027994297445,
+    "review_time": "Not separately measured"
+  }
+}

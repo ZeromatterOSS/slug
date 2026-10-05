@@ -7303,7 +7303,7 @@ impl BzlModuleEvaluator {
             .compute(&LoadLabelResolutionKey {
                 workspace: workspace.clone(),
                 requesting_package,
-                load: load.clone(),
+                load,
             })
             .await
             .map_err(|error| anyhow::anyhow!("resolving local .bzl load through DICE: {error}"))?;

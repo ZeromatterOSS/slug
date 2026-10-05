@@ -9,6 +9,14 @@ prefer removing redundant copies or reusing existing interners. Network-dependen
 source-admission observations and broader runtime work are deferred during this
 scope. Existing source/integration gates remain unproved; this does not waive them.
 
+Independent FINAL accepts moving the already-owned local load name into its
+existing DICE resolution key instead of cloning an unused local. Exact bytes,
+key equality and dependency/error behavior stay unchanged. Four offline controls
+pass, including direct malformed-module and same-DICE visibility/source/policy
+edit/restore checks; default Core/CLI compilation passes. One scratch clone is
+removed per wrapper call; retained strings remain and no RSS or timing benefit
+is measured. [Acceptance receipt](wp899-local-load-move-2026-10-05.json).
+
 Three DESIGNs and three FINALs accept borrowed Host source decoding and earlier
 root BUILD parse-tree release. The private decoder views existing immutable bytes;
 Host `.bzl` parsing still owns one String and hashes at the original late point.
