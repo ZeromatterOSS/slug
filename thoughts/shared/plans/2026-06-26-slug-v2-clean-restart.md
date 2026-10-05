@@ -35,7 +35,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Archive namespace complexity repair accepted; source observation design next; full WP899 unaccepted
+Status: Local string ownership and memory optimization; source integration deferred; full WP899 unaccepted
+
+Current user scope is local string interning and basic memory optimization with
+offline validation. Continue the memory/reuse skill at existing string owners;
+prefer removing redundant copies or reusing existing interners. Network-dependent
+source-admission observations and broader runtime work are deferred during this
+scope. Existing source/integration gates remain unproved; this does not waive them.
+
+Three DESIGNs and three FINALs accept local `.bzl` source sharing. `ParsedBzl`
+now retains the existing workspace `Arc<String>` instead of a duplicate String;
+cloning the parse result shares that source allocation. Both parser boundaries
+still receive owned Strings. The actual-DICE regression fails on the original
+source-copy assertion and passes after repair, including clone/lifetime and
+independent-content equality. Twelve protected loading controls and default
+Core/CLI all-target compilation pass. Parser copies and load-string clones remain;
+whole-process memory and source-fit are unmeasured. [Acceptance receipt](slug-v2-subplans/wp899-bzl-source-sharing-2026-10-05.json).
 
 Three DESIGNs and three FINALs accept the Slug-native archive namespace repair.
 A single phase-local BTreeMap replaces per-file scans of all prior paths. The
@@ -49,9 +64,8 @@ prior keys, excluding internal tree comparisons. All four children exit0/join;
 exact owned logs and parent cleanup pass three FINALs. Root-enforced limits are
 recorded without independent child AS/RSS readback. [Acceptance receipt](slug-v2-subplans/wp899-archive-namespace-2026-10-05.json).
 Tree overhead/infallible allocation remain; no timing/physical-memory/global17
-cause or actual-source-fit claim follows. Next is a separately reviewed source
-observation design after this relevant repair, preserving all source/resource/
-network guards; no automatic retry or cap increase. Full WP899/M7A remains open.
+cause or actual-source-fit claim follows. Further source observations are deferred
+under the current local-memory scope. Full WP899/M7A remains open.
 
 The separately frozen source observation after the accepted lexer repair ran once,
 with fresh automatic network approval and all caps unchanged. Global17 is spent:

@@ -1,0 +1,305 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "746abdd4c",
+  "disposition": "ACCEPTED_LOCAL_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native source storage; existing parser/loading behavior unchanged",
+  "decision": "ParsedBzl retains observed WorkspaceFileValue Arc<String>; its clones share original source allocation. Both AstModule boundaries still receive owned String copies. No new interner, cache, key, dependency or imported utility.",
+  "ownership": "Existing tracked immutable workspace source retained by parsed DICE value/history and clones until last Drop. Loads remain Vec<String>; Allocative remains derived.",
+  "invariants": [
+    "Content-based ParsedBzl/BzlParseKey equality, including separately allocated equal Arc contents",
+    "Same source bytes/digest/ordered loads; parser diagnostics, cycles, events and manifest invalidation unchanged",
+    "Normal WorkspaceFileKey dependency remains the sole source authority"
+  ],
+  "source_sha256": {
+    "app/slug_loading_v2/src/bzl_module.rs": "3cf60c8386101571022494d23245b17208efd053408cde3fda9c5052e4eef767",
+    "app/slug_loading_v2/src/bzl_source_memory_tests.rs": "15fc5f2ee926a6ad6871ae742fbbf6262b1494fa2818e91eb1a6a1e1b8307fa6"
+  },
+  "design_sha256": "2716fb49703b54650d1b5c3483152d691f2279bca478a115260be98d2c0471e9",
+  "design_reviews": {
+    "target/wp899/bzl-source-sharing-design-source.md": "1d075d6ca13c3b3c2d655975a4e1f642f318c4a45b9b31f6cb898981e717e0ba",
+    "target/wp899/bzl-source-sharing-design-input.md": "c7989762e3abeee42ef0e420f43a132e64c325b313a82b5fa49784d991c7bd09",
+    "target/wp899/bzl-source-sharing-design-evidence.md": "ceeb43109f7433fe9bcb83951ac90943acaf3a3bf93f58259da9235b00ea4020"
+  },
+  "validation": {
+    "baseline-compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 124,
+      "elapsed_seconds": 60.00378048000857,
+      "log_sha256": "f83868bdd44e75008cf5ed15b72bbd81234f6826ac9a3732edcf21335dcfb070"
+    },
+    "baseline-compile-r1": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 10.120194321032614,
+      "log_sha256": "ee6606f2fc09cb44fba6d4f539181b3ec82f8f9ba04cd10596a9f5b9392fb09d"
+    },
+    "baseline-preflight": {
+      "command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+        "--exact",
+        "bzl_module::bzl_source_memory_tests::parsed_source_shares_workspace_storage_and_survives_its_owners"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.02487051603384316,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "baseline-control": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+        "--exact",
+        "bzl_module::bzl_source_memory_tests::parsed_source_shares_workspace_storage_and_survives_its_owners",
+        "--nocapture"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 0.003226455010008067,
+      "log_sha256": "ed0de621d720a4338fd88dad73035a11c2b79ff905eec7712ad89b6c0260d796"
+    },
+    "candidate-compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--test",
+        "bzl_invalidation",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 22.35785474901786,
+      "log_sha256": "479afb3140fc326bd0c431ab83a6c963efe1c7bc04b25c26949037b90463f85d"
+    },
+    "slug_loading_v2-preflight": {
+      "command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+        "--exact",
+        "bzl_module::bzl_source_memory_tests::parsed_source_shares_workspace_storage_and_survives_its_owners"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.022126442985609174,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "slug_loading_v2-controls": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+        "--exact",
+        "bzl_module::bzl_source_memory_tests::parsed_source_shares_workspace_storage_and_survives_its_owners",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0028793230303563178,
+      "log_sha256": "9b6c8f1cf5c1289cb13d80a2ec27941e3309fddcf6753c3d6b67bdf11e17a043"
+    },
+    "bzl_invalidation-preflight": {
+      "command": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/bzl_invalidation-4642396b38012d4c",
+        "--exact",
+        "malformed_bzl_reports_bazel_module_compilation_summary",
+        "bzl_load_cycles_report_bazel_shape_without_hanging_and_recover_in_same_dice",
+        "bzl_load_cycle_preserves_the_acyclic_path_from_the_build_file",
+        "bzl_self_cycle_uses_bazel_self_edge_shape",
+        "bzl_load_diamond_is_not_reported_as_a_cycle",
+        "injected_bzl_create_edit_delete_replays_the_loaded_package",
+        "loading_event_capture_is_key_local_empty_replacing_and_failure_prefix_preserving",
+        "package_manifest_preserves_direct_edges_and_first_seen_diamond_closure",
+        "manifest_changes_when_leaf_content_or_load_edge_changes_without_target_change",
+        "same_dice_load_edges_invalidate_and_restore_without_target_changes",
+        "same_dice_bzl_visibility_source_and_imported_policy_invalidate_and_restore",
+        "build_comment_and_whitespace_edits_do_not_change_loaded_package"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.02179426100337878,
+      "log_sha256": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92"
+    },
+    "bzl_invalidation-controls": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "30s",
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/bzl_invalidation-4642396b38012d4c",
+        "--exact",
+        "malformed_bzl_reports_bazel_module_compilation_summary",
+        "bzl_load_cycles_report_bazel_shape_without_hanging_and_recover_in_same_dice",
+        "bzl_load_cycle_preserves_the_acyclic_path_from_the_build_file",
+        "bzl_self_cycle_uses_bazel_self_edge_shape",
+        "bzl_load_diamond_is_not_reported_as_a_cycle",
+        "injected_bzl_create_edit_delete_replays_the_loaded_package",
+        "loading_event_capture_is_key_local_empty_replacing_and_failure_prefix_preserving",
+        "package_manifest_preserves_direct_edges_and_first_seen_diamond_closure",
+        "manifest_changes_when_leaf_content_or_load_edge_changes_without_target_change",
+        "same_dice_load_edges_invalidate_and_restore_without_target_changes",
+        "same_dice_bzl_visibility_source_and_imported_policy_invalidate_and_restore",
+        "build_comment_and_whitespace_edits_do_not_change_loaded_package",
+        "--test-threads=1"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.07656873599626124,
+      "log_sha256": "ced4d2bc538a32e788e258f0126f1698b3f415b1101674a3220b5297af2b4658"
+    },
+    "core-cli-check": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--all-targets",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.928393707959913,
+      "log_sha256": "451e8de4e178785fcbdc121351ce90ea58e0dafccdcf8cf091aa8eb959dadb9a"
+    }
+  },
+  "selectors": {
+    "slug_loading_v2": {
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+      "artifact_sha256": "2816077a0ab4dcc0df40b761ae99a505a87d5c28ed468028c57299a5631176db",
+      "selectors": [
+        "bzl_module::bzl_source_memory_tests::parsed_source_shares_workspace_storage_and_survives_its_owners"
+      ]
+    },
+    "bzl_invalidation": {
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/bzl_invalidation-4642396b38012d4c",
+      "artifact_sha256": "08ecff36ae1439ffe06452046953714c1379a2fc95e224361d61da7da87da72a",
+      "selectors": [
+        "malformed_bzl_reports_bazel_module_compilation_summary",
+        "bzl_load_cycles_report_bazel_shape_without_hanging_and_recover_in_same_dice",
+        "bzl_load_cycle_preserves_the_acyclic_path_from_the_build_file",
+        "bzl_self_cycle_uses_bazel_self_edge_shape",
+        "bzl_load_diamond_is_not_reported_as_a_cycle",
+        "injected_bzl_create_edit_delete_replays_the_loaded_package",
+        "loading_event_capture_is_key_local_empty_replacing_and_failure_prefix_preserving",
+        "package_manifest_preserves_direct_edges_and_first_seen_diamond_closure",
+        "manifest_changes_when_leaf_content_or_load_edge_changes_without_target_change",
+        "same_dice_load_edges_invalidate_and_restore_without_target_changes",
+        "same_dice_bzl_visibility_source_and_imported_policy_invalidate_and_restore",
+        "build_comment_and_whitespace_edits_do_not_change_loaded_package"
+      ]
+    }
+  },
+  "baseline_failure": "One actual-DICE test failed101 at source byte pointer equality before production change; one selected/zero passed. Original ParsedBzl duplicated observed source.",
+  "pass_counts": {
+    "new_memory_regression": 1,
+    "protected_loading_controls": 12
+  },
+  "test_profile": "Pinned nightly-2025-09-14; Loading/Bzlmod opt0/debug0 overrides only, offline. Default Core/CLI all-target check.",
+  "invocation_corrections": [
+    "Initial default baseline compilation reached60s/124 before test artifact; switched to existing opt0/debug0 local support profile under unchanged60s cap. Matched baseline/candidate compilation passed."
+  ],
+  "limits": "Source-sharing proof only; parser scratch copies and load-string clones remain. Source allocation lives until last owner drops. Whole-process memory, speed and source-admission fit unmeasured. External module route unchanged.",
+  "scope": "User restricts current work to local string interning/basic memory optimization with offline checks. No network, Bazel oracle, actual source admission or Windows work in this component.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/bzl-source-sharing-slug_loading_v2-preflight.json": "a78963e6a4aa491783906efcb304af25b27282c0642d4ac69d570033b4d1b993",
+    "target/wp899/bzl-source-sharing-baseline-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/bzl-source-sharing-core-cli-check.json": "72f8f84b54cd6f3b5cc1fab380f36526f548a1d99c93b18843d0d1a46940b10d",
+    "target/wp899/bzl-source-sharing-baseline-control.jsonl": "ed0de621d720a4338fd88dad73035a11c2b79ff905eec7712ad89b6c0260d796",
+    "target/wp899/bzl-source-sharing-baseline-preflight.json": "668a1b456f339ef4433d493c435411650a2fb9b646c68ccee675715ca0403621",
+    "target/wp899/bzl-source-sharing-baseline-compile.jsonl": "f83868bdd44e75008cf5ed15b72bbd81234f6826ac9a3732edcf21335dcfb070",
+    "target/wp899/bzl-source-sharing-bzl_invalidation-preflight.json": "3eb841f7f966d571a43c66e17f183b48970c6e3c35d1a77164e8290e448ef81f",
+    "target/wp899/bzl-source-sharing-baseline-compile-r1.json": "48fe9d694f7666a7845e11dcfc17a485d4ea995bc8efd6284466f009335d1b8f",
+    "target/wp899/bzl-source-sharing-candidate-compile.json": "e4bdddbb701777ea024e34f8509acc956717791e5e68c0d4eaba2695d17ddb43",
+    "target/wp899/bzl-source-sharing-bzl_invalidation-controls.jsonl": "ced4d2bc538a32e788e258f0126f1698b3f415b1101674a3220b5297af2b4658",
+    "target/wp899/bzl-source-sharing-baseline-compile-r1.jsonl": "ee6606f2fc09cb44fba6d4f539181b3ec82f8f9ba04cd10596a9f5b9392fb09d",
+    "target/wp899/bzl-source-sharing-slug_loading_v2-controls.jsonl": "9b6c8f1cf5c1289cb13d80a2ec27941e3309fddcf6753c3d6b67bdf11e17a043",
+    "target/wp899/bzl-source-sharing-baseline-control.json": "1abbad334e041a0b289cd1c19562ed6ae5a8425f6e5cb21b699cba2060c4d7a1",
+    "target/wp899/bzl-source-sharing-baseline-compile.json": "b6641a743f9aa967e964e82f7dd40db6a50729b884dc4ce818cbaadccff1dfde",
+    "target/wp899/bzl-source-sharing-bzl_invalidation-controls.json": "ea82299289fe45952a06b8e6b7530c8d349bbfbdf2757bc194e8521dc54cf922",
+    "target/wp899/bzl-source-sharing-baseline-selector.json": "cad45b876d7e3092e75e966867d39e57c21f2aeb7f536dfacb0f745e01b77f70",
+    "target/wp899/bzl-source-sharing-bzl_invalidation-selectors.json": "82120a4b19671b263c087fe50f926fba37ad86b01df21f0bc5f630877d108533",
+    "target/wp899/bzl-source-sharing-bzl_invalidation-preflight.jsonl": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92",
+    "target/wp899/bzl-source-sharing-design-input.md": "c7989762e3abeee42ef0e420f43a132e64c325b313a82b5fa49784d991c7bd09",
+    "target/wp899/bzl-source-sharing-validate.py": "f4f6ff8f51bd791e20083d5293e5dbfbec2cc724713df5dd715aa54717e5ab71",
+    "target/wp899/bzl-source-sharing-candidate-compile.jsonl": "479afb3140fc326bd0c431ab83a6c963efe1c7bc04b25c26949037b90463f85d",
+    "target/wp899/bzl-source-sharing-design-evidence.md": "ceeb43109f7433fe9bcb83951ac90943acaf3a3bf93f58259da9235b00ea4020",
+    "target/wp899/bzl-source-sharing-design-source.md": "1d075d6ca13c3b3c2d655975a4e1f642f318c4a45b9b31f6cb898981e717e0ba",
+    "target/wp899/bzl-source-sharing-design.md": "2716fb49703b54650d1b5c3483152d691f2279bca478a115260be98d2c0471e9",
+    "target/wp899/bzl-source-sharing-slug_loading_v2-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/bzl-source-sharing-slug_loading_v2-selectors.json": "4d67625553d85e31e4c025a35d74df3349c7d2ba308f9cc43d4279a93650040e",
+    "target/wp899/bzl-source-sharing-core-cli-check.jsonl": "451e8de4e178785fcbdc121351ce90ea58e0dafccdcf8cf091aa8eb959dadb9a",
+    "target/wp899/bzl-source-sharing-slug_loading_v2-controls.json": "f4151977b6517f43e7ae0567297594a2618b5a536c55a73f0322a68e5b4c7236"
+  },
+  "validation_sha256": "cc8712af74cf03fb9009e46f185709e7c4b018a3a92d73997391cb47d121ad35",
+  "final_reviews": {
+    "target/wp899/bzl-source-sharing-final-source.md": "abf20d83037ca2f02b88d4bba392a683d140f37b382e8235a83017842af1ba1f",
+    "target/wp899/bzl-source-sharing-final-input.md": "66e2ce1c260b8ef7af57af2e719daa2b906b88621a90907ffc7e7aeedfdbdf24",
+    "target/wp899/bzl-source-sharing-final-evidence.md": "229ec10766a66e3b0483bda1b426b3ae69c176545eecc0e90abf453b388cefd7"
+  },
+  "timing": {
+    "elapsed_from_design_seconds": 563.6894528865814,
+    "compile_seconds_including_initial_timeout": 97.41022325801896,
+    "executed_test_seconds": 0.08267451403662562,
+    "review_time": "Not separately measured"
+  }
+}

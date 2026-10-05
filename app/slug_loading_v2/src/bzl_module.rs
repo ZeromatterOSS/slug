@@ -554,7 +554,7 @@ async fn observed_file(
 #[derive(Allocative, Clone, PartialEq, Eq)]
 #[doc(hidden)]
 pub struct ParsedBzl {
-    source: String,
+    source: Arc<String>,
     loads: Vec<String>,
     source_digest: [u8; 32],
 }
@@ -7465,7 +7465,7 @@ impl Key for BzlParseKey {
             })?;
             Ok(ParsedBzl {
                 source_digest: digest(&source),
-                source: source.as_ref().clone(),
+                source,
                 loads: ast
                     .loads()
                     .into_iter()
@@ -7595,7 +7595,7 @@ impl Key for BzlModuleEvalKey {
                 let ast = AstModule::parse(
                     &starlark_source_name(&self.path)
                         .ok_or_else(|| LoadingError::new("invalid .bzl source path"))?,
-                    parsed.source.clone(),
+                    parsed.source.as_ref().clone(),
                     &Dialect::Bazel,
                 )
                 .map_err(|error| LoadingError::new(error.to_string()))?;
@@ -8092,6 +8092,10 @@ fn flattened_lifetime_closure(
     }
     entries
 }
+
+#[cfg(test)]
+#[path = "bzl_source_memory_tests.rs"]
+mod bzl_source_memory_tests;
 
 #[cfg(all(test, unix))]
 #[path = "host_package_attempt_tests.rs"]
