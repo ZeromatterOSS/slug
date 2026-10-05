@@ -749,32 +749,29 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = pos)] count: Option<i32>,
         heap: Heap<'v>,
     ) -> anyhow::Result<StringValue<'v>> {
-        match count {
-            Some(count) if count >= 0 => {
-                Ok(heap.alloc_str(&this.replacen(old, new, count as usize)))
+        let limit = match count {
+            Some(count) if count >= 0 => count as usize,
+            Some(count) => {
+                return Err(anyhow::anyhow!(
+                    "Replace final argument was negative '{}'",
+                    count
+                ));
             }
-            Some(count) => Err(anyhow::anyhow!(
-                "Replace final argument was negative '{}'",
-                count
-            )),
-            None => {
-                // Optimise `replace` using the Rust standard library definition,
-                // but avoiding redundant allocation in the last step
-                let x = this.as_str();
-                let mut result = String::new();
-                let mut last_end = 0;
-                for (start, part) in x.match_indices(old) {
-                    result.push_str(unsafe { x.get_unchecked(last_end..start) });
-                    result.push_str(new);
-                    last_end = start + part.len();
-                }
-                if result.is_empty() && last_end == 0 {
-                    Ok(this)
-                } else {
-                    Ok(heap
-                        .alloc_str_concat(&result, unsafe { x.get_unchecked(last_end..x.len()) }))
-                }
-            }
+            None => usize::MAX,
+        };
+        // Build the replaced prefix, then copy the untouched suffix directly into the heap.
+        let x = this.as_str();
+        let mut result = String::new();
+        let mut last_end = 0;
+        for (start, part) in x.match_indices(old).take(limit) {
+            result.push_str(unsafe { x.get_unchecked(last_end..start) });
+            result.push_str(new);
+            last_end = start + part.len();
+        }
+        if result.is_empty() && last_end == 0 {
+            Ok(this)
+        } else {
+            Ok(heap.alloc_str_concat(&result, unsafe { x.get_unchecked(last_end..x.len()) }))
         }
     }
 
@@ -1267,6 +1264,10 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "replace_prefix_tests.rs"]
+mod replace_prefix_tests;
 
 #[cfg(test)]
 #[path = "whitespace_split_tests.rs"]

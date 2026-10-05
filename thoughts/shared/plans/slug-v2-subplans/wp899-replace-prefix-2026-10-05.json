@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "1fbd7db0c",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native string scratch ownership; admitted replacement/Unicode/BazelInternal semantics unchanged",
+  "decision": "Validate count before work, then share existing unlimited match_indices prefix builder with take(limit). Changed result uses existing alloc_str_concat prefix and untouched suffix; zero-count/no-match reuse existing input.",
+  "ownership": "Input StringValue and borrowed slices remain synchronous native-method scratch. Final changed strings retain normal heap allocation, roots, GC/freezing. No new interner, cache, API, retained representation, unsafe code, key or dependency.",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "ae3ac562e5ae19af4108196be6701e02e1b53d1fd7995686750d203d69a55086",
+    "starlark-rust/starlark/src/values/types/string/replace_prefix_tests.rs": "22930655de21ace05e1f5284333edfff14dc63f15213bb39b4a32c7e3328a725"
+  },
+  "design_sha256": "d8830f4d5b9f5466f9412831d2b8598177fd306fc25f0ea1b6d17753791cd6e5",
+  "design_reviews": {
+    "target/wp899/replace-prefix-design-source.md": "19d93d2dec3a36c7e7b46fcf3a986087000106ea3c47e5e937230fd6f9657f2a",
+    "target/wp899/replace-prefix-design-input.md": "2c297c181c93384487dafac53d68490484bfa8577c69fac1904bfd17154aba39",
+    "target/wp899/replace-prefix-design-evidence.md": "17c77cf8bd6d806be204abf51631d9378fc3738e86b6cf06009070b4131d0abd"
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/replace-prefix-baseline-compile.json",
+      "receipt_sha256": "125880e9f025a97da244d814321532dfe8f1f300dc11ea4dd4d1b5e07f9387d2",
+      "exit_code": 0,
+      "elapsed_seconds": 5.762548691011034,
+      "log_sha256": "487013742102dd49277c4f0dd141f4a518595d008e581aed0e56af729b34ab3e"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/replace-prefix-baseline-preflight.json",
+      "receipt_sha256": "97f89703ea60972e0be3f55bdacaf1740d1df050c70e2093c42f6ce8778844f4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019983182952273637,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/replace-prefix-baseline-controls.json",
+      "receipt_sha256": "bb3da17941082468db8948e354c2642d4ffa0e6ab1143605375072765306de84",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005108244018629193,
+      "log_sha256": "f4e32d87ce6a6da28add831475560a74a53574c15d49b145bd1a4c24ad0df116"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/replace-prefix-candidate-compile.json",
+      "receipt_sha256": "d1b26a4a21a58e4e2abbd1c01e339af86126ec72e2a1afeead6bc4078242646a",
+      "exit_code": 0,
+      "elapsed_seconds": 5.0647008389933035,
+      "log_sha256": "0034deeb82b22ee961fbe624515f1cfa8746c5d86933c94b4880c77691970d60"
+    },
+    "probe-compile": {
+      "receipt": "target/wp899/replace-prefix-probe-compile.json",
+      "receipt_sha256": "9bd7d9345abe13a68fee40ec70735e1ce314309423a2bbc64e638f262d8554dd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.1438817159505561,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "probe-run": {
+      "receipt": "target/wp899/replace-prefix-probe-run.json",
+      "receipt_sha256": "4ad6d012fb37b51ae126076f66b094a4b6f88ab882549e7cb062713bedf0005c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.025799449009355158,
+      "log_sha256": "b1bfb562e37cb50cc521caf281c54b8d5cd3ae5e6780edb4bb8b5c7a89af0718"
+    },
+    "preflight": {
+      "receipt": "target/wp899/replace-prefix-preflight.json",
+      "receipt_sha256": "238367585bb868ea0790802b9ff31d89f809d9a012f7694d925eafa624df0e1f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01992029300890863,
+      "log_sha256": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945"
+    },
+    "controls": {
+      "receipt": "target/wp899/replace-prefix-controls.json",
+      "receipt_sha256": "f86db69188292ff82d5d54624f968ed498a3f5376c1f4ba3ea1f1f16fdfb0fbf",
+      "exit_code": 0,
+      "elapsed_seconds": 0.007655524997971952,
+      "log_sha256": "fc2a30271b8cc052063106e9c9a79709f0d984928048c9c9ec498282aa9a3949"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/replace-prefix-dependents-check.json",
+      "receipt_sha256": "64f4f3c94e6b4709abdfb33b11ffd2a62c255e28b1dbe77d71cbb01e03ab8907",
+      "exit_code": 0,
+      "elapsed_seconds": 9.890902102983091,
+      "log_sha256": "24b79be6309c2f32746612ecde7073de86d8e8d5c1d8164809517eef31a7591e"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "e2755d3bc28bbe8e184596c2fd96cecbc367514e6e4be1fd71ec6e5d22d6e34d",
+    "selectors": [
+      "values::types::string::methods::replace_prefix_tests::limited_replace_reuses_input_when_no_match_is_consumed",
+      "values::types::string::methods::replace_prefix_tests::limited_replace_preserves_bytes_errors_and_frozen_ownership",
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_parts_borrow_input",
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_limits_preserve_remainders_and_utf8",
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_public_results_survive_gc_and_freeze",
+      "values::types::string::methods::tests::test_error_codes",
+      "values::types::string::methods::tests::test_count",
+      "values::types::string::methods::tests::test_find",
+      "values::types::string::methods::tests::test_elems_matches_bazel_list_behavior",
+      "values::types::string::methods::tests::test_codepoints_opaque_iterator",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_source_spans_and_reporting_columns",
+      "tests::bazel_internal_string::test_bazel_internal_oracle_matrix",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "tests::bazel_internal_string::test_bazel_internal_invalid_escapes_and_identifier_location"
+    ]
+  },
+  "baseline_result": "One semantic/error/GC/freeze control passes; runtime no-op pointer reuse regression fails101 as expected on old limited replacen path.",
+  "pass_counts": {
+    "new_owner_tests": 2,
+    "protected_string_controls": 17,
+    "differential_sources": 1365,
+    "differential_comparisons": 200655
+  },
+  "probe_pins": {
+    "baseline": "1fbd7db0c",
+    "source_sha256": {
+      "baseline": "c8a8d1d61ea89174eef7c83a154bb7b05b424ffbae82716ef928892273068476",
+      "candidate": "ae3ac562e5ae19af4108196be6701e02e1b53d1fd7995686750d203d69a55086"
+    },
+    "body_sha256": {
+      "baseline": "4adbd0e530a301b99c09d3b8a4bbc230df5e37185ebdff4eb18bb6d510d0de66",
+      "candidate": "3909d9792ce8cfbfaf8ea68cb86d0c1580ee1da2e8f62a17b7aa1bb231de123c"
+    },
+    "probe_sha256": "114f0dc3d844f80ae46f4917f6e0d2444a8047993fff34b9e696cf08f1be6c69",
+    "adapter": "Original method body unchanged except anyhow::anyhow! -> format! in negative error. Signature replaced with std-only string/heap stand-ins. Heap records initialized prefix/full-temporary payload length and untouched suffix separately; final owned output and input borrow modeled, native heap/GC established by actual tests."
+  },
+  "probe_artifact_sha256": "d63314f2447de57a127940a74960a59ee5cfde173f657daf607ceef2c61b0421",
+  "probe_result": {
+    "sources": 1365,
+    "comparisons": 200655,
+    "output_bytes": 1048577,
+    "baseline_temporary_payload_bytes": 1048577,
+    "candidate_prefix_payload_bytes": 1,
+    "candidate_untouched_suffix_bytes": 1048576
+  },
+  "invariants": [
+    "Negative count exact error before replacement; zero/one/oversized and unlimited count behavior.",
+    "Empty source/pattern/replacement, nonoverlapping match order, Unicode insertion boundaries, deletion and equal old/new bytes.",
+    "Fresh nonconstant/nonempty actual native input ptr reuse; changed result survives GC and freeze after input/module handles drop.",
+    "Existing plain heap allocation, mutable/frozen interner, whitespace and BazelInternal carriers preserved."
+  ],
+  "test_profile": "Pinned nightly-2025-09-14, default Starlark profile; std-only actual-body probe opt1/debug2; default Loading/Core/CLI all-target checks. Offline, preparation60s/tests30s caps.",
+  "limits": "Probe measures initialized temporary/full-prefix payload bytes supplied to allocation adapters, not capacity/allocator/RSS/timing. Fixed1MiB untouched suffix: old full temporary1048577B versus new prefix1B, same owned output1048577B. Final string allocation and changed prefix remain; no workload/source-fit claim.",
+  "scope": "Local strings and basic memory only; no network/Bazel/linked CLI/actual source admission/Windows work.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/replace-prefix-controls.json": "f86db69188292ff82d5d54624f968ed498a3f5376c1f4ba3ea1f1f16fdfb0fbf",
+    "target/wp899/replace-prefix-design.md": "d8830f4d5b9f5466f9412831d2b8598177fd306fc25f0ea1b6d17753791cd6e5",
+    "target/wp899/replace-prefix-baseline-compile.json": "125880e9f025a97da244d814321532dfe8f1f300dc11ea4dd4d1b5e07f9387d2",
+    "target/wp899/replace-prefix-probe.rs": "114f0dc3d844f80ae46f4917f6e0d2444a8047993fff34b9e696cf08f1be6c69",
+    "target/wp899/replace-prefix-probe-compile.json": "9bd7d9345abe13a68fee40ec70735e1ce314309423a2bbc64e638f262d8554dd",
+    "target/wp899/replace-prefix-dependents-check.json": "64f4f3c94e6b4709abdfb33b11ffd2a62c255e28b1dbe77d71cbb01e03ab8907",
+    "target/wp899/replace-prefix-probe-pins.json": "1d0079b5cbc57f72e2ff72da0627f01a71128d315210e7d619db31855ab6f096",
+    "target/wp899/replace-prefix-baseline-controls.json": "bb3da17941082468db8948e354c2642d4ffa0e6ab1143605375072765306de84",
+    "target/wp899/replace-prefix-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/replace-prefix-controls.jsonl": "fc2a30271b8cc052063106e9c9a79709f0d984928048c9c9ec498282aa9a3949",
+    "target/wp899/replace-prefix-candidate-compile.jsonl": "0034deeb82b22ee961fbe624515f1cfa8746c5d86933c94b4880c77691970d60",
+    "target/wp899/replace-prefix-probe-build.py": "d7a20060f8118f66fb64c401cdc87406894a6608f22798a7d1fbc06e572279c4",
+    "target/wp899/replace-prefix-candidate-compile.json": "d1b26a4a21a58e4e2abbd1c01e339af86126ec72e2a1afeead6bc4078242646a",
+    "target/wp899/replace-prefix-design-source.md": "19d93d2dec3a36c7e7b46fcf3a986087000106ea3c47e5e937230fd6f9657f2a",
+    "target/wp899/replace-prefix-design-evidence.md": "17c77cf8bd6d806be204abf51631d9378fc3738e86b6cf06009070b4131d0abd",
+    "target/wp899/replace-prefix-preflight.json": "238367585bb868ea0790802b9ff31d89f809d9a012f7694d925eafa624df0e1f",
+    "target/wp899/replace-prefix-candidate-body.rs": "3250f52b1b65995913c92fd36f0f84c843b846f945afe4c3c56ddac81e6deb6d",
+    "target/wp899/replace-prefix-selectors.json": "7d0e33427020ba4697b995ba32753163890ef7b04f938e02f7e1dcd935a6d75c",
+    "target/wp899/replace-prefix-baseline-controls.jsonl": "f4e32d87ce6a6da28add831475560a74a53574c15d49b145bd1a4c24ad0df116",
+    "target/wp899/replace-prefix-baseline-selectors.json": "427a299a9d8e05c2236ca34ccdacbc8f57e5d06de3a35ec4c784f33450b72c48",
+    "target/wp899/replace-prefix-baseline-preflight.json": "97f89703ea60972e0be3f55bdacaf1740d1df050c70e2093c42f6ce8778844f4",
+    "target/wp899/replace-prefix-dependents-check.jsonl": "24b79be6309c2f32746612ecde7073de86d8e8d5c1d8164809517eef31a7591e",
+    "target/wp899/replace-prefix-probe-run.jsonl": "b1bfb562e37cb50cc521caf281c54b8d5cd3ae5e6780edb4bb8b5c7a89af0718",
+    "target/wp899/replace-prefix-preflight.jsonl": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945",
+    "target/wp899/replace-prefix-design-input.md": "2c297c181c93384487dafac53d68490484bfa8577c69fac1904bfd17154aba39",
+    "target/wp899/replace-prefix-baseline-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/replace-prefix-baseline-compile.jsonl": "487013742102dd49277c4f0dd141f4a518595d008e581aed0e56af729b34ab3e",
+    "target/wp899/replace-prefix-probe-run.json": "4ad6d012fb37b51ae126076f66b094a4b6f88ab882549e7cb062713bedf0005c",
+    "target/wp899/replace-prefix-baseline-body.rs": "0deec5ab1d368400d77b5bfc218e8ea5ee228c1e3692b3390af75760f9c9d648"
+  },
+  "final_reviews": {
+    "target/wp899/replace-prefix-final-source.md": "bbb1a92d86f6a2ce0a25b336ff240a13708d8e0f42e8da9f72037edfad7b101c",
+    "target/wp899/replace-prefix-final-input.md": "a7d54b5589ea081ce07aa83f0e02534e8d7ca187bcfa46672a080606cd84476b",
+    "target/wp899/replace-prefix-final-evidence.md": "2b562dfafdff1aaeab3b28087483fd4cfe99e89181b5e4a494fa3d81044485ac"
+  },
+  "validation_sha256": "f504db14429b68552da4c6976a0884b76871618607b136d2a8c55320e7bf6d40",
+  "timing": {
+    "elapsed_from_design_seconds": 291.2811551094055,
+    "compile_seconds": 20.862033348937985,
+    "test_seconds": 0.0385632180259563,
+    "review_time": "Not separately measured"
+  }
+}

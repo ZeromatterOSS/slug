@@ -9,6 +9,18 @@ prefer removing redundant copies or reusing existing interners. Network-dependen
 source-admission observations and broader runtime work are deferred during this
 scope. Existing source/integration gates remain unproved; this does not waive them.
 
+Three DESIGNs and three FINALs accept reusing the existing replacement-prefix
+builder for limited `replace` calls. Count validation and matching stay unchanged;
+untouched suffixes copy directly into the final heap string, while zero-count or
+no-match calls reuse their input. Baseline semantic/lifetime coverage passes and
+pointer reuse fails; candidate 19 exact controls pass, including Unicode, errors,
+GC/freeze, ordinary allocation and existing interners. Extracted method bodies
+agree across 200,655 comparisons. With one early replacement and a 1 MiB untouched
+suffix, initialized temporary payload changes from 1,048,577 bytes to a 1-byte
+prefix; final output remains 1,048,577 bytes. Default Loading/Core/CLI compilation
+passes. This measures scratch payload, not capacity, RSS or speed, and does not
+establish source fit. [Acceptance receipt](wp899-replace-prefix-2026-10-05.json).
+
 Independent FINAL accepts moving the already-owned local load name into its
 existing DICE resolution key instead of cloning an unused local. Exact bytes,
 key equality and dependency/error behavior stay unchanged. Four offline controls
