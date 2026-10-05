@@ -44,54 +44,46 @@ use crate::values::typing::iter::StarlarkIter;
 
 // This does not exists in rust, split would cut the string incorrectly and
 // split_whitespace cannot take a n parameter.
-fn splitn_whitespace(s: &str, maxsplit: usize) -> Vec<String> {
+fn splitn_whitespace(s: &str, maxsplit: usize) -> Vec<&str> {
     let mut v = Vec::new();
-    let mut cur = String::new();
+    let mut start = None;
     let mut split = 1;
-    let mut eat_ws = true;
-    for c in s.chars() {
-        if split >= maxsplit && !eat_ws {
-            cur.push(c)
+    for (i, c) in s.char_indices() {
+        if split >= maxsplit && start.is_some() {
+            continue;
         } else if c.is_whitespace() {
-            if !cur.is_empty() {
-                v.push(cur);
-                cur = String::new();
+            if let Some(start) = start.take() {
+                v.push(&s[start..i]);
                 split += 1;
-                eat_ws = true;
             }
-        } else {
-            eat_ws = false;
-            cur.push(c)
+        } else if start.is_none() {
+            start = Some(i);
         }
     }
-    if !cur.is_empty() {
-        v.push(cur)
+    if let Some(start) = start {
+        v.push(&s[start..]);
     }
     v
 }
 
-fn rsplitn_whitespace(s: &str, maxsplit: usize) -> Vec<String> {
+fn rsplitn_whitespace(s: &str, maxsplit: usize) -> Vec<&str> {
     let mut v = Vec::new();
-    let mut cur = String::new();
+    let mut end = None;
     let mut split = 1;
-    let mut eat_ws = true;
-    for c in s.chars().rev() {
-        if split >= maxsplit && !eat_ws {
-            cur.push(c)
+    for (i, c) in s.char_indices().rev() {
+        if split >= maxsplit && end.is_some() {
+            continue;
         } else if c.is_whitespace() {
-            if !cur.is_empty() {
-                v.push(cur.chars().rev().collect());
-                cur = String::new();
+            if let Some(end) = end.take() {
+                v.push(&s[i + c.len_utf8()..end]);
                 split += 1;
-                eat_ws = true;
             }
-        } else {
-            eat_ws = false;
-            cur.push(c)
+        } else if end.is_none() {
+            end = Some(i + c.len_utf8());
         }
     }
-    if !cur.is_empty() {
-        v.push(cur.chars().rev().collect());
+    if let Some(end) = end {
+        v.push(&s[..end]);
     }
     v.reverse();
     v
@@ -1275,6 +1267,10 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "whitespace_split_tests.rs"]
+mod whitespace_split_tests;
 
 #[cfg(test)]
 mod tests {

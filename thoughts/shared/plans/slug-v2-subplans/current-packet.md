@@ -9,6 +9,18 @@ prefer removing redundant copies or reusing existing interners. Network-dependen
 source-admission observations and broader runtime work are deferred during this
 scope. Existing source/integration gates remain unproved; this does not waive them.
 
+Three DESIGNs and three FINALs accept borrowed whitespace-split scratch.
+Private forward/reverse helpers return character-boundary input slices instead
+of temporary Strings; existing consumers copy results into owned heap strings.
+Baseline semantic/GC cases pass while source sharing fails; candidate17 exact
+controls pass, including freeze/lifetime, plain/interned allocation and carrier
+coverage. Exact old/new helpers agree across196,080 comparisons. In the fixed
+4,096-part case, returned temporary payload capacity changes from524,288 bytes
+to zero per direction, and forward vector capacity from98,304 to65,536 bytes.
+Default Loading/Core/CLI all-target compilation passes. Input, final heap,
+reverse transient builder and whole-process memory are outside that capacity
+measurement; no RSS, timing or source-fit claim follows. [Acceptance receipt](wp899-whitespace-split-2026-10-05.json).
+
 Three DESIGNs and three FINALs accept borrowed source decoding in the external
 `.bzl` driver. Decode a UTF-8 view over the existing immutable byte Arc; allocate
 one owned parser String and retain the original late digest/error order. Exact

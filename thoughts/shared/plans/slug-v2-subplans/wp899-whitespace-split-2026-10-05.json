@@ -1,0 +1,191 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "70695ee5d",
+  "disposition": "ACCEPTED_LOCAL_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native temporary storage, existing string split/Unicode semantics unchanged",
+  "decision": "Private whitespace helpers return Vec<&str> character-boundary slices rather than constructing per-part Strings; output heap allocations remain owned through existing Vec/AllocList AllocValue. No cache/interner/API/DICE/identity change.",
+  "ownership": "Input borrow is synchronous scratch, copied into final heap strings before return; GC/freeze use normal output roots. Scratch vector remains; no per-part payload buffers or reverse text copies.",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "c8a8d1d61ea89174eef7c83a154bb7b05b424ffbae82716ef928892273068476",
+    "starlark-rust/starlark/src/values/types/string/whitespace_split_tests.rs": "b2c855b5b67521caab8282a1b364ec77d17daacf5f0ce09adbed921af3d9a9c4"
+  },
+  "design_sha256": "3f9cde3dfc07be97dcba2167345590dd6dcd33a09654b2f04ca3168519c0e556",
+  "design_base_sha256": "382a483900f0e482ef5bade3d24051cda911296231adbe076b2b3d5d06cedcb1",
+  "design_clarification": "One allocator-description sentence corrected: Vec<T>/AllocList both use heap.alloc_list_iter. Source reviewer confirmed same accepted contract; no algorithm/invariant change.",
+  "design_reviews": {
+    "target/wp899/whitespace-split-design-source.md": "081e659514c49b926adf7b4224f462d0e893229afe4a637e5e79189811a410c4",
+    "target/wp899/whitespace-split-design-input.md": "7ae1c092ef53ce1b54a51cd5061ba3a45f043e25f0a2aa054fc588b5227bbb55",
+    "target/wp899/whitespace-split-design-evidence.md": "d1c397769395b19b13a054be8917beaba2afd98b8caa50daad0d5e5a5e6b0a21"
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/whitespace-split-baseline-compile.json",
+      "receipt_sha256": "80fdf907b6244535654860235e12ec6759ed75417bb8604c39db47c482611701",
+      "exit_code": 0,
+      "elapsed_seconds": 6.258802789030597,
+      "log_sha256": "5b146295be15b3d450a92377b499fe4eb6b9faa71273389a3d131ae3e25f40df"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/whitespace-split-baseline-preflight.json",
+      "receipt_sha256": "ed019a0b9b9bc5e0257a7fda27befe25e025ced482e95d6a4eedabc0bc899024",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02168778097257018,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/whitespace-split-baseline-controls.json",
+      "receipt_sha256": "07720e2819d59d0404a87023ae15006ff630d8876875a7fab1e1d524fe24da50",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005101393966469914,
+      "log_sha256": "deaafcc6f1c3af7441224cad8a97a832e7af52b693857d6112f79fe93fbb1c6c"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/whitespace-split-candidate-compile.json",
+      "receipt_sha256": "bc9bcdbc4e9c9f4e2c74b09ea79294ba196972d4a80d9c3689b4a23512f4e5ba",
+      "exit_code": 0,
+      "elapsed_seconds": 5.5982722049811855,
+      "log_sha256": "ef1aa3d978f76a59f7508e785ca777743762fd7c954371a9e18038fa90be5f71"
+    },
+    "probe-compile": {
+      "receipt": "target/wp899/whitespace-split-probe-compile.json",
+      "receipt_sha256": "a7bf0ee58e3414e20cb3a9af394273a2b01b5d087e8ee52f8bb6700a8e9d109d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.16128282702993602,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "probe-run": {
+      "receipt": "target/wp899/whitespace-split-probe-run.json",
+      "receipt_sha256": "f908e682036470a84e72a0b8214f9a0a827ee8cb3e845083a7d1086a94dd0ab4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.026622024015523493,
+      "log_sha256": "ea9eab8c9a2d2ed916d0eaf56e36a20698a330f01a0ee13dc9f1440d522a574e"
+    },
+    "preflight": {
+      "receipt": "target/wp899/whitespace-split-preflight.json",
+      "receipt_sha256": "6d7c529e4c52d7467e5e730cfe39ccf2c7fc742b96f787ac4afac355f32b7741",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020088162971660495,
+      "log_sha256": "0ba35f7b3fc3b93667b6c95b23c20bb0c2acf48762b83a6ac1f95d107e6cf23f"
+    },
+    "controls": {
+      "receipt": "target/wp899/whitespace-split-controls.json",
+      "receipt_sha256": "424f1b5b511cee4521a760bc5f8ae32b7687c53880bfcece83ee32e4c97af15b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.006354988960083574,
+      "log_sha256": "935c1a991f1e3d91ae369a021481819d5d771bb934fa37492513efb7a6ded223"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/whitespace-split-dependents-check.json",
+      "receipt_sha256": "bcd89e1b8db500efd27acbe10b5bb28cb7cacdc8ebceb7a44ec8ecf52b91bbb6",
+      "exit_code": 0,
+      "elapsed_seconds": 8.550235720991623,
+      "log_sha256": "2c707307e5c9793a5dbc0171f3399d581104ec72a15497df5784831fc9089961"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "6cd8ac13323aa346ad94bb4fa22d5bf5080c85f2965ab8080dfffc554e3db6cc",
+    "selectors": [
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_parts_borrow_input",
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_limits_preserve_remainders_and_utf8",
+      "values::types::string::methods::whitespace_split_tests::whitespace_split_public_results_survive_gc_and_freeze",
+      "values::types::string::methods::tests::test_error_codes",
+      "values::types::string::methods::tests::test_count",
+      "values::types::string::methods::tests::test_find",
+      "values::types::string::methods::tests::test_elems_matches_bazel_list_behavior",
+      "values::types::string::methods::tests::test_codepoints_opaque_iterator",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_source_spans_and_reporting_columns",
+      "tests::bazel_internal_string::test_bazel_internal_oracle_matrix",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "tests::bazel_internal_string::test_bazel_internal_invalid_escapes_and_identifier_location"
+    ]
+  },
+  "probe_pins": {
+    "baseline": "70695ee5d",
+    "source_sha256": {
+      "baseline": "3acb8f0ffac4949ed87f9e1335fe355d4b008e0a2ec894fc06cfd985f15cffbf",
+      "candidate": "c8a8d1d61ea89174eef7c83a154bb7b05b424ffbae82716ef928892273068476"
+    },
+    "function_sha256": {
+      "baseline": {
+        "splitn_whitespace": "313e535625aecb84d4d1edd6b5f265da81b8c340d7633adc4b054128ad5bf152",
+        "rsplitn_whitespace": "2cb6a4c82b8f04588a77197019ec23874f9a05bb14933f1d77e7ab79ca5e016f"
+      },
+      "candidate": {
+        "splitn_whitespace": "a20d746b6794eaa3173194dfcba624e034474efa8efbd9c114db2481f5133f8f",
+        "rsplitn_whitespace": "d0b6b2eb806d5c51297c3bb863fdd39101f952f30b84c98ca5b623a400bb7367"
+      }
+    },
+    "probe_sha256": "495f48c1a368e00362d9dd3b26f983a04a1d7868d42642d70c8e9bf0c44beeae"
+  },
+  "probe_artifact_sha256": "bd3ef064b58f5c2b7fab2cf870c8dd21fe14dad2c9789f223a8d37f8177043fc",
+  "probe_result": {
+    "cases": 19608,
+    "comparisons": 196080,
+    "parts": 4096,
+    "baseline_forward_payload_capacity": 524288,
+    "baseline_reverse_payload_capacity": 524288,
+    "candidate_payload_capacity": 0,
+    "baseline_forward_vector_capacity": 98304,
+    "candidate_forward_vector_capacity": 65536
+  },
+  "baseline_result": "2 semantic/GC/freeze tests pass; input-sharing assertion fails101 as expected. Original temporary String buffers are distinct.",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "protected_controls": 14,
+    "differential_inputs": 19608,
+    "differential_comparisons": 196080
+  },
+  "test_profile": "Pinned nightly-2025-09-14, ordinary Starlark default profile; std-only exact-helper probe opt1/debug2; default Loading/Core/CLI alltargets compile. Offline, preparation60s/test30s.",
+  "limits": "Helper outputs preserve semantics of pinned existing Slug source. Probe measures returned temporary String capacities/vector only, excluding reverse transient builder/input/scaffold/final heap/RSS. Both4096x128-byte helper payloads524288\u21920, vector98304\u219265536 in the fixed case. No speed/whole-workload/source-fit claim. Existing maxsplit conversion/Unicode divergence unchanged.",
+  "scope": "Local strings/basic memory only; no network/Bazel/linkedCLI/actual source/Windows implementation.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/whitespace-split-baseline-compile.json": "80fdf907b6244535654860235e12ec6759ed75417bb8604c39db47c482611701",
+    "target/wp899/whitespace-split-controls.json": "424f1b5b511cee4521a760bc5f8ae32b7687c53880bfcece83ee32e4c97af15b",
+    "target/wp899/whitespace-split-candidate-compile.jsonl": "ef1aa3d978f76a59f7508e785ca777743762fd7c954371a9e18038fa90be5f71",
+    "target/wp899/whitespace-split-baseline-preflight.json": "ed019a0b9b9bc5e0257a7fda27befe25e025ced482e95d6a4eedabc0bc899024",
+    "target/wp899/whitespace-split-probe-build.py": "7b0a4aefef37f7c44429be5b1122a9de043e757f3f0c91c8bdd431abd81466e5",
+    "target/wp899/whitespace-split-probe.rs": "495f48c1a368e00362d9dd3b26f983a04a1d7868d42642d70c8e9bf0c44beeae",
+    "target/wp899/whitespace-split-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/whitespace-split-dependents-check.jsonl": "2c707307e5c9793a5dbc0171f3399d581104ec72a15497df5784831fc9089961",
+    "target/wp899/whitespace-split-controls.jsonl": "935c1a991f1e3d91ae369a021481819d5d771bb934fa37492513efb7a6ded223",
+    "target/wp899/whitespace-split-candidate-compile.json": "bc9bcdbc4e9c9f4e2c74b09ea79294ba196972d4a80d9c3689b4a23512f4e5ba",
+    "target/wp899/whitespace-split-design-evidence.md": "d1c397769395b19b13a054be8917beaba2afd98b8caa50daad0d5e5a5e6b0a21",
+    "target/wp899/whitespace-split-baseline-selectors.json": "c7ccd6e88f62dab2d6d3be370bcf2fcc12dcfd6772e52032ba71500cfed37db3",
+    "target/wp899/whitespace-split-baseline-controls.jsonl": "deaafcc6f1c3af7441224cad8a97a832e7af52b693857d6112f79fe93fbb1c6c",
+    "target/wp899/whitespace-split-design-source.md": "081e659514c49b926adf7b4224f462d0e893229afe4a637e5e79189811a410c4",
+    "target/wp899/whitespace-split-probe-compile.json": "a7bf0ee58e3414e20cb3a9af394273a2b01b5d087e8ee52f8bb6700a8e9d109d",
+    "target/wp899/whitespace-split-design.md": "3f9cde3dfc07be97dcba2167345590dd6dcd33a09654b2f04ca3168519c0e556",
+    "target/wp899/whitespace-split-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/whitespace-split-design-v0.md": "382a483900f0e482ef5bade3d24051cda911296231adbe076b2b3d5d06cedcb1",
+    "target/wp899/whitespace-split-probe-pins.json": "aa1783a33dc063a526a981ca56a620e5e3c7a54686f0c597409c00e4327dcd90",
+    "target/wp899/whitespace-split-preflight.jsonl": "0ba35f7b3fc3b93667b6c95b23c20bb0c2acf48762b83a6ac1f95d107e6cf23f",
+    "target/wp899/whitespace-split-selectors.json": "a189f73221d7de770554c38c22cadadcaf1a60feaecc831489d4444bb2bb66ed",
+    "target/wp899/whitespace-split-baseline-controls.json": "07720e2819d59d0404a87023ae15006ff630d8876875a7fab1e1d524fe24da50",
+    "target/wp899/whitespace-split-probe-run.jsonl": "ea9eab8c9a2d2ed916d0eaf56e36a20698a330f01a0ee13dc9f1440d522a574e",
+    "target/wp899/whitespace-split-dependents-check.json": "bcd89e1b8db500efd27acbe10b5bb28cb7cacdc8ebceb7a44ec8ecf52b91bbb6",
+    "target/wp899/whitespace-split-baseline-compile.jsonl": "5b146295be15b3d450a92377b499fe4eb6b9faa71273389a3d131ae3e25f40df",
+    "target/wp899/whitespace-split-probe-run.json": "f908e682036470a84e72a0b8214f9a0a827ee8cb3e845083a7d1086a94dd0ab4",
+    "target/wp899/whitespace-split-design-input.md": "7ae1c092ef53ce1b54a51cd5061ba3a45f043e25f0a2aa054fc588b5227bbb55",
+    "target/wp899/whitespace-split-preflight.json": "6d7c529e4c52d7467e5e730cfe39ccf2c7fc742b96f787ac4afac355f32b7741"
+  },
+  "validation_sha256": "99072f8f35a25b3b116bfe22d16ad68e847658e2c1e18acf9c14c3858d20d983",
+  "final_reviews": {
+    "target/wp899/whitespace-split-final-source.md": "1ec50f769db032ba05dcee03eb994f6bb48a2eaad5e0c438bb0054d3766d3a8b",
+    "target/wp899/whitespace-split-final-input.md": "0fab5431045aee14514972841ad2435c2a216083169b6cdeffd2a307df3b5701",
+    "target/wp899/whitespace-split-final-evidence.md": "2cfe4472f39877d1e4209ff5ef740831e45631925d6100855ac3c0a8360dc6ee"
+  },
+  "timing": {
+    "elapsed_from_design_seconds": 484.1741271018982,
+    "compile_seconds": 20.56859354203334,
+    "test_seconds": 0.03807840694207698,
+    "review_time": "Not separately measured"
+  }
+}
