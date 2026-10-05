@@ -1356,3 +1356,95 @@ fn scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup() {
         assert_eq!(scope.snapshot().live_buffer_bytes, 0);
     }
 }
+
+fn namespace_refusal(result: Result<(), ArchiveMaterializationError>) -> String {
+    let error = result.unwrap_err();
+    assert_eq!(error.stage, ArchiveFailureStage::Materialization);
+    error.message
+}
+
+#[test]
+fn selected_bcr_namespace_prefix_boundaries_preserve_exact_refusals() {
+    for (kind, description) in [
+        (EntryKind::Regular, "regular-file"),
+        (EntryKind::Symlink, "symbolic-link"),
+    ] {
+        for parent_first in [false, true] {
+            let mut namespace = BTreeMap::new();
+            for sibling in ["a!", "a.", "ab", "a0", "á!"] {
+                admit_namespace(&namespace, sibling, EntryKind::Regular).unwrap();
+                namespace.insert(sibling.to_owned(), EntryKind::Regular);
+            }
+            let (first, first_kind, second, second_kind, collision) = if parent_first {
+                ("a", kind, "a/b", EntryKind::Regular, "ancestor")
+            } else {
+                ("a/b", EntryKind::Regular, "a", kind, "descendant")
+            };
+            admit_namespace(&namespace, first, first_kind).unwrap();
+            namespace.insert(first.to_owned(), first_kind);
+            assert_eq!(
+                namespace_refusal(admit_namespace(&namespace, second, second_kind)),
+                format!("selected BCR tar has a {description} {collision} collision")
+            );
+        }
+    }
+    let mut namespace = BTreeMap::new();
+    namespace.insert("a/b".to_owned(), EntryKind::Regular);
+    admit_namespace(&namespace, "a", EntryKind::Directory).unwrap();
+    namespace.insert("a".to_owned(), EntryKind::Directory);
+    assert_eq!(
+        namespace_refusal(admit_namespace(&namespace, "a", EntryKind::Regular)),
+        "selected BCR tar has a duplicate path"
+    );
+    let longest = "x".repeat(PATH_LIMIT);
+    admit_namespace(&namespace, &longest, EntryKind::Regular).unwrap();
+    namespace.insert(longest.clone(), EntryKind::Regular);
+    assert_eq!(
+        namespace_refusal(admit_namespace(&namespace, &longest, EntryKind::Symlink)),
+        "selected BCR tar has a duplicate path"
+    );
+    // Valid Unicode occupies multiple bytes, but slash-prefix matching stays exact.
+    namespace.insert("á/b".to_owned(), EntryKind::Regular);
+    assert_eq!(
+        namespace_refusal(admit_namespace(&namespace, "á", EntryKind::Regular)),
+        "selected BCR tar has a regular-file descendant collision"
+    );
+}
+
+#[test]
+fn selected_bcr_namespace_admits_many_siblings_and_late_directory() {
+    let mut namespace = BTreeMap::new();
+    for i in (0..4096).rev() {
+        let path = format!("dir/file{i:04}");
+        admit_namespace(&namespace, &path, EntryKind::Regular).unwrap();
+        namespace.insert(path, EntryKind::Regular);
+    }
+    admit_namespace(&namespace, "dir", EntryKind::Directory).unwrap();
+    assert_eq!(namespace.len(), 4096);
+    assert_eq!(
+        namespace_refusal(admit_namespace(&namespace, "dir", EntryKind::Regular)),
+        "selected BCR tar has a regular-file descendant collision"
+    );
+
+    let mut raw = Vec::new();
+    for path in ["a!", "a.", "ab", "a0", "a/b"] {
+        append(&mut raw, path.as_bytes(), b'0', 0o644, 0, path.as_bytes());
+    }
+    append(&mut raw, b"a/", b'5', 0o755, 0, b"");
+    finish(&mut raw);
+    let root = tempfile::tempdir().unwrap();
+    extract(
+        capture(&gzip(&raw)).as_file(),
+        root.path(),
+        None,
+        &|| true,
+        None,
+    )
+    .unwrap();
+    for path in ["a!", "a.", "ab", "a0", "a/b"] {
+        assert_eq!(
+            std::fs::read(root.path().join(path)).unwrap(),
+            path.as_bytes()
+        );
+    }
+}

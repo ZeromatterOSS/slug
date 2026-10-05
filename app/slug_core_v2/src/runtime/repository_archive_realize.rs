@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs::File;
 use std::fs::FileTimes;
 use std::fs::OpenOptions;
@@ -6,6 +6,8 @@ use std::io::Read;
 use std::io::Seek;
 use std::io::SeekFrom;
 use std::io::Write;
+use std::ops::Bound::Included;
+use std::ops::Bound::Unbounded;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -151,7 +153,7 @@ fn extract(
     let _decoder_buffer_credit =
         source_service::buffer(scope, 64 * 1024 + 1024).map_err(materialization)?;
     let mut tar = BoundedTarReader::new(decoder, active, scope);
-    let mut namespace = HashMap::<String, EntryKind>::new();
+    let mut namespace = BTreeMap::<String, EntryKind>::new();
     let mut symlinks = Vec::new();
     let mut pending_longname: Option<String> = None;
     let mut headers = 0usize;
@@ -432,7 +434,7 @@ fn relative_link_destination(
 
 fn install_symlinks(
     root: &Path,
-    namespace: &HashMap<String, EntryKind>,
+    namespace: &BTreeMap<String, EntryKind>,
     symlinks: &[(String, String, String)],
     active: &dyn Fn() -> bool,
 ) -> Result<(), ArchiveMaterializationError> {
@@ -513,7 +515,7 @@ fn normalize_path(
 }
 
 fn admit_namespace(
-    namespace: &HashMap<String, EntryKind>,
+    namespace: &BTreeMap<String, EntryKind>,
     path: &str,
     kind: EntryKind,
 ) -> Result<(), ArchiveMaterializationError> {
@@ -537,12 +539,18 @@ fn admit_namespace(
         }
         ancestor = parent;
     }
+    // Extraction already validated this UTF-8 path and its PATH_LIMIT bound.
+    // Start at the slash: a near-prefix sibling such as `a!` must not hide `a/b`.
+    let mut prefix = [0; PATH_LIMIT + 1];
+    prefix[..path.len()].copy_from_slice(path.as_bytes());
+    prefix[path.len()] = b'/';
+    let prefix = std::str::from_utf8(&prefix[..path.len() + 1])
+        .expect("validated archive path with appended slash");
     if kind != EntryKind::Directory
-        && namespace.keys().any(|entry| {
-            entry
-                .strip_prefix(path)
-                .is_some_and(|suffix| suffix.starts_with('/'))
-        })
+        && namespace
+            .range::<str, _>((Included(prefix), Unbounded))
+            .next()
+            .is_some_and(|(entry, _)| entry.starts_with(prefix))
     {
         return Err(materialization(if kind == EntryKind::Regular {
             "selected BCR tar has a regular-file descendant collision"

@@ -35,7 +35,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Lexer source observation spent; bounded preparation work audit next; full WP899 unaccepted
+Status: Archive namespace complexity repair accepted; source observation design next; full WP899 unaccepted
+
+Three DESIGNs and three FINALs accept the Slug-native archive namespace repair.
+A single phase-local BTreeMap replaces per-file scans of all prior paths. The
+first key at or above exact path+'/' determines descendant existence using257B
+stack scratch. Declared keys/kinds, duplicate→nearest-ancestor→descendant refusal
+order, directory exemption, symlink order and archive ownership stay unchanged.
+Fresh20 ordinary controls (18 protected+2 new) and both audited ignored archive
+fixtures pass, including the exact4,493-row Bazel manifest. Core/CLI compilation
+passes. Fixed matched-profile A/B/B/A on4,096 siblings yields8,386,560/0/0/8,386,560
+prior keys, excluding internal tree comparisons. All four children exit0/join;
+exact owned logs and parent cleanup pass three FINALs. Root-enforced limits are
+recorded without independent child AS/RSS readback. [Acceptance receipt](slug-v2-subplans/wp899-archive-namespace-2026-10-05.json).
+Tree overhead/infallible allocation remain; no timing/physical-memory/global17
+cause or actual-source-fit claim follows. Next is a separately reviewed source
+observation design after this relevant repair, preserving all source/resource/
+network guards; no automatic retry or cap increase. Full WP899/M7A remains open.
 
 The separately frozen source observation after the accepted lexer repair ran once,
 with fresh automatic network approval and all caps unchanged. Global17 is spent:
@@ -48,8 +64,8 @@ prior allocation ownership or causal repair. Restoration/raw/engine retirement,
 settled descriptor credit2,436,520B and942/942censuses are proved. Child101 joins
 naturally; stage and exact owned parent cleanup pass three terminal FINALs.
 [Terminal receipt](slug-v2-subplans/wp899-lexer-growth-source-terminal-2026-10-05.json). Source admission and full WP899 remain
-unaccepted. Next is a source-owned audit of bounded preparation work with local
-discriminators; no automatic retry, cap growth or ordinary activation is selected.
+unaccepted. The bounded namespace work repair is accepted above; no automatic
+retry, cap growth or ordinary activation is selected.
 
 Three independent DESIGN and FINAL reviews accept the BazelInternal lexer
 reservation repair. Previously each literal reserved the entire remaining source;

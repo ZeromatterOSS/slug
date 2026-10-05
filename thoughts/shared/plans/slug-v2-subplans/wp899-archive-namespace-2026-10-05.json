@@ -1,0 +1,338 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "f4a62f143",
+  "disposition": "ACCEPTED_COMPONENT_SOURCE_ADMISSION_UNPROVED",
+  "compatibility": "Slug-native extraction complexity; admitted outputs/refusals unchanged",
+  "decision": "One phase-local BTreeMap replaces HashMap. Proper descendant lookup uses first key at or above exact path+slash in257B stack scratch; same declared paths/kinds and duplicate\u2192nearest-ancestor\u2192descendant error order. No secondary index.",
+  "ownership": "Phase-local extractor; no DICE/public/cache/interner/allocator/network/Windows change. Archive bounds, credits, byte/mode/mtime/integrity, cancellation and symlink vector lifetime stay.",
+  "complexity": "N entries, bounded D<=32 path components: tree admission O(D log N), replacing full prior-key scan per non-directory. String comparison is bounded by validated256-byte paths. Tree overhead and ancestor costs differ; no whole-workload speedup or memory claim.",
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "be7e8886710456279d436d7abc2eb1e3d0669cef419d2b41bdfd0e3cffff543b",
+    "app/slug_core_v2/src/runtime/tests/repository_archive_realize_tests.rs": "80e80b0268c5c647d06380891924eeb33974367a9753437e5fc71fa8e5d55975"
+  },
+  "design_sha256": "649064ca3eb13a6971015537982344a4340725a56c3cb2df27234611c1dc36bd",
+  "validation": {
+    "core-compile-r1": {
+      "receipt": "target/wp899/archive-namespace-core-compile-r1.json",
+      "exit_code": 0,
+      "elapsed_seconds": 5.199633078998886,
+      "sha256": "62dd7e5a7961398c58b31b80bfef59e69879ef1b90d1cfd02128ef0babc26836"
+    },
+    "preflight-r1": {
+      "receipt": "target/wp899/archive-namespace-preflight-r1.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.023874850012362003,
+      "sha256": "40b729e39e22a91e8ac5c9ea5dbd25500055c65704c180cd2adab675d5361701"
+    },
+    "controls": {
+      "receipt": "target/wp899/archive-namespace-controls.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.11907675897236913,
+      "sha256": "7166b8ffdaf12ed392ba81d892790841133614df199c66f5f001183c4632f432"
+    },
+    "jvm-control": {
+      "receipt": "target/wp899/archive-namespace-jvm-control.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.031905717973131686,
+      "sha256": "542a17e965ed9085090d36185a14ab95150255913c8a69e76beb6caecc283edc"
+    },
+    "bazel-control": {
+      "receipt": "target/wp899/archive-namespace-bazel-control.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.7676390919950791,
+      "sha256": "7bb84c7fc759612deb368c61086f7748f5fe9d5a3d607cefb37697a2062d14d5"
+    },
+    "core-cli-check": {
+      "receipt": "target/wp899/archive-namespace-core-cli-check.json",
+      "exit_code": 0,
+      "elapsed_seconds": 2.0057369340211153,
+      "sha256": "cc5d51d9b3dcd26c591745f262c493d255e75dcf7f09bd05aa1243346e6b6da0"
+    },
+    "baseline-compile": {
+      "receipt": "target/wp899/archive-namespace-baseline-compile.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.11411965603474528,
+      "sha256": "26b74ba65e55150f319a42fa7b0d0f43e70051cacf514fb51c9655e1dad5f5a8"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/archive-namespace-candidate-compile.json",
+      "exit_code": 0,
+      "elapsed_seconds": 0.14793569198809564,
+      "sha256": "37b8a8dd8095ed8b83f199a9c39b8ed2536470d3f4ece157e2127c4ad63a5c3e"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+    "artifact_sha256": "ba6735f92c2ab3da582c186363a2bd05cf52cebfb0df6f0cc089e1a7779ffdc4",
+    "selectors": [
+      "runtime::repository_archive_realize::tests::scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements",
+      "runtime::repository_archive_realize::tests::scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup",
+      "runtime::repository_archive_realize::tests::selected_bcr_active_cutoff_and_source_association_are_session_semantic",
+      "runtime::repository_archive_realize::tests::selected_bcr_admits_directory_0750_with_native_normalization_and_prefix",
+      "runtime::repository_archive_realize::tests::selected_bcr_admits_regular_0640_without_changing_bytes_mode_or_mtime",
+      "runtime::repository_archive_realize::tests::selected_bcr_cancellation_between_transforms_drops_every_capture",
+      "runtime::repository_archive_realize::tests::selected_bcr_checks_session_before_link_installation_and_rejects_linked_transforms",
+      "runtime::repository_archive_realize::tests::selected_bcr_consumes_only_well_formed_global_pax_comment_metadata",
+      "runtime::repository_archive_realize::tests::selected_bcr_disposable_artifact_matches_bazel_manifest",
+      "runtime::repository_archive_realize::tests::selected_bcr_enforces_physical_decompressed_entry_and_payload_limits",
+      "runtime::repository_archive_realize::tests::selected_bcr_module_and_cancellation_failures_drop_captures",
+      "runtime::repository_archive_realize::tests::selected_bcr_namespace_admits_many_siblings_and_late_directory",
+      "runtime::repository_archive_realize::tests::selected_bcr_namespace_prefix_boundaries_preserve_exact_refusals",
+      "runtime::repository_archive_realize::tests::selected_bcr_prefix_overlay_patch_module_order_and_modes_are_exact",
+      "runtime::repository_archive_realize::tests::selected_bcr_preserves_relative_file_symlink_text_after_prefix_and_file_order",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_complete_rules_jvm_external_archive",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mtime_and_association",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module",
+      "runtime::repository_archive_realize::tests::selected_bcr_rejects_hidden_extension_allocation_and_name_state",
+      "runtime::repository_archive_realize::tests::selected_bcr_rejects_paths_namespace_modes_and_malformed_streams",
+      "runtime::repository_archive_realize::tests::selected_bcr_symlink_namespace_collisions_refuse_both_archive_orders",
+      "runtime::repository_archive_realize::tests::selected_bcr_symlinks_refuse_unsupported_targets_modes_and_payloads"
+    ],
+    "ordinary_selectors": [
+      "runtime::repository_archive_realize::tests::scoped_bcr_counts_headers_overlay_patch_and_final_module_replacements",
+      "runtime::repository_archive_realize::tests::scoped_capture_fallible_reservation_preserves_bytes_poison_and_cleanup",
+      "runtime::repository_archive_realize::tests::selected_bcr_active_cutoff_and_source_association_are_session_semantic",
+      "runtime::repository_archive_realize::tests::selected_bcr_admits_directory_0750_with_native_normalization_and_prefix",
+      "runtime::repository_archive_realize::tests::selected_bcr_admits_regular_0640_without_changing_bytes_mode_or_mtime",
+      "runtime::repository_archive_realize::tests::selected_bcr_cancellation_between_transforms_drops_every_capture",
+      "runtime::repository_archive_realize::tests::selected_bcr_checks_session_before_link_installation_and_rejects_linked_transforms",
+      "runtime::repository_archive_realize::tests::selected_bcr_consumes_only_well_formed_global_pax_comment_metadata",
+      "runtime::repository_archive_realize::tests::selected_bcr_enforces_physical_decompressed_entry_and_payload_limits",
+      "runtime::repository_archive_realize::tests::selected_bcr_module_and_cancellation_failures_drop_captures",
+      "runtime::repository_archive_realize::tests::selected_bcr_namespace_admits_many_siblings_and_late_directory",
+      "runtime::repository_archive_realize::tests::selected_bcr_namespace_prefix_boundaries_preserve_exact_refusals",
+      "runtime::repository_archive_realize::tests::selected_bcr_prefix_overlay_patch_module_order_and_modes_are_exact",
+      "runtime::repository_archive_realize::tests::selected_bcr_preserves_relative_file_symlink_text_after_prefix_and_file_order",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_regular_0555_build_and_nested_source_with_bytes_mode_mtime_and_association",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_streamed_files_gnu_name_modes_mtime_and_module",
+      "runtime::repository_archive_realize::tests::selected_bcr_rejects_hidden_extension_allocation_and_name_state",
+      "runtime::repository_archive_realize::tests::selected_bcr_rejects_paths_namespace_modes_and_malformed_streams",
+      "runtime::repository_archive_realize::tests::selected_bcr_symlink_namespace_collisions_refuse_both_archive_orders",
+      "runtime::repository_archive_realize::tests::selected_bcr_symlinks_refuse_unsupported_targets_modes_and_payloads"
+    ],
+    "ignored_selectors": [
+      "runtime::repository_archive_realize::tests::selected_bcr_disposable_artifact_matches_bazel_manifest",
+      "runtime::repository_archive_realize::tests::selected_bcr_realizes_complete_rules_jvm_external_archive"
+    ]
+  },
+  "unique_passed": 22,
+  "ordinary_passed": 20,
+  "ignored_passed": 2,
+  "protected_inventory": {
+    "ordinary": 18,
+    "ignored": 2
+  },
+  "new_ordinary": 2,
+  "fixture_pins": [
+    {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp877/rules_jvm_external-6.7.tar.gz",
+      "bytes": 4738304,
+      "sha256": "a1e351607f04fed296ba33c4977d3fe2a615ed50df7896676b67aac993c53c18"
+    },
+    {
+      "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/content_addressable/sha256/2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2/file",
+      "bytes": 67196890,
+      "sha256": "2d0c8b967b619d5717be8210f52a24c5aa624e3229a38dc4071712db1dd522f2"
+    },
+    {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp886/authenticated-rules-rust/MODULE.bazel",
+      "bytes": 4481,
+      "sha256": "25e3b077128612754c4add1b4c90d20a6be06566b623dee6e32038d0e8f93062"
+    }
+  ],
+  "bazel_manifest": {
+    "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+",
+    "rows": 4493,
+    "files": 3544,
+    "directories": 949,
+    "sha256": "3196a914273a4debfe9c8fe65c4a74d116cd0f2c4b94f7d08e372d267382b0ee",
+    "bytes": 221054883,
+    "elapsed_seconds": 0.5990618339856155,
+    "expected_sha256": "3196a914273a4debfe9c8fe65c4a74d116cd0f2c4b94f7d08e372d267382b0ee"
+  },
+  "native_control": {
+    "schema": 1,
+    "rows": [
+      {
+        "mode": "baseline",
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "10s",
+          "/run/media/system/Colossus/dev/slug/target/wp899/archive-namespace-baseline-probe"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.04576477099908516,
+        "stdout": "namespace_entries=4096 yielded_prior_keys=8386560 semantic_controls=5",
+        "yielded_prior_keys": 8386560,
+        "joined": true,
+        "log": "/tmp/slug-wp899-archive-namespace-v29h5hch/0.log",
+        "log_identity": {
+          "device": 54,
+          "inode": 865017,
+          "uid": 1000,
+          "mode": "0o644"
+        },
+        "sha256": "9b160793515e74da5ce4a260d3c901ba7d8c6fcd7d3377d944fe872b28066de6"
+      },
+      {
+        "mode": "candidate",
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "10s",
+          "/run/media/system/Colossus/dev/slug/target/wp899/archive-namespace-candidate-probe"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0026779730105772614,
+        "stdout": "namespace_entries=4096 yielded_prior_keys=0 semantic_controls=5",
+        "yielded_prior_keys": 0,
+        "joined": true,
+        "log": "/tmp/slug-wp899-archive-namespace-v29h5hch/1.log",
+        "log_identity": {
+          "device": 54,
+          "inode": 865018,
+          "uid": 1000,
+          "mode": "0o644"
+        },
+        "sha256": "1987f95e1df08a9722758b13711d0a0d61a5f97040b6056bafa6f55fb7a1fb9f"
+      },
+      {
+        "mode": "candidate",
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "10s",
+          "/run/media/system/Colossus/dev/slug/target/wp899/archive-namespace-candidate-probe"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0022380599984899163,
+        "stdout": "namespace_entries=4096 yielded_prior_keys=0 semantic_controls=5",
+        "yielded_prior_keys": 0,
+        "joined": true,
+        "log": "/tmp/slug-wp899-archive-namespace-v29h5hch/2.log",
+        "log_identity": {
+          "device": 54,
+          "inode": 865019,
+          "uid": 1000,
+          "mode": "0o644"
+        },
+        "sha256": "1987f95e1df08a9722758b13711d0a0d61a5f97040b6056bafa6f55fb7a1fb9f"
+      },
+      {
+        "mode": "baseline",
+        "command": [
+          "timeout",
+          "--signal=TERM",
+          "--kill-after=3s",
+          "10s",
+          "/run/media/system/Colossus/dev/slug/target/wp899/archive-namespace-baseline-probe"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.04513317800592631,
+        "stdout": "namespace_entries=4096 yielded_prior_keys=8386560 semantic_controls=5",
+        "yielded_prior_keys": 8386560,
+        "joined": true,
+        "log": "/tmp/slug-wp899-archive-namespace-v29h5hch/3.log",
+        "log_identity": {
+          "device": 54,
+          "inode": 865020,
+          "uid": 1000,
+          "mode": "0o644"
+        },
+        "sha256": "9b160793515e74da5ce4a260d3c901ba7d8c6fcd7d3377d944fe872b28066de6"
+      }
+    ],
+    "freeze_sha256": "645005a55657a8ae5fe2638a18e738a1d7786522c03be0647ca9ae640cbc05d2",
+    "all_children_joined": true,
+    "proof_limits": "yielded keys only;excludes internal tree comparisons;no timing speedup/physicalmemory/global17cause/fullsourcefit claim"
+  },
+  "control_limits_provenance": "Root recorded inline exec_command sets hard/soft AS256MiB, FSIZE4096 and CORE0 via preexec_fn;10s timeout inherited. Enforcement is recorded, not independently read back in child/proc; no RSS/accounting proof. See private execution-provenance.md.",
+  "invocation_corrections": [
+    "Initial compile101: ArchiveMaterializationError lacks PartialEq; corrected tests to exact stage/message projection, no production error change.",
+    "Initial preflight1: two ignored fixtures; corrected ordinary20selection and separately executed both audited ignored fixtures. All original assertions retained."
+  ],
+  "sourcefit_gate": false,
+  "actual_retry_selected": false,
+  "residuals": [
+    "Tree node overhead is unmeasured; allocations remain infallible.",
+    "Yielded-key counts exclude internal tree comparisons; no timing speedup/physicalmemory claim.",
+    "Generic global17 timeout supplies no actual phase or causal attribution.",
+    "Full WP899 source admission and coupled integration FINAL remain unaccepted."
+  ],
+  "evidence_sha256": {
+    "target/wp899/archive-namespace-controls.jsonl": "a8c2711e196d737b5656e71277f70499d45148ba7a2cd0a824c98f83061d892c",
+    "target/wp899/archive-namespace-core-compile.json": "f10775bd2661f72ea1a398dcf46f96505839def47be943362efd91df934f784c",
+    "target/wp899/archive-namespace-preflight-r1.jsonl": "f6d957b5b7b8677b3cca737493844fc447422a6a68cd76bc6b4190450bc81368",
+    "target/wp899/archive-namespace-control-result.json": "c32e1c096da02921d8e25576b77212235eae7235f835931730d9772aa292b386",
+    "target/wp899/archive-namespace-selectors.json": "ad6eab5d1c2de3338277510c7f5ed552f9eb7029007ada14e367fa2f031996c2",
+    "target/wp899/archive-namespace-controls.json": "7166b8ffdaf12ed392ba81d892790841133614df199c66f5f001183c4632f432",
+    "target/wp899/archive-namespace-candidate-compile.jsonl": "8941bedb613886acff087cd2815cb68f784c63d64a9d2fcdb8732472e548fac8",
+    "target/wp899/archive-namespace-bazel-control.jsonl": "aafa764bf8de10b2db3feaca086175c3d56c2dad10f6f9a72d65ca2c469fb81f",
+    "target/wp899/archive-namespace-baseline-owner.txt": "2120b23c1b227cf3afff92892174741e03210e633b4f94ee87e34f452d3a0446",
+    "target/wp899/archive-namespace-probe-main.txt": "06006cae23a59c980a2bfb57dc29d63ae64a5a5434795ff90825e0596d4ccb2e",
+    "target/wp899/archive-namespace-control-ledger.json": "f00ac328790e06b788489171fb2fe27305d9406ceca944602626da7c1d53bcb0",
+    "target/wp899/archive-namespace-core-compile-r1.json": "62dd7e5a7961398c58b31b80bfef59e69879ef1b90d1cfd02128ef0babc26836",
+    "target/wp899/archive-namespace-design-input.md": "b978a46e97196783c74bfa86d463164c0a16485f1488ebb26522ff978cd3458b",
+    "target/wp899/archive-namespace-candidate-probe": "98b634a5acd7e5787444012727cb72f51d3bba6e24337c8b9340ed7e7b7ef952",
+    "target/wp899/archive-namespace-preflight.json": "9a660836af36e82ef79036ea08f74bdb2f76f1606392fe26894f7f9d43cbefb6",
+    "target/wp899/archive-namespace-preflight.jsonl": "a0fa6d8284eb8a7458ed9a2edde4da4edbe73e1a3757addb386afb81b7eb4e00",
+    "target/wp899/archive-namespace-preflight-r1.json": "40b729e39e22a91e8ac5c9ea5dbd25500055c65704c180cd2adab675d5361701",
+    "target/wp899/archive-namespace-candidate-owner.txt": "4c19900a87183a20fe0572d4dc9f8dc114fc26e806a1c7d1a84ae05fa15cbcba",
+    "target/wp899/archive-namespace-control-freeze.json": "645005a55657a8ae5fe2638a18e738a1d7786522c03be0647ca9ae640cbc05d2",
+    "target/wp899/archive-namespace-design.md": "649064ca3eb13a6971015537982344a4340725a56c3cb2df27234611c1dc36bd",
+    "target/wp899/archive-namespace-core-cli-check.jsonl": "fba66445924fc7311607cc173cfed9fa8baa1506fbc189ff2cf39e43b4b0fddd",
+    "target/wp899/archive-namespace-fixture-pins.json": "13b9a6552c7d55ff063eb0a8cd6afd505a0317ff4fe40c05982469ff63cb5788",
+    "target/wp899/archive-namespace-baseline-compile.json": "26b74ba65e55150f319a42fa7b0d0f43e70051cacf514fb51c9655e1dad5f5a8",
+    "target/wp899/archive-namespace-baseline-probe.rs": "8c0099e82f543b14e56f6b14efbf1ee52cd774deef50bacf0b76e042ef4484a3",
+    "target/wp899/archive-namespace-design-evidence.md": "9be9edd10027ec7d2f9a3cc99d5579a0c6608bbae6c07da4e180f5e9706cc2c3",
+    "target/wp899/archive-namespace-core-cli-check.json": "cc5d51d9b3dcd26c591745f262c493d255e75dcf7f09bd05aa1243346e6b6da0",
+    "target/wp899/archive-namespace-jvm-control.json": "542a17e965ed9085090d36185a14ab95150255913c8a69e76beb6caecc283edc",
+    "target/wp899/archive-namespace-bazel-manifest-pin.json": "9633cf8e490213e2249516b5e70f0caed35d51f2602a4fa8d1fdb6d1ab2d9438",
+    "target/wp899/archive-namespace-jvm-control.jsonl": "f58eb3b9f2a8e0cded79fc9443d4ae972b1060fc620078bd6898e73901a479a3",
+    "target/wp899/archive-namespace-design-source.md": "b64a69d67a5fcb55d809b759ad3ed3d9d7b9252fb7f94d26d3fb6088e104b572",
+    "target/wp899/archive-namespace-core-compile-r1.jsonl": "6947eca8965c1739767595529f21467d69a13b09d9519d92d42c99ebb4baef1f",
+    "target/wp899/archive-namespace-candidate-probe.rs": "2d4ece151970921075854fac21ce23a20588c9d8a9dc0b846ddff4b1914d5e6c",
+    "target/wp899/archive-namespace-core-compile.jsonl": "baa5fb13058864d81e84335a3c38d37b67aa1fde4d7152345d35e9a0cc375e88",
+    "target/wp899/archive-namespace-candidate-compile.json": "37b8a8dd8095ed8b83f199a9c39b8ed2536470d3f4ece157e2127c4ad63a5c3e",
+    "target/wp899/archive-namespace-baseline-probe": "66233d80f0b1673f163bd5afe3422668043f519e88a2774e63af02111d14e664",
+    "target/wp899/archive-namespace-bazel-control.json": "7bb84c7fc759612deb368c61086f7748f5fe9d5a3d607cefb37697a2062d14d5",
+    "target/wp899/archive-namespace-baseline-compile.jsonl": "7419a9491b3bd5ada0107f04c4711df69611ab1738474c85a0883b4aff37acb8",
+    "target/wp899/archive-namespace-execution-provenance.md": "3fee4a9e273605df52120c8df97d901dd5ccddc8f9080d29279dc6bfb69fecb5",
+    "target/wp899/archive-namespace-control-0.log": "9b160793515e74da5ce4a260d3c901ba7d8c6fcd7d3377d944fe872b28066de6",
+    "target/wp899/archive-namespace-control-1.log": "1987f95e1df08a9722758b13711d0a0d61a5f97040b6056bafa6f55fb7a1fb9f",
+    "target/wp899/archive-namespace-control-2.log": "1987f95e1df08a9722758b13711d0a0d61a5f97040b6056bafa6f55fb7a1fb9f",
+    "target/wp899/archive-namespace-control-3.log": "9b160793515e74da5ce4a260d3c901ba7d8c6fcd7d3377d944fe872b28066de6",
+    "target/wp899/archive-namespace-cleanup.json": "2db45abad8ecf297553308e1032e75b4bcdb0ef15c2b001dd6532de6688e1c8e"
+  },
+  "validation_sha256": "43cf22c68c46b9a6944e1cb40308d5e43cf8fd94798e9f0731381d21abf537f3",
+  "terminal_reviews": {
+    "target/wp899/archive-namespace-final-source.md": "5a37003bf8af17faec84342751f34d822440f3d6bea0d57ae9d1dbaba2159714",
+    "target/wp899/archive-namespace-final-input.md": "8439e452cafaf23c26e22e7a8b030f968be51f150e146a75c2a003ab929c89a9",
+    "target/wp899/archive-namespace-final-evidence.md": "233b919f31cc58f89c4628bfd07c44db7bd31a6e4a78cc34ffe2ca629e6afa5e"
+  },
+  "cleanup": {
+    "schema": 1,
+    "terminal_reviews": {
+      "target/wp899/archive-namespace-final-source.md": "5a37003bf8af17faec84342751f34d822440f3d6bea0d57ae9d1dbaba2159714",
+      "target/wp899/archive-namespace-final-input.md": "8439e452cafaf23c26e22e7a8b030f968be51f150e146a75c2a003ab929c89a9",
+      "target/wp899/archive-namespace-final-evidence.md": "233b919f31cc58f89c4628bfd07c44db7bd31a6e4a78cc34ffe2ca629e6afa5e"
+    },
+    "parent": {
+      "path": "/tmp/slug-wp899-archive-namespace-v29h5hch",
+      "device": 54,
+      "inode": 865016,
+      "uid": 1000,
+      "mode": "0o700"
+    },
+    "exact_nofollow_fd_named_log_and_parent_identities_hashes_verified": true,
+    "raw_logs_preserved": true,
+    "removed_logs": 4,
+    "removed_parent": true,
+    "all_children_joined": true
+  }
+}
