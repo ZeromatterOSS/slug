@@ -19,6 +19,30 @@ The line ranges below refer to the archived version, not current files. Current
 owner docs retain the applicable invariants and point here for detailed source
 anchors/receipts. Do not append new worker chronology to this index.
 
+## October 5 WP899 scheduling compaction
+
+Completed WP899 chronology and source-launch instructions were removed from active
+scheduling documents. This changes no acceptance, compatibility, ownership or
+resource/source gate. Current local memory work and unwaived deferred requirements
+remain in the manifest. Source attempts16/17 are spent; historical pending approval
+or retry text is superseded by their terminal receipts.
+
+The following ranges are pinned to immutable commit
+`dfea1798826170fb4db0eb5cfda0574eb39b6538`:
+
+| Path under thoughts/shared/plans | Archived lines | Topic |
+|---|---|---|
+| `slug-v2-subplans/current-packet.md` | 1–514 | Accepted local memory components, source observations and terminal chronology |
+| `slug-v2-subplans/current-packet.md` | 515–727 | Full WP899 result, frozen APIs and natural owners; requirements inherited unwaived |
+| `slug-v2-subplans/current-packet.md` | 728–1105 | Proof/source-service envelope, source parser/harness preservation and accounting extensions; requirements inherited unwaived |
+| `2026-06-26-slug-v2-clean-restart.md` | 35–1121 | Current-packet chronology, earlier generated-input receipt and historical gate progression |
+| `2026-06-26-slug-v2-clean-restart.md` | 1222–1234 | Closed legacy activation audit: sole replay accepted with 2,488 evaluated path callbacks at 220/220/219 cutoff, all immediate shard dependencies; no identity/invalidation causality, necessity, cost or avoidability proof. Aggregate chain closed; historical launch/successor wording is not current authorization |
+
+Use exact commit/path retrieval for historical evidence, never as active launch
+instructions. Durable local-memory receipts are indexed in the current manifest.
+The [global17 terminal](slug-v2-subplans/wp899-lexer-growth-source-terminal-2026-10-05.json)
+retains the latest result; actual source fit remains unproved.
+
 ## Immutable source locations
 
 | Path under thoughts/shared/plans | Baseline lines | Evidence |

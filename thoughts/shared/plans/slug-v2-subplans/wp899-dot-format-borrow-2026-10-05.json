@@ -1,0 +1,227 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "dfea17988",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native compiler scratch ownership; parser decisions/admitted formatting unchanged",
+  "decision": "Private parse_format_one returns borrowed Cow prefix/suffix for unescaped Text; lazily owned escape/additional-piece scratch. Existing immediate frozen alloc_str_intern remains unchanged.",
+  "ownership": "Source/token borrow ends during compiler optimization; no source borrow enters retained instructions. Existing frozen interner owns compiled segments, runtime format results retain normal heap/GC/freeze. No new cache/interner/API/DICE dependency/unsafe block.",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/dot_format.rs": "5ed2999cc39e0d58cc052267eae96745573b45506348bac616a8756a7c1edff2",
+    "starlark-rust/starlark/src/values/types/string/dot_format_memory_tests.rs": "9e355ba0254715cd6586087da13c080fad83dcd99ae21c3d215d15d6aab275ca"
+  },
+  "design_sha256": "bc96a5c017b4f201eab4279ff6d7895480a310a788dea41ed1729328c5a44a22",
+  "design_reviews": {
+    "target/wp899/dot-format-borrow-design-source.md": "133d854bfb1eaece158f7300b632ee7aa708b3a76369ed0cc1b510e7ec356181",
+    "target/wp899/dot-format-borrow-design-input.md": "36396c4ab907b0fbc823bc461e98a121072b55b1cbf349b6aa0f4169edc645d0",
+    "target/wp899/dot-format-borrow-design-evidence.md": "17cb4189c395de34be83ed4b06ce0e69b45c4a582e9a164993d8ce081cb58f2c"
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/dot-format-borrow-baseline-compile.json",
+      "receipt_sha256": "110316b7ed9e71f2d7023daefbe8033c3b64076af72daaba6f79b49b99282e91",
+      "exit_code": 0,
+      "elapsed_seconds": 5.128917053050827,
+      "log_sha256": "d20e81b225a21a11770035ed35ac9f279839dbff4139a06a3c0cd70c93b78cda"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/dot-format-borrow-baseline-preflight.json",
+      "receipt_sha256": "b235c0a0ec0633f04cf39826703e893fa8ac7af3e307a2e4a33211d326b9bfef",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020292045024689287,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/dot-format-borrow-baseline-controls.json",
+      "receipt_sha256": "7331e35a4c9da0f89bad6c97870bb6f2d1394f1d86249052c348b57fe668356f",
+      "exit_code": 101,
+      "elapsed_seconds": 0.00491700298152864,
+      "log_sha256": "6db230fe5b3f090867d11c77a7f3263b41c9eae0952fd59082f3c9d24253feba"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/dot-format-borrow-candidate-compile.json",
+      "receipt_sha256": "f073b23fe19a19941d7aaba649a31e51e78ed5baf01916c032e43c99a001daa1",
+      "exit_code": 0,
+      "elapsed_seconds": 4.972242399991956,
+      "log_sha256": "524474e9dfa17d182d1d98b6ac5e06581ff1030d0ad7aee20378a6b644a5e422"
+    },
+    "probe-compile": {
+      "receipt": "target/wp899/dot-format-borrow-probe-compile.json",
+      "receipt_sha256": "9619ac86758cdaa77beb3528e213922b7b70ded045126fea42331df0b9b0ebdb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.14119640999706462,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "probe-run": {
+      "receipt": "target/wp899/dot-format-borrow-probe-run.json",
+      "receipt_sha256": "930dd722f73eb01ec5e527ad8db76ff27b360e594b5d29a1295ef65e9c0e57fc",
+      "exit_code": 0,
+      "elapsed_seconds": 0.018646776967216283,
+      "log_sha256": "ccbd0f767d32ec26728207fa6c5e270dee6736f35d8e92a8fe15d78f6c0cce19"
+    },
+    "preflight": {
+      "receipt": "target/wp899/dot-format-borrow-preflight.json",
+      "receipt_sha256": "487aaad82d8d66a3567a710e3966b20936cd8fa0ac811062b24534982fd96e43",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020500586018897593,
+      "log_sha256": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945"
+    },
+    "controls": {
+      "receipt": "target/wp899/dot-format-borrow-controls.json",
+      "receipt_sha256": "8f55bf27ee9bb3d11d57c87ad89a8bbac29816ca241812afd8d29f73ac837900",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0070288029965013266,
+      "log_sha256": "4f15fd7e5dd9187996f73306a23281ce085d747c47167618e701533f08474260"
+    },
+    "golden-controls": {
+      "receipt": "target/wp899/dot-format-borrow-golden-controls.json",
+      "receipt_sha256": "2fb8b06c868f212ae8a3341370ffaa479859b98094c64864b7cdde8855ebf794",
+      "exit_code": 0,
+      "elapsed_seconds": 0.006070238014217466,
+      "log_sha256": "c1bc4330f9235de50a6d535f253f06c104e05837e8133f79b18e85e1a3014305"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/dot-format-borrow-dependents-check.json",
+      "receipt_sha256": "782f3e5317ff69e73b238211ac835204ce1e2c205dcc05169252a56c9e047d1b",
+      "exit_code": 0,
+      "elapsed_seconds": 7.7578739849850535,
+      "log_sha256": "3abd0d8348f6a05c98ee1e220dd4ff68cfcc9e9b2408508f1fcfe5f291efd6a4"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "21cf92161fc653ad96bc62ea0db5012a89fc6e572334b8023c1bd17dcefb2f69",
+    "selectors": [
+      "values::types::string::dot_format::dot_format_memory_tests::format_one_unescaped_segments_share_input",
+      "values::types::string::dot_format::dot_format_memory_tests::format_one_escapes_unicode_and_rejection_are_preserved",
+      "values::types::string::dot_format::dot_format_memory_tests::compiled_format_segments_retain_frozen_ownership",
+      "values::types::string::dot_format::tests::test_parse_format_one",
+      "values::types::string::dot_format::tests::test_format",
+      "values::types::string::dot_format::tests::test_format_capture",
+      "tests::bc::expr::test_format_one",
+      "tests::bc::expr::test_percent_s_one",
+      "tests::bc::expr::test_percent_s_one_format_one_eval",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_source_spans_and_reporting_columns",
+      "tests::bazel_internal_string::test_bazel_internal_oracle_matrix",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "tests::bazel_internal_string::test_bazel_internal_invalid_escapes_and_identifier_location"
+    ]
+  },
+  "baseline_result": "Actual-helper sharing pointer fails101 as expected; semantic/rejection matrix and compiled-function GC/freeze/retention controls pass2/2.",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "protected_controls": 16,
+    "candidate_initial_passes": 16,
+    "candidate_missing_fixture_env_failures": 3,
+    "corrected_golden_passes": 3,
+    "differential_inputs": 37449,
+    "differential_comparisons": 112347
+  },
+  "invocation_correction": "Initial candidate controls exit101:16 semantic/owner controls pass, three goldens need CARGO_MANIFEST_DIR. Corrected only those three with Starlark fixture path against unchanged executable; preflight already covered all19. Corrected3/3 pass, no source/artifact change, preserved16 passes; not a single19-pass batch.",
+  "probe_pins": {
+    "baseline": "dfea17988",
+    "source_sha256": {
+      "baseline": "76f66638979b7ff615914e1045070f5afe5d111208892fcfbb7f67e24be25435",
+      "candidate": "5ed2999cc39e0d58cc052267eae96745573b45506348bac616a8756a7c1edff2"
+    },
+    "helper_sha256": {
+      "baseline": "853da9fbf6678e7e382f6edbdbdb3e2760a1b7462f982ab149da0ca4c503db02",
+      "candidate": "36dfedc4dace9280dc63baa2d74aa60b578ebcb5e25600131fa5d7ba22fe84b9"
+    },
+    "parser_path": "starlark-rust/starlark_syntax/src/dot_format_parser.rs",
+    "parser_source_sha256": "437bc880d7316ec61d1099407cad74e3ce131902636af821efc3149e3ae70b80",
+    "adapted_parser_sha256": "9a121c4beff111aa050c24ba6865ddda0f5a15609fe05b8eb36c6383a9a6a888",
+    "probe_sha256": "5716854d977a1f0cd0c07dd8bdda510e7984dc9878a54083745a778a89b7d823",
+    "adapter": "Exact parser before test module; remove only Dupe import/derive, replace anyhow::anyhow! with format!, use std-only anyhow::Result alias. Exact old/new helper sections with function renaming only, same live parser in both. Output pair byte/polarity compares; capacities include returned String/owned-Cow only, not input/frozen/peak/RSS."
+  },
+  "probe_artifact_sha256": "18a99369facc58c506b55dceed4cee0114e16cbe8121acbe3be9ff5faab94f71",
+  "probe_result": {
+    "sources": 37449,
+    "comparisons": 112347,
+    "input_bytes": 1048578,
+    "decoded_segment_bytes": 1048576,
+    "baseline_returned_temporary_capacity": 1572868,
+    "candidate_returned_temporary_capacity": 0
+  },
+  "invariants": [
+    "Exact Text/Escape/Capture/error/rejection decisions; {} / {!s} optimization unchanged, named/indexed/repr/multiple/malformed falls back to ordinary .format.",
+    "Nonempty Unicode parser output shares actual input; escaped content accumulates correctly and empty segments remain exact.",
+    "Compiled literal functions with string/nonstring args survive GC and freeze, then invoke after original source and module/clone handles drop.",
+    "Existing FormatOne/PercentSOne bytecode and speculative execution plus plain/frozen interner/carrier controls preserved."
+  ],
+  "test_profile": "Pinned nightly-2025-09-14, default Starlark profile; std-only exact parser/helpers opt1/debug2; default Loading/Core/CLI alltargets check. Offline, preparation60s/test30s caps.",
+  "limits": "Fixed512KiB prefix+512KiB suffix unescaped input1048578B yields decoded pair1048576B; returned temporary capacity1572868->0. Measures returned String/owned-Cow capacities only, excluding input, final frozen interned storage, escape transient peaks, allocator/RSS/timing/source fit.",
+  "scope": "Local string/basic memory work only; no network/Bazel/linked CLI/actual source observation/Windows. Full WP899/M7A unaccepted.",
+  "full_wp899_accepted": false,
+  "plan_compaction": {
+    "archive_commit": "dfea1798826170fb4db0eb5cfda0574eb39b6538",
+    "archive_paths": {
+      "thoughts/shared/plans/slug-v2-subplans/current-packet.md": {
+        "lines": 1105,
+        "sha256": "ff884629f9735cee8ff216d0adac39e3be3b14822fd1720c2309b2cbec3fc39c"
+      },
+      "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": {
+        "lines": 1234,
+        "sha256": "517bc9fe98690e92602b1a7511bd8e86f037ba5da713cbca4d8042d73bac1e7b"
+      }
+    },
+    "decision": "Keep local offline scope, natural owners/reviews/finite validation directly; preserve full caller/actual source/vertical reads/restoration/retirement/clone-reader lastDrop/coupled FINAL requirements explicitly unwaived and pinned. No acceptance or cap/source scheduling change. Completed chronology/superseded launch text leaves active docs; existing history index owns exact paths/ranges.",
+    "correction": "Evidence FINAL REVISE found closed legacy activation launch/successor tail after supporting contracts. Archived original canonical1222\u20131234 behind same immutable pin and preserved closed outcome/limits in topic row. Correction FINAL ACCEPT; no code/artifact/test change.",
+    "correction_evidence": {
+      "target/wp899/dot-format-borrow-plan-correction.md": "80c11710c4569d2625259d784157ea139457ff1260ccb302f23fba164b928671",
+      "target/wp899/dot-format-borrow-final-evidence-initial.md": "9afadd6063c23ebcf5b49aae02be6750f11f0439aa20bb0ee2bd65acbe818c97"
+    }
+  },
+  "evidence_sha256": {
+    "target/wp899/dot-format-borrow-baseline-controls.jsonl": "6db230fe5b3f090867d11c77a7f3263b41c9eae0952fd59082f3c9d24253feba",
+    "target/wp899/dot-format-borrow-candidate-helper.rs": "36dfedc4dace9280dc63baa2d74aa60b578ebcb5e25600131fa5d7ba22fe84b9",
+    "target/wp899/dot-format-borrow-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/dot-format-borrow-candidate-compile.jsonl": "524474e9dfa17d182d1d98b6ac5e06581ff1030d0ad7aee20378a6b644a5e422",
+    "target/wp899/dot-format-borrow-baseline-controls.json": "7331e35a4c9da0f89bad6c97870bb6f2d1394f1d86249052c348b57fe668356f",
+    "target/wp899/dot-format-borrow-probe-run.json": "930dd722f73eb01ec5e527ad8db76ff27b360e594b5d29a1295ef65e9c0e57fc",
+    "target/wp899/dot-format-borrow-preflight.json": "487aaad82d8d66a3567a710e3966b20936cd8fa0ac811062b24534982fd96e43",
+    "target/wp899/dot-format-borrow-design-source.md": "133d854bfb1eaece158f7300b632ee7aa708b3a76369ed0cc1b510e7ec356181",
+    "target/wp899/dot-format-borrow-baseline-helper.rs": "853da9fbf6678e7e382f6edbdbdb3e2760a1b7462f982ab149da0ca4c503db02",
+    "target/wp899/dot-format-borrow-controls.json": "8f55bf27ee9bb3d11d57c87ad89a8bbac29816ca241812afd8d29f73ac837900",
+    "target/wp899/dot-format-borrow-design-evidence.md": "17cb4189c395de34be83ed4b06ce0e69b45c4a582e9a164993d8ce081cb58f2c",
+    "target/wp899/dot-format-borrow-probe-pins.json": "7521b27086a2f8e26e5337295ec57fd36ffd0f5c81a5b9e73bff4f56c6d912df",
+    "target/wp899/dot-format-borrow-candidate-compile.json": "f073b23fe19a19941d7aaba649a31e51e78ed5baf01916c032e43c99a001daa1",
+    "target/wp899/dot-format-borrow-probe-run.jsonl": "ccbd0f767d32ec26728207fa6c5e270dee6736f35d8e92a8fe15d78f6c0cce19",
+    "target/wp899/dot-format-borrow-preflight.jsonl": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945",
+    "target/wp899/dot-format-borrow-design.md": "bc96a5c017b4f201eab4279ff6d7895480a310a788dea41ed1729328c5a44a22",
+    "target/wp899/dot-format-borrow-controls.jsonl": "4f15fd7e5dd9187996f73306a23281ce085d747c47167618e701533f08474260",
+    "target/wp899/dot-format-borrow-dependents-check.jsonl": "3abd0d8348f6a05c98ee1e220dd4ff68cfcc9e9b2408508f1fcfe5f291efd6a4",
+    "target/wp899/dot-format-borrow-probe-compile.json": "9619ac86758cdaa77beb3528e213922b7b70ded045126fea42331df0b9b0ebdb",
+    "target/wp899/dot-format-borrow-probe.rs": "5716854d977a1f0cd0c07dd8bdda510e7984dc9878a54083745a778a89b7d823",
+    "target/wp899/dot-format-borrow-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/dot-format-borrow-baseline-compile.jsonl": "d20e81b225a21a11770035ed35ac9f279839dbff4139a06a3c0cd70c93b78cda",
+    "target/wp899/dot-format-borrow-selectors.json": "eb99bca9acf97c612182062ca556dae8534a3cc2dd6e4d88b52716c63cbe8b02",
+    "target/wp899/dot-format-borrow-plan-compaction.md": "871dcdaae4558c1818e8a083394a12a83c96f5744a75ee87aac453dc9a15336c",
+    "target/wp899/dot-format-borrow-probe-build.py": "b7bb6a99b94f5dd8d869aae073cee2c07a542bae50ae5d07e2f4a1358883f6fe",
+    "target/wp899/dot-format-borrow-baseline-selectors.json": "43eb8c6eb9b07c5df8f34089a80d4d94ef15e599328be1839fd288e092976dae",
+    "target/wp899/dot-format-borrow-baseline-compile.json": "110316b7ed9e71f2d7023daefbe8033c3b64076af72daaba6f79b49b99282e91",
+    "target/wp899/dot-format-borrow-design-input.md": "36396c4ab907b0fbc823bc461e98a121072b55b1cbf349b6aa0f4169edc645d0",
+    "target/wp899/dot-format-borrow-golden-controls.json": "2fb8b06c868f212ae8a3341370ffaa479859b98094c64864b7cdde8855ebf794",
+    "target/wp899/dot-format-borrow-baseline-preflight.json": "b235c0a0ec0633f04cf39826703e893fa8ac7af3e307a2e4a33211d326b9bfef",
+    "target/wp899/dot-format-borrow-dependents-check.json": "782f3e5317ff69e73b238211ac835204ce1e2c205dcc05169252a56c9e047d1b",
+    "target/wp899/dot-format-borrow-golden-controls.jsonl": "c1bc4330f9235de50a6d535f253f06c104e05837e8133f79b18e85e1a3014305"
+  },
+  "final_reviews": {
+    "target/wp899/dot-format-borrow-final-source.md": "a3b12938ddb1986bf68890d71ee054782bebd86aa86c11bffc30c7a272d55ed0",
+    "target/wp899/dot-format-borrow-final-input.md": "2c7bacf2cad57142f7d3aaf29025288952813457cad687deb953fe113ced0d81",
+    "target/wp899/dot-format-borrow-final-evidence.md": "f4b05c4704211941ef0fdcd3caf7cd2b12cff22df65f9f05b079293ce00ecf02"
+  },
+  "validation_sha256": "e9d5ca8c8aab570bdf1a8ba26f870907eb11777a6e03b7cfb1658dd84d8b431c",
+  "timing": {
+    "elapsed_from_design_seconds": 607.0874028205872,
+    "compile_seconds": 18.0002298480249,
+    "test_seconds": 0.036662820959463716,
+    "review_time": "Not separately measured"
+  }
+}

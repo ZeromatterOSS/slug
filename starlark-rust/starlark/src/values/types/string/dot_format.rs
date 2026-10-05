@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+use std::borrow::Cow;
 use std::str::FromStr;
 
 use starlark_syntax::dot_format_parser::FormatConv;
@@ -29,14 +30,22 @@ use crate::values::ValueError;
 use crate::values::ValueLike;
 use crate::values::dict::Dict;
 
-/// Try parse `"aaa{}bbb"` and return `("aaa", "bbb")`.
-pub(crate) fn parse_format_one(s: &str) -> Option<(String, String)> {
+fn append_format_text<'a>(segment: &mut Cow<'a, str>, text: &'a str) {
+    if matches!(segment, Cow::Borrowed("")) {
+        *segment = Cow::Borrowed(text);
+    } else {
+        segment.to_mut().push_str(text);
+    }
+}
+
+/// Try parse `"aaa{}bbb"` and return `("aaa", "bbb")`, borrowing unescaped text.
+pub(crate) fn parse_format_one(s: &str) -> Option<(Cow<'_, str>, Cow<'_, str>)> {
     let mut parser = FormatParser::new(s);
-    let mut before = String::with_capacity(s.len());
+    let mut before = Cow::Borrowed("");
     loop {
         match parser.next().ok()?? {
-            FormatToken::Text(text) => before.push_str(text),
-            FormatToken::Escape(e) => before.push_str(e.as_str()),
+            FormatToken::Text(text) => append_format_text(&mut before, text),
+            FormatToken::Escape(e) => before.to_mut().push_str(e.as_str()),
             FormatToken::Capture {
                 capture: "",
                 conv: FormatConv::Str,
@@ -46,11 +55,11 @@ pub(crate) fn parse_format_one(s: &str) -> Option<(String, String)> {
         }
     }
 
-    let mut after = String::with_capacity(s.len() - before.len());
+    let mut after = Cow::Borrowed("");
     loop {
         match parser.next().ok()? {
-            Some(FormatToken::Text(text)) => after.push_str(text),
-            Some(FormatToken::Escape(e)) => after.push_str(e.as_str()),
+            Some(FormatToken::Text(text)) => append_format_text(&mut after, text),
+            Some(FormatToken::Escape(e)) => after.to_mut().push_str(e.as_str()),
             Some(FormatToken::Capture { .. }) => return None,
             None => break,
         }
@@ -201,6 +210,10 @@ fn format_capture<'v, T: Iterator<Item = Value<'v>>>(
 }
 
 #[cfg(test)]
+#[path = "dot_format_memory_tests.rs"]
+mod dot_format_memory_tests;
+
+#[cfg(test)]
 mod tests {
     use starlark_map::small_map::SmallMap;
     use starlark_syntax::dot_format_parser::FormatConv;
@@ -275,16 +288,16 @@ mod tests {
     #[test]
     fn test_parse_format_one() {
         assert_eq!(
-            Some(("abc".to_owned(), "def".to_owned())),
+            Some(("abc".into(), "def".into())),
             parse_format_one("abc{}def")
         );
         assert_eq!(
-            Some(("abc".to_owned(), "def".to_owned())),
+            Some(("abc".into(), "def".into())),
             parse_format_one("abc{!s}def")
         );
         assert_eq!(None, parse_format_one("abc{!r}def"));
         assert_eq!(
-            Some(("a{b".to_owned(), "c}d{".to_owned())),
+            Some(("a{b".into(), "c}d{".into())),
             parse_format_one("a{{b{}c}}d{{")
         );
         assert_eq!(None, parse_format_one("a{"));
