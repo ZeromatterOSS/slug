@@ -1,0 +1,201 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "217a72d69",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native compiler scratch; admitted percent interpolation/Unicode/BazelInternal behavior unchanged",
+  "decision": "Private parse_percent_s_one borrows unescaped segments via char_indices; Option<String> initialized only on validated %% escape; private finish helper appends final decoded fragment or returns borrowed source slice. Existing immediate frozen interning unchanged.",
+  "ownership": "Both Cow segments are synchronous compiler scratch. Existing frozen alloc_str_intern owns retained instructions; runtime percent_s_one tuple/error logic and normal heap/GC/freeze allocation unchanged. No new cache/interner/API/key/dependency/retained representation/unsafe code.",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/interpolation.rs": "54678961435e32121ff195041396a2692cab5d50e25ba5fb5b357cce636e7427",
+    "starlark-rust/starlark/src/values/types/string/percent_s_memory_tests.rs": "ad87b40db8efbdabb87810b9b9f9caf3f085e7aeaed25b5d0d57f1f396d48441"
+  },
+  "design_sha256": "7bfa80bfa7c1457de5cabe334b63b081735b3e4ce462aeddfe91892eaef776c5",
+  "design_reviews": {
+    "target/wp899/percent-s-borrow-design-source.md": "5ed9b6feed669b83d2140dfbd93397d06e7276af680be3a9252746eb5e7f5855",
+    "target/wp899/percent-s-borrow-design-input.md": "6028bcce53eb47863cbde64dab0f7ea9139bb9ff6683d735c1f605bfd05d3a73",
+    "target/wp899/percent-s-borrow-design-evidence.md": "ad41bf22a3b1387e0fb35e3272c19687a9596eb3e929ec482906174f14560dc1"
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/percent-s-borrow-baseline-compile.json",
+      "receipt_sha256": "fc07506bee5105302cdf3dd8ae261576a0b916c2d5d5cca8d4d8639e5121fe26",
+      "exit_code": 0,
+      "elapsed_seconds": 5.819613608997315,
+      "log_sha256": "04d3afb768c29269fc8192743691f42d43117205eced899a0f7524f2b7f64735"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/percent-s-borrow-baseline-preflight.json",
+      "receipt_sha256": "9f4df6fc874df7fe0e7417cb1a26cd7818ef689aff1c05ef9142987b6fd5e360",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022553994960617274,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/percent-s-borrow-baseline-controls.json",
+      "receipt_sha256": "67a5c88a504d233fbd1140fbef515fa8dcc9db82dc075dcbbaeeb442805b03d1",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005508945963811129,
+      "log_sha256": "3d55cdcd9890b3b870e6ae3facc5b7902856cc7dccaf72f749496050ab4068f0"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/percent-s-borrow-candidate-compile.json",
+      "receipt_sha256": "a6f48b752ad35c3d1f909ef4a32e9cef1d645d9972168fa6205afc3370927464",
+      "exit_code": 0,
+      "elapsed_seconds": 4.891013610991649,
+      "log_sha256": "c0931ed5cb5b0558a4bf3f980b5d1b17a222f4554075d99987ce23067ac7840d"
+    },
+    "probe-compile": {
+      "receipt": "target/wp899/percent-s-borrow-probe-compile.json",
+      "receipt_sha256": "fd924752eee7a7d126e7e0c5cec6cfd278d479501ddec23b95689693b0fe7a69",
+      "exit_code": 0,
+      "elapsed_seconds": 0.1249350939760916,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "probe-run": {
+      "receipt": "target/wp899/percent-s-borrow-probe-run.json",
+      "receipt_sha256": "1d2a1700ab2f7c26a2af35b1ef1611948f9e88340c80c544125fb3a7dff5bbec",
+      "exit_code": 0,
+      "elapsed_seconds": 0.008303999027702957,
+      "log_sha256": "28b65106ed4e9cdf14329d8214cb7544c93577d422d137d634c4e456c1376ebb"
+    },
+    "preflight": {
+      "receipt": "target/wp899/percent-s-borrow-preflight.json",
+      "receipt_sha256": "120df686f4a8de34ae1b1987bb8057a95a07b3151be3baab591ecb192392ab15",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02231590502196923,
+      "log_sha256": "2e4c4611053d79053de344396dfa40052dfee9dbc59c0cee5fac8e26e1e6bee0"
+    },
+    "controls": {
+      "receipt": "target/wp899/percent-s-borrow-controls.json",
+      "receipt_sha256": "74336f6877a920ab233f4723ef7464e6f629d83fcaff0387e6f27d82cc1f3fbd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.008484859950840473,
+      "log_sha256": "639c30671f5a49a3b0477506af363f78aaec365c55eacb6e40a21607bf08951f"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/percent-s-borrow-dependents-check.json",
+      "receipt_sha256": "e935b01705513495fdb55f83980094cd30ed3e82aa2564151bb336d32a770bb6",
+      "exit_code": 0,
+      "elapsed_seconds": 7.776203487010207,
+      "log_sha256": "7364c1b8b885824a10061d418ee3d2470b76a5c61df0fc86d0dc9b67aa7bc332"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "a2e06361d97c18f67ed358ab6b052c2c77bf65bca7fe8fffdc97c6fd33a4d3c6",
+    "selectors": [
+      "values::types::string::interpolation::percent_s_memory_tests::percent_s_unescaped_segments_share_input",
+      "values::types::string::interpolation::percent_s_memory_tests::percent_s_escapes_unicode_and_rejection_are_preserved",
+      "values::types::string::interpolation::percent_s_memory_tests::compiled_percent_s_segments_retain_frozen_ownership",
+      "values::types::string::interpolation::percent_s_memory_tests::percent_s_compiler_preserves_bazel_internal_carriers",
+      "values::types::string::interpolation::tests::test_incomplete_format",
+      "values::types::string::interpolation::tests::test_unsupported_format_character",
+      "values::types::string::interpolation::tests::test_parse_percent_s_one",
+      "values::types::string::interpolation::tests::test_type_support_d",
+      "values::types::string::interpolation::tests::test_type_support_o",
+      "values::types::string::interpolation::tests::test_type_support_x",
+      "values::types::string::interpolation::tests::test_type_support_e",
+      "values::types::string::interpolation::tests::test_int_min",
+      "values::types::string::dot_format::dot_format_memory_tests::format_one_unescaped_segments_share_input",
+      "values::types::string::dot_format::dot_format_memory_tests::compiled_format_segments_retain_frozen_ownership",
+      "tests::bc::expr::test_format_one",
+      "tests::bc::expr::test_percent_s_one",
+      "tests::bc::expr::test_percent_s_one_format_one_eval",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_source_spans_and_reporting_columns",
+      "tests::bazel_internal_string::test_bazel_internal_oracle_matrix",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "tests::bazel_internal_string::test_bazel_internal_invalid_escapes_and_identifier_location"
+    ]
+  },
+  "baseline_result": "Actual-parser nonempty Unicode source sharing pointer fails101 as expected; semantic/rejection, retained compiled-function GC/freeze/tuple/fallback and actual BazelInternal carrier controls pass3/3.",
+  "pass_counts": {
+    "new_owner_tests": 4,
+    "protected_controls": 23,
+    "candidate_controls": 27,
+    "differential_inputs": 19608,
+    "differential_comparisons": 58824
+  },
+  "probe_pins": {
+    "baseline": "217a72d69",
+    "source_sha256": {
+      "baseline": "3c618ce9d0681c427af3fc33a13aab1f38486b92d6958c6092fdf0ac8b789c5b",
+      "candidate": "54678961435e32121ff195041396a2692cab5d50e25ba5fb5b357cce636e7427"
+    },
+    "helper_sha256": {
+      "baseline": "feced151f395febc02b936996afdc686d88577975db16f85e4c76118fc621edb",
+      "candidate": "e3f7d941b52d0fa92ce202408fdfa3788a3754c9d8a3e8d82aeeb0f32631f55f"
+    },
+    "probe_sha256": "4b5f547e11fd119f7f87bbb37941f984db73f6ab1558b4879caba4b781c02314",
+    "adapter": "Exact baseline/candidate helper sections plus candidate finish helper; function renaming only. No grammar/error/allocator adapter. Std-only Option-pair byte/polarity comparison and returned String/owned-Cow capacities; input/final frozen/peaks/RSS excluded."
+  },
+  "probe_artifact_sha256": "7c80944b9f3ffec66b3d2bd251640aeb692c76559df5eed5b3997166f4a017b5",
+  "probe_result": {
+    "sources": 19608,
+    "comparisons": 58824,
+    "input_bytes": 1048578,
+    "decoded_segment_bytes": 1048576,
+    "baseline_returned_temporary_capacity": 1572868,
+    "candidate_returned_temporary_capacity": 0
+  },
+  "invariants": [
+    "Both loops preserve absent/multiple/trailing/unknown conversion rejection; percent escape pairs advance at validated ASCII UTF-8 boundaries.",
+    "Empty/Unicode/NUL/leading/trailing/consecutive/adjacent %% fragments decode without losing accumulated text.",
+    "Unescaped output ptrs share original source; literal compiled function segments frozen-intern normally and functions invoke after source/module/clone drops.",
+    "String/nonstring/single-tuple runtime values, empty/multiple-tuple errors, generic %d/%r/multiple-conversion fallback and actual BazelInternal carrier output preserved.",
+    "All8 interpolation tests, compiler bytecode/evaluation/speculative execution, prior dot-format sharing/lifetime, ordinary heap/mutable/frozen interner and carrier controls pass."
+  ],
+  "test_profile": "Pinned nightly-2025-09-14 default Starlark; exact-helper std-only probe opt1/debug2; default Loading/Core/CLI alltarget offline check. Golden CARGO_MANIFEST_DIR set, regeneration flag absent. SerialCargo, preparation60s/test30s caps.",
+  "limits": "Fixed512KiB prefix+512KiB suffix: unescaped input1048578B, decoded pair1048576B, returned temporary capacity1572868->0. Returned String/owned-Cow capacities only; input, final frozen storage, escaping transient peaks, allocator/RSS/timing/source fit excluded. Escaped decoded buffers and final runtime allocations remain.",
+  "scope": "Local strings/basic memory only; no network/Bazel/linkedCLI/actual source/Windows work. FullWP899/M7A remains unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/percent-s-borrow-baseline-compile.json": "fc07506bee5105302cdf3dd8ae261576a0b916c2d5d5cca8d4d8639e5121fe26",
+    "target/wp899/percent-s-borrow-preflight.jsonl": "2e4c4611053d79053de344396dfa40052dfee9dbc59c0cee5fac8e26e1e6bee0",
+    "target/wp899/percent-s-borrow-baseline-compile.jsonl": "04d3afb768c29269fc8192743691f42d43117205eced899a0f7524f2b7f64735",
+    "target/wp899/percent-s-borrow-design-source.md": "5ed9b6feed669b83d2140dfbd93397d06e7276af680be3a9252746eb5e7f5855",
+    "target/wp899/percent-s-borrow-candidate-compile.json": "a6f48b752ad35c3d1f909ef4a32e9cef1d645d9972168fa6205afc3370927464",
+    "target/wp899/percent-s-borrow-baseline-selectors.json": "fef05bf5c2a601f99ea0021e7a427f307c92cfdb7a2518dd27c6f7d827e769ca",
+    "target/wp899/percent-s-borrow-probe-run.jsonl": "28b65106ed4e9cdf14329d8214cb7544c93577d422d137d634c4e456c1376ebb",
+    "target/wp899/percent-s-borrow-dependents-check.json": "e935b01705513495fdb55f83980094cd30ed3e82aa2564151bb336d32a770bb6",
+    "target/wp899/percent-s-borrow-candidate-compile.jsonl": "c0931ed5cb5b0558a4bf3f980b5d1b17a222f4554075d99987ce23067ac7840d",
+    "target/wp899/percent-s-borrow-baseline-controls.json": "67a5c88a504d233fbd1140fbef515fa8dcc9db82dc075dcbbaeeb442805b03d1",
+    "target/wp899/percent-s-borrow-probe-run.json": "1d2a1700ab2f7c26a2af35b1ef1611948f9e88340c80c544125fb3a7dff5bbec",
+    "target/wp899/percent-s-borrow-probe-build.py": "09f56feafa92112a11ea361b3c6e00ab13bbedce63b176882e97ee0956b05030",
+    "target/wp899/percent-s-borrow-controls.json": "74336f6877a920ab233f4723ef7464e6f629d83fcaff0387e6f27d82cc1f3fbd",
+    "target/wp899/percent-s-borrow-baseline-helper.rs": "feced151f395febc02b936996afdc686d88577975db16f85e4c76118fc621edb",
+    "target/wp899/percent-s-borrow-probe.rs": "4b5f547e11fd119f7f87bbb37941f984db73f6ab1558b4879caba4b781c02314",
+    "target/wp899/percent-s-borrow-probe-pins.json": "9cd6d068db50828b7c8232e16b292e6eb902634cd076bcc77218e17953495a7c",
+    "target/wp899/percent-s-borrow-probe-compile.json": "fd924752eee7a7d126e7e0c5cec6cfd278d479501ddec23b95689693b0fe7a69",
+    "target/wp899/percent-s-borrow-preflight.json": "120df686f4a8de34ae1b1987bb8057a95a07b3151be3baab591ecb192392ab15",
+    "target/wp899/percent-s-borrow-baseline-controls.jsonl": "3d55cdcd9890b3b870e6ae3facc5b7902856cc7dccaf72f749496050ab4068f0",
+    "target/wp899/percent-s-borrow-design-evidence.md": "ad41bf22a3b1387e0fb35e3272c19687a9596eb3e929ec482906174f14560dc1",
+    "target/wp899/percent-s-borrow-probe-compile.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/percent-s-borrow-controls.jsonl": "639c30671f5a49a3b0477506af363f78aaec365c55eacb6e40a21607bf08951f",
+    "target/wp899/percent-s-borrow-selectors.json": "497e631c48af19a4078614aa6cfd1a2f82054691c26eb23958bdc2227ce7b6da",
+    "target/wp899/percent-s-borrow-baseline-preflight.json": "9f4df6fc874df7fe0e7417cb1a26cd7818ef689aff1c05ef9142987b6fd5e360",
+    "target/wp899/percent-s-borrow-baseline-preflight.jsonl": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b",
+    "target/wp899/percent-s-borrow-dependents-check.jsonl": "7364c1b8b885824a10061d418ee3d2470b76a5c61df0fc86d0dc9b67aa7bc332",
+    "target/wp899/percent-s-borrow-candidate-helper.rs": "e3f7d941b52d0fa92ce202408fdfa3788a3754c9d8a3e8d82aeeb0f32631f55f",
+    "target/wp899/percent-s-borrow-design.md": "7bfa80bfa7c1457de5cabe334b63b081735b3e4ce462aeddfe91892eaef776c5",
+    "target/wp899/percent-s-borrow-design-input.md": "6028bcce53eb47863cbde64dab0f7ea9139bb9ff6683d735c1f605bfd05d3a73"
+  },
+  "final_reviews": {
+    "target/wp899/percent-s-borrow-final-source.md": "e70aa22480ebf1100657604eb77587056603a741a5724160bf83693363607c29",
+    "target/wp899/percent-s-borrow-final-input.md": "bea9f3f7f1b43d746ff8f0ccc9c55d916a3036a08886954a0f9bad3ce3070944",
+    "target/wp899/percent-s-borrow-final-evidence.md": "d774c2a91cacb55b9b867f5981489dd0a2aa29ad7871fc7637e4aab9619178cd"
+  },
+  "validation_sha256": "99d5d3a0d53753ba37ea213704854be17dc9018886499bc01d08ac61eb5f5809",
+  "timing": {
+    "elapsed_from_design_seconds": 441.51661944389343,
+    "compile_seconds": 18.611765800975263,
+    "test_seconds": 0.02229780494235456,
+    "review_time": "Not separately measured"
+  }
+}

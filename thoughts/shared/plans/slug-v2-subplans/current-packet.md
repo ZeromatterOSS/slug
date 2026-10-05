@@ -12,15 +12,14 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component borrows unescaped prefix/suffix text in the private
-`parse_format_one` compiler helper. Escapes use owned scratch; the existing
-compiler immediately interns both segments in its frozen heap. Final formatting
-values and compiled instructions retain their current owners. Preserve parser
-acceptance/rejection, errors, Unicode/BazelInternal carriers and GC/freeze behavior.
-Private returned `Cow<str>` values are synchronous compiler scratch only.
+The latest accepted component removes unescaped prefix/suffix copies from the private
+`parse_percent_s_one` compiler helper. Validated percent escapes use owned scratch;
+the existing compiler immediately interns both segments in its frozen heap.
+Preserve optimizer grammar/rejection, runtime tuple/error behavior, Unicode and
+GC/freeze ownership. Returned `Cow<str>` values are synchronous compiler scratch.
 This is Slug-native memory ownership, with admitted behavior unchanged.
-Continue by selecting the next proved redundant copy at existing compiler/string
-owners; each new component needs a bounded design before implementation.
+Next: select a proved redundant copy at existing string/compiler owners through
+a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
@@ -30,17 +29,18 @@ unwaived; memory controls cannot substitute for them.
 ## Local compiler memory contract
 
 Root owns edits, serial Cargo, integration and commits. Allowlist:
-`starlark-rust/starlark/src/values/types/string/dot_format.rs`, sibling
-`dot_format_memory_tests.rs`, compact receipt and matching Stage9 row. Compiler
-`call.rs` and runtime formatting/percent-s parsing need no change. Private probes
-stay under ignored `target/wp899`. Scheduling compaction uses this manifest,
-canonical status and the existing history index; no new evidence companion.
+`starlark-rust/starlark/src/values/types/string/interpolation.rs`, sibling
+`percent_s_memory_tests.rs`, compact receipt and matching Stage9 row. Compiler
+`expr.rs`, runtime interpolation and accepted dot-format parser remain unchanged.
+Private exact-helper probes stay under ignored `target/wp899`.
 
-Keep `FormatParser` token/capture/error decisions unchanged. Borrow the first
-Text token in each segment, materialize only for escape decoding/additional
-pieces, and preserve accumulated content. Existing `alloc_str_intern` immediately
-copies/interns outputs; no input borrow enters compiled instructions. Add no
-cache, interner, dependency, unsafe code, DICE key or retained representation.
+Keep the two parse loops and rejection decisions. Track character byte indices;
+copy literal fragments only after validated `%%` needs decoding. The `%s` capture
+ends the prefix and starts the suffix at ASCII boundaries. A private finishing
+helper borrows an unescaped fragment or appends it to owned escape scratch.
+Existing `alloc_str_intern` immediately copies/interns outputs; no input borrow
+enters compiled instructions. Add no cache, interner, dependency, unsafe code,
+DICE key or retained representation.
 
 Independent DESIGN and FINAL reviews cover parser decisions, borrowed lifetimes,
 compiler interning and meaningful evidence. New controls discriminate nonempty
@@ -59,7 +59,7 @@ default Loading/Core/CLI all targets offline, format Rust, and run plan/archive/
 checks. Preserve passing results unless relevant inputs change. Invocation errors
 get narrow repairs; semantic or ownership disagreement requires revisiting design.
 
-The exact-parser/helper differential probe measures returned temporary String or
+The exact-helper differential probe measures returned temporary String or
 owned-Cow capacities only. Input, final frozen storage, transient peaks, RSS,
 speed and source fit remain outside the claim. It does not replace real compiler
 and GC/freeze controls. Full WP899/M7A remains unaccepted.
@@ -68,6 +68,7 @@ and GC/freeze controls. Full WP899/M7A remains unaccepted.
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Percent-s compiler parser borrows unescaped segments before existing frozen interning. Fixed returned temporary capacity 1,572,868B→0; escaped buffers/final storage remain. Three DESIGNs/FINALs, 27 controls, 58,824 comparisons and default dependent checks pass | [Percent-s scratch borrowing](wp899-percent-s-borrow-2026-10-05.json) |
 | Dot-format compiler helper borrows unescaped segments before existing frozen interning. Fixed returned temporary capacity 1,572,868B→0; escaped scratch/final frozen storage remain. Three DESIGNs/FINALs, 19 unique controls (16+3 corrected goldens), 112,347 differential comparisons and default dependent checks pass | [Format scratch borrowing](wp899-dot-format-borrow-2026-10-05.json) |
 | Limited replacement omits untouched suffix from temporary payload; zero/no-match input reuse. Fixed temporary 1,048,577B→1B, same final output; no capacity/RSS/speed claim | [Replacement prefix](wp899-replace-prefix-2026-10-05.json) |
 | Local load-name String moved into existing DICE key; one unused scratch clone removed | [Load-name move](wp899-local-load-move-2026-10-05.json) |

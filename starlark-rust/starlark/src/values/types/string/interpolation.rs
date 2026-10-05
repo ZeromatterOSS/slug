@@ -18,6 +18,7 @@
 //! String interpolation-related code.
 //! Based on <https://docs.python.org/3/library/stdtypes.html#printf-style-string-formatting>
 
+use std::borrow::Cow;
 use std::fmt::Write;
 
 use dupe::Dupe;
@@ -352,31 +353,60 @@ pub(crate) fn percent(format: &str, value: Value) -> crate::Result<String> {
     }
 }
 
-/// Try parse `"aaa%sbbb"` and return `("aaa", "bbb")`.
-pub(crate) fn parse_percent_s_one(format: &str) -> Option<(String, String)> {
-    let mut before = String::with_capacity(format.len());
-    let mut chars = format.chars();
-    loop {
+fn finish_percent_segment(
+    format: &str,
+    start: usize,
+    end: usize,
+    buffer: Option<String>,
+) -> Cow<'_, str> {
+    match buffer {
+        Some(mut buffer) => {
+            buffer.push_str(&format[start..end]);
+            Cow::Owned(buffer)
+        }
+        None => Cow::Borrowed(&format[start..end]),
+    }
+}
+
+/// Try parse `"aaa%sbbb"` and return `("aaa", "bbb")`, borrowing unescaped text.
+pub(crate) fn parse_percent_s_one(format: &str) -> Option<(Cow<'_, str>, Cow<'_, str>)> {
+    let mut before = None;
+    let mut fragment_start = 0;
+    let mut chars = format.char_indices();
+    let capture = loop {
         match chars.next()? {
-            '%' => match chars.next()? {
-                '%' => before.push('%'),
-                's' => break,
+            (index, '%') => match chars.next()?.1 {
+                '%' => {
+                    before
+                        .get_or_insert_with(String::new)
+                        .push_str(&format[fragment_start..index + 1]);
+                    fragment_start = index + 2;
+                }
+                's' => break index,
                 _ => return None,
             },
-            c => before.push(c),
+            _ => {}
         }
-    }
-    let mut after = String::with_capacity(format.len() - before.len());
+    };
+    let before = finish_percent_segment(format, fragment_start, capture, before);
+    let mut after = None;
+    let mut fragment_start = capture + 2;
     loop {
         match chars.next() {
-            Some('%') => match chars.next()? {
-                '%' => after.push('%'),
+            Some((index, '%')) => match chars.next()?.1 {
+                '%' => {
+                    after
+                        .get_or_insert_with(String::new)
+                        .push_str(&format[fragment_start..index + 1]);
+                    fragment_start = index + 2;
+                }
                 _ => return None,
             },
-            Some(c) => after.push(c),
+            Some(_) => {}
             None => break,
         }
     }
+    let after = finish_percent_segment(format, fragment_start, format.len(), after);
     Some((before, after))
 }
 
@@ -412,6 +442,10 @@ pub(crate) fn percent_s_one<'v>(
 }
 
 #[cfg(test)]
+#[path = "percent_s_memory_tests.rs"]
+mod percent_s_memory_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::assert;
@@ -429,11 +463,11 @@ mod tests {
     #[test]
     fn test_parse_percent_s_one() {
         assert_eq!(
-            Some(("abc".to_owned(), "def".to_owned())),
+            Some(("abc".into(), "def".into())),
             parse_percent_s_one("abc%sdef")
         );
         assert_eq!(
-            Some(("a%b".to_owned(), "c%d%".to_owned())),
+            Some(("a%b".into(), "c%d%".into())),
             parse_percent_s_one("a%%b%sc%%d%%")
         );
         assert_eq!(None, parse_percent_s_one("a%"));

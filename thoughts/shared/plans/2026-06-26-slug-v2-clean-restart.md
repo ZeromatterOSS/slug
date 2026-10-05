@@ -39,10 +39,10 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: borrowed compiler format segments preserve existing frozen
-interning and parser/runtime behavior. Next: select a proved redundant copy at
-existing compiler/string owners through a bounded design checkpoint. No source observation, network-dependent retry, cap
-growth or runtime activation is selected. Windows remains minimal/deferred.
+Latest accepted change: unescaped `%s` compiler segments borrow source before
+existing frozen interning; optimizer rejection and runtime tuple/error behavior
+are preserved. Next: select a proved redundant copy at existing string/compiler
+owners through a bounded design checkpoint. No source observation, network-dependent retry, cap growth or runtime activation is selected. Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).
 Full WP899/M7A and source admission remain unaccepted.
