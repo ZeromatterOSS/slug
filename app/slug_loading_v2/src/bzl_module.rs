@@ -6866,7 +6866,7 @@ fn prepare_repository_package_evaluation(
         .map(|load| load.module_id.to_owned())
         .collect::<Vec<_>>();
     let child_loads =
-        prepare_repository_package_child_loads(key, &loads, &canonical_repo, &observations)?;
+        prepare_repository_package_child_loads(key, loads, &canonical_repo, &observations)?;
     let build_basename = relative_build_file
         .file_name()
         .expect("BUILD candidate has a basename")
@@ -6890,24 +6890,23 @@ fn prepare_repository_package_evaluation(
 
 fn prepare_repository_package_child_loads(
     key: &RepositoryPackageInventoryKey,
-    loads: &[String],
+    loads: Vec<String>,
     canonical_repo: &CompactString,
     observations: &PathObservationEpoch,
 ) -> Result<Vec<RepositoryPackageChildLoad>, RepositoryPackageInventoryDriverOutcome> {
     let HostRepositorySourceRoute::Root(route) = &key.route else {
         return Ok(loads
-            .iter()
-            .cloned()
+            .into_iter()
             .map(RepositoryPackageChildLoad::Canonical)
             .collect());
     };
     loads
-        .iter()
+        .into_iter()
         .map(|load| {
-            resolve_external_load_label(&key.package, load)
+            resolve_external_load_label(&key.package, &load)
                 .map(|label| {
                     RepositoryPackageChildLoad::Resolved(
-                        load.clone(),
+                        load,
                         ResolvedExternalBzlLoad {
                             route: HostRepositorySourceRoute::root(route.clone()),
                             label,
@@ -8093,6 +8092,10 @@ fn flattened_lifetime_closure(
     }
     entries
 }
+
+#[cfg(test)]
+#[path = "repository_child_load_memory_tests.rs"]
+mod repository_child_load_memory_tests;
 
 #[cfg(test)]
 #[path = "bzl_source_memory_tests.rs"]

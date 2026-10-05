@@ -39,11 +39,11 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: literal-concatenation compiler scratch borrows AST
-fragments before building the existing owned result; traversal, rejection and
-frozen ownership are preserved. Next: select a proved redundant copy at existing
-string/compiler owners through a bounded design checkpoint. No source observation,
-network-dependent retry, cap growth or runtime activation is selected.
+Latest accepted change: repository BUILD child preparation transfers existing
+raw load-name buffers on both routes, preserving order, errors, observations and
+owned async lifetimes. Next: select a proved redundant copy or existing interner
+reuse at local string owners through a bounded design checkpoint. No source
+observation, network-dependent retry, cap growth or runtime activation is selected.
 Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).

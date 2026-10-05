@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "a99bac023",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_loading_v2/src/bzl_module.rs": "ff9700fa25992570a8036ef2521c77589a2cc18a0d2095eee708b586dacc0e1a",
+    "app/slug_loading_v2/src/repository_child_load_memory_tests.rs": "4e6056afff53a2e7b16f4e714705564d9aab037c6c442c2af5a2eb184c746326"
+  },
+  "design_sha256": "362eb0341c89923cef28e10afd1bbf5426e59fd6bbd80d7bdc86ed4b5c1ff0cb",
+  "design_reviews": {
+    "target/wp899/repository-child-load-move-design-source.md": "0a45e736ed970049efc8f624b039de7655294ad5a24aaf3e8e366b06286838e0",
+    "target/wp899/repository-child-load-move-design-input.md": "a097cd15cd1440440e14e051b03fcc5729d9ad98aed5f25687e7f97ca626cc26",
+    "target/wp899/repository-child-load-move-design-evidence.md": "c5af7e345e41c9eea1b77bda08fc43a89f79f1474c30e9ba75e630e33576688b"
+  },
+  "ownership_proof": {
+    "exact_delta_verified": true,
+    "change": "Private helper/caller consume Vec<String>, into_iter and move same names into existing variants; resolution borrows synchronously; test hook only other production delta. External bzl helper and all DICE owners unchanged.",
+    "baseline_test_adapter": "Exactly one test helper call changes &loads to loads, otherwise same test source; baseline source/test hashes verified.",
+    "claim": "Both route controls preserve raw String pointers and capacities including duplicate name occurrences. Raw buffers are transferred once per child; vector metadata/AST/parser/retained child/error storage remain. Capacity is preserved, including spare capacity; no quantified RSS/speed/source-fit claim."
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/repository-child-load-move-baseline-compile.json",
+      "receipt_sha256": "6ccd85e4e782a7dde935143fa9684ea5d3c60bc0002fa3918853309ac43cffc2",
+      "exit_code": 0,
+      "elapsed_seconds": 52.172857615049,
+      "log_sha256": "a36153257da79da9e203a7a0ea6720289bf0e8341e6723a06558c34ccbc19d29"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/repository-child-load-move-baseline-preflight.json",
+      "receipt_sha256": "92f578c0a2286ab339c48944854f8a290122d2200f30fd1e93afd77a4f0e83b5",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024257195997051895,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/repository-child-load-move-baseline-controls.json",
+      "receipt_sha256": "2a79970f8a7a7932c8a09cb7ff557c4f852915b747eaae4e63bfc3ff7aeed15e",
+      "exit_code": 101,
+      "elapsed_seconds": 0.009924087033141404,
+      "log_sha256": "38286e95380ccabf16a882768ce80e4a50c01c3c89ea570797bef76ea085a21d"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/repository-child-load-move-candidate-compile.json",
+      "receipt_sha256": "dc18cf26674ea5cef10708f1b90092a9385c3746a608a500b0d1ff2a1cf8780c",
+      "exit_code": 0,
+      "elapsed_seconds": 15.76017734897323,
+      "log_sha256": "1a37a474fc9a8db4d0c67faf2fd951db433389c99bd169eae10e456b387d705c"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/repository-child-load-move-candidate-preflight.json",
+      "receipt_sha256": "3b786200cd62873f44c99d450233730f10ce10c83bf013d8cb1e628941ae79b8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02218170597916469,
+      "log_sha256": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/repository-child-load-move-candidate-controls.json",
+      "receipt_sha256": "29132ad02d05546232bd6e249722708fbfa1d0cfdef63ad9be897d30e9302a0b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.014642619993537664,
+      "log_sha256": "4f391f5ebe37648e70d92e13f6118879aa212f7c311ddc8a1f6b4eb0ad5c6ea6"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/repository-child-load-move-dependents-check.json",
+      "receipt_sha256": "0ec7d759795c2c5c441ed514e9456ae2840e59c308d704fc7a5dc5cbb8d474c5",
+      "exit_code": 0,
+      "elapsed_seconds": 5.264611256949138,
+      "log_sha256": "2ddc858559f8ca40d42c029497cf9480b560123fa1a6d7a3616d55a0a742b4ce"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+    "artifact_sha256": "8700c89cfdef89b56d8acb800fb9331636bce0b7edcc62ca7f1b03e6fcaf24a6",
+    "selectors": [
+      "bzl_module::repository_child_load_memory_tests::root_prepared_loads_transfer_original_string_buffers",
+      "bzl_module::repository_child_load_memory_tests::canonical_prepared_loads_transfer_original_string_buffers",
+      "bzl_module::repository_child_load_memory_tests::prepared_loads_preserve_order_variants_and_first_error_observations",
+      "bzl_module::host_package_load_tests::repository_package_load_prevalidates_all_loads_and_gates_loaded_target_kinds",
+      "bzl_module::host_package_load_tests::repository_package_load_activates_external_macro_manifest_lifetime_and_local_events",
+      "bzl_module::host_package_load_tests::repository_package_policy_projection_shares_success_and_inventory_events",
+      "bzl_module::host_package_load_tests::canonical_package_policy_adapter_reuses_inventory_result_and_epoch_arcs",
+      "bzl_module::host_package_load_tests::repository_package_genrule_preserves_external_identity_and_source_aba"
+    ]
+  },
+  "baseline_result": "1 semantic/order/typed first-error/nonempty-observations control passed; Root and Canonical buffer-pointer assertions failed exactly as expected (2).",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "protected_controls": 5,
+    "candidate_controls": 8
+  },
+  "invariants": [
+    "Raw names retain exact bytes/order/duplicates, String pointer and capacity; existing variants/routes/labels unchanged.",
+    "Canonical malformed/empty/Unicode/NUL names remain unvalidated passthrough; root first typed repository error and full nonempty observations retained after partial success.",
+    "Normal wrapper prevalidation prevents child computation on invalid later loads; existing manifest/events/inventory projections/source ABA remain correct.",
+    "No borrowed name escapes into async or retained state; existing String/route and DICE identity/equality/hash/observation owners unchanged."
+  ],
+  "test_profile": "Pinned nightly-2025-09-14 default offline Loading lib and default Core/CLI alltargets; serial Cargo, preparation60s/test30s caps, exact artifact preflight. No filesystem/network/daemon/runtime tests.",
+  "scope": "Local strings/basic memory only; no Bazel/linkedruntime/actualsource/retry/cap growth/Windows expansion. FullWP899/M7A unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/repository-child-load-move-design-source.md": "0a45e736ed970049efc8f624b039de7655294ad5a24aaf3e8e366b06286838e0",
+    "target/wp899/repository-child-load-move-dependents-check.json": "0ec7d759795c2c5c441ed514e9456ae2840e59c308d704fc7a5dc5cbb8d474c5",
+    "target/wp899/repository-child-load-move-design.md": "362eb0341c89923cef28e10afd1bbf5426e59fd6bbd80d7bdc86ed4b5c1ff0cb",
+    "target/wp899/repository-child-load-move-design-evidence.md": "c5af7e345e41c9eea1b77bda08fc43a89f79f1474c30e9ba75e630e33576688b",
+    "target/wp899/repository-child-load-move-baseline-controls.jsonl": "38286e95380ccabf16a882768ce80e4a50c01c3c89ea570797bef76ea085a21d",
+    "target/wp899/repository-child-load-move-controls.py": "75055e6d4958d9a7c0f0e71ed3e6860edddf00a073294daa520aa613c8961380",
+    "target/wp899/repository-child-load-move-baseline-controls.json": "2a79970f8a7a7932c8a09cb7ff557c4f852915b747eaae4e63bfc3ff7aeed15e",
+    "target/wp899/repository-child-load-move-candidate-selectors.json": "bb278144fd2ee5b1d6a4f5d04a13c18f2945f2123ffd2fd21e034de23b0b111f",
+    "target/wp899/repository-child-load-move-candidate-preflight.jsonl": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565",
+    "target/wp899/repository-child-load-move-candidate-preflight.json": "3b786200cd62873f44c99d450233730f10ce10c83bf013d8cb1e628941ae79b8",
+    "target/wp899/repository-child-load-move-start.json": "29a9a64a600a269134a5fc02080843880f3e128ed8155b85cb6b67dc06c5eae0",
+    "target/wp899/repository-child-load-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/repository-child-load-move-candidate-controls.jsonl": "4f391f5ebe37648e70d92e13f6118879aa212f7c311ddc8a1f6b4eb0ad5c6ea6",
+    "target/wp899/repository-child-load-move-baseline-compile.json": "6ccd85e4e782a7dde935143fa9684ea5d3c60bc0002fa3918853309ac43cffc2",
+    "target/wp899/repository-child-load-move-design-input.md": "a097cd15cd1440440e14e051b03fcc5729d9ad98aed5f25687e7f97ca626cc26",
+    "target/wp899/repository-child-load-move-baseline-selectors.json": "9a7d58e1b05e9c3d2339a427388b0c557704e57484577fe144b0a98a0e472ae6",
+    "target/wp899/repository-child-load-move-baseline-preflight.json": "92f578c0a2286ab339c48944854f8a290122d2200f30fd1e93afd77a4f0e83b5",
+    "target/wp899/repository-child-load-move-baseline-compile.jsonl": "a36153257da79da9e203a7a0ea6720289bf0e8341e6723a06558c34ccbc19d29",
+    "target/wp899/repository-child-load-move-dependents-check.jsonl": "2ddc858559f8ca40d42c029497cf9480b560123fa1a6d7a3616d55a0a742b4ce",
+    "target/wp899/repository-child-load-move-candidate-compile.jsonl": "1a37a474fc9a8db4d0c67faf2fd951db433389c99bd169eae10e456b387d705c",
+    "target/wp899/repository-child-load-move-baseline-source.json": "5a6e88fa82826b2f5c865936ceff5402f8e688270775229a3d8e9d77e57f2e17",
+    "target/wp899/repository-child-load-move-candidate-compile.json": "dc18cf26674ea5cef10708f1b90092a9385c3746a608a500b0d1ff2a1cf8780c",
+    "target/wp899/repository-child-load-move-candidate-controls.json": "29132ad02d05546232bd6e249722708fbfa1d0cfdef63ad9be897d30e9302a0b"
+  },
+  "validation_sha256": "ec9fce77267e5aec34a4a134d98264419792cc8006fb905a89c1439c66dd81b6",
+  "final_reviews": {
+    "target/wp899/repository-child-load-move-final-source.md": "c9569377f07352f6fc42fad6b17b8926e5ef79775d711826228f3703e36c25cb",
+    "target/wp899/repository-child-load-move-final-input.md": "897e082fe002540dc8fa96e4974bd0da1c7a249e053d263200bc9537abc0958c",
+    "target/wp899/repository-child-load-move-final-evidence.md": "dfa7959b9fe73a53e29a1fd8e0136f7d3e2348d7d58731aa1f72dfc8ccfc87e9"
+  },
+  "timing": {
+    "elapsed_from_design_seconds": 405.61328530311584,
+    "compile_seconds": 73.19764622097136,
+    "test_seconds": 0.02456670702667907,
+    "review_time": "Not separately measured"
+  }
+}
