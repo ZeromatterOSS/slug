@@ -12,12 +12,11 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component removes unescaped prefix/suffix copies from the private
-`parse_percent_s_one` compiler helper. Validated percent escapes use owned scratch;
-the existing compiler immediately interns both segments in its frozen heap.
-Preserve optimizer grammar/rejection, runtime tuple/error behavior, Unicode and
-GC/freeze ownership. Returned `Cow<str>` values are synchronous compiler scratch.
-This is Slug-native memory ownership, with admitted behavior unchanged.
+The latest accepted component borrows AST literal fragments during private
+`CompilerExprUtil::reduces_to_string` collection, removing two per-fragment owned
+copy sites. Traversal/rejection/order and the returned owned concatenated String
+are unchanged; existing frozen heap allocation owns compiled values.
+This is Slug-native scratch ownership, with admitted behavior unchanged.
 Next: select a proved redundant copy at existing string/compiler owners through
 a bounded design checkpoint.
 
@@ -28,46 +27,40 @@ unwaived; memory controls cannot substitute for them.
 
 ## Local compiler memory contract
 
-Root owns edits, serial Cargo, integration and commits. Allowlist:
-`starlark-rust/starlark/src/values/types/string/interpolation.rs`, sibling
-`percent_s_memory_tests.rs`, compact receipt and matching Stage9 row. Compiler
-`expr.rs`, runtime interpolation and accepted dot-format parser remain unchanged.
-Private exact-helper probes stay under ignored `target/wp899`.
+Accepted component: private `CompilerExprUtil::reduces_to_string` in
+`starlark-rust/starlark/src/eval/compiler/expr.rs` borrows AST literal fragments
+in `Vec<&str>` before constructing its existing owned concatenated result.
+Preserve traversal, left-association, early rejection, reverse/concat and frozen
+heap allocation. No borrowed fragment escapes or enters compiled instructions.
+The exact source/type change removes two per-fragment owned-copy sites; vector,
+final String and frozen storage remain. No RSS, byte-capacity or speed claim.
 
-Keep the two parse loops and rejection decisions. Track character byte indices;
-copy literal fragments only after validated `%%` needs decoding. The `%s` capture
-ends the prefix and starts the suffix at ASCII boundaries. A private finishing
-helper borrows an unescaped fragment or appends it to owned escape scratch.
-Existing `alloc_str_intern` immediately copies/interns outputs; no input borrow
-enters compiled instructions. Add no cache, interner, dependency, unsafe code,
-DICE key or retained representation.
+Root owns edits, serial Cargo and commits. Allowlist: compiler `expr.rs`, sibling
+`literal_concat_memory_tests.rs`, compact receipt and matching Stage9 row.
+Private design/evidence stays under ignored `target/wp899/literal-concat-borrow-*`.
+The bounded design and three DESIGN/FINAL reviews cover AST ownership, optimizer
+semantics and evidence; pins live in the [acceptance receipt](wp899-literal-concat-borrow-2026-10-05.json).
+No new helper/API/cache/interner/dependency/key/unsafe or retained representation.
 
-Independent DESIGN and FINAL reviews cover parser decisions, borrowed lifetimes,
-compiler interning and meaningful evidence. New controls discriminate nonempty
-input-pointer sharing, empty/Unicode/escaped segments, exact optimizer rejection,
-and retained compiled functions invoked after original source/module handles drop.
-Keep ordinary formatter fallback successes/errors and existing compiler bytecode,
-speculative execution, allocation/interner and carrier controls.
+Controls exercise the actual private helper's ordered Unicode/NUL/empty/long
+left chains, rejection boundaries and owned result after AST drop. Compile/freeze
+functions, then invoke after source/module handles drop; cover mixed dynamic
+fallback and actual BazelInternal carriers. Reuse constant-folding/bytecode,
+GC/frozen/interner and recently accepted compiler scratch controls.
 
-Validation uses the pinned nightly-2025-09-14 toolchain resolved with `rustup which`.
-Prepare default Starlark tests with offline Cargo `--no-run --message-format=json`,
-then preflight exact selectors and execute focused tests against that unchanged
-artifact. Golden controls need `CARGO_MANIFEST_DIR` set to the Starlark crate
-fixture directory. New selectors need their own preflight; rebuilding invalidates it.
-Serialize Cargo; preparation is capped at 60s and focused execution at 30s. Check
-default Loading/Core/CLI all targets offline, format Rust, and run plan/archive/diff
-checks. Preserve passing results unless relevant inputs change. Invocation errors
-get narrow repairs; semantic or ownership disagreement requires revisiting design.
-
-The exact-helper differential probe measures returned temporary String or
-owned-Cow capacities only. Input, final frozen storage, transient peaks, RSS,
-speed and source fit remain outside the claim. It does not replace real compiler
-and GC/freeze controls. Full WP899/M7A remains unaccepted.
+Resolve pinned nightly-2025-09-14 tools through `rustup which`. Serial offline
+Starlark default no-run Cargo JSON, exact artifact preflight and focused execution;
+one default Loading/Core/CLI all-target check. Preparation60s/test30s operation
+caps; goldens need CARGO_MANIFEST_DIR and no regeneration. Format changed Rust;
+plan/archive/diff checks. Preserve passing evidence unless relevant inputs change.
+Semantic/ownership disagreement revisits design; invocation repairs stay narrow.
+Full WP899/M7A and source/integration gates remain unwaived and unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Literal-concatenation compiler helper borrows AST fragments; two intermediate owned-copy sites removed, final String/frozen ownership unchanged. Three DESIGNs/FINALs, corrected baseline 3/3, candidate 15/15 and default dependent checks pass; no quantified memory/speed claim | [Literal concatenation borrowing](wp899-literal-concat-borrow-2026-10-05.json) |
 | Percent-s compiler parser borrows unescaped segments before existing frozen interning. Fixed returned temporary capacity 1,572,868B→0; escaped buffers/final storage remain. Three DESIGNs/FINALs, 27 controls, 58,824 comparisons and default dependent checks pass | [Percent-s scratch borrowing](wp899-percent-s-borrow-2026-10-05.json) |
 | Dot-format compiler helper borrows unescaped segments before existing frozen interning. Fixed returned temporary capacity 1,572,868B→0; escaped scratch/final frozen storage remain. Three DESIGNs/FINALs, 19 unique controls (16+3 corrected goldens), 112,347 differential comparisons and default dependent checks pass | [Format scratch borrowing](wp899-dot-format-borrow-2026-10-05.json) |
 | Limited replacement omits untouched suffix from temporary payload; zero/no-match input reuse. Fixed temporary 1,048,577B→1B, same final output; no capacity/RSS/speed claim | [Replacement prefix](wp899-replace-prefix-2026-10-05.json) |

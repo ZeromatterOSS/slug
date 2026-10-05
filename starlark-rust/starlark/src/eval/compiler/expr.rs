@@ -1081,14 +1081,15 @@ impl<P: AstPayload> CompilerExprUtil<P> for ExprP<P> {
         mut left: &'a AstExprP<P>,
         mut right: &'a AstExprP<P>,
     ) -> Option<String> {
-        let mut results = Vec::new();
+        // Borrow AST fragments until the final owned string is assembled.
+        let mut results: Vec<&str> = Vec::new();
         loop {
             if op != BinOp::Add {
                 return None;
             }
             // a + b + c  associates as  (a + b) + c
             let x = right.unpack_string_literal()?;
-            results.push(x.to_owned());
+            results.push(x);
             match &left.node {
                 ExprP::Op(left2, op2, right2) => {
                     op = *op2;
@@ -1097,7 +1098,7 @@ impl<P: AstPayload> CompilerExprUtil<P> for ExprP<P> {
                 }
                 _ => {
                     let x = left.unpack_string_literal()?;
-                    results.push(x.to_owned());
+                    results.push(x);
                     break;
                 }
             }
@@ -1483,3 +1484,6 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
             .collect::<Result<_, CompilerInternalError>>()
     }
 }
+
+#[cfg(test)]
+mod literal_concat_memory_tests;
