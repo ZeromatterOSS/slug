@@ -1,0 +1,252 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e3dde983c",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/dot_format.rs": "4457e815c34f5b343968028a8f978cdf8ffe15dfc684a0a919209ed4cd5c22fa",
+    "starlark-rust/starlark/src/values/types/string/interpolation.rs": "385160312b07c446188c4f6969134c08cfd1ecc4bb2667fa08fc7025e9cc47f5",
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "d1fa6f5a020c3302009a447c69472d820abaf9a9b8e03b67548bebf30b087a7f",
+    "starlark-rust/starlark/src/eval/compiler/expr/empty_format_memory_tests.rs": "6cdf75e3d0465de81df55510b573526d4e2e5ed6cb415e3343dd122c1a87c06d"
+  },
+  "design_sha256": "52609dd7c825c19410bbcbe811bd45859a6de870cc157e860a0e26462414f8ac",
+  "reviewed_design_sha256": "4645e7f174c3f645baeca365df4a3a12420f93b3c3eac4604cff3cc275468cf6",
+  "design_reviews": {
+    "target/wp899/empty-format-reuse-design-source.md": "fd329f1295bf7ae7ff55365122c79746a80dbe15f1dc26cd27912c0855adc16d",
+    "target/wp899/empty-format-reuse-design-input.md": "bde1cacabd078105ef2079d4a842340afc8497d3ef8e1eee50a6e22e8872a415",
+    "target/wp899/empty-format-reuse-design-evidence.md": "f0c15c4d95d4aba562b769aef893c7d3da530e93f6b2b71e5f602045caccd344"
+  },
+  "ownership_proof": "Entire production delta is exactly two empty StringValue guard arms; expr.rs test hook only. Compiler own frozen interning and all other parser/native/runtime/conversion/tuple/error paths unchanged. Test placement clarification adds only private compiler test hook, preserving reviewed production contract.",
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/empty-format-reuse-baseline-compile.json",
+      "receipt_sha256": "957719cec8bdb559959cc236b24f50b960ead2f7504d3de28bc9e87234aa2f7b",
+      "exit_code": 101,
+      "elapsed_seconds": 2.067774922994431,
+      "log_sha256": "1c6013749ccb4e5142163ed448ab18e0d5a9f52d2085ab354662226eb62d0cd4"
+    },
+    "baseline-r1-compile": {
+      "receipt": "target/wp899/empty-format-reuse-baseline-r1-compile.json",
+      "receipt_sha256": "e3c0146a613d7379fddac9c2f1fe4ab7e259ddd9bffa2fed02c4caa72948f4dd",
+      "exit_code": 0,
+      "elapsed_seconds": 5.7652534220251255,
+      "log_sha256": "968175ced3cc2f80b14d85ef90bb015c337114a13a66f7dd995084849e2ba15a"
+    },
+    "baseline-r1-preflight": {
+      "receipt": "target/wp899/empty-format-reuse-baseline-r1-preflight.json",
+      "receipt_sha256": "fddf91151eed72b846f14ce4fb5f5107c870cca6e579251ce80ec36ed4104ff4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020832249021623284,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "baseline-r1-controls": {
+      "receipt": "target/wp899/empty-format-reuse-baseline-r1-controls.json",
+      "receipt_sha256": "d9edccad6ad4369b672ed13f5dbd17d4eb306c5bb4c92388512c8a40421cc252",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005822328035719693,
+      "log_sha256": "2dec4cf9944eece8c30214b43c24ffa160211aa681d8610746920c250add5f2c"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/empty-format-reuse-candidate-compile.json",
+      "receipt_sha256": "27743050e822091e9a9034754e98c4640db4b8fdf085a97d25129b886fc91079",
+      "exit_code": 1,
+      "elapsed_seconds": 0.011591145012062043,
+      "log_sha256": "64d9b5a7c7aae9b1198aff50e7e6b8f57b9ea7eff8e49ba07ee119e14c1ba013"
+    },
+    "candidate-r1-compile": {
+      "receipt": "target/wp899/empty-format-reuse-candidate-r1-compile.json",
+      "receipt_sha256": "77e705962379b49e90c728b5aa89c2bae586c2b4b5aff52f787087b0d11ff603",
+      "exit_code": 0,
+      "elapsed_seconds": 3.846636859001592,
+      "log_sha256": "c990c614226aae668916b774f9a8b9c205ffde198bb715df32d588c81ce08efb"
+    },
+    "candidate-r1-preflight": {
+      "receipt": "target/wp899/empty-format-reuse-candidate-r1-preflight.json",
+      "receipt_sha256": "0fa021413ea7d793dca345415558e0974c9ef503ef83947bdfce4ee32d18984e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021952235023491085,
+      "log_sha256": "e8cb5f83c097ad4ba09946deb22fd0d0d60a7bab332f19a626687851c71e1c0e"
+    },
+    "candidate-r1-controls": {
+      "receipt": "target/wp899/empty-format-reuse-candidate-r1-controls.json",
+      "receipt_sha256": "b96986fb80f5040d6f80cf203fdb63b092110c7b4e991e594f5fcd8b178c2c9a",
+      "exit_code": 0,
+      "elapsed_seconds": 0.005139735003467649,
+      "log_sha256": "39337345a5172080cfd18b4dad708bd9c54b101f168aef5fc3f90cc31d0c8d74"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/empty-format-reuse-dependents-check.json",
+      "receipt_sha256": "bb0887e3d5e2d2a35305632223b65ed6b54c0f302f4f7dc9856d64e62a3a3652",
+      "exit_code": 0,
+      "elapsed_seconds": 8.429511548019946,
+      "log_sha256": "314b4ae68edf09a666c215d338ec01544b0cd3433d433af8da96c5b03f2d5857"
+    }
+  },
+  "selectors": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "b53ae31e5846ac670b110173c3ee56bf9d78c9fbe80032335df575f6f56ccaf1",
+    "selectors": [
+      "eval::compiler::expr::empty_format_memory_tests::empty_segments_reuse_mutable_and_frozen_inputs",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_compiler_constants_skip_mutable_roundtrip",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_semantics_and_retained_compiled_functions",
+      "eval::compiler::expr::empty_format_memory_tests::empty_segment_compiled_functions_preserve_bazel_internal_carriers",
+      "values::types::string::interpolation::percent_s_memory_tests::compiled_percent_s_segments_retain_frozen_ownership",
+      "values::types::string::interpolation::tests::test_incomplete_format",
+      "values::types::string::interpolation::tests::test_unsupported_format_character",
+      "values::types::string::interpolation::tests::test_parse_percent_s_one",
+      "values::types::string::interpolation::tests::test_type_support_d",
+      "values::types::string::interpolation::tests::test_type_support_o",
+      "values::types::string::interpolation::tests::test_type_support_x",
+      "values::types::string::interpolation::tests::test_type_support_e",
+      "values::types::string::interpolation::tests::test_int_min",
+      "values::types::string::dot_format::dot_format_memory_tests::compiled_format_segments_retain_frozen_ownership",
+      "tests::bc::expr::test_format_one",
+      "tests::bc::expr::test_percent_s_one",
+      "tests::bc::expr::test_percent_s_one_format_one_eval",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "values::layout::heap::heap_type::tests::test_string_reallocated_on_heap",
+      "values::layout::heap::heap_type::tests::test_interned_string_equal",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ]
+  },
+  "baseline_result": "2 semantic/retained GC/freeze/imported/carrier tests pass; native pointer/heap and directcompiler arena controls fail as expected (2).",
+  "pass_counts": {
+    "new_owner_tests": 4,
+    "protected_controls": 19,
+    "candidate_controls": 23
+  },
+  "metrics": {
+    "baseline-r1": {
+      "helpers": [
+        {
+          "case": "dot",
+          "input_bytes": 65536,
+          "arena_growth": 139200,
+          "input_pointer_reused": false
+        },
+        {
+          "case": "percent",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": false
+        },
+        {
+          "case": "tuple",
+          "input_bytes": 65536,
+          "arena_growth": 278464,
+          "input_pointer_reused": false
+        },
+        {
+          "case": "frozen",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": false
+        }
+      ],
+      "compiler": [
+        {
+          "percent": false,
+          "input_bytes": 65536,
+          "arena_growth": 69568
+        },
+        {
+          "percent": true,
+          "input_bytes": 65536,
+          "arena_growth": 139200
+        }
+      ]
+    },
+    "candidate-r1": {
+      "helpers": [
+        {
+          "case": "dot",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": true
+        },
+        {
+          "case": "percent",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": true
+        },
+        {
+          "case": "tuple",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": true
+        },
+        {
+          "case": "frozen",
+          "input_bytes": 65536,
+          "arena_growth": 0,
+          "input_pointer_reused": true
+        }
+      ],
+      "compiler": [
+        {
+          "percent": false,
+          "input_bytes": 65536,
+          "arena_growth": 0
+        },
+        {
+          "percent": true,
+          "input_bytes": 65536,
+          "arena_growth": 0
+        }
+      ]
+    }
+  },
+  "corrections": [
+    "Initial test compile used unsupported heap.alloc(()) for empty tuple; corrected to existing AllocTuple::EMPTY and rebuilt baseline before execution.",
+    "Initial candidate invocation accidentally placed rustdoc before cargo as command; exit1 without compiling candidate. Corrected command, rebuilt and preflighted fresh artifact."
+  ],
+  "limits": "Heap.allocated_bytes measures arena chunks/padding, not exact string payload. Fixed64KiB input, no heap growth in identity cases; some baseline copy calls reused available chunk space (growth0 despite distinct ptr). Source+ptr prove removed allocation. Retained input/frozen/interner metadata/nonempty/nonstring storage remain; no RSS/speed/source fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default offline Starlark and default Loading/Core/CLI alltargets; serial Cargo prep60s/test30s caps. Exact fresh artifact preflight; CARGO_MANIFEST_DIR for goldens, regeneration absent.",
+  "scope": "Local strings/basicmemory only; no network/Bazel/linkedruntime/actualsource/retry/cap growth/Windows expansion. FullWP899/M7A/source/integration remains unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/empty-format-reuse-design-evidence.md": "f0c15c4d95d4aba562b769aef893c7d3da530e93f6b2b71e5f602045caccd344",
+    "target/wp899/empty-format-reuse-design-input.md": "bde1cacabd078105ef2079d4a842340afc8497d3ef8e1eee50a6e22e8872a415",
+    "target/wp899/empty-format-reuse-design.md": "52609dd7c825c19410bbcbe811bd45859a6de870cc157e860a0e26462414f8ac",
+    "target/wp899/empty-format-reuse-controls.py": "f77f7b8bb77f2d91767d13c576644dbe277db7079b8ef92f3969d3ed991aa1f5",
+    "target/wp899/empty-format-reuse-candidate-compile.json": "27743050e822091e9a9034754e98c4640db4b8fdf085a97d25129b886fc91079",
+    "target/wp899/empty-format-reuse-dependents-check.jsonl": "314b4ae68edf09a666c215d338ec01544b0cd3433d433af8da96c5b03f2d5857",
+    "target/wp899/empty-format-reuse-baseline-r1-controls.jsonl": "2dec4cf9944eece8c30214b43c24ffa160211aa681d8610746920c250add5f2c",
+    "target/wp899/empty-format-reuse-baseline-r1-compile.json": "e3c0146a613d7379fddac9c2f1fe4ab7e259ddd9bffa2fed02c4caa72948f4dd",
+    "target/wp899/empty-format-reuse-candidate-r1-preflight.jsonl": "e8cb5f83c097ad4ba09946deb22fd0d0d60a7bab332f19a626687851c71e1c0e",
+    "target/wp899/empty-format-reuse-design-reviewed.md": "4645e7f174c3f645baeca365df4a3a12420f93b3c3eac4604cff3cc275468cf6",
+    "target/wp899/empty-format-reuse-baseline-compile.jsonl": "1c6013749ccb4e5142163ed448ab18e0d5a9f52d2085ab354662226eb62d0cd4",
+    "target/wp899/empty-format-reuse-baseline-source.json": "5960d2052315a6691e8a472c643ef4bfa91d6dac711661479cceb09fee5c5b44",
+    "target/wp899/empty-format-reuse-start.json": "eee4227a09e3da3c4f6368b99b583c5832ef16417089d8b494d482235757088b",
+    "target/wp899/empty-format-reuse-baseline-r1-preflight.jsonl": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b",
+    "target/wp899/empty-format-reuse-candidate-compile.jsonl": "64d9b5a7c7aae9b1198aff50e7e6b8f57b9ea7eff8e49ba07ee119e14c1ba013",
+    "target/wp899/empty-format-reuse-candidate-r1-compile.jsonl": "c990c614226aae668916b774f9a8b9c205ffde198bb715df32d588c81ce08efb",
+    "target/wp899/empty-format-reuse-candidate-r1-controls.json": "b96986fb80f5040d6f80cf203fdb63b092110c7b4e991e594f5fcd8b178c2c9a",
+    "target/wp899/empty-format-reuse-baseline-r1-controls.json": "d9edccad6ad4369b672ed13f5dbd17d4eb306c5bb4c92388512c8a40421cc252",
+    "target/wp899/empty-format-reuse-baseline-r1-compile.jsonl": "968175ced3cc2f80b14d85ef90bb015c337114a13a66f7dd995084849e2ba15a",
+    "target/wp899/empty-format-reuse-candidate-r1-selectors.json": "7badbda4b4b46e933caeb944501e7f2be6faf804b8047b894b8b44eb595b3808",
+    "target/wp899/empty-format-reuse-baseline-r1-selectors.json": "01855629e623870aa3a8d65dd5717dbe1a5514d6f3b60401740cb7cd9973d833",
+    "target/wp899/empty-format-reuse-candidate-r1-preflight.json": "0fa021413ea7d793dca345415558e0974c9ef503ef83947bdfce4ee32d18984e",
+    "target/wp899/empty-format-reuse-baseline-compile.json": "957719cec8bdb559959cc236b24f50b960ead2f7504d3de28bc9e87234aa2f7b",
+    "target/wp899/empty-format-reuse-baseline-r1-preflight.json": "fddf91151eed72b846f14ce4fb5f5107c870cca6e579251ce80ec36ed4104ff4",
+    "target/wp899/empty-format-reuse-candidate-r1-controls.jsonl": "39337345a5172080cfd18b4dad708bd9c54b101f168aef5fc3f90cc31d0c8d74",
+    "target/wp899/empty-format-reuse-candidate-r1-compile.json": "77e705962379b49e90c728b5aa89c2bae586c2b4b5aff52f787087b0d11ff603",
+    "target/wp899/empty-format-reuse-design-source.md": "fd329f1295bf7ae7ff55365122c79746a80dbe15f1dc26cd27912c0855adc16d",
+    "target/wp899/empty-format-reuse-dependents-check.json": "bb0887e3d5e2d2a35305632223b65ed6b54c0f302f4f7dc9856d64e62a3a3652"
+  },
+  "validation_sha256": "bdbc9c3d4c5f4d49e853a50b6ab2cee979b5043388111d3cb2613150fd2a4537",
+  "final_reviews": {
+    "target/wp899/empty-format-reuse-final-source.md": "39368abaa05bd58c77878a0d723d9aec96f3a74dde5332231a548334819d0316",
+    "target/wp899/empty-format-reuse-final-input.md": "2552852a9116648166478ce650476516161a79f41af9764f45579df8be06c0a4",
+    "target/wp899/empty-format-reuse-final-evidence.md": "eb55559544d9f42dfda59dca71c4988330d6d2eba4e4cf7aaa7e21e236281588"
+  },
+  "timing": {
+    "elapsed_from_design_seconds": 436.66282963752747,
+    "compile_seconds": 20.120767897053156,
+    "test_seconds": 0.010962063039187342,
+    "review_time": "Not separately measured"
+  }
+}

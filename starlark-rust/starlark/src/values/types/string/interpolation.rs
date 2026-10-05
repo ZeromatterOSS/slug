@@ -418,6 +418,7 @@ pub(crate) fn percent_s_one<'v>(
     heap: Heap<'v>,
 ) -> crate::Result<StringValue<'v>> {
     Ok(match StringValue::new(arg) {
+        Some(arg) if before.is_empty() && after.is_empty() => arg,
         Some(arg) => heap.alloc_str_concat3(before, &arg, after),
         None => {
             let one = match Tuple::from_value(arg) {

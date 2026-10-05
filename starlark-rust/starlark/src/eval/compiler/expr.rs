@@ -1487,3 +1487,6 @@ impl<'v, 'a, 'e> Compiler<'v, 'a, 'e, '_> {
 
 #[cfg(test)]
 mod literal_concat_memory_tests;
+
+#[cfg(test)]
+mod empty_format_memory_tests;

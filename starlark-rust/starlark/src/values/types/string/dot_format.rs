@@ -76,6 +76,7 @@ pub(crate) fn format_one<'v>(
     heap: Heap<'v>,
 ) -> StringValue<'v> {
     match StringValue::new(arg) {
+        Some(arg) if before.is_empty() && after.is_empty() => arg,
         Some(arg) => heap.alloc_str_concat3(before, &arg, after),
         None => {
             let mut result = String::with_capacity(before.len() + after.len() + 10);
