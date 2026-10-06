@@ -201,7 +201,7 @@ impl RunfilesSupportActionSpec {
             Self::RunfilesTree { support, .. } => {
                 let mut seen = FxHashSet::default();
                 let mut visit = |artifact: &AnalysisArtifact| {
-                    if seen.insert(artifact.clone()) {
+                    if !seen.contains(artifact) && seen.insert(artifact.clone()) {
                         visitor(artifact);
                     }
                 };

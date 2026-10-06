@@ -13969,4 +13969,8 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod symlink_aquery_tests {
         include!("tests/symlink_aquery_tests.rs");
     }
+
+    mod runfiles_aquery_tests {
+        include!("tests/runfiles_aquery_tests.rs");
+    }
 }

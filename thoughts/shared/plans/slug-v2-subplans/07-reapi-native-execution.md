@@ -439,6 +439,13 @@ Absolute/custom-policy/nonregular/constant metadata sharing stays unsupported.
 The six saved query pairs still lack authentic typed-producer activation evidence;
 this metadata/planner admission does not prove their production-root execution.
 
+[WP915 support query](wp915-runfiles-aquery-2026-10-06.json) adds class-specific text
+from the existing immutable four support specs through borrowed checked views.
+Its complete physical-role owner/root/kind guards, raw-artifact input projection,
+fixed SymlinkTree env/owner properties and special RunfilesTree header are metadata
+only. No layout/materialization/source observation or execution plan is rebuilt.
+Existing prerequisite, support sharing refusal and publication gates remain.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

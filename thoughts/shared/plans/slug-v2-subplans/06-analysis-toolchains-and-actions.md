@@ -1065,6 +1065,13 @@ execution projection still fail closed. Select the typed FilesToRun/runfiles
 standard-provider category next from actual BCR consumers, without a
 `cc_common`, rules_cc, parser or C++ branch.
 
+The [WP915 support query view](wp915-runfiles-aquery-2026-10-06.json) borrows the
+existing configured action/spec/context and immutable support graph. It validates
+all physical roles against borrowed owner configuration bytes and output roots,
+ordinary expected kinds and default Unix policies before query. Retained ownership,
+publication equality and executable support production remain unchanged. Callback
+loans stay synchronous; no new DICE key/cache, string pool or lifetime boundary.
+
 The complete typed DefaultInfo/runfiles/FilesToRun category architecture is
 independently accepted in
 `WP-6-7A-typed-files-to-run-runfiles-category-architecture-r1`. It freezes one

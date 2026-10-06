@@ -59,7 +59,7 @@ pub(super) fn append_symlink(
     Ok(())
 }
 
-fn progress_message<'a>(
+pub(super) fn progress_message<'a>(
     message: Option<&'a str>,
     mnemonic: &str,
     target: &str,

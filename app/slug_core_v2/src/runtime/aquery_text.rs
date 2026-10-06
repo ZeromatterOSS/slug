@@ -11,6 +11,7 @@ use std::fmt::Write;
 use slug_analysis_v2::ConfigurationKind;
 use slug_analysis_v2::ConfiguredActionView;
 use slug_analysis_v2::ConfiguredNodeResult;
+use slug_analysis_v2::ConfiguredRunfilesSupportActionView;
 use slug_analysis_v2::ConfiguredSpawnActionView;
 use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionKind;
@@ -22,6 +23,7 @@ use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
 use super::file_write_aquery_text::format_file_write_aquery_text;
+use super::runfiles_support_aquery_text::append_runfiles_support;
 use super::spawn_query_inputs::visit_declared_artifacts;
 use super::symlink_aquery_text::append_symlink;
 
@@ -64,6 +66,8 @@ fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
             ConfiguredActionView::from_configured_action(action)?;
         } else if action.symlink_spec().is_some() {
             ConfiguredSymlinkActionView::from_configured_action(action)?;
+        } else if action.runfiles_support_spec().is_some() {
+            ConfiguredRunfilesSupportActionView::from_configured_action(action)?;
         } else {
             ConfiguredSpawnActionView::from_configured_action(action)?;
         }
@@ -83,6 +87,11 @@ fn append_owner(output: &mut String, owner: &ConfiguredNodeResult) -> Result<(),
             append_symlink(
                 output,
                 ConfiguredSymlinkActionView::from_configured_action(action)?,
+            )?;
+        } else if action.runfiles_support_spec().is_some() {
+            append_runfiles_support(
+                output,
+                ConfiguredRunfilesSupportActionView::from_configured_action(action)?,
             )?;
         } else {
             append_spawn(
@@ -166,24 +175,7 @@ fn append_spawn(
     append_list(output, "Outputs", &outputs);
     drop(outputs);
 
-    let mut environment: Vec<_> = spawn
-        .environment()
-        .fixed()
-        .iter()
-        .map(|(key, value)| {
-            let mut field = String::with_capacity(key.len() + 1 + value.len());
-            append_unicode(&mut field, key);
-            field.push('=');
-            append_unicode(&mut field, value);
-            field
-        })
-        .collect();
-    environment.sort_unstable();
-    if !environment.is_empty() {
-        append_list(output, "Environment", &environment);
-    }
-
-    drop(environment);
+    append_environment(output, spawn.environment());
 
     // allArguments query expansion, not execution's spilled argv/virtual files.
     // Drop the complete rendered argv at the end of this action, not command.
@@ -201,7 +193,39 @@ fn append_spawn(
         projection.display_token()
     )
     .unwrap();
-    let mut requirements: Vec<_> = spawn.execution_requirements().iter().collect();
+    append_execution_info(output, spawn.execution_requirements().iter());
+    output.push('\n');
+    Ok(())
+}
+
+pub(super) fn append_environment(
+    output: &mut String,
+    environment: &slug_configuration_v2::RetainedActionEnvironment,
+) {
+    let mut environment: Vec<_> = environment
+        .fixed()
+        .iter()
+        .map(|(key, value)| {
+            let mut field = String::with_capacity(key.len() + 1 + value.len());
+            append_unicode(&mut field, key);
+            field.push('=');
+            append_unicode(&mut field, value);
+            field
+        })
+        .collect();
+    environment.sort_unstable();
+    if !environment.is_empty() {
+        append_list(output, "Environment", &environment);
+    }
+
+    drop(environment);
+}
+
+pub(super) fn append_execution_info<'a>(
+    output: &mut String,
+    entries: impl Iterator<Item = (&'a str, &'a str)>,
+) {
+    let mut requirements: Vec<_> = entries.collect();
     requirements
         .sort_unstable_by(|(left, _), (right, _)| left.encode_utf16().cmp(right.encode_utf16()));
     if !requirements.is_empty() {
@@ -216,8 +240,6 @@ fn append_spawn(
         }
         output.push_str("}\n");
     }
-    output.push('\n');
-    Ok(())
 }
 
 fn append_inputs(

@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-214-m7a-runfiles-support-query-projection-r1
-Status: Ordinary Symlink sharing accepted; typed runfiles-support query selected
+Packet: WP-7-215-m7a-solib-query-projection-r1
+Status: Four runfiles-support query families accepted; typed Solib query selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects the four typed
-runfiles-support action query families. [WP914](./slug-v2-subplans/wp914-symlink-equivalence-2026-10-06.json)
-accepts ordinary Artifact Symlink sharing and exact duplicate-producer planning,
-with41 focused passes and CLI compile coverage; semantic/query owners remain
-complete. Actual six typed producer rows, other query families, authentic source/
-runtime, whole-workload memory fit and M7A remain open. Allocation/interner discipline,
-source16/17/18 and source caps persist; Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects borrowed typed
+Solib query metadata. [WP915](./slug-v2-subplans/wp915-runfiles-aquery-2026-10-06.json)
+accepts the four default runfiles-support query families, class-specific headers,
+fixed environment/owner properties and exact input identity. All47 distinct focused
+checks and updated CLI compile pass; no retained string pool is added. Full-root
+query, authentic source/runtime, whole-workload memory fit and M7A remain open.
+Allocation/interner discipline, source16/17/18 and source caps persist; Windows minimal.
 
 ### Ready and blocked queue
 
@@ -54,7 +54,7 @@ priorities stay queued until their concrete prerequisites and owners are ready.
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects four typed runfiles-support query families; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects typed Solib query metadata; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

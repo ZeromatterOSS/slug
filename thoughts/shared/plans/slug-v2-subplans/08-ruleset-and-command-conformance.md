@@ -410,8 +410,16 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   owners retain query multiplicity; [WP914](wp914-symlink-equivalence-2026-10-06.json)
   also preserves both admitted equal-output Artifact records and their progress,
   while closure-proven duplicates share one planned producer. Full structural input/
-  output identity and platform-agnostic class proof govern this limited sharing. Genuine unresolved/Solib/runfiles
-  query and ActionKeys stay deferred; no execution or source gate is widened.
+  output identity and platform-agnostic class proof govern this limited sharing. Genuine unresolved/Solib query and ActionKeys stay deferred; no execution or source gate is widened.
+- [WP915 runfiles-support text query](wp915-runfiles-aquery-2026-10-06.json) borrows
+  the four default Unix support classes from the validated closure. Repo/Source
+  manifests expose executable=false; SymlinkTree alone exposes fixed env and
+  effective default-owner ExecutionInfo; RunfilesTree has an unquoted header and
+  no TreeArtifact marker. Full identity precedes sorted field projection. Source
+  path storage transfers where printable, and input/env scratch remains local.
+  Default policy/root/owner/kind guards fail the whole command before publication;
+  no support sharing, execution, source or full-root gate is widened. ActionKeys,
+  broader families and whole memory fit remain open.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command
