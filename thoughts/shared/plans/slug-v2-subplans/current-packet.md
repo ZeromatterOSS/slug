@@ -63,40 +63,36 @@ known_shas.bzl4,749,878B is streamedhashonly at fixedfact_body_limit. Neither
 empty/absent fact table proves noimports. Native initialization/wholeworkloadfit
 remain open; do notraise Python limits or retryidenticaldiagnosticguards.
 
-Next freeze a native parser memory/import profile for exactly these two source
-bodies and current hashes,using actual Loading BazelInternal parser behavior.
-Measure AST/source-scratch/retirement under existingenvelope before choosing
-broader producer work; sourceArc owner and parser-owned String scratch must both
-be accounted. Existing BzlParseKey shares retained workspace Arc<String> and
-compactloadfacts,but its AstModule::parse defaultencoding/wholeStringscratch differs
-from HostBzl/Repository parse_with_string_encoding(...BazelInternal); do not claim
-one as the other's profile. No production parser/identity change is selected.
-[The native-profile seam](../../../../target/wp936/native-profile-seam.md),SHA256
-5a4113a0759bc06d547f81813d1606dd9337a739a495f6457759e5c36fb254fa,
-names the existingsmallLoadingtestowner and exactHostBzl/ExternalBzlparser calls.
-Retain only ownedloadnames/scalar locations; AstLoad/FileSpan/CodeMap/error holders
-can retain the entire parser source and must retire with AST. RSS decrease isnot
-a destructor proof. Root first freezes exactnativeproof/owner/allowlist and obtains designreview;
-this checkpoint does not authorize a new Rust runtime or certificate by itself.
+[WP937](wp937-native-source-memory-2026-10-06.json) accepts two complete native
+BazelInternal parser profiles with exact input hashes and original source-owner
+retirement. rustc.bzl peaks at23,932KiB/0.159s, with12 ordered native loads and274B
+owned label capacity; known_shas.bzl peaks at44,236KiB/0.209s, with0 native loads.
+Source capacities145,040B/4,749,878B each have one separately accounted parser copy.
+Three FD controls and three protected Rust tests pass; offline Loading preparation
+58.834s and direct Core check42.899s pass. AST/code-map retirement is structural;
+original Arc weak expiry is asserted. RSS retention is not live-allocation proof.
+Both representative parses fit the existing256MiB RSS envelope; module evaluation,
+normal source certificates and whole-workload fit remain open. Python guard records
+remain closed; no limits were raised or identical diagnostics retried.
 
-[The next fact table](../../../../target/wp936/next-inputs.json),SHA256
-3f3c0a41e474d253de514baad3bead26725b850ad232a4f01278102352403702,
-preserves45 ordered admitted edges:40local/5external,22edges to10newlocalcandidates.
-Two unprovedparents retainnull edge sets/reasons. Newexternal labels @bazel_skylib
-and @rules_cc remain unmapped alongside @bazel_features/@bazel_tools. Literal
-MODULE declarations still do notselectMVS roots. Hold10newlocal candidate reads
-until the source-specific profile/import owner is frozen; no auto-recursion or
-source16–18/F3/BCR/fullroot/acquisition retry. The existing
-[normal retained command seam](../../../../target/wp934/producer-seam.md) remains
-next after genuine source/module/import/generatedtool/registration/provider readiness.
-Borrow action/context andexistinginterned owners; no copiedfixture/secondsemanticcache.
+Proceed with [the normal command source prerequisite](../../../../target/wp937/successor-source.md),
+after freezing its smallest Core test adapter, offline scope, lower image/scratch
+budgets, exact source/effect ownership and independently reviewed operation contract.
+Use the unchanged public probe fixture, native host, explicit rules_rust override and
+nightly setting through existing prepare_build_request/normal singleton drive_command.
+Retain its first genuine typed error or accepted terminal and actual counters under
+existing process caps. No donated sources/providers, guessed transitive roots or repeated
+root commands. New native loads add :lto.bzl,:rustc_resource_set.bzl,:stamp.bzl and external
+action_names/cc_common prerequisites to the earlier held candidates; normal ownership
+should identify the next reached prerequisite before another diagnostic read loop.
+Full source/module/materialization/registration/provider/public Rustc/M7A remain open.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp936
-source/design/input/control/operation/hash records, a focused Core sibling
-runtime/tests/rustc_producer_aquery_tests.rs, its test-only include in runtime/dice.rs,
+source/evidence review before dependent Rust work. Accepted WP937 allowlist: ignored target/wp937
+source/design/input/FDcontrol/operation/hash records and the existing Loading
+app/slug_loading_v2/src/bzl_source_memory_tests.rs for two Linuxignored profiles,
 and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture
 adapter needs its exact existing owner/path and growth reason frozen before editing;
 prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.

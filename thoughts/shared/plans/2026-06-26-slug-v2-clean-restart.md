@@ -63,10 +63,15 @@ Three old hashes match;11 current controls reused.0.092s/22,848KiB process peak 
 [WP936](./slug-v2-subplans/wp936-direct-local-imports-2026-10-06.json)
 observes all16 directlocal files/5,092,301B at31,180KiB peakRSS,11reusedcontrols.
 14partial fact tables remain; rustc’s postparse nodeguard and4.75MBknown_shas
-hash-only bodyguard leave native imports/initialization unproved. Next freeze the
-actual Loading native parser memory/import profile for those two bodies before
-broader producer work.10newliteral imports/external/module/generated prerequisites
-remain; no limitraise or fullworkloadfit/publicproducer admission follows.
+hash-only bodyguard left native imports/initialization unproved.
+[WP937](./slug-v2-subplans/wp937-native-source-memory-2026-10-06.json) accepts the
+two actual native parsers at23,932/44,236KiB peaks,12/0 native loads,3FD+3protected
+tests and separate Loading/Core preparation. Original source ownership retires;
+one required parser copy is counted. These representative parses fit the existing
+envelope. Next freeze one normal offline public-probe source-prerequisite command
+with lower image/scratch budgets, preserving its first typed result and actual
+source counters. No Python limitraise, wholeworkloadfit or publicproducer admission
+follows; transitive/module/generated prerequisites remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

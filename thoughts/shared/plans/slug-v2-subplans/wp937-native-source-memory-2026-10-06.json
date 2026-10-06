@@ -1,0 +1,346 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP937 native source parser memory profile",
+  "date": "2026-10-06",
+  "status": "accepted representative native parses only",
+  "baseline": "5fc88fd3b",
+  "contract": {
+    "path": "target/wp937/design.md",
+    "sha256": "b7ca83b716ffa6a3c615f0565f9cd7da27bcfbd3f19ad1b021feea32fd12e30f"
+  },
+  "result": "Both actual BazelInternal syntax/import profiles pass; source buffer transfer, required parser copy, compact load retention and original source weak retirement verified. Broader normal source-readiness work resumes under explicit caps.",
+  "source_pins": {
+    "target/wp937/supervise.py": "9f7a6589a10a7afe0bbd674a3b8e83e7ba01c3952eff537f997888d874dba436",
+    "target/wp937/fd_source.py": "7a8dfe69f2899855475b1dc5d19deeaa45c129a3dabf9d3713aba9ec063ee7b0",
+    "target/wp937/fd_controls.py": "2a784d611517cb3b5113ec3aa03a456d6142b03f50b5924aec9434e3bfd45576",
+    "target/wp937/inputs.json": "16a76d15d7dd730ded1d8ad7cbfe7b3ea3d31e5d025ddfa3543c030c52281b14",
+    "app/slug_loading_v2/src/bzl_source_memory_tests.rs": "ddc4136ed6e690045646499830bf0d3376cb95eb14bf52aaa1fbe4125e9faee4"
+  },
+  "executable": {
+    "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989",
+    "sha256": "330011ff772492dfa7e876c6b4cfa41230b48fd9500b0e518ad904c967fab0e9"
+  },
+  "native_inputs": {
+    "root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+    "files": [
+      {
+        "path": "rust/private/rustc.bzl",
+        "bytes": 145040,
+        "sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4"
+      },
+      {
+        "path": "rust/private/known_shas.bzl",
+        "bytes": 4749878,
+        "sha256": "f35c95378eb10fd57f719e42fd88fea2b1c15b5049556daf8cdc18ef385ff446"
+      }
+    ]
+  },
+  "validation": {
+    "executed_tests": 8,
+    "fd_controls": 3,
+    "ordinary_tests": 3,
+    "native_tests": 2,
+    "operations": {
+      "controls": {
+        "path": "target/wp937/controls-operation.json",
+        "sha256": "0c5f0a5ed36c080810eabacf7d554220efc7d61e58af867974b9061f775225c0"
+      },
+      "list": {
+        "path": "target/wp937/list-operation.json",
+        "sha256": "d3ee297ff93cb2d590b1d34d658b3d13356b338a1d43ff19c0d14e91d3b3a16c"
+      },
+      "preflight": {
+        "path": "target/wp937/preflight-operation.json",
+        "sha256": "31bc1904a26868ac33ce38cd8cd8f8afb9907bedaa7d6b2b45ea999a81ef58d1"
+      },
+      "ordinary-0": {
+        "path": "target/wp937/ordinary-0-operation.json",
+        "sha256": "a8b92c1e9781df75da5a1eeaf3c759eecb056f51413e6ca22f57f848dc31881f"
+      },
+      "ordinary-1": {
+        "path": "target/wp937/ordinary-1-operation.json",
+        "sha256": "23ca40d83409111597787ad37ad79ac6a384be0e79efbfbb211cffbffc469771"
+      },
+      "ordinary-2": {
+        "path": "target/wp937/ordinary-2-operation.json",
+        "sha256": "65489ddfae0f82db83ea4dd3835c1e39d11f8a14788948379302ae8cc4ec8697"
+      },
+      "native-0": {
+        "path": "target/wp937/native-0-operation.json",
+        "sha256": "0721c7a7d4a4d888d465ced526fd21b18cc76e4c1659f489e1a25bf8e3a09f78"
+      },
+      "native-1": {
+        "path": "target/wp937/native-1-operation.json",
+        "sha256": "c9a764fb81747c3d45cfb9983deea63c7b2bd6bffb8a5b0d03a7174e2cb80d2f"
+      }
+    },
+    "native_results": [
+      {
+        "path": "target/wp937/native-0-result.json",
+        "sha256": "745b0e5d6832ab994b2335dc9ba8397a19538f0ba429d8a318caca2952d90f7e"
+      },
+      {
+        "path": "target/wp937/native-1-result.json",
+        "sha256": "10d16ab3fae07db979b24ee2bdbe66c22d2e124a8e8b4fc5a71a9010e0716d13"
+      }
+    ],
+    "compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 58.8338059639791,
+      "artifacts": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-0edda4d11be1d989"
+      ]
+    },
+    "direct_core_check": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 42.89925849006977
+    },
+    "all_groups_empty_joined": true
+  },
+  "allocation": {
+    "scope": "Two separate-process native BazelInternal syntax/import profiles of exact pinned source files; not module evaluation, import resolution or normal producer proof.",
+    "peak_rule": "max(monitored_rss_kib, child_rusage_peak_kib, all six native phase RSS samples)",
+    "rss_limit_kib": 262144,
+    "basis": {
+      "native-0-operation.json": "0721c7a7d4a4d888d465ced526fd21b18cc76e4c1659f489e1a25bf8e3a09f78",
+      "native-0-result.json": "745b0e5d6832ab994b2335dc9ba8397a19538f0ba429d8a318caca2952d90f7e",
+      "native-1-operation.json": "c9a764fb81747c3d45cfb9983deea63c7b2bd6bffb8a5b0d03a7174e2cb80d2f",
+      "native-1-result.json": "10d16ab3fae07db979b24ee2bdbe66c22d2e124a8e8b4fc5a71a9010e0716d13",
+      "controls-operation.json": "0c5f0a5ed36c080810eabacf7d554220efc7d61e58af867974b9061f775225c0",
+      "ordinary-0-operation.json": "a8b92c1e9781df75da5a1eeaf3c759eecb056f51413e6ca22f57f848dc31881f",
+      "ordinary-1-operation.json": "23ca40d83409111597787ad37ad79ac6a384be0e79efbfbb211cffbffc469771",
+      "ordinary-2-operation.json": "65489ddfae0f82db83ea4dd3835c1e39d11f8a14788948379302ae8cc4ec8697"
+    },
+    "phase_columns": [
+      "phase",
+      "rss_kib"
+    ],
+    "cases": [
+      {
+        "path": "rust/private/rustc.bzl",
+        "source_sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4",
+        "source_bytes": 145040,
+        "original_source_capacity_bytes": 145040,
+        "owned_parser_string_capacity_bytes": 145040,
+        "native_load_count": 12,
+        "owned_load_label_capacity_bytes": 274,
+        "elapsed_seconds": 0.15940480399876833,
+        "monitored_rss_kib": 716,
+        "child_rusage_peak_kib": 23932,
+        "phase_rss": [
+          [
+            "baseline",
+            12780
+          ],
+          [
+            "after_input",
+            18152
+          ],
+          [
+            "after_parse",
+            20644
+          ],
+          [
+            "after_ast_retirement",
+            22644
+          ],
+          [
+            "after_source_retirement",
+            23544
+          ],
+          [
+            "after_final_drop",
+            23760
+          ]
+        ],
+        "conservative_peak_rss_kib": 23932,
+        "selected_count": 1,
+        "pass_count": 1,
+        "joined_and_group_empty": true,
+        "source_fd_brackets_and_exact_shared_eof": true,
+        "original_source_weak_retirement_passed": true,
+        "ast_retirement": "structural; no retained AstLoad, FileSpan, CodeMap or AST in compact result"
+      },
+      {
+        "path": "rust/private/known_shas.bzl",
+        "source_sha256": "f35c95378eb10fd57f719e42fd88fea2b1c15b5049556daf8cdc18ef385ff446",
+        "source_bytes": 4749878,
+        "original_source_capacity_bytes": 4749878,
+        "owned_parser_string_capacity_bytes": 4749878,
+        "native_load_count": 0,
+        "owned_load_label_capacity_bytes": 0,
+        "elapsed_seconds": 0.2093866199720651,
+        "monitored_rss_kib": 38612,
+        "child_rusage_peak_kib": 44236,
+        "phase_rss": [
+          [
+            "baseline",
+            12688
+          ],
+          [
+            "after_input",
+            22436
+          ],
+          [
+            "after_parse",
+            39548
+          ],
+          [
+            "after_ast_retirement",
+            31240
+          ],
+          [
+            "after_source_retirement",
+            27584
+          ],
+          [
+            "after_final_drop",
+            27584
+          ]
+        ],
+        "conservative_peak_rss_kib": 44236,
+        "selected_count": 1,
+        "pass_count": 1,
+        "joined_and_group_empty": true,
+        "source_fd_brackets_and_exact_shared_eof": true,
+        "original_source_weak_retirement_passed": true,
+        "ast_retirement": "structural; no retained AstLoad, FileSpan, CodeMap or AST in compact result"
+      }
+    ],
+    "supporting_gates": {
+      "fd_controls": {
+        "selected_count": 3,
+        "pass_count": 3,
+        "elapsed_seconds": 0.05184083501808345,
+        "conservative_peak_rss_kib": 25104
+      },
+      "ordinary_source_sharing": {
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.15644375991541892,
+        "conservative_peak_rss_kib": 32160
+      },
+      "ordinary_host_source_parser_ownership": {
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.15611577790696174,
+        "conservative_peak_rss_kib": 36580
+      },
+      "ordinary_host_source_encoding_refusal": {
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.15539599594194442,
+        "conservative_peak_rss_kib": 35676
+      }
+    },
+    "total_native_input_bytes_sequential": 4894918,
+    "executed_test_count": 8,
+    "native_case_peak_rss_kib": 44236,
+    "both_native_cases_fit_frozen_envelope": true,
+    "capacity_qualification": "Source Arc buffer and one required full parser String scratch are separate. Capacities exclude AST nodes, vector/Arc metadata and allocator overhead; they are not total live heap.",
+    "retention_qualification": "Phase RSS is process-resident telemetry. Changes after drops do not prove AST deallocation or reachable heap savings; allocator page retention remains possible. Original source release is independently asserted by Weak expiry.",
+    "whole_workload_fit_proved": false,
+    "source_certificate": false,
+    "normal_producer_proved": false,
+    "source16_F3_full_root_retry": false
+  },
+  "compatibility": {
+    "exact": "Pinned full source bytes/hashes and native ownership assertions.",
+    "slug_native": "BazelInternal native syntax/load order/scalar spans; no evaluation or resolved import graph.",
+    "deferred": "Actual sources/modules/generated mappings/toolchains/providers/normal public Rustc/full workload memory/M7A; Windows minimal."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp937/design-source.md",
+      "sha256": "2f491b5b325cd8f0d190bda95388c978e1ecfdc993138a6621bdc8567be507a1"
+    },
+    "design-evidence": {
+      "path": "target/wp937/design-evidence.md",
+      "sha256": "a8f27a7f1b05ffcdf3a70bc740d6b836cdc3e399f263523f7e5e5f90f58fd9e2"
+    },
+    "preflight-source": {
+      "path": "target/wp937/preflight-source.md",
+      "sha256": "0dbf506c3fbec1bba131658a19ef981d7ddef01dedc57ed0e8880a868aad63b5"
+    },
+    "preflight-evidence": {
+      "path": "target/wp937/preflight-evidence.md",
+      "sha256": "0e55377fcd259675888b04a0b9a60db8f3fa612144897682cf5f6bfe168d5217"
+    },
+    "final-source": {
+      "path": "target/wp937/final-source.md",
+      "sha256": "c89321dbd0ed9db91a1165cf288d23b83b6086095b22c21807f09a493f05f0ac"
+    },
+    "final-evidence": {
+      "path": "target/wp937/final-evidence.md",
+      "sha256": "1565bc3b03d47f106778a14e8ec0e385072b7ebd9c1127bec63ad5270b2f217a"
+    }
+  },
+  "next": {
+    "recommendation": {
+      "path": "target/wp937/successor-source.md",
+      "sha256": "b8d87fad022eb0e0fec18c58fb393c625debd4f8eff54d2effca9bfeaf959c8a"
+    },
+    "gate": "Freeze new normal offline //pkg:probe command prerequisite with existing Core singleton owner, lower image/scratch budgets and first typed terminal/counters; no donor or root retry.",
+    "packet_continues": true,
+    "whole_workload_fit_unproved": true
+  },
+  "packet_elapsed_seconds": 1155.0906853675842
+}
