@@ -1,0 +1,219 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP936 direct local import availability",
+  "date": "2026-10-06",
+  "status": "accepted finite file observations only",
+  "baseline": "70f7660fb",
+  "contract": {
+    "path": "target/wp936/design.md",
+    "sha256": "9950282cf258439179d7a0c71b6c6252f774444971fef32bc47420eeeef7ab27"
+  },
+  "result": "All16 exact newlocal candidates observed,5092301B/zerooverflow;14 partial literal fact tables,onepostparse nodeguard andonehash-only bodyguard. No native/source closure admission.",
+  "source_pins": {
+    "target/wp936/read.py": "4783933d896aaa6c8447020e5b3ddfe0e72b3bfc108bb1b0276253e800d04ef9",
+    "target/wp936/bounded.py": "431a41ef18b2b4c6b4202b23544fd1521000abd20c31f40867c418cb824a934f",
+    "target/wp936/inputs.json": "8b42c48e09f8fffb8f721d45f1942e275c07fa3126c886a2999740e3b0a9d26e",
+    "target/wp936/design.md": "9950282cf258439179d7a0c71b6c6252f774444971fef32bc47420eeeef7ab27",
+    "target/wp933/read.py": "b1449695dce5f24f7fa34db8131b4ad4dd8cf67776c36753d57d365d0c943b13",
+    "target/wp933/facts.py": "19ce415b75d77e667c846807650cfbe41120cbed7f80e48c2e978236b6f1e429",
+    "target/wp933/reader_controls.py": "a74b6762ad0ef2a9182b62b2724ead97e23a94c437f5e35f4bb601699cc82ddd",
+    "target/wp933/fact_controls.py": "4ac9568502600f73facae5a7618c049db5150d3d2bf87e782cd994af9e3328e3",
+    "target/wp933/bounded.py": "fd49ad59bfa727e6a0bae7548436c65f6aeefbda13080e56f298b5d840cb2aa2",
+    "target/wp933/inputs.json": "361f7ae08a6117a9e1588c9339d8b348dafd53907080d5286193ca5a67ba7462",
+    "target/wp933/design.md": "1abbac83ac7ceec8cd08908fcc0a905e3818d38bed2ff42d89220b00e16594a1",
+    "target/wp933/preflight.json": "838be3abe7438e253611135d2ad4f10163a9c0da2ce224864993800eb7f3b8df",
+    "target/wp933/controls-operation.json": "7fa9fba9b5d51be74c8b7604987f35629aaef219e0092912e0584186ddfe4d84",
+    "target/wp933/controls.stderr": "001f12f6483ae91eba640ac615b115e3966e82ca798d74c3d964cfedc2082ddc",
+    "target/wp934/result.json": "6fe313becbf839874a89e9ac15aaa40855bab27b62da67c28f9fd4f4344cc8dc",
+    "target/wp934/metadata-operation.json": "3ca57f0bee106ae7b539afd60ced9f267ef9935017d3da29698c46296a4b5dcc",
+    "target/wp934/final-source.md": "e459c6ed10402d3a2cb112d5be5249f9df9862cb0ca6cbc003e49624427d1d02",
+    "target/wp934/final-evidence.md": "70031f1d301bb8129d29a3d7cd218eeb01ee3506d2a10ee13df0a167452ff90a",
+    "target/wp935/result.json": "24f1dc348871a7b6e5b17c1bd7c1a080b7b2132922d6a3c69718827f46686c3a",
+    "target/wp935/next-inputs.json": "76e5b34ba185e08c8a27ac2e9c537056dc7cb28c2cf5f4efd1069a29d7db156d",
+    "target/wp935/availability-operation.json": "de30df5934ef5ccea24e6409f75c394ec097c961d05a2ae5939b533588cb7829",
+    "target/wp935/final-source.md": "ea7f9a7674663a5805df400e4f6ad98ba7b1e79397139a577c2567be4f34df6b",
+    "target/wp935/final-evidence.md": "a811182a4f2259cffcab2e18575cf3cb146c16ca883f1602bbdffb8697d74dd2"
+  },
+  "observed_sources": [
+    {
+      "path": "rust/toolchain.bzl",
+      "bytes": 1023,
+      "sha256": "b94731396dc90e4ef8bbdc753252aac80208aba9cd857a7e7ca74d23f6aabbce"
+    },
+    {
+      "path": "rust/private/clippy.bzl",
+      "bytes": 22211,
+      "sha256": "a778d2ddc77587ffbffc72efcdaa458a1ffae0763e500da1c876b9b567b2a686"
+    },
+    {
+      "path": "rust/private/common.bzl",
+      "bytes": 3201,
+      "sha256": "cee50122624c7fd9c9a6545a647062f350dd25bc8cf6dda873944290463d4db6"
+    },
+    {
+      "path": "rust/private/lints.bzl",
+      "bytes": 3181,
+      "sha256": "0c6dcf615bb9f43d57c4056253f89a9f1bed0b16b9e17d8eed64da85d1b05677"
+    },
+    {
+      "path": "rust/private/rust.bzl",
+      "bytes": 65708,
+      "sha256": "a645bd5db6344bd3c0997dcf73600475c0af53fb4dd025890be24b8e1e2dbfd8"
+    },
+    {
+      "path": "rust/private/rust_analyzer.bzl",
+      "bytes": 20078,
+      "sha256": "09324b657db2d87728820b3f314a6d1d8d4208cff2276325a652d78f2b6a66a5"
+    },
+    {
+      "path": "rust/private/rustc.bzl",
+      "bytes": 145040,
+      "sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4"
+    },
+    {
+      "path": "rust/private/rustdoc.bzl",
+      "bytes": 16546,
+      "sha256": "944d095c356c29266828175d45c07aa42f7c977bb0e8e0acf9e87086a7182147"
+    },
+    {
+      "path": "rust/private/rustdoc_test.bzl",
+      "bytes": 16615,
+      "sha256": "89a7fdb54cf0dcbc9ebdfc9fd970b3b0df311edd305936e5dfcca800cb404180"
+    },
+    {
+      "path": "rust/private/rustfmt.bzl",
+      "bytes": 10691,
+      "sha256": "71ad2f08f5cf2d7a88ee983339c4371309d2ef2b0c407dcc1266bbe83155fb7a"
+    },
+    {
+      "path": "rust/private/unpretty.bzl",
+      "bytes": 10681,
+      "sha256": "d4d43a1e8fe8d7a5a17a3bf07dafe2ec530c7f7584ba48df138a2683abfa9d7b"
+    },
+    {
+      "path": "rust/platform/triple.bzl",
+      "bytes": 5310,
+      "sha256": "19fd04c62b3a50057ffc8ab9b831f5182bc531e4307f6065065ce214de4129e6"
+    },
+    {
+      "path": "rust/platform/triple_mappings.bzl",
+      "bytes": 19189,
+      "sha256": "2e870b79faea6239b98ec870de99763e2a963396d53cd63b045915ee9485901d"
+    },
+    {
+      "path": "rust/private/nightly_versions.bzl",
+      "bytes": 1033,
+      "sha256": "2a6a17ea96d50535fc1315556c2c48fd0adebecc4b5d6d20cbfafe1f9fc03f8a"
+    },
+    {
+      "path": "rust/private/semver.bzl",
+      "bytes": 1916,
+      "sha256": "966fe4b90082dd92bac60398b2801824f41906eea71364b64f630f0c175250ab"
+    },
+    {
+      "path": "rust/private/known_shas.bzl",
+      "bytes": 4749878,
+      "sha256": "f35c95378eb10fd57f719e42fd88fea2b1c15b5049556daf8cdc18ef385ff446"
+    }
+  ],
+  "unproved_facts": [
+    {
+      "path": "rust/private/rustc.bzl",
+      "bytes": 145040,
+      "reason": "node_limit after AST construction,empty admitted loads is not absence"
+    },
+    {
+      "path": "rust/private/known_shas.bzl",
+      "bytes": 4749878,
+      "reason": "fact_body_limit;streamedfullhash,no body/AST/import facts"
+    }
+  ],
+  "validation": {
+    "reused_controls": 11,
+    "new_tests": 0,
+    "selected_rows": 16,
+    "observed_rows": 16,
+    "completed_decisions": 16,
+    "elapsed_seconds": 0.17255484103225172,
+    "operation": {
+      "path": "target/wp936/availability-operation.json",
+      "sha256": "dec4af71caa65c4a63feeec84bc1b65aa8e111c2594c562a17f4aba43ae702ec"
+    },
+    "report": {
+      "path": "target/wp936/result.json",
+      "sha256": "e7c94998d762ea532c86ad2d91849188e082b0a8af22b3a57663e279f36b6652"
+    },
+    "preflight": {
+      "path": "target/wp936/preflight.json",
+      "sha256": "e4cb8280d21859eb58237a8155dd174471fb459f1ec23fac7feb8902b4950142"
+    },
+    "all_groups_empty_joined": true
+  },
+  "allocation": {
+    "strategy": "Unchanged64KiBstream/one256KiBbody,singlefilebody/text/ASTretirement;4.75MBknown_shasstreamedhashonly.No corpus/globalpool.",
+    "actual_read_bytes": 5092301,
+    "trace": {
+      "loaded_current": 1765549,
+      "loaded_peak": 1765549,
+      "retained_compact_helpers_and_facts": 2144290,
+      "peak_through_retirement": 9555071,
+      "tracing_excludes_encoding": true
+    },
+    "rss_peak_kib": 31180,
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304
+    },
+    "source_bytes_limit": 16777216,
+    "qualification": "14 small diagnostic fact admissions+rustc full ASTguard+known_shas hashonly;8192node is postparse,256KiBbodycapstaysfixed. Trace excludes initialinterpreter/launchercompile/tracemallocimport+encoding,RSSincludesencoding. No native large-table initialization/Slugsavings/fullworkloadfit."
+  },
+  "compatibility": {
+    "exact": "All16 currenthashes/individualbrackets recorded; old21reference/sourcebodies notreread.",
+    "slug_native": "Diagnosticliteral-import paths/facts only.",
+    "deferred": "Two guarded native import/initialization gaps,10newlocal candidates/external mappings/modules/materialization/provider/publicproducer/fullfit/M7A;Windowsminimal."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp936/design-source.md",
+      "sha256": "6f4d0033a36090e57712d01f0c40a994fe3e5b02dddf7d8601839f9d49cc55ea"
+    },
+    "design-evidence": {
+      "path": "target/wp936/design-evidence.md",
+      "sha256": "b1c6b1e940a88e089b8285d51555c77e89ff59300045df7b9b7768bb63a4dda3"
+    },
+    "preflight-source": {
+      "path": "target/wp936/preflight-source.md",
+      "sha256": "a6ffed2a9ed92a0221b3a32f73404903b175af71cd0eea0cfe2b78843926bd2c"
+    },
+    "final-source": {
+      "path": "target/wp936/final-source.md",
+      "sha256": "d643be285ee5d5ce720b6f1dee5078dbd7ff1512b003da60cee7308bf3f998c4"
+    },
+    "final-evidence": {
+      "path": "target/wp936/final-evidence.md",
+      "sha256": "9e6163cad924d221828eb2ee0570db8e08f3d106bd9e970f6dec2af7c637165c"
+    }
+  },
+  "next": {
+    "recommendation": {
+      "path": "target/wp936/successor-source.md",
+      "sha256": "ce2d90a731a2ac1243977cce926989840ab12fb34e9408a5b4d6f3db2b25f0d6"
+    },
+    "input_table": {
+      "path": "target/wp936/next-inputs.json",
+      "sha256": "3f3c0a41e474d253de514baad3bead26725b850ad232a4f01278102352403702"
+    },
+    "gate": "Freeze native source-parser memory/import profile for exact rustc andknown_shas bodies underexistingcaps usingactualBazelInternal ASTowner. No largerPythonlimits/identicalguardretry; nativeprofile notsourcecert/publicproducer. Then10 literal local imports/external-source prerequisites.",
+    "packet_continues": true,
+    "public_producer_whole_fit_unproved": true,
+    "native_profile_recommendation": {
+      "path": "target/wp936/native-profile-seam.md",
+      "sha256": "5a4113a0759bc06d547f81813d1606dd9337a739a495f6457759e5c36fb254fa"
+    }
+  },
+  "packet_elapsed_seconds": 620.3894608020782
+}

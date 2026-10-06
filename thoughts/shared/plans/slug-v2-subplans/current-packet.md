@@ -55,26 +55,46 @@ finite explicit-root reads only,not native sources/module/provider/wholeworkload
 spelling from a closed anchored metadata observation; the original WP933 logical
 alias refusal remains closed. No implicit cache certificate or oldpathretry.
 
-Next freeze16 notyetobserved direct local import candidates from
-[the exact fact table](../../../../target/wp935/next-inputs.json),SHA256
-76e5b34ba185e08c8a27ac2e9c537056dc7cb28c2cf5f4efd1069a29d7db156d,
-and [the source recommendation](../../../../target/wp935/successor-source.md),SHA256
-ebd53b46206a8438c6b60f2f094e45860496f20e9722241d10b79651ae290a43.
-28 ordered edges retain raw labels/callerhash/lines:25local(4alreadyobserved,21edges
-to16newfiles),3external(@bazel_features once,@bazel_tools twice) stay unmapped.
-Sevennondev/3dev original MODULE declarations are literal requests,not selectedMVS
-versions or available dependencyroots. repository_utils now has actual requiredload
-edges at extensions13/repositories8. Same strict streaming/bracket/body/AST/caps apply;
-no auto-recursion,tree/census/archive/acquisition/source16–18/F3/BCR/fullroot retry.
-Normal public producer uses the existing [retained command seam](../../../../target/wp934/producer-seam.md)
-only after its genuine source/import/extension/generated tool/registration/provider
-prerequisites. Borrow retained action/context and existinginterned owners; no copied
-sourcefixture or secondsemanticcache. Full Slug-workload memory fit remains open.
+[WP936](wp936-direct-local-imports-2026-10-06.json) accepts all16 new local
+file observations/5,092,301B,0overflow,0.173s.11 unchangedcontrols reused;
+31,180KiB peakRSS,traced9,555,071Bpeak/2,144,290Bretained with perfile retirement.
+14 partialfact tables admitted. rustc.bzl145,040B hits postparse node_limit;
+known_shas.bzl4,749,878B is streamedhashonly at fixedfact_body_limit. Neither
+empty/absent fact table proves noimports. Native initialization/wholeworkloadfit
+remain open; do notraise Python limits or retryidenticaldiagnosticguards.
+
+Next freeze a native parser memory/import profile for exactly these two source
+bodies and current hashes,using actual Loading BazelInternal parser behavior.
+Measure AST/source-scratch/retirement under existingenvelope before choosing
+broader producer work; sourceArc owner and parser-owned String scratch must both
+be accounted. Existing BzlParseKey shares retained workspace Arc<String> and
+compactloadfacts,but its AstModule::parse defaultencoding/wholeStringscratch differs
+from HostBzl/Repository parse_with_string_encoding(...BazelInternal); do not claim
+one as the other's profile. No production parser/identity change is selected.
+[The native-profile seam](../../../../target/wp936/native-profile-seam.md),SHA256
+5a4113a0759bc06d547f81813d1606dd9337a739a495f6457759e5c36fb254fa,
+names the existingsmallLoadingtestowner and exactHostBzl/ExternalBzlparser calls.
+Retain only ownedloadnames/scalar locations; AstLoad/FileSpan/CodeMap/error holders
+can retain the entire parser source and must retire with AST. RSS decrease isnot
+a destructor proof. Root first freezes exactnativeproof/owner/allowlist and obtains designreview;
+this checkpoint does not authorize a new Rust runtime or certificate by itself.
+
+[The next fact table](../../../../target/wp936/next-inputs.json),SHA256
+3f3c0a41e474d253de514baad3bead26725b850ad232a4f01278102352403702,
+preserves45 ordered admitted edges:40local/5external,22edges to10newlocalcandidates.
+Two unprovedparents retainnull edge sets/reasons. Newexternal labels @bazel_skylib
+and @rules_cc remain unmapped alongside @bazel_features/@bazel_tools. Literal
+MODULE declarations still do notselectMVS roots. Hold10newlocal candidate reads
+until the source-specific profile/import owner is frozen; no auto-recursion or
+source16–18/F3/BCR/fullroot/acquisition retry. The existing
+[normal retained command seam](../../../../target/wp934/producer-seam.md) remains
+next after genuine source/module/import/generatedtool/registration/provider readiness.
+Borrow action/context andexistinginterned owners; no copiedfixture/secondsemanticcache.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp935
+source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp936
 source/design/input/control/operation/hash records, a focused Core sibling
 runtime/tests/rustc_producer_aquery_tests.rs, its test-only include in runtime/dice.rs,
 and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture

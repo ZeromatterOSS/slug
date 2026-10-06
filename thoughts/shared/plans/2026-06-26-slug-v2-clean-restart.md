@@ -60,8 +60,13 @@ not a source certificate.
 observes all13 finite rows325,671B,including119,073B of five current upstream sources.
 Three old hashes match;11 current controls reused.0.092s/22,848KiB process peak and
 4,300,734B trace peak through perfile retirement establish finite-reader fit only.
-Next are16 literal local import candidates and unmapped external/module/generated
-prerequisites; no full-workload fit or normal public producer admission follows.
+[WP936](./slug-v2-subplans/wp936-direct-local-imports-2026-10-06.json)
+observes all16 directlocal files/5,092,301B at31,180KiB peakRSS,11reusedcontrols.
+14partial fact tables remain; rustc’s postparse nodeguard and4.75MBknown_shas
+hash-only bodyguard leave native imports/initialization unproved. Next freeze the
+actual Loading native parser memory/import profile for those two bodies before
+broader producer work.10newliteral imports/external/module/generated prerequisites
+remain; no limitraise or fullworkloadfit/publicproducer admission follows.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
