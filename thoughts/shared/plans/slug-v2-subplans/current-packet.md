@@ -12,62 +12,62 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component transfers owned list elements when compiler
-addition folding succeeds. The exact per-operand 1000-element guard, ordered
-fallback, element spans and frozen constant conversion remain. Fifteen fixed
-Symbol buffers transfer across four fixtures; output collection remains and
-output/nested IR capacity is not promised equal. Next: select a proved redundant
-local copy or existing interner reuse through a bounded design checkpoint.
+The latest accepted component converts temporary DOT class labels through owned
+CompactString conversion only for tight buffers at or above the pinned minimum
+heap capacity. Short and spare buffers retain the original copying conversion.
+Exact DOT bytes, final capacities, graph owners and release boundaries remain.
+Next: select a proved redundant local copy or existing interner reuse through a
+bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted list addition element ownership contract
+## Accepted DOT class-label conversion ownership contract
 
-Private ExprCompiled::add keeps the exact tuple admission guards and independent
-1000-element limits. After both succeed, a local closure transfers owned List(xs)
-elements; every other admitted operand uses unchanged short frozen-list constant
-conversion. The repeated constant check is pure and guard-proved. Element spans,
-frozen handles and original operand spans for generated constants remain. The
-same left/right iterator chain and collect, ordinary Add with untouched rejected
-operands, and bin_op's preceding constant folding stay unchanged. Existing
-ExprShortList/as_short_list/as_exprs remain. No new helper/public API/interner/
-cache/key/unsafe/dependency/retained representation or donor.
+Private SelectedQueryGraph::class_label keeps every assembly operation, numeric
+temporary, byte threshold, first-member exemption, truncation marker/count and
+member order. Only its final owned String conversion changes: capacity==len AND
+len>=size_of::<String>()+size_of::<usize>() selects existing CompactString::from;
+all shorter/inline/below-floor/spare values keep original CompactString::new.
+Pinned compact_str 0.8.2's copying heap constructor clamps to that minimum; its
+owned constructor transfers ordinarily encodable buffers. The large-capacity
+32-bit fallback copies through the original heap constructor and is excluded
+from transfer claims. This preserves final capacity and natural ownership.
 
-Three DESIGNs/FINALs accept whole-owner source proof and identical corrected
-273-line sibling tests. Baseline has two semantic/lifecycle passes and one intended
-ownership failure; candidate passes 12/12. All fifteen fixed Symbol buffers
-transfer across dynamic/dynamic, dynamic/frozen, frozen/dynamic and dynamic/empty
-routes (6/3/3/3), preserving exact helper IR/content/order/spans/frozen handles.
-Four expression/frozen combinations admit 1000 elements per side into 2000 total;
-eight oversized/invalid cases preserve rejected operands and pointers. Empty
-lists, effects/order/count, Unicode, list mutation, four byte-identical diagnostics
-and retained frozen functions after source/module/clone drop and explicit GC pass.
-Fifteen protected sources, prior type-equality ownership and string-carrier tests,
-four existing list-add/constant-fold controls including bounded too-large inlining,
-and default Loading/Core/CLI alltargets checks pass.
+Class-label CompactStrings remain synchronous render-phase scratch released
+with stdout's local labels vector. Returned stdout remains independently owned;
+request-owned graph labels/structural identity, factoring, quotient-edge dedup,
+sorted/unsorted traversal and public formatting paths remain unchanged. No new
+helper/public API/interner/cache/key/unsafe/dependency/representation or donor.
 
-The initial test-only E0308 integer constructor correction preserves its failed
-compile and original-source hash. An existing golden failure is independently
-baseline-reproduced with a byte-identical mismatch; only five stale call-site
-ranges are manually corrected to actual point spans. Opcodes, offsets, registers,
-order and all other golden bytes remain. No golden regeneration or new assets.
-Fresh exact artifacts/preflights, serial pinned offline prep60s/tests30s and
-format/archive/plan/diff hygiene pass.
+The original three DESIGN REVISEs identified the 25-31-byte capacity-floor
+mismatch before production implementation. Revised guards/boundary controls
+received three DESIGN R2 ACCEPTs; three FINALs accept the actual diff and evidence.
+Identical 118-line tests pass baseline 2/2 and candidate 7/7. Fourteen actual class
+cases preserve bytes, capacity and inline/heap state, including 24/25/31/32,
+tight/spare, empty/Unicode, byte-threshold/one-over, oversized first-member and
+multi-digit remaining counts. Eight raw DOT outputs match baseline in factored/
+unfactored and sorted/unsorted modes over duplicate/cyclic/generated-file graphs;
+source/graph/clone drop retains output text. Five existing graph regressions,
+thirteen protected sources, three pinned dependency sources and default Core/CLI
+alltargets checks pass. Initial baseline preparation before added boundary cases
+is not a test gate; revised baseline/candidate fresh artifacts and exact preflights,
+serial pinned offline prep60s/tests30s and format/archive/plan/diff hygiene pass.
+No assets or golden changes.
 
-Acceptance proves one borrowed expression-list deep-clone conversion bypassed and
-fixed Symbol transfer. Output collection, constant conversion and final bytecode/
-frozen owners remain. Nested IR Vec spare capacity may survive where clone
-discarded it; output Vec capacity is not promised equal. No unchanged capacity,
-reduced total retained/aggregate memory, allocator-count, peak/RSS/speed/source-fit
-claim. Full WP899/M7A stays open.
+Acceptance is exact source/library proof of bypassing one qualifying conversion
+text-copy site, with no runtime pointer or allocator measurement. Assembly,
+numeric temporary, short/spare/encoding-fallback copies, metadata and final stdout
+remain. No all-buffer transfer, quantified memory/allocation count, aggregate/
+peak/RSS/speed/source-fit claim. Full WP899/M7A stays open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| DOT class-label conversion consumes tight buffers only at/above the pinned compact heap floor; short/spare original copying, exact bytes/final capacities/graph identity/release remain. Three revised DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, fourteen byte/capacity cases, eight equal DOT outputs, five existing graph controls and default Core/CLI checks. Initial heap-floor proposal rejected before implementation; source/library copy-bypass proof only, large 32-bit fallback excluded and no quantified memory/aggregate/RSS/speed claim | [DOT class-label conversion](wp899-dot-class-label-move-2026-10-06.json) |
 | Compiler list addition folding transfers owned elements after both unchanged per-operand 1000 guards; ordered fallback/tree/spans/frozen constant conversion stay. Three DESIGNs/FINALs; same corrected baseline two semantic passes/one ownership failure, candidate 12/12, fifteen Symbol buffers transferred across four routes, four admitted boundary combinations/eight rejection checks/four equal diagnostics and default dependents. Independently baseline-proved five-span golden correction; output collection/capacity caveats remain, no aggregate/RSS/speed claim | [List addition element transfer](wp899-list-add-arg-move-2026-10-06.json) |
 | Compiler type equality folding transfers the owned type(x) argument after unchanged guards, in both operand orders; rejected operands/pointers, helper IR/spans/frozen type-name ownership and ordered fallback stay. Three DESIGNs/FINALs; identical baseline two semantic passes/one ownership failure, candidate 19/19, three Symbol buffers transferred per orientation (15,384 content bytes each), ten rejection cases, five equal diagnostics and default dependents. Generic IR capacity caveat; no aggregate/RSS/speed claim | [Type equality argument transfer](wp899-type-equality-arg-move-2026-10-05.json) |
 | Terminal type-is/format optimizations transfer the sole owned expression only after every unchanged guard succeeds; every rejected helper preserves full args/pointers, optimizer order/spans/interner/foreign frozen owners stay. Three DESIGNs/FINALs; identical baseline two semantic passes/one ownership failure, candidate 16/16, three Symbol buffers transferred per route (15,384 content bytes each), seventeen rejection checks, five equal diagnostics and default dependents. Generic IR capacity caveat; no aggregate/RSS/speed claim | [Terminal call argument transfer](wp899-terminal-call-arg-move-2026-10-05.json) |

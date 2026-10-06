@@ -402,7 +402,14 @@ impl SelectedQueryGraph {
             }
             label.push_str(item);
         }
-        CompactString::new(label)
+        // Preserve compact_str's minimum heap capacity when reusing a tight buffer.
+        if label.capacity() == label.len()
+            && label.len() >= std::mem::size_of::<String>() + std::mem::size_of::<usize>()
+        {
+            CompactString::from(label)
+        } else {
+            CompactString::new(label)
+        }
     }
 }
 
@@ -439,6 +446,10 @@ fn topological_order(successors: &[Vec<u32>]) -> Vec<u32> {
     postorder.reverse();
     postorder
 }
+
+#[cfg(test)]
+#[path = "output/dot_class_label_memory_tests.rs"]
+mod dot_class_label_memory_tests;
 
 #[cfg(test)]
 mod graph_output_tests {

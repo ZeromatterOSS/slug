@@ -39,13 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: compiler list addition folding transfers owned elements
-after unchanged per-operand 1000 guards. Ordered fallback, element spans and
-frozen constant conversion remain. Twelve controls and default dependent checks
-pass; fifteen Symbol buffers transfer across four fixtures. An existing golden
-span mismatch is independently baseline-proved and corrected. Output collection
-remains; output/nested IR capacity is not promised equal, with no aggregate/RSS/
-speed claim.
+Latest accepted change: temporary DOT class labels use owned compact conversion
+only for tight buffers at/above the pinned heap-capacity floor. Short/spare copying,
+exact bytes/final capacities, graph owners and render release remain. Seven
+controls, fourteen capacity cases, eight equal DOT outputs and default dependent
+checks pass. Source/library ownership proof removes one qualifying conversion
+copy; no quantified allocation/aggregate/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.

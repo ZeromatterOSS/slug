@@ -1,0 +1,312 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "60aeab340",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_query_v2/src/output.rs": "230e3a101d937c65e2382f7623ae0713cf847a4bdea735e68990ddaee5d7dd93",
+    "app/slug_query_v2/src/output/dot_class_label_memory_tests.rs": "8923f1d4fc3e2ddcc115ccbaff55c572b0065ff7ea55bd609ad93c2f500fbb82",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "app/slug_query_v2/Cargo.toml": "c45d3a393da6f22b6b0e3cbfbe401ad7a4b0986de662ae19ae4872b5c5b4561f",
+    "app/slug_query_v2/src/lib.rs": "a140c2b6971b5e8439c14124ed0f3dc30919f0f2dcecef87f8cb50aaecd0a672",
+    "app/slug_query_v2/src/graph.rs": "0ab8cfe470b7f493702f9c2ad96dc63898b370d7ef5aae42bd7e00347c30dcfc",
+    "app/slug_query_v2/src/evaluator.rs": "8d9bd8ed0359bec36515040391e2df02e003d62f2cc18a97a0e5a33f7a436991",
+    "app/slug_query_v2/src/loading_environment.rs": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de",
+    "app/slug_query_v2/src/generic.rs": "7eb2ef573cace410b8415c90f2d3a5a7dd29497a45290d11524597a2d974ab8f",
+    "app/slug_query_v2/src/traversal.rs": "0d5a50a2041806546bd9471017486d53ac05d48b813964fabcdf350203ba6b6c",
+    "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3"
+  },
+  "dependency_sha256": {
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/lib.rs": "794b1923d5b04e941998fc54ca00fcf0ea19460fec2db1db6de96810f6da5eec",
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/repr/mod.rs": "f13dd831c63141051499a84248dac0c8b0e04832240b7da0d27cbaecae32ee2c",
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/repr/heap.rs": "7582f77aecf4c231a4d89160b2b41c9c90b0effecb7fab68d59ea2b4bd95b6e6"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+    "artifact_sha256": "a13f6fb367e546fb07fc9335f3c716ef295897f9b7981e5940e4320184ed4c27",
+    "selectors": [
+      "output::dot_class_label_memory_tests::dot_class_labels_preserve_bytes_capacity_and_truncation_boundaries",
+      "output::dot_class_label_memory_tests::dot_outputs_preserve_modes_graph_owners_and_retained_text",
+      "output::graph_output_tests::full_factored_dot_matches_bazel_node_then_outgoing_edge_layout",
+      "output::graph_output_tests::unfactored_dot_keeps_equivalent_nodes_separate",
+      "output::graph_output_tests::callback_unfactored_dot_deduplicates_edges_and_orders_cycles_without_adjacency",
+      "output::graph_output_tests::factoring_requires_matching_predecessors_and_deduplicates_quotient_edges",
+      "output::graph_output_tests::factored_order_compares_member_label_sequences_not_joined_dot_labels"
+    ],
+    "source_sha256": {
+      "app/slug_query_v2/src/output.rs": "230e3a101d937c65e2382f7623ae0713cf847a4bdea735e68990ddaee5d7dd93",
+      "app/slug_query_v2/src/output/dot_class_label_memory_tests.rs": "8923f1d4fc3e2ddcc115ccbaff55c572b0065ff7ea55bd609ad93c2f500fbb82"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+    "artifact_sha256": "48a3296485377b95c26c441f2e081b4a16dd4f50269ce5b4babc22b6a2b6f2c8",
+    "selectors": [
+      "output::dot_class_label_memory_tests::dot_class_labels_preserve_bytes_capacity_and_truncation_boundaries",
+      "output::dot_class_label_memory_tests::dot_outputs_preserve_modes_graph_owners_and_retained_text"
+    ],
+    "source_sha256": {
+      "app/slug_query_v2/src/output.rs": "4422bb4b2e537973e5b0ac030c41e7f8dcf6df0d18faec5addb95a49eea7b611",
+      "app/slug_query_v2/src/output/dot_class_label_memory_tests.rs": "8923f1d4fc3e2ddcc115ccbaff55c572b0065ff7ea55bd609ad93c2f500fbb82"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/dot-class-label-move-baseline-compile.json",
+      "sha256": "29df568d969fc473fb57b4bda9bbf78476f061c95be9394e9c24911d9ce9650b",
+      "exit_code": 0,
+      "elapsed_seconds": 58.345933226984926,
+      "log_sha256": "17ed24a538c39eac25259d6c709d0c4a797e18ac954e39e76eced1d6065c4c6f"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/dot-class-label-move-baseline-r2-compile.json",
+      "sha256": "cccf0a4c0e042fecf2ea6f1864633e19bbbdc7b948f429101643ab60b89f7484",
+      "exit_code": 0,
+      "elapsed_seconds": 1.1059910610201769,
+      "log_sha256": "375b132cbe24e24618c0350ad11cbef7a94208a64bfcf354302a11bcf92638bb"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/dot-class-label-move-baseline-r2-preflight.json",
+      "sha256": "eea49f3fcfd686628a5fb3b1dea4bc1eedf4178690870b7efe7cfab958a6f903",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021921514999121428,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/dot-class-label-move-baseline-r2-controls.json",
+      "sha256": "4baa9544db56f2e242fed70a08cfc5344f12e9a65599dbf1b5fafbfef898ef2e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0020119500113651156,
+      "log_sha256": "a04b712894cfbb23aa9bca721bafd75607dca15b047c822f67f395b21460dee4"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/dot-class-label-move-candidate-compile.json",
+      "sha256": "418d2877b41ab75d3b0e120393aacf0e324a5a857461c655c5ac6d6d8787b54d",
+      "exit_code": 0,
+      "elapsed_seconds": 1.263066314975731,
+      "log_sha256": "6f4c23c1bcc4ba48c719eb0b916089d5c13d9e19381148081b8375dba803dc6a"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/dot-class-label-move-candidate-preflight.json",
+      "sha256": "27450cc4eed9fad04104e0f69d24f2156f09ac3073a0e0fd40e1eabb7f7635a2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022060816001612693,
+      "log_sha256": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/dot-class-label-move-candidate-controls.json",
+      "sha256": "ea44634ea6620d70be73e5b0811786a300333159870a9bd3c973968f63645a91",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0021954700350761414,
+      "log_sha256": "75a5ea194b584205d2045db779c78fb9467e6389fde34e73cf2b82727fb5286d"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/dot-class-label-move-dependents-check.json",
+      "sha256": "5af8f3ca6be8fe9920f1b603e8d94852efa53d5bc961468b3378fcf928d0f9dd",
+      "exit_code": 0,
+      "elapsed_seconds": 1.8987388619570993,
+      "log_sha256": "5203f3eccb1261bf074b092545d36d7e5465cbae299546afada4da41d3b5a697"
+    }
+  },
+  "proof": "Whole output.rs equals baseline plus sibling hook and only final class_label conversion guarded by capacity==len AND len>=size_of<String>+size_of<usize>. Encodable tight buffers above pinned compact_str0.8.2 heap floor move via existing From<String>; all short/inline/below-floor/spare inputs use original new, large32bit capacity encoding fallback copies through same original heap constructor. All prior label assembly/numeric temporary/byte threshold/truncation/first-label exemption/order/factoring/deduplication/stdout/graph/evaluator unchanged. Thirteen protected source files and identical revised tests. No new helper/API/interner/cache/key/unsafe/dependency/retained representation or donor.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "candidate_new": 2,
+    "candidate_protected": 5,
+    "candidate_total": 7,
+    "class_label_cases": 14,
+    "exact_equal_graph_outputs": 8
+  },
+  "class_label_capacity_controls": [
+    {
+      "case": 0,
+      "tight": true,
+      "bytes": 0,
+      "final_capacity": 24
+    },
+    {
+      "case": 1,
+      "tight": true,
+      "bytes": 0,
+      "final_capacity": 24
+    },
+    {
+      "case": 2,
+      "tight": false,
+      "bytes": 1,
+      "final_capacity": 24
+    },
+    {
+      "case": 3,
+      "tight": true,
+      "bytes": 24,
+      "final_capacity": 24
+    },
+    {
+      "case": 4,
+      "tight": true,
+      "bytes": 25,
+      "final_capacity": 32
+    },
+    {
+      "case": 5,
+      "tight": true,
+      "bytes": 31,
+      "final_capacity": 32
+    },
+    {
+      "case": 6,
+      "tight": true,
+      "bytes": 32,
+      "final_capacity": 32
+    },
+    {
+      "case": 7,
+      "tight": true,
+      "bytes": 8193,
+      "final_capacity": 8193
+    },
+    {
+      "case": 8,
+      "tight": false,
+      "bytes": 485,
+      "final_capacity": 485
+    },
+    {
+      "case": 9,
+      "tight": false,
+      "bytes": 503,
+      "final_capacity": 503
+    },
+    {
+      "case": 10,
+      "tight": false,
+      "bytes": 507,
+      "final_capacity": 507
+    },
+    {
+      "case": 11,
+      "tight": false,
+      "bytes": 533,
+      "final_capacity": 533
+    },
+    {
+      "case": 12,
+      "tight": false,
+      "bytes": 503,
+      "final_capacity": 503
+    },
+    {
+      "case": 13,
+      "tight": false,
+      "bytes": 32,
+      "final_capacity": 32
+    }
+  ],
+  "graph_output_sha256": [
+    "1a01bd1fb8d05f566e305478f7172b8522cfccc5e93325e85429faaad45bcd44",
+    "2b001eb6915d48f6ee19c87430cfa43d327c6a967ee7ba113a6061ca001501c0",
+    "1a01bd1fb8d05f566e305478f7172b8522cfccc5e93325e85429faaad45bcd44",
+    "2b001eb6915d48f6ee19c87430cfa43d327c6a967ee7ba113a6061ca001501c0",
+    "1679e7176903923c342b2586ed0f14dacddbce94800d4d54b60c1d52eee25d0b",
+    "219ff95ef8468b0cb25d8ed9fa5080937437054291db3e5dfb3604278560ef58",
+    "1679e7176903923c342b2586ed0f14dacddbce94800d4d54b60c1d52eee25d0b",
+    "219ff95ef8468b0cb25d8ed9fa5080937437054291db3e5dfb3604278560ef58"
+  ],
+  "limits": "Source/library-proved qualifying conversion copy bypass only; no pointer or allocator measurement. One owned String-to-CompactString text-copy site bypassed for tight encodable heap buffers above minimum. Short/inline/spare/large32bitfallback copying, assembly/numeric scratch, metadata and final stdout remain. Natural synchronous render-label vector release unchanged, owned stdout/graph identity untouched. Final capacities equal in all14 controls, including24/25/31/32 and tight/spare/threshold/Unicode/oversize-first cases; no all-buffer transfer, quantified memory/allocation-count, aggregate/peak/RSS/speed/source-fit claim.",
+  "design_revision": "Three initial DESIGN REVISEs found heap floor mismatch for25-31-byte tight buffers. R2 adds pinned minimum guard and capacityboundary coverage, three DESIGN R2 ACCEPTs. No rejected production implementation was made. Original design/verdicts preserved. Initial baseline compile before31/32 cases is preparation only; revised baseline is freshly compiled and tested.",
+  "growth": {
+    "test_sibling_lines": 118,
+    "estimate": "80-140lines; two tests/no assets.",
+    "production": "Final private class_label conversion and cfg sibling hook, existing compact output owner remains cohesive."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline slug_query_v2 lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/dot-class-label-move-archive-check.json": "e88c698e5165322827db9edc74550a37a38f1965885667cb63e8461709beaba6",
+    "target/wp899/dot-class-label-move-archive-check.jsonl": "33210b4428a39a6fcd3787500aeb17550ee001a2d9f7feb08a2fe8c06c50b06d",
+    "target/wp899/dot-class-label-move-baseline-compile.json": "29df568d969fc473fb57b4bda9bbf78476f061c95be9394e9c24911d9ce9650b",
+    "target/wp899/dot-class-label-move-baseline-compile.jsonl": "17ed24a538c39eac25259d6c709d0c4a797e18ac954e39e76eced1d6065c4c6f",
+    "target/wp899/dot-class-label-move-baseline-r2-compile.json": "cccf0a4c0e042fecf2ea6f1864633e19bbbdc7b948f429101643ab60b89f7484",
+    "target/wp899/dot-class-label-move-baseline-r2-compile.jsonl": "375b132cbe24e24618c0350ad11cbef7a94208a64bfcf354302a11bcf92638bb",
+    "target/wp899/dot-class-label-move-baseline-r2-controls.json": "4baa9544db56f2e242fed70a08cfc5344f12e9a65599dbf1b5fafbfef898ef2e",
+    "target/wp899/dot-class-label-move-baseline-r2-controls.jsonl": "a04b712894cfbb23aa9bca721bafd75607dca15b047c822f67f395b21460dee4",
+    "target/wp899/dot-class-label-move-baseline-r2-preflight.json": "eea49f3fcfd686628a5fb3b1dea4bc1eedf4178690870b7efe7cfab958a6f903",
+    "target/wp899/dot-class-label-move-baseline-r2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/dot-class-label-move-baseline-r2-selectors.json": "62a95ba7393f138d6f23097a1f6637c47746f3e1fb203675ebd6007e568c2c6b",
+    "target/wp899/dot-class-label-move-candidate-compile.json": "418d2877b41ab75d3b0e120393aacf0e324a5a857461c655c5ac6d6d8787b54d",
+    "target/wp899/dot-class-label-move-candidate-compile.jsonl": "6f4c23c1bcc4ba48c719eb0b916089d5c13d9e19381148081b8375dba803dc6a",
+    "target/wp899/dot-class-label-move-candidate-controls.json": "ea44634ea6620d70be73e5b0811786a300333159870a9bd3c973968f63645a91",
+    "target/wp899/dot-class-label-move-candidate-controls.jsonl": "75a5ea194b584205d2045db779c78fb9467e6389fde34e73cf2b82727fb5286d",
+    "target/wp899/dot-class-label-move-candidate-preflight.json": "27450cc4eed9fad04104e0f69d24f2156f09ac3073a0e0fd40e1eabb7f7635a2",
+    "target/wp899/dot-class-label-move-candidate-preflight.jsonl": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520",
+    "target/wp899/dot-class-label-move-candidate-selectors.json": "18cd02773f375b7921abc43ab50f738335d3a61e44c2e9de22b4e9ffe0e41bca",
+    "target/wp899/dot-class-label-move-controls.py": "3e91d73853e0438f2983cef8e249f52861eadc96284c2f7ca7145458baec50af",
+    "target/wp899/dot-class-label-move-dependents-check.json": "5af8f3ca6be8fe9920f1b603e8d94852efa53d5bc961468b3378fcf928d0f9dd",
+    "target/wp899/dot-class-label-move-dependents-check.jsonl": "5203f3eccb1261bf074b092545d36d7e5465cbae299546afada4da41d3b5a697",
+    "target/wp899/dot-class-label-move-design-evidence.md": "c12611efec63e70450d95763eefbf63a1d65afadbfd0f6a396980b8a673b99b0",
+    "target/wp899/dot-class-label-move-design-ownership.md": "e47734f3757c777c6449d7185a6423086e28aa330ede11a23131f66df493dee0",
+    "target/wp899/dot-class-label-move-design-r2-evidence.md": "4f16ef884dab23948f6595194faa3dd58c570a9110591636b24ed6ee34f18905",
+    "target/wp899/dot-class-label-move-design-r2-ownership.md": "b2b44ac9611160e748fde1dc6a1806969e8d524dc8a6fcc477437295cf25924b",
+    "target/wp899/dot-class-label-move-design-r2-source.md": "1af76d2ff55a425a7bd858de415cd9db52d196b38690fdd14c4770da166bd97c",
+    "target/wp899/dot-class-label-move-design-r2.md": "94ee1fedd3b9965c310fdef689ca9f4ac08db1292d01a0f0a31b3ba712ab1e70",
+    "target/wp899/dot-class-label-move-design-source.md": "4b2724d782cb1a4b58dc7b201f4c08521f6d9d05e19e0727179c329fb81c00c9",
+    "target/wp899/dot-class-label-move-design.md": "66e4857070088561e154aa238909db5434156f9a0287da87240324f56963e70b",
+    "target/wp899/dot-class-label-move-format-check.json": "66db271d1b778af0ec31cc9287773c4fd1e7cf1345e048da5dcab4813ef52560",
+    "target/wp899/dot-class-label-move-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/dot-class-label-move-record.py": "fbed513f2f45bd9de1382edf0a72f91b6185a52edb21feee49a3a3dedf7f5b1f",
+    "target/wp899/dot-class-label-move-start.json": "c6d2f5ca3d9868ae77f9019f17c47a676b9cce6e320b0f86710bab38c473883f"
+  },
+  "start": {
+    "started_at": "2026-10-06T02:47:48.946050+00:00",
+    "baseline": "60aeab3404df0ed7423fd38ffcb898d602607c16"
+  },
+  "timing": {
+    "compile_seconds": 62.61372946493793,
+    "test_seconds": 0.004207420046441257,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 472.513948
+  },
+  "validation_sha256": "b2c926112b7b44b205435ccb267e71d021f42b21ed396c7870731886e35ff610",
+  "final_reviews": {
+    "target/wp899/dot-class-label-move-final-source.md": "da051275dbb0cd4e4528f1d0798dc3bc0985f889c63888a59ecc619603fbbca6",
+    "target/wp899/dot-class-label-move-final-ownership.md": "2a088fc0d0b983a9913d66928513ed43355724d35b5dbc64271e7f77e31ad0c4",
+    "target/wp899/dot-class-label-move-final-evidence.md": "39a2e8fded245596e5157c5f1f469f9f5f8c6f899dd3575bfe9e3ba39a86cb59"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "7b435560a582d5d152af49a905bc442578742c95e75cbd3459c1b2cf5e5c0aaf",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "67e5100d966de1662b2668260c59b47706967d5f40309ae8d387c67801e59fac",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "bef480b2a27156e4c6accf15c7775fe5d4362c49a82e8610d9be1e188c987fe2"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/dot-class-label-move-format-check.json",
+      "sha256": "66db271d1b778af0ec31cc9287773c4fd1e7cf1345e048da5dcab4813ef52560",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/dot-class-label-move-archive-check.json",
+      "sha256": "e88c698e5165322827db9edc74550a37a38f1965885667cb63e8461709beaba6",
+      "exit_code": 0,
+      "log_sha256": "33210b4428a39a6fcd3787500aeb17550ee001a2d9f7feb08a2fe8c06c50b06d"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/dot-class-label-move-plan-check.json",
+      "sha256": "193ec934b3fd2504129db8473c68482a0a5ac1963c62edea0b237884e6789950",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/dot-class-label-move-diff-check.json",
+      "sha256": "d2063c9659835139765d783c3322d26959b1df6072d74c3f92be70d33e0caac3",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
