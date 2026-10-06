@@ -1,0 +1,232 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "ed2016063",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/label/display_memory_tests.rs": "a7bfd3cb38349c44768f2ffe6af4b88bc3a3a8e292a05cb540a30388572ae46f"
+  },
+  "unchanged_identity_sources": {
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_identity_v2/src/package.rs": "a715fc400f471241ebc77f78b6c18ffb8ef8766e2fec4cbfcb4e78b7f1d3ae6a",
+    "app/slug_identity_v2/src/pattern.rs": "6a8bc5813cb78102e37df47858b2062b5547f8bc54bdbc0d5cb015a6b8f6bc84",
+    "app/slug_identity_v2/src/repo_mapping.rs": "650c239ca0fc869197a57f5858ff836a7475df37eb7f4978926e1696969af319",
+    "app/slug_identity_v2/src/serialization.rs": "eb512be50d5fdc1a464c7bd2d540c945f9f0fe2079e4ff0e62a027ef2ffccad5"
+  },
+  "artifacts": [
+    {
+      "target": "slug_identity_v2",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_identity_v2-ae088004c4b75cf6",
+      "artifact_sha256": "25ad539a0741e97e7bb129e838bef17e98e1a0f7fbb36465153721c80c195ab0",
+      "selectors": [
+        "label::display_memory_tests::nonroot_repository_display_uses_original_source_bytes",
+        "label::display_memory_tests::display_preserves_root_unicode_flags_and_owned_results",
+        "label::display_memory_tests::display_propagates_error_at_every_output_prefix_without_later_writes"
+      ]
+    },
+    {
+      "target": "label_roundtrip",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/label_roundtrip-0bc7d87575712a98",
+      "artifact_sha256": "3371c56457a1c162e584da7d1a20590be890740403a2d6e3a8fdc93fded92d6c",
+      "selectors": [
+        "apparent_labels_roundtrip_many_examples",
+        "canonical_labels_and_mapping_serialization_distinguish_mappings",
+        "rejects_invalid_labels",
+        "target_names_match_bazel_validation_and_preserve_printable_unicode"
+      ]
+    },
+    {
+      "target": "pattern",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/pattern-8f5a3e5c1105d3dc",
+      "artifact_sha256": "c90920d4f9e1f7035d6f06e057dd6811a421d09b088b6dd09575823c5589c265",
+      "selectors": [
+        "parses_target_patterns",
+        "contextually_projects_current_mapped_and_canonical_patterns",
+        "explicit_empty_apparent_repo_requires_its_mapping_entry"
+      ]
+    }
+  ],
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/apparent-label-display-borrow-baseline-compile.json",
+      "sha256": "8b6d7a8d42d03f1559516e7237b3cbde4b4b4486e4fdc68a32ce5762e9df662f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.5115643620374613,
+      "log_sha256": "be67d077f9a7ceae54229b754d5f41cb5c5babb89b365de3806f3bc6afbfde1e"
+    },
+    "baseline-slug_identity_v2-preflight": {
+      "receipt": "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-preflight.json",
+      "sha256": "18cb6585c88af57a6b0ba04a50e543ce9efaafa7d17b5f5bb7461c97d1ab0a0e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0197261439752765,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-slug_identity_v2-controls": {
+      "receipt": "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-controls.json",
+      "sha256": "46331c5ecc3f9973741ebe046339ea8cd8b9afe9e37121f14dd11476999cc331",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0015437069814652205,
+      "log_sha256": "2b34289cd04cd3df81a9b91f2d0a8b8ed2b754d34113a65bf952dede7ab9dd8a"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-compile.json",
+      "sha256": "ef5d1a1e65f2c06be82a414b97875f5271d5449b2872ee6786b7f3e50c3d1335",
+      "exit_code": 0,
+      "elapsed_seconds": 0.526881484023761,
+      "log_sha256": "73c3bb52a004a02ec70b7cd3d68cddfab612d97a55d779bfe4aa858bb3697749"
+    },
+    "candidate-slug_identity_v2-preflight": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-preflight.json",
+      "sha256": "63b4b6dd90edd244bad87e93086c47edfb80f62a5fb3c3bf72f531827de062eb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019870474992785603,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "candidate-slug_identity_v2-controls": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-controls.json",
+      "sha256": "8f85ba4afdf45190cd3e8e8da516657d60cea6467eca26a470304f4a56d7a3a5",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0013781659654341638,
+      "log_sha256": "7eab0d58f5735a126d6664eb79bec5f7e266a3682fc7928a3d9b53a509b351da"
+    },
+    "candidate-label_roundtrip-preflight": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-preflight.json",
+      "sha256": "df883a3d46885cc1ae639e70cc287540df4fbc90b0200a8cfa4717569eeac62e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019195150991436094,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "candidate-label_roundtrip-controls": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-controls.json",
+      "sha256": "8490b6c3b401cd65b26807453766bef1688cfad84262b8ae27805e50caa0c7a7",
+      "exit_code": 0,
+      "elapsed_seconds": 0.001180704974103719,
+      "log_sha256": "bb19e7d510fbb31a3a993331908f32f83aaf1914b4ada9c31c11b583b7fa44bc"
+    },
+    "candidate-pattern-preflight": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-pattern-preflight.json",
+      "sha256": "5eb40991cd35f1f04d89416f639f426077b884f509b734a44c819f16470a961e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01943851198302582,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "candidate-pattern-controls": {
+      "receipt": "target/wp899/apparent-label-display-borrow-candidate-pattern-controls.json",
+      "sha256": "e7a0f480fde010a4aeb4bd29134bd1ee9b192bbc34d8ebccf833d7c1570c3b8e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0011733450228348374,
+      "log_sha256": "35d3eadd2d44eaa373a6ccb275fe45916339953797a3c6393160fe0aaab68092"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/apparent-label-display-borrow-dependents-check.json",
+      "sha256": "0dacb7c7c81ca30e6a763708f799bf74c07e4400b7c5273d52ae2d7e724fd7cb",
+      "exit_code": 0,
+      "elapsed_seconds": 6.058835849980824,
+      "log_sha256": "9cb711ff41ffb510eecb9e3f99507c07aef573a7625cffa1004e50b2bbd44f7e"
+    }
+  },
+  "design_sha256": "53bfb7303c00feb255a5351d0d0026bcee1091499868c98cc28dc4d63fde34b9",
+  "design_reviews": {
+    "target/wp899/apparent-label-display-borrow-design-source.md": "02193ad0f874fe97a896d0dc5623c54b4f194ea5a9231b53c508d8d58eb4a870",
+    "target/wp899/apparent-label-display-borrow-design-input.md": "fce97f5cc79c0c28325a9d9a9d2ad720879037af98a0d0fb0446d6d0a35ca493",
+    "target/wp899/apparent-label-display-borrow-design-evidence.md": "8394bb40d9702c6c57d57b0d7725a3af52cbb0ea499e822b09e653e06344cda6"
+  },
+  "ownership_proof": "Entire-file baseline comparison allows only direct nonroot repo Display plus existing package/target write and sibling test hook. Root omission stays; all label parse/equality/hash/order/mapping code unchanged, other identity producer/serialization files baseline-identical. Exact same new tests baseline/candidate. Borrowed repo lives throughout synchronous fmt; final output String stays owned.",
+  "pass_counts": {
+    "new_owner_controls": 3,
+    "roundtrip_mapping_invalid_label_controls": 4,
+    "pattern_controls": 3,
+    "unique_candidate_controls": 10,
+    "execution_groups": [
+      3,
+      4,
+      3
+    ],
+    "baseline_semantic_passed": 2,
+    "baseline_source_pointer_failed": 1
+  },
+  "metrics": {
+    "baseline": {
+      "repository_bytes": 20491,
+      "source_pointer_shared": false
+    },
+    "candidate": {
+      "repository_bytes": 20491,
+      "source_pointer_shared": true
+    }
+  },
+  "format_invariants": "Exact root including explicit empty repo/nonroot/root-package/Unicode target and flags unchanged; assembled owned output remains after each label drop. For every byte prefix of two ASCII root/nonroot fixtures, sink accepts that same prefix then errors; no post-error writes. Pointer test searches repo content inside chunks and compares subspan address to immutable owner, without write-call-count assertions.",
+  "limits": "Exactly one nonroot temporary repository String removed by source/type/actual sink pointer. Existing input strings, formatting final storage and parse allocations remain. No allocated-capacity ratio, aggregate/peak/RSS/timing/speed/whole-workload/source-fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default Identity lib/label_roundtrip/pattern plus default Loading/Core/CLI alltargets offline; serial Cargo prep60s/focused tests30s/exactfresh artifact preflights; no golden regeneration.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/apparent-label-display-borrow-baseline-compile.json": "8b6d7a8d42d03f1559516e7237b3cbde4b4b4486e4fdc68a32ce5762e9df662f",
+    "target/wp899/apparent-label-display-borrow-baseline-compile.jsonl": "be67d077f9a7ceae54229b754d5f41cb5c5babb89b365de3806f3bc6afbfde1e",
+    "target/wp899/apparent-label-display-borrow-baseline-selectors.json": "3cae975f117d396f3fe535afa1f1c02e89ecb1a1813a89dc8b3f7d39cf1c48b9",
+    "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-controls.json": "46331c5ecc3f9973741ebe046339ea8cd8b9afe9e37121f14dd11476999cc331",
+    "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-controls.jsonl": "2b34289cd04cd3df81a9b91f2d0a8b8ed2b754d34113a65bf952dede7ab9dd8a",
+    "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-preflight.json": "18cb6585c88af57a6b0ba04a50e543ce9efaafa7d17b5f5bb7461c97d1ab0a0e",
+    "target/wp899/apparent-label-display-borrow-baseline-slug_identity_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/apparent-label-display-borrow-candidate-compile.json": "ef5d1a1e65f2c06be82a414b97875f5271d5449b2872ee6786b7f3e50c3d1335",
+    "target/wp899/apparent-label-display-borrow-candidate-compile.jsonl": "73c3bb52a004a02ec70b7cd3d68cddfab612d97a55d779bfe4aa858bb3697749",
+    "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-controls.json": "8490b6c3b401cd65b26807453766bef1688cfad84262b8ae27805e50caa0c7a7",
+    "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-controls.jsonl": "bb19e7d510fbb31a3a993331908f32f83aaf1914b4ada9c31c11b583b7fa44bc",
+    "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-preflight.json": "df883a3d46885cc1ae639e70cc287540df4fbc90b0200a8cfa4717569eeac62e",
+    "target/wp899/apparent-label-display-borrow-candidate-label_roundtrip-preflight.jsonl": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b",
+    "target/wp899/apparent-label-display-borrow-candidate-pattern-controls.json": "e7a0f480fde010a4aeb4bd29134bd1ee9b192bbc34d8ebccf833d7c1570c3b8e",
+    "target/wp899/apparent-label-display-borrow-candidate-pattern-controls.jsonl": "35d3eadd2d44eaa373a6ccb275fe45916339953797a3c6393160fe0aaab68092",
+    "target/wp899/apparent-label-display-borrow-candidate-pattern-preflight.json": "5eb40991cd35f1f04d89416f639f426077b884f509b734a44c819f16470a961e",
+    "target/wp899/apparent-label-display-borrow-candidate-pattern-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/apparent-label-display-borrow-candidate-selectors.json": "7088963121f0c92c5aab9e4e41d4fece6b788df3029ad24b244bcac3e920c765",
+    "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-controls.json": "8f85ba4afdf45190cd3e8e8da516657d60cea6467eca26a470304f4a56d7a3a5",
+    "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-controls.jsonl": "7eab0d58f5735a126d6664eb79bec5f7e266a3682fc7928a3d9b53a509b351da",
+    "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-preflight.json": "63b4b6dd90edd244bad87e93086c47edfb80f62a5fb3c3bf72f531827de062eb",
+    "target/wp899/apparent-label-display-borrow-candidate-slug_identity_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/apparent-label-display-borrow-controls.py": "4d86356e2c928df897dbe888969a959c8fb3836805fdcea55b11239e11df1e8b",
+    "target/wp899/apparent-label-display-borrow-dependents-check.json": "0dacb7c7c81ca30e6a763708f799bf74c07e4400b7c5273d52ae2d7e724fd7cb",
+    "target/wp899/apparent-label-display-borrow-dependents-check.jsonl": "9cb711ff41ffb510eecb9e3f99507c07aef573a7625cffa1004e50b2bbd44f7e",
+    "target/wp899/apparent-label-display-borrow-design-evidence.md": "8394bb40d9702c6c57d57b0d7725a3af52cbb0ea499e822b09e653e06344cda6",
+    "target/wp899/apparent-label-display-borrow-design-input.md": "fce97f5cc79c0c28325a9d9a9d2ad720879037af98a0d0fb0446d6d0a35ca493",
+    "target/wp899/apparent-label-display-borrow-design-source.md": "02193ad0f874fe97a896d0dc5623c54b4f194ea5a9231b53c508d8d58eb4a870",
+    "target/wp899/apparent-label-display-borrow-design.md": "53bfb7303c00feb255a5351d0d0026bcee1091499868c98cc28dc4d63fde34b9",
+    "target/wp899/apparent-label-display-borrow-record.py": "0284270e4a457b76ca6637c239f46ae261743eb2009f6d3739b1043a83eb239a",
+    "target/wp899/apparent-label-display-borrow-start.json": "85f86062b8c8f131d0e54f770ec3fa63071cce3c6f5e30e166878e94f6df0c50"
+  },
+  "timing": {
+    "compile_seconds": 7.097281696042046,
+    "test_seconds": 0.005275922943837941,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 232.1144154071808
+  },
+  "validation_sha256": "5f0513614b54af860951a8215777b3347ae065bd94438399471ed82ab65c76c6",
+  "final_reviews": {
+    "target/wp899/apparent-label-display-borrow-final-source.md": "b86352fff60c7827da52dc6c886213e0eea66a3cc816dc7c07b8fa7eed674a83",
+    "target/wp899/apparent-label-display-borrow-final-input.md": "05da4a3af0c37ea7f80ce1bd246db9ab90a5a6db032c8a54f25b422099c863a5",
+    "target/wp899/apparent-label-display-borrow-final-evidence.md": "992cb2b644a014c84c07135e027522a8988512079ac7654802b991b746b77a13"
+  },
+  "growth": "114-line sibling tests; existing small identity formatter remains cohesive, only its body/test hook changed.",
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/apparent-label-display-borrow-format-check.json",
+      "sha256": "bf4d3638e438743833ad4e48e22d12e07bc5b5e02ad99e738517f89b39018ddc",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/apparent-label-display-borrow-diff-check.json",
+      "sha256": "d5cbc22479113380af2e34e979d35342cc659bb1beef253feb456a036c36e822",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/apparent-label-display-borrow-plan-check.json",
+      "sha256": "9fc5d68309eb4eea1b70da2d588beec2efb1518def1aab8e57b87be5df04e118",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/apparent-label-display-borrow-archive-check.json",
+      "sha256": "1b249b134e4f6330ad98b9fbdb67c1bb91ce9d4a39e711bc16cf581a224ab8ba",
+      "exit_code": 0
+    }
+  }
+}

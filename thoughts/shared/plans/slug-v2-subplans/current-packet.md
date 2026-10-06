@@ -12,46 +12,43 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component transfers tightly allocated strings from consumed
-attribute-query candidates, removing their final atom clone while preserving the
-original clone for spare capacity. Exact rendering, callback order, errors and
-final ownership remain unchanged. This is Slug-native scratch ownership with
-admitted behavior unchanged. Next: select a proved redundant copy or existing
-interner reuse at local string owners through a bounded design checkpoint.
+The latest accepted component writes apparent-label repository text directly
+from its owner, removing one temporary String per nonroot format. Root spelling,
+exact bytes, flags, errors, identity and final ownership remain unchanged. This is
+Slug-native scratch ownership with admitted behavior unchanged. Next: select a
+proved redundant copy or existing interner reuse at local string owners through
+a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted attribute candidate rendering memory contract
+## Accepted apparent-label formatting memory contract
 
-Private AttrCandidateAtom::render consumes its atom and transfers String only
-when capacity equals length; spare-capacity atoms retain the original clone.
-List iteration consumes atoms in original order; final CompactStrings remain
-owned and labels stay borrowed through unchanged synchronous callbacks. Expansion,
-selector/cross-product/concat/dictionary replacement and retained owners remain
-unchanged. No public API/interner/cache/key/unsafe/dependency/representation change.
+ApparentLabel Display writes nonroot repository directly from its existing owner,
+then package/target; root still omits '@'. Only the fmt body and sibling test hook
+changed. Canonical labels, parsing, validation, mapping, hashing, ordering,
+serialization and retained ownership remain unchanged. Slug-native scratch with
+admitted bytes unchanged; no helper/API/interner/cache/key/unsafe/dependency.
 
-The initial unconditional move was rejected after a real expanded concatenation
-exposed excess capacity. Revised three DESIGNs/FINALs accept 12/12 controls and
-default Core/CLI checks; identical baseline has3 semantic passes/1 tight-pointer
-failure. Tight9219B atom/scalar buffers transfer and keep9219B final capacity;
-spare27657B buffers still clone to9219B. Real8193B concatenation temporarycap12288B
-still renders finalcap8193B. Full inline/static may move harmlessly, with no heap
-savings attributed. Sibling160-line tests cover retained ownership, callback order,
-duplicates, empty/inline and public wrapper; eight existing controls cover selector
-correlation/cross-product/defaults, typed errors, lists/dicts/null/query structure.
-Existing large attrs.rs keeps its cohesive small renderer. Serial pinned offline
-validation/artifact exact preflight and hygiene checks are recorded in the receipt.
-Only tight heap atom clones removed; spare/expansion copies, final list/dict
-formatting and metadata remain. No aggregate/peak/RSS/speed/source-fit claim.
-FullWP899/M7A/source/integration requirements remain unwaived/unaccepted.
+Three DESIGNs/FINALs accept ten focused controls as 3+4+3 and default Loading/Core/
+CLI alltarget checks. Identical baseline has two semantic passes and one source-
+pointer failure; candidate borrows the 20,491-byte repo span. Root/nonroot/root
+package/Unicode targets, formatting flags, owned output after label drop and every
+ASCII byte-prefix error stop pass without chunk-count assertions. Roundtrip,
+mapping serialization, invalid labels and mapped/root pattern controls pass.
+The 114-line sibling preserves the small production formatter's owner. Serial
+pinned offline Cargo JSON/artifact exact preflight and hygiene checks are recorded
+in the receipt. Only the nonroot temporary repository String is removed; input,
+parsing and final output storage remain. No aggregate capacity/peak/RSS/speed/
+source-fit claim. Full WP899/M7A requirements remain unwaived/unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Apparent-label formatting borrows existing repository bytes; root spelling, flags, errors, identity and final owned output preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure, candidate 10 controls as 3+4+3 and default Loading/Core/CLI checks. A 20,491-byte repository shares its owner at the sink. One temporary String removed; no aggregate/RSS/speed claim | [Apparent-label display borrowing](wp899-apparent-label-display-borrow-2026-10-05.json) |
 | Attribute-query rendering transfers tight heap strings from consuming temporary atoms; spare-capacity strings retain original cloning and final capacity. Three revised DESIGNs/FINALs; baseline3 semantic passes/1 tight-pointer failure, candidate12/12 and default Core/CLI checks. Unconditional move rejected; natural concat8193B tempcap12288B/finalcap8193B unchanged. Callback/order/errors/final ownership preserved; no aggregate/RSS/speed claim | [Guarded candidate transfer](wp899-attr-candidate-render-move-2026-10-05.json) |
 | Rule output templates borrow existing attribute/target strings and temporary dedup keys; all six shapes/four placeholders, exact order/errors and owned outputs preserved. Three DESIGNs/FINALs; baseline 1 semantic pass/2 pointer failures, candidate 9 controls as5+3+1 and default Core/CLI checks. Reviewed stale DICE assertion correction preserves changed source identity and equivalent output facts. Scratch copies only; no aggregate/RSS/speed claim | [Output-template borrowing](wp899-output-template-borrow-2026-10-05.json) |
 | Compiler typo matching borrows existing frozen names; reversed-local/module/global order, duplicates, ties and owned diagnostics preserved. Three DESIGNs/FINALs, baseline 1 semantic pass/2 pointer failures; candidate 22/22 and default dependent checks. Fixed32x1024B global payloads now borrowed, owner matches0→32 and nested visible matches0→14. Cold scratch only, vectors/matching/final errors remain | [Scope-name borrowing](wp899-scope-name-borrow-2026-10-05.json) |

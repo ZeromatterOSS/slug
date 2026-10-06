@@ -540,12 +540,10 @@ impl CanonicalLabel {
 
 impl fmt::Display for ApparentLabel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let repo = if self.repo.is_root() {
-            String::new()
-        } else {
-            self.repo.to_string()
-        };
-        write!(f, "{}//{}:{}", repo, self.package, self.target)
+        if !self.repo.is_root() {
+            write!(f, "{}", self.repo)?;
+        }
+        write!(f, "//{}:{}", self.package, self.target)
     }
 }
 
@@ -602,6 +600,10 @@ fn split_package_and_target(value: &str) -> Result<(PackagePath, TargetName), St
     };
     Ok((package, target))
 }
+
+#[cfg(test)]
+#[path = "label/display_memory_tests.rs"]
+mod display_memory_tests;
 
 #[cfg(test)]
 mod tests {
