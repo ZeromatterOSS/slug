@@ -12,59 +12,69 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component writes repetition by two directly from the existing
-string into final heap storage, bypassing a temporary repeated String. Integer
-unpacking/capacity priority, other counts, bytes/hash, GC/frozen owners and caller
-behavior remain. Next: select a proved redundant local copy or existing interner
-reuse through a bounded design checkpoint.
+The latest accepted component filters glob exclusions before copying candidate
+paths into owned results. Include flags, validation priority, unescaped matching,
+UTF16 sorting/dedup and final owned strings remain. Final Vec capacity can shrink;
+earlier matcher allocation work and failure sequencing have explicit limits.
+Next: select a proved redundant local copy or existing interner reuse through a
+bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted direct string repetition by two contract
+## Accepted glob exclusion-before-copy contract
 
-StarlarkStr::mul names the exact original self.len()*max(0,l) capacity expression
-after unchanged i32 unpacking. Only l==2 and capacity<=isize::MAX use existing
-heap.alloc_str_concat(self,self). The original capacity constructor/loop/final
-allocation stay for every other count and oversized capacity. Arithmetic stays
-before the guard; deterministic String capacity-overflow still takes its original
-path. Unchanged rmul delegation covers both directions. No callback/effect, new
-helper/API/interner/cache/key/DICE/identity/unsafe/dependency/donor or retained
-representation. Slug-native scratch optimization preserves inherited Rust bytes/
-integer/errors; local Bazel context adds no Java/UTF16/size parity claim.
+expand_glob applies its existing exclusion predicate to original candidate bytes
+before copying retained paths, removing the final retain pass. Every include
+pattern still runs and records its match flag independently of exclusion.
+check_include_matches, validate_excludes and check_final_matches keep exact
+priority. Leading-@ escaping, UTF16 sorting/dedup, regular/directory selection,
+listing/spec owners and final independent String outputs remain. No helper/API/
+interner/cache/key/DICE/identity/unsafe/dependency/donor, observed-host traversal
+or matcher algorithm changes. Slug-native copy scheduling/storage optimization
+preserves inherited admitted glob results, with no widened parity.
 
-Existing concat synchronously copies the two complete borrowed immutable source
-sequences into independently owned final heap storage. The String adapter and
-concat use the same empty constant, nonempty UNINIT_HASH, byte count, existing
-u32 length check and natural tracing/freezing. No input/substring sharing is
-introduced; final heap copying remains. Allocation/OOM failure sequencing is
-excluded; capacity arithmetic/overflow is preserved by exact source/guard proof,
-without huge allocating workloads or unsafe fake-length fixtures.
+Exclusion variants are immutable pure boolean matchers (Invalid=>false), with
+total boolean/error semantics conditional on normal allocation. Earlier matching
+can add temporary work on routes that later report include/exclude errors.
+Allocation-machinery failure/panic sequencing, including earlier matcher Vec<char>
+capacity overflow on huge inputs/later-error routes, is excluded beyond OOM.
+No arbitrary-size/platform allocation-order or universal lower-work claim.
+Final Vec backing storage/capacity may shrink; exact prior capacity is not preserved.
 
-Three DESIGNs/FINALs accept identical 180-line tests: baseline 2/2, candidate 8/8,
-including six unchanged arithmetic/interner/speculative/standard/internal string
-controls. 5,460 actual compiled left/right multiplications match Rust repeat for
-341 ASCII/Unicode/NUL/empty strings at i32-min/negative/zero/one/two/three/five
-counts plus four large owned count-two outputs. Full bytes/type/lazy hashes and
-input buffers stay. Fourteen full wrong-operand/range errors match baseline exactly.
-Fresh mutable inputs clear before explicit GC; folded constants and retained frozen
-results/functions survive source/module/clone drop and subsequent fresh-module use.
-Protected helper/adapter/static string/heap sources and pinned Rust RawVec/String
-sources stay. Pinned serial offline fresh artifacts/exact preflights, default
-Loading/Core/CLI and format/archive/plan/diff pass. No fixture correction/assets/
-goldens.
+Three DESIGNs/FINALs accept identical corrected 217-line tests: baseline one
+semantic pass/one intended capacity failure; candidate 12/12 including eight
+existing glob boundaries and two actual synchronous BUILD/native-glob controls.
+432 full Result comparisons match the original collect/validate/retain algorithm;
+180 complete diagnostics match exactly. Missing include→invalid exclude→all-excluded
+priority, literal/headtail/complex/invalid rules, empty includes, hidden/parenthesis/
+question/recursive/Unicode/NUL paths, directories, projected duplicates, original
+byte exclusions and UTF16 ordering are discriminated. Fixed 128 long excluded
+paths return an empty Vec with public capacity 128→0; source bytes/capacities/
+pointers stay. Mixed owned outputs [6,4,3077] bytes survive source/listing/spec/clone
+drops. Default Query/Core/CLI, pinned serial offline fresh artifacts/exact preflights
+and format/archive/plan/diff pass. No assets/goldens.
 
-Acceptance proves bypass of the applicable temporary repeated String construction
-and copying only. Final output still owns and copies its complete bytes. No pointer/
-arena/allocator/count/quantified payload/aggregate/peak/RSS/speed/source-fit claim.
-Windows minimal/deferred; full WP899/M7A and source integration open/unwaived.
+Initial unchanged baseline E0433 was a fixture-only undeclared serde_json call;
+standard Debug output captures the same raw errors without adding a dependency.
+Baseline-r2 fixture miscounted é🙂 as seven UTF8 bytes instead of six. Only the
+expected length changes 3589→3077; exact full string/source/ownership assertions
+remain. Original/r2 snapshots and failed receipts reconstruct; corrected fresh
+baseline/candidate tests are identical. Second correction reassessment preserves
+the original design. The source review's allocation qualification is recorded.
+
+Acceptance proves rejected-path String-copy bypass and this fixed final vector-
+capacity observation only. No string allocator/count/quantified payload/aggregate/
+peak/RSS/speed/source-fit claim. Windows minimal/deferred; full WP899/M7A and source
+integration remain open/unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Glob exclusions precede candidate String copies; include flags/error priority, original-byte matching, escaping/UTF16 sort/dedup and owned outputs stay. Three DESIGNs/FINALs; corrected baseline one semantic pass/one capacity failure, candidate 12/12, 432 results/180 equal errors, fixed empty Vec capacity 128→0/retained mixed outputs/default Query/Core/CLI. Fixture failures/corrections preserved. Vec storage may shrink; earlier matcher work/allocation failure-panic sequencing excluded, no aggregate/RSS/speed claim | [Glob exclusion before copying](wp899-glob-exclude-before-copy-2026-10-06.json) |
 | String repetition by two copies directly into existing final heap concat, omitting temporary String; unpack/arithmetic/capacity priority, other counts, bytes/type/hash, mul/rmul/folding and GC/frozen owners stay. Three DESIGNs/FINALs; same baseline 2/2, candidate 8/8, 5,460 comparisons/fourteen equal full errors/four large owned outputs/default Loading/Core/CLI. Source scratch-bypass proof only, no quantified memory/RSS/speed claim; OOM sequencing excluded | [Direct repetition by two](wp899-string-repeat-two-direct-2026-10-06.json) |
 | Query tests() tag filtering scratch borrows immutable suite-owned names/suffixes; hash/dedup/order, manual/prefix/tag/size filtering, caller awaits/strict policy/edges and final owners remain. Three DESIGNs/FINALs; same baseline one semantic pass/one pointer failure + three integrations, candidate 5/5, 123 source pointers and 6,669 filters, twenty-one existing oracle rows/default Core/CLI. Async lifetime is source/type proof. Three alternative scratch copy sites only; set storage may change, no quantified memory/RSS/speed claim | [Query suite-tag borrowing](wp899-query-suite-tag-borrow-2026-10-06.json) |
 | Equal native replacement returns existing whole input after count validation; fallback/bytes/errors/speculation/tracing/freezing unchanged. Three DESIGNs/FINALs; corrected baseline two semantic passes/one sharing failure, candidate 10/10, 16,374 comparisons/ten equal raw errors, four large sharing/zero arena observations and retained frozen/GC controls; default Loading/Core/CLI. Original/r2 fixture failures preserved. Fixed fixture accounting only; no allocator/aggregate/RSS/speed claim | [Equal replacement input reuse](wp899-replace-equal-input-reuse-2026-10-06.json) |

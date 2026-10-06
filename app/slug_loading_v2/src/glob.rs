@@ -458,14 +458,13 @@ pub fn expand_glob(listing: &PackageListing, spec: &GlobSpec) -> Result<Vec<Stri
                 included = true;
             }
         }
-        if included {
+        if included && !spec.is_excluded(candidate.as_bytes()) {
             matches.push(candidate.to_string());
         }
     }
 
     spec.check_include_matches(&include_matched)?;
     spec.validate_excludes()?;
-    matches.retain(|candidate| !spec.is_excluded(candidate.as_bytes()));
     spec.check_final_matches(matches.is_empty())?;
     for path in &mut matches {
         if path.starts_with('@') {
@@ -577,3 +576,7 @@ fn unicode_segment_matches(pattern: &str, candidate: &str) -> bool {
     }
     pattern_index == pattern.len()
 }
+
+#[cfg(test)]
+#[path = "glob/exclude_copy_memory_tests.rs"]
+mod exclude_copy_memory_tests;

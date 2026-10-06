@@ -1,0 +1,403 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "57c3522ce81f28c470c024554f88b322032a1b91",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native local copy scheduling/final vector storage; inherited admitted glob bytes/validation/errors/order unchanged conditional normal allocation; no widened parity",
+  "source_sha256": {
+    "app/slug_loading_v2/src/glob.rs": "e397f0a5ef31904ab3d38fceef702327214e04add3876c4aebdf74f6e4bfae42",
+    "app/slug_loading_v2/src/glob/exclude_copy_memory_tests.rs": "4b46545348b2e9d10cb102f314c4e9f11b4e06d4bf6ad2cf6ed330342dcb4009",
+    "app/slug_loading_v2/tests/glob_boundaries.rs": "2313c9fa14be5b0e8489658694c33a98512ec8338e4aba418090ee0591cc1d70",
+    "app/slug_loading_v2/tests/build_file_loading.rs": "e237097c6a2709f214ff878a8aebda4723f5687c8c4d1504ac7b6b4ed61b70ce",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "app/slug_loading_v2/Cargo.toml": "5af8ae9fffd743c683605ca78d9b9b9c8c29ebd7af6ec40a7fc2da4f4a16d06c",
+    "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+    "app/slug_loading_v2/src/package.rs": "fb965919aafdab8b019f294a510447169df2381da4a2a6cc9e322afe04866a9e",
+    "app/slug_loading_v2/src/host_glob/mod.rs": "94dd7448f373388f1f486a1f6c2e3ef9efb4cec4881757111e8f54bafeba9cd4",
+    "app/slug_loading_v2/src/host_glob/traversal.rs": "a9bd6a8f1ab4d1f7c45368ded14952f411418457cf0bc8b661ecd53c96f3310c",
+    "app/slug_query_v2/src/loading_environment.rs": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de"
+  },
+  "reference_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/com/google/devtools/build/lib/packages/GlobCache.java": "cf79d5a4a64924990936dfa1ae186aec94ea4ea9b0b7d7192c4ac30329558236",
+    "/run/media/system/Colossus/dev/bazel/src/main/java/com/google/devtools/build/lib/vfs/UnixGlob.java": "ee31920be13cfc3304f36f08dbf433fbb6cc44659f38ce76982933c4da4f0474",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs": "5c51411a79a9c48ce17940080603d7129a7426dec86ae43d1d8924f7bfa8198a"
+  },
+  "baseline_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "40e42eb0e18f95c9e76269c1b838d3fecdf55ad960ae906b7debe2f267e73751",
+        "selectors": [
+          "glob::exclude_copy_memory_tests::excluded_paths_leave_no_final_vector_backing_and_mixed_outputs_remain_owned",
+          "glob::exclude_copy_memory_tests::exclusion_scheduling_preserves_full_results_error_priority_and_projection"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/glob.rs": "9acda4b8989c46bc62f7ae0621647658871a1bce3de59506dad50043e2ae9a03",
+      "app/slug_loading_v2/src/glob/exclude_copy_memory_tests.rs": "4b46545348b2e9d10cb102f314c4e9f11b4e06d4bf6ad2cf6ed330342dcb4009",
+      "app/slug_loading_v2/tests/glob_boundaries.rs": "2313c9fa14be5b0e8489658694c33a98512ec8338e4aba418090ee0591cc1d70",
+      "app/slug_loading_v2/tests/build_file_loading.rs": "e237097c6a2709f214ff878a8aebda4723f5687c8c4d1504ac7b6b4ed61b70ce"
+    }
+  },
+  "candidate_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "c3c48f60cf456736f50f700e38b75569ec4f3c79c277e219d37950b4b34acb2d",
+        "selectors": [
+          "glob::exclude_copy_memory_tests::excluded_paths_leave_no_final_vector_backing_and_mixed_outputs_remain_owned",
+          "glob::exclude_copy_memory_tests::exclusion_scheduling_preserves_full_results_error_priority_and_projection"
+        ],
+        "fresh": false
+      },
+      "glob_boundaries": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/glob_boundaries-a64663d3faa75145",
+        "artifact_sha256": "103c15d111f9c8b187c11e977658f87f2b20cc3b1ccea54890cf644e81351bbd",
+        "selectors": [
+          "expands_over_immutable_listing_with_sorted_results_and_excludes",
+          "directories_are_candidates_only_when_requested",
+          "allow_empty_false_is_checked_per_include_pattern",
+          "empty_include_and_all_excluded_have_deterministic_errors",
+          "validates_complete_include_syntax_and_admits_recursive_and_literal_punctuation",
+          "matcher_preserves_hidden_and_wildcard_parenthesis_rules",
+          "exclusions_preserve_bazel_shortcuts_question_and_error_precedence",
+          "projection_escapes_leading_at_and_uses_java_utf16_order"
+        ],
+        "fresh": false
+      },
+      "build_file_loading": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/build_file_loading-ddc2c87810e6583a",
+        "artifact_sha256": "ba0d9b43db35318479ee6815b57261a9d9af1738cd13b2692771698f225b07c5",
+        "selectors": [
+          "build_and_macro_native_glob_share_the_prepared_package_listing",
+          "glob_reports_context_and_allow_empty_type_errors"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/glob.rs": "e397f0a5ef31904ab3d38fceef702327214e04add3876c4aebdf74f6e4bfae42",
+      "app/slug_loading_v2/src/glob/exclude_copy_memory_tests.rs": "4b46545348b2e9d10cb102f314c4e9f11b4e06d4bf6ad2cf6ed330342dcb4009",
+      "app/slug_loading_v2/tests/glob_boundaries.rs": "2313c9fa14be5b0e8489658694c33a98512ec8338e4aba418090ee0591cc1d70",
+      "app/slug_loading_v2/tests/build_file_loading.rs": "e237097c6a2709f214ff878a8aebda4723f5687c8c4d1504ac7b6b4ed61b70ce"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-compile.json",
+      "sha256": "4b53a61321804c9bf46100212824470b1a79ef48862d8dcd0dfd6def1b9421b7",
+      "exit_code": 101,
+      "elapsed_seconds": 25.556966725038365,
+      "log_sha256": "e94864f77c44f0a8def6a15d72a5105657e4809ee061740901286e844daec23d"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r2-compile.json",
+      "sha256": "438013ce3bce4fcf0886123ca52f35db1f49c600cb82b09c146c1248377b4ecf",
+      "exit_code": 0,
+      "elapsed_seconds": 16.336149837006815,
+      "log_sha256": "0ade18c671f5c8383025ee71f4184101a2953d75535cc6e5aff3f3da0a84e813"
+    },
+    "baseline-r2-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-preflight.json",
+      "sha256": "88e93149b8367bc94018d706f0166294ccc950f76cc441420d97fdd93b2a0e71",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024095365952234715,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-r2-slug_loading_v2-controls": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-controls.json",
+      "sha256": "73dc3e4d1e89a3a97598d75a619f5304be492cbd33de3ddcddb8ccda192c204a",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005658267007675022,
+      "log_sha256": "e40db27790e52a3c3d99d32d4a8f3078ec2a9ec3d759d0cb9d6c42a1ec2102da"
+    },
+    "baseline-r3-compile": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r3-compile.json",
+      "sha256": "e7240b6ed7f986edf6ed0091faaca1d6b3df0c8936100801f968128556508897",
+      "exit_code": 0,
+      "elapsed_seconds": 6.090606821002439,
+      "log_sha256": "009df2a67fca9878c9036e7efd609fc01066cf7d85a0efcd080c143c2da0c635"
+    },
+    "baseline-r3-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-preflight.json",
+      "sha256": "d7e13f5ee740c4e91349770c0524d293ee0315ce4fd0de58bbe0049a114dab00",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02584302402101457,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-r3-slug_loading_v2-controls": {
+      "receipt": "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-controls.json",
+      "sha256": "a8debe979bf99b159fcfe0bb0609b3e18378e50c55147c33d3a48a8cab982787",
+      "exit_code": 101,
+      "elapsed_seconds": 0.006161299010273069,
+      "log_sha256": "ff0e2d741d1fb642ccdeddb130b428000f12d66bdadad4dd828880ad96465b0a"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-compile.json",
+      "sha256": "2cbe9a6689934c60daa6147e54a9992d2784bd24631507ea8d555f1e0f1752c0",
+      "exit_code": 0,
+      "elapsed_seconds": 13.250755029032007,
+      "log_sha256": "0fcd33aac7ab2f9b7227a73080dc2ff2092b0b0b30df9b803c1a65739baedf26"
+    },
+    "candidate-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-preflight.json",
+      "sha256": "f498e5644e5272693ec752c1926953c3058de8322adc47d49b7f46a53927c006",
+      "exit_code": 0,
+      "elapsed_seconds": 0.026995100954081863,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "candidate-slug_loading_v2-controls": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-controls.json",
+      "sha256": "aebd541f05372c7b3c3fd660012bcd2913f9701fff410633722b45cb38ab091b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.006439550954382867,
+      "log_sha256": "5257476c973bdf1d2ad98d9500db913fc51803c023bcf9fb5809413a9b353c1f"
+    },
+    "candidate-glob_boundaries-preflight": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-preflight.json",
+      "sha256": "25dba771f129ac31c766e820186f1341c4a666cbaddf50e966822012874694b6",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022270147979725152,
+      "log_sha256": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565"
+    },
+    "candidate-glob_boundaries-controls": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-controls.json",
+      "sha256": "faa0fd80d802c90aa85fc62a0cdc351692a2a83fad6dcb8a00353035ad74889b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0012903259485028684,
+      "log_sha256": "466cb266107bf93ac4ce12a308090af28f2c265f344e7779249ea22d64450536"
+    },
+    "candidate-build_file_loading-preflight": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-preflight.json",
+      "sha256": "e49fcb5db047a6249e11fbca9dcafc659c22369c9f1740e3ef39251ced0752c0",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021272812969982624,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "candidate-build_file_loading-controls": {
+      "receipt": "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-controls.json",
+      "sha256": "aef350e681bc3f3642c25cc930cfea627506925df35f059ac4d82f4100af1a41",
+      "exit_code": 0,
+      "elapsed_seconds": 0.010707990964874625,
+      "log_sha256": "aaf011cdfb98120b67bce1a46c34649fe54bf7c25f19d988f9670dc279b7a18c"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-dependents-check.json",
+      "sha256": "ded33fe68b05ad89bec6268c5242c15be6be56094f0559fb3c48e180ecf5c516",
+      "exit_code": 0,
+      "elapsed_seconds": 5.265475754975341,
+      "log_sha256": "20a040db058306a6bd1a5a8898f3d6b010ec459f4350b7d77bc66c67f540b59d"
+    },
+    "format-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-format-check.json",
+      "sha256": "36390ee8f29504a542dc392e07af9e68a32f851f67249151d7de9795a0d654b2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021661594975739717,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-archive-check.json",
+      "sha256": "e6fcb4b7eae74ce0f3a097bd81fbce9efba48d7ea9aaf6c87d2fc3da1034a5ef",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03730905998963863,
+      "log_sha256": "68a12f2df9359b3ef36b3ac7292a65ee88439d39cb42019f3ff0df879b7d691c"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "9acda4b8989c46bc62f7ae0621647658871a1bce3de59506dad50043e2ae9a03",
+    "exact_replacements": [
+      [
+        "        if included {",
+        "        if included && !spec.is_excluded(candidate.as_bytes()) {"
+      ],
+      [
+        "    matches.retain(|candidate| !spec.is_excluded(candidate.as_bytes()));\n",
+        ""
+      ]
+    ],
+    "every_other_byte_unchanged": true
+  },
+  "test_profile": "Pinned nightly2025-09-14 fourtools; serial offline Loading lib+glob_boundaries+build_file_loading CargoJSON no-run prep60s/exactnonignored preflight/tests30s; manifestdirectory/no goldenregeneration; defaultQueryCoreCLI alltargets/format/archive/plan/diff",
+  "pass_counts": {
+    "original_baseline_compile_exit": 101,
+    "baseline_r2_semantic": 1,
+    "baseline_r2_fixture_failure": 1,
+    "corrected_baseline_semantic": 1,
+    "corrected_baseline_intended_capacity_failure": 1,
+    "candidate_new": 2,
+    "candidate_protected": 10,
+    "candidate_total": 12
+  },
+  "metrics": {
+    "baseline-r3": {
+      "result_comparisons": 432,
+      "raw_errors_count": 180,
+      "raw_errors_sha256": "63714c28b6889bd79763217c461b782e393a9d6d85c52d95d816cca6eeef6bf1",
+      "unique_raw_errors": [
+        "all files in the glob have been excluded, but allow_empty is set to False",
+        "glob pattern 'missing' didn't match anything, but allow_empty is set to False",
+        "invalid glob pattern \"bad/**x*\": recursive wildcard must be its own segment"
+      ],
+      "all_excluded_paths": 128,
+      "all_excluded_final_vector_capacity": 128,
+      "mixed_retained_bytes": [
+        6,
+        4,
+        3077
+      ]
+    },
+    "candidate": {
+      "result_comparisons": 432,
+      "raw_errors_count": 180,
+      "raw_errors_sha256": "63714c28b6889bd79763217c461b782e393a9d6d85c52d95d816cca6eeef6bf1",
+      "unique_raw_errors": [
+        "all files in the glob have been excluded, but allow_empty is set to False",
+        "glob pattern 'missing' didn't match anything, but allow_empty is set to False",
+        "invalid glob pattern \"bad/**x*\": recursive wildcard must be its own segment"
+      ],
+      "all_excluded_paths": 128,
+      "all_excluded_final_vector_capacity": 0,
+      "mixed_retained_bytes": [
+        6,
+        4,
+        3077
+      ]
+    }
+  },
+  "invariant_to_evidence": {
+    "copy_bypass": "All inclusion checks/flags stay before guard; same originalbytes exclusion now precedes only candidate String copying, eliminating rejected copies. No new borrowedoutput/helper",
+    "results_errors": "432full Result comparisons against originalcollect/validate/retain algorithm and180equal full diagnostics; literal/headtail/complex/invalid predicates,emptyincludes/all-excluded, missinginclude-beforeinvalidexclude-beforefinal, directories/duplicates/hidden/parentheses/question/recursive/Unicode/NUL cases",
+    "projection": "Exact leading@ escaping after originalbyte exclusions, cross-file/directory/projectedduplicate dedup andUTF16ordering asserted; original lastsort/dedup unchanged",
+    "owners": "128longsource paths preserve listing bytes/capacities/pointers; mixedownedoutput survives listing/spec/clone/sourcebufferdrop, exactretained bytes6/4/3077",
+    "capacity": "Fixed128all-excluded allow_emptytrue output has observed finalVeccapacity128\u21920; publiccapacitymaychange, no stringallocatorcount inferred",
+    "normal_callers": "Eightunchangedglobboundaries andtwoactual BUILD/nativeglob listing/context/typecontrols plus defaultQueryCoreCLI",
+    "allocation_limit": "Earlier matcher temporary allocation may execute onlatervalidationerror routes; source review explicitly excludes allocation-machinery failure/panic sequencing incl capacityoverflow, beyondOOM. Pureboolean semantics conditional normal allocation; no arbitrary-size/platformorderclaim or lower-work/peak claim"
+  },
+  "design_qualification": {
+    "record": "target/wp899/glob-exclude-before-copy-design-qualification.json",
+    "original_design_sha256": "53fcbe464da4fd2b98cfd9278d761b4476ea1d5cf257e3e5cce5573722b28f68",
+    "reason": "Source DESIGN reviewer identified earlier matcher Vec<char> capacity overflow may precede later validation errors on huge inputs/32bit. Pure total boolean semantics conditioned on normal allocation; explicitly exclude allocation-machinery failure/panic sequencing, not just OOM. No arbitrary-size/platform allocation-order claim. Normal Result/error/order contract and proposed production change unchanged; no new runtime or giant fixture."
+  },
+  "fixture_corrections": [
+    {
+      "record": "target/wp899/glob-exclude-before-copy-fixture-correction.json",
+      "original_test_sha256": "448c7b1dbde47bed2cfd9dc34e5ab0e8a637a2695d3eabea96d79d4ed91fe0fa",
+      "reason": "Initial unchanged-baseline compile E0433: slug_loading_v2 has no serde_json dependency. Use standard Rust Debug string-vector output for raw captured error list, adding no dependency and preserving every semantic/capacity/source/ownership assertion. Error fixture text is ASCII with supported escapes; recorder verifies identical full decoded diagnostics. Fresh corrected baseline/candidate use identical test."
+    },
+    {
+      "record": "target/wp899/glob-exclude-before-copy-fixture-correction-r2.json",
+      "previous_test_sha256": "fb1854db60baa847cd0328c6ccb39de6de085efe6ea921c05045be87c9b84706",
+      "reason": "Unchanged baseline-r2 correctly returned exact retained long string but fixture miscounted UTF8 \u00e9\ud83d\ude42 as seven bytes; it is six. Keep exact full-string/owned-after-drop/source assertions and correct only expected len from3589 to3077. Earlier observed all-excludedcapacity128 preserved. Second correction reassessed before production: both issues fixture-only (undeclared serializer and byte arithmetic), original exclusion-before-copy design unchanged. Fresh baseline-r3/candidate identical corrected tests."
+    }
+  ],
+  "limits": "Only source rejected-path String-copy bypass and fixed final vector-capacity observation. FinalVec backingstorage/capacity may shrink; retained resultStrings stillowned. Earlier matcher work can increase onerrorroutes. Allocation-machinery failure/panicsequencing incl earliermatcher capacityoverflow/OOMexcluded; no arbitrary-size/platformorderclaim. No allocator/count/quantifiedpayload/aggregate/peak/RSS/speed/source-fit claim. No new helper/API/interner/cache/key/DICE/identity/unsafe/dependency/donor or changedobserved-host traversal. Windowsminimal/deferred; fullWP899/M7A/sourceintegration open/unwaived.",
+  "growth": {
+    "test_lines": 217,
+    "estimate": "140\u2013230lines;two tests/noassets/goldens",
+    "production": "Two narrow predicate/retain changes plus siblingcfg hook"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T04:34:04.514575+00:00",
+    "baseline": "57c3522ce81f28c470c024554f88b322032a1b91"
+  },
+  "timing": {
+    "compile_and_check_seconds": 66.49995416705497,
+    "test_seconds": 0.03025743388570845,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 614.153002
+  },
+  "evidence_sha256": {
+    "target/wp899/glob-exclude-before-copy-archive-check.json": "e6fcb4b7eae74ce0f3a097bd81fbce9efba48d7ea9aaf6c87d2fc3da1034a5ef",
+    "target/wp899/glob-exclude-before-copy-archive-check.jsonl": "68a12f2df9359b3ef36b3ac7292a65ee88439d39cb42019f3ff0df879b7d691c",
+    "target/wp899/glob-exclude-before-copy-baseline-compile.json": "4b53a61321804c9bf46100212824470b1a79ef48862d8dcd0dfd6def1b9421b7",
+    "target/wp899/glob-exclude-before-copy-baseline-compile.jsonl": "e94864f77c44f0a8def6a15d72a5105657e4809ee061740901286e844daec23d",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-compile.json": "438013ce3bce4fcf0886123ca52f35db1f49c600cb82b09c146c1248377b4ecf",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-compile.jsonl": "0ade18c671f5c8383025ee71f4184101a2953d75535cc6e5aff3f3da0a84e813",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-selectors.json": "f9a4af27b3de3af29cc3e4d706a52618f79249c14c39aa212a2ea588891cb8f7",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-controls.json": "73dc3e4d1e89a3a97598d75a619f5304be492cbd33de3ddcddb8ccda192c204a",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-controls.jsonl": "e40db27790e52a3c3d99d32d4a8f3078ec2a9ec3d759d0cb9d6c42a1ec2102da",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-preflight.json": "88e93149b8367bc94018d706f0166294ccc950f76cc441420d97fdd93b2a0e71",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-slug_loading_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/glob-exclude-before-copy-baseline-r2-test.rs": "fb1854db60baa847cd0328c6ccb39de6de085efe6ea921c05045be87c9b84706",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-compile.json": "e7240b6ed7f986edf6ed0091faaca1d6b3df0c8936100801f968128556508897",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-compile.jsonl": "009df2a67fca9878c9036e7efd609fc01066cf7d85a0efcd080c143c2da0c635",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-selectors.json": "c4159fb8a8309bfc6afa37b49852008c5abac734c697e09d8ee73d59cfd0d0a6",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-controls.json": "a8debe979bf99b159fcfe0bb0609b3e18378e50c55147c33d3a48a8cab982787",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-controls.jsonl": "ff0e2d741d1fb642ccdeddb130b428000f12d66bdadad4dd828880ad96465b0a",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-preflight.json": "d7e13f5ee740c4e91349770c0524d293ee0315ce4fd0de58bbe0049a114dab00",
+    "target/wp899/glob-exclude-before-copy-baseline-r3-slug_loading_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-controls.json": "aef350e681bc3f3642c25cc930cfea627506925df35f059ac4d82f4100af1a41",
+    "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-controls.jsonl": "aaf011cdfb98120b67bce1a46c34649fe54bf7c25f19d988f9670dc279b7a18c",
+    "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-preflight.json": "e49fcb5db047a6249e11fbca9dcafc659c22369c9f1740e3ef39251ced0752c0",
+    "target/wp899/glob-exclude-before-copy-candidate-build_file_loading-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/glob-exclude-before-copy-candidate-compile.json": "2cbe9a6689934c60daa6147e54a9992d2784bd24631507ea8d555f1e0f1752c0",
+    "target/wp899/glob-exclude-before-copy-candidate-compile.jsonl": "0fcd33aac7ab2f9b7227a73080dc2ff2092b0b0b30df9b803c1a65739baedf26",
+    "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-controls.json": "faa0fd80d802c90aa85fc62a0cdc351692a2a83fad6dcb8a00353035ad74889b",
+    "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-controls.jsonl": "466cb266107bf93ac4ce12a308090af28f2c265f344e7779249ea22d64450536",
+    "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-preflight.json": "25dba771f129ac31c766e820186f1341c4a666cbaddf50e966822012874694b6",
+    "target/wp899/glob-exclude-before-copy-candidate-glob_boundaries-preflight.jsonl": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565",
+    "target/wp899/glob-exclude-before-copy-candidate-selectors.json": "4ecf7b45be272a8b80ad80c9013388536e8a0e6cd6a3960ec4ca421cc78bd032",
+    "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-controls.json": "aebd541f05372c7b3c3fd660012bcd2913f9701fff410633722b45cb38ab091b",
+    "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-controls.jsonl": "5257476c973bdf1d2ad98d9500db913fc51803c023bcf9fb5809413a9b353c1f",
+    "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-preflight.json": "f498e5644e5272693ec752c1926953c3058de8322adc47d49b7f46a53927c006",
+    "target/wp899/glob-exclude-before-copy-candidate-slug_loading_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/glob-exclude-before-copy-controls.py": "f926019fc4207dda2248f1524030e7a1ff4669eac549bc67fd7dd3917e9f92f4",
+    "target/wp899/glob-exclude-before-copy-dependents-check.json": "ded33fe68b05ad89bec6268c5242c15be6be56094f0559fb3c48e180ecf5c516",
+    "target/wp899/glob-exclude-before-copy-dependents-check.jsonl": "20a040db058306a6bd1a5a8898f3d6b010ec459f4350b7d77bc66c67f540b59d",
+    "target/wp899/glob-exclude-before-copy-design-evidence.md": "53529e1a614f8505b38b15d5c3dce705a229fcff781a325dd4cbe6e95878dc52",
+    "target/wp899/glob-exclude-before-copy-design-ownership.md": "c293dbec8224629340c00b4e2dbe033b0a4daf9f82bd68f0b6ad578dd883dcd0",
+    "target/wp899/glob-exclude-before-copy-design-qualification.json": "d923227a39f9f77d116cdaa2bc5f04907424b34fcc47b425d00a9a87a1d9f0f4",
+    "target/wp899/glob-exclude-before-copy-design-source.md": "04d35d127bc95e7759a7f3f9864b5365d4311f7d6c6a49b254579bbc24edea3b",
+    "target/wp899/glob-exclude-before-copy-design.md": "a71e4857f367a9fa67fc55c724c01506082fc4a99e0285c65b45f5613234984b",
+    "target/wp899/glob-exclude-before-copy-fixture-correction-r2.json": "9cc969232a6b9ccd13b77e67c05e5868d375c6299f709fff1cfdda0ae34b579a",
+    "target/wp899/glob-exclude-before-copy-fixture-correction.json": "29229180b60bed46bee975127001d6b0b6481d3b1b21938404d672de4efcc832",
+    "target/wp899/glob-exclude-before-copy-format-check.json": "36390ee8f29504a542dc392e07af9e68a32f851f67249151d7de9795a0d654b2",
+    "target/wp899/glob-exclude-before-copy-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/glob-exclude-before-copy-original-design.md": "53fcbe464da4fd2b98cfd9278d761b4476ea1d5cf257e3e5cce5573722b28f68",
+    "target/wp899/glob-exclude-before-copy-original-test.rs": "448c7b1dbde47bed2cfd9dc34e5ab0e8a637a2695d3eabea96d79d4ed91fe0fa",
+    "target/wp899/glob-exclude-before-copy-record.py": "877038c5c4957929889989d6fbe967dcc20851edd24d12e5d1bacde00b8d8e08",
+    "target/wp899/glob-exclude-before-copy-start.json": "52a55b24a4600eb35727ef3763314b01c88073555f3154a1f1006211b73af903"
+  },
+  "validation_sha256": "315d990bf9ff1fa0dae871b5635d7eb441d3de9e55a09ca343183c78178d7041",
+  "final_reviews": {
+    "target/wp899/glob-exclude-before-copy-final-source.md": "60edca9aac56d754d36fa6d45d0ecd54345e5158cf8b0f57b21e648006a07414",
+    "target/wp899/glob-exclude-before-copy-final-ownership.md": "98d48c1eafa5916263c90e56360ffe57bbbbc72c6fda1e6e2881247df4837c35",
+    "target/wp899/glob-exclude-before-copy-final-evidence.md": "c465c92b1fc4def1e4e4e88b41fe31c19d110212c19b542bc5c124644c6652a2"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "11198bd2a4d3ca869bbfaebeb7613ab62366d8713f7534cbf7343121384b12e8",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "ba8fff405c6c0aa3628b4bc9925bdf729b584164352a383e8d6b4ff68f481083",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "5731b4515619d80ab2966990a7e9d44bc8c04ff898ec61da1a9e88d8553e0b63"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-format-check.json",
+      "sha256": "36390ee8f29504a542dc392e07af9e68a32f851f67249151d7de9795a0d654b2",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-archive-check.json",
+      "sha256": "e6fcb4b7eae74ce0f3a097bd81fbce9efba48d7ea9aaf6c87d2fc3da1034a5ef",
+      "exit_code": 0,
+      "log_sha256": "68a12f2df9359b3ef36b3ac7292a65ee88439d39cb42019f3ff0df879b7d691c"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-plan-check.json",
+      "sha256": "cd3aeb38ec8022b057bc9657ee6a48ad9251c0e4d7edc04056580e0eec1dbbba",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/glob-exclude-before-copy-diff-check.json",
+      "sha256": "d6a1d756eba87be04453149216315517caab61ce10fb362eaa9e3ad3bb4bf010",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

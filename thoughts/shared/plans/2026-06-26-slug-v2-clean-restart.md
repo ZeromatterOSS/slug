@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: string repetition by two writes directly into final heap
-storage, omitting temporary String construction/copying. Unpack/capacity priority,
-other counts, bytes/hash and natural ownership remain. Eight controls, 5,460 byte/
-hash comparisons, fourteen equal diagnostics, retained GC/frozen outputs and
-dependent checks pass. Source scratch-bypass proof only; no quantified memory/
-RSS/speed claim.
+Latest accepted change: glob exclusions run before candidate path copying.
+Include flags/error priority, unescaped matching, ordering and owned output remain.
+Twelve controls, 432 result comparisons, 180 equal diagnostics, fixed empty Vec
+capacity 128→0, retained strings and Query/Core/CLI checks pass. Vec storage may
+shrink; earlier matcher allocation-work/failure sequencing has explicit limits.
+No aggregate/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
