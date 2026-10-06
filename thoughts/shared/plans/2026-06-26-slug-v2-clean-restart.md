@@ -34,29 +34,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: One bounded progress-origin source observation selected; actual source fit and full WP899 unaccepted
+Packet: WP-7-200-m7a-current-production-inventory-r1
+Status: Ready for bounded offline CLI dependency inventory reconciliation
 
-The [current manifest](./slug-v2-subplans/current-packet.md) owns the bounded
-source-progress discriminator, accepted memory evidence and unwaived full gates.
-Fresh64-round string lifecycle and lexer controls show controlled fixture memory
-under unchanged caps. Preserve the original failed64KiB stability guard; a separate
-cache-backed reassessment permits offline profiling, not complete source fit.
-Source progress now distinguishes five Need dispatch origins using fixed
-request-local numeric counters. Eight baseline/ten candidate exact controls
-protect normal caller, changed-owner refusal, cancellation and restoration.
-Next: one separately selected actual source observation, global18/local1, uses
-the new origin counters under unchanged caps and fresh concrete approval.
-No automatic retry, cap growth or runtime activation; full source fit stays open.
-Windows remains minimal/deferred.
-Completed observations and superseded launch instructions are retained in the
-[pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).
-Full WP899/M7A and source admission remain unaccepted.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects current Linux
+normal/build CLI inventory reconciliation under canonical priority1, using one
+locked/offline metadata observation and static declared producers. Classify live
+local/external, generated-input and pin deltas before semantic implementation.
+Metadata features are not unit/configured compiler flags; M7A remains partial.
+
+Controlled64-round string lifecycle and lexer evidence permits bounded broader
+progress; allocation/interner discipline is retained in AGENTS.md. The original
+memory-stability REFUSED remains. Global18 stopped in a declared15s TLS handshake
+step during initial-owner resolution, with peak sampled RSS73146368B and no
+allocation-abort diagnostic. Three FINALs accept terminal evidence and cleanup;
+full source admission stays open. Global16/17/18 remain spent, with no automatic
+retry or cap increase. See [terminal receipt](./slug-v2-subplans/wp899-progress-profile-terminal-2026-10-06.json).
+Windows remains minimal/deferred. Full WP899/M7A integration remains unaccepted.
 
 ### Ready and blocked queue
 
-These milestone priorities remain queued. They do not authorize work beyond
-the current bounded source-preparation observation scope.
+The current packet selects bounded accounting under priority1; the remaining
+priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
