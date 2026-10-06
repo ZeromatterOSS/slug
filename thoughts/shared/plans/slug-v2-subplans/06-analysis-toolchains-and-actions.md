@@ -495,9 +495,14 @@ The native Unicode rendering domain remains Slug-native.
 status parser on WorkspaceStatusArtifacts: LF and first-space delimiters, last-value
 duplicates, exact Latin1 mapping, and independent compact map ownership. It streams
 borrowed slices into existing owned compact values without a whole-file decoded
-String or extra pair Vec. Actual status production/observation, Latin1 template/output
-conversion, tracked template reads, arbitrary or Java callbacks, execution/cache
-policy, installed module tools and full cc_toolchain remain deferred.
+String or extra pair Vec. [WP924](wp924-build-info-supplied-byte-render-2026-10-06.json)
+completes pure supplied status/template bytes to independently owned header bytes.
+Both entrypoints share one borrowed callback selector and literal engine; byte input
+Latin1 closure permits exact checked byte encoding. Local map/template owners drop
+before encoding, while rendered String/final Vec overlap remains explicit.
+Actual status production/observation, tracked template reads/certificates, writer
+permissions, arbitrary or Java callbacks, execution/cache policy, installed module
+tools and full cc_toolchain remain deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is

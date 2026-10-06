@@ -1,0 +1,345 @@
+{
+  "packet": "WP-7-223-m7a-build-info-supplied-byte-render-r1",
+  "operational_packet": "WP924",
+  "date": "2026-10-06",
+  "base": "50dd195701c994265f1a9e39d3faca58c8fd8f24",
+  "status": "accepted",
+  "contract": {
+    "receipt": "target/wp924/contract.md",
+    "sha256": "0ea169584516ec8aefd43f6c93a5687720738fa07c7452988c670105de04f8a5"
+  },
+  "outcome": "Complete pure supplied status/template byte rendering into independent BuildInfo header bytes through existing checked recipes.",
+  "compatibility": {
+    "exact": "Finite Info/Version Latin1 status/template decoding, ordered literal substitutions, defaults and timestamp errors, exact closed-domain byte encoding.",
+    "slug_native": "Existing general valid-Unicode String rendering and structural action/status/source/configuration identity unchanged.",
+    "deferred": "Actual status production/update policy, tracked template acquisition/certificates, output writer permissions, volatile/cache policy, general callbacks, runtime/input-tree/REAPI, Windows breadth, authentic source/full-root/M7A and aggregate memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "files": [
+      {
+        "file": "WorkspaceStatusAction.java",
+        "sha256": "2e05526a947d4643a5e9b5cc45ee5c938ecd6fc133941e87a02147a2953a9db8",
+        "lines": "120-134 parseValues"
+      },
+      {
+        "file": "BuildInfoFileWriteAction.java",
+        "sha256": "6ea1c24bca5ca5bf21b144e50a8e63b55258e6e9170a98a1db1766367a5c4661",
+        "lines": "99-184 status/callback/template/writer"
+      },
+      {
+        "file": "Template.java",
+        "sha256": "aea5bec06fef60c190a1e16a29769d6c534e902a08501bec8e8785fcb55d3b68",
+        "lines": "103-110; Latin1 read107"
+      },
+      {
+        "file": "LocalTemplateExpansionStrategy.java",
+        "sha256": "8b9318e7207f578adbf0fead43fb9a3d8ec23602fe42d5f6eef24a0e5c57ed5e",
+        "lines": "48-59 encoding52;75-85 literal loop80-82"
+      }
+    ],
+    "anchors": "target/wp924/pinned-source.json",
+    "anchors_sha256": "6aecbbdc0e6a297736a993102ac75483bdc9b3d8e1d42c28bae4a5b138e51894",
+    "correction": "Immutable numeric positions corrected from inherited mutable-tree notes; full file hashes/body algorithms unchanged. Historical receipts remain preserved."
+  },
+  "ownership": {
+    "api": "BuildInfoCallbackRecipe::render_supplied_bytes(&[u8], &[u8]) -> Result<Vec<u8>, static str error>.",
+    "storage": "One shared borrowed three-pair selector and existing Cow literal replacement engine. Parse status and validate timestamp before template decode. Map/template owners release at lexical block exit before final encoding. Independently owned rendered String and returned Vec retain no input or recipe loans. Closed Latin1 decoder/default/replacement domain justifies checked u8 conversion; arbitrary Unicode entrypoint never passes through encoder. No new retained pool/interner/cache/key/graph/DICE/async boundary.",
+    "cost": "Compact decoder buffers can grow; duplicate/constructor and old/new replacement storage may overlap. Rendered UTF8 String overlaps final growing Vec during encoding. No exact capacity, single-allocation, zero-copy, speedup or whole-fit claim. Existing scoped interning remains; unique temporary content stays local."
+  },
+  "discriminators": "Eight independent full byte cases; six exact missing timestamp errors; six literal pass/cascade/self/backward/cross-boundary/equality cases; all256 no-match bytes for both recipes; heap-sized matched high-byte output and two no-match Vecs after all input/recipe/snapshot owners drop. Repeats and immutability. Existing actual retained installed main/external Target/Exec recipes repeat complete byte headers and Version error through unchanged catalog templates. Supplied test bytes do not assert artifact observation.",
+  "source_sha256": {
+    "app/slug_build_api_v2/src/actions/build_info_transform.rs": "047846e699df3b1efa3121d416086f4d09fa4468889a3f4b5d3f4305799df08e",
+    "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs": "bd8f401579fc641a44c7152c3d2915c8a07ed8d9bf2bd529514d2212f8dea274",
+    "app/slug_build_api_v2/src/workspace_status.rs": "ec5fa4d2244cab9b8f669a7fd76a19fe3ae6b3c32c72f4911133e059c41387a3",
+    "app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs": "a3ba209f7e48eddab9c26b6919f604febc6dc0ee823f95e75f07557c30ad1014"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved nightly-2025-09-14, offline Cargo JSON jobs1 preparation <=60s TERM3; exact nonignored preflight before serial10s TERM3 runtime. Analysis invocation-only dev opt0/debug0 for bzlmod/loading/core/analysis; owner default opt1/debug2; CLI default check.",
+    "compiles": {
+      "cli-check": {
+        "exit_code": 0,
+        "seconds": 7.9144428570289165,
+        "receipt": "target/wp924/cli-check.json"
+      },
+      "build-api-tests": {
+        "exit_code": 0,
+        "seconds": 2.656759166973643,
+        "receipt": "target/wp924/build-api-tests.json"
+      },
+      "analysis-tests": {
+        "exit_code": 0,
+        "seconds": 12.03045495704282,
+        "receipt": "target/wp924/analysis-tests.json"
+      }
+    },
+    "owner": {
+      "tests": [
+        {
+          "name": "actions::build_info_transform::tests::build_info_specs_preserve_all_owned_inputs_and_metadata",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004120889003388584,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::constant_metadata_is_orthogonal_and_cannot_enter_other_action_families",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002680051955394447,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_registration_is_ordered_atomic_and_conflicts_across_metadata",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003085174015723169,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_callback_render_preserves_defaults_order_and_errors",
+          "exit_code": 0,
+          "elapsed_seconds": 0.001010774984024465,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_callback_render_outputs_outlive_borrowed_unicode_inputs",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0010123240062966943,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::workspace_status_identity_metadata_and_projections_are_structural",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0010337650310248137,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::workspace_status_preserves_nonunicode_workspace_identity",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0009406539611518383,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::workspace_status_runfiles_refuse_before_resolver",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0009794539073482156,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::supplied_status_latin1_decoder_maps_every_byte_without_utf8_interpretation",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0009220149368047714,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::supplied_status_values_preserve_literal_separators_duplicates_and_ownership",
+          "exit_code": 0,
+          "elapsed_seconds": 0.000958943972364068,
+          "passed_one": true
+        },
+        {
+          "name": "workspace_status::tests::supplied_status_values_compose_with_checked_build_info_recipes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0010477349860593677,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_supplied_bytes_preserve_full_headers_raw_values_and_errors",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0009506640490144491,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_supplied_bytes_keep_ordered_literal_and_cross_boundary_passes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0010262849973514676,
+          "passed_one": true
+        },
+        {
+          "name": "actions::build_info_transform::tests::build_info_supplied_bytes_roundtrip_all_bytes_and_outlive_input_owners",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0009798440150916576,
+          "passed_one": true
+        }
+      ],
+      "selected": 14,
+      "passed": 14,
+      "elapsed_seconds": 0.020766234025359154,
+      "max_child_rss_kib": 12444
+    },
+    "owner_preflight": {
+      "exit_code": 0,
+      "output": "Verified 14 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.06965479406062514,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_build_api_v2-31b6e4cd11657155",
+      "executable_sha256": "3e880ea25083b6405ef925dda4ce4d8f24ab44af56711a5b353e14b7eb63a4de",
+      "selected": 14,
+      "artifact_profile": {
+        "opt_level": "1",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "analysis": {
+      "tests": [
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_build_info_and_unchanged_main_external_instances_register_real_actions",
+          "exit_code": 0,
+          "elapsed_seconds": 0.3923074969789013,
+          "passed_one": true
+        },
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_build_info_restores_full_configuration_and_rejects_java_callbacks",
+          "exit_code": 0,
+          "elapsed_seconds": 0.053849952993914485,
+          "passed_one": true
+        },
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_template_source_keeps_catalog_authority_and_refuses_host_resolution",
+          "exit_code": 0,
+          "elapsed_seconds": 0.038549612974748015,
+          "passed_one": true
+        }
+      ],
+      "selected": 3,
+      "passed": 3,
+      "elapsed_seconds": 0.48472355294506997,
+      "max_child_rss_kib": 105744
+    },
+    "analysis_preflight": {
+      "exit_code": 0,
+      "output": "Verified 3 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.1672264930093661,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-3e0b37736bfde50c",
+      "executable_sha256": "69606cd4fec2b7e0a6c097bf6b206967d752fa83bad90c3c169e44ce83545d40",
+      "selected": 3,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "checks": [
+      {
+        "name": "rustfmt",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "--check",
+          "app/slug_build_api_v2/src/actions/build_info_transform.rs",
+          "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs",
+          "app/slug_build_api_v2/src/workspace_status.rs",
+          "app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.011677082045935094,
+        "output": ""
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.00370615697465837,
+        "output": ""
+      },
+      {
+        "name": "archive-status",
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03265074698720127,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs\n M app/slug_build_api_v2/src/actions/build_info_transform.rs\n M app/slug_build_api_v2/src/actions/build_info_transform/tests.rs\n M app/slug_build_api_v2/src/workspace_status.rs\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n"
+      }
+    ],
+    "integration": [
+      {
+        "name": "final-diff-check",
+        "exit_code": 0,
+        "elapsed_seconds": 0.005832366063259542,
+        "output": ""
+      },
+      {
+        "name": "plan-status",
+        "exit_code": 0,
+        "elapsed_seconds": 0.01429074490442872,
+        "output": "Packet: WP-7-224-m7a-build-info-catalog-template-preparation-r1\n"
+      }
+    ],
+    "protected_prefix": {
+      "file": "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs",
+      "baseline_sha256": "ccd4b75851e6fa9d7c31010133de113b82f2a3008903d5013620de5c6edb1922",
+      "baseline_bytes": 17960,
+      "unchanged_prefix": true
+    },
+    "scope": "14/14 owner (11 protected +3 new),3/3 installed Analysis, default CLI compile check; no actual CLI binary/oracle/daemon/runtime execution."
+  },
+  "design_reviews": {
+    "source": {
+      "receipt": "target/wp924/design-source.md",
+      "sha256": "5a79d12e8368b7277acab208cfb2862912e491e1faae580c1ac13a2f1c7dadae"
+    },
+    "ownership": {
+      "receipt": "target/wp924/design-ownership.md",
+      "sha256": "83c60e7f031afa82d016586d65f8f4fee3bb1925edfaca9addd64872f77f1fca"
+    },
+    "evidence": {
+      "receipt": "target/wp924/design-evidence.md",
+      "sha256": "7264b1bc3f60a80991eb5bc4668fc2b0b31ace3f54becaf8677edc542de11a1b"
+    }
+  },
+  "reviews": {
+    "source": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp924/final-source.md",
+      "sha256": "9210d57f052cd504d7221dee502327891849f4cc5e5485cb13c82c4089727de1"
+    },
+    "ownership": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp924/final-ownership.md",
+      "sha256": "c804f3e5a0b9116215353d49f66806b6cc8ae75e5c15a5c4c9692bb296b8f862"
+    },
+    "evidence": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp924/final-evidence.md",
+      "sha256": "27c6937f74d02356a43d8b5ad6c4d527178e99e3e10e2852d875cca39bbcab88"
+    }
+  },
+  "growth": "Four named Rust owners only,135 appended owner test lines and14 Analysis lines. Protected17960-byte renderer test prefix unchanged; decoder body/parser unchanged, visibility only. No new assets/corpus/dependency/harness or copied fixture matrix.",
+  "corrections": "Initial source-anchor extraction went past immutable strategy86 lines and raised IndexError; corrected numeric extraction succeeded without API/production/test/algorithm changes. No semantic compile/preflight/runtime failure or code correction. Source frozen through FINAL reviews.",
+  "memory_readiness": {
+    "inherited_receipt": "wp899-memory-readiness-2026-10-06.json",
+    "qualification": "Controlled64round/131072-string readiness under512MiB AS/256MiB RSS remains bounded. Original64KiB postdrop refusal, representative lexer gap and source/whole-workload fit qualifications persist. Test RSS observations are not workload fit proof."
+  },
+  "successor": {
+    "packet": "WP-7-224-m7a-build-info-catalog-template-preparation-r1",
+    "basis": "Dedicated tracked installed BuildInfo template preparation selected from validated observed action closure and existing immutable catalog DICE byte owner. Reuse Arc result/bytes and actual route observations, retain configuration/action identity and source frontier; no filesystem-only staging widening or invented status producer.",
+    "source_note": "target/wp924/successor-source.md",
+    "sha256": "543eaab7ca6c7890c1aa9e05fc037c6bb2927f5e672c02202f8f2a88ccebd6df"
+  },
+  "remaining": "Authentic status producers/template preparation/writer/execution/cache/full-root/M7A and aggregate fit open. Resource caps/refusals and spent source16/17/18 unchanged; no retry.",
+  "timing": {
+    "compile_seconds": 22.60165698104538,
+    "runtime_seconds": 0.5054897869704291,
+    "observed_since_recorded_start_seconds": 1001.4687322450336,
+    "qualification": "Review duration not independently measured; source-anchor correction timing included."
+  },
+  "operational_evidence": {
+    "directory": "target/wp924",
+    "hash_index": "target/wp924/operational-hashes.json",
+    "index_sha256": "ad14e5c9ca4038d931138320601300eb85213ce4061fb7f5bccaed3a7e198f75"
+  }
+}

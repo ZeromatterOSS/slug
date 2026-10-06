@@ -1,4 +1,4 @@
-//! Checked finite build-info recipes and pure rendering of supplied strings.
+//! Checked finite build-info recipes and pure rendering of supplied content.
 use std::borrow::Cow;
 use std::sync::Arc;
 
@@ -13,6 +13,8 @@ use crate::ActionOutputMetadata;
 use crate::AnalysisArtifact;
 use crate::WorkspaceStatusArtifact;
 use crate::WorkspaceStatusArtifactKind;
+use crate::WorkspaceStatusArtifacts;
+use crate::workspace_status::decode_latin1;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum BuildInfoTransformKind {
@@ -58,7 +60,34 @@ impl BuildInfoCallbackRecipe {
         status: &CanonicalStringMap,
         template: &str,
     ) -> Result<String, &'static str> {
-        let substitutions = match self.kind {
+        Ok(render_substitutions(self.substitutions(status)?, template))
+    }
+    /// Render supplied Latin1 status/template bytes into independent header bytes.
+    /// This does not observe artifacts or execute the transform action.
+    pub fn render_supplied_bytes(
+        &self,
+        status_bytes: &[u8],
+        template_bytes: &[u8],
+    ) -> Result<Vec<u8>, &'static str> {
+        let rendered = {
+            let status = WorkspaceStatusArtifacts::parse_supplied_values(status_bytes);
+            let substitutions = self.substitutions(&status)?;
+            let template = decode_latin1(template_bytes);
+            render_substitutions(substitutions, template.as_str())
+        }; // Map and template storage are released before byte encoding.
+        Ok(rendered
+            .chars()
+            .map(|character| {
+                u8::try_from(u32::from(character))
+                    .expect("byte inputs and callback defaults stay in Latin1")
+            })
+            .collect())
+    }
+    fn substitutions<'a>(
+        &self,
+        status: &'a CanonicalStringMap,
+    ) -> Result<[(&'static str, &'a str); 3], &'static str> {
+        Ok(match self.kind {
             BuildInfoTransformKind::Info => [
                 (
                     "{BUILD_EMBED_LABEL}",
@@ -90,16 +119,7 @@ impl BuildInfoCallbackRecipe {
                     ("{BUILD_TIMESTAMP}", timestamp),
                 ]
             }
-        };
-        let mut output = Cow::Borrowed(template);
-        for (key, value) in substitutions {
-            if key != value && output.contains(key) {
-                // Literal replacement skips this pass's inserted text; later
-                // passes see it. A matching pass briefly owns old/new buffers.
-                output = Cow::Owned(output.replace(key, value));
-            }
-        }
-        Ok(output.into_owned())
+        })
     }
     pub fn kind(&self) -> BuildInfoTransformKind {
         self.kind
@@ -110,6 +130,18 @@ impl BuildInfoCallbackRecipe {
     pub fn digest(&self) -> &[u8; 32] {
         &self.digest
     }
+}
+
+fn render_substitutions(substitutions: [(&str, &str); 3], template: &str) -> String {
+    let mut output = Cow::Borrowed(template);
+    for (key, value) in substitutions {
+        if key != value && output.contains(key) {
+            // Literal replacement skips this pass's inserted text; later
+            // passes see it. A matching pass briefly owns old/new buffers.
+            output = Cow::Owned(output.replace(key, value));
+        }
+    }
+    output.into_owned()
 }
 
 #[derive(Debug, Eq, PartialEq, Allocative)]

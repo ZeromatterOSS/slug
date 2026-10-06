@@ -98,7 +98,7 @@ impl WorkspaceStatusArtifacts {
     }
 }
 
-fn decode_latin1(bytes: &[u8]) -> CompactString {
+pub(crate) fn decode_latin1(bytes: &[u8]) -> CompactString {
     if bytes.is_ascii() {
         CompactString::from(std::str::from_utf8(bytes).expect("ASCII is valid UTF8"))
     } else {

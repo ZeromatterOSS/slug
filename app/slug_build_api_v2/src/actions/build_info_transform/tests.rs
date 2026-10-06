@@ -519,3 +519,138 @@ fn build_info_callback_render_outputs_outlive_borrowed_unicode_inputs() {
         "unchanged é😀\0\r\n{OTHER}".as_bytes()
     );
 }
+
+#[test]
+fn build_info_supplied_bytes_preserve_full_headers_raw_values_and_errors() {
+    use BuildInfoTransformKind::Info;
+    use BuildInfoTransformKind::Version;
+
+    let info_header = b"#define BUILD_EMBED_LABEL \"{BUILD_EMBED_LABEL}\"\n#define BUILD_HOST \"{BUILD_HOST}\"\n#define BUILD_USER \"{BUILD_USER}\"\n";
+    let version_header = b"#define BUILD_SCM_REVISION \"{BUILD_SCM_REVISION}\"\n#define BUILD_SCM_STATUS \"{BUILD_SCM_STATUS}\"\n#define BUILD_TIMESTAMP {BUILD_TIMESTAMP}\n";
+    let cases: &[(BuildInfoTransformKind, &[u8], &[u8], &[u8])] = &[
+        (Info, b"", info_header, b"#define BUILD_EMBED_LABEL \"\"\n#define BUILD_HOST \"hostname\"\n#define BUILD_USER \"username\"\n"),
+        (Version, b"BUILD_TIMESTAMP 123\n", version_header, b"#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP 123\n"),
+        (Info, b"BUILD_EMBED_LABEL caf\xE9\nBUILD_HOST \xC3\xA9\nBUILD_USER \xFF\x80\0\r\n", info_header, b"#define BUILD_EMBED_LABEL \"caf\xE9\"\n#define BUILD_HOST \"\xC3\xA9\"\n#define BUILD_USER \"\xFF\x80\0\r\"\n"),
+        (Version, b"BUILD_SCM_REVISION r\xE9\nBUILD_SCM_STATUS \xFF\0\r\nBUILD_TIMESTAMP first\nBUILD_TIMESTAMP  not numeric \r\nBUILD_TIMESTAMP\n", version_header, b"#define BUILD_SCM_REVISION \"r\xE9\"\n#define BUILD_SCM_STATUS \"\xFF\0\r\"\n#define BUILD_TIMESTAMP  not numeric \r\n"),
+        (Info, b"BUILD_EMBED_LABEL old\nBUILD_EMBED_LABEL \nBUILD_EMBED_LABEL\nBUILD_HOST \nBUILD_USER \n", b"[{BUILD_EMBED_LABEL}][{BUILD_HOST}][{BUILD_USER}]\xFE\0\r", b"[][][]\xFE\0\r"),
+        (Version, b"BUILD_TIMESTAMP \n", version_header, b"#define BUILD_SCM_REVISION \"0\"\n#define BUILD_SCM_STATUS \"\"\n#define BUILD_TIMESTAMP \n"),
+        (Version, b"BUILD_TIMESTAMP \n", b"", b""),
+        (Info, b"", b"", b""),
+    ];
+    for &(kind, status, template, expected) in cases {
+        let callback = recipe(kind);
+        let before = callback.clone();
+        let status = status.to_vec();
+        let template = template.to_vec();
+        let inputs = (status.clone(), template.clone());
+        for _ in 0..2 {
+            assert_eq!(
+                callback.render_supplied_bytes(&status, &template).unwrap(),
+                expected
+            );
+        }
+        assert_eq!((&status, &template), (&inputs.0, &inputs.1));
+        assert_eq!(callback, before);
+    }
+    let callback = recipe(Version);
+    for status in [b"".as_slice(), b"BUILD_TIMESTAMP\nBUILD_TIMESTAMP\t123\n"] {
+        for template in [
+            b"{BUILD_TIMESTAMP}".as_slice(),
+            b"",
+            b"no recognized key\xFF\0\r",
+        ] {
+            assert_eq!(
+                callback.render_supplied_bytes(status, template),
+                Err(
+                    "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
+                )
+            );
+        }
+    }
+}
+
+#[test]
+fn build_info_supplied_bytes_keep_ordered_literal_and_cross_boundary_passes() {
+    use BuildInfoTransformKind::Info;
+    use BuildInfoTransformKind::Version;
+
+    let cases: &[(BuildInfoTransformKind, &[u8], &[u8], &[u8])] = &[
+        (Info, b"BUILD_EMBED_LABEL {BUILD_HOST}\nBUILD_HOST {BUILD_USER}\nBUILD_USER \xE9{BUILD_EMBED_LABEL}{BUILD_USER}\n", b"{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}", b"\xE9{BUILD_EMBED_LABEL}{BUILD_USER}|\xE9{BUILD_EMBED_LABEL}{BUILD_USER}|\xE9{BUILD_EMBED_LABEL}{BUILD_USER}"),
+        (Version, b"BUILD_SCM_REVISION {BUILD_SCM_STATUS}\nBUILD_SCM_STATUS {BUILD_TIMESTAMP}\nBUILD_TIMESTAMP \xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}\n", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}", b"\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}|\xFF{BUILD_SCM_REVISION}{BUILD_TIMESTAMP}"),
+        (Info, b"BUILD_EMBED_LABEL {BUILD_\nBUILD_HOST later\x80\n", b"{BUILD_EMBED_LABEL}HOST}|{BUILD_EMBED_LABEL}EMBED_LABEL}", b"later\x80|{BUILD_EMBED_LABEL}"),
+        (Version, b"BUILD_SCM_REVISION {BUILD_\nBUILD_SCM_STATUS later\xFE\nBUILD_TIMESTAMP \n", b"{BUILD_SCM_REVISION}SCM_STATUS}|{BUILD_SCM_REVISION}SCM_REVISION}", b"later\xFE|{BUILD_SCM_REVISION}"),
+        (Info, b"BUILD_EMBED_LABEL {BUILD_EMBED_LABEL}\nBUILD_HOST {BUILD_HOST}\nBUILD_USER {BUILD_USER}\n", b"{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}|{OTHER}", b"{BUILD_EMBED_LABEL}{BUILD_EMBED_LABEL}|{BUILD_HOST}|{BUILD_USER}|{OTHER}"),
+        (Version, b"BUILD_SCM_REVISION {BUILD_SCM_REVISION}\nBUILD_SCM_STATUS {BUILD_SCM_STATUS}\nBUILD_TIMESTAMP {BUILD_TIMESTAMP}\n", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}", b"{BUILD_SCM_REVISION}|{BUILD_SCM_STATUS}|{BUILD_TIMESTAMP}{BUILD_TIMESTAMP}"),
+    ];
+    for &(kind, status, template, expected) in cases {
+        let callback = recipe(kind);
+        assert_eq!(
+            callback.render_supplied_bytes(status, template).unwrap(),
+            expected
+        );
+        assert_eq!(
+            callback.render_supplied_bytes(status, template).unwrap(),
+            expected
+        );
+    }
+}
+
+#[test]
+fn build_info_supplied_bytes_roundtrip_all_bytes_and_outlive_input_owners() {
+    use BuildInfoTransformKind::Info;
+    use BuildInfoTransformKind::Version;
+
+    let (matched, unchanged_info, unchanged_version) = {
+        let info = recipe(Info);
+        let version = recipe(Version);
+        let mut status = b"BUILD_TIMESTAMP 1\nBUILD_HOST ".to_vec();
+        status.extend(std::iter::repeat_n(0xE9, 512));
+        status.extend_from_slice(b"\0\r\n");
+        let template = b"\xFF[{BUILD_HOST}][{BUILD_HOST}]\0\r".to_vec();
+        // This byte sequence contains no recognized placeholder, and includes
+        // valid and invalid UTF8, raw delimiters and all control characters.
+        let all_bytes = (0..=255u8).collect::<Vec<_>>();
+        let snapshots = (
+            status.clone(),
+            template.clone(),
+            all_bytes.clone(),
+            info.clone(),
+            version.clone(),
+        );
+        let matched = info.render_supplied_bytes(&status, &template).unwrap();
+        let unchanged_info = info.render_supplied_bytes(&status, &all_bytes).unwrap();
+        let unchanged_version = version.render_supplied_bytes(&status, &all_bytes).unwrap();
+        assert_eq!(unchanged_info, all_bytes);
+        assert_eq!(unchanged_version, all_bytes);
+        assert_eq!(
+            info.render_supplied_bytes(&status, &template).unwrap(),
+            matched
+        );
+        assert_eq!(
+            (&status, &template, &all_bytes, &info, &version),
+            (
+                &snapshots.0,
+                &snapshots.1,
+                &snapshots.2,
+                &snapshots.3,
+                &snapshots.4
+            )
+        );
+        drop(snapshots);
+        drop(status);
+        drop(template);
+        drop(all_bytes);
+        drop(info);
+        drop(version);
+        (matched, unchanged_info, unchanged_version)
+    };
+    // Only the returned byte Vecs survive the supplied input/recipe owners.
+    let mut expected = b"\xFF[".to_vec();
+    expected.extend(std::iter::repeat_n(0xE9, 512));
+    expected.extend_from_slice(b"\0\r][");
+    expected.extend(std::iter::repeat_n(0xE9, 512));
+    expected.extend_from_slice(b"\0\r]\0\r");
+    assert_eq!(matched, expected);
+    assert_eq!(unchanged_info, (0..=255u8).collect::<Vec<_>>());
+    assert_eq!(unchanged_version, (0..=255u8).collect::<Vec<_>>());
+}

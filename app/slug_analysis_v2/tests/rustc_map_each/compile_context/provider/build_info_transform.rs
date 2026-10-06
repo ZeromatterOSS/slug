@@ -54,6 +54,7 @@ fn check_rendered_header(spec: &slug_build_api_v2::BuildInfoTransformSpec) {
         ("BUILD_SCM_STATUS", "clean"),
         ("BUILD_TIMESTAMP", "123456"),
     ]);
+    let status_bytes = b"BUILD_EMBED_LABEL release\nBUILD_HOST builder\nBUILD_USER user\nBUILD_SCM_REVISION abc123\nBUILD_SCM_STATUS clean\nBUILD_TIMESTAMP 123456\n";
     // Supplied immutable catalog bodies, not runtime template-read authority.
     let (template, expected) = match spec.callback().kind() {
         BuildInfoTransformKind::Info => (
@@ -75,9 +76,22 @@ fn check_rendered_header(spec: &slug_build_api_v2::BuildInfoTransformSpec) {
             spec.callback().render_template(&status, template).unwrap(),
             expected
         );
+        assert_eq!(
+            spec.callback()
+                .render_supplied_bytes(status_bytes, template.as_bytes())
+                .unwrap(),
+            expected.as_bytes()
+        );
         assert_eq!(spec, &before);
     }
     if spec.callback().kind() == BuildInfoTransformKind::Version {
+        assert_eq!(
+            spec.callback()
+                .render_supplied_bytes(b"", template.as_bytes()),
+            Err(
+                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
+            )
+        );
         assert_eq!(
             spec.callback()
                 .render_template(&Default::default(), template),

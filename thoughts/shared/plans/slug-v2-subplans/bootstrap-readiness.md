@@ -458,9 +458,12 @@ main/external Target/Exec recipes produce complete supplied ASCII headers.
 [WP923](wp923-supplied-workspace-status-values-2026-10-06.json) supplies pure status-byte
 parsing with exact Latin1/LF/first-space/last-value semantics and owned compact maps.
 Parsed supplied content composes with both checked string recipes, without observing
-status artifacts. Actual status producer/observations, Latin1 template/output byte
-conversion, tracked template reads, volatile execution/cache policy, module tools
-and full cc_toolchain remain unproved.
+status artifacts. [WP924](wp924-build-info-supplied-byte-render-2026-10-06.json) now
+completes supplied status/template byte rendering with exact Latin1 decode/encode
+and shared finite callback/literal order, including all256-byte no-match roundtrip.
+Actual status producer/observations, tracked template acquisition/certificates,
+writer permissions, volatile execution/cache policy, module tools and full
+cc_toolchain remain unproved.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun
