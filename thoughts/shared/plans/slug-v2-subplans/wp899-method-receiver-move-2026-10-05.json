@@ -1,0 +1,287 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "035aa71cb",
+  "preservation_commit": "7f9af6adb",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "3ac5e254115ec9d56496f89b71576dd16d829dead1f1ff4ca548c2105c242708",
+    "starlark-rust/starlark/src/eval/compiler/call/receiver_memory_tests.rs": "5926167a27577f46616851d373c5bdb32691d0f32d0d9884b0bcf11f7fa33661",
+    "starlark-rust/starlark/src/tests/bc/golden/expr_call_maybe_known_method.golden": "c6e23f825e51c4b55dac45ac641f4dce17619113119a5f16fc13b11d557fb914"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "54d7ededdd8dfd9e698b2a629d21cdc2fd6c64cca57c1fc8d00db61cd4ee5301",
+    "selectors": [
+      "eval::compiler::call::receiver_memory_tests::method_call_transfers_nested_symbol_buffers_and_preserves_ir_spans_arguments",
+      "eval::compiler::call::receiver_memory_tests::ordinary_call_keeps_function_arguments_and_span_ownership",
+      "eval::compiler::call::receiver_memory_tests::nested_method_execution_preserves_order_errors_and_frozen_ownership",
+      "tests::bc::expr::test_call_maybe_known_method",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "tests::opt::speculative_exec::test_speculatively_inline_enum",
+      "tests::opt::test_same_module_struct_getattr_inlined",
+      "tests::opt::test_type_is_inlined",
+      "tests::bc::expr::test_type",
+      "tests::bc::expr::test_format_one",
+      "tests::bc::expr::test_percent_s_one_format_one_eval",
+      "tests::bc::expr::test_spec_exec_list",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::dot_format::dot_format_memory_tests::compiled_format_segments_retain_frozen_ownership"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/call.rs": "3ac5e254115ec9d56496f89b71576dd16d829dead1f1ff4ca548c2105c242708",
+      "starlark-rust/starlark/src/eval/compiler/call/receiver_memory_tests.rs": "5926167a27577f46616851d373c5bdb32691d0f32d0d9884b0bcf11f7fa33661"
+    }
+  },
+  "corrected_golden_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "54d7ededdd8dfd9e698b2a629d21cdc2fd6c64cca57c1fc8d00db61cd4ee5301",
+    "selectors": [
+      "tests::bc::expr::test_call_maybe_known_method"
+    ],
+    "fixture": "starlark-rust/starlark/src/tests/bc/golden/expr_call_maybe_known_method.golden",
+    "fixture_sha256": "c6e23f825e51c4b55dac45ac641f4dce17619113119a5f16fc13b11d557fb914",
+    "reuse": "Restored artifact hash exactly equals original candidate; unchanged14 passing selectors/results preserved, corrected fixture one selector fresh"
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/method-receiver-move-baseline-compile.json",
+      "sha256": "8bc4c91bb13b3b5fa5f674c1d45b28383e19ccf08fec775add45b8d72ac49df7",
+      "exit_code": 0,
+      "elapsed_seconds": 6.233763676020317,
+      "log_sha256": "e078ea73e4a862d0103cec99b9dca4d459c1cc9e638bb67f89a25af5b2912a06"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/method-receiver-move-baseline-preflight.json",
+      "sha256": "8bf0d3079bbfa7a70645f921d6aa7533545da104930a651bd8a20ba821ec3898",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019581162952817976,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/method-receiver-move-baseline-controls.json",
+      "sha256": "800a2fcbad0c3209f7da0d7bf51d30f5783000f4093e92250f05a58ba7df9889",
+      "exit_code": 101,
+      "elapsed_seconds": 0.006518821988720447,
+      "log_sha256": "708fea7f899726ee8017e019e7832f5013c7f740a95bfdc2c579c572cb3c1c3a"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/method-receiver-move-candidate-compile.json",
+      "sha256": "0609be75ff11602d9b43eea18e9a8a988d34de8d5d205d98e80d951a974d4041",
+      "exit_code": 0,
+      "elapsed_seconds": 4.8513323229853995,
+      "log_sha256": "37b1716e32a2127c475f22b73fd5d93d41c5d2b7b6ed51701969559d47129eb7"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/method-receiver-move-candidate-preflight.json",
+      "sha256": "fb49f92ef8f5827b9b2d6f853d8faacc3c483793864ee67a49ac5b5edf51c554",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024321787001099437,
+      "log_sha256": "eeccc490ea06d18e2bbf2ec8d86d13c40febc52f5efb0edfa48fa03edee3d438"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/method-receiver-move-candidate-controls.json",
+      "sha256": "8a77b9f57ca727f2c08de13f046a5de413f6476930a9b44128c4620098e067d3",
+      "exit_code": 101,
+      "elapsed_seconds": 0.008716331969480962,
+      "log_sha256": "07225272b259a3db6783dbcf2bce3af2bc94bc4fdfa60abf36733225b9b31a62"
+    },
+    "golden-baseline-compile": {
+      "receipt": "target/wp899/method-receiver-move-golden-baseline-compile.json",
+      "sha256": "97936bb41183aba78b94b96fd2b84c0d05017779505e9be287ef27eb85f31b0a",
+      "exit_code": 0,
+      "elapsed_seconds": 4.818016892997548,
+      "log_sha256": "7be7b37f095d309a647b6505d303cac7ba58a2e056c2f9d84dbed41f691f6fe2"
+    },
+    "golden-baseline-preflight": {
+      "receipt": "target/wp899/method-receiver-move-golden-baseline-preflight.json",
+      "sha256": "ac489ea1fa865e0948138b64752092fe64796dad7d220dbd84b490a739c7abde",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02004034596029669,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "golden-baseline-controls": {
+      "receipt": "target/wp899/method-receiver-move-golden-baseline-controls.json",
+      "sha256": "18eb68808ef9807e89960b22489d33bae851725743fe983a3bbe094ef6b75f28",
+      "exit_code": 101,
+      "elapsed_seconds": 0.004594582016579807,
+      "log_sha256": "2ca996e234dafa3e8bae1639aead7c4dd7b5f1ef117e96d8c33285b489cf2f52"
+    },
+    "restored-candidate-compile": {
+      "receipt": "target/wp899/method-receiver-move-restored-candidate-compile.json",
+      "sha256": "72ca233597ae8be72a638e92680c020e3f6650361d2ce521d4f75a5ea6c38925",
+      "exit_code": 0,
+      "elapsed_seconds": 4.831925139995292,
+      "log_sha256": "7e7e65aea66dd636940573fc831a852fa327d77faa59735550bcc3cef40bdb0c"
+    },
+    "corrected-golden-preflight": {
+      "receipt": "target/wp899/method-receiver-move-corrected-golden-preflight.json",
+      "sha256": "4a9c779ac94e9be11bbff42127611b592117ba5bcc7f22c4e3f41ff526afa05c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022063015028834343,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "corrected-golden-controls": {
+      "receipt": "target/wp899/method-receiver-move-corrected-golden-controls.json",
+      "sha256": "5eb0a9ca305d3e505508b02d8c1d63f1b6aaa4f4185ed9f0695753041f0b854e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.004515290958806872,
+      "log_sha256": "357282ca0319c2cb0359f3186e7f84caec552dd37e9fcaa956a06f4ee4761bd4"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/method-receiver-move-dependents-check.json",
+      "sha256": "7636ca99d27099f595728ab303a0a68247c1909370ff2bff1fe3d74cce73645b",
+      "exit_code": 0,
+      "elapsed_seconds": 7.514988326001912,
+      "log_sha256": "a40dc1e9bbb657f32090647fec9b574dd2c0a91a7580fde7ca0d07cc9fc718ca"
+    }
+  },
+  "design_sha256": "eb0a5d7d2b03e70574ebb93653733e75c5032ba5933e18663dc5d2e63e7e18b7",
+  "design_reviews": {
+    "target/wp899/method-receiver-move-design-source.md": "25107f22590d3d80454adcff8b7e91b785bbf90ef04331b3672382a448d2c090",
+    "target/wp899/method-receiver-move-design-input.md": "99d1503ea04a227997cb6a071f9d3743922ca89104a604f02ed20dfa258f3952",
+    "target/wp899/method-receiver-move-design-evidence.md": "a9d6d909cd8efc7232dc79873ae9c9e12a7095bb0cac28a7f7d4d1c57080adce"
+  },
+  "correction_design_sha256": "48e3d5bddbba40b608854f722f0e20f5b1792de5fc43d9a5fd4a4657dfcb51dc",
+  "correction_design_reviews": {
+    "target/wp899/method-receiver-move-golden-design-source.md": "1910f1de208384705b344ed4b013022743d099a1606381fb61d3bc9f9b6694c2",
+    "target/wp899/method-receiver-move-golden-design-input.md": "65dc50b8683546bd203da50b70ec2fa0916e50b72d4cd9b7c69131b6d364c0e4",
+    "target/wp899/method-receiver-move-golden-design-evidence.md": "a9e55db6ed8e4960c244fc5c83aaac7adc84e20df82fb8ff39770450e6abc878"
+  },
+  "ownership_proof": "Entire call.rs comparison against baseline allows only owned match, moved receiver/borrowed field in unchanged new_method and sibling hook. Earlier optimizer probes, new_method implementation, spans/arguments, ordinary fallback and all other code byte-identical. Same new tests baseline/candidate; nested Box Symbol payloads transferred. Final IR/frozen owners unchanged. Exact entire golden comparison allows only one instruction source span replacement confirmed by identical source-matched baseline/candidate generated output.",
+  "pass_counts": {
+    "new_owner_controls": 3,
+    "existing_protected_controls": 12,
+    "unique_candidate_controls": 15,
+    "passing_execution_groups": [
+      14,
+      1
+    ],
+    "initial_candidate_passed": 14,
+    "initial_candidate_attributed_golden_failed": 1,
+    "fresh_corrected_golden_passed": 1,
+    "baseline_new_semantic_passed": 2,
+    "baseline_new_pointer_failed": 1,
+    "fresh_baseline_golden_failed": 1
+  },
+  "metrics": {
+    "baseline": {
+      "nested_symbols": 3,
+      "symbol_content_bytes": 15384,
+      "original_payload_pointer_matches": 0
+    },
+    "candidate": {
+      "nested_symbols": 3,
+      "symbol_content_bytes": 15384,
+      "original_payload_pointer_matches": 3
+    }
+  },
+  "attributed_failure": {
+    "baseline": "035aa71cb",
+    "unchanged_baseline_sources": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "d1fa6f5a020c3302009a447c69472d820abaf9a9b8e03b67548bebf30b087a7f",
+      "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+      "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+      "starlark-rust/starlark/src/eval/bc/compiler/call.rs": "724b0ea6954bbb0598d53fe749815f87a7ae6461d278707d73ff205aa9355f8f",
+      "starlark-rust/starlark_syntax/src/golden_test_template.rs": "4ad4dad58f122f3595266f6808a1e586931acfeab96295f75ba212f79f13895e",
+      "starlark-rust/starlark/src/tests/bc/golden/expr_call_maybe_known_method.golden": "ebd4dc55db2a142e3aba9cffad8d0b9fc278f2d7f370ee5b58ec522d828fb5a3"
+    },
+    "actual_equals_baseline_and_candidate": true,
+    "expected_sha256": "ebd4dc55db2a142e3aba9cffad8d0b9fc278f2d7f370ee5b58ec522d828fb5a3",
+    "actual_sha256": "c6e23f825e51c4b55dac45ac641f4dce17619113119a5f16fc13b11d557fb914",
+    "exact_delta": {
+      "old": "CallMaybeKnownMethodPos &x append <m> &2..&3 instrs.star.bzl:1:14-25 ->&1",
+      "new": "CallMaybeKnownMethodPos &x append <m> &2..&3 instrs.star.bzl:1:22 ->&1"
+    },
+    "baseline_selection": "target/wp899/method-receiver-move-golden-baseline-selectors.json",
+    "attribution": "Fresh exact one-test baseline reproduces byte-identical expected/actual golden mismatch. Baseline and candidate generate lparen1:22, fixture expects fullcall1:14-25. expr.rs passes args.lparen; unchanged BC writer emits call_site. Only one fixture instruction span changes, no regeneration or source span change."
+  },
+  "artifact_reuse": "Candidate source and executable preserved before the one missing baseline golden gate; restored exact candidate source from preservation commit, rebuilt and verified original executable hash. All14 passing controls/preflight preserved; only corrected golden executed fresh with exact preflight.15unique required gates are14+1, not one15-pass execution. Baseline/candidate failed raw records retained; no golden regeneration.",
+  "limits": "Removed one receiver deep-clone and demonstrated transfer of three fixed Box Symbol content payloads totaling15384bytes in this fixture. Other optimizer/outer field clones, receiver boxes and final compiled/frozen storage remain. General receiver IR Vecs may preserve spare capacity when moved where clone would discard it; no unchanged general retained capacity, lower total retained/aggregate memory or quantified allocator/peak/RSS/timing/speed/source-fit claim.",
+  "growth": "208-line sibling covers actual dynamic nestedIR/spans/args, ordinary fallback and runtime order/GC/errors/retained frozen functions. Existing call.rs/function remain cohesive.",
+  "test_profile": "Pinned nightly-2025-09-14 default Starlark lib plus default Loading/Core/CLI alltargets offline; serial Cargo prep60s/focusedtests30s; exactartifact preflights, CARGO_MANIFEST_DIR set, no regeneration.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/method-receiver-move-baseline-compile.json": "8bc4c91bb13b3b5fa5f674c1d45b28383e19ccf08fec775add45b8d72ac49df7",
+    "target/wp899/method-receiver-move-baseline-compile.jsonl": "e078ea73e4a862d0103cec99b9dca4d459c1cc9e638bb67f89a25af5b2912a06",
+    "target/wp899/method-receiver-move-baseline-controls.json": "800a2fcbad0c3209f7da0d7bf51d30f5783000f4093e92250f05a58ba7df9889",
+    "target/wp899/method-receiver-move-baseline-controls.jsonl": "708fea7f899726ee8017e019e7832f5013c7f740a95bfdc2c579c572cb3c1c3a",
+    "target/wp899/method-receiver-move-baseline-preflight.json": "8bf0d3079bbfa7a70645f921d6aa7533545da104930a651bd8a20ba821ec3898",
+    "target/wp899/method-receiver-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/method-receiver-move-baseline-selectors.json": "0817deff92baa41ca22402519d46a2a5e746c1c1f469d93289a979e5feb6f2b8",
+    "target/wp899/method-receiver-move-candidate-compile.json": "0609be75ff11602d9b43eea18e9a8a988d34de8d5d205d98e80d951a974d4041",
+    "target/wp899/method-receiver-move-candidate-compile.jsonl": "37b1716e32a2127c475f22b73fd5d93d41c5d2b7b6ed51701969559d47129eb7",
+    "target/wp899/method-receiver-move-candidate-controls.json": "8a77b9f57ca727f2c08de13f046a5de413f6476930a9b44128c4620098e067d3",
+    "target/wp899/method-receiver-move-candidate-controls.jsonl": "07225272b259a3db6783dbcf2bce3af2bc94bc4fdfa60abf36733225b9b31a62",
+    "target/wp899/method-receiver-move-candidate-preflight.json": "fb49f92ef8f5827b9b2d6f853d8faacc3c483793864ee67a49ac5b5edf51c554",
+    "target/wp899/method-receiver-move-candidate-preflight.jsonl": "eeccc490ea06d18e2bbf2ec8d86d13c40febc52f5efb0edfa48fa03edee3d438",
+    "target/wp899/method-receiver-move-candidate-selectors.json": "58811d6434b4f7b8bb5c5ac8ac2bdd9087bc35978149f0f0d554b5fa1102d87d",
+    "target/wp899/method-receiver-move-controls.py": "263ca73141e75455c0ad65b3172983a1f3deade04912c4f37ceaf24f7d557d1e",
+    "target/wp899/method-receiver-move-corrected-golden-controls.json": "5eb0a9ca305d3e505508b02d8c1d63f1b6aaa4f4185ed9f0695753041f0b854e",
+    "target/wp899/method-receiver-move-corrected-golden-controls.jsonl": "357282ca0319c2cb0359f3186e7f84caec552dd37e9fcaa956a06f4ee4761bd4",
+    "target/wp899/method-receiver-move-corrected-golden-preflight.json": "4a9c779ac94e9be11bbff42127611b592117ba5bcc7f22c4e3f41ff526afa05c",
+    "target/wp899/method-receiver-move-corrected-golden-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/method-receiver-move-corrected-golden-selectors.json": "3711a69f3800cd1045addb6b0f1589588114f19769061151e1b5760456e90d4a",
+    "target/wp899/method-receiver-move-dependents-check.json": "7636ca99d27099f595728ab303a0a68247c1909370ff2bff1fe3d74cce73645b",
+    "target/wp899/method-receiver-move-dependents-check.jsonl": "a40dc1e9bbb657f32090647fec9b574dd2c0a91a7580fde7ca0d07cc9fc718ca",
+    "target/wp899/method-receiver-move-design-evidence.md": "a9d6d909cd8efc7232dc79873ae9c9e12a7095bb0cac28a7f7d4d1c57080adce",
+    "target/wp899/method-receiver-move-design-input.md": "99d1503ea04a227997cb6a071f9d3743922ca89104a604f02ed20dfa258f3952",
+    "target/wp899/method-receiver-move-design-source.md": "25107f22590d3d80454adcff8b7e91b785bbf90ef04331b3672382a448d2c090",
+    "target/wp899/method-receiver-move-design.md": "eb0a5d7d2b03e70574ebb93653733e75c5032ba5933e18663dc5d2e63e7e18b7",
+    "target/wp899/method-receiver-move-golden-attribution.json": "cf4ff8ec130519a2696387da3be62cb452ed52474c6d069629713e87c9050d01",
+    "target/wp899/method-receiver-move-golden-baseline-compile.json": "97936bb41183aba78b94b96fd2b84c0d05017779505e9be287ef27eb85f31b0a",
+    "target/wp899/method-receiver-move-golden-baseline-compile.jsonl": "7be7b37f095d309a647b6505d303cac7ba58a2e056c2f9d84dbed41f691f6fe2",
+    "target/wp899/method-receiver-move-golden-baseline-controls.json": "18eb68808ef9807e89960b22489d33bae851725743fe983a3bbe094ef6b75f28",
+    "target/wp899/method-receiver-move-golden-baseline-controls.jsonl": "2ca996e234dafa3e8bae1639aead7c4dd7b5f1ef117e96d8c33285b489cf2f52",
+    "target/wp899/method-receiver-move-golden-baseline-preflight.json": "ac489ea1fa865e0948138b64752092fe64796dad7d220dbd84b490a739c7abde",
+    "target/wp899/method-receiver-move-golden-baseline-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/method-receiver-move-golden-baseline-selectors.json": "e56e505f02e97625137ffcc9ad92547dd6482e60b1f27ac0bdbd2225724ca7c4",
+    "target/wp899/method-receiver-move-golden-design-evidence.md": "a9e55db6ed8e4960c244fc5c83aaac7adc84e20df82fb8ff39770450e6abc878",
+    "target/wp899/method-receiver-move-golden-design-input.md": "65dc50b8683546bd203da50b70ec2fa0916e50b72d4cd9b7c69131b6d364c0e4",
+    "target/wp899/method-receiver-move-golden-design-source.md": "1910f1de208384705b344ed4b013022743d099a1606381fb61d3bc9f9b6694c2",
+    "target/wp899/method-receiver-move-golden-design.md": "48e3d5bddbba40b608854f722f0e20f5b1792de5fc43d9a5fd4a4657dfcb51dc",
+    "target/wp899/method-receiver-move-preservation.json": "37340581b8c1bef94e00c5b366f8fc17f9bd4fa45b2f854d9e92b939a3a293ab",
+    "target/wp899/method-receiver-move-preserved-call.rs": "3ac5e254115ec9d56496f89b71576dd16d829dead1f1ff4ca548c2105c242708",
+    "target/wp899/method-receiver-move-preserved-candidate-artifact": "54d7ededdd8dfd9e698b2a629d21cdc2fd6c64cca57c1fc8d00db61cd4ee5301",
+    "target/wp899/method-receiver-move-record.py": "bf5ec07ecc06741614487fac4b392f1f5e6010f28f9d7e152d7f0612c5189ff2",
+    "target/wp899/method-receiver-move-restored-candidate-compile.json": "72ca233597ae8be72a638e92680c020e3f6650361d2ce521d4f75a5ea6c38925",
+    "target/wp899/method-receiver-move-restored-candidate-compile.jsonl": "7e7e65aea66dd636940573fc831a852fa327d77faa59735550bcc3cef40bdb0c",
+    "target/wp899/method-receiver-move-start.json": "35a20f3a70ca5b11b7f6c12958d97f2372d02d6fea6317efd3bdf6edf577843e"
+  },
+  "timing": {
+    "compile_seconds": 28.25002635800047,
+    "test_seconds": 0.024345026933588088,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 798.0555994510651
+  },
+  "validation_sha256": "c1cdbba914c3b7eba9e883328c418e676624b946979d88876b71d3cc63c7eaff",
+  "final_reviews": {
+    "target/wp899/method-receiver-move-final-source.md": "537b9b17e9a138d07d983e5ca3906d0270a6a4393ddab69a746528a93501b2cb",
+    "target/wp899/method-receiver-move-final-input.md": "2e7d9f8b037e63f35ebfd4e211f1cb272af54c681ec32b9fa41b7c80bc4b93a9",
+    "target/wp899/method-receiver-move-final-evidence.md": "9fa40632d76b4d5915cce7365906bf32a6fe954f94a72ed0b3a3b2d099ce2424"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/method-receiver-move-format-check.json",
+      "sha256": "5326f17c0b1fe57c7bf34a4882cfee7975516cac52cb4fafca46b0e8d474613d",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/method-receiver-move-diff-check.json",
+      "sha256": "eafd6c4eb000ff9870c831dbed001cc094d0ddfaca756bb85385fa8304cf71b4",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/method-receiver-move-plan-check.json",
+      "sha256": "2295a704b57aa630f9059a768c7adc60e5196ede9e3c15da329a0258117641c6",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/method-receiver-move-archive-check.json",
+      "sha256": "ab62ed0d9fee4016e48d832ddf8fd6bbc1d3b2c287938ae5739a1ec9c224bf8e",
+      "exit_code": 0
+    }
+  }
+}

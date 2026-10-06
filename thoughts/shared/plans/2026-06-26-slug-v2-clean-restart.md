@@ -39,8 +39,8 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: apparent-label formatting writes repository bytes from
-its existing owner, removing a temporary String while preserving exact behavior.
+Latest accepted change: compiler method calls transfer their owned receiver,
+removing a deep clone while preserving IR, spans, arguments and frozen ownership.
 Next: select a proved redundant copy or existing interner reuse at
 local string owners through a bounded design checkpoint. No source observation,
 network-dependent retry, cap growth or runtime activation is selected.

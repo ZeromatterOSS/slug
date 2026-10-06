@@ -12,42 +12,48 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component writes apparent-label repository text directly
-from its owner, removing one temporary String per nonroot format. Root spelling,
-exact bytes, flags, errors, identity and final ownership remain unchanged. This is
-Slug-native scratch ownership with admitted behavior unchanged. Next: select a
-proved redundant copy or existing interner reuse at local string owners through
-a bounded design checkpoint.
+The latest accepted component transfers the compiler's owned method receiver
+instead of deep-cloning it. Nested Symbol buffers move to the same compiled owner;
+optimizer order, spans, arguments, fallback and frozen ownership remain unchanged.
+This is Slug-native scratch ownership with admitted behavior unchanged. Next:
+select a proved redundant copy or existing interner reuse at local string owners
+through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted apparent-label formatting memory contract
+## Accepted compiler method receiver memory contract
 
-ApparentLabel Display writes nonroot repository directly from its existing owner,
-then package/target; root still omits '@'. Only the fmt body and sibling test hook
-changed. Canonical labels, parsing, validation, mapping, hashing, ordering,
-serialization and retained ownership remain unchanged. Slug-native scratch with
-admitted bytes unchanged; no helper/API/interner/cache/key/unsafe/dependency.
+CallCompiled::call consumes its owned Dot receiver through unchanged new_method.
+All earlier optimizer probes, source spans, callsite, arguments and ordinary-call
+fallback remain unchanged; outer field clones and normal compiled/frozen owners
+remain. No helper/API/cache/interner/key/unsafe/dependency/representation/DICE
+change. The same three new tests have baseline two semantic passes/one pointer
+failure; candidate nested Symbols share 3/3 original buffers, with 15,384 content
+bytes. Exact IR/spans/args, fallback, runtime order/errors/GC and frozen functions
+after source/module drop pass. Existing optimizer and carrier controls pass.
 
-Three DESIGNs/FINALs accept ten focused controls as 3+4+3 and default Loading/Core/
-CLI alltarget checks. Identical baseline has two semantic passes and one source-
-pointer failure; candidate borrows the 20,491-byte repo span. Root/nonroot/root
-package/Unicode targets, formatting flags, owned output after label drop and every
-ASCII byte-prefix error stop pass without chunk-count assertions. Roundtrip,
-mapping serialization, invalid labels and mapped/root pattern controls pass.
-The 114-line sibling preserves the small production formatter's owner. Serial
-pinned offline Cargo JSON/artifact exact preflight and hygiene checks are recorded
-in the receipt. Only the nonroot temporary repository String is removed; input,
-parsing and final output storage remain. No aggregate capacity/peak/RSS/speed/
-source-fit claim. Full WP899/M7A requirements remain unwaived/unaccepted.
+Three DESIGNs/FINALs accept the component. One protected method golden exposed a
+stale callsite span, independently reproduced with byte-identical expected/actual
+strings on a fresh source-matched baseline. Three correction DESIGNs accepted only
+that fixture instruction span changing from full call 1:14-25 to existing lparen
+1:22; no regeneration or span source change. Candidate was preserved in review
+commit 7f9af6adb, restored and rebuilt to the identical executable hash. Fifteen
+unique controls close as 14 preserved passes + 1 fresh corrected golden; default
+Loading/Core/CLI alltargets pass. The 208-line sibling preserves the small compiler
+owner. Serial pinned offline Cargo JSON/artifact exact preflights and hygiene
+checks are in the receipt. Only receiver deep-clone/fixed Symbol copies removed;
+generic receiver IR Vec spare capacity may remain where Clone discarded it.
+No unchanged general capacity, reduced total retained/aggregate memory, allocator/
+peak/RSS/speed/source-fit claim. Full WP899/M7A remains unwaived/unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Compiler method calls move owned receiver instead of deep-cloning; optimizer order/IR/spans/args/fallback/frozen ownership preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure; 3 Symbol buffers share owners (15,384 content bytes). Fifteen gates as 14 preserved + 1 reviewed stale golden correction, independently baseline-reproduced; default Loading/Core/CLI checks pass. Generic IR spare capacity remains possible; no aggregate/RSS/speed claim | [Method receiver transfer](wp899-method-receiver-move-2026-10-05.json) |
 | Apparent-label formatting borrows existing repository bytes; root spelling, flags, errors, identity and final owned output preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure, candidate 10 controls as 3+4+3 and default Loading/Core/CLI checks. A 20,491-byte repository shares its owner at the sink. One temporary String removed; no aggregate/RSS/speed claim | [Apparent-label display borrowing](wp899-apparent-label-display-borrow-2026-10-05.json) |
 | Attribute-query rendering transfers tight heap strings from consuming temporary atoms; spare-capacity strings retain original cloning and final capacity. Three revised DESIGNs/FINALs; baseline3 semantic passes/1 tight-pointer failure, candidate12/12 and default Core/CLI checks. Unconditional move rejected; natural concat8193B tempcap12288B/finalcap8193B unchanged. Callback/order/errors/final ownership preserved; no aggregate/RSS/speed claim | [Guarded candidate transfer](wp899-attr-candidate-render-move-2026-10-05.json) |
 | Rule output templates borrow existing attribute/target strings and temporary dedup keys; all six shapes/four placeholders, exact order/errors and owned outputs preserved. Three DESIGNs/FINALs; baseline 1 semantic pass/2 pointer failures, candidate 9 controls as5+3+1 and default Core/CLI checks. Reviewed stale DICE assertion correction preserves changed source identity and equivalent output facts. Scratch copies only; no aggregate/RSS/speed claim | [Output-template borrowing](wp899-output-template-borrow-2026-10-05.json) |
