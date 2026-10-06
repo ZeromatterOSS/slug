@@ -34,22 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-207-m7a-starlark-syntax-prerequisite-preparation-r1
-Status: Root compile capped cleanly; isolated syntax prerequisite selected
+Packet: WP-7-208-m7a-starlark-library-prerequisite-preparation-r1
+Status: Syntax prerequisite accepted; isolated Starlark library compile selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects one ordinary
-syntax-library prerequisite compile after the current root reached its60s cap.
-The root child joined after TERM, all2826 enumerated inputs stayed unchanged and
-no compiler leftovers were observed; see
-[root cap receipt](./slug-v2-subplans/wp907-cli-root-build-cap-2026-10-06.json).
-Root success/interrupted owner remain unproved. Compression-leaf and configured
-producer evidence remains accepted. No identical root retry/cap growth or Slug
-source retry/activation; source-memory/M7A open, allocation/interner discipline,
-original memory REFUSED/source16/17/18 and source limits persist. Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects the ordinary
+Starlark library after its syntax prerequisite succeeded in12.023s with unchanged
+enumerated inputs and clean completion. See the
+[syntax receipt](./slug-v2-subplans/wp908-syntax-prerequisite-build-2026-10-06.json).
+Root linking remains open after its60s cap; the isolated required prerequisite is
+not a timeout-cause attribution or identical root retry. Source-memory/M7A remain
+open. Allocation/interner discipline, original memory REFUSED/source16/17/18 and
+source limits persist; Windows minimal.
 
 ### Ready and blocked queue
 
-The current packet selects bounded accounting under priority1; the remaining
+The current packet selects bounded compiler preparation under priority2; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |

@@ -180,8 +180,13 @@ Three FINALs accept this bounded result. The subsequent
 compilation cap:child143 after TERM, joined/groupempty,2826 enumerated inputs
 unchanged and no observed compiler leftovers. Partial diagnostics contain no
 compiler error or root success; the interrupted owner remains unknown. Current
-root compilation stays open. Select an isolated ordinary starlark_syntax compiler
-prerequisite with exact grammar inputs, not an identical root retry or cap growth.
+root compilation stays open. The subsequent
+[syntax prerequisite](wp908-syntax-prerequisite-build-2026-10-06.json) succeeded
+in12.023s with28 actions and790 cache hits,2827 unchanged pins and clean completion.
+The8,259,098B rlib and included618,176B grammar source match their normal producers;
+five script metadata files are naturally empty. Three FINALs accept this focused
+preparation without fresh-generation or root-success claims. Select the ordinary
+Starlark library consumer next under the same caps.
 
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 

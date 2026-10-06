@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "base": "e35117e0eeb48e638fe96c1095271c42d323728c",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "build",
+    "//starlark-rust/starlark_syntax:starlark_syntax",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--jobs=2",
+    "--spawn_strategy=standalone",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 60,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": true,
+  "tests_requested": false,
+  "compiler_census_before": [],
+  "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+  "downloads_requested": false,
+  "elapsed_seconds": 12.022608658997342,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "compiler_census_after": [],
+  "unexplained_compiler_processes_observed": false,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+    },
+    "stderr.log": {
+      "bytes": 1738,
+      "sha256": "94913fac970b963303f2c900bcff1dd53366a320bb89c9a469714a5a9b99f300"
+    }
+  },
+  "packet": "WP-7-207-m7a-starlark-syntax-prerequisite-preparation-r1",
+  "disposition": "ACCEPTED_BOUNDED_SYNTAX_PREREQUISITE_BUILD",
+  "input_pin_count": 2827,
+  "reported_processes": {
+    "action_cache_hit": 790,
+    "internal": 1,
+    "local": 27,
+    "total_actions": 28
+  },
+  "producer_outputs": {
+    "schema": 1,
+    "execroot": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/execroot/_main",
+    "execroot_identity": [
+      66308,
+      125830534,
+      16877,
+      4096,
+      1791270917431834066,
+      1791270917431834066
+    ],
+    "regular_outputs": [
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/libstarlark_syntax-244294683.rlib",
+        "bytes": 8259098,
+        "sha256": "79457f49d69715ccf678a5b08a287759342bd5186b0e8a0cbd39c74638f16883",
+        "identity": [
+          66308,
+          127140719,
+          33133,
+          8259098,
+          1791270917420175047,
+          1791270917431834066
+        ],
+        "artifact_id": 4096,
+        "producer_action_index": 291
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.env",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863931,
+          33133,
+          0,
+          1791270522824560347,
+          1791270522826560351
+        ],
+        "utf8_content": "",
+        "artifact_id": 7249,
+        "producer_action_index": 457
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.flags",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863934,
+          33133,
+          0,
+          1791270522824560347,
+          1791270522826560351
+        ],
+        "utf8_content": "",
+        "artifact_id": 7250,
+        "producer_action_index": 457
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.linkflags",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863935,
+          33133,
+          0,
+          1791270522824560347,
+          1791270522826560351
+        ],
+        "utf8_content": "",
+        "artifact_id": 7215,
+        "producer_action_index": 457
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.linksearchpaths",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863936,
+          33133,
+          0,
+          1791270522824560347,
+          1791270522826560351
+        ],
+        "utf8_content": "",
+        "artifact_id": 23,
+        "producer_action_index": 457
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.depenv",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863933,
+          33133,
+          0,
+          1791270522824560347,
+          1791270522826560351
+        ],
+        "utf8_content": "",
+        "artifact_id": 9197,
+        "producer_action_index": 457
+      }
+    ],
+    "regular_output_bytes": 8259098,
+    "out_dir": {
+      "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark_syntax/build_script.out_dir",
+      "artifact_id": 3920,
+      "producer_action_index": 457,
+      "identity": [
+        66308,
+        127143074,
+        16749,
+        4096,
+        1791270522272559488,
+        1791270522826270583
+      ],
+      "entries": [
+        {
+          "path": "syntax/grammar.report",
+          "type": "regular",
+          "bytes": 2889433,
+          "sha256": "7d1f21f0da19602496f1f01e2c949f4597bb24a8d57dbe5b9af418731a4f23fb",
+          "identity": [
+            66308,
+            127143169,
+            33133,
+            2889433,
+            1791270522818560338,
+            1791270522826270583
+          ]
+        },
+        {
+          "path": "syntax/grammar.rs",
+          "type": "regular",
+          "bytes": 618176,
+          "sha256": "b8f262d5c57e6348de5de7d5ea09fab6714b6e4f01543adfceed3092a0c7b096",
+          "identity": [
+            66308,
+            127143170,
+            33133,
+            618176,
+            1791270522823560346,
+            1791270522826270583
+          ]
+        },
+        {
+          "path": "syntax",
+          "type": "directory"
+        }
+      ],
+      "entry_count": 3,
+      "regular_bytes": 3507609
+    },
+    "scope": "One ordinary Bazel library success and bounded producer output bytes. No final executable native-link, hermetic tools, full root, Slug execution or memory/source fit proof."
+  },
+  "scope": "One ordinary syntax-library success with generated grammar and bounded producer-output observations. Natural cache reuse is permitted; no all-fresh, full-root, Slug source-memory fit, runtime or M7A claim.",
+  "next_decision": "Prepare the demanded Starlark library separately under the same caps; its completion is a new prerequisite, not a timeout-cause attribution or an identical root retry.",
+  "evidence_sha256": {
+    "target/wp908/build-observe.py": "65b1337349656eed24a0ff2b57cd4d90177d42e7423b7a671fd5405514b13214",
+    "target/wp908/claim.json": "37f256c3fde75bfab99ffb1067b6b148a3f8a3f39473d2f85ec234039719fb0a",
+    "target/wp908/observation.json": "047ca3e487fa1690faa9b7f10ded9e17260f8036578dbd511a080d055c5eef26",
+    "target/wp908/outputs.py": "77e5e83a9bb4bbf2aeb45688bf9d53b337933b57358cefbdc1293b8841b1ec6d",
+    "target/wp908/outputs.json": "65ff13d92b57d4065130de9007aacf2c92064a6fa28344351eca7cfde3624d1a",
+    "target/wp908/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp908/stderr.log": "94913fac970b963303f2c900bcff1dd53366a320bb89c9a469714a5a9b99f300",
+    "target/wp908/final-source.md": "aa5a0959f6c904218111a5473a2f5ae7e00bd6c1e6382ecabb54c7f60c71a227",
+    "target/wp908/final-evidence.md": "d693d207b7d4d4e889c14400d65bc7adf5b591b9fa5b60fa398d0b1a8d4a10e6",
+    "target/wp908/final-ownership.md": "1a54ba483f8915a96498df4000702de99d7678cb97241a263d2b3adf150f927e"
+  },
+  "independent_final_reviews": {
+    "target/wp908/final-source.md": "aa5a0959f6c904218111a5473a2f5ae7e00bd6c1e6382ecabb54c7f60c71a227",
+    "target/wp908/final-evidence.md": "d693d207b7d4d4e889c14400d65bc7adf5b591b9fa5b60fa398d0b1a8d4a10e6",
+    "target/wp908/final-ownership.md": "1a54ba483f8915a96498df4000702de99d7678cb97241a263d2b3adf150f927e"
+  }
+}

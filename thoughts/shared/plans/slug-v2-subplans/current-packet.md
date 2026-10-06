@@ -1,68 +1,63 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-207-m7a-starlark-syntax-prerequisite-preparation-r1
-Status: Root compile capped cleanly; isolated syntax prerequisite selected
+Packet: WP-7-208-m7a-starlark-library-prerequisite-preparation-r1
+Status: Syntax prerequisite accepted; isolated Starlark library compile selected
 
 ## Observable outcome and source basis
 
-Prepare the ordinary //starlark-rust/starlark_syntax:starlark_syntax library and
-its LALRPOP generated grammar under the same bounded compiler operation. This
-narrows current root preparation after its60s resource refusal. It is a required
-captured compiler prerequisite, not an attributed cause of that timeout or an
-identical root retry. Compatibility: Slug-native external Bazel preparation only;
-no Slug semantic/runtime/REAPI/source-memory admission or full M7A. Root owns
-invocation, input/output observations, integration/status and commits.
+Prepare the ordinary //starlark-rust/starlark:starlark library under the inherited
+bounded compiler operation. WP908 accepted its syntax dependency, including the
+nonempty generated grammar. WP905 Rustc action235 owns artifact4099,
+bazel-out/k8-fastbuild/bin/starlark-rust/starlark/libstarlark-1881180005.rlib;
+Core/analysis/Starlark/bzlmod/loading compiler actions157/179/212/216/220 consume
+it through normal --extern/input edges. This is a required prerequisite, not a
+cause attribution for the capped root build. Compatibility: Slug-native external
+Bazel preparation only. Root owns invocation, output observations and integration.
 
-WP905 Rustc action291 emits libstarlark_syntax-244294683.rlib (artifact4096);
-Starlark action235 consumes it via ordinary --extern/input edges, with Core/loading
-consumers downstream. Literal BUILD selects src/**/*.rs, ordinary build_script,
-grammar.lalrpop data/compile_data, normal dependencies and proc macros. Build-script
-run457 owns tree3920 build_script.out_dir plus five metadata files; host compile687
-owns script9192. Source include requires syntax/grammar.rs from OUT_DIR. Use actual
-configured producer paths/bytes, not handwritten/generated substitutes or source
-changes. Reuse inherited WP907 final-source and WP905 graph/schema/field evidence.
+Literal BUILD selects src/**/*.rs, the ordinary build_script and declared deps/
+proc macros. build.rs observes the selected RUSTC --version and emits rust_nightly
+when appropriate. Build-script run329 owns tree3922 build_script.out_dir and five
+metadata files6494/6495/6004/25/7794; host compile533 owns script7791. Use normal
+producer outputs; no substitute generation, BUILD/source/feature/toolchain edit.
+Reuse WP905 graph/schema and WP908 accepted controller/input/output reviews.
 
 ## One operation and boundaries
 
-Select pinned batch Bazel build of the one literal syntax library target with noRC,
-nofetch/downloader disabled/lockfileerror/nightly, loading2/jobs2/standalone local
-actions without persistent workers. Same compilation60s/cleanup3s/output16MiB each/
-JVM2GiB; jobs2 is action dispatch only. No test/backend/network acquisition, Slug
-source request, C++ activation or automatic root retry. Fresh exact platform cache
-review covers the one compile. Reuse accepted WNOWAIT retained-leader group/census
-controller unchanged. Check process overlap; preserve failure/unknown cleanup and
-caps rather than repeat or grow them.
+Select one pinned batch Bazel build of the literal library target: noRC, nofetch,
+downloader disabled, lockfile error, nightly, loading2/jobs2, standalone. Retain
+compilation60s/cleanup3s/output16MiB per log/JVM2GiB. jobs2 bounds declared action
+dispatch, not nested subprocesses. A fresh exact platform review covers the cache
+writes. Reuse the retained-leader WNOWAIT group controller and named process census;
+no overlapping Cargo/native build. No test, acquisition, backend, Slug source
+request or automatic root retry. Preserve failure and cleanup evidence; no cap growth.
 
-Pin all tracked Rust/Cargo/BUILD/bzl authority plus *.lalrpop, actual build.rs and
-src/syntax/grammar.lalrpop, locks/MODULE/toolchain, binary and cached compiler/runner
-Rust/bzl sources/selected RepoSpecs/prepared sources. Preserve clean/known scheduling
-state and exact pre/post pins. Local output inspection uses normal execroot paths,
-anchored directoryFD traversal, NOFOLLOW/NONBLOCK regular opens, bounded chunks and
-FD/named identity/type/size checks. Only after joined/group-empty and empty observed
-compiler snapshots: verify nonempty expected rlib and generated syntax/grammar.rs,
-and capture required bounded metadata/tree receipt. Permit natural cache/generated
-states without forcing regeneration; no conclusion that every action newly executed.
+Pin the inherited tracked Rust/Cargo/BUILD/bzl/lalrpop authority, locks/MODULE/
+toolchain, pinned binary, cached compiler/runner sources and prepared repositories.
+Require clean scheduling state and unchanged enumerated pins. After successful
+join/group emptiness and empty observed compiler snapshots, use the reused anchored
+NOFOLLOW/NONBLOCK bounded reader to observe the nonempty regular rlib, five regular
+metadata files (empty is allowed), and out_dir. An empty out_dir is valid for this
+compiler-version script. Natural cached outputs are allowed; do not claim every
+action executed afresh or every ambient/transitive system input is authenticated.
 
 ## Acceptance and scope
 
-Actual named library success plus exact producer-output bytes prove narrower
-compiler preparation. They do not prove full CLI linking/default outputs, every
-transitive/system tool's freshness/hermeticity, source fit or M7A. On failure choose
-its concrete source/normal producer before any code change. Independent finals cover
-source/producer correspondence, evidence scope and actual lifecycle/input facts;
-reuse inherited controllers, no new framework or broad suites. Tracked allowlist:
-manifest/canonical/compact receipts, Stage10/readiness only reusable gate change;
-operational target/wp908. No production/lock/BUILD/toolchain edit yet. Run plan/diff
-checks and commit accepted actual outcome. Source AS/RSS/disk/string limits and
-AGENTS allocation/interner discipline persist; Windows minimal/deferred.
+Named library success and exact producer-output observations advance focused
+compiler preparation. Full CLI linking, source-memory fit, Slug execution and M7A
+remain open. On failure name the actual diagnostic or preserve unattributed cap;
+choose its concrete owner before any production change. Independent finals cover
+source correspondence, evidence and lifecycle deltas using accepted scaffolding;
+no new framework or broad suites. Tracked allowlist: manifest/canonical, compact
+receipt and Stage10 reusable gate evidence; operational target/wp909. Run plan/diff
+checks and commit the accepted actual outcome. Allocation/interner discipline and
+all Slug source AS/RSS/disk/string caps persist; Windows minimal/deferred.
 
 ## Immediate predecessor
 
-WP907 at748a8bd0b reached its60s cap, child143/60.096s after TERM, joined/groupempty
-without KILL.2826 enumerated pins/clean state unchanged; pre/post observed compiler
-censuses empty. Three FINALs accept resource terminal only, no root output/error/
-interrupted-owner attribution. See
-[root cap receipt](wp907-cli-root-build-cap-2026-10-06.json). WP906 compression-leaf
-success and WP904/905 current compiler/producer inventory remain accepted. Full
-root/source/M7A stay open; original memory REFUSED/source16/17/18 spent. No Slug
-source retry or runtime activation; siblings reference.
+WP908 at e35117e0e succeeded in12.023s:28 reported actions (1 internal/27 local)
+and790 cache hits,2827 enumerated pins unchanged, natural join/groupempty and no
+observed compiler leftovers. The8,259,098B syntax rlib and618,176B grammar source
+match their normal producers; three FINALs accept focused preparation only. See
+[syntax receipt](wp908-syntax-prerequisite-build-2026-10-06.json). WP907 root cap
+remains without cause attribution; original memory REFUSED/source16/17/18 remain
+spent. No Slug source retry or M7A activation; siblings are reference.
