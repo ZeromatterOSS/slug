@@ -598,7 +598,7 @@ impl ExprCompiled {
                 span,
             },
             // Collapse `not not e` to `e` only if `e` is known to produce a boolean.
-            ExprCompiled::Builtin1(Builtin1::Not, e) if e.is_definitely_bool() => (*e).clone(),
+            ExprCompiled::Builtin1(Builtin1::Not, e) if e.is_definitely_bool() => *e,
             _ => IrSpanned {
                 node: ExprCompiled::Builtin1(Builtin1::Not, Box::new(expr)),
                 span,
@@ -1490,3 +1490,6 @@ mod literal_concat_memory_tests;
 
 #[cfg(test)]
 mod empty_format_memory_tests;
+
+#[cfg(test)]
+mod double_not_memory_tests;

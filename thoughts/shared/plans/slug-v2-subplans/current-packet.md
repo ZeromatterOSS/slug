@@ -12,10 +12,10 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component reuses complete input substrings returned by
-split()/rsplit() at final list allocation. Splitting decisions, parameters and
-order remain; lists, borrowed scratch containers and partial-string copies keep
-their existing allocation. All 42 selected whole-result routes share their inputs.
+The latest accepted component transfers the compiler's already-owned inner
+expression when simplifying double negation around a known boolean. The exact
+guard, spans, tree, constant truthiness and fallback remain. Three fixed Symbol
+buffers transfer without copying; generic IR spare capacity may survive the move.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -24,45 +24,36 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted split/rsplit complete input reuse contract
+## Accepted compiler double-not ownership contract
 
-Both methods retain typed StringValue inputs and map a method-local allocation
-closure over existing final list iterators. Every result part is a source slice;
-equal byte length proves complete input and returns the existing value. Partial
-parts still allocate independent strings, avoiding larger-source retention.
-Whitespace helpers, borrowed Vec capacities, iterators/reversal/order, one-byte
-match counts, existing UTF-8 conversion, maxsplit normalization and current
-separator behavior remain unchanged. Bounded whitespace rsplit still reaches
-the same list allocator through AllocList. Public list[str], positional/default
-parameters, exact errors, speculative annotations and normal tracing/freezing
-stay. No extra search, global helper, API, interner, cache, key, unsafe code,
-dependency or retained representation; result lists and scratch remain.
+ExprCompiled::not consumes its input; its existing guarded Not(Box e) branch
+returns *e instead of deep-cloning and dropping the same inner expression. The
+is_definitely_bool guard, constant truthiness, fallback and exact tree/spans stay.
+Fixed boxed Symbol text transfers to the same IR owner. No helper, API, interner,
+cache, key, unsafe code, dependency, retained representation or donor import.
+Other optimizer copies and final bytecode/frozen ownership remain.
 
-Three DESIGNs/FINALs accept exact whole-owner transformation/formatting proof,
-baseline-identical archive method comparison and identical new tests. Baseline
-has two semantic/lifecycle passes and one intended sharing failure; candidate
-passes 14/14, 77,750 comparisons per variant and six byte-identical errors. All
-42 candidate whole-result routes share, covering whitespace, limits/defaults and
-byte/multibyte/UTF-8 separators. Independent bounded-whitespace word framing,
-separator references, Unicode trimming, overlap/order/empty cases, mutable lists,
-nonspeculative mutable source-drop/explicit GC, retained frozen results/functions
-and speculative constants pass. Protected case (74,898) and splitlines (5,602)
-comparisons, interner/carrier and default Loading/Core/CLI alltargets checks pass.
-Fresh artifacts/exact preflights, serial pinned prep60s/tests30s and format/archive/
-plan/diff hygiene pass. Reviewers accept the 366-line sibling six lines above
-estimate as distinct route coverage; no fixture assets.
+Three DESIGNs/FINALs accept whole-owner source proof and identical 239-line sibling
+tests. Baseline has two semantic/lifecycle passes and one intended ownership
+failure (0/3 original Symbol buffers); candidate passes 13/13 with 3/3 transferred,
+15,384 content bytes. All boolean-guard variants, nonboolean fallback, constant
+truthiness, exact spans, effects/order/count, two byte-identical error diagnostics,
+retained frozen functions after source/module/clone drop and explicit GC pass.
+Protected bounded boolean/negation/equality/type, speculative and string-carrier
+controls and default Loading/Core/CLI alltargets compile checks pass. Fresh exact
+artifacts/preflights, serial pinned offline prep60s/tests30s and format/archive/
+plan/diff hygiene pass; no fixture assets or golden regeneration.
 
-Two 131,072-byte ASCII/Unicode fixtures change from unshared to shared. Observed
-public Heap::allocated_bytes() growth changes from [270272,540608] to [0,0]. These
-are fixture arena observations, not allocation counts or general memory/capacity/
-aggregate/peak/RSS/speed/source-fit claims. Current empty-separator behavior and
-maxsplit arithmetic are preserved; no behavior repair or broader i32::MAX claim.
-Full WP899/M7A remains open.
+Acceptance proves one removed scratch deep-clone and fixed Symbol owner transfer.
+Generic IR Vec spare capacity may survive where clone discarded it. No unchanged
+capacity, reduced total retained/aggregate memory, allocation count, peak/RSS,
+speed or source-fit claim. Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Compiler double-not bool fold transfers already-owned inner IR instead of deep-cloning; exact guard/tree/spans/constant/fallback/frozen ownership preserved. Three DESIGNs/FINALs; identical baseline two semantic passes/one pointer failure, candidate 13/13, three Symbol buffers transferred (15,384 content bytes), two equal diagnostics and default dependents. Generic IR spare capacity caveat; no aggregate/RSS/speed claim | [Double-not ownership transfer](wp899-double-not-move-2026-10-05.json) |
 | Split/rsplit reuse complete input substrings by equal byte length at final list allocation; all splitting decisions, parameters/order, lists/scratch and partial owned strings preserved. Three DESIGNs/FINALs; same tests baseline two semantic passes/one sharing failure, candidate 14/14, 77,750 comparisons per variant, six equal errors, 42 sharing routes and default dependents. Two 128 KiB fixtures share with zero observed added arena accounting; fixture observations only | [Split/rsplit input reuse](wp899-split-input-reuse-2026-10-05.json) |
 | Capitalize/title join lower/upper in unchanged ASCII whole-input reuse; exact first-position/word-boundary guards preserve all changed ASCII/Unicode fallback, errors and GC/frozen/speculative behavior. Three DESIGNs/FINALs; identical baseline two semantic passes/one new sharing failure, candidate 11/11, 74,898 comparisons per variant, eight equal errors and default dependents. Both new 96 KiB fixtures share; zero public arena growth is fixture accounting only | [ASCII capitalize/title reuse](wp899-ascii-title-case-reuse-2026-10-05.json) |
 | Native splitlines reuses complete nonempty inputs without CR/LF; list and actual split-line allocations, bytes/parameters/errors, GC/frozen and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one sharing failure, candidate 11/11, 5,602 character comparisons per variant and default dependents. Four large ASCII/Unicode cases share; observed zero added arena accounting excludes allocator/aggregate/speed claims | [Splitlines input reuse](wp899-splitlines-input-reuse-2026-10-05.json) |

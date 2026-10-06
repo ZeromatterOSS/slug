@@ -1,0 +1,206 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "da03c0767",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "e054a466d40ce7098a3c008eda590f369860f0a2248c296e5dfaf0948f886b9f",
+    "starlark-rust/starlark/src/eval/compiler/expr/double_not_memory_tests.rs": "ea8ec78e1e553d37be4dbb5aad5cb4c454bd115e85749cffd711b94446eabbb4",
+    "starlark-rust/starlark/src/collections/symbol/symbol.rs": "8301dd1d265979baffdae5660ca89628e7ed4b4dd7c228fde7735c2f7d895453",
+    "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+    "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "3ac5e254115ec9d56496f89b71576dd16d829dead1f1ff4ca548c2105c242708",
+    "starlark-rust/starlark/src/tests/opt/eq.rs": "e8841fc743448710a5730d1d926c64d3707def1975495a3976412c11d5e2eac7",
+    "starlark-rust/starlark/src/tests/opt/if_rand.rs": "58d38794c95d85b8d286f45485a2215d5268e642671f601bddc87df0192fa30f",
+    "starlark-rust/starlark/src/tests/opt/type_is.rs": "5c5131e0d01e80bebe90c261f76c7d1f1a31f6bc43668190c1a2438d4dbbe983",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "a944bb6b408f84791487b6d3bebaa1613613599bedec64e2a44f3190fcd70bc2",
+    "selectors": [
+      "eval::compiler::expr::double_not_memory_tests::double_not_transfers_symbol_buffers_and_preserves_expression_spans",
+      "eval::compiler::expr::double_not_memory_tests::boolean_guard_constant_truthiness_and_fallback_spans_are_preserved",
+      "eval::compiler::expr::double_not_memory_tests::double_not_evaluation_preserves_effects_errors_and_frozen_functions",
+      "tests::opt::if_rand::test_basic",
+      "tests::opt::if_rand::test_and_or_not",
+      "tests::opt::eq::test_eq_bool_is_ptr_eq",
+      "tests::opt::eq::test_eq_int",
+      "tests::opt::eq::test_eq_str",
+      "tests::opt::type_is::returns_type_is",
+      "tests::opt::type_is::does_not_return_type_is",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "e054a466d40ce7098a3c008eda590f369860f0a2248c296e5dfaf0948f886b9f",
+      "starlark-rust/starlark/src/eval/compiler/expr/double_not_memory_tests.rs": "ea8ec78e1e553d37be4dbb5aad5cb4c454bd115e85749cffd711b94446eabbb4"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "eaf570c6e7681b140a16f594a7c70775dbe827f55974299ad58e58d1aa3631eb",
+    "selectors": [
+      "eval::compiler::expr::double_not_memory_tests::double_not_transfers_symbol_buffers_and_preserves_expression_spans",
+      "eval::compiler::expr::double_not_memory_tests::boolean_guard_constant_truthiness_and_fallback_spans_are_preserved",
+      "eval::compiler::expr::double_not_memory_tests::double_not_evaluation_preserves_effects_errors_and_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "63bb11786a6841305ee1316491d8f27ab85812c5a411493333284332582da2a3",
+      "starlark-rust/starlark/src/eval/compiler/expr/double_not_memory_tests.rs": "ea8ec78e1e553d37be4dbb5aad5cb4c454bd115e85749cffd711b94446eabbb4"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/double-not-move-baseline-compile.json",
+      "sha256": "67595f6e2a46f21c9f7e6f3f948035bb7d8ddf25302e95c141d7ba4bc9093f5f",
+      "exit_code": 0,
+      "elapsed_seconds": 6.395414825994521,
+      "log_sha256": "a073d1f3b1cca5e04dc426e6d6d90ac893be160e8922368fb567fe5325c5b62d"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/double-not-move-baseline-preflight.json",
+      "sha256": "0d8a9b0b153db79a6df55feaea05e6d6dae9babf1aef9a55c62fe03cc2b86369",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02033471903996542,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/double-not-move-baseline-controls.json",
+      "sha256": "8fb6621ec0bdee39877eedc0ec2b318438fb90d129d8864f041ad3ea5c7bf04c",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005886658967938274,
+      "log_sha256": "0fd2d0c4a7f2ea4bb4f7013f459130e1821b73af4cb3db3cf44cf6d75ee231c2"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/double-not-move-candidate-compile.json",
+      "sha256": "d933163b8df8eef9881c76b9eb489378e871154732b6cf748f5e6eda38b560a1",
+      "exit_code": 0,
+      "elapsed_seconds": 3.007451694982592,
+      "log_sha256": "96343f2c0c5534211cd8b32b0b13e5af093555851b5ae733cbebfa874ce56142"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/double-not-move-candidate-preflight.json",
+      "sha256": "e6eadbd51788994544f0fea2262e266a1a5bf7df493f4fc6ef70c27f69c85f1e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019694566959515214,
+      "log_sha256": "3d8ce2649dba2567b177a129f9de3c75f79d98d271e4a628d1fc2aacc0a92f52"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/double-not-move-candidate-controls.json",
+      "sha256": "9ff94b86a1a945c094e48ddcf52678b299c72b961397be3e6eeb9618dd49697d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.014927332988008857,
+      "log_sha256": "b2dea3f347bd7ae1f6a6cce7d5ab03e3cc2c3fc89b85356cb0920de9712392af"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/double-not-move-dependents-check.json",
+      "sha256": "6c75db7182dcb1124fff637d37fe5fb1dd8da3828242198473b6622bea716d4e",
+      "exit_code": 0,
+      "elapsed_seconds": 7.571827084000688,
+      "log_sha256": "c0e0dc91cee4a525c8d03e69ab3575123806e362014607c3c916d83c8c91dfa5"
+    }
+  },
+  "proof": "Entire expr.rs equals baseline plus sibling test hook and exactly (*e).clone() to *e in the existing owned guarded double-not branch. is_definitely_bool, constant truthiness, fallback, IR/spans unchanged; identical sibling tests. Symbol derived Clone copies fixed Box text; move transfers existing owner. No helper/API/interner/cache/key/unsafe/dependency/retained representation or donor import.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_gate_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 10,
+    "candidate_total": 13,
+    "exact_equal_error_records": 2
+  },
+  "ownership_fixture": {
+    "symbols": 3,
+    "content_bytes": 15384,
+    "baseline_reused_buffers": 0,
+    "candidate_reused_buffers": 3
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      folded([], struct(), struct(outer=struct(inner=1)))\nerror: Object of type `struct` has no attribute `outer`\n --> assert.bzl:6:21\n  |\n6 |     return not not (seen(log, \"left\", left).outer.inner == seen(log, \"right\", right).outer.inner)\n  |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      folded([], struct(outer=struct(inner=1)), struct(outer=struct()))\nerror: Object of type `struct` has no attribute `inner`\n --> assert.bzl:6:60\n  |\n6 |     return not not (seen(log, \"left\", left).outer.inner == seen(log, \"right\", right).outer.inner)\n  |                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n"
+  ],
+  "limits": "One compiler scratch deep-clone removed; fixed Symbol buffers transfer. Generic IR Vec spare capacity may survive where clone discarded it. No unchanged-capacity, reduced total retained/aggregate memory, allocation-count, peak/RSS/speed/source-fit claim. Final bytecode/frozen owners and other optimizer clones remain.",
+  "growth": {
+    "test_sibling_lines": 239,
+    "estimate": "180-260 lines, three tests, no fixture assets",
+    "production": "One expression return, three-line cfg test hook; cohesive existing owner."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline baseline/candidate Starlark lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets checks.",
+  "scope": "Local string/basic memory optimization; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/double-not-move-baseline-compile.json": "67595f6e2a46f21c9f7e6f3f948035bb7d8ddf25302e95c141d7ba4bc9093f5f",
+    "target/wp899/double-not-move-baseline-compile.jsonl": "a073d1f3b1cca5e04dc426e6d6d90ac893be160e8922368fb567fe5325c5b62d",
+    "target/wp899/double-not-move-baseline-controls.json": "8fb6621ec0bdee39877eedc0ec2b318438fb90d129d8864f041ad3ea5c7bf04c",
+    "target/wp899/double-not-move-baseline-controls.jsonl": "0fd2d0c4a7f2ea4bb4f7013f459130e1821b73af4cb3db3cf44cf6d75ee231c2",
+    "target/wp899/double-not-move-baseline-preflight.json": "0d8a9b0b153db79a6df55feaea05e6d6dae9babf1aef9a55c62fe03cc2b86369",
+    "target/wp899/double-not-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/double-not-move-baseline-selectors.json": "0a56b986c69e278a23f29517f0a1d7cfdc091cd9ca503cf85276ba316a032ae3",
+    "target/wp899/double-not-move-candidate-compile.json": "d933163b8df8eef9881c76b9eb489378e871154732b6cf748f5e6eda38b560a1",
+    "target/wp899/double-not-move-candidate-compile.jsonl": "96343f2c0c5534211cd8b32b0b13e5af093555851b5ae733cbebfa874ce56142",
+    "target/wp899/double-not-move-candidate-controls.json": "9ff94b86a1a945c094e48ddcf52678b299c72b961397be3e6eeb9618dd49697d",
+    "target/wp899/double-not-move-candidate-controls.jsonl": "b2dea3f347bd7ae1f6a6cce7d5ab03e3cc2c3fc89b85356cb0920de9712392af",
+    "target/wp899/double-not-move-candidate-preflight.json": "e6eadbd51788994544f0fea2262e266a1a5bf7df493f4fc6ef70c27f69c85f1e",
+    "target/wp899/double-not-move-candidate-preflight.jsonl": "3d8ce2649dba2567b177a129f9de3c75f79d98d271e4a628d1fc2aacc0a92f52",
+    "target/wp899/double-not-move-candidate-selectors.json": "a95717e6ce08e532be41238a4f47a926a4bc8a825338060ff345e06ea0f8895e",
+    "target/wp899/double-not-move-controls.py": "ea719a24bc5fb93cbcbb34bfe46a6d6d2c518953599dee409a50e1dc34b9b11f",
+    "target/wp899/double-not-move-dependents-check.json": "6c75db7182dcb1124fff637d37fe5fb1dd8da3828242198473b6622bea716d4e",
+    "target/wp899/double-not-move-dependents-check.jsonl": "c0e0dc91cee4a525c8d03e69ab3575123806e362014607c3c916d83c8c91dfa5",
+    "target/wp899/double-not-move-design-evidence.md": "eb610c9620413f03be0d7892b7e39acc2bf94d9535d56ff9ae6262127c3278e0",
+    "target/wp899/double-not-move-design-ownership.md": "b76826f887fd015a748f15bb6c27ae02863f235248fc11b2f9cc00ad89f595f1",
+    "target/wp899/double-not-move-design-source.md": "63a48b5f1d4ea264d06605348b899c37b5a8433a40f0d0cf29dea969913e0a29",
+    "target/wp899/double-not-move-design.md": "5d2031c43bbecf077b8d284842f95b8ed9b43c0da4f285958aa891dccb87bc4e",
+    "target/wp899/double-not-move-record.py": "253ede317381b608569ab8cd42eac3a8d4f2667a5b508eb71482f2a7cdf07c60",
+    "target/wp899/double-not-move-start.json": "3e10920c08adb9a463498a048c4feab3c0c999594738beeb44e1b0b3306fd924"
+  },
+  "start": {
+    "started_at": "2026-10-06T01:52:49.425442+00:00",
+    "baseline": "da03c07679b47e59b37d778b67e068a2aa2cf9ac"
+  },
+  "timing": {
+    "compile_seconds": 16.9746936049778,
+    "test_seconds": 0.02081399195594713,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 311.465841
+  },
+  "validation_sha256": "cd197a8fac3dd87cef5275c3888410bfb651151482aa95de5464a7a4486ca955",
+  "final_reviews": {
+    "target/wp899/double-not-move-final-source.md": "7ccf111da3150cf576322d97bb310d860877164bfbe7cda5bbc1a227cbdcf8ab",
+    "target/wp899/double-not-move-final-ownership.md": "1eb7f60b0a5b43ff2977d202306531d6002c6d44e08d90a862d7f2f1e580d63d",
+    "target/wp899/double-not-move-final-evidence.md": "153814eccb03af15891582e033152b807490608178c62667cad8e0967c1053b1"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "4bee2d4276eb3c61899a5f4ddd7e5ab1bbe15511abff5e84d1c14afb741f780d",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "11b52e8c4d0ebebe446f36221193537d234aa8385773d7f2a6dd31335c7e8856",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "d9bcec42b4d6393b2b16ad0b99951d0751dd61bdb61097a4e89bdd081e0b9a87"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/double-not-move-format-check.json",
+      "sha256": "995e00e922ed3fd4360acec193c0da2002e498c90e5945a6953ea6b6b6fc7fa2",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/double-not-move-archive-check.json",
+      "sha256": "f02b9e41a41c27724001cb9c1e1c01fb4970af3c0cfcf4125a2c2fd31a1effd2",
+      "exit_code": 0,
+      "log_sha256": "c5d4e2f4d6dc8f89ae1b55e15a6fb8e083e133cc96c2d9e43071e9cbe7989ed1"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/double-not-move-plan-check.json",
+      "sha256": "abab71d8e8fd8ba06b968b65641826be09c31513f77e627ec89a7cdc56213c6d",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/double-not-move-diff-check.json",
+      "sha256": "14e9ba4b510709e5e197d255cfa5a33242dd2ef2a0a56db5a30067152f6f5c92",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
