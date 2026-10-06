@@ -1,0 +1,265 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "34350352d",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "8098f43044e34f1a42d78a521c4d296c2d1e2c5843c6bcf9820fd3c639971920",
+    "starlark-rust/starlark/src/values/types/string/join_two_memory_tests.rs": "622c4c8f142a907d89fb96fd8e243756d7c2d1fd3747b1e65c751b572e237024",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "starlark-rust/starlark/Cargo.toml": "1aee590006684fde395f91a74df4f4ace2db2c6ecc3f0f7afe564a76eabac660",
+    "starlark-rust/starlark/src/values/layout/avalues/str_.rs": "8f08110a3d77772b8b8645cb95f1820ed75e1fce77ea7bebb766c13ea06b2930",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/iter.rs": "54e992312ef2b35535509f2e99dbca41f678fcecbd1459714c4966a6dfe2a3bb",
+    "starlark-rust/starlark/src/values/traits.rs": "7a79a43417bc733274b67e2c9ca7ab7d9d3e91e5858bf36a4136516eeda50fb0",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/values/types/string/split_input_reuse_tests.rs": "955e4b2775c8829480de07e3e4c0c6c49e419a4aabcb2a962e295b4dcd132f4a",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3"
+  },
+  "dependency_sha256": {
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs": "5c51411a79a9c48ce17940080603d7129a7426dec86ae43d1d8924f7bfa8198a",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/string.rs": "bde5c14b3071610c7a0658276b56efb5d6d60de9e5fcaef1779b9c6d9724f17a",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/alloc/layout.rs": "740bcbad6d868b045668db82b6664ab715a9a46c3792c433da6f04be2ac6334f",
+    "/run/media/system/Colossus/dev/bazel/src/main/java/net/starlark/java/eval/StringModule.java": "6d8194222f0c9087c87777fb7420bf91a9b39340cf53b1ee261c9de73fad720d"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "6cf68d3e9a042bea1e8e14b6dd9e9da76d42871e0fab8df61d00269fa51510b0",
+    "selectors": [
+      "values::types::string::methods::join_two_memory_tests::join_cardinality_bytes_parameters_and_raw_errors_are_preserved",
+      "values::types::string::methods::join_two_memory_tests::join_iterator_validation_hint_cleanup_and_capacity_panic_order_are_preserved",
+      "values::types::string::methods::join_two_memory_tests::joined_results_and_functions_survive_gc_freeze_and_source_drop",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::methods::split_input_reuse_tests::complete_split_results_share_input_across_directions_and_routes",
+      "values::types::string::methods::split_input_reuse_tests::split_bytes_trimming_limits_lists_and_exact_errors_are_preserved",
+      "values::types::string::methods::split_input_reuse_tests::split_results_and_functions_survive_gc_freeze_and_source_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "8098f43044e34f1a42d78a521c4d296c2d1e2c5843c6bcf9820fd3c639971920",
+      "starlark-rust/starlark/src/values/types/string/join_two_memory_tests.rs": "622c4c8f142a907d89fb96fd8e243756d7c2d1fd3747b1e65c751b572e237024"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "4d5b9e093a5edd3ee0f6ea917a4b8fd911f7e18e5520f6c7ee1f23b96c08d0a0",
+    "selectors": [
+      "values::types::string::methods::join_two_memory_tests::join_cardinality_bytes_parameters_and_raw_errors_are_preserved",
+      "values::types::string::methods::join_two_memory_tests::join_iterator_validation_hint_cleanup_and_capacity_panic_order_are_preserved",
+      "values::types::string::methods::join_two_memory_tests::joined_results_and_functions_survive_gc_freeze_and_source_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "d9c662f2afc341009bb903c203bd2ad9b3fbce038b1da398430b0e7019d64418",
+      "starlark-rust/starlark/src/values/types/string/join_two_memory_tests.rs": "622c4c8f142a907d89fb96fd8e243756d7c2d1fd3747b1e65c751b572e237024"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/join-two-direct-baseline-compile.json",
+      "sha256": "55995c3ece1b52b9997a5af636a202a8f805ff8d1262997543d5682686795894",
+      "exit_code": 101,
+      "elapsed_seconds": 3.4602650810265914,
+      "log_sha256": "71f028b601472068cf95d822341b823041fd5b4bdb2ec0ffadafa3d6f39c2277"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/join-two-direct-baseline-r2-compile.json",
+      "sha256": "30ac70636509a7ae97229a38e80d1558fa8b1f1e752abb74fb7f3ed9f6e09dd3",
+      "exit_code": 0,
+      "elapsed_seconds": 11.375353871029802,
+      "log_sha256": "0663f16794f68a880f74f561c4d190f96cc7100a74de0c45faa31833e382b94a"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/join-two-direct-baseline-r2-preflight.json",
+      "sha256": "a6af44734ccae800d51f91e699081a0f20d93630dfb85225d6e0b5097ab62ac2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0220530959777534,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/join-two-direct-baseline-r2-controls.json",
+      "sha256": "389e0ff391962490f3bbe5fd5d4e02f491a019769d869a38061c72bb45fa19e5",
+      "exit_code": 0,
+      "elapsed_seconds": 0.007791306998115033,
+      "log_sha256": "e606182da563ce37ab62a476192e41a7791e6c12bf808f9ce85a8c37d10156bf"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/join-two-direct-candidate-compile.json",
+      "sha256": "4ad59191fd321c69e4ca784e62612847326e706fa756117fa5407c30bbf73afb",
+      "exit_code": 0,
+      "elapsed_seconds": 9.027048573014326,
+      "log_sha256": "727b30f8005c2abcb79d8cb5f81ec439f64996c03fae9c8d768e1a0862313902"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/join-two-direct-candidate-preflight.json",
+      "sha256": "19f71349753b1ec34e57cc94e7b4ac2ae3147619736d2878855c70a79b44d82d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02230009902268648,
+      "log_sha256": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/join-two-direct-candidate-controls.json",
+      "sha256": "eb3467a8148542e01b05ec9486c203b901656ae2b6320c743615a796b9c57beb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.07742795604281127,
+      "log_sha256": "051317eec33be8cd1c43ad05548bf9638186ae2484b1365738bcccc7d1978bb7"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/join-two-direct-dependents-check.json",
+      "sha256": "ca7d54baf5023607df86e399b2e1fa763d30709ed97ff97504cb7043bdeaf5b4",
+      "exit_code": 0,
+      "elapsed_seconds": 7.5876949109951966,
+      "log_sha256": "62e6ff53e5f06669ed643e62994424cccbb8fc8a5a1e7786c7c50dedb9acdd69"
+    }
+  },
+  "proof": "Whole methods.rs equals baseline plus sibling hook and only join third-item prefetch guard/direct result branch and Option.into_iter.chain(it) loop input. Firsttwo next/validation, hint/guess/arithmetic, zero/singleton paths, original 3+ String constructor/three appends/separator-before-validation/final heap conversion unchanged. Prefetch only guess<=isize::MAX; larger guesses enter original u8 capacity-overflow before third next. Exhausted exact2 iterator dropped before existing heap.alloc_str_concat3(s1,this,s2) allocates independent output, with existing empty/constant helper behavior. Some prefetched item consumed once through chain, native cleanup before final allocation/error retained. No public API/interner/cache/key/production unsafe/dependency/retained representation or donor import. Sixteen protected files and identical corrected tests.",
+  "pass_counts": {
+    "baseline_semantic": 3,
+    "candidate_new": 3,
+    "candidate_protected": 8,
+    "candidate_total": 11,
+    "value_comparisons": 2053,
+    "iterator_traces": 31,
+    "exact_equal_errors": 33
+  },
+  "trace_sha256": "ca3c48aa0c3a2ecf03809fc41a75a1c5236a874044075a6752e89413a2ee6ddb",
+  "error_sha256": [
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "7697bc953c141a2954ac643936f2f5d46e8df21beae333e44a45a9e2d7365c18",
+    "cfbd9e62a8a8ca867466cc4d79add1b6318d04426ba0fe7693fc05bd29d591f0",
+    "4d1547c2bd01f14f9b53199cd4f7ea447bd8c0640e685d62c2af6a9aff1597a2",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50",
+    "5345c10a06ba929772bd69505166e951150bf7225ef26b16249ea39b88f4bb50"
+  ],
+  "retained_output_bytes": 42496,
+  "limits": "Source/helper-proved bypass of exactly-two temporary String construction and initial scratch appends only. Final heap allocation/copy remains; 3+ scratch and all natural owners remain. No pointer/allocator witness, quantified memory/allocation count, arena/aggregate/peak/RSS/speed/source-fit claim. Deterministic arithmetic/capacity-overflow and iterator stop order preserved; allocator OOM/failure sequencing excluded because removal of allocation inherently changes it. Fixture output length is not memory savings. Inherited Rust Unicode/errors retained, no Bazel parity expansion.",
+  "design_revision": "Initial source DESIGN REVISE found capacity-overflow before third next; two initial other DESIGNs ACCEPT. R2 adds isize::MAX guard and truthful lazy enormous iterator catch/trace control, three R2 DESIGNs ACCEPT before production. Original proposal/verdicts preserved.",
+  "test_correction": "Initial baseline compile E0716: temporary FrozenModule error-function handle borrowed too briefly. Retain both handles before evaluator; original test hash/failure receipt preserved. Corrected identical baseline/candidate tests pass.",
+  "growth": {
+    "test_sibling_lines": 353,
+    "estimate": "240-330lines; actual353 after formatting/lazy overflow/retained function ownership controls. Modest estimate overrun is review trigger, no new assets/goldens or production responsibility.",
+    "production": "Existing join remains bounded (<80lines), no new helper; sibling isolates three tests from native-method owner."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline starlark lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/join-two-direct-archive-check.json": "c563870b6c0c753294a6d1143cbb08dee30a004f28617a5c83a6bd083497978e",
+    "target/wp899/join-two-direct-archive-check.jsonl": "a379acaeec68b6dbcbb90e9f2d6f08ef3700caa5ecaa01f9b99d6b815265de03",
+    "target/wp899/join-two-direct-baseline-compile.json": "55995c3ece1b52b9997a5af636a202a8f805ff8d1262997543d5682686795894",
+    "target/wp899/join-two-direct-baseline-compile.jsonl": "71f028b601472068cf95d822341b823041fd5b4bdb2ec0ffadafa3d6f39c2277",
+    "target/wp899/join-two-direct-baseline-r2-compile.json": "30ac70636509a7ae97229a38e80d1558fa8b1f1e752abb74fb7f3ed9f6e09dd3",
+    "target/wp899/join-two-direct-baseline-r2-compile.jsonl": "0663f16794f68a880f74f561c4d190f96cc7100a74de0c45faa31833e382b94a",
+    "target/wp899/join-two-direct-baseline-r2-controls.json": "389e0ff391962490f3bbe5fd5d4e02f491a019769d869a38061c72bb45fa19e5",
+    "target/wp899/join-two-direct-baseline-r2-controls.jsonl": "e606182da563ce37ab62a476192e41a7791e6c12bf808f9ce85a8c37d10156bf",
+    "target/wp899/join-two-direct-baseline-r2-preflight.json": "a6af44734ccae800d51f91e699081a0f20d93630dfb85225d6e0b5097ab62ac2",
+    "target/wp899/join-two-direct-baseline-r2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/join-two-direct-baseline-r2-selectors.json": "8a1340d90eb5e015ddc55d1b246b4dbec833af68d7430826f177cdd486f822ff",
+    "target/wp899/join-two-direct-candidate-compile.json": "4ad59191fd321c69e4ca784e62612847326e706fa756117fa5407c30bbf73afb",
+    "target/wp899/join-two-direct-candidate-compile.jsonl": "727b30f8005c2abcb79d8cb5f81ec439f64996c03fae9c8d768e1a0862313902",
+    "target/wp899/join-two-direct-candidate-controls.json": "eb3467a8148542e01b05ec9486c203b901656ae2b6320c743615a796b9c57beb",
+    "target/wp899/join-two-direct-candidate-controls.jsonl": "051317eec33be8cd1c43ad05548bf9638186ae2484b1365738bcccc7d1978bb7",
+    "target/wp899/join-two-direct-candidate-preflight.json": "19f71349753b1ec34e57cc94e7b4ac2ae3147619736d2878855c70a79b44d82d",
+    "target/wp899/join-two-direct-candidate-preflight.jsonl": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff",
+    "target/wp899/join-two-direct-candidate-selectors.json": "1699d828276c2d6d20bda95618f906a8d5860a870d020d01ff0ede1e8adb398e",
+    "target/wp899/join-two-direct-controls.py": "1237006e434d072663af186ec8bb449c328bf04dfe3f8cf37f85661f074e3b8b",
+    "target/wp899/join-two-direct-dependents-check.json": "ca7d54baf5023607df86e399b2e1fa763d30709ed97ff97504cb7043bdeaf5b4",
+    "target/wp899/join-two-direct-dependents-check.jsonl": "62e6ff53e5f06669ed643e62994424cccbb8fc8a5a1e7786c7c50dedb9acdd69",
+    "target/wp899/join-two-direct-design-evidence.md": "a526b53cffd479d5f20d077b761ac18383fbc9076899856bb69c7473bb29b60c",
+    "target/wp899/join-two-direct-design-ownership.md": "5f67b80a484b1fc1fcc2b6a035923de99335a19d676a4696c393de5715505627",
+    "target/wp899/join-two-direct-design-r2-evidence.md": "656f1d57b9f02ac639c1a966eb0925d016e8f7c46992ea58e443f0badcbd9b27",
+    "target/wp899/join-two-direct-design-r2-ownership.md": "88e90b1278c99550fd67b6976b3dc3c9d0e50baba84fb8d9a885b3160106b5ed",
+    "target/wp899/join-two-direct-design-r2-source.md": "d92b49e7f51fe1a9094e923adbc85e68dc445ba6575b7b76db66d2cfb1dd20a8",
+    "target/wp899/join-two-direct-design-r2.md": "24bed2d4e1cf5f291d52066b5d58a94b787dee0f980d5b7a9a33b730c9426441",
+    "target/wp899/join-two-direct-design-source.md": "751f79d3d309d71171c00c23110e571b0dbe85c1ce20764c9c87f30ad9f40a72",
+    "target/wp899/join-two-direct-design.md": "6b23bee9fb4c09cf794da4cea8c2163d56b5217069d5979692af88641c160d01",
+    "target/wp899/join-two-direct-format-check.json": "616234950a66dda1406d6c25e4c7ce43a69add351bfd25d738002e804ac7a36b",
+    "target/wp899/join-two-direct-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/join-two-direct-record.py": "0093439038ad2a4f1560aed881d9d63b5d3b560e8b67ddca05425a1f6909b03d",
+    "target/wp899/join-two-direct-start.json": "15a6ac08c9558c20b986de72bbaa241dc725f40dafe0b0519a8460c48b1b0e49",
+    "target/wp899/join-two-direct-test-compiler-correction.json": "1bd1ca60cae564a99f58991c1097f8fbb293f26d971416929810d84e1076da8b"
+  },
+  "start": {
+    "started_at": "2026-10-06T03:11:56.968492+00:00",
+    "baseline": "34350352d554a0d085c95342cd2d0fb2f81d3c84"
+  },
+  "timing": {
+    "compile_seconds": 31.450362436065916,
+    "test_seconds": 0.08521926304092631,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 609.913796
+  },
+  "validation_sha256": "05f138a6c268f962897a18dccbb97e13f47e2e1c1d5820c57dc824149a1a9138",
+  "final_reviews": {
+    "target/wp899/join-two-direct-final-source.md": "4c42b62aaa455e83e8e9a2091626f0c5bfda372ce534bb1a66eb33470896f58c",
+    "target/wp899/join-two-direct-final-ownership.md": "517cbcf8cafdeab8ee04fb30e59766dba58a776c6a7f29ab39be4e26564f8b78",
+    "target/wp899/join-two-direct-final-evidence.md": "96c9c435bf9e92fdf46eecc368bbf8e1f4d66ed751794717fc470e17cb0f1db1"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "a0136880ee80f70a042dfbc73c31a5fb55b5ac295d9640a663f9d12edf0dd113",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "9976a2ee5a2d125fe67a84f6929bd4178a45cdfbdc7df8f846897ef7fd9f4359",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "fc2dce5059e70989172361161f325de14faa00bf05dc50722fb2b781e948bc64"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/join-two-direct-format-check.json",
+      "sha256": "616234950a66dda1406d6c25e4c7ce43a69add351bfd25d738002e804ac7a36b",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/join-two-direct-archive-check.json",
+      "sha256": "c563870b6c0c753294a6d1143cbb08dee30a004f28617a5c83a6bd083497978e",
+      "exit_code": 0,
+      "log_sha256": "a379acaeec68b6dbcbb90e9f2d6f08ef3700caa5ecaa01f9b99d6b815265de03"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/join-two-direct-plan-check.json",
+      "sha256": "23d4add36105f6fcb90eb9ca89eeb6e41da060c1d1c4f0b04dec3637adce877a",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/join-two-direct-diff-check.json",
+      "sha256": "5f488cf8e2dff65dd4c235de6096661b883655349f77d31bc092ba53e68f1f12",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

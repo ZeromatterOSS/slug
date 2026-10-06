@@ -12,9 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component borrows canonical and apparent repository owners
-when rendering attribute labels. It removes a temporary canonical deep clone and
-Arc construction, preserving exact spelling, final capacity and owned output.
+The latest accepted component joins exactly two strings directly into the existing
+Starlark heap, bypassing a temporary String. Iteration/validation/cleanup, bytes,
+errors, capacity-overflow ordering and final output ownership remain.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -23,38 +23,47 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted query attribute-label borrowing contract
+## Accepted native two-element join scratch contract
 
-QueryLabel output_label and output_attribute_label share one private formatter
-borrowing CanonicalLabel and optional ApparentRepoName. Attribute rendering keeps
-full canonical repository equality and the existing then/flatten apparent alias
-projection. Some apparent renders @repo//package:target; None root uses
-//package:target; None nonroot uses the unchanged CanonicalLabel Display, exactly
-equivalent to the prior QueryLabel default formatting. Public Display, parsing,
-mapping provenance, semantic Eq/Hash/Ord, Arc owners and graph/DICE state remain.
-Every branch retains CompactString::new and its final owned capacity. Borrowed
-inputs expire during synchronous formatting; no reference escapes in output.
+Native join keeps zero/singleton routes and both initial iterator steps and string
+validation. It reads size_hint and computes the same capacity guess before third
+prefetch. For guess<=isize::MAX, a missing third item drops the exhausted iterator
+then uses existing heap.alloc_str_concat3(first, separator, second); an existing
+third item feeds Option.into_iter().chain(it) into the original buffer loop. Larger
+guesses enter the original String::with_capacity before third next, preserving u8
+capacity-overflow panic/cleanup. Three-or-more construction/appends, separator-
+before-validation, final heap allocation, errors and iterator stop remain. Empty/
+constant-string behavior, Rust Unicode, speculative/GC/frozen ownership stay.
+No new helper/API/interner/cache/key/production unsafe/dependency or representation.
 
-Three DESIGNs and FINALs accept the bounded helper and source transformation.
-Identical corrected 141-line tests pass baseline 2/2 and candidate 13/13: twenty
-actual attribute cases cover root/canonical/apparent aliases and same/foreign
-repositories, empty packages and Unicode, with independent spellings and original
-algorithm bytes/capacity references. Long fields retain three owned outputs after
-source/apparent/owner/clone drops. Eleven existing identity/attribute/DOT controls,
-sixteen protected sources, default Core/CLI alltargets and pinned offline fresh
-artifact/preflight/format/archive/plan/diff checks pass. Initial preparation before
-the explicit expected spelling correction is not a test gate; corrected baseline
-and candidate tests are identical. No assets or golden changes.
+Initial source DESIGN REVISE identified oversized-capacity ordering before any
+production implementation. Revised guard/lazy-iterator control received three R2
+DESIGNs; three FINALs accept the actual diff and evidence. Identical corrected
+353-line tests pass baseline 3/3 and candidate 11/11, with 2,053 independent bytes/
+cardinality comparisons, 31 identical next/hint/stop traces and 33 byte-identical
+errors. Allocating and unknown-hint iterators protect validation/early cleanup;
+a truthful lazy enormous sequence catches capacity overflow before third next.
+Empty/one-byte constant and singleton identity, GC/freeze/list mutation and retained
+output/functions after source/module drop pass. Eight existing intern/speculative/
+encoding/split controls, sixteen protected sources, pinned helper/standard-library
+proof and default Loading/Core/CLI alltargets pass. Initial E0716 test-handle lifetime
+correction preserves original hash/failed preparation; identical corrected variants
+use fresh pinned offline artifacts/exact preflights. Formatted test growth exceeds
+240-330 estimate by 23 lines for cohesive boundary/lifecycle controls. No assets or
+golden changes; format/archive/plan/diff hygiene pass.
 
-Acceptance removes one temporary CanonicalLabel deep-clone/Arc::new source site
-and optional apparent Arc handle clone. Formatting String and final compact copying
-remain. No runtime pointer or allocator measurement, quantified allocation count,
-payload, aggregate/peak/RSS/speed or source-fit claim. Full WP899/M7A stays open.
+Acceptance bypasses only the exactly-two temporary String construction and its
+initial scratch appends. Final heap allocation/copy and larger-join scratch remain.
+No runtime pointer/allocator witness, quantified memory/count, arena/aggregate/
+peak/RSS/speed/source-fit claim. Allocator OOM/failure sequencing is excluded because
+removing an allocation inherently changes it; deterministic capacity overflow stays.
+No new Bazel parity claim. Full WP899/M7A stays open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Native two-element join writes borrowed parts directly into existing heap concat3; zero/singleton and larger buffers, exact bytes/errors/iterator cleanup/capacity-overflow/frozen ownership remain. Three revised DESIGNs/FINALs; identical corrected baseline 3/3, candidate 11/11, 2,053 comparisons, 31 equal traces, 33 equal errors and default dependents. Initial capacity proposal rejected and fixture E0716 corrected; source scratch-bypass proof only, OOM sequencing excluded, no quantified memory/aggregate/RSS/speed claim | [Two-element join](wp899-join-two-direct-2026-10-06.json) |
 | Query attribute labels borrow canonical/apparent owners instead of temporary deep clone/Arc construction; full repo projection, exact spelling/final capacity/owned output/identity remain. Three DESIGNs/FINALs; identical baseline 2/2, candidate 13/13, twenty attribute cases and retained output after source drops, eleven existing graph/DOT controls and default dependents. Source clone-site proof only; formatting/final copying remain, no quantified memory/aggregate/RSS/speed claim | [Query attribute-label borrowing](wp899-query-attribute-label-borrow-2026-10-06.json) |
 | DOT class-label conversion consumes tight buffers only at/above the pinned compact heap floor; short/spare original copying, exact bytes/final capacities/graph identity/release remain. Three revised DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, fourteen byte/capacity cases, eight equal DOT outputs, five existing graph controls and default Core/CLI checks. Initial heap-floor proposal rejected before implementation; source/library copy-bypass proof only, large 32-bit fallback excluded and no quantified memory/aggregate/RSS/speed claim | [DOT class-label conversion](wp899-dot-class-label-move-2026-10-06.json) |
 | Compiler list addition folding transfers owned elements after both unchanged per-operand 1000 guards; ordered fallback/tree/spans/frozen constant conversion stay. Three DESIGNs/FINALs; same corrected baseline two semantic passes/one ownership failure, candidate 12/12, fifteen Symbol buffers transferred across four routes, four admitted boundary combinations/eight rejection checks/four equal diagnostics and default dependents. Independently baseline-proved five-span golden correction; output collection/capacity caveats remain, no aggregate/RSS/speed claim | [List addition element transfer](wp899-list-add-arg-move-2026-10-06.json) |

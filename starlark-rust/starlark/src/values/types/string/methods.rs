@@ -650,11 +650,26 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
                         let n = it.size_hint().0 + 2;
                         let guess =
                             (cmp::max(s1.len(), s2.len()) * n) + (this.len() * (n - 1)) + 20;
+                        // Keep capacity overflow before the next iterator step.
+                        let third = if guess <= isize::MAX as usize {
+                            match it.next() {
+                                None => {
+                                    drop(it);
+                                    return Ok(heap
+                                        .alloc_str_concat3(s1, this, s2)
+                                        .to_value_of_unchecked()
+                                        .cast());
+                                }
+                                Some(x) => Some(x),
+                            }
+                        } else {
+                            None
+                        };
                         let mut r = String::with_capacity(guess);
                         r.push_str(s1);
                         r.push_str(this);
                         r.push_str(s2);
-                        for x in it {
+                        for x in third.into_iter().chain(it) {
                             r.push_str(this);
                             r.push_str(as_str(x)?.as_str());
                         }
@@ -1349,6 +1364,10 @@ mod splitlines_input_reuse_tests;
 #[cfg(test)]
 #[path = "split_input_reuse_tests.rs"]
 mod split_input_reuse_tests;
+
+#[cfg(test)]
+#[path = "join_two_memory_tests.rs"]
+mod join_two_memory_tests;
 
 #[cfg(test)]
 mod tests {

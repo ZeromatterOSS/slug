@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: query attribute-label rendering borrows canonical and
-apparent repository owners, removing a temporary deep clone and Arc construction.
-Exact repository projection, spelling, final capacity, identity and owned output
-remain. Thirteen controls, twenty attribute cases and default dependent checks
-pass. Source ownership proof only; formatting and final compact copying remain,
-with no quantified allocation/aggregate/RSS/speed claim.
+Latest accepted change: two-element native string join writes directly into the
+existing Starlark heap, bypassing temporary String construction. Exact bytes,
+errors, iterator cleanup, deterministic capacity overflow and final ownership stay.
+Eleven controls, 2,053 comparisons, 31 equal traces, 33 equal errors and default
+dependent checks pass. Source ownership proof only; final heap copy and larger-join
+scratch remain, with no quantified memory/aggregate/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
