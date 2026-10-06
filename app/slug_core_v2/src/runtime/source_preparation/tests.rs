@@ -447,6 +447,9 @@ fn request_materialization_need_refreshes_only_normal_wrapper_and_changed_owner_
         inputs.guest_namespace = Some(guest());
         let prior = snapshot(&f.runtime);
         let material_need = Cell::new(false);
+        let origins = Cell::new(super::progress_origins::ProgressOrigins::default());
+        let pending_origin = Cell::new(None);
+        let legacy_progress = Cell::new(0u64);
         let refreshed = Cell::new(false);
         let sibling = std::cell::RefCell::new(None);
         let result = f.runtime.prepare_selected_source_view_inner(
@@ -457,7 +460,19 @@ fn request_materialization_need_refreshes_only_normal_wrapper_and_changed_owner_
                 tool_policy: namespace.profile_key().tool_sources_key().policy(),
             },
             Some(&|phase| {
+                if matches!(phase, selected_tool_source::ToolPhase::BeforeProgress(_)) {
+                    assert!(pending_origin.take().is_some_and(
+                        |origin| origin != selected_tool_source::ProgressOrigin::InitialOwner
+                    ));
+                    legacy_progress.set(legacy_progress.get() + 1);
+                }
                 match phase {
+                    selected_tool_source::ToolPhase::ProgressFrom(origin) => {
+                        let mut counts = origins.get();
+                        counts.record(origin);
+                        origins.set(counts);
+                        pending_origin.set(Some(origin));
+                    }
                     selected_tool_source::ToolPhase::BeforeProgress(need)
                         if !need.repository_materializations().is_empty()
                             && !material_need.replace(true) =>
@@ -486,6 +501,19 @@ fn request_materialization_need_refreshes_only_normal_wrapper_and_changed_owner_
         assert!(
             material_need.get(),
             "genuine independent writer must request materialization"
+        );
+        let counts = origins.get();
+        assert!(counts.valid());
+        assert!(counts.count(selected_tool_source::ProgressOrigin::InitialOwner) > 0);
+        let inner_dispatches = selected_tool_source::ProgressOrigin::ALL[1..]
+            .iter()
+            .map(|origin| counts.count(*origin))
+            .sum::<u64>();
+        assert_eq!(legacy_progress.get(), inner_dispatches);
+        assert!(inner_dispatches > 0);
+        eprintln!(
+            "progress origins: {:?}",
+            selected_tool_source::ProgressOrigin::ALL.map(|origin| counts.count(origin))
         );
         if change_owner {
             assert!(

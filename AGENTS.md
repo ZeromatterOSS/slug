@@ -76,6 +76,19 @@ Start from the live checkout, not from memory.
   BuildBuddy authentication. Never inspect, print, copy, or commit its contents;
   no credential or derived secret material may enter this checkout or Git.
 
+## Allocation discipline
+
+- Avoid unnecessary owned string copies. Borrow or transfer existing storage
+  when its lifetime fits the consumer; preserve independent ownership for
+  retained values.
+- Use existing string interners for repeated immutable strings when their
+  scope and cleanup fit the semantic owner. Account for the retention cost of
+  interning unique or temporary strings; do not introduce a global pool merely
+  to avoid local copies.
+- Check representative allocation and retention against the workload's memory
+  budget before resuming broader work after a memory regression. Small copy
+  fixtures do not establish whole-workload fit; preserve explicit resource caps.
+
 ## DICE and incremental state
 
 DICE is Slug's incremental computation graph. Use it for semantic build state

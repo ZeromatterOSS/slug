@@ -1,0 +1,490 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "base": "258108a4147026f18207195c710ffc2a82a39c1a",
+  "disposition": "ACCEPTED_LOCAL_SOURCE_PROGRESS_DISCRIMINATOR_FULL_SOURCE_FIT_OPEN",
+  "compatibility": "Slug-native cfg(test) diagnostics; admitted semantic behavior unchanged",
+  "source_pins": {
+    "app/slug_core_v2/src/runtime/selected_tool_source.rs": "9a4446699f886eca4942c809c952a7c99bf3a149f3684376eebdd8cc3f5c1be1",
+    "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs": "659dbf992ce9ae61b035ad3bac60135bd5d06f8546ee3d7671306a01c1d0434d",
+    "app/slug_core_v2/src/runtime/source_preparation.rs": "a5529e8435968f4de2ffbf1da08afefd8ee6eac660c8a0738cd4c0fd7efbb9f7",
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "fffef0080967cf65be4f67d8b5df1e51d01193dab316f94cc5094203d58cde84",
+    "app/slug_core_v2/src/runtime/source_preparation/tests.rs": "6ae98d703cd2205ade6524228b215c1063813fa90cd67783010f2c7b04982486",
+    "app/slug_core_v2/src/runtime/source_preparation/progress_origins.rs": "7cf41515d4af48a4e1556a5369ab84003c896c6a0a6d5c67aa00e502df3c55ab"
+  },
+  "result": "Five fixed codes distinguish initial owner, owner refresh, plan, data plan and source certification Need dispatches before existing normal progress. Recorder uses fiveu64 andstickyoverflow flag, <=48B pinnedlayout; no text/source/Need/owner retention or allocation. Static receipt keys and validity are separate from legacy counters and sticky timeout provenance.",
+  "validation": {
+    "baseline": {
+      "selected": 8,
+      "passed": 8,
+      "elapsed_seconds": 1.0707992110401392,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "bd90cf1cd476905c832d49e75c69c4a2c85f427d53bb574a3876c93b6f715779",
+      "features": [
+        "default"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "tests": [
+        {
+          "name": "runtime::dice::source_preparation::tests::request_materialization_need_refreshes_only_normal_wrapper_and_changed_owner_refuses",
+          "exit_code": 0,
+          "elapsed_seconds": 0.26728980999905616,
+          "log_sha256": "7456af6c2ba2f44a3fefc5aa780515059101048f81a6385e9c3a8189103aaf5f"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_selected_owner_missing_failure_cancel_restore_full_bundle",
+          "exit_code": 0,
+          "elapsed_seconds": 0.07927022001240402,
+          "log_sha256": "8d5d8e63a7cda37cfa4c64b533337d94b08846459ae668878afbb33a6d1998e1"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_post_plan_source_change_keeps_all_stages_through_restore_then_repairs",
+          "exit_code": 0,
+          "elapsed_seconds": 0.08503643801668659,
+          "log_sha256": "fa00039e255b9cd8d2d1121d9aba330a7e265d7f2b9fd258165887a993ad4567"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_failed_real_label_capture_retains_partial_and_unused_stages_during_restore",
+          "exit_code": 0,
+          "elapsed_seconds": 0.1739828129648231,
+          "log_sha256": "650d8c2b8d60278fc3ad9af4a1591a65c4b013d5799e996c6e55eddf4fbd294f"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::scoped_cancel_at_restoration_preserves_full_prior_some_and_drops_captured_images",
+          "exit_code": 0,
+          "elapsed_seconds": 0.05266894301166758,
+          "log_sha256": "eaf2d9a3670ad121c4001abfdbfe8b8d2ee76a762540f0ec01e48b8f7a24e80b"
+        },
+        {
+          "name": "runtime::dice::selected_tool_source::tests::native_tools_stale_build_and_cancel_cleanup_then_repair",
+          "exit_code": 0,
+          "elapsed_seconds": 0.08235096401767805,
+          "log_sha256": "18782beb47fa8956c23a6555b6759a6047c9c1faa71f41469a55bab383bb49c2"
+        },
+        {
+          "name": "runtime::dice::selected_tool_source::tests::native_tools_mixed_need_invalid_second_refuses_before_proof_and_source_io",
+          "exit_code": 0,
+          "elapsed_seconds": 0.051963808946311474,
+          "log_sha256": "a69cb990ffe1b491db555238a1ff8ca53c6d2a153babc467a489e9f201e98f1c"
+        },
+        {
+          "name": "runtime::dice::source_preparation::genuine_root::genuine_timeout_receipt_requires_settled_named_creator_and_exact_chosen_cause",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0026937429793179035,
+          "log_sha256": "9a5e4185347d6dd54054fdfeafc9c0480cf8981fd7a93583755523044c0c406e"
+        }
+      ]
+    },
+    "candidate": {
+      "selected": 10,
+      "passed": 10,
+      "elapsed_seconds": 1.0600454190280288,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "895331f3680832665f13081c7fc5b242539e4e9bd7d3d57d1b9c204d3a9408f9",
+      "features": [
+        "default"
+      ],
+      "profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "tests": [
+        {
+          "name": "runtime::dice::source_preparation::tests::request_materialization_need_refreshes_only_normal_wrapper_and_changed_owner_refuses",
+          "exit_code": 0,
+          "elapsed_seconds": 0.2692776389885694,
+          "log_sha256": "844d5728cf013924b6853cef2c151bf972f06ba85428220e15bf4e937da017fe"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_selected_owner_missing_failure_cancel_restore_full_bundle",
+          "exit_code": 0,
+          "elapsed_seconds": 0.08012455300195143,
+          "log_sha256": "aaa259e0d62c5e9a185c172c51bc7bf4dcd09bbc7b906b72451953040c8484b9"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_post_plan_source_change_keeps_all_stages_through_restore_then_repairs",
+          "exit_code": 0,
+          "elapsed_seconds": 0.08245672500925139,
+          "log_sha256": "d5a200eff203c2ee3cf052413a57578d74905011e9c49ec6ba97c98fc256aafe"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::request_failed_real_label_capture_retains_partial_and_unused_stages_during_restore",
+          "exit_code": 0,
+          "elapsed_seconds": 0.1678526740288362,
+          "log_sha256": "fe5327beac3181d18d54cf690b394b6c09e85ee454bf1c88fbc4e69a94d487c3"
+        },
+        {
+          "name": "runtime::dice::source_preparation::tests::scoped_cancel_at_restoration_preserves_full_prior_some_and_drops_captured_images",
+          "exit_code": 0,
+          "elapsed_seconds": 0.05243057099869475,
+          "log_sha256": "1ca5a705da8c31e9d909cfe031c6c785c3084332a92a9eae5495fce41f3015fb"
+        },
+        {
+          "name": "runtime::dice::selected_tool_source::tests::native_tools_stale_build_and_cancel_cleanup_then_repair",
+          "exit_code": 0,
+          "elapsed_seconds": 0.08479615702526644,
+          "log_sha256": "5ca0da9cc2dd9995a9ee26f95e1e36e59479745ee60af6dbcf377cdc22338cc0"
+        },
+        {
+          "name": "runtime::dice::selected_tool_source::tests::native_tools_mixed_need_invalid_second_refuses_before_proof_and_source_io",
+          "exit_code": 0,
+          "elapsed_seconds": 0.05194148898590356,
+          "log_sha256": "c39e56852485e74e2d9b1baefed2b0d4553d423618f1dff46a7007788cbd6e60"
+        },
+        {
+          "name": "runtime::dice::source_preparation::genuine_root::genuine_timeout_receipt_requires_settled_named_creator_and_exact_chosen_cause",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002598911989480257,
+          "log_sha256": "23efa026289798e79c51de4422259cc069810e84b6a6a5a30e9b2352fa831836"
+        },
+        {
+          "name": "runtime::dice::source_preparation::progress_origins::tests::origins_have_stable_distinct_numeric_codes_and_static_keys",
+          "exit_code": 0,
+          "elapsed_seconds": 0.00222408096306026,
+          "log_sha256": "4ab80ec852025d8dbcb68e3e6d24e07d31f6c3a496e0cc936ac305153b9d47a3"
+        },
+        {
+          "name": "runtime::dice::source_preparation::progress_origins::tests::origin_counts_are_request_local_and_overflow_is_sticky_invalid",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0018296589842066169,
+          "log_sha256": "9a89f1400af1ad3bf452cb9dfa0532aa0c6d750c1dab7235522b1eecaa8e78ba"
+        }
+      ]
+    }
+  },
+  "normal_fixture_observations": {
+    "success": [
+      10,
+      0,
+      14,
+      0,
+      17
+    ],
+    "changed_owner_refusal": [
+      10,
+      0,
+      6,
+      0,
+      0
+    ],
+    "order": [
+      "InitialOwner",
+      "OwnerRefresh",
+      "Plan",
+      "DataPlan",
+      "Sources"
+    ],
+    "runtime_covered": [
+      "InitialOwner",
+      "Plan",
+      "Sources"
+    ],
+    "source_and_unit_only": [
+      "OwnerRefresh",
+      "DataPlan"
+    ],
+    "protected": "Legacy BeforeProgress order/count, unchanged ownership-changed error, fullcaller/restoration and finalresources."
+  },
+  "default_core_cli_check": {
+    "command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "60s",
+      "env",
+      "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "check",
+      "-p",
+      "slug_core_v2",
+      "-p",
+      "slug_cli_v2",
+      "--all-targets",
+      "--offline",
+      "--message-format=json"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 23.010646655980963,
+    "log_sha256": "02018d1db023f75cb1ace1426fe334dfb24586eb15b60dbbef59f4c7463cedb6"
+  },
+  "compile_receipts": {
+    "progress-origin-baseline-compile.json": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "env",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 124,
+      "elapsed_seconds": 60.00499571900582,
+      "log_sha256": "de364b058e8c4db56402ab5ad026a09762163f300864221c7bb956e1b9b6b759"
+    },
+    "progress-origin-baseline-core-compile.json": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "env",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 18.18643440201413,
+      "log_sha256": "da3771c37be6e24237289bc8c1d543e03e4e88bc0e9322dc35340c7daa894630"
+    },
+    "progress-origin-candidate-compile.json": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "env",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 23.470617010025308,
+      "log_sha256": "397708d1c32c8e79bfe13e97452068845a2170dc79ce51830464ab0126dbe0cb"
+    },
+    "progress-origin-candidate-compile-r2.json": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "env",
+        "RUSTC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC=/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 3.924880234990269,
+      "log_sha256": "3c0ab214ecde4bcf651be5cbb8989e17aeac361ac638ca7806d5f666c61a0252"
+    }
+  },
+  "invocation_notes": [
+    "Baseline preparation timedout60s after dependency rebuilds; existingcompleted artifacts reused, remainingCore18.19s terminal0, unchanged60spreparationceiling.",
+    "Initialcandidate23.47s terminal0; added reviewed48B layoutassert and restoredneighbor rustfmt-onlydiff, finalcandidate3.92s terminal0 freshpreflight10tests."
+  ],
+  "memory_evidence": "wp899-memory-readiness-2026-10-06.json; originalstabilityguardREFUSED retained; separateboundedofflineprofilingreassessment only.",
+  "no_claims": [
+    "progress completed",
+    "elapsed stage durations",
+    "causal timeout attribution",
+    "historical40GiB attribution",
+    "actual-source fit",
+    "whole-workload memory improvement",
+    "fullWP899/M7A acceptance"
+  ],
+  "source_attempt_selected": false,
+  "source_caps_changed": false,
+  "windows": "Minimal/deferred peruser",
+  "next": "Select grounded remaining-deadline checkpoint using normal-owner origin observations; no automatic retry or cap growth.",
+  "independent_reviews": {
+    "design": {
+      "source": {
+        "path": "target/wp899/broader-progress-origin-design-source.md",
+        "sha256": "1d8fde2efc8208b99ba68e5a1153e73bdc27cd6d682433401ee691e106ef7826"
+      },
+      "ownership": {
+        "path": "target/wp899/broader-progress-origin-design-ownership.md",
+        "sha256": "e82e7e24c2997281ac4d133285021e1a5ddd13b0c7555a8d9caf0a165a64ab3e"
+      },
+      "evidence": {
+        "path": "target/wp899/broader-progress-origin-design-evidence.md",
+        "sha256": "d11552937164d64f4c47bf516814b282eae6cc2386b11f1bbe9e482d8d50b2d3"
+      }
+    },
+    "final": {
+      "source": {
+        "path": "target/wp899/broader-progress-origin-final-source.md",
+        "sha256": "39fde8f1a5aac64a5f4552b8e89fffe4af7b81bcc1c878ccfc1deb6f0f0dcdf8"
+      },
+      "ownership": {
+        "path": "target/wp899/broader-progress-origin-final-ownership.md",
+        "sha256": "c0358c905bab5dcd9be6ac2d48ee991315080e67ad360437ceab4e7e17d2c55a"
+      },
+      "evidence": {
+        "path": "target/wp899/broader-progress-origin-final-evidence.md",
+        "sha256": "070bd19756b73a1533b350372d53afef0ab307cf15b6d02eb89d72baa4f3d254"
+      }
+    }
+  },
+  "evidence_pins": {
+    "target/wp899/broader-progress-origin-design.md": "178885de7b23511dbfe65994aae6ca1f20d04149bc73a0d2420cab04ed1dcd6e",
+    "target/wp899/broader-progress-origin-final-input.md": "a5fee769436824b02c5379c561680c1e60aa9a2681d9d4e352aa00003ae4af2d",
+    "target/wp899/progress-origin-baseline-tests.json": "84b5cd45aa371b12567535e140877dea1753b14295b0719d44887c19b6940f94",
+    "target/wp899/progress-origin-candidate-tests.json": "5950c94adf9e4155e80b88580f657b5432774dbaf592d76d24eb85011b821727",
+    "target/wp899/progress-origin-baseline-preflight.log": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565",
+    "target/wp899/progress-origin-candidate-preflight.log": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca",
+    "target/wp899/progress-origin-default-check.json": "bb418ce7a1914d78fd29317954ef38cd1cfc49e5da5c6e46775ad4a7cf7c200c",
+    "target/wp899/progress-origin-default-check.jsonl": "02018d1db023f75cb1ace1426fe334dfb24586eb15b60dbbef59f4c7463cedb6",
+    "target/wp899/progress-origin-final-validation.json": "35996cd7a3e5bb3caa283e978ce7f5f2d9bec2fa1d92f8b5212a2457533fd077",
+    "target/wp899/progress-origin-tests.py": "1a50c1ec86d896c90e1cbd2431752528deadcf0f1369ebef08faf316c9cb395f",
+    "target/wp899/broader-progress-origin-design-source.md": "1d8fde2efc8208b99ba68e5a1153e73bdc27cd6d682433401ee691e106ef7826",
+    "target/wp899/broader-progress-origin-design-ownership.md": "e82e7e24c2997281ac4d133285021e1a5ddd13b0c7555a8d9caf0a165a64ab3e",
+    "target/wp899/broader-progress-origin-design-evidence.md": "d11552937164d64f4c47bf516814b282eae6cc2386b11f1bbe9e482d8d50b2d3",
+    "target/wp899/broader-progress-origin-final-source.md": "39fde8f1a5aac64a5f4552b8e89fffe4af7b81bcc1c878ccfc1deb6f0f0dcdf8",
+    "target/wp899/broader-progress-origin-final-ownership.md": "c0358c905bab5dcd9be6ac2d48ee991315080e67ad360437ceab4e7e17d2c55a",
+    "target/wp899/broader-progress-origin-final-evidence.md": "070bd19756b73a1533b350372d53afef0ab307cf15b6d02eb89d72baa4f3d254"
+  },
+  "root_checks": [
+    {
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+        "--edition",
+        "2024",
+        "--config",
+        "skip_children=true",
+        "--check",
+        "app/slug_core_v2/src/runtime/selected_tool_source.rs",
+        "app/slug_core_v2/src/runtime/selected_tool_source/prepare.rs",
+        "app/slug_core_v2/src/runtime/source_preparation.rs",
+        "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs",
+        "app/slug_core_v2/src/runtime/source_preparation/tests.rs",
+        "app/slug_core_v2/src/runtime/source_preparation/progress_origins.rs"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05203859898028895,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/v2_plan_status.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.014322918024845421,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    {
+      "command": [
+        "scripts/v2_archive_status.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0300691649899818,
+      "log_sha256": "d0f05eb95ef0b8d5798bae9adae8d9d88c98d42726c9c304b8cfb36323e153e1"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.007813217001967132,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "packet_elapsed_seconds": null,
+  "elapsed_note": "Packet start was not recorded; compile/test elapsed values and review artifacts are recorded separately."
+}

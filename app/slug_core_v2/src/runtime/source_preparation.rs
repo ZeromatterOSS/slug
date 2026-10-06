@@ -18,6 +18,9 @@ mod genuine_root;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "source_preparation/harness_clock.rs"]
 mod harness_clock;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_preparation/progress_origins.rs"]
+mod progress_origins;
 #[path = "source_preparation/request.rs"]
 mod request;
 #[cfg(all(test, target_os = "linux"))]
@@ -140,6 +143,12 @@ impl WorkspaceRuntime {
                 self.wait_source_idle()?;
                 match outcome? {
                     selected_tool_source::attempt::Attempt::Need(need) => {
+                        #[cfg(test)]
+                        if let Some(hook) = hook {
+                            hook(selected_tool_source::ToolPhase::ProgressFrom(
+                                selected_tool_source::ProgressOrigin::InitialOwner,
+                            ))?;
+                        }
                         selected_tool_source::progress_baseline(&mut guard, &need, deadline)?;
                     }
                     selected_tool_source::attempt::Attempt::Complete(observed, selected) => {

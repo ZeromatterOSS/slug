@@ -298,6 +298,7 @@ struct Observer {
     before_capture: Cell<bool>,
     after_capture: Cell<bool>,
     progress: Cell<u64>,
+    progress_origins: Cell<super::progress_origins::ProgressOrigins>,
     refreshes: Cell<u64>,
     stage_contained: Cell<bool>,
     stage_paths_observed: Cell<u64>,
@@ -325,6 +326,7 @@ impl Observer {
             before_capture: Cell::new(false),
             after_capture: Cell::new(false),
             progress: Cell::new(0),
+            progress_origins: Cell::new(super::progress_origins::ProgressOrigins::default()),
             refreshes: Cell::new(0),
             stage_contained: Cell::new(true),
             stage_paths_observed: Cell::new(0),
@@ -345,6 +347,11 @@ impl Observer {
                 .max(self.images.descriptor_budget().used_bytes()),
         );
         match phase {
+            selected_tool_source::ToolPhase::ProgressFrom(origin) => {
+                let mut counts = self.progress_origins.get();
+                counts.record(origin);
+                self.progress_origins.set(counts);
+            }
             selected_tool_source::ToolPhase::BeforeCapture => self.before_capture.set(true),
             selected_tool_source::ToolPhase::AfterCapture => self.after_capture.set(true),
             selected_tool_source::ToolPhase::BeforeProgress(_) => {
@@ -1137,6 +1144,11 @@ fn run(
     // this function returns; only then may the outer receipt certify highwater.
     descriptor_settled.set(observer.raw_restored.get() && observer.engine.upgrade().is_none());
     receipt.number("progress_rounds", observer.progress.get())?;
+    let origins = observer.progress_origins.get();
+    for origin in selected_tool_source::ProgressOrigin::ALL {
+        receipt.number(origin.receipt_key(), origins.count(origin))?;
+    }
+    receipt.number("progress_origins_valid", u64::from(origins.valid()))?;
     receipt.number("owner_refreshes", observer.refreshes.get())?;
     receipt.number("reached_capture", u64::from(observer.before_capture.get()))?;
     receipt.number("completed_capture", u64::from(observer.after_capture.get()))?;

@@ -116,6 +116,7 @@ impl WorkspaceRuntime {
                         attempt::Attempt::Need(need) => {
                             #[cfg(test)]
                             if let Some(hook) = hook {
+                                hook(ToolPhase::ProgressFrom(ProgressOrigin::OwnerRefresh))?;
                                 hook(ToolPhase::BeforeProgress(&need))?;
                             }
                             progress_baseline(&mut guard, &need, deadline)?;
@@ -182,6 +183,7 @@ impl WorkspaceRuntime {
                     attempt::Attempt::Need(need) => {
                         #[cfg(test)]
                         if let Some(hook) = hook {
+                            hook(ToolPhase::ProgressFrom(ProgressOrigin::Plan))?;
                             hook(ToolPhase::BeforeProgress(&need))?;
                         }
                         progress_baseline(&mut guard, &need, deadline)?;
@@ -253,6 +255,7 @@ impl WorkspaceRuntime {
                         attempt::Attempt::Need(need) => {
                             #[cfg(test)]
                             if let Some(hook) = hook {
+                                hook(ToolPhase::ProgressFrom(ProgressOrigin::DataPlan))?;
                                 hook(ToolPhase::BeforeProgress(&need))?;
                             }
                             progress_baseline(&mut guard, &need, deadline)?;
@@ -386,6 +389,7 @@ impl WorkspaceRuntime {
                     attempt::Attempt::Need(need) => {
                         #[cfg(test)]
                         if let Some(hook) = hook {
+                            hook(ToolPhase::ProgressFrom(ProgressOrigin::Sources))?;
                             hook(ToolPhase::BeforeProgress(&need))?;
                         }
                         if let PreparationMode::Runtime { key, .. }

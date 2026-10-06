@@ -394,10 +394,53 @@ pub(in crate::runtime::dice) enum ToolPhase<'stage> {
     AfterCapture,
     CaptureActivity(&'stage std::path::Path),
     BeforeProgress(&'stage SourcePreparationNeeds),
+    // Observed dispatch only; neither completion nor timeout attribution.
+    ProgressFrom(ProgressOrigin),
     OwnerRefreshed(
         &'stage slug_loading_v2::ObservedSelectedPreparationOwner,
         &'stage slug_loading_v2::ObservedSelectedPreparationOwner,
     ),
     BeforeRestore(&'stage prepare::setup::Stages),
     AfterRestore(&'stage prepare::setup::Stages),
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(in crate::runtime::dice) enum ProgressOrigin {
+    InitialOwner,
+    OwnerRefresh,
+    Plan,
+    DataPlan,
+    Sources,
+}
+
+#[cfg(test)]
+impl ProgressOrigin {
+    pub(in crate::runtime::dice) const ALL: [Self; 5] = [
+        Self::InitialOwner,
+        Self::OwnerRefresh,
+        Self::Plan,
+        Self::DataPlan,
+        Self::Sources,
+    ];
+
+    pub(in crate::runtime::dice) fn code(self) -> usize {
+        match self {
+            Self::InitialOwner => 1,
+            Self::OwnerRefresh => 2,
+            Self::Plan => 3,
+            Self::DataPlan => 4,
+            Self::Sources => 5,
+        }
+    }
+
+    pub(in crate::runtime::dice) fn receipt_key(self) -> &'static str {
+        match self {
+            Self::InitialOwner => "progress_from_initial_owner",
+            Self::OwnerRefresh => "progress_from_owner_refresh",
+            Self::Plan => "progress_from_plan",
+            Self::DataPlan => "progress_from_data_plan",
+            Self::Sources => "progress_from_sources",
+        }
+    }
 }

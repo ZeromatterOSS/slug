@@ -35,18 +35,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Local string ownership and memory optimization; source integration deferred; full WP899 unaccepted
+Status: Broader source-preparation profiling resumed offline; actual source fit and full WP899 unaccepted
 
-The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
-offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: File path/basename helpers borrow existing artifact owners,
-omitting temporary copying/formatting while preserving bytes and final ownership.
-Six focused checks, nine path/thirteen basename source pointers, seventy-eight
-retained fields, six equal diagnostics and Core/CLI pass. Three Derived kinds are
-exercised; RunfilesTree has source proof only. No quantified memory/RSS/speed claim.
-Next: select a proved redundant local copy or existing interner reuse through a
-bounded design checkpoint. No source observation, network-dependent retry,
-cap growth or runtime activation is selected.
+The [current manifest](./slug-v2-subplans/current-packet.md) owns the bounded
+source-progress discriminator, accepted memory evidence and unwaived full gates.
+Fresh64-round string lifecycle and lexer controls show controlled fixture memory
+under unchanged caps. Preserve the original failed64KiB stability guard; a separate
+cache-backed reassessment permits offline profiling, not complete source fit.
+Source progress now distinguishes five Need dispatch origins using fixed
+request-local numeric counters. Eight baseline/ten candidate exact controls
+protect normal caller, changed-owner refusal, cancellation and restoration.
+Next: use these observations to select a grounded remaining-deadline checkpoint;
+full source fit remains open.
+No actual-source/network retry, cap growth or runtime activation is selected.
 Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).
@@ -55,7 +56,7 @@ Full WP899/M7A and source admission remain unaccepted.
 ### Ready and blocked queue
 
 These milestone priorities remain queued. They do not authorize work beyond
-the current local, offline scope.
+the current bounded, offline source-preparation scope.
 
 | Order | Result | State / dependency |
 |---|---|---|

@@ -1,28 +1,56 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Local string ownership and memory optimization; source integration deferred; full WP899 unaccepted
+Status: Broader source-preparation profiling resumed offline; actual source fit and full WP899 unaccepted
 
 ## Active scope and observable outcome
 
-The user's current direction is local string interning and basic memory
-optimization, with offline validation. Use the orchestration and memory-reuse
-skills at existing string owners. Remove proved redundant copies or reuse existing
-interners without changing semantic identity, source authority or natural owners.
-Windows work remains minimal stubs/deferred until it can be tested effectively.
-Other checkout directories are reference material.
+The user asks to resume the broader plan once string allocation is controlled,
+and to keep using existing string interners where their ownership/lifetime fits.
+Fresh current-source offline checks complete 64 parse/evaluate/freeze/clone/drop
+rounds and 131,072 validated strings. Peak sampled RSS is about 14 MiB; Rust-global
+requested peak is 3,224,754 bytes, with late postdrop levels at 1,430,538 and
+1,692,682 bytes. The fixed cache can retain whole backing chunks; this fixture
+shows controlled headroom, not whole-workload fit or historical 40 GiB attribution.
+The original extra 64 KiB stability guard failed and its REFUSED result remains.
+A separate source-backed reassessment permits bounded offline profiling under
+unchanged caps. Lexer synthetic and authenticated rules_rust parse controls pass.
+See [memory reassessment](wp899-memory-readiness-2026-10-06.json).
 
-The latest accepted component preserves File path borrows and reads basename
-slices directly from existing artifact owners. Formatting and heap allocation
-copy the same bytes; final string ownership, attributes and identity remain.
-Fixed private pointer checks prove borrowing; no measured memory claim.
-Next: select a proved redundant local copy or existing interner reuse through a
-bounded design checkpoint.
+The source-owned deadline discriminator required by attempt 17 now has five
+fixed, request-local cfg(test) counters for progress dispatches from initial-owner,
+owner-refresh, plan, data-plan and source-certification Need branches. Preserve
+legacy hooks, normal progress/error order and full restoration. Counts describe
+observed dispatches, not completed work, durations or causal timeout attribution.
+Use existing normal caller fixtures, checked overflow/isolation tests, protected
+cancellation/restoration gates and direct Core/CLI compile. No retained strings,
+Need/owner payloads, new interner/cache/key/lock or production behavior change.
+Compatibility is Slug-native diagnostics; inherited admitted bytes stay exact.
 
-No network-dependent source observation, actual-source retry, cap growth,
-Bazel invocation, linked CLI/runtime activation or broader integration is
-selected during this scope. Source-admission and integration gates remain
-unwaived; memory controls cannot substitute for them.
+The previous accepted component preserves File path/basename borrows. Future
+allocation work follows the durable AGENTS.md guidance and measured owners.
+Windows remains minimal stubs/deferred; other directories remain reference.
+No actual-source retry, network observation, cap growth, Bazel invocation or
+linked runtime activation is selected. Global16/17 remain spent. Full source
+admission, runtime/query/bootstrap and integration gates stay unwaived.
+
+## Accepted source-progress origin discriminator
+
+The five diagnostic counters are now implemented at their normal Need dispatch
+owners. They retain no payload or source authority and do not allocate. Counter
+overflow remains sticky-invalid without changing preparation errors. Existing
+legacy hooks, normal DICE path, capture and restoration stay intact. Three
+DESIGN/FINAL reviews and eight baseline/ten candidate exact controls cover
+checked overflow, <=48B layout, request isolation and normal caller behavior.
+The normal fixture observes initial-owner/plan/source dispatches; owner-refresh
+and data-plan Need placement has source proof and unit coverage only. No timing,
+completed-progress or timeout-cause inference follows from these counts.
+See [progress origins](wp899-progress-origins-2026-10-06.json).
+
+Next: use this source-owned discriminator to select the remaining deadline
+checkpoint. Preserve spent attempt ledgers and explicit ceilings; a further
+actual-source observation requires a grounded selection, not an automatic retry.
+Full integration remains unaccepted.
 
 ## Accepted File path/basename borrowing contract
 
