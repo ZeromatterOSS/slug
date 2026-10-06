@@ -1033,10 +1033,13 @@ fn try_eval_type_is(
     r: IrSpanned<ExprCompiled>,
 ) -> Result<IrSpanned<ExprCompiled>, (IrSpanned<ExprCompiled>, IrSpanned<ExprCompiled>)> {
     let span = l.span.merge(&r.span);
-    if let (Some(l), Some(r)) = (l.as_type(), r.as_string()) {
+    if let (Some(_), Some(r)) = (l.as_type(), r.as_string()) {
+        let ExprCompiled::Call(mut call) = l.node else {
+            unreachable!("as_type only matches calls");
+        };
         Ok(IrSpanned {
             span,
-            node: ExprCompiled::type_is(l.clone(), r),
+            node: ExprCompiled::type_is(call.node.args.pos_named.pop().unwrap(), r),
         })
     } else {
         Err((l, r))
@@ -1493,3 +1496,6 @@ mod empty_format_memory_tests;
 
 #[cfg(test)]
 mod double_not_memory_tests;
+
+#[cfg(test)]
+mod type_equality_memory_tests;

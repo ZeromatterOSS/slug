@@ -1,0 +1,247 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "cb8ef6c7d",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "1afdd0aa7bdb71213aa1ed783e477369ce670995999867cc893099e229af833d",
+    "starlark-rust/starlark/src/eval/compiler/expr/type_equality_memory_tests.rs": "ac09e2c7f010ea753dc2d624d11cdb0bba5fc10d096717c05ed8bc9b0dcaa0b2",
+    "starlark-rust/starlark/src/collections/symbol/symbol.rs": "8301dd1d265979baffdae5660ca89628e7ed4b4dd7c228fde7735c2f7d895453",
+    "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+    "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "bdb6cdd2378c1de24e9f9d2c24863fda0c4960809e548e33cc8369228fed986c",
+    "starlark-rust/starlark/src/eval/compiler/args.rs": "d0a2e05c8fe7a815430ece5b6e23696bc6afa48d61a0e42963be4c9052df36c2",
+    "starlark-rust/starlark/src/eval/compiler/call/builtin_arg_memory_tests.rs": "7a7225d970d55b53ddf65ca41906056b8b4e8cbec6d24d891965996e35a2c4c4",
+    "starlark-rust/starlark/src/eval/compiler/call/terminal_arg_memory_tests.rs": "3f2962973e671fc0f9716542b2766541bf3c07b32a795bd7b1f668d2ace136a0",
+    "starlark-rust/starlark/src/eval/compiler/expr/double_not_memory_tests.rs": "ea8ec78e1e553d37be4dbb5aad5cb4c454bd115e85749cffd711b94446eabbb4",
+    "starlark-rust/starlark/src/tests/opt.rs": "c9e2c5366fc541aaf3e2ced1c3c90b1634fca27afaeca675224560645994ab3e",
+    "starlark-rust/starlark/src/tests/opt/type_is.rs": "5c5131e0d01e80bebe90c261f76c7d1f1a31f6bc43668190c1a2438d4dbbe983",
+    "starlark-rust/starlark/src/tests/opt/eq.rs": "e8841fc743448710a5730d1d926c64d3707def1975495a3976412c11d5e2eac7",
+    "starlark-rust/starlark/src/tests/opt/if_rand.rs": "58d38794c95d85b8d286f45485a2215d5268e642671f601bddc87df0192fa30f",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/values/owned.rs": "edf16c1a7488868f332b1536bce5b78cdf0627f1d755ba39a8df870e7416ef2f",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "b26a2479662de0325399cad352381b08c23eb418184d2579605b8765a9710fc5",
+    "selectors": [
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_transfers_symbols_in_both_orders_and_preserves_ir_spans",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_rejections_preserve_operands_pointers_and_constant_fallbacks",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_preserves_effects_errors_and_retained_frozen_functions",
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_call_optimizations_transfer_symbols_and_preserve_ir_and_frozen_parts",
+      "eval::compiler::call::terminal_arg_memory_tests::rejected_terminal_checks_preserve_arguments_and_full_call_fallback",
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_calls_preserve_effects_errors_and_retained_frozen_functions",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_calls_transfer_sole_argument_symbol_buffers_and_preserve_ir",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_argument_shape_guards_folding_and_ordinary_calls_are_preserved",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_calls_preserve_effects_errors_and_retained_frozen_functions",
+      "tests::opt::test_type_is_inlined",
+      "tests::opt::type_is::returns_type_is",
+      "tests::opt::type_is::does_not_return_type_is",
+      "tests::opt::eq::test_eq_bool_is_ptr_eq",
+      "tests::opt::eq::test_eq_int",
+      "tests::opt::eq::test_eq_str",
+      "tests::opt::if_rand::test_basic",
+      "tests::opt::if_rand::test_and_or_not",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "1afdd0aa7bdb71213aa1ed783e477369ce670995999867cc893099e229af833d",
+      "starlark-rust/starlark/src/eval/compiler/expr/type_equality_memory_tests.rs": "ac09e2c7f010ea753dc2d624d11cdb0bba5fc10d096717c05ed8bc9b0dcaa0b2"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "60cb626cbc348925bceb02381a6fceb47daf1fa89fddc5932f02ae5b5f50fb68",
+    "selectors": [
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_transfers_symbols_in_both_orders_and_preserves_ir_spans",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_rejections_preserve_operands_pointers_and_constant_fallbacks",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_preserves_effects_errors_and_retained_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "5bd971acbf858fb864e17fccd9f20830bca1ca8d623aea11953dc8a3d6e2e7b1",
+      "starlark-rust/starlark/src/eval/compiler/expr/type_equality_memory_tests.rs": "ac09e2c7f010ea753dc2d624d11cdb0bba5fc10d096717c05ed8bc9b0dcaa0b2"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/type-equality-arg-move-baseline-compile.json",
+      "sha256": "55f2cf2ab71cb1d2d5f2b8e2be0f67af1ec86cb5e5fef71e2d5c6dd055acc2ae",
+      "exit_code": 0,
+      "elapsed_seconds": 6.273684545012657,
+      "log_sha256": "96d34dab7160a2b42c4e8dae5fe8d7faf581bec99a7f18fd2b6deb1a15064aea"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/type-equality-arg-move-baseline-preflight.json",
+      "sha256": "c7262a842ad935476893817bdfefbcd08cc951db4abae203f56ed029788bc9b3",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024125008028931916,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/type-equality-arg-move-baseline-controls.json",
+      "sha256": "e7e548b998bc28c881a2fd06a595789e0a8a3d38b6d79c96c23b7f8aee261e58",
+      "exit_code": 101,
+      "elapsed_seconds": 0.006115900003351271,
+      "log_sha256": "0d3d764deb49d0f52e476876a2e4ebd3abd152aa9dca1f54028a3a9913bec54b"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/type-equality-arg-move-candidate-compile.json",
+      "sha256": "cd68238eb6a2b899f4ac57a3e165762822bffc39ac6b84f481d683a24949b390",
+      "exit_code": 0,
+      "elapsed_seconds": 3.9492982440278865,
+      "log_sha256": "20212a8c764568d19b841781f349eb6f81f2dfc328f99e4d3d85f700e6d814ab"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/type-equality-arg-move-candidate-preflight.json",
+      "sha256": "b39f3b46d85900dc5c5f5bbb8aaab389948800f8792480ccabef8e20f125b3f5",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020301538985222578,
+      "log_sha256": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/type-equality-arg-move-candidate-controls.json",
+      "sha256": "fbbe64008b0887dd69cbdcd8b4b4656a6709f021b35ef3b78cfe7055fdb36aaa",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019681106030475348,
+      "log_sha256": "edf3c2e35f78eec8875374ffc5ebd75d700d40a4fd47ff6b5073f98372e17168"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/type-equality-arg-move-dependents-check.json",
+      "sha256": "c3ead124f60dc803f673901bded0aa6333779f706738497f2fc58b2da6cd436d",
+      "exit_code": 0,
+      "elapsed_seconds": 7.557926962967031,
+      "log_sha256": "97a8610b5b37da77b6a58005aa3c74adde0cf8a006bef0d54241b36f67543411"
+    }
+  },
+  "proof": "Whole expr.rs equals baseline plus sibling hook and only successful try_eval_type_is borrowed-argument clone replaced by owned Call destructure/sole argument pop. Exact tuple guard/evaluation order/span merge and Err operands stay. as_type matches only Call; CallCompiled as_type plus one_pos proves builtin and sole argument. Both internal unreachable/unwrap are guard-proved. equals constant/original/reversed/fallback and unchanged type_is helper remain baseline-identical; 15 protected source files and identical tests. No new helper/API/interner/cache/key/unsafe/dependency/retained representation or donor.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_gate_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 16,
+    "candidate_total": 19,
+    "rejected_helper_and_full_equals_cases": 10,
+    "shape_guard_negative_cases": 6,
+    "exact_equal_error_records": 5
+  },
+  "ownership_fixtures": {
+    "baseline": [
+      {
+        "reversed": false,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 0
+      },
+      {
+        "reversed": true,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 0
+      }
+    ],
+    "candidate": [
+      {
+        "reversed": false,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 3
+      },
+      {
+        "reversed": true,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 3
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      direct([], struct())\nerror: Object of type `struct` has no attribute `outer`\n --> assert.bzl:6:17\n  |\n6 |     return type(seen(log, \"direct\", value).outer.inner) == \"list\"\n  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      reverse([], struct(outer=struct()))\nerror: Object of type `struct` has no attribute `inner`\n --> assert.bzl:8:27\n  |\n8 |     return \"list\" == type(seen(log, \"reverse\", value).outer.inner)\n  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      star([], [])\n  * assert.bzl:12, in star\n      return type(*seen(log, \"star\", values)) == \"list\"\nerror: Wrong number of positional arguments, expected 1, got 0\n  --> assert.bzl:12:12\n   |\n12 |     return type(*seen(log, \"star\", values)) == \"list\"\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      star([], [[], {}])\n  * assert.bzl:12, in star\n      return type(*seen(log, \"star\", values)) == \"list\"\nerror: Wrong number of positional arguments, expected 1, got 2\n  --> assert.bzl:12:12\n   |\n12 |     return type(*seen(log, \"star\", values)) == \"list\"\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      named([], {'x': []})\n  * assert.bzl:14, in named\n      return type(**seen(log, \"named\", values)) == \"list\"\nerror: Found `x` extra named parameter(s) for call to function\n  --> assert.bzl:14:12\n   |\n14 |     return type(**seen(log, \"named\", values)) == \"list\"\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n"
+  ],
+  "limits": "One compiler scratch argument deep-clone site removed, three fixed Symbol buffers transfer in each equality operand orientation (15384 content bytes per fixture). Generic IR Vec spare capacity may survive where clone discarded it; no unchanged-capacity, reduced total retained/aggregate memory, allocation count, peak/RSS/speed/source-fit claim. Unchanged helper/final bytecode/frozen owners and other optimizer clones remain. Same frozen type string handle and spans preserved; no new ownership domain.",
+  "growth": {
+    "test_sibling_lines": 333,
+    "estimate": "220-310 lines; actual333 exceeds by23, review trigger: distinct ten helper/full-caller negative cases, frozen-name pointer/span controls and effect/error/frozen lifetime coverage. Three tests/no assets.",
+    "production": "One bounded private helper plus three-line cfg sibling hook, cohesive existing expression owner."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline Starlark lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/type-equality-arg-move-baseline-compile.json": "55f2cf2ab71cb1d2d5f2b8e2be0f67af1ec86cb5e5fef71e2d5c6dd055acc2ae",
+    "target/wp899/type-equality-arg-move-baseline-compile.jsonl": "96d34dab7160a2b42c4e8dae5fe8d7faf581bec99a7f18fd2b6deb1a15064aea",
+    "target/wp899/type-equality-arg-move-baseline-controls.json": "e7e548b998bc28c881a2fd06a595789e0a8a3d38b6d79c96c23b7f8aee261e58",
+    "target/wp899/type-equality-arg-move-baseline-controls.jsonl": "0d3d764deb49d0f52e476876a2e4ebd3abd152aa9dca1f54028a3a9913bec54b",
+    "target/wp899/type-equality-arg-move-baseline-preflight.json": "c7262a842ad935476893817bdfefbcd08cc951db4abae203f56ed029788bc9b3",
+    "target/wp899/type-equality-arg-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/type-equality-arg-move-baseline-selectors.json": "c091a619238258e40ee8696a73d9b59e3aaea2d2f42775ce88fdad8353887bb3",
+    "target/wp899/type-equality-arg-move-candidate-compile.json": "cd68238eb6a2b899f4ac57a3e165762822bffc39ac6b84f481d683a24949b390",
+    "target/wp899/type-equality-arg-move-candidate-compile.jsonl": "20212a8c764568d19b841781f349eb6f81f2dfc328f99e4d3d85f700e6d814ab",
+    "target/wp899/type-equality-arg-move-candidate-controls.json": "fbbe64008b0887dd69cbdcd8b4b4656a6709f021b35ef3b78cfe7055fdb36aaa",
+    "target/wp899/type-equality-arg-move-candidate-controls.jsonl": "edf3c2e35f78eec8875374ffc5ebd75d700d40a4fd47ff6b5073f98372e17168",
+    "target/wp899/type-equality-arg-move-candidate-preflight.json": "b39f3b46d85900dc5c5f5bbb8aaab389948800f8792480ccabef8e20f125b3f5",
+    "target/wp899/type-equality-arg-move-candidate-preflight.jsonl": "1aa0f65043f4d294ab708966376c5924af58ed3626de1257b3ad1d6bf954b945",
+    "target/wp899/type-equality-arg-move-candidate-selectors.json": "bd9d7041887dc658d96b43755c1cea19eccf9c3c10942b8eb008a461a7f6b6ba",
+    "target/wp899/type-equality-arg-move-controls.py": "4a253fd237a4e767487d9301367f2632de30d7fba13fc410d362c4fc7fa6b252",
+    "target/wp899/type-equality-arg-move-dependents-check.json": "c3ead124f60dc803f673901bded0aa6333779f706738497f2fc58b2da6cd436d",
+    "target/wp899/type-equality-arg-move-dependents-check.jsonl": "97a8610b5b37da77b6a58005aa3c74adde0cf8a006bef0d54241b36f67543411",
+    "target/wp899/type-equality-arg-move-design-evidence.md": "41fd4f35c199d438af18a028447bb087ac9c8b78a4de2dbb29ad3dbf06b8f58a",
+    "target/wp899/type-equality-arg-move-design-ownership.md": "d88c3c28e7f8a2a42da827b3cfa19a3b95e62a24cd645dbdb4c719423cbcff21",
+    "target/wp899/type-equality-arg-move-design-source.md": "5e9d2b1e2867b68d63d0c65094621346212ca7ccbeccaba4bbe7834de62455f2",
+    "target/wp899/type-equality-arg-move-design.md": "ed3d31ff6eb8cc821423ede3b90fc211b10dfb49e0444c6245ebe6c295673f53",
+    "target/wp899/type-equality-arg-move-record.py": "2875c8592869013fa6920ef3ed563236f00fb8e564a37ea284cd838d6aab7114",
+    "target/wp899/type-equality-arg-move-start.json": "2423aac8b59cbaaa8a1ebd7c29563fb71db811f37b58777ec91102066f8d098e"
+  },
+  "start": {
+    "started_at": "2026-10-06T02:20:43.233759+00:00",
+    "baseline": "cb8ef6c7da0ca7506376c731f21a1dcd11050268"
+  },
+  "timing": {
+    "compile_seconds": 17.780909752007574,
+    "test_seconds": 0.02579700603382662,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 751.474602
+  },
+  "validation_sha256": "acf7932b64da19dc4322dd34243a7c1d6c8efce7610fcb85085012ef9894790b",
+  "final_reviews": {
+    "target/wp899/type-equality-arg-move-final-source.md": "c0730492c9b3f54386498b751740aee0469190d02194004bd7078f733d87e98c",
+    "target/wp899/type-equality-arg-move-final-ownership.md": "34fe728367ef63986d86ac68568c7e7ad01589c615541ca1c876bbdaf6b576d6",
+    "target/wp899/type-equality-arg-move-final-evidence.md": "0d24c1afcf42a41582679d7560a3894e25e10212115dca8ad487cbdc7438f8b7"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "6dde2e5c75a61c3a85b47d6afee1925cd9ac3be0835e3d1c937bd22605fa0019",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "daa54bc120a9bd93edc49c00786d0a70b280381f1233b27665f84db1f440dc06",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "cf7243ac8f142d6c00b15ba8534fb0f187d2931449bbe6b60befd5c100fb8dad"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/type-equality-arg-move-format-check.json",
+      "sha256": "e519424e380b54bfccf073f5483821d815997893664ba8f0c3cbcef9b7ba6e4d",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/type-equality-arg-move-archive-check.json",
+      "sha256": "5645891fa4d2b15b4af5bad15de40b87f2810c9be7b2ad32bce6e92ea79033ec",
+      "exit_code": 0,
+      "log_sha256": "506ae7029bd950b3757f589e72506d283049c73a20cb092f0f9ff4e767228c98"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/type-equality-arg-move-plan-check.json",
+      "sha256": "66f79115718d9acd55c757ac77a72b7907dc001b8e607b8719608ec75ba15b94",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/type-equality-arg-move-diff-check.json",
+      "sha256": "98cd7121b1ddb5246308f8321a296beaefe9bf36aa343662fed301c5a2d31cb1",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
