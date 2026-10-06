@@ -284,14 +284,14 @@ impl CallCompiled {
         }
 
         if fun.is_fn_len() {
-            if let Some(arg) = args.one_pos() {
-                return ExprCompiled::len(span, arg.clone());
+            if args.one_pos().is_some() {
+                return ExprCompiled::len(span, args.pos_named.into_iter().next().unwrap());
             }
         }
 
         if fun.is_fn_type() {
-            if let Some(arg) = args.one_pos() {
-                return ExprCompiled::typ(span, arg.clone());
+            if args.one_pos().is_some() {
+                return ExprCompiled::typ(span, args.pos_named.into_iter().next().unwrap());
             }
         }
 
@@ -338,3 +338,7 @@ impl IrSpanned<CallCompiled> {
 #[cfg(test)]
 #[path = "call/receiver_memory_tests.rs"]
 mod receiver_memory_tests;
+
+#[cfg(test)]
+#[path = "call/builtin_arg_memory_tests.rs"]
+mod builtin_arg_memory_tests;
