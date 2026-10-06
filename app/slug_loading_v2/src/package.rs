@@ -80,6 +80,10 @@ use starlark_map::small_set::SmallSet;
 mod label_flag;
 pub use label_flag::LabelFlagDeclaration;
 
+#[cfg(test)]
+#[path = "package/module_metadata_memory_tests.rs"]
+mod module_metadata_memory_tests;
+
 use crate::apple_common::apple_common_globals;
 use crate::attrs::AllowedAttributeValues;
 use crate::attrs::AttributeDependencyConfiguration;
@@ -10321,36 +10325,40 @@ fn module_metadata_native_methods(builder: &mut MethodsBuilder) {
     fn module_name<'v>(
         #[starlark(this)] _native: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<StringValue<'v>> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         PackageRecorder::label_source_identity_for_call(eval)?;
-        Ok(recorder.associated_module_metadata()?.0.to_owned())
+        Ok(eval
+            .heap()
+            .alloc_str(recorder.associated_module_metadata()?.0))
     }
 
     fn module_version<'v>(
         #[starlark(this)] _native: Value<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<StringValue<'v>> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
         PackageRecorder::label_source_identity_for_call(eval)?;
-        Ok(recorder.associated_module_metadata()?.1.to_owned())
+        Ok(eval
+            .heap()
+            .alloc_str(recorder.associated_module_metadata()?.1))
     }
 }
 
 #[starlark_module]
 fn build_module_metadata_globals(builder: &mut GlobalsBuilder) {
-    fn module_name<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<String> {
-        Ok(PackageRecorder::from_evaluator(eval)?
-            .associated_module_metadata()?
-            .0
-            .to_owned())
+    fn module_name<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<StringValue<'v>> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        Ok(eval
+            .heap()
+            .alloc_str(recorder.associated_module_metadata()?.0))
     }
 
-    fn module_version<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<String> {
-        Ok(PackageRecorder::from_evaluator(eval)?
-            .associated_module_metadata()?
-            .1
-            .to_owned())
+    fn module_version<'v>(eval: &mut Evaluator<'v, '_, '_>) -> anyhow::Result<StringValue<'v>> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        Ok(eval
+            .heap()
+            .alloc_str(recorder.associated_module_metadata()?.1))
     }
 }
 

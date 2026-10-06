@@ -12,10 +12,10 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component allocates the C++ compilation-mode name directly
-in the existing Starlark heap, bypassing a temporary Rust String. Caller/projection
-checks, method type/arity, final bytes and natural heap/frozen owners remain.
-This is a tiny source-proved copy-site removal, with no measured memory claim.
+The latest accepted component copies module name/version metadata directly from
+existing recorder fields into the Starlark heap. Four temporary Rust String copies
+are omitted; lookup priority, bindings/type/bytes and heap/frozen owners remain.
+This is a source-proved scratch-copy removal, with no measured memory claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -24,46 +24,49 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted C++ compilation-mode direct heap contract
+## Accepted module metadata direct heap contract
 
-The private compilation_mode getter returns StringValue from existing
-heap.alloc_str over the same retained enum member, naming the evaluator heap
-lifetime. The previous to_owned String was immediately copied by the generated
-String allocation adapter. The existing StringValue adapter passes through the
-heap value. Current-caller check stays first, projection error next; generated
-method parameter binding, Starlark string type and arity/error priority remain.
-The projection owns source bytes during synchronous copying; final heap/frozen
-strings own their bytes independently. No new public API/helper/interner/cache/
-key/DICE/identity/unsafe/dependency/donor or adjacent method changes. alloc_str
-does not invoke alloc_str_intern. Slug-native scratch copy bypass preserves
-inherited admitted behavior without widening parity.
+The four private module_name/module_version getters in BUILD globals and native
+methods return StringValue from existing heap.alloc_str over the same borrowed
+PackageRecorder CompactString fields. The generated StringValue adapter passes
+through the final heap value, omitting the prior temporary to_owned String.
+Native recorder lookup, current source lookup and metadata error keep exact
+priority; BUILD recorder/metadata lookup remain. Generated argument binding,
+exposure tables and Starlark string type/bytes are unchanged. Recorder owners
+stay alive during synchronous copying; final strings own bytes independently.
+No producer/admission/route/invalidation/key/DICE/identity/unsafe/dependency/
+donor or new helper/API/cache/interner. alloc_str does not invoke interning.
+Slug-native scratch-copy bypass preserves inherited admitted behavior.
 
-Three DESIGNs/FINALs accept identical baseline/candidate four focused tests.
-The single 86-line test calls all fastbuild/dbg/opt modes through actual .bzl
-functions, checks exact type/value, and captures nine equal complete diagnostics
-for denied caller/positional/named argument errors. cpp/read bindings are cleared;
-evaluator/context drop before freezing and OwnedFrozenValue results survive
-FrozenModule drops. Existing retained-fragment identity/current-caller, facade
-method boundaries and independent target/exec projection controls remain.
-Default Core/CLI, pinned serial offline builds/exact nonignored preflights and
-format/archive/plan/diff pass. No assets/goldens.
+Three DESIGNs/FINALs accept identical 170-line tests and baseline/candidate 5/5.
+Five raw retained-field fixtures across BUILD/Bzl/Bzlmod return thirty values
+with exact empty/ASCII/Unicode/NUL/long bytes/type/hash; these copying fixtures
+admit no new producer names or versions. Recorder bytes remain; evaluator and
+recorder drop before freezing, and returned OwnedFrozenValue fields survive
+FrozenModule/source-case drops. Twenty-eight full diagnostics match for both
+fields, wrong positional/named args, missing package state, unsupported metadata,
+and missing native source plus metadata (source error first). Three existing
+synthetic in-memory EpochBuilder tests protect calling BUILD vs loaded macro,
+apparent/canonical/root fields, declared/empty versions, same-DICE A/B/A and
+wrong-context/unsupported-route boundaries. No actual source observation/network/
+Bazel/daemon activity. Default Core/CLI and pinned serial offline fresh build/
+exact nonignored preflight/format/archive/plan/diff pass. No assets/goldens.
 
-The initial unchanged baseline fixture called the getter at module level,
-triggering the existing function-caller requirement before its denied-caller
-assertion. Exact same calls are wrapped in read functions, with read cleared
-before freeze; all value/type/error/retained-result assertions remain. Original
-snapshot, failure and narrow correction are preserved; production stayed
-unchanged until the corrected baseline passed. Only one fixture correction.
+The first baseline preflight omitted the bzl_module namespace for three existing
+test selectors and ran no tests. Correct selectors from the current executable
+reuse the exact successful baseline build/artifact/source; no test, production
+or assertion changed. Failed invocation and original launcher are preserved.
 
-Acceptance proves one tiny temporary String-copy site bypass. Final heap copy
-remains; allocation failure/OOM sequencing is excluded. No allocator/count/
-quantified memory/aggregate/peak/RSS/speed/source-fit claim. Windows minimal/
-deferred; full WP899/M7A and source integration remain open/unwaived.
+Acceptance proves four temporary String construction-site bypasses only. Final
+heap copying remains; allocation-failure sequencing is excluded. No allocator/
+count/quantified memory/aggregate/peak/RSS/speed/source-fit or wider parity claim.
+Windows minimal/deferred; full WP899/M7A and source integration remain open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Module name/version BUILD/native getters copy existing recorder fields directly into heap; lookup priority, type/bindings/errors and independent heap/frozen owners stay. Three DESIGNs/FINALs; same baseline/candidate 5/5, thirty returned fields across three exposures, twenty-eight equal full diagnostics, existing synthetic calling-BUILD/A/B/A/context controls and default Core/CLI. Selector-only correction preserved. Four source temporary-copy sites only; no quantified memory/RSS/speed claim | [Module metadata direct heap](wp899-module-metadata-direct-2026-10-06.json) |
 | C++ compilation-mode getter allocates directly in existing heap, omitting temporary Rust String; current caller/projection order, method string type/arity/errors and final heap/frozen owners stay. Three DESIGNs/FINALs; same baseline/candidate 4/4, all three modes/nine equal complete errors/retained frozen results/default Core/CLI. Original module-level fixture failure/correction preserved. One tiny source-copy bypass only; no quantified memory/RSS/speed claim | [C++ mode direct heap](wp899-cpp-mode-direct-2026-10-06.json) |
 | Glob exclusions precede candidate String copies; include flags/error priority, original-byte matching, escaping/UTF16 sort/dedup and owned outputs stay. Three DESIGNs/FINALs; corrected baseline one semantic pass/one capacity failure, candidate 12/12, 432 results/180 equal errors, fixed empty Vec capacity 128→0/retained mixed outputs/default Query/Core/CLI. Fixture failures/corrections preserved. Vec storage may shrink; earlier matcher work/allocation failure-panic sequencing excluded, no aggregate/RSS/speed claim | [Glob exclusion before copying](wp899-glob-exclude-before-copy-2026-10-06.json) |
 | String repetition by two copies directly into existing final heap concat, omitting temporary String; unpack/arithmetic/capacity priority, other counts, bytes/type/hash, mul/rmul/folding and GC/frozen owners stay. Three DESIGNs/FINALs; same baseline 2/2, candidate 8/8, 5,460 comparisons/fourteen equal full errors/four large owned outputs/default Loading/Core/CLI. Source scratch-bypass proof only, no quantified memory/RSS/speed claim; OOM sequencing excluded | [Direct repetition by two](wp899-string-repeat-two-direct-2026-10-06.json) |
