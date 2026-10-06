@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Broader source-preparation profiling resumed offline; actual source fit and full WP899 unaccepted
+Status: One bounded progress-origin source observation selected; actual source fit and full WP899 unaccepted
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the bounded
 source-progress discriminator, accepted memory evidence and unwaived full gates.
@@ -45,9 +45,9 @@ cache-backed reassessment permits offline profiling, not complete source fit.
 Source progress now distinguishes five Need dispatch origins using fixed
 request-local numeric counters. Eight baseline/ten candidate exact controls
 protect normal caller, changed-owner refusal, cancellation and restoration.
-Next: use these observations to select a grounded remaining-deadline checkpoint;
-full source fit remains open.
-No actual-source/network retry, cap growth or runtime activation is selected.
+Next: one separately selected actual source observation, global18/local1, uses
+the new origin counters under unchanged caps and fresh concrete approval.
+No automatic retry, cap growth or runtime activation; full source fit stays open.
 Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).
@@ -56,7 +56,7 @@ Full WP899/M7A and source admission remain unaccepted.
 ### Ready and blocked queue
 
 These milestone priorities remain queued. They do not authorize work beyond
-the current bounded, offline source-preparation scope.
+the current bounded source-preparation observation scope.
 
 | Order | Result | State / dependency |
 |---|---|---|

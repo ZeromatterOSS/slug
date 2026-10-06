@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-199-m7a-request-selected-source-profile-r1
-Status: Broader source-preparation profiling resumed offline; actual source fit and full WP899 unaccepted
+Status: One bounded progress-origin source observation selected; actual source fit and full WP899 unaccepted
 
 ## Active scope and observable outcome
 
@@ -30,9 +30,12 @@ Compatibility is Slug-native diagnostics; inherited admitted bytes stay exact.
 The previous accepted component preserves File path/basename borrows. Future
 allocation work follows the durable AGENTS.md guidance and measured owners.
 Windows remains minimal stubs/deferred; other directories remain reference.
-No actual-source retry, network observation, cap growth, Bazel invocation or
-linked runtime activation is selected. Global16/17 remain spent. Full source
-admission, runtime/query/bootstrap and integration gates stay unwaived.
+Select ONE bounded actual-checkout source observation with the accepted origin
+counters, global attempt18/local1, under the unchanged inherited caps. Concrete
+eligibility/freeze and fresh platform network approval precede execution; no
+automatic retry, cap growth, Bazel invocation or runtime activation is selected.
+Global16/17 remain spent. See [observation contract](wp899-progress-profile-contract.md).
+Full source admission/runtime/query/bootstrap and integration gates stay unwaived.
 
 ## Accepted source-progress origin discriminator
 
@@ -47,9 +50,9 @@ and data-plan Need placement has source proof and unit coverage only. No timing,
 completed-progress or timeout-cause inference follows from these counts.
 See [progress origins](wp899-progress-origins-2026-10-06.json).
 
-Next: use this source-owned discriminator to select the remaining deadline
-checkpoint. Preserve spent attempt ledgers and explicit ceilings; a further
-actual-source observation requires a grounded selection, not an automatic retry.
+Next: execute the separately selected bounded progress-origin source observation
+once its concrete eligibility gates pass, then choose the next normal owner from
+its actual terminal evidence. Preserve spent attempts and explicit ceilings.
 Full integration remains unaccepted.
 
 ## Accepted File path/basename borrowing contract
