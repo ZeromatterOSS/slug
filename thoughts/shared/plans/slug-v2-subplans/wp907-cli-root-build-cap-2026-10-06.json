@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "base": "748a8bd0be33eeb585edb9183be9fccf4120f4d4",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "build",
+    "//app/slug_cli_v2:slug",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--jobs=2",
+    "--spawn_strategy=standalone",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 60,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": true,
+  "term_sent": true,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 143,
+  "automatic_retry": false,
+  "actions_requested": true,
+  "tests_requested": false,
+  "compiler_census_before": [],
+  "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+  "downloads_requested": false,
+  "elapsed_seconds": 60.09576474200003,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "compiler_census_after": [],
+  "unexplained_compiler_processes_observed": false,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+    },
+    "stderr.log": {
+      "bytes": 2723,
+      "sha256": "52f4f30b1d9b9793aa84aff63178926e1bb4fd0c1133293c3e08a3fac441fa6c"
+    }
+  },
+  "packet": "WP-7-206-m7a-current-cli-root-build-r1",
+  "disposition": "ACCEPTED_BOUNDED_ROOT_COMPILATION_RESOURCE_REFUSAL",
+  "input_pin_count": 2826,
+  "root_build_success_proved": false,
+  "compiler_error_reported_in_captured_log": false,
+  "interrupted_action_owner": null,
+  "timeout_cause_attribution": null,
+  "scope": "Deadline-triggered TERM and joined/group-empty unchanged-input evidence only. Captured partial compiler diagnostics do not establish root success or semantic failure; no output was promoted.",
+  "next_decision": "Select one isolated ordinary starlark_syntax library prerequisite build with same60s/3s caps and grammar-source pins. This is a narrower required producer, not an asserted timeout cause or identical root retry.",
+  "evidence_sha256": {
+    "target/wp907/build-observe.py": "1fb436fc41a7508859fde5cffab6255a1311d5e7865df2206d2579f4c69f85a3",
+    "target/wp907/observation.json": "0de2ea902aefb308e2c36b819b3dcf13c2f85e49e8129d455a56127d9d9a3844",
+    "target/wp907/claim.json": "a8c175a08344b37ebfa8c014d035a817cc147d3a848d4932a952e1341bdb459f",
+    "target/wp907/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp907/stderr.log": "52f4f30b1d9b9793aa84aff63178926e1bb4fd0c1133293c3e08a3fac441fa6c",
+    "target/wp907/analysis.json": "6cf50fae78bb9bf0e5cc201cc80772feae28824d8f1d434c865eb7bdda864e54",
+    "target/wp907/final-source.md": "418b10d87c1559db6596a3d701f0596251d7f256628ee006c4e3ef75b7871c88",
+    "target/wp907/final-evidence.md": "51d3894cd56b5f329cbcf074379bc98abff2be15150fda03475b48374afbd560",
+    "target/wp907/final-ownership.md": "3b7806192cecfebca3e25759be2b1ba8cf5484c6ea0458e17258df94f35a9d6f"
+  },
+  "independent_final_reviews": {
+    "target/wp907/final-source.md": "418b10d87c1559db6596a3d701f0596251d7f256628ee006c4e3ef75b7871c88",
+    "target/wp907/final-evidence.md": "51d3894cd56b5f329cbcf074379bc98abff2be15150fda03475b48374afbd560",
+    "target/wp907/final-ownership.md": "3b7806192cecfebca3e25759be2b1ba8cf5484c6ea0458e17258df94f35a9d6f"
+  }
+}

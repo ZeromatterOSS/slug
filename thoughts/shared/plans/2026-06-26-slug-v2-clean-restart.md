@@ -34,16 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-206-m7a-current-cli-root-build-r1
-Status: Compression leaf built; one bounded current CLI-root compilation selected
+Packet: WP-7-207-m7a-starlark-syntax-prerequisite-preparation-r1
+Status: Root compile capped cleanly; isolated syntax prerequisite selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) selects one ordinary
-current CLI-root Bazel compile after accepted configured producer accounting.
-The compression leaf built in22.195s and its actual rlib/metadata/native products
-are verified; see [leaf receipt](./slug-v2-subplans/wp906-compression-leaf-build-2026-10-06.json).
-Current root compilation, authentic Slug source fit/execution and M7A remain open.
-No Slug source retry/runtime activation; allocation/interner discipline, original
-memory REFUSED/source16/17/18 and unchanged source limits persist. Windows minimal.
+syntax-library prerequisite compile after the current root reached its60s cap.
+The root child joined after TERM, all2826 enumerated inputs stayed unchanged and
+no compiler leftovers were observed; see
+[root cap receipt](./slug-v2-subplans/wp907-cli-root-build-cap-2026-10-06.json).
+Root success/interrupted owner remain unproved. Compression-leaf and configured
+producer evidence remains accepted. No identical root retry/cap growth or Slug
+source retry/activation; source-memory/M7A open, allocation/interner discipline,
+original memory REFUSED/source16/17/18 and source limits persist. Windows minimal.
 
 ### Ready and blocked queue
 

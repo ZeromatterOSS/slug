@@ -175,7 +175,13 @@ plus1,286,232B liblzma.a, with static link metadata. This proves focused ordinar
 preparation, not final native executable linking/full CLI build/Slug execution or
 source-memory fit. Runner Rust files were not in the wrapper's pre/post pin set;
 separate source hashes and observed outputs do not confer complete hermeticity.
-Three FINALs accept this bounded result. Full current CLI compilation is next.
+Three FINALs accept this bounded result. The subsequent
+[current CLI-root build](wp907-cli-root-build-cap-2026-10-06.json) hit its60s
+compilation cap:child143 after TERM, joined/groupempty,2826 enumerated inputs
+unchanged and no observed compiler leftovers. Partial diagnostics contain no
+compiler error or root success; the interrupted owner remains unknown. Current
+root compilation stays open. Select an isolated ordinary starlark_syntax compiler
+prerequisite with exact grammar inputs, not an identical root retry or cap growth.
 
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 
