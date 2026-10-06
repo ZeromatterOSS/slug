@@ -1,0 +1,377 @@
+{
+  "packet": "WP-7-224-m7a-build-info-catalog-template-preparation-r1",
+  "operational_packet": "WP925",
+  "date": "2026-10-06",
+  "base": "a57eb9af03694fe340d8c40c5acf349fe789103a",
+  "status": "accepted",
+  "contract": {
+    "receipt": "target/wp925/contract.md",
+    "sha256": "b9cb697c964e28c3d242e04920a1876016ba0816b97943916ed76f24ac1ccbe4"
+  },
+  "outcome": "Tracked immutable installed BuildInfo template content selected from the actual observed validated configured closure, accepted through normal native current-frontier validation.",
+  "compatibility": {
+    "exact": "Installed Info/Version catalog template path/bytes/SHA/kind/mode and checked recipe role selection, pinned Bazel9.2 source.",
+    "slug_native": "Structural command/configuration/action/source identity, tracked DICE/native request/frontier and private metadata preparation bridge.",
+    "deferred": "Actual workspace status production/update/writer permissions, complete input set, BuildInfo/constant-output action execution/cache/REAPI, arbitrary/Derived/custom templates, Windows breadth, authentic source/full-root/M7A and aggregate memory fit."
+  },
+  "reference": {
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "receipt": "wp924-build-info-supplied-byte-render-2026-10-06.json",
+    "anchors": "BuildInfoFileWriteAction99-184 declared template selection180; Template103-110 resolver Latin1 read107; unchanged catalog owner validates each embedded SHA.",
+    "template_sha256": {
+      "tools/build_defs/build_info/templates/volatile_file.h.template": "83f47681c317f7b1249b6dcc9fa23a089233cf2f3a3801fedaca82869def8807",
+      "tools/build_defs/build_info/templates/non_volatile_file.h.template": "4d014ba8408a9a1e5cc9aca57183dee8bda0561ee92d4732bf174d0392218269"
+    }
+  },
+  "ownership": {
+    "analysis": "ObservedCatalogSourceFile retains original Arc<Result<BuiltinBazelToolsSourceFileValue,BuiltinError>> and actual tracked route observations. Private Filesystem/FilesystemOrCatalog/CatalogOnly policy shares existing resolution; root/nonBuiltin catalog-only refuses before physical reads. Need/error/Complete normal envelope preserved. Compact key path scratch replaces extra String; no copied body/retained path/pseudo real_path/snapshot injection.",
+    "core": "Full BuildCommandRootKey/ConfiguredTargetKey/ordinal DICE identity selects actual retained action/view and exact installed Source role before catalog await. Inputs retain original evaluation Arc, owner/action indices, observed catalog owner and full union frontier/associated SourceCertificate. CompleteOk-only validity and structural equality; no lock across compute or externally injected semantic result. NativeCommandRoot returns same Arc and exposes SelectedDependencySuperset/SourceCertifiedCurrentClosure to unchanged current-source validation.",
+    "release": "Held metadata deliberately retains whole evaluation graph/catalog/source observations. Request handles, engine/history and final-handle lifetimes remain independent. Tests drop engine/request/runtime owners, compare complete bytes, then prove BOTH metadata/catalog Weak owners release with bounded2s/1ms polling of existing OS-thread graph teardown. Cancellation ownership follows inherited DICE; not every cancellation interleaving tested.",
+    "cost": "New compact keys, observation/certificate containers, diagnostic strings and retained Arcs allocate. No new interner/pool/cache/global/task, graph/body copy, capacity/zero-copy/speedup or whole-fit claim. Reuse scoped canonical labels/compact and Arc/Allocative utilities."
+  },
+  "discriminators": "Real main/external Target/Exec installed actions both ordinals, full bytes/path/hash/mode/action membership, direct original catalog result Arc identity, repeat+actual Copt/HostCopt configuration A/B/A, observations/certificate Arc association, full-byte survival and dual Weak release. Normal empty epoch Need and invalidity then completion. Root/Local/missing/directory and absent owner/ordinal/family/custom/swapped/Derived/status/platform guards. Genuine native drive acceptance/host shadow ignored/postcompute BUILD mutation refresh/Builtin route revocation preserves accepted state. No successful synthetic action or host template copy.",
+  "source_sha256": {
+    "app/slug_analysis_v2/src/dice/source_file.rs": "d21cea0d05d3185e11877a269fc6922868439fb8b0cd63f0326dc77b5e80e092",
+    "app/slug_analysis_v2/src/dice.rs": "3a1c18458fd6a927a4ad30a78c446186c30e47d6bf58774d873ecf28f53208b0",
+    "app/slug_analysis_v2/src/lib.rs": "ed37f66574e604afe6946d6d2879a515c49f2c0806961d9a71c1bb52d310bdba",
+    "app/slug_core_v2/src/runtime/build_info_template_inputs.rs": "1498e04c0a80c994d47854ec14d4a6448aa0a289daa1263e372e57ae6dc2d892",
+    "app/slug_core_v2/src/runtime/dice.rs": "29d4e009ddbe1af8dad0a4700d83dfeefe5534295274281b0fb4070a61dc7af4",
+    "app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs": "2478507a432312f9ae8e58b739a611261724677bc6b71dead455374fa918cc7f",
+    "app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs": "d680a445d0f14a48ff6d45f33742bf20bfa71dc863389b3930b2e6820c69606c"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved nightly-2025-09-14; offlineJSON jobs1 prep<=60s TERM3; exact nonignored preflight then serial10s TERM3 runtime. Core/Analysis invocation-only dev opt0/debug0 for four heavy packages; default CLI check.",
+    "compiles": {
+      "analysis-tests": {
+        "exit_code": 0,
+        "seconds": 16.69118632504251,
+        "receipt": "target/wp925/analysis-tests.json"
+      },
+      "cli-check-initial": {
+        "exit_code": 101,
+        "seconds": 20.353415968012996,
+        "receipt": "target/wp925/cli-check-initial.json"
+      },
+      "cli-check": {
+        "exit_code": 0,
+        "seconds": 16.118782719015144,
+        "receipt": "target/wp925/cli-check.json"
+      },
+      "core-tests-before-release-correction": {
+        "exit_code": 0,
+        "seconds": 34.95123057498131,
+        "receipt": "target/wp925/core-tests-before-release-correction.json"
+      },
+      "core-tests-diagnostic": {
+        "exit_code": 0,
+        "seconds": 9.886315675103106,
+        "receipt": "target/wp925/core-tests-diagnostic.json"
+      },
+      "core-tests-initial": {
+        "exit_code": 101,
+        "seconds": 53.83292732096743,
+        "receipt": "target/wp925/core-tests-initial.json"
+      },
+      "core-tests": {
+        "exit_code": 0,
+        "seconds": 8.39723189896904,
+        "receipt": "target/wp925/core-tests.json"
+      }
+    },
+    "core": {
+      "tests": [
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_real_producer_fields_scopes_and_borrowed_owners",
+          "exit_code": 0,
+          "elapsed_seconds": 0.040468110935762525,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_restores_held_results_and_owned_text",
+          "exit_code": 0,
+          "elapsed_seconds": 0.03646778303664178,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_metadata_guards_info_identity_and_priority",
+          "exit_code": 0,
+          "elapsed_seconds": 0.030547298025339842,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_prerequisites::tests::build_info_transforms_and_constant_outputs_refuse_before_prerequisite_traversal",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0046682399697601795,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_prerequisites::tests::workspace_status_requires_a_real_producer_before_execution_planning",
+          "exit_code": 0,
+          "elapsed_seconds": 0.005444585112854838,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::workspace_status_descriptors_reject_before_source_staging",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0021560488967224956,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::build_only_observations_survive_the_narrow_source_certificate",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0020335899898782372,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::native_source_staging_tracks_sources_and_rejects_conflicting_roots",
+          "exit_code": 0,
+          "elapsed_seconds": 0.27366811700630933,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_command_tests::observed_build_identity_and_epoch_union_are_restricted_and_left_stable",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003908067010343075,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::installed_templates_retain_main_external_target_exec_catalog_owners_and_configuration_aba",
+          "exit_code": 0,
+          "elapsed_seconds": 0.12098226195666939,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::catalog_template_preparation_preserves_need_and_rejects_root_local_missing_directory",
+          "exit_code": 0,
+          "elapsed_seconds": 0.023473975947126746,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::template_preparation_rejects_absent_owner_ordinal_family_and_uninstalled_metadata",
+          "exit_code": 0,
+          "elapsed_seconds": 0.034980917000211775,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::native_template_preparation_certifies_current_frontier_ignores_shadow_and_refuses_revoked_route",
+          "exit_code": 0,
+          "elapsed_seconds": 0.1966521410504356,
+          "passed_one": true
+        }
+      ],
+      "selected": 13,
+      "passed": 13,
+      "elapsed_seconds": 0.7754782860865816,
+      "max_child_rss_kib": 80904
+    },
+    "core_preflight": {
+      "exit_code": 0,
+      "output": "Verified 13 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21193027996923774,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "3b3593fbfb8a76ca951d25ac9f6392888cc70a7e18c4904ae9fdea10b60c6cfb",
+      "selected": 13,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "analysis": {
+      "tests": [
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_build_info_and_unchanged_main_external_instances_register_real_actions",
+          "exit_code": 0,
+          "elapsed_seconds": 0.3916296659735963,
+          "passed_one": true
+        },
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_build_info_restores_full_configuration_and_rejects_java_callbacks",
+          "exit_code": 0,
+          "elapsed_seconds": 0.05457355489488691,
+          "passed_one": true
+        },
+        {
+          "name": "rustc_map_each::compile_context::provider::build_info_transform::installed_template_source_keeps_catalog_authority_and_refuses_host_resolution",
+          "exit_code": 0,
+          "elapsed_seconds": 0.039377486100420356,
+          "passed_one": true
+        }
+      ],
+      "selected": 3,
+      "passed": 3,
+      "elapsed_seconds": 0.4855941869318485,
+      "max_child_rss_kib": 105808
+    },
+    "analysis_preflight": {
+      "exit_code": 0,
+      "output": "Verified 3 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.16727732901927084,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-3e0b37736bfde50c",
+      "executable_sha256": "bb922ad15f6c673ebe5740ce7c9db6b62a5d311cb8ddf2ef51dd0fb043d7e272",
+      "selected": 3,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "checks": [
+      {
+        "name": "rustfmt",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "--check",
+          "app/slug_analysis_v2/src/dice/source_file.rs",
+          "app/slug_analysis_v2/src/dice.rs",
+          "app/slug_analysis_v2/src/lib.rs",
+          "app/slug_core_v2/src/runtime/build_info_template_inputs.rs",
+          "app/slug_core_v2/src/runtime/dice.rs",
+          "app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs",
+          "app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.31461499992292374,
+        "output": ""
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.011250040959566832,
+        "output": ""
+      },
+      {
+        "name": "archive-status",
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0341861629858613,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_analysis_v2/src/dice.rs\n M app/slug_analysis_v2/src/dice/source_file.rs\n M app/slug_analysis_v2/src/lib.rs\n M app/slug_core_v2/src/runtime/dice.rs\n M app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs\n?? app/slug_core_v2/src/runtime/build_info_template_inputs.rs\n?? app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs\n"
+      },
+      {
+        "name": "plan-status",
+        "command": [
+          "python3",
+          "scripts/v2_plan_status.py"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.014492035028524697,
+        "output": "Packet: WP-7-224-m7a-build-info-catalog-template-preparation-r1\n"
+      }
+    ],
+    "integration": [
+      {
+        "name": "final-diff-check",
+        "exit_code": 0,
+        "elapsed_seconds": 0.013735012034885585,
+        "output": ""
+      },
+      {
+        "name": "plan-status",
+        "exit_code": 0,
+        "elapsed_seconds": 0.01414779294282198,
+        "output": "Packet: WP-7-225-m7a-native-workspace-status-inputs-r1\n"
+      },
+      {
+        "name": "archive-status",
+        "exit_code": 0,
+        "elapsed_seconds": 0.03284248791169375,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_analysis_v2/src/dice.rs\n M app/slug_analysis_v2/src/dice/source_file.rs\n M app/slug_analysis_v2/src/lib.rs\n M app/slug_core_v2/src/runtime/dice.rs\n M app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs\n M thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md\n M thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md\n M thoughts/shared/plans/slug-v2-subplans/bootstrap-readiness.md\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n?? app/slug_core_v2/src/runtime/build_info_template_inputs.rs\n?? app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs\n"
+      }
+    ],
+    "protected_tests": {
+      "file": "app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs",
+      "baseline_test_body_bytes": 16405,
+      "baseline_test_body_sha256": "2cabc850d89b33ab27d6936033a25caaa7c6bfea02cb7ac8794da05c714811fe",
+      "unchanged_original_tests": true
+    },
+    "scope": "13/13 final Core (4new+9protected),3/3 installed Analysis, default CLI check. No actual CLI/oracle/daemon/execution invocation. Optional old bare registry-dependent native guard unproved, full offline suite not claimed."
+  },
+  "design_reviews": {
+    "source": {
+      "receipt": "target/wp925/design-source.md",
+      "sha256": "eaaa7a5ee7133f0089271d2a9efb7fb6224f8952174a80124d3ec790649ea754"
+    },
+    "ownership": {
+      "receipt": "target/wp925/design-ownership.md",
+      "sha256": "ee4fee72cbf5e5dba87b0d8e13c262cdad48366cbd3098ad34697d6c401218a1"
+    },
+    "evidence": {
+      "receipt": "target/wp925/design-evidence.md",
+      "sha256": "b6e8e94029960c5e8809935491151bc517ab17492132e1c42ccdce052f942bb3"
+    }
+  },
+  "reviews": {
+    "source": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp925/final-source.md",
+      "sha256": "c6bd0513bc1271e6072c624332fabb601edc11788ba06da34f85e9bc3cac669d"
+    },
+    "ownership": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp925/final-ownership.md",
+      "sha256": "f136f4634c93c333ada21a0b2a773b95473c0038ae6849d6840d6b4331a6d782"
+    },
+    "evidence": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp925/final-evidence.md",
+      "sha256": "566fadf7d554722ab73d03e42d93b8a0ba2c41b67de9967159c29f7829143034"
+    }
+  },
+  "growth": "Estimate triggers reviewed:227-line Core semantic sibling,121-net-line existing Analysis source-route boundary; dense dice/lib files export/register only.648-line nested tests cover4distinct lifecycle/Need/guard/native boundaries with one existing finite fixture and2minimal adapters. Original16405 test-body bytes unchanged. No assets/corpus/registry or alternative driver/graph copy.",
+  "corrections": {
+    "design": "Wrong installed label package/.template spelling corrected before activation; three DESIGN accepted corrected contract.",
+    "compile": "Initial specialized Native error helper projection mismatch corrected. Test Key value Arc/accepted snapshot fields corrected. Initial failures retained.",
+    "test": "Copt+HostCopt distinguish full Exec configuration; final full bytes after owner release strengthened.20yield release assumption failed; DICE state processor OS-thread ownership diagnosis led bounded2s wait preserving BOTH final Weak assertions, actual release passes. No production lifetime change.",
+    "source_note": "target/wp925/lifecycle-review.md",
+    "source_note_sha256": "3020dabb2177f3d407b8ee213ee8681e8f65f6b037c2a3df8a3162d90baf5c08"
+  },
+  "unproved_optional_gate": {
+    "name": "runtime::dice::tests::build_command_tests::terminal_epoch_replaces_equal_arcs_and_conflicts_abort_before_publication",
+    "status": "blocked/unproved; neither passed nor waived",
+    "cause": "Original bare module/filegroup fixture lacks finite Local builtin declarations; root mapping requests uncached rules_license1.0.0 BCR MODULE and TransportConnect fails before intended frontier predicate/template acquisition.",
+    "attribution": "target/wp925/bare-fixture-attribution.md",
+    "attribution_sha256": "1980169b361b7f093b3e67d0a7bdff7c9201e9e13c505fb6042c55e4aca863e1",
+    "qualification": "One temporary diagnostic reproduced earlier fixture phase and was removed. Original test/production guard unchanged. Unsuccessful default registry access occurred in this optional fixture; no registry/source retry or successful acquisition. Passing pureconflictunion/detachedcertificate/ordinarynative stage/newnative refresh/refusal are separate mandatory predicates, not proof of blocked fixture."
+  },
+  "memory_readiness": {
+    "inherited_receipt": "wp899-memory-readiness-2026-10-06.json",
+    "qualification": "Controlled64round/131072-string readiness within512MiB AS/256MiB RSS remains bounded; original64KiB postdrop refusal and full-source/whole-workload fit gap persist. Test RSS is observation, not fit proof. Unique timestamps/status input fields must not enter unbounded/global interning."
+  },
+  "successor": {
+    "packet": "WP-7-225-m7a-native-workspace-status-inputs-r1",
+    "basis": "Genuine native request capture and workspace-global default status-content DICE producer selected; root must freeze native user/hostname/clock/request-revision contract and three DESIGN before code. Status producer UTF8 serialization differs from Latin1 consumer. No supplied/fabricated maps or guessed time/identity as observed status.",
+    "source_note": "target/wp925/successor-source.md",
+    "sha256": "ae36ba19c1a0c8f240dcd29a01d2141467ff4718c1eea3f9e41a20d385a1ef11"
+  },
+  "remaining": "Genuine status inputs/producer, output writer/update/volatile cache, complete input-tree/execution/REAPI, authentic full-root/M7A and aggregate fit open; source16/17/18 spent and original caps/refusals unchanged. Windows minimal unsupported/stubs.",
+  "timing": {
+    "all_recorded_compile_seconds": 160.23109048209153,
+    "final_compile_seconds": 41.20720094302669,
+    "final_runtime_seconds": 1.2610724730184302,
+    "observed_since_recorded_start_seconds": 2096.456423264928,
+    "qualification": "Initial corrections and optional fixture attribution retained; review duration not independently measured."
+  },
+  "operational_evidence": {
+    "directory": "target/wp925",
+    "hash_index": "target/wp925/operational-hashes.json",
+    "index_sha256": "5134c38d91615f3952018d2077826fb87db7feeebc69954fded2f6cd97edb6a6"
+  }
+}

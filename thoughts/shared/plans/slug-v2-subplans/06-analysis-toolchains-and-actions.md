@@ -500,13 +500,19 @@ completes pure supplied status/template bytes to independently owned header byte
 Both entrypoints share one borrowed callback selector and literal engine; byte input
 Latin1 closure permits exact checked byte encoding. Local map/template owners drop
 before encoding, while rendered String/final Vec overlap remains explicit.
-Actual status production/observation, tracked template reads/certificates, writer
-permissions, arbitrary or Java callbacks, execution/cache policy, installed module
-tools and full cc_toolchain remain deferred.
+[WP925](wp925-build-info-catalog-template-preparation-2026-10-06.json) adds a separate
+observed catalog-content resolver and private native BuildInfo template preparation
+key. The actual validated installed action selects the tracked catalog route/value;
+original result/byte Arcs, full action identity and complete union frontier/certificate
+are retained. Native acceptance checks current observations, and held metadata keeps
+its evaluation graph alive. Actual status production/observation, writer permissions,
+arbitrary or Java callbacks, execution/cache policy, installed module tools and full
+cc_toolchain remain deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is
-invented, and runtime source acquisition remains refused for the builtin catalog.
+invented. Ordinary filesystem source acquisition still refuses the builtin catalog;
+the separate metadata path shares immutable catalog content without a real_path.
 Root-origin loading of this zero-import C++ module uses the same tracked canonical
 builtin mapping owner as installed-target loading; unrelated zero-import modules
 are not promoted. The existing single-import promotion remains unchanged.

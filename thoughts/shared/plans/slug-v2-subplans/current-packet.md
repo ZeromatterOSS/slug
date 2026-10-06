@@ -1,107 +1,108 @@
 # Slug V2 current work packet
 
-Packet: WP-7-224-m7a-build-info-catalog-template-preparation-r1
-Status: Complete supplied byte rendering accepted; tracked installed template preparation selected
+Packet: WP-7-225-m7a-native-workspace-status-inputs-r1
+Status: Tracked installed template preparation accepted; native default status input ownership selected
 
 ## Observable result and source basis
 
-Prepare the actual installed Info/Version template content from a validated observed
-configured action closure, using the existing immutable bazel_tools catalog DICE owner.
-The four demanded TranslateBuildInfo rows need real template acquisition and status
-production after pure supplied content rendering. Select template preparation now;
-workspace status production has separate host/user/time/command/env and stable/volatile
-policy decisions. Root freezes concrete API and three DESIGN reviews before code.
+Produce genuine default workspace-status content inside DICE from actual native request
+inputs, then use those owned bytes with the accepted tracked catalog template/checked
+recipe. The demanded TranslateBuildInfo rows still lack status content after template
+preparation; supplied maps are not a producer. Root freezes concrete capture/revision API,
+platform policy, file allowlist and three DESIGN reviews before code (operations WP926).
 
-Pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a,
-BuildInfoFileWriteAction99–184 selects the declared template at180, Template.java103–107
-reads it through the resolver. Source/discovery: target/wp924/successor-source.md and
-corrected immutable anchors target/wp924/pinned-source.json. Source template bytes/SHA
-are exact; canonical identity, structural configuration/output paths remain native.
-No action execution, status production, writer permissions or full input-set claim.
+Pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a;
+WorkspaceStatusAction71–96 defaults; BazelWorkspaceStatusModule87–98/173–188/231–242,
+139–158 and205–215; WorkspaceStatusFunction38–49 andValue28–38/63–72.
+Discovery target/wp925/successor-source.md pins full file hashes/numbered source.
+Producer status files are sorted UTF8 key-space-value-LF; accepted consumer parses those
+bytes as Latin1. Preserve this distinction, including nonASCII native identity.
+Exact admitted default field ordering/UTF8 serialization and ordinary UTC timestamp/date
+format; native Rust Host identity/time capture and structural request/action identity.
+No command execution, file publication/mtime/volatile cache policy or REAPI admission.
 
-## Semantic owner and authority
+## Semantic owner and decision checkpoint
 
-Analysis source_file.rs currently resolves observed source acquisition only to
-filesystem paths and refuses catalog acquisition. Its analysis-existence path already
-selects BuiltinBazelToolsSourceFileKey through the observed repository route, but
-throws content away. Bzlmod's existing immutable value owns verified path/Arc bytes/
-SHA/executable. Add a separate narrow observed catalog-content boundary returning
-that shared owner plus the selected route observations, using tracked normal
-HostCanonicalRepositoryLoadRouteObservationKey and catalog snapshot/key. Preserve
-filesystem-only resolve_source_input_observed and its host-shadow refusal; do not
-invent a real_path, direct filesystem fallback or public caller-supplied snapshot.
-Propagate genuine Need/error/Complete and reject nonBuiltin/missing/directory routes.
+Select Unix default empty embed label/no status command, SOURCE_DATE_EPOCH absent, valid
+native identity text and supported positive wall-clock/calendar range initially. Reject
+unsupported policy/environment/range before accepting status metadata; do not fabricate
+hostname/username/time constants or treat missing native sources as successful defaults.
+FORMATTED_DATE is required, although the finite C++ callbacks ignore it.
 
-Core owns a dedicated BuildInfo template preparation key with full BuildCommandRootKey,
-ConfiguredTargetKey and action ordinal. Select the actual retained typed action from
-BuildCommandRootObservationKey's validated closure, check workspace/status/output/
-selected template membership, and admit exactly the installed Info/Version Source
-labels under the real selected catalog. Reject custom filesystem/Derived/status-role
-or unknown templates and absent/wrong owner/action. Reuse checked_build_frontier,
-union_build_observations and actual SourceCertificate association; catalog provenance
-is its tracked immutable key/value, never a fabricated filesystem Path observation.
-Validate the native request frontier before publishing prepared metadata. Verify the
-normal observed closure really reaches the selected actions before claiming a callable
-native preparation; invocation corrections stay in packet, genuine ownership or
-source-stage contradictions require a concrete REPLAN, not an execution-guard bypass.
+The existing ProcessHostOwner has no status identity/time inputs; repository_environment
+is a restricted Bzlmod snapshot and is not full status client environment. Freeze a
+bounded explicit Rust Host source: actual kernel short hostname plus request-observed
+native reported user/Unix identity, with errors for absent/nonUnicode sources. Root must
+resolve which native user source and identity classification is supported; do not add
+unowned NSS/DNS/LDAP/shell lookups or claim HotSpot property equality. Only these demanded
+status observations are captured; no full environment duplication/global sampler.
+Source date epoch presence/value must be genuinely captured so the initial refusal is
+tracked, not inferred from repository environment or omitted on a warm hit.
 
-Read docs/developers/dice.md before edits. Every semantic fact is a tracked key or
-dependency; keep full route/catalog/action/configuration identity in retained equality,
-Need/invalidation/restoration. No shared lock across compute, external semantic-value
-injection, fresh-graph/direct-filesystem bypass, global registry or fallback scan.
-Current requested prerequisite planners and Spawn-only staging guards stay closed
-for WorkspaceStatus/BuildInfo/constant outputs. Prepared template metadata is not a
-complete BuildInfo source input set, certificate for status bytes or execution authority.
+Capture one actual wall-clock sample per logical native request before revision input
+publication; retries in that request reuse it, a new request revokes/replaces it. Reuse
+existing request-revision updater/transaction and overlap protocol, with workspace input
+key(s) whose versioned captured raw input owns every changed fact. Compute status bytes
+inside DICE, not outside and injected as a semantic map. Keep workspace-global descriptor
+and producer independent of consumer configuration. Same live request shares one producer;
+overlapping transactions keep their own versioned request capture without a racing
+singleton or ever-growing unique-key history. Full equality/validity includes policy,
+native source identity, time and request association; stale/foreign captures fail closed.
+No lock across compute, detached sampler, process-global status pool or fresh graph.
+
+Root must verify existing native completion accepts this request-input association before
+claiming genuine status metadata. Private callable native root/test bridge is sufficient
+initially. Combine actual producer and template owner only after both are current in the
+same request. Status output writing, stable compare/mtime, unconditional volatile file,
+constant-output cache dirtiness, complete input-tree/action execution remain deferred;
+all current WorkspaceStatus/BuildInfo/constant planner refusals stay closed.
 
 ## Allocation and scope
 
-Reuse Arc catalog bytes/result, existing Arc evaluation/frontier owners and scoped
-canonical label/path interners. Borrow inspected actions/labels/content; no copied
-catalog/template body, whole graph clone, owned presentation path or new global pool.
-Classify new metadata as DICE-retained semantic and accepted request handle as command-
-owned, with cache/equality cutoff/invalidation/engine and final-handle release boundaries.
-Document container/key copies and cancelled/failed preparation release. Preserve
-allocative and compact-string utility choices. Independent old/new configuration
-metadata may share immutable catalog bytes but must retain full action identity.
-No allocator/whole-fit claim; existing memory/caps/refusals and source16/17/18 persist.
+Reuse existing compact strings/canonical identity/Arc and scoped interners. Borrow fixed
+field names/native captured values; emit directly to independently owned stable/volatile
+byte buffers, with no repeated whole maps/body copies/global interning of timestamps or
+unique environment values. Retained captured input/content is DICE semantic; command
+handles own shared results. Document version cutoff/revocation/overlap/cancellation/
+engine/history/final-handle release and field/buffer/graph retention. Existing memory
+refusal/caps and full-workload-fit qualification persist; no allocation reduction claim.
 
-Frozen allowlist in target/wp925/contract.md follows DESIGN checkpoint. Candidate
-files: Analysis dice/source_file.rs, source_file/tests.rs if a sibling is needed,
-dice.rs/lib.rs exports only; Core new runtime/build_info_template_inputs.rs plus
-runtime/dice.rs registration only, existing tests/build_info_aquery_tests.rs private
-helper/include wiring and new nested tests/build_info_template_inputs_tests.rs.
-Reuse existing normal installed producer fixture/protocol; no corpus/registry/assets
-copy or builtin/Loading/source staging/CLI API/runtime execution edits. Inspect the
-large Analysis/Core dice files: limit them to small exports/module registration,
-placing semantic responsibility in bounded siblings. Production<300/test<300 estimates
-are review triggers. Root owns production integration/compile/commit; independent
-source/ownership/evidence DESIGN and FINAL, disjoint workers. Operations target/wp925.
+Concrete allowlist follows DESIGN checkpoint. Candidates: small new Core runtime status
+input/producer siblings, ProcessHostOwner native source/helper additions, limited native
+request/revision input registration glue and one focused test sibling reusing WP925
+fixture. BuildAPI status content type only if the ownership review proves it necessary.
+Keep large dice files to glue. No renderer/parser/catalog/Bzlmod/Analysis descriptor
+identity/source staging/CLI success/execution guard changes, source16/17/18 retry, corpus
+or registry acquisition. Windows unsupported/stubs only. Combined production/test estimates
+and supported native acquisition/date-format sources must be frozen before implementation.
 
 ## Evidence and validation
 
-Actual installed main/external Target/Exec actions select exact catalog bytes/SHA/path,
-with unchanged host-shadow file ignored. Exercise repeat and full configuration A/B/A,
-held metadata through owner/request/engine release, shared immutable byte owner, full
-selected-action identity and observation/certificate association. Negatives cover
-nonBuiltin route, missing/directory catalog, wrong ordinal/owner/template role, absent
-closure, conflicting frontier and stale/revoked route. Need and errors come through
-normal owners. Preserve existing BuildInfo registration/query/source-host refusals,
-ordinary source staging and execution/constant-output planner guards. Root may use
-finite authored observed fixtures under the existing completion protocol; they do
-not establish authentic full-root source/runtime or status production.
+Native capture must prove actual observed hostname/user and timestamp interval plus
+matching UTC FORMATTED_DATE, full stable/volatile fields and independent sorted UTF8
+bytes/final LF. Source tests may inject raw fields only for conversion/refusal attribution,
+never claim injected timestamps/maps are observed production. Genuine same-request sharing
+across consumer configurations, new-request freshness, held old content, source/policy
+A/B/A, overlap/cancellation and final owner release discriminate lifetime/invalidation.
+Unsupported command/embed/source-date/nonUnicode/missing/time failures must precede
+publication. Combine genuine native status with tracked template through checked recipe
+and assert complete independent headers. Protect existing source/certificate/recipe/
+workspace-role/execution refusals. No materialized status/output/full-root success claim.
 
-Serial pinned offlineJSON owner/direct-dependent no-run/defaultCLI preparation<=60s
-TERM3 jobs1; fresh exact nonignored preflight before serial10s TERM3 focused gates.
-Use established heavy invocation-only four-package opt0/debug0 when required. Native
-ancestor-sensitive fixtures run serially. No oracle/network/source16/17/18 retry;
-rebuild actual CLI only before an actual binary invocation. Fmt/diff/archive/status,
-compact receipt and local root commit. Full-root/M7A, status producer/update/cache,
-complete inputs/execution/REAPI, Windows breadth and aggregate memory fit remain open.
+Serial pinned offlineJSON owner/dependent no-run/defaultCLI preparation<=60s TERM3 jobs1;
+heavy invocation-only four-package opt0/debug0 when needed. Exact nonignored preflight,
+serial10s TERM3 native gates and bounded cleanup waits. Closed finite Local module fixtures
+only: the legacy bare frontier fixture is registry-dependent and unproved offline; do
+not retry its BCR access. Fmt/diff/archive/plan checks, three FINAL reviews, compact receipt
+and local commit. Existing operation caps, source16/17/18 limits, original memory refusal,
+full-root/M7A/whole-fit qualifications and minimal Windows scope remain.
 
 ## Immediate predecessor
 
-[WP924](wp924-build-info-supplied-byte-render-2026-10-06.json) completes pure supplied
-status/template Latin1 bytes to independent header Vec using shared callback/literal
-logic and decoder. Fourteen owner and three installed Analysis controls, default CLI
-check and three FINAL reviews pass. Map/template release precedes checked byte encoding;
-String/Vec and replacement buffer overlap remain qualified, with no retained pool.
+[WP925](wp925-build-info-catalog-template-preparation-2026-10-06.json) adds tracked catalog
+content preparation for actual retained installed main/external Target/Exec BuildInfo
+recipes. Original catalog Arc bytes/result and evaluation/identity/frontier owners are
+shared. Thirteen Core and three installed Analysis gates, CLI check and three FINAL reviews
+pass; full-byte/Weak release and native current-frontier refresh/revocation are proved.
+The optional old bare registry-dependent frontier fixture remains unproved/blocked; no
+old guard was modified. Template metadata grants no status/execution/whole-fit authority.

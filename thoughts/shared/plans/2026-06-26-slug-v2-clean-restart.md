@@ -34,32 +34,34 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-224-m7a-build-info-catalog-template-preparation-r1
-Status: Complete supplied byte rendering accepted; tracked installed template preparation selected
+Packet: WP-7-225-m7a-native-workspace-status-inputs-r1
+Status: Tracked installed template preparation accepted; native default status input ownership selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects dedicated tracked
-installed BuildInfo template content from its actual validated closure and immutable
-catalog DICE owner. Filesystem-only source staging, workspace status production and
-volatile execution prerequisites remain separate.
-[WP924](./slug-v2-subplans/wp924-build-info-supplied-byte-render-2026-10-06.json)
-completes pure supplied status/template bytes to independent header bytes via shared
-callback/literal logic and exact Latin1 conversion. Fourteen owner controls, three
-actual installed Analysis controls, default CLI check and three FINAL reviews pass.
-Map/template storage is released before encoding; rendered String/final Vec and old/new
-replacement buffers may overlap. No retained cache/pool/key is added. Whole-workload
-memory fit, authentic source/full-root/runtime and M7A stay open; allocation/interner
-discipline, prior memory/resource caps, source16/17/18 limits and minimal Windows scope persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects genuine native
+request input capture and a workspace-global default status-content producer inside
+DICE. Its native identity/time/revision contract needs a concrete DESIGN checkpoint;
+status writing, update/cache policy and execution remain separate.
+[WP925](./slug-v2-subplans/wp925-build-info-catalog-template-preparation-2026-10-06.json)
+prepares actual installed BuildInfo templates from the validated observed closure,
+sharing original catalog bytes/result and full evaluation/frontier/certificate owners.
+Thirteen Core controls, three installed Analysis controls, CLI check and three FINAL
+reviews pass, including full configuration restoration, native refresh/revocation and
+held-result release. The optional legacy bare frontier fixture is registry-dependent
+and unproved offline; no old guard changed. Held metadata retains its evaluation graph.
+Whole-workload memory fit, authentic source/full-root/runtime and M7A stay open;
+allocation/interner discipline, prior memory/resource caps, source16/17/18 limits and
+minimal Windows scope persist.
 
 ### Ready and blocked queue
 
-The current packet selects demanded tracked BuildInfo template preparation under priority3; the remaining
+The current packet selects demanded native default workspace-status inputs under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects tracked BuildInfo template preparation; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects native default workspace-status inputs; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

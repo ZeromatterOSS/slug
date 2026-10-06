@@ -461,9 +461,14 @@ Parsed supplied content composes with both checked string recipes, without obser
 status artifacts. [WP924](wp924-build-info-supplied-byte-render-2026-10-06.json) now
 completes supplied status/template byte rendering with exact Latin1 decode/encode
 and shared finite callback/literal order, including all256-byte no-match roundtrip.
-Actual status producer/observations, tracked template acquisition/certificates,
+[WP925](wp925-build-info-catalog-template-preparation-2026-10-06.json) prepares tracked
+installed template content from the actual validated configured closure, sharing the
+original immutable catalog owner and retaining full source frontier/certificate.
+Actual main/external Target/Exec selection, full configuration restoration, native
+current-source refresh/revocation and held-owner release pass. Status production,
 writer permissions, volatile execution/cache policy, module tools and full
-cc_toolchain remain unproved.
+cc_toolchain remain unproved. The unrelated legacy bare frontier fixture requires an
+uncached registry dependency and remains unproved offline; its guard was not changed.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun

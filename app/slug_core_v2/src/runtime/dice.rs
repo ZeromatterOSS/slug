@@ -3175,6 +3175,11 @@ pub use requested_artifacts::RequestedTargetArtifacts;
 mod runfiles_manifest;
 pub use runfiles_manifest::PreparedRunfilesManifests;
 
+// Private native preparation bridge; execution consumers remain deferred.
+#[allow(dead_code)]
+#[path = "build_info_template_inputs.rs"]
+mod build_info_template_inputs;
+
 #[path = "action_chain_staging.rs"]
 mod action_chain_staging;
 pub use action_chain_staging::PreparedActionChainInputs;

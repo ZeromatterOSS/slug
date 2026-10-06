@@ -1,9 +1,14 @@
 //! Source existence follows the selected repository owner, never an execution-path string.
 
+use std::sync::Arc;
+
 use allocative::Allocative;
+use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
+use slug_bzlmod_v2::BuiltinBazelToolsSourceFileError;
 use slug_bzlmod_v2::BuiltinBazelToolsSourceFileKey;
+use slug_bzlmod_v2::BuiltinBazelToolsSourceFileValue;
 use slug_bzlmod_v2::HostRepositoryPathKey;
 use slug_bzlmod_v2::HostRepositoryPathObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceInputDispositionView;
@@ -44,9 +49,42 @@ impl ObservedSourcePath {
     }
 }
 
+/// Immutable catalog content selected by the observed repository route.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct ObservedCatalogSourceFile {
+    result: Result<
+        Arc<Result<BuiltinBazelToolsSourceFileValue, BuiltinBazelToolsSourceFileError>>,
+        AnalysisError,
+    >,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedCatalogSourceFile {
+    pub fn result(
+        &self,
+    ) -> &Result<
+        Arc<Result<BuiltinBazelToolsSourceFileValue, BuiltinBazelToolsSourceFileError>>,
+        AnalysisError,
+    > {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SourceAcquisition {
+    Filesystem,
+    FilesystemOrCatalog,
+    CatalogOnly,
+}
+
 enum SourceResolution {
     Filesystem(ResolvedPath),
-    CatalogFile,
+    CatalogFile(Arc<Result<BuiltinBazelToolsSourceFileValue, BuiltinBazelToolsSourceFileError>>),
 }
 
 struct ObservedSourceResolution {
@@ -86,15 +124,43 @@ pub async fn resolve_source_input_observed(
         ConfiguredAnalysisMode::Observed,
         workspace,
         label,
-        false,
+        SourceAcquisition::Filesystem,
     )
     .await
     .map(|result| {
         result.map(|observed| ObservedSourcePath {
             result: observed.result.and_then(|source| match source {
                 SourceResolution::Filesystem(path) => Ok(path),
-                SourceResolution::CatalogFile => Err(AnalysisError::message(
+                SourceResolution::CatalogFile(_) => Err(AnalysisError::message(
                     "catalog source has no filesystem acquisition path",
+                )),
+            }),
+            observations: observed.observations,
+        })
+    })
+}
+
+/// Acquire catalog content without giving it a guessed filesystem path.
+#[doc(hidden)]
+pub async fn resolve_catalog_source_input_observed(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    label: &CanonicalLabel,
+) -> LoadingPreparationOutcome<Result<ObservedCatalogSourceFile, ObservedPathFrontierError>> {
+    resolve_source_with_observations(
+        ctx,
+        ConfiguredAnalysisMode::Observed,
+        workspace,
+        label,
+        SourceAcquisition::CatalogOnly,
+    )
+    .await
+    .map(|result| {
+        result.map(|observed| ObservedCatalogSourceFile {
+            result: observed.result.and_then(|source| match source {
+                SourceResolution::CatalogFile(value) => Ok(value),
+                SourceResolution::Filesystem(_) => Err(AnalysisError::message(
+                    "catalog acquisition requires a Builtin repository route",
                 )),
             }),
             observations: observed.observations,
@@ -108,25 +174,31 @@ pub(super) async fn resolve_source_input(
     workspace: &NormalizedAbsolutePath,
     label: &CanonicalLabel,
 ) -> AnalysisSemanticOutcome<SourceFileState> {
-    resolve_source_with_observations(ctx, mode, workspace, label, true)
-        .await
-        .map(|result| {
-            result.map(|observed| {
-                observed.result.map(|source| match source {
-                    SourceResolution::CatalogFile => SourceFileState::RegularFile,
-                    SourceResolution::Filesystem(path) => match path.state() {
-                        slug_workspace_v2::ResolvedPathState::Missing => SourceFileState::Missing,
-                        slug_workspace_v2::ResolvedPathState::Present(metadata) => {
-                            if metadata.kind() == slug_workspace_v2::PathNodeKind::RegularFile {
-                                SourceFileState::RegularFile
-                            } else {
-                                SourceFileState::Unsupported(metadata.kind())
-                            }
+    resolve_source_with_observations(
+        ctx,
+        mode,
+        workspace,
+        label,
+        SourceAcquisition::FilesystemOrCatalog,
+    )
+    .await
+    .map(|result| {
+        result.map(|observed| {
+            observed.result.map(|source| match source {
+                SourceResolution::CatalogFile(_) => SourceFileState::RegularFile,
+                SourceResolution::Filesystem(path) => match path.state() {
+                    slug_workspace_v2::ResolvedPathState::Missing => SourceFileState::Missing,
+                    slug_workspace_v2::ResolvedPathState::Present(metadata) => {
+                        if metadata.kind() == slug_workspace_v2::PathNodeKind::RegularFile {
+                            SourceFileState::RegularFile
+                        } else {
+                            SourceFileState::Unsupported(metadata.kind())
                         }
-                    },
-                })
+                    }
+                },
             })
         })
+    })
 }
 
 async fn resolve_source_with_observations(
@@ -134,9 +206,17 @@ async fn resolve_source_with_observations(
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     label: &CanonicalLabel,
-    admit_catalog: bool,
+    acquisition: SourceAcquisition,
 ) -> SourcePathOutcome {
     if label.package().repo().is_root() {
+        if acquisition == SourceAcquisition::CatalogOnly {
+            return complete(
+                Err(AnalysisError::message(
+                    "catalog acquisition requires a Builtin repository route",
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
         return resolve_root_source_input(ctx, mode, source_path(workspace, label), label).await;
     }
     let mut observations = PathObservationEpoch::empty();
@@ -205,20 +285,18 @@ async fn resolve_source_with_observations(
             );
         }
     };
-    let relative =
-        std::path::PathBuf::from(label.package().package().as_str()).join(label.target().as_str());
-    if admit_catalog {
+    if acquisition != SourceAcquisition::Filesystem {
         if let HostRepositorySourceInputDispositionView::Builtin(identity) =
             route.input().view().disposition()
         {
             // The tracked route selects the immutable catalog owner. Never
             // invent a physical path or broaden ordinary source reads to bytes.
             let package = label.package().package().as_str();
-            let relative = if package.is_empty() {
-                label.target().as_str().to_owned()
-            } else {
-                format!("{package}/{}", label.target().as_str())
-            };
+            let mut relative = CompactString::new(package);
+            if !relative.is_empty() {
+                relative.push('/');
+            }
+            relative.push_str(label.target().as_str());
             let result = match ctx
                 .compute(&BuiltinBazelToolsSourceFileKey::new(
                     identity.snapshot(),
@@ -226,15 +304,12 @@ async fn resolve_source_with_observations(
                 ))
                 .await
             {
-                Ok(value) => value
-                    .as_ref()
-                    .as_ref()
-                    .map(|_| SourceResolution::CatalogFile)
-                    .map_err(|error| {
-                        AnalysisError::message(format!(
-                            "resolving catalog source file {label}: {error}"
-                        ))
-                    }),
+                Ok(value) => match value.as_ref() {
+                    Ok(_) => Ok(SourceResolution::CatalogFile(value)),
+                    Err(error) => Err(AnalysisError::message(format!(
+                        "resolving catalog source file {label}: {error}"
+                    ))),
+                },
                 Err(error) => Err(AnalysisError::message(format!(
                     "resolving catalog source file {label} through DICE: {error}"
                 ))),
@@ -242,6 +317,16 @@ async fn resolve_source_with_observations(
             return complete(result, observations);
         }
     }
+    if acquisition == SourceAcquisition::CatalogOnly {
+        return complete(
+            Err(AnalysisError::message(
+                "catalog acquisition requires a Builtin repository route",
+            )),
+            observations,
+        );
+    }
+    let relative =
+        std::path::PathBuf::from(label.package().package().as_str()).join(label.target().as_str());
     let route = HostRepositorySourceRoute::canonical(route.input().clone());
     let resolved = match mode {
         ConfiguredAnalysisMode::Legacy => match ctx

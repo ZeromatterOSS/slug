@@ -67,7 +67,14 @@ fn build_info_epoch() -> PathObservationEpoch {
 }
 
 async fn build_info_transaction(dice: &Arc<Dice>) -> dice::DiceTransaction {
-    let transaction = build_root_transaction(dice, build_info_epoch()).await;
+    build_info_transaction_with_epoch(dice, build_info_epoch()).await
+}
+
+async fn build_info_transaction_with_epoch(
+    dice: &Arc<Dice>,
+    epoch: PathObservationEpoch,
+) -> dice::DiceTransaction {
+    let transaction = build_root_transaction(dice, epoch).await;
     let mut updater = transaction.into_updater();
     // The generic helper uses a Local bazel_tools override for small authored
     // fixtures. This authenticated builtin requires the actual Builtin route.
@@ -124,6 +131,11 @@ async fn build_info_transaction(dice: &Arc<Dice>) -> dice::DiceTransaction {
         )])
         .unwrap();
     updater.commit().await
+}
+
+mod template_inputs {
+    use super::*;
+    include!("build_info_template_inputs_tests.rs");
 }
 
 fn build_info_key(target: &str, changed: bool) -> BuildCommandRootKey {
