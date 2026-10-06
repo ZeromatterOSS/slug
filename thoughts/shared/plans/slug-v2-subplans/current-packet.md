@@ -12,54 +12,58 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component extends unchanged ASCII input reuse to
-capitalize()/title(), completing the four native case methods. Exact
-first-position/alphabetic word-boundary guards skip duplicate String construction
-and heap string copying. Every changed ASCII/non-ASCII fallback remains. Next:
-select a proved redundant local copy or existing interner reuse through a bounded
-design checkpoint.
+The latest accepted component reuses complete input substrings returned by
+split()/rsplit() at final list allocation. Splitting decisions, parameters and
+order remain; lists, borrowed scratch containers and partial-string copies keep
+their existing allocation. All 42 selected whole-result routes share their inputs.
+Next: select a proved redundant local copy or existing interner reuse through a
+bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted capitalize/title unchanged ASCII reuse contract
+## Accepted split/rsplit complete input reuse contract
 
-Capitalize reuses its complete StringValue when every byte is ASCII, the first
-byte is not lowercase and all later bytes are not uppercase. Title starts at a
-word boundary, rejects lowercase there/uppercase elsewhere, and resets the
-boundary after every nonalphabetic ASCII byte. Empty strings may reuse their
-constant. Every changed ASCII and every non-ASCII input retain the original
-character conversion loops and equivalent final heap allocation. Public string
-type/zero visible arguments, exact errors, speculative annotations, interning,
-tracing/freezing and all other methods remain unchanged. No new helper, API,
-interner, cache, key, unsafe code, dependency or retained representation.
+Both methods retain typed StringValue inputs and map a method-local allocation
+closure over existing final list iterators. Every result part is a source slice;
+equal byte length proves complete input and returns the existing value. Partial
+parts still allocate independent strings, avoiding larger-source retention.
+Whitespace helpers, borrowed Vec capacities, iterators/reversal/order, one-byte
+match counts, existing UTF-8 conversion, maxsplit normalization and current
+separator behavior remain unchanged. Bounded whitespace rsplit still reaches
+the same list allocator through AllocList. Public list[str], positional/default
+parameters, exact errors, speculative annotations and normal tracing/freezing
+stay. No extra search, global helper, API, interner, cache, key, unsafe code,
+dependency or retained representation; result lists and scratch remain.
 
-Three DESIGNs/FINALs accept whole-owner proof, baseline-identical archived loops
-and identical extended case tests. Baseline has two semantic passes and one
-sharing failure: lower/upper already share, capitalize/title copy. Candidate
-passes 11/11 with all four sharing, 74,898 character-reference comparisons per
-variant, eight byte-identical errors, Unicode/typed returns, nonspeculative
-mutable source-drop/explicit GC, frozen result/function survival and speculative
-constants. Interner/carrier and splitlines controls (5,602 comparisons) pass;
-default Loading/Core/CLI alltargets check offline. Fresh artifacts/exact
-preflights, serial pinned prep60s/tests30s and format/archive/plan/diff hygiene
-pass. Existing sibling grows from 188 to 295 lines; reviewers accept five lines
-above the estimate as focused coverage. No fixture assets or new test hook.
+Three DESIGNs/FINALs accept exact whole-owner transformation/formatting proof,
+baseline-identical archive method comparison and identical new tests. Baseline
+has two semantic/lifecycle passes and one intended sharing failure; candidate
+passes 14/14, 77,750 comparisons per variant and six byte-identical errors. All
+42 candidate whole-result routes share, covering whitespace, limits/defaults and
+byte/multibyte/UTF-8 separators. Independent bounded-whitespace word framing,
+separator references, Unicode trimming, overlap/order/empty cases, mutable lists,
+nonspeculative mutable source-drop/explicit GC, retained frozen results/functions
+and speculative constants pass. Protected case (74,898) and splitlines (5,602)
+comparisons, interner/carrier and default Loading/Core/CLI alltargets checks pass.
+Fresh artifacts/exact preflights, serial pinned prep60s/tests30s and format/archive/
+plan/diff hygiene pass. Reviewers accept the 366-line sibling six lines above
+estimate as distinct route coverage; no fixture assets.
 
-Each new capitalize/title fixture has 98,304 bytes and changes from unshared to
-shared; lower/upper fixtures retain sharing. Public Heap::allocated_bytes()
-growth changes from [0,0,409536,0] to [0,0,0,0]. Baseline title's copy fits existing
-arena capacity, so zero growth does not count allocations. Source proves both
-construction paths are skipped only for unchanged ASCII. Fallback scratch/final
-storage remains; no exact allocator/payload, general capacity, aggregate/peak/
-RSS/speed or source-fit claim. Full WP899/M7A remains open.
+Two 131,072-byte ASCII/Unicode fixtures change from unshared to shared. Observed
+public Heap::allocated_bytes() growth changes from [270272,540608] to [0,0]. These
+are fixture arena observations, not allocation counts or general memory/capacity/
+aggregate/peak/RSS/speed/source-fit claims. Current empty-separator behavior and
+maxsplit arithmetic are preserved; no behavior repair or broader i32::MAX claim.
+Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Split/rsplit reuse complete input substrings by equal byte length at final list allocation; all splitting decisions, parameters/order, lists/scratch and partial owned strings preserved. Three DESIGNs/FINALs; same tests baseline two semantic passes/one sharing failure, candidate 14/14, 77,750 comparisons per variant, six equal errors, 42 sharing routes and default dependents. Two 128 KiB fixtures share with zero observed added arena accounting; fixture observations only | [Split/rsplit input reuse](wp899-split-input-reuse-2026-10-05.json) |
 | Capitalize/title join lower/upper in unchanged ASCII whole-input reuse; exact first-position/word-boundary guards preserve all changed ASCII/Unicode fallback, errors and GC/frozen/speculative behavior. Three DESIGNs/FINALs; identical baseline two semantic passes/one new sharing failure, candidate 11/11, 74,898 comparisons per variant, eight equal errors and default dependents. Both new 96 KiB fixtures share; zero public arena growth is fixture accounting only | [ASCII capitalize/title reuse](wp899-ascii-title-case-reuse-2026-10-05.json) |
 | Native splitlines reuses complete nonempty inputs without CR/LF; list and actual split-line allocations, bytes/parameters/errors, GC/frozen and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one sharing failure, candidate 11/11, 5,602 character comparisons per variant and default dependents. Four large ASCII/Unicode cases share; observed zero added arena accounting excludes allocator/aggregate/speed claims | [Splitlines input reuse](wp899-splitlines-input-reuse-2026-10-05.json) |
 | Native lower()/upper() reuse unchanged ASCII inputs; all changed ASCII/Unicode conversion, public types/errors, GC/frozen ownership and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one intended sharing failure, candidate 8/8 and 32,768 ASCII comparisons plus default dependents. Both 96 KiB fixtures share with zero additional public heap accounting; fixture observations only | [ASCII case input reuse](wp899-ascii-case-reuse-2026-10-05.json) |

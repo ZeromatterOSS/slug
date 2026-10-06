@@ -39,10 +39,10 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: capitalize/title join lower/upper in unchanged ASCII
-input reuse. Exact first-position/alphabetic word-boundary guards skip duplicate
-construction; changed ASCII/Unicode conversion, errors and GC/frozen ownership
-remain. Both new 96 KiB fixtures share with zero observed added heap accounting.
+Latest accepted change: split/rsplit reuse complete input substrings at final
+allocation. Splitting decisions, parameters/order, list/scratch allocation and
+partial owned strings remain. All 42 selected whole-result routes share; two
+128 KiB fixtures show zero observed added public heap accounting.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.

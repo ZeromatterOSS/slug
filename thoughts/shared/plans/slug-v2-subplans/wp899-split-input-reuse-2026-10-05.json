@@ -1,0 +1,227 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "d04a47221",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "aa8c2a3cd912c7fbd5f9bd98ccc46e5d6fedb7fbfe4b00d578d9919897c6a2b7",
+    "starlark-rust/starlark/src/values/types/string/split_input_reuse_tests.rs": "955e4b2775c8829480de07e3e4c0c6c49e419a4aabcb2a962e295b4dcd132f4a",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/types/string/str_type.rs": "a476b73bdc0845592fee35732c419338d2c108328b8656df14383af1061fc812",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/values/types/string/ascii_case_reuse_tests.rs": "034206fa18961e9d1f7d909e4b85f8ee2e8ae5a980e28bdf520c6cea5fd12e55",
+    "starlark-rust/starlark/src/values/types/string/splitlines_input_reuse_tests.rs": "0ef57b84f8bc9c777fea514f1c3301f3067e55b5659e2a8fd343254bd2dc6dc5",
+    "starlark-rust/starlark/src/values/types/list/alloc.rs": "4da1cb1f17fc395a6911de974fcc2116623b892a7d244610dc0bef6c62ca2832",
+    "starlark-rust/starlark/src/values/types/list/value.rs": "7b637aa87c1635b166de6fd1270575f5d94fc24d7cbbee7bef6d3d05cc20e657",
+    "starlark-rust/starlark/src/values/layout/avalues/list.rs": "d1e8fd7db77e1b172f897da6e007d09c86460e50efb383ab7893a16f055cf150"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "e46551779e1af5cf11ab37f44fa059e1054ccd36b420e3ac562a1329d7de142e",
+    "selectors": [
+      "values::types::string::methods::split_input_reuse_tests::complete_split_results_share_input_across_directions_and_routes",
+      "values::types::string::methods::split_input_reuse_tests::split_bytes_trimming_limits_lists_and_exact_errors_are_preserved",
+      "values::types::string::methods::split_input_reuse_tests::split_results_and_functions_survive_gc_freeze_and_source_drop",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::methods::ascii_case_reuse_tests::unchanged_ascii_case_reuses_input_without_heap_growth",
+      "values::types::string::methods::ascii_case_reuse_tests::ascii_pairs_unicode_fallback_types_and_exact_errors_are_preserved",
+      "values::types::string::methods::ascii_case_reuse_tests::case_results_and_functions_survive_gc_freeze_and_module_drop",
+      "values::types::string::methods::splitlines_input_reuse_tests::unsplit_lines_share_whole_input_and_avoid_payload_growth",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_bytes_lists_parameters_and_exact_errors_are_preserved",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_lists_and_functions_survive_gc_freeze_and_source_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "aa8c2a3cd912c7fbd5f9bd98ccc46e5d6fedb7fbfe4b00d578d9919897c6a2b7",
+      "starlark-rust/starlark/src/values/types/string/split_input_reuse_tests.rs": "955e4b2775c8829480de07e3e4c0c6c49e419a4aabcb2a962e295b4dcd132f4a"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/split-input-reuse-baseline-compile.json",
+      "sha256": "25e75afb91140878295d04ad09c1ab5bd925d6421c622fda153eefe5da9a5945",
+      "exit_code": 0,
+      "elapsed_seconds": 6.476871364982799,
+      "log_sha256": "03d104f3620d78607151f8d7556ab352842f0d7a09e5c8ad2e1edb285c91b624"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/split-input-reuse-baseline-preflight.json",
+      "sha256": "7a373db2aa21055d2bebdca9e3c273113fab59cd3bb39aa0bef153b659475b79",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02062500099418685,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/split-input-reuse-baseline-controls.json",
+      "sha256": "569ec3f8429c80ae8d83eabd281b59750fd0c635954af7842be4d61650862429",
+      "exit_code": 101,
+      "elapsed_seconds": 0.07309025904396549,
+      "log_sha256": "d18263910c815b8c5b7660d274d7f83e0c008d64e8723ef38992d7c15bd21a2a"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/split-input-reuse-candidate-compile.json",
+      "sha256": "345b373021ba9fabde80cbf4a5d89539bd4a9c7e91f3ca33446e474523b81ebe",
+      "exit_code": 0,
+      "elapsed_seconds": 5.091247894975822,
+      "log_sha256": "5d0257aee9d7499a6fc23234ac9271e371c3c081f61b18788ef8f4073d164ba7"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/split-input-reuse-candidate-preflight.json",
+      "sha256": "5a815b70a6705d7a67d07fab553bb801c96b1f0508627a6c8c675be531470f77",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0226155020063743,
+      "log_sha256": "f93140572c3412c5a6125da5a94d08575c950ea3de3dc8bfc3acd63057ac85bc"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/split-input-reuse-candidate-controls.json",
+      "sha256": "e8ca1c7a69e8b2b90b19b29fb87f60b57d1799a5aac6b897b8b14806979e04ff",
+      "exit_code": 0,
+      "elapsed_seconds": 0.11212948098545894,
+      "log_sha256": "5eb1a4a2b029225f71267e32b9441487d4440e0760fd5ec2656be64ade0706c3"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/split-input-reuse-dependents-check.json",
+      "sha256": "c0a86d8226e2ee031d4c05021469a3d51ef283095cd68448a6a636ecca712348",
+      "exit_code": 0,
+      "elapsed_seconds": 7.662013830034994,
+      "log_sha256": "7a54429a5b81f6ef97a6c098d0af95f57c0c03455ff88d89e28510e1ad1cb207"
+    }
+  },
+  "design_sha256": "9a1d354c4c89954707852bb2f6e4adb44e4fab976a99f3f157b26b3c861cf155",
+  "design_reviews": {
+    "target/wp899/split-input-reuse-design-source.md": "6746344c860a0551e10c90c7bfb6cb62d9e6da7973bd4ceefa244d51dca7465d",
+    "target/wp899/split-input-reuse-design-ownership.md": "045c75d6f67644e1f6625db59f4159ebb4db5822937de0af128ab2084e58c605",
+    "target/wp899/split-input-reuse-design-evidence.md": "12fb029afeffd29fb75d9a42966a63d5cd06dbe99c16269e8b5741b675c4b31b"
+  },
+  "proof": "Entire methods.rs comparison permits only receiver changes/as_str cursors, exact per-method closure comparing source substring length, lazy final allocation mapping and sibling hook plus pinned formatting. All split decisions/borrowed Vec/helper/capacity/order/reversal/count/unsafe UTF-8 conversion/maxsplit normalization/docs/annotations remain. Archived method loops baseline-identical. Vec and AllocList converge on unchanged alloc_list_iter; identity AllocValue on mapped StringValue. Identical sibling baseline/candidate. No new retained state/interner/cache/API/key/unsafe/dependency.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_gate_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 11,
+    "candidate_total": 14,
+    "split_comparisons_per_variant": 77750,
+    "candidate_whole_input_sharing_probes": 42,
+    "protected_case_comparisons_candidate": 74898,
+    "protected_splitlines_comparisons_candidate": 5602,
+    "exact_equal_error_records": 6
+  },
+  "metrics": {
+    "baseline": [
+      {
+        "method": "split_parts",
+        "input_bytes": 131072,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 270272
+      },
+      {
+        "method": "rsplit_parts",
+        "input_bytes": 131072,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 540608
+      }
+    ],
+    "candidate": [
+      {
+        "method": "split_parts",
+        "input_bytes": 131072,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "rsplit_parts",
+        "input_bytes": 131072,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:6, in extra\n      def extra(s): return s.split(None, None, None)\nerror: Wrong number of positional arguments, expected between 0 and 2, got 3\n --> assert.bzl:6:22\n  |\n6 | def extra(s): return s.split(None, None, None)\n  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:7, in named\n      def named(s): return s.rsplit(sep = \"|\")\nerror: Found `sep` extra named parameter(s) for call to function\n --> assert.bzl:7:22\n  |\n7 | def named(s): return s.rsplit(sep = \"|\")\n  |                      ^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:8, in wrong_sep\n      def wrong_sep(s): return s.split(1)\nerror: Type of parameter `sep` doesn't match, expected `None | str`, actual `int (repr: 1)`\n --> assert.bzl:8:26\n  |\n8 | def wrong_sep(s): return s.split(1)\n  |                          ^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:9, in wrong_limit\n      def wrong_limit(s): return s.rsplit(None, \"bad\")\nerror: Type of parameter `maxsplit` doesn't match, expected `None | int`, actual `string (repr: \"bad\")`\n --> assert.bzl:9:28\n  |\n9 | def wrong_limit(s): return s.rsplit(None, \"bad\")\n  |                            ^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n"
+  ],
+  "limits": "Only complete input substrings reuse by proven equal length; all partial substrings remain allocated owned strings. Result lists and borrowed scratch Vecs/iterators remain. Two fixed 131072-byte ASCII/Unicode fixture arena observations [270272,540608] to [0,0], not exact payload/allocator count or general memory/capacity/aggregate/peak/RSS/speed/source-fit benefit. Baseline sharing gate fails and two measured pointers false; candidate all 42 route probes assert true. GC disabled only for isolated accounting/comparison; explicit GC/frozen results/functions and source-drop controlled separately. Current empty-separator behavior preserved despite doc wording; maxsplit arithmetic unchanged, no repair or broader i32::MAX claim. Int receiver errors use wrapper type guards; same string unpacking source-proved.",
+  "growth": {
+    "test_sibling_lines": 366,
+    "estimate": "280-360; actual 366, six-line excess after formatting; no fixture assets",
+    "owner_boundary": "Two cohesive methods keep splitting logic; local closures and lazy allocation maps plus sibling hook only. No global helper or donor import."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14, default Starlark lib plus default Loading/Core/CLI alltargets offline; serial Cargo prep60s/tests30s/fresh exact artifact preflight; CARGO_MANIFEST_DIR set, no golden regeneration.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/split-input-reuse-archive-reference.rs": "92b7dbdbc038f36eecdf29dfd4733cf2e5b51c954a6b39f58a66715a6230135b",
+    "target/wp899/split-input-reuse-baseline-compile.json": "25e75afb91140878295d04ad09c1ab5bd925d6421c622fda153eefe5da9a5945",
+    "target/wp899/split-input-reuse-baseline-compile.jsonl": "03d104f3620d78607151f8d7556ab352842f0d7a09e5c8ad2e1edb285c91b624",
+    "target/wp899/split-input-reuse-baseline-controls.json": "569ec3f8429c80ae8d83eabd281b59750fd0c635954af7842be4d61650862429",
+    "target/wp899/split-input-reuse-baseline-controls.jsonl": "d18263910c815b8c5b7660d274d7f83e0c008d64e8723ef38992d7c15bd21a2a",
+    "target/wp899/split-input-reuse-baseline-preflight.json": "7a373db2aa21055d2bebdca9e3c273113fab59cd3bb39aa0bef153b659475b79",
+    "target/wp899/split-input-reuse-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/split-input-reuse-baseline-selectors.json": "a84b111c119bbafc6a1944bf4375a4bd34a60c9365dc3aeccc927fa40c2b397e",
+    "target/wp899/split-input-reuse-candidate-compile.json": "345b373021ba9fabde80cbf4a5d89539bd4a9c7e91f3ca33446e474523b81ebe",
+    "target/wp899/split-input-reuse-candidate-compile.jsonl": "5d0257aee9d7499a6fc23234ac9271e371c3c081f61b18788ef8f4073d164ba7",
+    "target/wp899/split-input-reuse-candidate-controls.json": "e8ca1c7a69e8b2b90b19b29fb87f60b57d1799a5aac6b897b8b14806979e04ff",
+    "target/wp899/split-input-reuse-candidate-controls.jsonl": "5eb1a4a2b029225f71267e32b9441487d4440e0760fd5ec2656be64ade0706c3",
+    "target/wp899/split-input-reuse-candidate-preflight.json": "5a815b70a6705d7a67d07fab553bb801c96b1f0508627a6c8c675be531470f77",
+    "target/wp899/split-input-reuse-candidate-preflight.jsonl": "f93140572c3412c5a6125da5a94d08575c950ea3de3dc8bfc3acd63057ac85bc",
+    "target/wp899/split-input-reuse-candidate-selectors.json": "08f0b381a7ca31826476d5b2619b2530a61a1a1d2a751e08768b89bd70d7521e",
+    "target/wp899/split-input-reuse-controls.py": "e464832913f20bbc4aeb0e43f8dac5985e41a7389e8dbf26da81e323bc2847fb",
+    "target/wp899/split-input-reuse-dependents-check.json": "c0a86d8226e2ee031d4c05021469a3d51ef283095cd68448a6a636ecca712348",
+    "target/wp899/split-input-reuse-dependents-check.jsonl": "7a54429a5b81f6ef97a6c098d0af95f57c0c03455ff88d89e28510e1ad1cb207",
+    "target/wp899/split-input-reuse-design-evidence.md": "12fb029afeffd29fb75d9a42966a63d5cd06dbe99c16269e8b5741b675c4b31b",
+    "target/wp899/split-input-reuse-design-ownership.md": "045c75d6f67644e1f6625db59f4159ebb4db5822937de0af128ab2084e58c605",
+    "target/wp899/split-input-reuse-design-source.md": "6746344c860a0551e10c90c7bfb6cb62d9e6da7973bd4ceefa244d51dca7465d",
+    "target/wp899/split-input-reuse-design.md": "9a1d354c4c89954707852bb2f6e4adb44e4fab976a99f3f157b26b3c861cf155",
+    "target/wp899/split-input-reuse-record.py": "ac81af52a45af6c401e9ea6a71b04f54f0eb3737729451aae8f4d75a72859f44",
+    "target/wp899/split-input-reuse-start.json": "44b24cd0b1e113dd70a44eabe152d0f561c0ba647b7696bc951c19a6ef3ef2c7",
+    "target/wp899/split-input-reuse-transform.py": "15cc11a7bbcf3c890c316c5247c3bf1471cf456f7b725d8c1fe6a767cfa43ff6"
+  },
+  "timing": {
+    "compile_seconds": 19.230133089993615,
+    "test_seconds": 0.18521974002942443,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 476.005259513855
+  },
+  "validation_sha256": "5f80372afb3c08c41bc25edbcef50f5b4dc19f167fe1ee6f70bc34698ed9d252",
+  "final_reviews": {
+    "target/wp899/split-input-reuse-final-source.md": "5ed1c889633f056bbe0caf6225591c56cf25755264f73019ecdd8a461f9baf85",
+    "target/wp899/split-input-reuse-final-ownership.md": "a96f3fbff8845f2c3c0345c9c8102989202be5331265cd4c37c88618e91eb983",
+    "target/wp899/split-input-reuse-final-evidence.md": "879498d3d93afcd700cfa9497eaad5c93d15ad5120b4c815722b5e48b051ae4a"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/split-input-reuse-format-check.json",
+      "sha256": "19a5c0a6a5d6a8d8355be5b772ae5d112e8790aa7761790eef5ea7eec0ae99d7",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/split-input-reuse-archive-check.json",
+      "sha256": "f7981c54b847181876cd13180a7b0d24201e37a835a408e7daf467a27c937c5c",
+      "exit_code": 0,
+      "log_sha256": "371933e72c39bca944af121e41269ffee168383bc978736394f7d75d6d76dbf1"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/split-input-reuse-plan-check.json",
+      "sha256": "b36432fd5b6ab4a57a17f7be509acc2f9aff05614423983c0176cc1b7414bfce",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/split-input-reuse-diff-check.json",
+      "sha256": "e8bc07e3e62e697fab407b695eefd76b0ef3a96165ff07b6a89096c0d9e88b98",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

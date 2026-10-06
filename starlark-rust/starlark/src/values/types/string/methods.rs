@@ -918,11 +918,19 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// ```
     #[starlark(speculative_exec_safe)]
     fn rsplit<'v>(
-        this: &str,
+        this: StringValue<'v>,
         #[starlark(require = pos, default = NoneOr::None)] sep: NoneOr<&str>,
         #[starlark(require = pos, default = NoneOr::None)] maxsplit: NoneOr<i32>,
         heap: Heap<'v>,
     ) -> anyhow::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
+        let s = this.as_str();
+        let alloc = |part: &str| {
+            if part.len() == this.len() {
+                this
+            } else {
+                heap.alloc_str(part)
+            }
+        };
         let maxsplit = match maxsplit.into_option() {
             None => None,
             Some(v) => {
@@ -936,19 +944,22 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         Ok(match sep.into_option() {
             None => match maxsplit {
                 None => heap
-                    .alloc_typed_unchecked(AllocList(this.split_whitespace()))
+                    .alloc_typed_unchecked(AllocList(s.split_whitespace().map(alloc)))
                     .cast(),
                 Some(maxsplit) => heap
-                    .alloc_typed_unchecked(rsplitn_whitespace(this, maxsplit))
+                    .alloc_typed_unchecked(AllocList(
+                        rsplitn_whitespace(s, maxsplit).into_iter().map(alloc),
+                    ))
                     .cast(),
             },
             Some(sep) => {
                 let mut v: Vec<_> = match maxsplit {
-                    None => this.rsplit(sep).collect(),
-                    Some(maxsplit) => this.rsplitn(maxsplit, sep).collect(),
+                    None => s.rsplit(sep).collect(),
+                    Some(maxsplit) => s.rsplitn(maxsplit, sep).collect(),
                 };
                 v.reverse();
-                heap.alloc_typed_unchecked(AllocList(v)).cast()
+                heap.alloc_typed_unchecked(AllocList(v.into_iter().map(alloc)))
+                    .cast()
             }
         })
     }
@@ -1017,11 +1028,19 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// ```
     #[starlark(speculative_exec_safe)]
     fn split<'v>(
-        this: &str,
+        this: StringValue<'v>,
         #[starlark(require = pos, default = NoneOr::None)] sep: NoneOr<&str>,
         #[starlark(require = pos, default = NoneOr::None)] maxsplit: NoneOr<i32>,
         heap: Heap<'v>,
     ) -> anyhow::Result<ValueOfUnchecked<'v, UnpackList<String>>> {
+        let s = this.as_str();
+        let alloc = |part: &str| {
+            if part.len() == this.len() {
+                this
+            } else {
+                heap.alloc_str(part)
+            }
+        };
         let maxsplit = match maxsplit.into_option() {
             None => None,
             Some(v) => {
@@ -1034,32 +1053,35 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
         };
         Ok(match (sep.into_option(), maxsplit) {
             (None, None) => heap
-                .alloc_typed_unchecked(AllocList(this.split_whitespace()))
+                .alloc_typed_unchecked(AllocList(s.split_whitespace().map(alloc)))
                 .cast(),
             (None, Some(maxsplit)) => heap
-                .alloc_typed_unchecked(AllocList(splitn_whitespace(this, maxsplit)))
+                .alloc_typed_unchecked(AllocList(
+                    splitn_whitespace(s, maxsplit).into_iter().map(alloc),
+                ))
                 .cast(),
             (Some(sep), None) => {
                 if sep.len() == 1 {
                     // If we are searching for a 1-byte string, we can provide a much faster path.
                     // Since it is one byte, given how UTF8 works, all the resultant slices must be UTF8 too.
                     let b = sep.as_bytes()[0];
-                    let count = fast_string::count_matches_byte(this, b);
+                    let count = fast_string::count_matches_byte(s, b);
                     let mut res = Vec::with_capacity(count + 1);
                     res.extend(
-                        this.as_bytes()
+                        s.as_bytes()
                             .split(|x| *x == b)
                             .map(|x| unsafe { std::str::from_utf8_unchecked(x) }),
                     );
                     debug_assert_eq!(res.len(), count + 1);
-                    heap.alloc_typed_unchecked(AllocList(res)).cast()
+                    heap.alloc_typed_unchecked(AllocList(res.into_iter().map(alloc)))
+                        .cast()
                 } else {
-                    heap.alloc_typed_unchecked(AllocList(this.split(sep)))
+                    heap.alloc_typed_unchecked(AllocList(s.split(sep).map(alloc)))
                         .cast()
                 }
             }
             (Some(sep), Some(maxsplit)) => heap
-                .alloc_typed_unchecked(AllocList(this.splitn(maxsplit, sep)))
+                .alloc_typed_unchecked(AllocList(s.splitn(maxsplit, sep).map(alloc)))
                 .cast(),
         })
     }
@@ -1323,6 +1345,10 @@ mod ascii_case_reuse_tests;
 #[cfg(test)]
 #[path = "splitlines_input_reuse_tests.rs"]
 mod splitlines_input_reuse_tests;
+
+#[cfg(test)]
+#[path = "split_input_reuse_tests.rs"]
+mod split_input_reuse_tests;
 
 #[cfg(test)]
 mod tests {
