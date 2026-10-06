@@ -1383,8 +1383,10 @@ enum AttrCandidateAtom<'a> {
 }
 
 impl AttrCandidateAtom<'_> {
-    fn render(&self, render_label: &impl Fn(&CanonicalLabel) -> CompactString) -> CompactString {
+    fn render(self, render_label: &impl Fn(&CanonicalLabel) -> CompactString) -> CompactString {
         match self {
+            Self::String(value) if value.capacity() == value.len() => value,
+            // Preserve compact final results when concatenation leaves spare capacity.
             Self::String(value) => value.clone(),
             Self::Label(label) => render_label(label),
         }
@@ -1405,7 +1407,7 @@ impl AttrCandidateValue<'_> {
             Self::List(values) => CompactString::new(format!(
                 "[{}]",
                 values
-                    .iter()
+                    .into_iter()
                     .map(|value| value.render(render_label))
                     .collect::<Vec<_>>()
                     .join(", ")
@@ -1693,6 +1695,10 @@ fn combine_attr_candidates<'a>(
     }
     Ok(combined)
 }
+
+#[cfg(test)]
+#[path = "attrs/candidate_memory_tests.rs"]
+mod candidate_memory_tests;
 
 #[cfg(test)]
 mod validation_tests;

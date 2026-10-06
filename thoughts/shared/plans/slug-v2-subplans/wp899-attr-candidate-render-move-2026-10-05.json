@@ -1,0 +1,311 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "345451aac",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+    "app/slug_loading_v2/src/attrs/candidate_memory_tests.rs": "8906a4414495f336a042b4b547d92e719f558f963ab41e9dd50ca1671db1b1d4"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+    "artifact_sha256": "3578d7196d767db00348dce6eacee5f1b6b16c3a028d5ff20d8b02feb3e7bd1e",
+    "selectors": [
+      "attrs::candidate_memory_tests::atom_and_scalar_render_transfer_tight_buffers_and_release_spare_capacity",
+      "attrs::candidate_memory_tests::rendering_preserves_callback_order_duplicates_and_owned_results",
+      "attrs::candidate_memory_tests::public_candidates_remain_owned_after_coerced_inputs_drop",
+      "attrs::candidate_memory_tests::concatenated_candidate_current_render_releases_spare_capacity",
+      "attrs::tests::query_value_keeps_the_loading_value_structure_order_and_provenance",
+      "attrs::tests::attr_candidates_preserve_equal_selector_key_correlation",
+      "attrs::tests::attr_candidates_cross_product_distinct_selector_key_sets",
+      "attrs::tests::attr_candidates_correlate_explicit_keys_even_when_only_one_selector_has_default",
+      "attrs::tests::nested_selectors_reject_conflicting_equal_key_and_default_bindings",
+      "attrs::tests::invalid_concatenation_returns_a_typed_error",
+      "attrs::tests::attr_candidates_render_ordered_lists_and_dictionaries_with_canonical_labels",
+      "attrs::tests::attr_candidates_skip_null_optional_values_and_are_available_from_query_values"
+    ],
+    "source_sha256": {
+      "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+      "app/slug_loading_v2/src/attrs/candidate_memory_tests.rs": "8906a4414495f336a042b4b547d92e719f558f963ab41e9dd50ca1671db1b1d4"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-compile.json",
+      "sha256": "8466acf8b9b2474aa40ff27058bfce523af624cf8ffc961d9a76a6547200872c",
+      "exit_code": 0,
+      "elapsed_seconds": 11.689565015025437,
+      "log_sha256": "7231b0543f22fc8a972ff92460950412ab02892ec43b13af0429c1d85c182cf0"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-preflight.json",
+      "sha256": "090dcd7a760c528ecf4c52316d8e6a3af873c1ff8f4d1ca2c712d0af9c612d4b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02481940801953897,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-controls.json",
+      "sha256": "7e307438a904d9b4d9e022f9e6d575e4c6677821e30b95e5c30d76550423a406",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0022546309628523886,
+      "log_sha256": "b0f209bea3912dcf539c3046073d7654f50d79c7e8f606f39bab0665e3c8d7db"
+    },
+    "spare-compile": {
+      "receipt": "target/wp899/attr-candidate-render-move-spare-compile.json",
+      "sha256": "74dd9b2734d36d09773bd3b69e49835414867dc49f604a7cef4bb064b512eaec",
+      "exit_code": 0,
+      "elapsed_seconds": 11.723083454999141,
+      "log_sha256": "660a3eefde16a03e79f1f4f2703121e6412e1d6f887fab08854a1a6ed290fd09"
+    },
+    "spare-preflight": {
+      "receipt": "target/wp899/attr-candidate-render-move-spare-preflight.json",
+      "sha256": "4ddd106b9684ea9a2e1a8457bc7cd81a4f0534e8d11215cb265b6389ffcd6c69",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024013244023080915,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "spare-controls": {
+      "receipt": "target/wp899/attr-candidate-render-move-spare-controls.json",
+      "sha256": "353b47b933baf1913b889f584d73db9d3c90dd0ab2b0a75199602fe42ee4015d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0018675790051929653,
+      "log_sha256": "5931532ae060ca3adaa7d13f19d0ae1bb77465d3a017a0d78482e5fe20d4abe0"
+    },
+    "baseline-r1-compile": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-r1-compile.json",
+      "sha256": "a4c111ea36cbad03f09a1e2b2419ee93610ae8c099a747cce5248cb3e05c437e",
+      "exit_code": 0,
+      "elapsed_seconds": 11.712009723007213,
+      "log_sha256": "e6fca1e08270d08f1a412cf19009006f49512d8180f04d93c550e3364c64f0c6"
+    },
+    "baseline-r1-preflight": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-r1-preflight.json",
+      "sha256": "952f07a880689aab06066b6d9f49f2bf98c3b666b9a73de0e73f7bbcb4fc2497",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024398087000008672,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "baseline-r1-controls": {
+      "receipt": "target/wp899/attr-candidate-render-move-baseline-r1-controls.json",
+      "sha256": "2f53311bb14dc3c63f0c8fcf0cf6abdd553d7ed24dee9ce37aa526c1959700fc",
+      "exit_code": 101,
+      "elapsed_seconds": 0.002479582035448402,
+      "log_sha256": "42d6d58cc0d04c1fa536609584be7a6b3e4808189547e813a6ac9f80c6f0fa58"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/attr-candidate-render-move-candidate-compile.json",
+      "sha256": "8d2d988bda032a78ee43382e93456c33841b7e24cd2bcdb327fc3577ef250ff7",
+      "exit_code": 0,
+      "elapsed_seconds": 11.397415811021347,
+      "log_sha256": "19132cb372c8facc9e9a5facba789bcc8f07f6b63e3bcad7f3f43d188db1dc04"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/attr-candidate-render-move-candidate-preflight.json",
+      "sha256": "dadeb7ac9c2aec927dbc94e761eb3ded246e8438c55062c9bfb5b9960ef0a727",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024387266021221876,
+      "log_sha256": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/attr-candidate-render-move-candidate-controls.json",
+      "sha256": "80ea76b1b89939acbb638d437f760aac8c9e7d6f854690e23c6194e5af94ee85",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0025452919653616846,
+      "log_sha256": "7187165ae6bbabd0c3e6c043a8c47f6eca48182ab4f3068f68168e597cf70685"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/attr-candidate-render-move-dependents-check.json",
+      "sha256": "9c1959316a888117db65c4b644951599401bbed8b889f1538dfd0abba5c07c72",
+      "exit_code": 0,
+      "elapsed_seconds": 4.520440207037609,
+      "log_sha256": "6b1b5a1875f63d11aaa4a37247c256286cfe25ac2eef8bed4a35dd7c2a23869a"
+    }
+  },
+  "design_sha256": "aa744bb7c9df9bf602d292595e391d7c1c36aa9ec1bebff551e018f1c508f642",
+  "design_reviews": {
+    "target/wp899/attr-candidate-render-move-capacity-design-source.md": "37e7f24b48223e0c7fd51a3ea04b3047e78d84f247180fffcae6777be014d6ff",
+    "target/wp899/attr-candidate-render-move-capacity-design-input.md": "cf82e5e3e316cf1185bd220250274e2e0b886bdbe71d47800599986f7da10a9c",
+    "target/wp899/attr-candidate-render-move-capacity-design-evidence.md": "a5f62583956a3e96282deaa45976af6e43616f776a3186af3635409eae67b17e"
+  },
+  "ownership_proof": "Entire-file baseline comparison allows only consuming atom signature, capacity==len guarded String transfer, unchanged spare clone, consuming list iterator and sibling test hook. Retained CoercedAttributeValue, expansion/selector cross-product/concat/dictionary replacement code and all other production code byte-identical. Identical revised tests baseline/candidate; final strings owned, labels borrowed synchronously.",
+  "pass_counts": {
+    "new_owner_controls": 4,
+    "existing_owner_controls": 8,
+    "unique_candidate_controls": 12,
+    "baseline_revised_passed": 3,
+    "baseline_revised_pointer_failed": 1
+  },
+  "metrics": {
+    "baseline-r1": {
+      "atom_scalar": [
+        {
+          "route": "atom",
+          "allocation": "tight",
+          "bytes": 9219,
+          "temporary_capacity": 9219,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        },
+        {
+          "route": "atom",
+          "allocation": "spare",
+          "bytes": 9219,
+          "temporary_capacity": 27657,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        },
+        {
+          "route": "scalar",
+          "allocation": "tight",
+          "bytes": 9219,
+          "temporary_capacity": 9219,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        },
+        {
+          "route": "scalar",
+          "allocation": "spare",
+          "bytes": 9219,
+          "temporary_capacity": 27657,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        }
+      ],
+      "natural_concat": {
+        "bytes": 8193,
+        "temporary_capacity": 12288,
+        "final_capacity": 8193
+      }
+    },
+    "candidate": {
+      "atom_scalar": [
+        {
+          "route": "atom",
+          "allocation": "tight",
+          "bytes": 9219,
+          "temporary_capacity": 9219,
+          "final_capacity": 9219,
+          "source_pointer_transferred": true
+        },
+        {
+          "route": "atom",
+          "allocation": "spare",
+          "bytes": 9219,
+          "temporary_capacity": 27657,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        },
+        {
+          "route": "scalar",
+          "allocation": "tight",
+          "bytes": 9219,
+          "temporary_capacity": 9219,
+          "final_capacity": 9219,
+          "source_pointer_transferred": true
+        },
+        {
+          "route": "scalar",
+          "allocation": "spare",
+          "bytes": 9219,
+          "temporary_capacity": 27657,
+          "final_capacity": 9219,
+          "source_pointer_transferred": false
+        }
+      ],
+      "natural_concat": {
+        "bytes": 8193,
+        "temporary_capacity": 12288,
+        "final_capacity": 8193
+      }
+    }
+  },
+  "rejected_design": "Unconditional movement rejected after original spare fixture and natural expanded concat demonstrated excess capacity retention. Original3 DESIGN accepts withdrawn;3 revised DESIGN accepts explicit capacity guard. Original failure/source and natural-path logs retained. No unconditional production implementation was made.",
+  "corrections": [
+    "Revised design retains original clone when capacity differs from len; tight heap strings alone remove one final atom clone. Full inline/static can satisfy guard harmlessly; no heap savings attributed to them.",
+    "Revised baseline nocapture concat metrics interleave test status; corrected failure-list accounting reuses complete unchanged output; no test rerun."
+  ],
+  "limits": "Final capacities unchanged in paired fixed tight/spare and natural concat controls. Guard establishes transfer at minimum payload capacity only; spare original clones remain. Expansion/cross-product copies, metadata, list/dict formatting and final owned output storage remain. No aggregate allocated-capacity, peak/RSS/timing/speed/whole-workload/source-fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default Loading lib + default Core/CLI alltargets offline; serial Cargo prep60s/focused tests30s/exactfresh artifact preflights; no golden regeneration.",
+  "growth": "160-line sibling owner tests; existing large attrs.rs retains its cohesive <50-line renderer, no new production responsibility/API/helper.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/attr-candidate-render-move-baseline-compile.json": "8466acf8b9b2474aa40ff27058bfce523af624cf8ffc961d9a76a6547200872c",
+    "target/wp899/attr-candidate-render-move-baseline-compile.jsonl": "7231b0543f22fc8a972ff92460950412ab02892ec43b13af0429c1d85c182cf0",
+    "target/wp899/attr-candidate-render-move-baseline-controls.json": "7e307438a904d9b4d9e022f9e6d575e4c6677821e30b95e5c30d76550423a406",
+    "target/wp899/attr-candidate-render-move-baseline-controls.jsonl": "b0f209bea3912dcf539c3046073d7654f50d79c7e8f606f39bab0665e3c8d7db",
+    "target/wp899/attr-candidate-render-move-baseline-preflight.json": "090dcd7a760c528ecf4c52316d8e6a3af873c1ff8f4d1ca2c712d0af9c612d4b",
+    "target/wp899/attr-candidate-render-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/attr-candidate-render-move-baseline-r1-accounting.json": "1cbcd1ec6d8ebd1ac301fdc5fd47f50d5ad0249d95928f02feb34b870f824da2",
+    "target/wp899/attr-candidate-render-move-baseline-r1-compile.json": "a4c111ea36cbad03f09a1e2b2419ee93610ae8c099a747cce5248cb3e05c437e",
+    "target/wp899/attr-candidate-render-move-baseline-r1-compile.jsonl": "e6fca1e08270d08f1a412cf19009006f49512d8180f04d93c550e3364c64f0c6",
+    "target/wp899/attr-candidate-render-move-baseline-r1-controls.json": "2f53311bb14dc3c63f0c8fcf0cf6abdd553d7ed24dee9ce37aa526c1959700fc",
+    "target/wp899/attr-candidate-render-move-baseline-r1-controls.jsonl": "42d6d58cc0d04c1fa536609584be7a6b3e4808189547e813a6ac9f80c6f0fa58",
+    "target/wp899/attr-candidate-render-move-baseline-r1-preflight.json": "952f07a880689aab06066b6d9f49f2bf98c3b666b9a73de0e73f7bbcb4fc2497",
+    "target/wp899/attr-candidate-render-move-baseline-r1-preflight.jsonl": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b",
+    "target/wp899/attr-candidate-render-move-baseline-r1-selectors.json": "49b3551215171ec2c2bc7d8c7ccc692ad64771fa74edd28321e144c95ce5b378",
+    "target/wp899/attr-candidate-render-move-baseline-selectors.json": "e34ccdecff8b757c5526ec9bae38c96c53aac6826307161647af94e29509d069",
+    "target/wp899/attr-candidate-render-move-candidate-compile.json": "8d2d988bda032a78ee43382e93456c33841b7e24cd2bcdb327fc3577ef250ff7",
+    "target/wp899/attr-candidate-render-move-candidate-compile.jsonl": "19132cb372c8facc9e9a5facba789bcc8f07f6b63e3bcad7f3f43d188db1dc04",
+    "target/wp899/attr-candidate-render-move-candidate-controls.json": "80ea76b1b89939acbb638d437f760aac8c9e7d6f854690e23c6194e5af94ee85",
+    "target/wp899/attr-candidate-render-move-candidate-controls.jsonl": "7187165ae6bbabd0c3e6c043a8c47f6eca48182ab4f3068f68168e597cf70685",
+    "target/wp899/attr-candidate-render-move-candidate-preflight.json": "dadeb7ac9c2aec927dbc94e761eb3ded246e8438c55062c9bfb5b9960ef0a727",
+    "target/wp899/attr-candidate-render-move-candidate-preflight.jsonl": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92",
+    "target/wp899/attr-candidate-render-move-candidate-selectors.json": "5e36b13b7c313d8eb5c91cd2615123e68d8cf279ce5ec26a0830ace45568579c",
+    "target/wp899/attr-candidate-render-move-capacity-design-evidence.md": "a5f62583956a3e96282deaa45976af6e43616f776a3186af3635409eae67b17e",
+    "target/wp899/attr-candidate-render-move-capacity-design-input.md": "cf82e5e3e316cf1185bd220250274e2e0b886bdbe71d47800599986f7da10a9c",
+    "target/wp899/attr-candidate-render-move-capacity-design-source.md": "37e7f24b48223e0c7fd51a3ea04b3047e78d84f247180fffcae6777be014d6ff",
+    "target/wp899/attr-candidate-render-move-capacity-design.md": "aa744bb7c9df9bf602d292595e391d7c1c36aa9ec1bebff551e018f1c508f642",
+    "target/wp899/attr-candidate-render-move-capacity-wording.md": "9e90b8819c48d1b8c67e98fef8e5f096ecf116a808b3407fbbadf80a5b8cdd5b",
+    "target/wp899/attr-candidate-render-move-controls.py": "056bc8c658fd5607f8976d0fb5c9e1a3bcec21af081e9d91f951f0eb968afd7d",
+    "target/wp899/attr-candidate-render-move-dependents-check.json": "9c1959316a888117db65c4b644951599401bbed8b889f1538dfd0abba5c07c72",
+    "target/wp899/attr-candidate-render-move-dependents-check.jsonl": "6b1b5a1875f63d11aaa4a37247c256286cfe25ac2eef8bed4a35dd7c2a23869a",
+    "target/wp899/attr-candidate-render-move-design-evidence.md": "5231f6d65f69466a762e638a5f87765f811add81813e7b3a65e33faca38e6f6b",
+    "target/wp899/attr-candidate-render-move-design-input.md": "768d449741d368034056f930b2fb5461242af0a3a3bd8e066af2c25a8cde829c",
+    "target/wp899/attr-candidate-render-move-design-source.md": "ffabef79d827f9137c93e970f18755304ad99195a62f44fd57970667b31a6095",
+    "target/wp899/attr-candidate-render-move-design.md": "e73646be47ba5aba4bb0723e418f8515018fa37a49a1cf64054317abe2b7c4d0",
+    "target/wp899/attr-candidate-render-move-record.py": "32c3ef80725b7c0fd2f6bd0d98814b06ec9cdfd0acba0d7631b912a37fc3ac5e",
+    "target/wp899/attr-candidate-render-move-spare-compile.json": "74dd9b2734d36d09773bd3b69e49835414867dc49f604a7cef4bb064b512eaec",
+    "target/wp899/attr-candidate-render-move-spare-compile.jsonl": "660a3eefde16a03e79f1f4f2703121e6412e1d6f887fab08854a1a6ed290fd09",
+    "target/wp899/attr-candidate-render-move-spare-controls.json": "353b47b933baf1913b889f584d73db9d3c90dd0ab2b0a75199602fe42ee4015d",
+    "target/wp899/attr-candidate-render-move-spare-controls.jsonl": "5931532ae060ca3adaa7d13f19d0ae1bb77465d3a017a0d78482e5fe20d4abe0",
+    "target/wp899/attr-candidate-render-move-spare-preflight.json": "4ddd106b9684ea9a2e1a8457bc7cd81a4f0534e8d11215cb265b6389ffcd6c69",
+    "target/wp899/attr-candidate-render-move-spare-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/attr-candidate-render-move-start.json": "aed5db44bdfc3a88ca1e8a7b9fbe932a92d5b65e2276f5306ff8c20d761b64a7"
+  },
+  "timing": {
+    "compile_seconds": 51.04251421109075,
+    "test_seconds": 0.00914708396885544,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 444.3377106189728
+  },
+  "validation_sha256": "14b6695be146733ec86c99e58ccf3b3b56ee1e6d40ea34f378503eded9866bde",
+  "final_reviews": {
+    "target/wp899/attr-candidate-render-move-final-source.md": "74a21be8a15da869a79037365cfa36697eb11f52e528711cedec588f4032403c",
+    "target/wp899/attr-candidate-render-move-final-input.md": "2affc82c67eac72330c4832b03a559d858e049355ccc5f82aef9040072c99b04",
+    "target/wp899/attr-candidate-render-move-final-evidence.md": "fdbd3ff9b3fc303c98de0e4d876cc8d69be06763e17b0dd1e41c4cf891089625"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/attr-candidate-render-move-format-check.json",
+      "sha256": "6f92f5d550c706184ff723207db5f686f545886f4d4de1b34a8a73b8e88c8322",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/attr-candidate-render-move-diff-check.json",
+      "sha256": "f36aa08f88e5f8bb711907da951083d1eb6a935971cae3d65b7faf8986d39474",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/attr-candidate-render-move-plan-check.json",
+      "sha256": "762201458a4bb4cde89b22f9b4d9f5e8efc8f335c9f408ecaf73c08e5b422b01",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/attr-candidate-render-move-archive-check.json",
+      "sha256": "5bfafff6937ab981f48594ecf33c667db7edf270364eb3300591132affee8748",
+      "exit_code": 0
+    }
+  }
+}
