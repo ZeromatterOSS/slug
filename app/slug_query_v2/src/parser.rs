@@ -204,7 +204,7 @@ fn unquoted_bare_negative_tokens(source: &str) -> Option<String> {
         index
     }
 
-    fn scan_token(source: &str, mut index: usize) -> Option<(String, usize)> {
+    fn scan_token(source: &str, mut index: usize) -> Option<(&str, usize)> {
         while let Some((ch, next)) = next_char(source, index) {
             if !ch.is_ascii_whitespace() {
                 break;
@@ -213,21 +213,21 @@ fn unquoted_bare_negative_tokens(source: &str) -> Option<String> {
         }
         let (first, next) = next_char(source, index)?;
         if "(),+-=^".contains(first) {
-            return Some((first.to_string(), next));
+            return Some((&source[index..next], next));
         }
         if first == '\'' || first == '"' {
             let value_start = next;
             let mut end = next;
             while let Some((ch, following)) = next_char(source, end) {
                 if ch == first {
-                    return Some((source[value_start..end].to_owned(), following));
+                    return Some((&source[value_start..end], following));
                 }
                 end = following;
             }
-            return Some((source[value_start..].to_owned(), source.len()));
+            return Some((&source[value_start..], source.len()));
         }
         let end = scan_word(source, index);
-        Some((source[index..end].to_owned(), end))
+        Some((&source[index..end], end))
     }
 
     let mut quote = None;
@@ -488,3 +488,7 @@ fn word(input: Span<'_>) -> Parsed<'_, Span<'_>> {
     }
     alt((quoted('\''), quoted('"'), unquoted)).parse(input)
 }
+
+#[cfg(test)]
+#[path = "parser/query_error_token_memory_tests.rs"]
+mod query_error_token_memory_tests;

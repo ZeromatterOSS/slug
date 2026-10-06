@@ -1,0 +1,308 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "04ad54dd4",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native memory implementation; inherited diagnostic semantics unchanged, no widened Bazel parity",
+  "source_sha256": {
+    "app/slug_query_v2/src/parser.rs": "35224a853b80140053d6f8cec1936c2ed1bf2e4ada02c4d7c543f2946729bd9f",
+    "app/slug_query_v2/src/parser/query_error_token_memory_tests.rs": "03aa055951e7cd875ce5c2ff5ffd21d219a8c901d78034d3f117f12f8f08f941",
+    "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "app/slug_query_v2/Cargo.toml": "c45d3a393da6f22b6b0e3cbfbe401ad7a4b0986de662ae19ae4872b5c5b4561f",
+    "app/slug_query_v2/src/lib.rs": "a140c2b6971b5e8439c14124ed0f3dc30919f0f2dcecef87f8cb50aaecd0a672",
+    "app/slug_query_v2/src/expr.rs": "db8f9e3b96cc45093e7ff39e8f9c884573204d3eac2b4b82b26fcc4e9f84afcc",
+    "app/slug_query_v2/src/graph.rs": "78edec100be062e915891493ac669683c83ce870c140698767cbd393f983b4a0",
+    "app/slug_query_v2/src/evaluator.rs": "8d9bd8ed0359bec36515040391e2df02e003d62f2cc18a97a0e5a33f7a436991",
+    "app/slug_query_v2/src/loading_environment.rs": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de",
+    "app/slug_query_v2/src/generic.rs": "7eb2ef573cace410b8415c90f2d3a5a7dd29497a45290d11524597a2d974ab8f",
+    "app/slug_query_v2/src/traversal.rs": "0d5a50a2041806546bd9471017486d53ac05d48b813964fabcdf350203ba6b6c",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3"
+  },
+  "reference_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java": "336cdc96d2202acdcc37b221c22f40e973341fbab70d37d32c6b925eddf5174d",
+    "/run/media/system/Colossus/dev/bazel/src/main/java/com/google/devtools/build/lib/query2/engine/Lexer.java": "5ef9f441764dc603b8002729346c2a9b0f94b85ad6e836478a3f11892e5b32b0",
+    "/run/media/system/Colossus/dev/bazel/src/test/java/com/google/devtools/build/lib/query2/engine/QueryParserTest.java": "e77df81de485f2c52e639a42209cf496df0bd2e74239bac8f68ac919fdda9173",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/str.rs": "02e739ddde026222b06b9fc8dd1c6a6206f919bb33b2e33dcc6163a24bbd29e2"
+  },
+  "baseline_selection": {
+    "targets": {
+      "slug_query_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+        "artifact_sha256": "54631ecb17d1e520314fce937b8f01d80bcd07a1727c06032610b466a5fba176",
+        "selectors": [
+          "parser::query_error_token_memory_tests::negative_context_tokens_preserve_exact_scanning_and_three_token_limit",
+          "parser::query_error_token_memory_tests::query_errors_preserve_messages_spans_priority_and_owned_lifetimes"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_query_v2/src/parser.rs": "5b0390aef092956ff5ceb1db4bf32fb73e173c4eaa960914413b2c4deb16af6a",
+      "app/slug_query_v2/src/parser/query_error_token_memory_tests.rs": "03aa055951e7cd875ce5c2ff5ffd21d219a8c901d78034d3f117f12f8f08f941",
+      "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960"
+    }
+  },
+  "candidate_selection": {
+    "targets": {
+      "slug_query_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+        "artifact_sha256": "1ed7da0120da86346dbfbb5969a71a4e4b786e8b53c22bfc99da0ef454e15149",
+        "selectors": [
+          "parser::query_error_token_memory_tests::negative_context_tokens_preserve_exact_scanning_and_three_token_limit",
+          "parser::query_error_token_memory_tests::query_errors_preserve_messages_spans_priority_and_owned_lifetimes"
+        ],
+        "fresh": false
+      },
+      "query": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/query-1eec5767cc6ec170",
+        "artifact_sha256": "4835516afd891641600fd6147e21ea20055835c837c17c4321957e5a2f2a0e8f",
+        "selectors": [
+          "parser_retains_bazel_left_associative_shape_and_source_spans",
+          "parser_accepts_generic_calls_let_parentheses_and_space_separated_set",
+          "signed_java_integer_slots_validate_without_narrowing_expression_integers",
+          "parser_reports_bazel_premature_end_diagnostic_with_a_span"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_query_v2/src/parser.rs": "35224a853b80140053d6f8cec1936c2ed1bf2e4ada02c4d7c543f2946729bd9f",
+      "app/slug_query_v2/src/parser/query_error_token_memory_tests.rs": "03aa055951e7cd875ce5c2ff5ffd21d219a8c901d78034d3f117f12f8f08f941",
+      "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/query-error-token-borrow-baseline-compile.json",
+      "sha256": "f8d3eba546db0c9a74d0f5c94ca3878cc6dd351a4fd37cc9ecf00c710dddecc1",
+      "exit_code": 0,
+      "elapsed_seconds": 10.800148186041042,
+      "log_sha256": "9188c0bdc1361c15c6ee56b18139b6d134d583f2b23b41c7bf0a7b3d48db9e02"
+    },
+    "baseline-slug_query_v2-preflight": {
+      "receipt": "target/wp899/query-error-token-borrow-baseline-slug_query_v2-preflight.json",
+      "sha256": "d3d90c63d76d3b404b704b4fff7a5f1388d99fdfa981c35288beb2fcd85d365d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02196792495669797,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-slug_query_v2-controls": {
+      "receipt": "target/wp899/query-error-token-borrow-baseline-slug_query_v2-controls.json",
+      "sha256": "b2680bef97e5ed2a45320a2ebfa84d855bfbaea89bb194eeba9bd5b09bbf7e28",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002019829989876598,
+      "log_sha256": "50c528ec9e758e6fc4c8b82351cc4a5eb3bf877eee6264b5e3e04f1b8a58a54a"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/query-error-token-borrow-candidate-compile.json",
+      "sha256": "2c399033a0912d52946d84fb36d069c12761fc76ef44c9e6406217f3047e8088",
+      "exit_code": 0,
+      "elapsed_seconds": 1.191296421980951,
+      "log_sha256": "3c4ad674e52ef2d2127b02917f73e82e94604838aa43fc6e84a901fd110ba477"
+    },
+    "candidate-slug_query_v2-preflight": {
+      "receipt": "target/wp899/query-error-token-borrow-candidate-slug_query_v2-preflight.json",
+      "sha256": "2bd83420e93d6f9e31e4d6c4ea57f85d700fc38440d8c3223ec5e3df1ccf12b2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024081946990918368,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "candidate-slug_query_v2-controls": {
+      "receipt": "target/wp899/query-error-token-borrow-candidate-slug_query_v2-controls.json",
+      "sha256": "4013bcb35f1fd92d1f9717343db9ddfdb10caa070893898dc6a6c505f7a7cdde",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002362330968026072,
+      "log_sha256": "50c528ec9e758e6fc4c8b82351cc4a5eb3bf877eee6264b5e3e04f1b8a58a54a"
+    },
+    "candidate-query-preflight": {
+      "receipt": "target/wp899/query-error-token-borrow-candidate-query-preflight.json",
+      "sha256": "1ad9d405b4b97adbb1c33beba39c750b7fa441840ea7658aa4b831445a9f6b0c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019844726019073278,
+      "log_sha256": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b"
+    },
+    "candidate-query-controls": {
+      "receipt": "target/wp899/query-error-token-borrow-candidate-query-controls.json",
+      "sha256": "2fa78baeb16f79875638887a069cb6da3128fd0fb6bb10575a8547a392f6c2fb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.001593787979800254,
+      "log_sha256": "0b1ca054263d8a37dbb8166e5599ec9c63936fece4cfb94bcfc36f58f0ba7d59"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/query-error-token-borrow-dependents-check.json",
+      "sha256": "b445e3cfe4ff923c350e9e92cce7c32fb0e90bfacdb533567ada0d330cbcc763",
+      "exit_code": 0,
+      "elapsed_seconds": 6.81722191197332,
+      "log_sha256": "3e286d67d2ef8126163fdcdd795ba4aa34e691927a5787cc616f72ebe01888ff"
+    },
+    "format-check": {
+      "receipt": "target/wp899/query-error-token-borrow-format-check.json",
+      "sha256": "4569f2cc1a22594d3f54d33410792ce49fdfae40202a9a45a92fdffd67bef94f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.00861076102592051,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/query-error-token-borrow-archive-check.json",
+      "sha256": "99e305b0785e7edc77ad640ea35db697cb6715c31851410c716a3914557c1aaf",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03436765598598868,
+      "log_sha256": "4d7d15c74af24092d3b704e882ab986c7e18f980d305725fb573893e1aa30668"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "5b0390aef092956ff5ceb1db4bf32fb73e173c4eaa960914413b2c4deb16af6a",
+    "exact_replacements": [
+      [
+        "Option<(String, usize)>",
+        "Option<(&str, usize)>"
+      ],
+      [
+        "Some((first.to_string(), next))",
+        "Some((&source[index..next], next))"
+      ],
+      [
+        "Some((source[value_start..end].to_owned(), following))",
+        "Some((&source[value_start..end], following))"
+      ],
+      [
+        "Some((source[value_start..].to_owned(), source.len()))",
+        "Some((&source[value_start..], source.len()))"
+      ],
+      [
+        "Some((source[index..end].to_owned(), end))",
+        "Some((&source[index..end], end))"
+      ]
+    ],
+    "every_other_byte_unchanged": true
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14 four tools; serial offline lib+query integration CargoJSON no-run prep60s/exact preflight/tests30s, CARGO_MANIFEST_DIR, no golden regeneration. Default Core/CLI alltargets compile; selected format/archive/plan/diff checks.",
+  "pass_counts": {
+    "baseline_new": 2,
+    "candidate_new": 2,
+    "candidate_protected": 4,
+    "candidate_total": 6
+  },
+  "metrics": {
+    "scanner_cases": 30,
+    "none_cases": 12,
+    "errors": [
+      "syntax error at '- 1 )' at bytes 8..8",
+      "syntax error at '- 1 ,' at bytes 10..10",
+      "syntax error at '- 1 \u00e9\ud83d\ude42' at bytes 17..17",
+      "syntax error at '- 1 ' at bytes 11..11",
+      "syntax error at '- 1 @@repo++ext//:x' at bytes 24..24",
+      "syntax error at '- 1 unterminated\ud83d\ude42)' at bytes 26..26",
+      "premature end of input at bytes 7..7",
+      "premature end of input at bytes 8..8",
+      "premature end of input at bytes 8..8",
+      "syntax error in query expression at bytes 11..11",
+      "syntax error in query expression at bytes 9..9"
+    ],
+    "errors_sha256": "7bda80fde723b3597bc416ca82b2011caf539325ffb0b49f77ac6cdfe8db1798",
+    "retained_message_bytes": [
+      40982,
+      40982
+    ]
+  },
+  "invariant_to_evidence": {
+    "four_token_routes_and_bytes": "direct actual helper: 30 exact contexts, 12 None cases, punctuation/bare/closed/unterminated quote, both quote styles/empty/EOF, Unicode/nonASCII whitespace/NUL/mixed quotes/@@+ and three-token cap",
+    "public_diagnostics_and_spans": "11 complete byte-identical raw errors, exact byte endpoints and premature/generic priority",
+    "ownership": "Two 40,982-byte Unicode errors and clones survive source/payload/error-owner drop. Source next_char boundaries prove all slices valid; join independently owns output",
+    "surrounding_semantics": "Four unchanged signed-integer/parser AST/source-span/premature integration controls and Core/CLI default alltargets",
+    "copy_removal": "Whole-owner proof only four alternative String construction sites become borrowed source slices and return payload &str; unchanged Rust generic Borrow<str> join source creates final owned String"
+  },
+  "limits": "Source-proof only cold diagnostic token copies removed. Existing Vec/join/format!/CompactString and successful AST lowering remain. No runtime pointer/allocator witness, quantified allocation/payload/count, aggregate/peak/RSS/speed/source-fit claim. No new helper/API/interner/cache/key/DICE/identity/unsafe/dependency/retained representation/donor import. Windows minimal/deferred; full WP899/M7A/source integration open/unwaived.",
+  "growth": {
+    "test_lines": 148,
+    "estimate": "100-170 lines; two cohesive tests, no assets/goldens",
+    "production": "Payload signature/four copy expressions plus cfg sibling hook only; owner below500lines/helperbelow110"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T03:42:10.848432+00:00",
+    "baseline": "04ad54dd45e94124d11e09f0467a1392fef8099a"
+  },
+  "timing": {
+    "compile_and_check_seconds": 18.808666519995313,
+    "test_seconds": 0.005975948937702924,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 255.904278
+  },
+  "evidence_sha256": {
+    "target/wp899/query-error-token-borrow-archive-check.json": "99e305b0785e7edc77ad640ea35db697cb6715c31851410c716a3914557c1aaf",
+    "target/wp899/query-error-token-borrow-archive-check.jsonl": "4d7d15c74af24092d3b704e882ab986c7e18f980d305725fb573893e1aa30668",
+    "target/wp899/query-error-token-borrow-baseline-compile.json": "f8d3eba546db0c9a74d0f5c94ca3878cc6dd351a4fd37cc9ecf00c710dddecc1",
+    "target/wp899/query-error-token-borrow-baseline-compile.jsonl": "9188c0bdc1361c15c6ee56b18139b6d134d583f2b23b41c7bf0a7b3d48db9e02",
+    "target/wp899/query-error-token-borrow-baseline-selectors.json": "f965ec074612a3a256dd12aa629712f022849982c40046d37bea65baedc62039",
+    "target/wp899/query-error-token-borrow-baseline-slug_query_v2-controls.json": "b2680bef97e5ed2a45320a2ebfa84d855bfbaea89bb194eeba9bd5b09bbf7e28",
+    "target/wp899/query-error-token-borrow-baseline-slug_query_v2-controls.jsonl": "50c528ec9e758e6fc4c8b82351cc4a5eb3bf877eee6264b5e3e04f1b8a58a54a",
+    "target/wp899/query-error-token-borrow-baseline-slug_query_v2-preflight.json": "d3d90c63d76d3b404b704b4fff7a5f1388d99fdfa981c35288beb2fcd85d365d",
+    "target/wp899/query-error-token-borrow-baseline-slug_query_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-error-token-borrow-candidate-compile.json": "2c399033a0912d52946d84fb36d069c12761fc76ef44c9e6406217f3047e8088",
+    "target/wp899/query-error-token-borrow-candidate-compile.jsonl": "3c4ad674e52ef2d2127b02917f73e82e94604838aa43fc6e84a901fd110ba477",
+    "target/wp899/query-error-token-borrow-candidate-query-controls.json": "2fa78baeb16f79875638887a069cb6da3128fd0fb6bb10575a8547a392f6c2fb",
+    "target/wp899/query-error-token-borrow-candidate-query-controls.jsonl": "0b1ca054263d8a37dbb8166e5599ec9c63936fece4cfb94bcfc36f58f0ba7d59",
+    "target/wp899/query-error-token-borrow-candidate-query-preflight.json": "1ad9d405b4b97adbb1c33beba39c750b7fa441840ea7658aa4b831445a9f6b0c",
+    "target/wp899/query-error-token-borrow-candidate-query-preflight.jsonl": "d3de99936612be438931e4aebac8c78ec23b081e8d66cc5460d0e9fa599e0e9b",
+    "target/wp899/query-error-token-borrow-candidate-selectors.json": "479e98e828bc3ac76725962727c6ac30d3491a9aad805b5e95ae287014de8c9e",
+    "target/wp899/query-error-token-borrow-candidate-slug_query_v2-controls.json": "4013bcb35f1fd92d1f9717343db9ddfdb10caa070893898dc6a6c505f7a7cdde",
+    "target/wp899/query-error-token-borrow-candidate-slug_query_v2-controls.jsonl": "50c528ec9e758e6fc4c8b82351cc4a5eb3bf877eee6264b5e3e04f1b8a58a54a",
+    "target/wp899/query-error-token-borrow-candidate-slug_query_v2-preflight.json": "2bd83420e93d6f9e31e4d6c4ea57f85d700fc38440d8c3223ec5e3df1ccf12b2",
+    "target/wp899/query-error-token-borrow-candidate-slug_query_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-error-token-borrow-controls.py": "2b424a2dc3058a6c8ea466256c2873d508335f441016849c66940a8f53159e46",
+    "target/wp899/query-error-token-borrow-dependents-check.json": "b445e3cfe4ff923c350e9e92cce7c32fb0e90bfacdb533567ada0d330cbcc763",
+    "target/wp899/query-error-token-borrow-dependents-check.jsonl": "3e286d67d2ef8126163fdcdd795ba4aa34e691927a5787cc616f72ebe01888ff",
+    "target/wp899/query-error-token-borrow-design-evidence.md": "3c06cf072dadf07b5d83a1a81479a3412679da9c78977553f1f83f4bc184a3c9",
+    "target/wp899/query-error-token-borrow-design-ownership.md": "2564d241addc55896afcee67b639fc00614bdc37f713631712268b3b348f40ac",
+    "target/wp899/query-error-token-borrow-design-source.md": "811fc3d8aa3199fc9825876d6e1d9bc141fb1236dea64c173f3abb2de14d41f8",
+    "target/wp899/query-error-token-borrow-design.md": "3c73c7ae848aa5ddcc061c40ab53ebfb24762276c2e6f0b96732cce58e594c3c",
+    "target/wp899/query-error-token-borrow-format-check.json": "4569f2cc1a22594d3f54d33410792ce49fdfae40202a9a45a92fdffd67bef94f",
+    "target/wp899/query-error-token-borrow-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/query-error-token-borrow-record.py": "df4bb5c76a3e39e7f6d988e85a62e78764f8c17a36f9dd936ff9ae9fd86b8dd8",
+    "target/wp899/query-error-token-borrow-start.json": "756fa7cb2ed7f8a0cc729a3108670cd340bebfd4b6dc9e06ac5cd5a0f28dab00"
+  },
+  "validation_sha256": "c2898cb6d582a96b415a29cd6fdd2cb390db8b3f42608a082143ea71a432821e",
+  "final_reviews": {
+    "target/wp899/query-error-token-borrow-final-source.md": "f86f6de153cfb0a6ce29c92c415561e88bd90e363f9158e9da63adc5fb7d78fb",
+    "target/wp899/query-error-token-borrow-final-ownership.md": "a5d9ffb982cc021e35c0be69b814fcf71b9305545461147a7a29008a56a3152b",
+    "target/wp899/query-error-token-borrow-final-evidence.md": "b5291731e45c49a914428d1ca1abebd604eabfbd7df90540d8ab13f8224063b6"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "4b12c20c0331ecffc53b2184632fd38a69d7949f1c0cbfd3dbf27537e8fdbf44",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "4206155cb6ac25ae381a26a08d2e338b985d433a397c8b36a4bdf52dad21f97b",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "733b98dd927f76debeef8cde25dadb3ed27bcc0f311cc46cf63ae902af1750be"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/query-error-token-borrow-format-check.json",
+      "sha256": "4569f2cc1a22594d3f54d33410792ce49fdfae40202a9a45a92fdffd67bef94f",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/query-error-token-borrow-archive-check.json",
+      "sha256": "99e305b0785e7edc77ad640ea35db697cb6715c31851410c716a3914557c1aaf",
+      "exit_code": 0,
+      "log_sha256": "4d7d15c74af24092d3b704e882ab986c7e18f980d305725fb573893e1aa30668"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/query-error-token-borrow-plan-check.json",
+      "sha256": "114cc42e9149c25a40731f187c49f5e97caa959f687b9db0c6b14bebf1b287b5",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/query-error-token-borrow-diff-check.json",
+      "sha256": "8d8eb9d41d5d0924da00aaa3b3c6c974aceb07024bf8ab6bba2a2790b505da19",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

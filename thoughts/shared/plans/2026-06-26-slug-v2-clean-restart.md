@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: type expression-statement lowering transfers its already-
-owned argument, removing a redundant deep clone. Exact guards, inner spans/IR,
-effects/errors, rejected owners and frozen lifetimes remain. Ten controls, three
-Symbol buffers per compiled/freeze-optimized route, seven equal errors and default
-dependent checks pass; two baseline-proved stale golden spans corrected. Generic
-IR capacity caveat remains, with no retained/aggregate/RSS/speed claim.
+Latest accepted change: query error-context tokens borrow existing source slices,
+removing four alternative temporary string-copy sites. Scanning, UTF8 boundaries,
+diagnostic bytes/spans/priority and final owned messages remain. Six controls,
+42 scanner cases, eleven equal errors, retained Unicode error clones and default
+Core/CLI checks pass. Source proof only; final formatting/storage remain, with no
+quantified memory/allocator/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.

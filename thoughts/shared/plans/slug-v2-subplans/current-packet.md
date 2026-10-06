@@ -12,9 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component transfers the owned type(x) argument when lowering
-an expression statement, removing a redundant deep clone. Exact guards, inner IR/
-spans, effects/errors, rejected owners and frozen lifetimes remain.
+The latest accepted component borrows query error-context tokens until the existing
+join creates an owned message. Four alternative scratch copies are removed;
+scanning, exact diagnostics/spans, parser semantics and final ownership remain.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -23,45 +23,42 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted type expression-statement argument ownership contract
+## Accepted query diagnostic token borrowing contract
 
-StmtsCompiled::expr preserves earlier purity/list/tuple/not/type-is/logical branches
-and the final as_type predicate position. Successful recognition destructures the
-proved owned Call and pops its sole positional argument into unchanged recursive
-lowering. Exact builtin identity and one_pos guards remain authoritative; rejected
-shapes preserve complete IR, pointers and outer spans. Accepted argument inner IR/
-spans, fixed Symbol payload/hash/bytes and frozen handles transfer intact. Compiler
-stmt_expr and freeze statement optimization remain normal producers; legitimate
-borrowed optimize clones are unchanged. No helper/API/interner/cache/key/unsafe/
-dependency/retained representation or donor import.
+The existing negative-token diagnostic helper's nested scan_token returns source
+slices for punctuation, closed quote contents, unterminated quote contents and
+bare words. Every index comes from zero, EOF or next_char UTF8 boundaries; ASCII
+punctuation slices equal prior char formatting. All quote/word/whitespace/@@+ and
+negative-detection decisions, three-token clipping and cursor updates remain.
+Scratch Vec::with_capacity(3) stays local. The pinned standard-library Borrow<str>
+join creates the same independently owned String; public parser retains original
+format!/CompactString, premature-error priority, numeric byte spans and owned AST.
+No helper/API/interner/cache/key/DICE/identity/unsafe/dependency/retained representation
+or donor import. Slug-native memory implementation preserves inherited diagnostics;
+Bazel three-token context/lexer sources are reference only, with no widened parity.
 
-Three DESIGNs/FINALs accept corrected identical 323-line tests: baseline two semantic
-passes/one ownership failure and candidate 10/10. Each freshly compiled and owned
-freeze-optimized route transfers three Symbol buffers (15,384 content bytes), with
-exact inner spans/tree. Nine rejected shapes and pure elision preserve owners;
-public direct/nested/list/tuple/short-circuit/shadowed-callee effects, seven equal raw
-errors, GC and retained frozen functions after source/module drop pass. Nineteen
-protected sources and default Loading/Core/CLI alltargets checks pass. Initial
-fixture static checking rejected deliberately invalid runtime declarations; disable
-fixture checking before declaration, preserve every semantic/pointer assertion and
-original hash/failure. Two stale and/or bytecode call-site ranges independently fail
-identically on baseline and candidate. Manual single point-span correction per
-golden leaves all opcodes/ordering/targets/other bytes unchanged, with no regeneration.
-Fresh corrected baseline/candidate/attribution artifacts and exact preflights,
-serial pinned offline prep60s/tests30s and format/archive/plan/diff hygiene pass.
-No new assets; allowlist extends only to those two existing goldens.
+Three DESIGNs/FINALs accept identical 148-line sibling tests: baseline 2/2 and
+candidate 6/6 including four unchanged signed-integer/AST/span/premature integration
+controls. Thirty exact scanner contexts/twelve None cases cover all four payload
+routes, both/empty/truncated/mixed quotes, EOF, Unicode/NUL/nonASCII whitespace,
+operators/@@+ and three-token limit. Eleven complete raw errors/spans/priority are
+byte-identical; successful expressions and two 40,982-byte Unicode errors/clones
+survive source/payload/error-owner drop. Sixteen protected sources, fresh pinned
+serial offline lib/integration CargoJSON artifacts/exact preflights, default
+Core/CLI alltargets and format/archive/plan/diff checks pass. No failures, assets
+or goldens; production changes only the payload signature/four expressions/hook.
 
-Acceptance removes this consuming deep-clone site only. Earlier borrowed clones,
-IR metadata and natural heap/frozen owners remain. Fixed Symbol content pointers
-exclude padded allocation/count/whole-workload claims. Generic nested IR Vec spare
-capacity may survive where cloning normalized it; no unchanged general capacity or
-reduced retained/aggregate/peak/RSS/speed/source-fit claim. No new Bazel parity claim.
-Full WP899/M7A stays open.
+Acceptance is source-proved removal of four alternative temporary token-copy
+sites only. Vec/join/final formatting/compact storage and AST lowering remain.
+No runtime pointer/allocator witness, quantified memory/count/payload, aggregate/
+peak/RSS/speed/source-fit claim. Windows remains minimal/deferred. Full WP899/M7A
+source integration remains open and unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Query negative-token diagnostics borrow exact input slices through existing final join; scanning/UTF8/quote/three-token rules, public bytes/spans/priority and owned output remain. Three DESIGNs/FINALs; same tests baseline 2/2, candidate 6/6, thirty contexts/twelve negatives, eleven equal errors and two long retained error clones; default Core/CLI checks. Source copy-site proof only, no quantified memory/allocator/RSS/speed claim | [Query error token borrowing](wp899-query-error-token-borrow-2026-10-06.json) |
 | Compiler type expression-statement lowering transfers its owned sole argument under the unchanged exact guard; earlier branches, inner IR/spans/frozen owners and rejected full IR/pointers stay. Three DESIGNs/FINALs; corrected same-test baseline two semantic passes/one ownership failure, candidate 10/10, three Symbol buffers per compiled/owned freeze-optimized route (15,384 content bytes each), nine rejection shapes/seven equal errors/default dependents. Fixture static-checking correction and two independently baseline-proved single-span golden corrections preserved. Generic IR capacity caveat; no retained/aggregate/RSS/speed claim | [Type statement argument transfer](wp899-type-statement-arg-move-2026-10-06.json) |
 | Native two-element join writes borrowed parts directly into existing heap concat3; zero/singleton and larger buffers, exact bytes/errors/iterator cleanup/capacity-overflow/frozen ownership remain. Three revised DESIGNs/FINALs; identical corrected baseline 3/3, candidate 11/11, 2,053 comparisons, 31 equal traces, 33 equal errors and default dependents. Initial capacity proposal rejected and fixture E0716 corrected; source scratch-bypass proof only, OOM sequencing excluded, no quantified memory/aggregate/RSS/speed claim | [Two-element join](wp899-join-two-direct-2026-10-06.json) |
 | Query attribute labels borrow canonical/apparent owners instead of temporary deep clone/Arc construction; full repo projection, exact spelling/final capacity/owned output/identity remain. Three DESIGNs/FINALs; identical baseline 2/2, candidate 13/13, twenty attribute cases and retained output after source drops, eleven existing graph/DOT controls and default dependents. Source clone-site proof only; formatting/final copying remain, no quantified memory/aggregate/RSS/speed claim | [Query attribute-label borrowing](wp899-query-attribute-label-borrow-2026-10-06.json) |
