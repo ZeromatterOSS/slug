@@ -12,9 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component joins exactly two strings directly into the existing
-Starlark heap, bypassing a temporary String. Iteration/validation/cleanup, bytes,
-errors, capacity-overflow ordering and final output ownership remain.
+The latest accepted component transfers the owned type(x) argument when lowering
+an expression statement, removing a redundant deep clone. Exact guards, inner IR/
+spans, effects/errors, rejected owners and frozen lifetimes remain.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -23,46 +23,46 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted native two-element join scratch contract
+## Accepted type expression-statement argument ownership contract
 
-Native join keeps zero/singleton routes and both initial iterator steps and string
-validation. It reads size_hint and computes the same capacity guess before third
-prefetch. For guess<=isize::MAX, a missing third item drops the exhausted iterator
-then uses existing heap.alloc_str_concat3(first, separator, second); an existing
-third item feeds Option.into_iter().chain(it) into the original buffer loop. Larger
-guesses enter the original String::with_capacity before third next, preserving u8
-capacity-overflow panic/cleanup. Three-or-more construction/appends, separator-
-before-validation, final heap allocation, errors and iterator stop remain. Empty/
-constant-string behavior, Rust Unicode, speculative/GC/frozen ownership stay.
-No new helper/API/interner/cache/key/production unsafe/dependency or representation.
+StmtsCompiled::expr preserves earlier purity/list/tuple/not/type-is/logical branches
+and the final as_type predicate position. Successful recognition destructures the
+proved owned Call and pops its sole positional argument into unchanged recursive
+lowering. Exact builtin identity and one_pos guards remain authoritative; rejected
+shapes preserve complete IR, pointers and outer spans. Accepted argument inner IR/
+spans, fixed Symbol payload/hash/bytes and frozen handles transfer intact. Compiler
+stmt_expr and freeze statement optimization remain normal producers; legitimate
+borrowed optimize clones are unchanged. No helper/API/interner/cache/key/unsafe/
+dependency/retained representation or donor import.
 
-Initial source DESIGN REVISE identified oversized-capacity ordering before any
-production implementation. Revised guard/lazy-iterator control received three R2
-DESIGNs; three FINALs accept the actual diff and evidence. Identical corrected
-353-line tests pass baseline 3/3 and candidate 11/11, with 2,053 independent bytes/
-cardinality comparisons, 31 identical next/hint/stop traces and 33 byte-identical
-errors. Allocating and unknown-hint iterators protect validation/early cleanup;
-a truthful lazy enormous sequence catches capacity overflow before third next.
-Empty/one-byte constant and singleton identity, GC/freeze/list mutation and retained
-output/functions after source/module drop pass. Eight existing intern/speculative/
-encoding/split controls, sixteen protected sources, pinned helper/standard-library
-proof and default Loading/Core/CLI alltargets pass. Initial E0716 test-handle lifetime
-correction preserves original hash/failed preparation; identical corrected variants
-use fresh pinned offline artifacts/exact preflights. Formatted test growth exceeds
-240-330 estimate by 23 lines for cohesive boundary/lifecycle controls. No assets or
-golden changes; format/archive/plan/diff hygiene pass.
+Three DESIGNs/FINALs accept corrected identical 323-line tests: baseline two semantic
+passes/one ownership failure and candidate 10/10. Each freshly compiled and owned
+freeze-optimized route transfers three Symbol buffers (15,384 content bytes), with
+exact inner spans/tree. Nine rejected shapes and pure elision preserve owners;
+public direct/nested/list/tuple/short-circuit/shadowed-callee effects, seven equal raw
+errors, GC and retained frozen functions after source/module drop pass. Nineteen
+protected sources and default Loading/Core/CLI alltargets checks pass. Initial
+fixture static checking rejected deliberately invalid runtime declarations; disable
+fixture checking before declaration, preserve every semantic/pointer assertion and
+original hash/failure. Two stale and/or bytecode call-site ranges independently fail
+identically on baseline and candidate. Manual single point-span correction per
+golden leaves all opcodes/ordering/targets/other bytes unchanged, with no regeneration.
+Fresh corrected baseline/candidate/attribution artifacts and exact preflights,
+serial pinned offline prep60s/tests30s and format/archive/plan/diff hygiene pass.
+No new assets; allowlist extends only to those two existing goldens.
 
-Acceptance bypasses only the exactly-two temporary String construction and its
-initial scratch appends. Final heap allocation/copy and larger-join scratch remain.
-No runtime pointer/allocator witness, quantified memory/count, arena/aggregate/
-peak/RSS/speed/source-fit claim. Allocator OOM/failure sequencing is excluded because
-removing an allocation inherently changes it; deterministic capacity overflow stays.
-No new Bazel parity claim. Full WP899/M7A stays open.
+Acceptance removes this consuming deep-clone site only. Earlier borrowed clones,
+IR metadata and natural heap/frozen owners remain. Fixed Symbol content pointers
+exclude padded allocation/count/whole-workload claims. Generic nested IR Vec spare
+capacity may survive where cloning normalized it; no unchanged general capacity or
+reduced retained/aggregate/peak/RSS/speed/source-fit claim. No new Bazel parity claim.
+Full WP899/M7A stays open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Compiler type expression-statement lowering transfers its owned sole argument under the unchanged exact guard; earlier branches, inner IR/spans/frozen owners and rejected full IR/pointers stay. Three DESIGNs/FINALs; corrected same-test baseline two semantic passes/one ownership failure, candidate 10/10, three Symbol buffers per compiled/owned freeze-optimized route (15,384 content bytes each), nine rejection shapes/seven equal errors/default dependents. Fixture static-checking correction and two independently baseline-proved single-span golden corrections preserved. Generic IR capacity caveat; no retained/aggregate/RSS/speed claim | [Type statement argument transfer](wp899-type-statement-arg-move-2026-10-06.json) |
 | Native two-element join writes borrowed parts directly into existing heap concat3; zero/singleton and larger buffers, exact bytes/errors/iterator cleanup/capacity-overflow/frozen ownership remain. Three revised DESIGNs/FINALs; identical corrected baseline 3/3, candidate 11/11, 2,053 comparisons, 31 equal traces, 33 equal errors and default dependents. Initial capacity proposal rejected and fixture E0716 corrected; source scratch-bypass proof only, OOM sequencing excluded, no quantified memory/aggregate/RSS/speed claim | [Two-element join](wp899-join-two-direct-2026-10-06.json) |
 | Query attribute labels borrow canonical/apparent owners instead of temporary deep clone/Arc construction; full repo projection, exact spelling/final capacity/owned output/identity remain. Three DESIGNs/FINALs; identical baseline 2/2, candidate 13/13, twenty attribute cases and retained output after source drops, eleven existing graph/DOT controls and default dependents. Source clone-site proof only; formatting/final copying remain, no quantified memory/aggregate/RSS/speed claim | [Query attribute-label borrowing](wp899-query-attribute-label-borrow-2026-10-06.json) |
 | DOT class-label conversion consumes tight buffers only at/above the pinned compact heap floor; short/spare original copying, exact bytes/final capacities/graph identity/release remain. Three revised DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, fourteen byte/capacity cases, eight equal DOT outputs, five existing graph controls and default Core/CLI checks. Initial heap-floor proposal rejected before implementation; source/library copy-bypass proof only, large 32-bit fallback excluded and no quantified memory/aggregate/RSS/speed claim | [DOT class-label conversion](wp899-dot-class-label-move-2026-10-06.json) |

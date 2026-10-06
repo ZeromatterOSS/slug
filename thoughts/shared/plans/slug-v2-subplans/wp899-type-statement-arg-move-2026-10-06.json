@@ -1,0 +1,360 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "ef1f1d24f",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/stmt.rs": "e9a6632484694923ce0e7ca3a733334a17f42fc952b3672bccebce82e5c9760b",
+    "starlark-rust/starlark/src/eval/compiler/stmt/type_statement_memory_tests.rs": "1a934ba20dfc0e9cec80d0a7841d6733fc7bf33318222b3a5b7dca60f30d1238",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "starlark-rust/starlark/Cargo.toml": "1aee590006684fde395f91a74df4f4ace2db2c6ecc3f0f7afe564a76eabac660",
+    "starlark-rust/starlark/src/eval/compiler/args.rs": "d0a2e05c8fe7a815430ece5b6e23696bc6afa48d61a0e42963be4c9052df36c2",
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "bdb6cdd2378c1de24e9f9d2c24863fda0c4960809e548e33cc8369228fed986c",
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "107abcab4bf6698d99c1a7fc50978dd4055178393a48e39d63690c5177cd44c4",
+    "starlark-rust/starlark/src/eval/compiler/expr_bool.rs": "3b30810b046dacf4a6efb686322606fff71b1dd18130ce26d0c34bb024b0fd22",
+    "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+    "starlark-rust/starlark/src/collections/symbol/symbol.rs": "8301dd1d265979baffdae5660ca89628e7ed4b4dd7c228fde7735c2f7d895453",
+    "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+    "starlark-rust/starlark/src/eval/runtime/frozen_file_span.rs": "1ec9b76f017e9b2f4088166aa5d48bda95f2bb89a48157e15f10f9bc6a2ba42a",
+    "starlark-rust/starlark/src/tests/bc/expr.rs": "d84247184dc36d74a90beeed279b7b357f52c62d54dfa7cd7636c88e8e314c6b",
+    "starlark-rust/starlark/src/tests/bc/if_stmt.rs": "19b0cdd5e74e8d89589f67f95af423b0dea4c311394a6dee611837120c1e5944",
+    "starlark-rust/starlark/src/tests/opt/if_rand.rs": "58d38794c95d85b8d286f45485a2215d5268e642671f601bddc87df0192fa30f",
+    "starlark-rust/starlark/src/eval/compiler/expr/type_equality_memory_tests.rs": "ac09e2c7f010ea753dc2d624d11cdb0bba5fc10d096717c05ed8bc9b0dcaa0b2",
+    "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3",
+    "starlark-rust/starlark/src/tests/bc/golden/if_stmt_and_stmt.golden": "5d55a8fd76c5c4ee590f59c91a562dc016322904e5bf7ca8a816c3a1f5b6cebb",
+    "starlark-rust/starlark/src/tests/bc/golden/if_stmt_or_stmt.golden": "c9e69639164e35416272447be6cbb83a069725390d8f6ebd855461bd1c735ecb"
+  },
+  "dependency_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/net/starlark/java/eval/MethodLibrary.java": "0229d9e3a16f48b9555ac94c4c56d94b90042f48db33feb5e50c514c5c948eb2"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "f071c2f2db33f40633cae9ba9d3fab22882967b00f0f3e953624db85292b0d17",
+    "selectors": [
+      "eval::compiler::stmt::type_statement_memory_tests::type_statements_transfer_symbols_after_compile_and_owned_freeze_optimization",
+      "eval::compiler::stmt::type_statement_memory_tests::rejected_type_statement_shapes_keep_complete_ir_owners_and_pure_elision",
+      "eval::compiler::stmt::type_statement_memory_tests::type_statements_preserve_effects_errors_shadowing_and_retained_frozen_functions",
+      "tests::bc::expr::test_type",
+      "tests::bc::if_stmt::test_and_stmt",
+      "tests::bc::if_stmt::test_or_stmt",
+      "tests::opt::if_rand::test_basic",
+      "tests::opt::if_rand::test_and",
+      "tests::opt::if_rand::test_or",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_preserves_effects_errors_and_retained_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/stmt.rs": "e9a6632484694923ce0e7ca3a733334a17f42fc952b3672bccebce82e5c9760b",
+      "starlark-rust/starlark/src/eval/compiler/stmt/type_statement_memory_tests.rs": "1a934ba20dfc0e9cec80d0a7841d6733fc7bf33318222b3a5b7dca60f30d1238"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "736fc0e4b2a52475f7b4b1fa97bf0ab7b14c4bf23373702d985273b6e4fb4113",
+    "selectors": [
+      "eval::compiler::stmt::type_statement_memory_tests::type_statements_transfer_symbols_after_compile_and_owned_freeze_optimization",
+      "eval::compiler::stmt::type_statement_memory_tests::rejected_type_statement_shapes_keep_complete_ir_owners_and_pure_elision",
+      "eval::compiler::stmt::type_statement_memory_tests::type_statements_preserve_effects_errors_shadowing_and_retained_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/stmt.rs": "472b6eb97f1a00734a8d7b336b9935ef47dd0112370e6eac226f0d2edf598567",
+      "starlark-rust/starlark/src/eval/compiler/stmt/type_statement_memory_tests.rs": "1a934ba20dfc0e9cec80d0a7841d6733fc7bf33318222b3a5b7dca60f30d1238"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-compile.json",
+      "sha256": "3facbae5a12a5410e06d7a4c2efdf0c30a78bb7c9f3537f8d11340e2af80aeb9",
+      "exit_code": 0,
+      "elapsed_seconds": 6.610373570001684,
+      "log_sha256": "75928fba34b34d9516e912c7b638564803fbf33ba32d7d5c9559c0b8d160c609"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-preflight.json",
+      "sha256": "a2751ad2084e761190b2f8d605558a7e6dbc474b5e377719504157f01a2f500a",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02001311699859798,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-controls.json",
+      "sha256": "948ff3ce129111e6dbfc6f0ee54a2789db2fc89225f70882e534df27c1dedfa5",
+      "exit_code": 101,
+      "elapsed_seconds": 0.005027473962400109,
+      "log_sha256": "c8d35291ff896b85c9bfe3e2b2cf8ca52c8a1e0323dceb0bb59b2609973dc6a0"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-r2-compile.json",
+      "sha256": "e194b09f278079b25a36e64921b877807c5fe0d0bd7b376fcf022c33f9ec9528",
+      "exit_code": 0,
+      "elapsed_seconds": 4.020177434023935,
+      "log_sha256": "64e8c350744cb51d489b52543a750bd0da4ddd2d94f0a7c2d51852d0f78cc3e9"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-r2-preflight.json",
+      "sha256": "31907aa88420ad574f58c861e155bc1752aa8ccf05127a2fe4899e6bf7e16efc",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020231768023222685,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-r2-controls.json",
+      "sha256": "7513aa2baeba9b71eafc29d98dc1c85e7cef48d4f15b8c04ba33a67adb46d027",
+      "exit_code": 101,
+      "elapsed_seconds": 0.006231550010852516,
+      "log_sha256": "b348831e873436fb00a99507cc4d8f4ce8a9ab7fd91bb4f7bc358afa4a513adb"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-compile.json",
+      "sha256": "6399d571858313c6e15737a5561a2603e8305d77381c89bbe7fc5342a3d14d5a",
+      "exit_code": 0,
+      "elapsed_seconds": 5.256734712980688,
+      "log_sha256": "545be02e1be990d695a47c16d347c454e214bd34bada8c986912a78a65cc7b57"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-preflight.json",
+      "sha256": "f62ea569086ad52637e5f02998b70ae2ba43a63cb5ddc8765d59085cb6f8828f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020303768978919834,
+      "log_sha256": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-controls.json",
+      "sha256": "cdd6a602cc261473c23450c9533ae474df0cf26d11fe97d5fc47ea154bc2f8f6",
+      "exit_code": 101,
+      "elapsed_seconds": 0.01076586201088503,
+      "log_sha256": "48e36e8e9e1a2b152b629cd1f343f5d311ec5b4aa67604f7689b338db70b2245"
+    },
+    "baseline-golden-compile": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-golden-compile.json",
+      "sha256": "3179eddbd59497430198ee0fad11217610be6db7ff110679deb2123e530409d5",
+      "exit_code": 0,
+      "elapsed_seconds": 5.225436220993288,
+      "log_sha256": "0680dd0a4526b036bad1558c9f1be02ab9349bf6bdea4cb7780e861177d2ebac"
+    },
+    "baseline-golden-preflight": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-golden-preflight.json",
+      "sha256": "11684cdd3cf6e1f1cf82d2915624db8ccda349aa071aecfbc71752ef512e32b1",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021858096006326377,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-golden-controls": {
+      "receipt": "target/wp899/type-statement-arg-move-baseline-golden-controls.json",
+      "sha256": "70966e887955eba3acd148d65b78018828eebf58aadc3fdfb2f31fbc62ed2994",
+      "exit_code": 101,
+      "elapsed_seconds": 0.004785762983374298,
+      "log_sha256": "ac867d4b500c75afae13026f8b537936332ab109e4b2605ee9b4de1397e1bdb7"
+    },
+    "candidate-r2-compile": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-r2-compile.json",
+      "sha256": "94c5bd400a882ce69659776849f81a5c11803aa88c7258fdb3c0095c6f2cb1aa",
+      "exit_code": 0,
+      "elapsed_seconds": 5.1989988120039925,
+      "log_sha256": "57f989954e4fdcef3fe57103d619ce4c70ac593ba0a6819123416dc8d083d005"
+    },
+    "candidate-r2-preflight": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-r2-preflight.json",
+      "sha256": "283af151e423575b96689a7df8101406fa9a71880857acc163b163ed1326ace8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020307137980125844,
+      "log_sha256": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca"
+    },
+    "candidate-r2-controls": {
+      "receipt": "target/wp899/type-statement-arg-move-candidate-r2-controls.json",
+      "sha256": "4e6fe4b58a013df3d149d3e65f4f4de47464e1ef6ceb6d192fc3bc52d4b0042a",
+      "exit_code": 0,
+      "elapsed_seconds": 0.010510069958399981,
+      "log_sha256": "d89545d120406f780c8ea151697fee97e01df6b200b7f5e9f8c74fe3f5f698c1"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/type-statement-arg-move-dependents-check.json",
+      "sha256": "60ebcc6b7c6562fd960b497aa0caed18f3c21ac1fd82f0b363e3396a34acc40f",
+      "exit_code": 0,
+      "elapsed_seconds": 7.57045007700799,
+      "log_sha256": "37190c8afd7efea8115ca01595576b318eedaaa72c70e9e98982b7b4ee77b83a"
+    }
+  },
+  "proof": "Whole stmt.rs equals baseline plus sibling hook and only final StmtsCompiled::expr type branch: same expr.as_type predicate position, destructure proved owned Call and pop sole pos_named argument into unchanged recursion. as_type exact builtin identity and one_pos shape guards remain unchanged; earlier purity/list/tuple/not/type-is/logical branches, rejected complete IR/owners and all compiler/freeze wrappers unchanged. CallCompiled::call/ExprCompiled::typ create owned type calls for fallible/effectful inputs; borrowed optimize clones remain legitimate and unchanged. Inner spans/tree, Symbol payload/hash/bytes and frozen handles move intact. Nineteen protected sources plus identical corrected tests; two independently baseline-proved stale golden call-site spans manually corrected. No helper/API/interner/cache/key/unsafe/dependency/retained representation or donor import.",
+  "pass_counts": {
+    "corrected_baseline_semantic": 2,
+    "corrected_baseline_ownership_failure": 1,
+    "candidate_new": 3,
+    "candidate_protected": 7,
+    "candidate_total": 10,
+    "rejected_shapes": 9,
+    "exact_equal_errors": 7
+  },
+  "ownership_controls": {
+    "baseline-r2": [
+      {
+        "optimized": false,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "shared": 0
+      },
+      {
+        "optimized": true,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "shared": 0
+      }
+    ],
+    "candidate-r2": [
+      {
+        "optimized": false,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "shared": 3
+      },
+      {
+        "optimized": true,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "shared": 3
+      }
+    ]
+  },
+  "error_sha256": [
+    "d94e0f9b5557f4d29156bf67505a4a61553ae9dd3f440e959e335f59fbc8d96b",
+    "9bf19f97db8ac84e815d70ddbc4fe6f24df44d9d5e5c9ebd2cc9f29ac499cdfa",
+    "bd8b36b7209d403111a25a9f8fcbff5419deb0392c38319dfbaee316a1ca1f2d",
+    "dc778fd0d6b1931ea72038532639ef663c28d41d35e0ffb9a93547db19dc4501",
+    "d6f3b043eb38b98643e983e5fabba259306025bafdb8c450129fd3ab215b5c90",
+    "4c30a9c757a5bcda9be1189e2da880db56ff557967c312d241b233fdfd8a50c3",
+    "d831d4178cf8c6c1a5f92159003023c4eaa260736ac7136c7ba5d49d5328aedf"
+  ],
+  "golden_correction": {
+    "reason": "Two stale bytecode call-site expectations independently fail identically at ef1f1d24f baseline and initial candidate. Manual single-span correction per golden; no regeneration or weakened assertion. This extends bounded allowlist to these two goldens only.",
+    "corrections": [
+      {
+        "path": "starlark-rust/starlark/src/tests/bc/golden/if_stmt_and_stmt.golden",
+        "original_sha256": "6a03af19c21181053e9b77d1c6995f1795bcc3522100ff56b59a0d982a98ddff",
+        "corrected_sha256": "5d55a8fd76c5c4ee590f59c91a562dc016322904e5bf7ca8a816c3a1f5b6cebb",
+        "change": "Only noop call-site 2:9-15 -> 2:13; instruction comments/ordering/opcodes/targets/other bytes identical."
+      },
+      {
+        "path": "starlark-rust/starlark/src/tests/bc/golden/if_stmt_or_stmt.golden",
+        "original_sha256": "5a2fc6ddbca20d6bcfb92520e2ddd91a6a5154c306b109527fab2a8db37c2466",
+        "corrected_sha256": "c9e69639164e35416272447be6cbb83a069725390d8f6ebd855461bd1c735ecb",
+        "change": "Only noop call-site 2:8-14 -> 2:12; instruction comments/ordering/opcodes/targets/other bytes identical."
+      }
+    ],
+    "baseline_receipt": "target/wp899/type-statement-arg-move-baseline-golden-controls.json",
+    "candidate_receipt": "target/wp899/type-statement-arg-move-candidate-controls.json"
+  },
+  "limits": "One consuming IR deep-clone site removed. Each compiled and owned freeze-optimized fixture transfers three fixed Symbol buffers, 15384 content bytes per route. Pointer/content witnesses exclude padded allocation/count/total memory claims. Earlier borrowed optimize cloning, IR metadata and natural heap/frozen owners remain. Generic nested IR Vec spare capacity may survive where cloning normalized it; no unchanged general capacity or reduced retained/aggregate/peak/RSS/speed/source-fit claim. No new Bazel parity claim.",
+  "test_correction": "Initial baseline semantic fixture stopped at static checking of deliberately invalid type() declaration; disable fixture static checking before declaring runtime rejection/effect functions. Preserve initial hash/failure; all semantic and pointer assertions unchanged. Corrected identical baseline/candidate tests use fresh artifacts; runtime errors independently compared.",
+  "growth": {
+    "test_sibling_lines": 323,
+    "estimate": "280-340lines; three tests/no new assets.",
+    "production": "Existing bounded StmtsCompiled::expr (<55lines) final branch only; sibling tests, two manual stale golden span expectations only."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline starlark lib prep60s/tests30s; fresh CargoJSON/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets check reused from byte-identical initial candidate production/test sources; golden expectations are runtime-read data only.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/type-statement-arg-move-archive-check.json": "975f15fd43e4c01c94de6685c038231d8cd681c9296d303e00efd5bca74879ff",
+    "target/wp899/type-statement-arg-move-archive-check.jsonl": "797afc87b38e429bbfdaf52f3099a1476d78cf659a1f4fd57e7fd5728ba35a4f",
+    "target/wp899/type-statement-arg-move-baseline-compile.json": "3facbae5a12a5410e06d7a4c2efdf0c30a78bb7c9f3537f8d11340e2af80aeb9",
+    "target/wp899/type-statement-arg-move-baseline-compile.jsonl": "75928fba34b34d9516e912c7b638564803fbf33ba32d7d5c9559c0b8d160c609",
+    "target/wp899/type-statement-arg-move-baseline-controls.json": "948ff3ce129111e6dbfc6f0ee54a2789db2fc89225f70882e534df27c1dedfa5",
+    "target/wp899/type-statement-arg-move-baseline-controls.jsonl": "c8d35291ff896b85c9bfe3e2b2cf8ca52c8a1e0323dceb0bb59b2609973dc6a0",
+    "target/wp899/type-statement-arg-move-baseline-golden-compile.json": "3179eddbd59497430198ee0fad11217610be6db7ff110679deb2123e530409d5",
+    "target/wp899/type-statement-arg-move-baseline-golden-compile.jsonl": "0680dd0a4526b036bad1558c9f1be02ab9349bf6bdea4cb7780e861177d2ebac",
+    "target/wp899/type-statement-arg-move-baseline-golden-controls.json": "70966e887955eba3acd148d65b78018828eebf58aadc3fdfb2f31fbc62ed2994",
+    "target/wp899/type-statement-arg-move-baseline-golden-controls.jsonl": "ac867d4b500c75afae13026f8b537936332ab109e4b2605ee9b4de1397e1bdb7",
+    "target/wp899/type-statement-arg-move-baseline-golden-controls.py": "06de0d450b41f0f8a6d0ce1478c9ec1b29ac8dd2addae7447b87990218db7f7a",
+    "target/wp899/type-statement-arg-move-baseline-golden-preflight.json": "11684cdd3cf6e1f1cf82d2915624db8ccda349aa071aecfbc71752ef512e32b1",
+    "target/wp899/type-statement-arg-move-baseline-golden-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/type-statement-arg-move-baseline-golden-selectors.json": "85a6283315b3117b73b0e581191f89589a420ae4e2886741f204cf926395e748",
+    "target/wp899/type-statement-arg-move-baseline-preflight.json": "a2751ad2084e761190b2f8d605558a7e6dbc474b5e377719504157f01a2f500a",
+    "target/wp899/type-statement-arg-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/type-statement-arg-move-baseline-r2-compile.json": "e194b09f278079b25a36e64921b877807c5fe0d0bd7b376fcf022c33f9ec9528",
+    "target/wp899/type-statement-arg-move-baseline-r2-compile.jsonl": "64e8c350744cb51d489b52543a750bd0da4ddd2d94f0a7c2d51852d0f78cc3e9",
+    "target/wp899/type-statement-arg-move-baseline-r2-controls.json": "7513aa2baeba9b71eafc29d98dc1c85e7cef48d4f15b8c04ba33a67adb46d027",
+    "target/wp899/type-statement-arg-move-baseline-r2-controls.jsonl": "b348831e873436fb00a99507cc4d8f4ce8a9ab7fd91bb4f7bc358afa4a513adb",
+    "target/wp899/type-statement-arg-move-baseline-r2-preflight.json": "31907aa88420ad574f58c861e155bc1752aa8ccf05127a2fe4899e6bf7e16efc",
+    "target/wp899/type-statement-arg-move-baseline-r2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/type-statement-arg-move-baseline-r2-selectors.json": "7ecd90ce45c076ec1f3b2541b2b377aa160f573887bf1c0724fa9b587754cd52",
+    "target/wp899/type-statement-arg-move-baseline-selectors.json": "b5730ecfc1100cb0c990cc2cb1b9673397e7d1623ba0d4597a4c3a809b56273c",
+    "target/wp899/type-statement-arg-move-candidate-compile.json": "6399d571858313c6e15737a5561a2603e8305d77381c89bbe7fc5342a3d14d5a",
+    "target/wp899/type-statement-arg-move-candidate-compile.jsonl": "545be02e1be990d695a47c16d347c454e214bd34bada8c986912a78a65cc7b57",
+    "target/wp899/type-statement-arg-move-candidate-controls.json": "cdd6a602cc261473c23450c9533ae474df0cf26d11fe97d5fc47ea154bc2f8f6",
+    "target/wp899/type-statement-arg-move-candidate-controls.jsonl": "48e36e8e9e1a2b152b629cd1f343f5d311ec5b4aa67604f7689b338db70b2245",
+    "target/wp899/type-statement-arg-move-candidate-owner.rs": "e9a6632484694923ce0e7ca3a733334a17f42fc952b3672bccebce82e5c9760b",
+    "target/wp899/type-statement-arg-move-candidate-preflight.json": "f62ea569086ad52637e5f02998b70ae2ba43a63cb5ddc8765d59085cb6f8828f",
+    "target/wp899/type-statement-arg-move-candidate-preflight.jsonl": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca",
+    "target/wp899/type-statement-arg-move-candidate-r2-compile.json": "94c5bd400a882ce69659776849f81a5c11803aa88c7258fdb3c0095c6f2cb1aa",
+    "target/wp899/type-statement-arg-move-candidate-r2-compile.jsonl": "57f989954e4fdcef3fe57103d619ce4c70ac593ba0a6819123416dc8d083d005",
+    "target/wp899/type-statement-arg-move-candidate-r2-controls.json": "4e6fe4b58a013df3d149d3e65f4f4de47464e1ef6ceb6d192fc3bc52d4b0042a",
+    "target/wp899/type-statement-arg-move-candidate-r2-controls.jsonl": "d89545d120406f780c8ea151697fee97e01df6b200b7f5e9f8c74fe3f5f698c1",
+    "target/wp899/type-statement-arg-move-candidate-r2-preflight.json": "283af151e423575b96689a7df8101406fa9a71880857acc163b163ed1326ace8",
+    "target/wp899/type-statement-arg-move-candidate-r2-preflight.jsonl": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca",
+    "target/wp899/type-statement-arg-move-candidate-r2-selectors.json": "fe295bc700c554d4fbb5c9ffffe594355ab582f0459bc28d77631b006c0ad4e2",
+    "target/wp899/type-statement-arg-move-candidate-selectors.json": "fe295bc700c554d4fbb5c9ffffe594355ab582f0459bc28d77631b006c0ad4e2",
+    "target/wp899/type-statement-arg-move-controls.py": "efe8665660b9df07bea0ecb7d84a0d24ceba27564beba365237d4f21676b8a0b",
+    "target/wp899/type-statement-arg-move-dependents-check.json": "60ebcc6b7c6562fd960b497aa0caed18f3c21ac1fd82f0b363e3396a34acc40f",
+    "target/wp899/type-statement-arg-move-dependents-check.jsonl": "37190c8afd7efea8115ca01595576b318eedaaa72c70e9e98982b7b4ee77b83a",
+    "target/wp899/type-statement-arg-move-design-evidence.md": "c660b1be2b9c356a043614fb74259adc50eb909b3fa88402e61af3c88a9d0e7e",
+    "target/wp899/type-statement-arg-move-design-ownership.md": "cce3bed2485e1545ff1042c6a1286c18512c4df6836cd5689aafd97e3226fd6f",
+    "target/wp899/type-statement-arg-move-design-source.md": "0e034f22a8db887d11db6816dbce916c58c2b76df71adcffa450795900d8fd8f",
+    "target/wp899/type-statement-arg-move-design.md": "d386d02ccd123815b62c248c749164d4860c2667d9b56f82e4304456844567c0",
+    "target/wp899/type-statement-arg-move-format-check.json": "d8da3e84023e041a55fc1cd4a6a92682991ada221690e1470768f16801bdfd5c",
+    "target/wp899/type-statement-arg-move-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/type-statement-arg-move-golden-correction.json": "44858a4f12cf06affdd65c229bc1571d00fb19e0c256547bf5972da2372d5f42",
+    "target/wp899/type-statement-arg-move-record.py": "58908ae2551d5271d957413e7c40c95a96b458cea2b43781b5191138aa31e8e2",
+    "target/wp899/type-statement-arg-move-start.json": "b3d3e7c32b596e9f76a785fc9382dcbd0a2fcaa1f3b23b7148e006c8de18471e",
+    "target/wp899/type-statement-arg-move-test-fixture-correction.json": "3c8f13d4b0ad90b5d4a781fc789d544726f678f71470ba9f61354adb42c72a90"
+  },
+  "start": {
+    "started_at": "2026-10-06T03:27:42.395065+00:00",
+    "baseline": "ef1f1d24f6d24be77c3c8fd060975ba2bc8be6db"
+  },
+  "timing": {
+    "compile_seconds": 33.88217082701158,
+    "test_seconds": 0.03732071892591193,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 778.781747
+  },
+  "validation_sha256": "445c0112b37e2bb404fc7f88920511b7e9238364df62557034d5569ca59fb099",
+  "final_reviews": {
+    "target/wp899/type-statement-arg-move-final-source.md": "4b6354677c0350457af8febd24b99492d663c70d4cc2c090a0dc003900511645",
+    "target/wp899/type-statement-arg-move-final-ownership.md": "71b0b7110cb3cde9017bb52ae523ffc7786be9ab41de11385d3572a4c7ffd8f0",
+    "target/wp899/type-statement-arg-move-final-evidence.md": "59443a4dc7ccf8baecd9c23b0b15f5e20fcddd417655f04e04e04cf859292be2"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "3788faeaa9ebe92be78f7ae82d5e52317f50946c24396658bd90fc1021a7a856",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "f717d19a5e4747d7bdd241238488030f81991bf9012fe3f768d57e5a6cc5cde4",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "bd982acf48c2d281d1b58d1ff4b85f75ece810f0057a1ea8b0da687106797870"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/type-statement-arg-move-format-check.json",
+      "sha256": "d8da3e84023e041a55fc1cd4a6a92682991ada221690e1470768f16801bdfd5c",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/type-statement-arg-move-archive-check.json",
+      "sha256": "975f15fd43e4c01c94de6685c038231d8cd681c9296d303e00efd5bca74879ff",
+      "exit_code": 0,
+      "log_sha256": "797afc87b38e429bbfdaf52f3099a1476d78cf659a1f4fd57e7fd5728ba35a4f"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/type-statement-arg-move-plan-check.json",
+      "sha256": "02164e39cc00244d5eac334475bb1dae6678efa6b356d69a2b3f86762a2984fa",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/type-statement-arg-move-diff-check.json",
+      "sha256": "eda221b83c4a7fa71b0eb98aab12556407f8fea098e52d1f8fb58c30b9af75b3",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

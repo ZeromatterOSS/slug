@@ -278,8 +278,11 @@ impl StmtsCompiled {
                 Self::if_stmt(expr.span, x, StmtsCompiled::empty(), Self::expr(y))
             }
             expr => {
-                if let Some(t) = expr.as_type() {
-                    StmtsCompiled::expr(t.clone())
+                if expr.as_type().is_some() {
+                    let ExprCompiled::Call(mut call) = expr else {
+                        unreachable!("as_type proved an owned call");
+                    };
+                    StmtsCompiled::expr(call.node.args.pos_named.pop().unwrap())
                 } else {
                     StmtsCompiled::one(IrSpanned {
                         span,
@@ -821,3 +824,7 @@ impl Compiler<'_, '_, '_, '_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "stmt/type_statement_memory_tests.rs"]
+mod type_statement_memory_tests;
