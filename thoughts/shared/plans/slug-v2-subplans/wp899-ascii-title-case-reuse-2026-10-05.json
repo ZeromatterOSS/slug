@@ -1,0 +1,244 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "4201f9fd2",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "a421149d49703f8bdaffe8057e46ad0d89ccf2e2fc1a8f65bd00375faf23238a",
+    "starlark-rust/starlark/src/values/types/string/ascii_case_reuse_tests.rs": "034206fa18961e9d1f7d909e4b85f8ee2e8ae5a980e28bdf520c6cea5fd12e55",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/types/string/str_type.rs": "a476b73bdc0845592fee35732c419338d2c108328b8656df14383af1061fc812",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/values/types/string/splitlines_input_reuse_tests.rs": "0ef57b84f8bc9c777fea514f1c3301f3067e55b5659e2a8fd343254bd2dc6dc5"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "40d737c0790ee7a40fbc5cd952fed72e75d4ef35d71798f8cece08b1eadde42f",
+    "selectors": [
+      "values::types::string::methods::ascii_case_reuse_tests::unchanged_ascii_case_reuses_input_without_heap_growth",
+      "values::types::string::methods::ascii_case_reuse_tests::ascii_pairs_unicode_fallback_types_and_exact_errors_are_preserved",
+      "values::types::string::methods::ascii_case_reuse_tests::case_results_and_functions_survive_gc_freeze_and_module_drop",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::methods::splitlines_input_reuse_tests::unsplit_lines_share_whole_input_and_avoid_payload_growth",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_bytes_lists_parameters_and_exact_errors_are_preserved",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_lists_and_functions_survive_gc_freeze_and_source_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "a421149d49703f8bdaffe8057e46ad0d89ccf2e2fc1a8f65bd00375faf23238a",
+      "starlark-rust/starlark/src/values/types/string/ascii_case_reuse_tests.rs": "034206fa18961e9d1f7d909e4b85f8ee2e8ae5a980e28bdf520c6cea5fd12e55"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/ascii-title-case-reuse-baseline-compile.json",
+      "sha256": "bf8c0e46399d453c9a1630b8e17405922de97805f583869bb20e9547bebf108a",
+      "exit_code": 0,
+      "elapsed_seconds": 5.589770109974779,
+      "log_sha256": "2a2175a97b6ab670155cc9c4a93a88f3bda5c72e451a2f0ec3284a19523ec7b2"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/ascii-title-case-reuse-baseline-preflight.json",
+      "sha256": "f80d17748198654b3322ed3f21319333e92ddf6b0b981e3cde6adba781b54275",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020139470987487584,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/ascii-title-case-reuse-baseline-controls.json",
+      "sha256": "0ad095526e801b5606326931c0d9eede3b89609fe2b0864a7d4f7ef46db7f098",
+      "exit_code": 101,
+      "elapsed_seconds": 0.03720570600125939,
+      "log_sha256": "fb815b2faf3449e21293c02fc273c7cde70d596059b7812fbc6c5ac10a2be10b"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/ascii-title-case-reuse-candidate-compile.json",
+      "sha256": "06299f662a0e4dd20b8ebaf16f20007579f3f3c47a359b6fbab81a2f60908458",
+      "exit_code": 0,
+      "elapsed_seconds": 5.0372321080067195,
+      "log_sha256": "45abda7313bded4ee52b6e854dcc58eacfe92952741c5fdea087485578f18c69"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/ascii-title-case-reuse-candidate-preflight.json",
+      "sha256": "63a534516e62f1bd85fef55d15bc785ee8041bb26ea9d9d734aace87c8f58bca",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02175554900895804,
+      "log_sha256": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/ascii-title-case-reuse-candidate-controls.json",
+      "sha256": "cb1f90cc3699768ac6ce6e9a30bf1f5a9a4222864923e19315085112fdb84c7b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03681168396724388,
+      "log_sha256": "c0f0f3bf74761baa324d62511b7533f776242e140eeeb3dacaaa42502ff1f27c"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/ascii-title-case-reuse-dependents-check.json",
+      "sha256": "9b53ef0f0841f5920549407772116f6b64a97208550f92af654eba67f0530a71",
+      "exit_code": 0,
+      "elapsed_seconds": 7.62622467399342,
+      "log_sha256": "b20d3ea42966666099bfc3995bcb13df5a99fd627a0d8cfff829276d7ec086a4"
+    }
+  },
+  "design_sha256": "5149b00da1acecf19ffde8840fe3c6779d6da729c3e694c1e44053a0b1d6d366",
+  "design_reviews": {
+    "target/wp899/ascii-title-case-reuse-design-source.md": "f6abb4ce431200d695642b60372c6b81514171102334c4496fa9c8a2da3e3073",
+    "target/wp899/ascii-title-case-reuse-design-ownership.md": "95cee3363db748801abbdc2a033f4a1d7da89ff99563183d90075ac025a5910a",
+    "target/wp899/ascii-title-case-reuse-design-evidence.md": "d29d9b4302b497954cb41c3db9d481ea216097ad4ae9c97e36ff45a4698f885f"
+  },
+  "proof": "Entire methods.rs comparison permits only capitalize/title StringValue signatures, exact unchanged ASCII guards, original character loops and same alloc_str return allocation. Existing lower/upper/splitlines and all docs/annotations/other methods unchanged. Archived fallback loops match baseline. Identical extended case sibling baseline/candidate. Guards skip both Rust String construction and final duplicate string only for unchanged ASCII. No new retained state/interner/cache/API/key/unsafe/dependency.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_failed": 1,
+    "candidate_extended_case": 3,
+    "candidate_protected": 8,
+    "candidate_total": 11,
+    "case_comparisons_per_variant": 74898,
+    "protected_splitlines_comparisons_candidate": 5602,
+    "exact_equal_error_records": 8
+  },
+  "metrics": {
+    "baseline": [
+      {
+        "method": "lower_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "upper_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "capitalize_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 409536
+      },
+      {
+        "method": "title_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 0
+      }
+    ],
+    "candidate": [
+      {
+        "method": "lower_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "upper_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "capitalize_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "method": "title_case",
+        "input_bytes": 98304,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:8, in bad_lower\n      def bad_lower(s): return s.lower(0)\nerror: Wrong number of positional arguments, expected 0, got 1\n --> assert.bzl:8:26\n  |\n8 | def bad_lower(s): return s.lower(0)\n  |                          ^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:9, in bad_upper\n      def bad_upper(s): return s.upper(unexpected = 0)\nerror: Found `unexpected` extra named parameter(s) for call to function\n --> assert.bzl:9:26\n  |\n9 | def bad_upper(s): return s.upper(unexpected = 0)\n  |                          ^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:6, in bad_capitalize\n      def bad_capitalize(s): return s.capitalize(0)\nerror: Wrong number of positional arguments, expected 0, got 1\n --> assert.bzl:6:31\n  |\n6 | def bad_capitalize(s): return s.capitalize(0)\n  |                               ^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:7, in bad_title\n      def bad_title(s): return s.title(unexpected = 0)\nerror: Found `unexpected` extra named parameter(s) for call to function\n --> assert.bzl:7:26\n  |\n7 | def bad_title(s): return s.title(unexpected = 0)\n  |                          ^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n"
+  ],
+  "limits": "Only unchanged ASCII capitalized/titlecase whole inputs reuse; all changed ASCII and every Unicode input retain original scratch and final heap allocation. Four fixed 98304-byte fixtures: lower/upper sharing unchanged, new capitalize/title false to true. Public Heap::allocated_bytes values include arena/chunks/padding; baseline title copy fits existing arena with zero growth despite unshared pointer. No exact allocator/payload, general capacity/aggregate/peak/RSS/speed/source-fit conclusion. GC disabled only for isolated accounting/comparison; explicit GC and retained mutable/frozen results/functions independently controlled. Int errors are typed wrapper guards, not direct receiver-unpack probes; source proves same string unpack type.",
+  "growth": {
+    "case_sibling_before_lines": 188,
+    "case_sibling_after_lines": 295,
+    "estimated_after_lines": "230-290; actual 295, existing sibling reused without new fixture assets",
+    "owner_boundary": "Two short native method guards/signature/return edits only; original fallback loops remain. No new test hook/helper in production or donor import."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14, default Starlark lib plus default Loading/Core/CLI alltargets offline; serial Cargo prep60s/tests30s/fresh exact artifact preflight; CARGO_MANIFEST_DIR set, no golden regeneration.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/ascii-title-case-reuse-archive-reference.rs": "283b078701631137cdc57eab1f6131079c6a72f9dec7deff1f0bbeda9e64870a",
+    "target/wp899/ascii-title-case-reuse-baseline-compile.json": "bf8c0e46399d453c9a1630b8e17405922de97805f583869bb20e9547bebf108a",
+    "target/wp899/ascii-title-case-reuse-baseline-compile.jsonl": "2a2175a97b6ab670155cc9c4a93a88f3bda5c72e451a2f0ec3284a19523ec7b2",
+    "target/wp899/ascii-title-case-reuse-baseline-controls.json": "0ad095526e801b5606326931c0d9eede3b89609fe2b0864a7d4f7ef46db7f098",
+    "target/wp899/ascii-title-case-reuse-baseline-controls.jsonl": "fb815b2faf3449e21293c02fc273c7cde70d596059b7812fbc6c5ac10a2be10b",
+    "target/wp899/ascii-title-case-reuse-baseline-preflight.json": "f80d17748198654b3322ed3f21319333e92ddf6b0b981e3cde6adba781b54275",
+    "target/wp899/ascii-title-case-reuse-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/ascii-title-case-reuse-baseline-selectors.json": "ae0a19ec742fd2d2c5716ef295bdbe5781c0d768524fc44d7831212708146aa7",
+    "target/wp899/ascii-title-case-reuse-candidate-compile.json": "06299f662a0e4dd20b8ebaf16f20007579f3f3c47a359b6fbab81a2f60908458",
+    "target/wp899/ascii-title-case-reuse-candidate-compile.jsonl": "45abda7313bded4ee52b6e854dcc58eacfe92952741c5fdea087485578f18c69",
+    "target/wp899/ascii-title-case-reuse-candidate-controls.json": "cb1f90cc3699768ac6ce6e9a30bf1f5a9a4222864923e19315085112fdb84c7b",
+    "target/wp899/ascii-title-case-reuse-candidate-controls.jsonl": "c0f0f3bf74761baa324d62511b7533f776242e140eeeb3dacaaa42502ff1f27c",
+    "target/wp899/ascii-title-case-reuse-candidate-preflight.json": "63a534516e62f1bd85fef55d15bc785ee8041bb26ea9d9d734aace87c8f58bca",
+    "target/wp899/ascii-title-case-reuse-candidate-preflight.jsonl": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff",
+    "target/wp899/ascii-title-case-reuse-candidate-selectors.json": "a7f6b645db43e3e2f6ef39288a6b5da2310747ea4522de913005a900adfd2a34",
+    "target/wp899/ascii-title-case-reuse-controls.py": "27dc84fed4a4303af12979cc83999f842ba2f437e4fdb86439d9eedf1eb92795",
+    "target/wp899/ascii-title-case-reuse-dependents-check.json": "9b53ef0f0841f5920549407772116f6b64a97208550f92af654eba67f0530a71",
+    "target/wp899/ascii-title-case-reuse-dependents-check.jsonl": "b20d3ea42966666099bfc3995bcb13df5a99fd627a0d8cfff829276d7ec086a4",
+    "target/wp899/ascii-title-case-reuse-design-evidence.md": "d29d9b4302b497954cb41c3db9d481ea216097ad4ae9c97e36ff45a4698f885f",
+    "target/wp899/ascii-title-case-reuse-design-ownership.md": "95cee3363db748801abbdc2a033f4a1d7da89ff99563183d90075ac025a5910a",
+    "target/wp899/ascii-title-case-reuse-design-source.md": "f6abb4ce431200d695642b60372c6b81514171102334c4496fa9c8a2da3e3073",
+    "target/wp899/ascii-title-case-reuse-design.md": "5149b00da1acecf19ffde8840fe3c6779d6da729c3e694c1e44053a0b1d6d366",
+    "target/wp899/ascii-title-case-reuse-record.py": "34d8313881e619a0e6ec275a5892b4fe64c98e869b4f8366f61ca916e01a4ace",
+    "target/wp899/ascii-title-case-reuse-start.json": "eb4e0926b61e41cf0831f50090378a5e2e6589e6c0f92d6e055be168d193db8f"
+  },
+  "timing": {
+    "compile_seconds": 18.25322689197492,
+    "test_seconds": 0.07401738996850327,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 376.413223028183
+  },
+  "validation_sha256": "0718064fa6a3de41a9af493cb79c52749eb3f67eb7ee534beb36fe0959bb7ff8",
+  "final_reviews": {
+    "target/wp899/ascii-title-case-reuse-final-source.md": "d54d405892177ff69bc0e63d907e729d1bee8908a272c68da6d9e7031e33aa3b",
+    "target/wp899/ascii-title-case-reuse-final-ownership.md": "bdc7731e182daae82735990410e3db478503be97817f7ab66a53a214d952381a",
+    "target/wp899/ascii-title-case-reuse-final-evidence.md": "b1629cf4597767edf3c3ae8e4472c1257eea0dfde50bbebcd9c57f3a4b8f0e2e"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/ascii-title-case-reuse-format-check.json",
+      "sha256": "600348f71ed083ed0db5dd38e4c1fd4609c4e6923164813098cf75a9bb32bac9",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/ascii-title-case-reuse-archive-check.json",
+      "sha256": "60a4789c92d21a31004af8de9254157e569d9a0db9912e148140e914b3b4c295",
+      "exit_code": 0,
+      "log_sha256": "2107725c8cac6fd61b194dede25fffbd144c78a2cb8a0b1ae6f236f324adad66"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/ascii-title-case-reuse-plan-check.json",
+      "sha256": "91034ae8c898ec9ee8e9d8f4a7577f44cc587aa3627ef66404e6dddd03c8b5e9",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/ascii-title-case-reuse-diff-check.json",
+      "sha256": "48de849d2a49b6dfc93eb7839d71cd7fa53f80855e85853762699dbcefc9782c",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

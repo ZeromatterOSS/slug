@@ -126,7 +126,17 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn capitalize(this: &str) -> anyhow::Result<String> {
+    fn capitalize<'v>(this: StringValue<'v>, heap: Heap<'v>) -> anyhow::Result<StringValue<'v>> {
+        if this.bytes().enumerate().all(|(i, byte)| {
+            byte.is_ascii()
+                && if i == 0 {
+                    !byte.is_ascii_lowercase()
+                } else {
+                    !byte.is_ascii_uppercase()
+                }
+        }) {
+            return Ok(this);
+        }
         let mut result = String::with_capacity(this.len());
         for (i, c) in this.chars().enumerate() {
             if i == 0 {
@@ -135,7 +145,7 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
                 result.extend(c.to_lowercase())
             }
         }
-        Ok(result)
+        Ok(heap.alloc_str(&result))
     }
 
     /// [string.codepoints](
@@ -1183,7 +1193,22 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn title(this: &str) -> anyhow::Result<String> {
+    fn title<'v>(this: StringValue<'v>, heap: Heap<'v>) -> anyhow::Result<StringValue<'v>> {
+        let mut word_start = true;
+        if this.bytes().all(|byte| {
+            if !byte.is_ascii() {
+                return false;
+            }
+            let changes = if word_start {
+                byte.is_ascii_lowercase()
+            } else {
+                byte.is_ascii_uppercase()
+            };
+            word_start = !byte.is_ascii_alphabetic();
+            !changes
+        }) {
+            return Ok(this);
+        }
         let mut last_space = true;
         let mut result = String::with_capacity(this.len());
         for c in this.chars() {
@@ -1199,7 +1224,7 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
                 last_space = false;
             }
         }
-        Ok(result)
+        Ok(heap.alloc_str(&result))
     }
 
     /// [string.upper](

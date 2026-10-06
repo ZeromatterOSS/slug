@@ -12,51 +12,55 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component reuses complete nonempty splitlines inputs when
-no CR/LF delimiter is present. The result list and all actual split-line
-allocations remain. Four large ASCII/Unicode cases share their inputs; exact
-outputs, parameters and GC/frozen ownership remain unchanged. Next: select a
-proved redundant local copy or existing interner reuse through a bounded design
-checkpoint.
+The latest accepted component extends unchanged ASCII input reuse to
+capitalize()/title(), completing the four native case methods. Exact
+first-position/alphabetic word-boundary guards skip duplicate String construction
+and heap string copying. Every changed ASCII/non-ASCII fallback remains. Next:
+select a proved redundant local copy or existing interner reuse through a bounded
+design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted unsplit splitlines input reuse contract
+## Accepted capitalize/title unchanged ASCII reuse contract
 
-Native splitlines uses the existing StringValue only in its nonempty tail when
-no delimiter has pushed a line. Every delimiter branch pushes, including empty
-lines, so this reuses the complete input. Empty input, CR/LF/CRLF pairing,
-trailing/consecutive terminators, keepends parameters, exact errors and ordered
-list[str] result remain unchanged. Every actual split-line allocation and the
-result Vec/list remain. No added scan, helper, API, interner, cache, key, unsafe
-code, dependency or retained representation; tracing/freezing follow normal
-list ownership. Archived Buck2-derived loop comparison is baseline-identical.
+Capitalize reuses its complete StringValue when every byte is ASCII, the first
+byte is not lowercase and all later bytes are not uppercase. Title starts at a
+word boundary, rejects lowercase there/uppercase elsewhere, and resets the
+boundary after every nonalphabetic ASCII byte. Empty strings may reuse their
+constant. Every changed ASCII and every non-ASCII input retain the original
+character conversion loops and equivalent final heap allocation. Public string
+type/zero visible arguments, exact errors, speculative annotations, interning,
+tracing/freezing and all other methods remain unchanged. No new helper, API,
+interner, cache, key, unsafe code, dependency or retained representation.
 
-Three DESIGNs/FINALs accept exact whole-owner source proof and identical tests.
-Baseline has two semantic passes and one intended sharing failure; candidate
-passes 11/11, including 5,602 independent character comparisons per variant and
-four byte-identical error records. Mutable list/type, nonspeculative mutable
-input source-drop/explicit GC, frozen results/functions after module/handle drop,
-speculative constants, interner/carrier and prior ASCII reuse controls pass.
-Default Loading/Core/CLI alltargets check offline. Fresh artifacts/exact
-preflights, pinned serial prep60s/tests30s and format/archive/plan/diff hygiene
-pass. Three local edits and test hook remain in the cohesive owner; reviewers
-accept the 252-line sibling above the 180-220 estimate as discriminating coverage.
+Three DESIGNs/FINALs accept whole-owner proof, baseline-identical archived loops
+and identical extended case tests. Baseline has two semantic passes and one
+sharing failure: lower/upper already share, capitalize/title copy. Candidate
+passes 11/11 with all four sharing, 74,898 character-reference comparisons per
+variant, eight byte-identical errors, Unicode/typed returns, nonspeculative
+mutable source-drop/explicit GC, frozen result/function survival and speculative
+constants. Interner/carrier and splitlines controls (5,602 comparisons) pass;
+default Loading/Core/CLI alltargets check offline. Fresh artifacts/exact
+preflights, serial pinned prep60s/tests30s and format/archive/plan/diff hygiene
+pass. Existing sibling grows from 188 to 295 lines; reviewers accept five lines
+above the estimate as focused coverage. No fixture assets or new test hook.
 
-ASCII 102,400-byte and Unicode 86,016-byte inputs in both keepends modes change
-from unshared to shared. Observed public Heap::allocated_bytes() growth changes
-from [212928,425920,0,851904] to [0,0,0,0]. The baseline zero-growth copy fits
-existing arena capacity; these observations do not count allocations. Lists and
-all other storage remain; no exact allocator/payload, general capacity,
-aggregate/peak/RSS/speed or source-fit claim. Full WP899/M7A remains open.
+Each new capitalize/title fixture has 98,304 bytes and changes from unshared to
+shared; lower/upper fixtures retain sharing. Public Heap::allocated_bytes()
+growth changes from [0,0,409536,0] to [0,0,0,0]. Baseline title's copy fits existing
+arena capacity, so zero growth does not count allocations. Source proves both
+construction paths are skipped only for unchanged ASCII. Fallback scratch/final
+storage remains; no exact allocator/payload, general capacity, aggregate/peak/
+RSS/speed or source-fit claim. Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Capitalize/title join lower/upper in unchanged ASCII whole-input reuse; exact first-position/word-boundary guards preserve all changed ASCII/Unicode fallback, errors and GC/frozen/speculative behavior. Three DESIGNs/FINALs; identical baseline two semantic passes/one new sharing failure, candidate 11/11, 74,898 comparisons per variant, eight equal errors and default dependents. Both new 96 KiB fixtures share; zero public arena growth is fixture accounting only | [ASCII capitalize/title reuse](wp899-ascii-title-case-reuse-2026-10-05.json) |
 | Native splitlines reuses complete nonempty inputs without CR/LF; list and actual split-line allocations, bytes/parameters/errors, GC/frozen and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one sharing failure, candidate 11/11, 5,602 character comparisons per variant and default dependents. Four large ASCII/Unicode cases share; observed zero added arena accounting excludes allocator/aggregate/speed claims | [Splitlines input reuse](wp899-splitlines-input-reuse-2026-10-05.json) |
 | Native lower()/upper() reuse unchanged ASCII inputs; all changed ASCII/Unicode conversion, public types/errors, GC/frozen ownership and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one intended sharing failure, candidate 8/8 and 32,768 ASCII comparisons plus default dependents. Both 96 KiB fixtures share with zero additional public heap accounting; fixture observations only | [ASCII case input reuse](wp899-ascii-case-reuse-2026-10-05.json) |
 | Manifest temporary SmallSets borrow full canonical labels; seven scratch clone sites removed, first-seen/full structural identity/fingerprints/final owned and frozen outputs preserved. Three DESIGNs/FINALs; identical baseline 3/3 and candidate 8/8 as 6 lib + 2 BUILD, default Loading/Core/CLI checks. Explicit scratch drop resolves preserved compiler E0505; no allocator/capacity/RSS/speed claim | [Manifest label borrowing](wp899-manifest-label-borrow-2026-10-05.json) |
