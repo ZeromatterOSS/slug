@@ -1,0 +1,384 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e6a90771407e8ef6fe455631572d591d3e0acbdf",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native local memory optimization; inherited Rust Starlark bytes, count validation and errors preserved; local Bazel context adds no Java/UTF16/negative-count parity",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "6444a195114471738ae2bb0f3aa84c1d2c99b5be9a00d84f4c49e007797a572c",
+    "starlark-rust/starlark/src/values/types/string/replace_equal_input_reuse_tests.rs": "487695a1bd60576ead2355c6ae432f5aa82b99173734650bc9d18650134edcae",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "starlark-rust/starlark/Cargo.toml": "1aee590006684fde395f91a74df4f4ace2db2c6ecc3f0f7afe564a76eabac660",
+    "starlark-rust/starlark/src/values/types/string/replace_prefix_tests.rs": "22930655de21ace05e1f5284333edfff14dc63f15213bb39b4a32c7e3328a725",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/values/types/string/str_type.rs": "a476b73bdc0845592fee35732c419338d2c108328b8656df14383af1061fc812",
+    "starlark-rust/starlark/src/values/layout/typed/string.rs": "ba60c42dce98e42a45bb906c517a5a3b0ca4735c8ed3e7f3135ecf8dc8818612",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257"
+  },
+  "reference_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/net/starlark/java/eval/StringModule.java": "6d8194222f0c9087c87777fb7420bf91a9b39340cf53b1ee261c9de73fad720d"
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "d09f6abc4db21a9ec68c052e8174d4872597c4d205bdcdba461d7b204a0a466f",
+    "selectors": [
+      "values::types::string::methods::replace_equal_input_reuse_tests::equal_replacements_share_large_inputs_without_added_heap_accounting",
+      "values::types::string::methods::replace_equal_input_reuse_tests::equal_and_changed_replacements_preserve_bytes_counts_types_and_raw_errors",
+      "values::types::string::methods::replace_equal_input_reuse_tests::reused_and_changed_results_survive_gc_freeze_and_source_module_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "9fcfdd4ab977536d512d7446fc47e9a1f8e1e3aa5c9891605e87af025509595a",
+      "starlark-rust/starlark/src/values/types/string/replace_equal_input_reuse_tests.rs": "487695a1bd60576ead2355c6ae432f5aa82b99173734650bc9d18650134edcae"
+    }
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "d4ddaf178bed161e7b3dfad5bc5d26902dd0d1f76f963797a6f196f4622b1b5d",
+    "selectors": [
+      "values::types::string::methods::replace_equal_input_reuse_tests::equal_replacements_share_large_inputs_without_added_heap_accounting",
+      "values::types::string::methods::replace_equal_input_reuse_tests::equal_and_changed_replacements_preserve_bytes_counts_types_and_raw_errors",
+      "values::types::string::methods::replace_equal_input_reuse_tests::reused_and_changed_results_survive_gc_freeze_and_source_module_drop",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::methods::replace_prefix_tests::limited_replace_reuses_input_when_no_match_is_consumed",
+      "values::types::string::methods::replace_prefix_tests::limited_replace_preserves_bytes_errors_and_frozen_ownership"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "6444a195114471738ae2bb0f3aa84c1d2c99b5be9a00d84f4c49e007797a572c",
+      "starlark-rust/starlark/src/values/types/string/replace_equal_input_reuse_tests.rs": "487695a1bd60576ead2355c6ae432f5aa82b99173734650bc9d18650134edcae"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-compile.json",
+      "sha256": "d8abe54fbc0a6c9badc08a0f49e0510003bb878b99ad9b919f4b361a10b6941a",
+      "exit_code": 101,
+      "elapsed_seconds": 2.104423785000108,
+      "log_sha256": "5ee724093fd689d44224dcc59e9b9509a39802888ca3bc49a04553fa09b69a83"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r2-compile.json",
+      "sha256": "a1670722b85586c724d7089f452536cde69382f410c82f52d5d0578bbdf5fd2a",
+      "exit_code": 0,
+      "elapsed_seconds": 6.500720473995898,
+      "log_sha256": "ea100c4c7d5179b4f3f88b4baf1d902c0cbf19810d3dfbc3f807270e7f4b763e"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r2-preflight.json",
+      "sha256": "414ae9c3ed8b80baa14401b0c9875905413484c4161e2800f947222fe7499f6e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0227280089748092,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r2-controls.json",
+      "sha256": "98bade0987098ef8559c0c3d15a379435e45dbfb366667adaddf3c47a73d2908",
+      "exit_code": 101,
+      "elapsed_seconds": 0.007778267958201468,
+      "log_sha256": "fe44262183b13a59505c32960c5e9a5c0a404bd54b66d23fac76020cedab5771"
+    },
+    "baseline-r3-compile": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r3-compile.json",
+      "sha256": "f1fdd525d3921305b34c8ad940a18d830158a203e46852dc90d0aec54e15a350",
+      "exit_code": 0,
+      "elapsed_seconds": 4.240973601001315,
+      "log_sha256": "cb2743991ce40a942081eb35572e136f0d01423245f87c937d07bc78810ca403"
+    },
+    "baseline-r3-preflight": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r3-preflight.json",
+      "sha256": "96814715b2dadcefb3108a39802ea75209f5476ff78529be15275573f3b8273f",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019966666004620492,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r3-controls": {
+      "receipt": "target/wp899/replace-equal-input-reuse-baseline-r3-controls.json",
+      "sha256": "3efdc23a10380fd1e493bb6264faa85a6d14b6c87ec04a0a3e1c1b6fbf1f25e7",
+      "exit_code": 101,
+      "elapsed_seconds": 0.012883441988378763,
+      "log_sha256": "20f7692cb426765effc61a3279e98acd4d9ed723690b6d52541998580dc813ac"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/replace-equal-input-reuse-candidate-compile.json",
+      "sha256": "a42bb01fa639c091e4fa4cf0ce0b8c420a06e5c3f9ed41d60ebd4eb8166db8a5",
+      "exit_code": 0,
+      "elapsed_seconds": 9.025145730993245,
+      "log_sha256": "0a748249081fcd0540a0479eeec98fe06ddd12b0f9380eb50291358a12d3ef05"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/replace-equal-input-reuse-candidate-preflight.json",
+      "sha256": "7e8b5c2af4f25c7f4dfc0574204b25dbb20bb6627636a800ef9cbfe5c597ed37",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020023457007482648,
+      "log_sha256": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/replace-equal-input-reuse-candidate-controls.json",
+      "sha256": "69e56a4bd16d79b96b2cb40d379131385bbc90f54dc4e9694d75f38420d83f27",
+      "exit_code": 0,
+      "elapsed_seconds": 0.013028423010837287,
+      "log_sha256": "2b44a4e212d62b44c1e264acb1338dee55b16a628df9e891822ba1babc4eafa5"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-dependents-check.json",
+      "sha256": "2ab9e20d25a0169e68557f6379bc664dc015016a2836aacaf71f6b3196d3274d",
+      "exit_code": 0,
+      "elapsed_seconds": 7.611410327022895,
+      "log_sha256": "aec5c34323f6ccce35d552ea45b487be74cf3fa05613764dfebea2bcdcb8a35b"
+    },
+    "format-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-format-check.json",
+      "sha256": "5a3f35eb64455de83929f6aea71e167c6fe4df92b800f06e385df24e8bb57bf2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020151487027760595,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-archive-check.json",
+      "sha256": "09aa277edd5e077f99b918cd7f1f280226b38bb203827fa9a8ad8374a5628bfb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.035610652004834265,
+      "log_sha256": "f6ee8fc5665947bfbe9bc20e7f22f07bb05145d685ea75941c857d7072b9f77d"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "9fcfdd4ab977536d512d7446fc47e9a1f8e1e3aa5c9891605e87af025509595a",
+    "exact_replacements": [
+      [
+        "        // Build the replaced prefix, then copy the untouched suffix directly into the heap.\n",
+        "        if old == new {\n            return Ok(this);\n        }\n        // Build the replaced prefix, then copy the untouched suffix directly into the heap.\n"
+      ]
+    ],
+    "every_other_byte_unchanged": true
+  },
+  "test_profile": "Pinned nightly2025-09-14 four tools; serial offline starlark lib CargoJSON no-run prep60s/exact preflight/tests30s; CARGO_MANIFEST_DIR/no golden regeneration; default Loading/Core/CLI alltargets, rustfmt/archive/plan/diff",
+  "pass_counts": {
+    "original_baseline_compile": 101,
+    "baseline_r2_semantic_pass": 1,
+    "baseline_r2_fixture_and_intended_failures": 2,
+    "corrected_baseline_semantic_pass": 2,
+    "corrected_baseline_intended_sharing_failure": 1,
+    "candidate_new": 3,
+    "candidate_protected": 7,
+    "candidate_total": 10
+  },
+  "metrics": {
+    "baseline-r3": {
+      "raw_errors": [
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:4, in negative\n      def negative(s): return s.replace(\"a\", \"a\", -1)\nerror: Replace final argument was negative '-1'\n --> assert.bzl:4:25\n  |\n4 | def negative(s): return s.replace(\"a\", \"a\", -1)\n  |                         ^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:5, in empty_negative\n      def empty_negative(s): return s.replace(\"\", \"\", -2)\nerror: Replace final argument was negative '-2'\n --> assert.bzl:5:31\n  |\n5 | def empty_negative(s): return s.replace(\"\", \"\", -2)\n  |                               ^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:6, in wrong_old\n      def wrong_old(s): return s.replace(1, 1)\nerror: Type of parameter `old` doesn't match, expected `str`, actual `int (repr: 1)`\n --> assert.bzl:6:26\n  |\n6 | def wrong_old(s): return s.replace(1, 1)\n  |                          ^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:7, in wrong_new\n      def wrong_new(s): return s.replace(\"a\", 1)\nerror: Type of parameter `new` doesn't match, expected `str`, actual `int (repr: 1)`\n --> assert.bzl:7:26\n  |\n7 | def wrong_new(s): return s.replace(\"a\", 1)\n  |                          ^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:8, in wrong_count\n      def wrong_count(s): return s.replace(\"a\", \"a\", \"bad\")\nerror: Type of parameter `count` doesn't match, expected `int`, actual `string (repr: \"bad\")`\n --> assert.bzl:8:28\n  |\n8 | def wrong_count(s): return s.replace(\"a\", \"a\", \"bad\")\n  |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:9, in none_count\n      def none_count(s): return s.replace(\"a\", \"a\", None)\nerror: Type of parameter `count` doesn't match, expected `int`, actual `NoneType (repr: None)`\n --> assert.bzl:9:27\n  |\n9 | def none_count(s): return s.replace(\"a\", \"a\", None)\n  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:10, in large_count\n      def large_count(s): return s.replace(\"a\", \"a\", 2147483648)\nerror: Error unpacking value for parameter `count` of type `int\n  --> assert.bzl:10:28\n   |\n10 | def large_count(s): return s.replace(\"a\", \"a\", 2147483648)\n   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:11, in extra\n      def extra(s): return s.replace(\"a\", \"a\", 1, 2)\nerror: Wrong number of positional arguments, expected between 2 and 3, got 4\n  --> assert.bzl:11:22\n   |\n11 | def extra(s): return s.replace(\"a\", \"a\", 1, 2)\n   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:12, in named\n      def named(s): return s.replace(old = \"a\", new = \"a\")\nerror: Found `old` `new` extra named parameter(s) for call to function\n  --> assert.bzl:12:22\n   |\n12 | def named(s): return s.replace(old = \"a\", new = \"a\")\n   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Object of type `int` has no attribute `replace`\n --> assert.bzl:3:39\n  |\n3 | def default_case(s, old, new): return s.replace(old, new)\n  |                                       ^^^^^^^^^^^^^^^^^^^\n  |\n"
+      ],
+      "raw_errors_sha256": "00967358e158f7739e64cee05e32dff3567f09fcf28da60e6a80bd4a1278fccb",
+      "comparisons": 16374,
+      "retained_bytes": [
+        28672,
+        28672,
+        8192,
+        28677
+      ],
+      "probes": [
+        {
+          "bytes": 98304,
+          "count": "Some(1)",
+          "shared": false,
+          "heap_growth": 204736
+        },
+        {
+          "bytes": 98304,
+          "count": "None",
+          "shared": false,
+          "heap_growth": 204736
+        },
+        {
+          "bytes": 114688,
+          "count": "Some(1)",
+          "shared": false,
+          "heap_growth": 237504
+        },
+        {
+          "bytes": 114688,
+          "count": "None",
+          "shared": false,
+          "heap_growth": 237504
+        }
+      ]
+    },
+    "candidate": {
+      "raw_errors": [
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:4, in negative\n      def negative(s): return s.replace(\"a\", \"a\", -1)\nerror: Replace final argument was negative '-1'\n --> assert.bzl:4:25\n  |\n4 | def negative(s): return s.replace(\"a\", \"a\", -1)\n  |                         ^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:5, in empty_negative\n      def empty_negative(s): return s.replace(\"\", \"\", -2)\nerror: Replace final argument was negative '-2'\n --> assert.bzl:5:31\n  |\n5 | def empty_negative(s): return s.replace(\"\", \"\", -2)\n  |                               ^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:6, in wrong_old\n      def wrong_old(s): return s.replace(1, 1)\nerror: Type of parameter `old` doesn't match, expected `str`, actual `int (repr: 1)`\n --> assert.bzl:6:26\n  |\n6 | def wrong_old(s): return s.replace(1, 1)\n  |                          ^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:7, in wrong_new\n      def wrong_new(s): return s.replace(\"a\", 1)\nerror: Type of parameter `new` doesn't match, expected `str`, actual `int (repr: 1)`\n --> assert.bzl:7:26\n  |\n7 | def wrong_new(s): return s.replace(\"a\", 1)\n  |                          ^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:8, in wrong_count\n      def wrong_count(s): return s.replace(\"a\", \"a\", \"bad\")\nerror: Type of parameter `count` doesn't match, expected `int`, actual `string (repr: \"bad\")`\n --> assert.bzl:8:28\n  |\n8 | def wrong_count(s): return s.replace(\"a\", \"a\", \"bad\")\n  |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:9, in none_count\n      def none_count(s): return s.replace(\"a\", \"a\", None)\nerror: Type of parameter `count` doesn't match, expected `int`, actual `NoneType (repr: None)`\n --> assert.bzl:9:27\n  |\n9 | def none_count(s): return s.replace(\"a\", \"a\", None)\n  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:10, in large_count\n      def large_count(s): return s.replace(\"a\", \"a\", 2147483648)\nerror: Error unpacking value for parameter `count` of type `int\n  --> assert.bzl:10:28\n   |\n10 | def large_count(s): return s.replace(\"a\", \"a\", 2147483648)\n   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:11, in extra\n      def extra(s): return s.replace(\"a\", \"a\", 1, 2)\nerror: Wrong number of positional arguments, expected between 2 and 3, got 4\n  --> assert.bzl:11:22\n   |\n11 | def extra(s): return s.replace(\"a\", \"a\", 1, 2)\n   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:12, in named\n      def named(s): return s.replace(old = \"a\", new = \"a\")\nerror: Found `old` `new` extra named parameter(s) for call to function\n  --> assert.bzl:12:22\n   |\n12 | def named(s): return s.replace(old = \"a\", new = \"a\")\n   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+        "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Object of type `int` has no attribute `replace`\n --> assert.bzl:3:39\n  |\n3 | def default_case(s, old, new): return s.replace(old, new)\n  |                                       ^^^^^^^^^^^^^^^^^^^\n  |\n"
+      ],
+      "raw_errors_sha256": "00967358e158f7739e64cee05e32dff3567f09fcf28da60e6a80bd4a1278fccb",
+      "comparisons": 16374,
+      "retained_bytes": [
+        28672,
+        28672,
+        8192,
+        28677
+      ],
+      "probes": [
+        {
+          "bytes": 98304,
+          "count": "Some(1)",
+          "shared": true,
+          "heap_growth": 0
+        },
+        {
+          "bytes": 98304,
+          "count": "None",
+          "shared": true,
+          "heap_growth": 0
+        },
+        {
+          "bytes": 114688,
+          "count": "Some(1)",
+          "shared": true,
+          "heap_growth": 0
+        },
+        {
+          "bytes": 114688,
+          "count": "None",
+          "shared": true,
+          "heap_growth": 0
+        }
+      ]
+    }
+  },
+  "invariant_to_evidence": {
+    "identity": "old==new inserts exactly each removed byte; empty pattern equal replacement changes no bytes. Four large actual native calls have independent equal old/new owners, fresh arena each fixture, GC disabled, baseline false\u2192candidate true sharing",
+    "bytes": "16374 actual compiled native calls vs independent Rust replacen reference: bounded ASCII/Unicode/NUL corpus, empty/overlapping patterns, equal/different replacements, zero/one/two/unlimited/max counts; unchanged different-text fallback",
+    "errors": "10 complete raw diagnostics exactly equal baseline/candidate: negative equal/empty count, wrong old/new/count, explicit None count, range/arity/names/receiver. Count validation remains strictly before guard",
+    "lifecycle": "Fresh mutable source strings cleared then explicit GC; frozen outputs/functions/constants remain after source/module/clone drop, exact retained bytes and function use from new module; speculative constant forms",
+    "protected": "Existing mutable/frozen interner, standard/internal string carriers, speculative methods and replacement-prefix controls unchanged; default Loading/Core/CLI checks"
+  },
+  "fixture_corrections": [
+    {
+      "record": "target/wp899/replace-equal-input-reuse-test-correction.json",
+      "original_test_sha256": "6d46863111b24d07eac529402595c011f2eac3907416a0d5d0e700256f0383bc",
+      "correction": "Initial baseline compile E0597: FrozenValueOwned handles fetched inside error loop and default handle declared after Evaluator did not outlive stored evaluator borrow. Fetch all eight error functions and default before Module/Evaluator; loop borrows stable array. Every semantic/error/pointer/lifecycle assertion and Starlark source stays. Initial failed preparation preserved; fresh corrected baseline/candidate identical tests."
+    },
+    {
+      "record": "target/wp899/replace-equal-input-reuse-fixture-correction-r2.json",
+      "previous_test_sha256": "d0a6e80baa2092ece2be15c53968caef74c3075298631ccdd0d7309870fd0f16",
+      "reason": "Unchanged baseline showed unlimited calls must omit count; explicit None is rejected. Shared arena spare chunks masked Unicode growth. Use default_case for omitted count, add explicit None rejection, and use a fresh Module/Evaluator for each accounting fixture. All byte, count, pointer and lifecycle assertions stay. Second correction reassessed: native equal-byte identity design unchanged; failures are fixture invocation/accounting isolation, before production change."
+    }
+  ],
+  "limits": "Fixed fixture sharing/public arena accounting only. Source proof bypasses equal-text temporary String and final heap-copy construction. No allocator/count/padded payload, aggregate/peak/RSS/speed/source-fit claim. Allocation/OOM failure sequencing excluded. Whole immutable existing StringValue uses natural tracing/freezing; no substring/new API/helper/interner/cache/key/DICE/identity/unsafe/dependency/donor. Windows deferred/minimal; full WP899/M7A/source integration open/unwaived.",
+  "growth": {
+    "test_lines": 261,
+    "estimate": "230-330 lines;three tests/no assets/goldens",
+    "production": "3-line guard after unchanged count validation plus cfg sibling hook"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T04:06:36.633469+00:00",
+    "baseline": "e6a90771407e8ef6fe455631572d591d3e0acbdf"
+  },
+  "timing": {
+    "compile_and_check_seconds": 29.48267391801346,
+    "test_seconds": 0.03369013295741752,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 608.302383
+  },
+  "evidence_sha256": {
+    "target/wp899/replace-equal-input-reuse-archive-check.json": "09aa277edd5e077f99b918cd7f1f280226b38bb203827fa9a8ad8374a5628bfb",
+    "target/wp899/replace-equal-input-reuse-archive-check.jsonl": "f6ee8fc5665947bfbe9bc20e7f22f07bb05145d685ea75941c857d7072b9f77d",
+    "target/wp899/replace-equal-input-reuse-baseline-compile.json": "d8abe54fbc0a6c9badc08a0f49e0510003bb878b99ad9b919f4b361a10b6941a",
+    "target/wp899/replace-equal-input-reuse-baseline-compile.jsonl": "5ee724093fd689d44224dcc59e9b9509a39802888ca3bc49a04553fa09b69a83",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-compile.json": "a1670722b85586c724d7089f452536cde69382f410c82f52d5d0578bbdf5fd2a",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-compile.jsonl": "ea100c4c7d5179b4f3f88b4baf1d902c0cbf19810d3dfbc3f807270e7f4b763e",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-controls.json": "98bade0987098ef8559c0c3d15a379435e45dbfb366667adaddf3c47a73d2908",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-controls.jsonl": "fe44262183b13a59505c32960c5e9a5c0a404bd54b66d23fac76020cedab5771",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-preflight.json": "414ae9c3ed8b80baa14401b0c9875905413484c4161e2800f947222fe7499f6e",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-selectors.json": "3c4d2c7089d40fb917acb49495404c6a2ef2b368b2f1509b053457b3dd632cd2",
+    "target/wp899/replace-equal-input-reuse-baseline-r2-test.rs": "d0a6e80baa2092ece2be15c53968caef74c3075298631ccdd0d7309870fd0f16",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-compile.json": "f1fdd525d3921305b34c8ad940a18d830158a203e46852dc90d0aec54e15a350",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-compile.jsonl": "cb2743991ce40a942081eb35572e136f0d01423245f87c937d07bc78810ca403",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-controls.json": "3efdc23a10380fd1e493bb6264faa85a6d14b6c87ec04a0a3e1c1b6fbf1f25e7",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-controls.jsonl": "20f7692cb426765effc61a3279e98acd4d9ed723690b6d52541998580dc813ac",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-preflight.json": "96814715b2dadcefb3108a39802ea75209f5476ff78529be15275573f3b8273f",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/replace-equal-input-reuse-baseline-r3-selectors.json": "a19913fb8f8160c05c4ee805799104bfc48ddda6edc917f4a5231901759c413f",
+    "target/wp899/replace-equal-input-reuse-candidate-compile.json": "a42bb01fa639c091e4fa4cf0ce0b8c420a06e5c3f9ed41d60ebd4eb8166db8a5",
+    "target/wp899/replace-equal-input-reuse-candidate-compile.jsonl": "0a748249081fcd0540a0479eeec98fe06ddd12b0f9380eb50291358a12d3ef05",
+    "target/wp899/replace-equal-input-reuse-candidate-controls.json": "69e56a4bd16d79b96b2cb40d379131385bbc90f54dc4e9694d75f38420d83f27",
+    "target/wp899/replace-equal-input-reuse-candidate-controls.jsonl": "2b44a4e212d62b44c1e264acb1338dee55b16a628df9e891822ba1babc4eafa5",
+    "target/wp899/replace-equal-input-reuse-candidate-preflight.json": "7e8b5c2af4f25c7f4dfc0574204b25dbb20bb6627636a800ef9cbfe5c597ed37",
+    "target/wp899/replace-equal-input-reuse-candidate-preflight.jsonl": "13fd6f027bcbf949c243296cbb1b55bb66dc14b4394ba4641439ab82d9ac10ca",
+    "target/wp899/replace-equal-input-reuse-candidate-selectors.json": "6a9d2aa3ff46c018862ae83483a5827ce426f14dc1d94b806113a808fa9f394f",
+    "target/wp899/replace-equal-input-reuse-controls.py": "0196a897db8f4bc529c571f9ba20a0cb949a41ea4b5449d4446fa4c5751f83eb",
+    "target/wp899/replace-equal-input-reuse-dependents-check.json": "2ab9e20d25a0169e68557f6379bc664dc015016a2836aacaf71f6b3196d3274d",
+    "target/wp899/replace-equal-input-reuse-dependents-check.jsonl": "aec5c34323f6ccce35d552ea45b487be74cf3fa05613764dfebea2bcdcb8a35b",
+    "target/wp899/replace-equal-input-reuse-design-evidence.md": "e2a32b4604ae4653247897783b964e2d2ad3f33cd4b55de19378b65616e63a08",
+    "target/wp899/replace-equal-input-reuse-design-ownership.md": "dc36e155d30bd4175be8f52e2f7b3bc08f70bd62a06b878a8fdad91b89b7ef62",
+    "target/wp899/replace-equal-input-reuse-design-source.md": "68e63d4778a3c085d3933d9d6e4051718340099c4a8f7f0900fb260d591d5ba2",
+    "target/wp899/replace-equal-input-reuse-design.md": "fc9676897c192542e3766b8c0ad18965433c16d0bfe5c6ad343defffbddcf6a4",
+    "target/wp899/replace-equal-input-reuse-fixture-correction-r2.json": "12da114c93c286b2cfa35a8a118fb4c51f0c599e3c37c0acc36a4fd9c5b6db6e",
+    "target/wp899/replace-equal-input-reuse-format-check.json": "5a3f35eb64455de83929f6aea71e167c6fe4df92b800f06e385df24e8bb57bf2",
+    "target/wp899/replace-equal-input-reuse-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/replace-equal-input-reuse-original-test.rs": "6d46863111b24d07eac529402595c011f2eac3907416a0d5d0e700256f0383bc",
+    "target/wp899/replace-equal-input-reuse-record.py": "ccb29e2389188b26b2523b49c85abf89a7732f8d62fe2f2b760f290abcbe2b19",
+    "target/wp899/replace-equal-input-reuse-start.json": "91c5d2f4757ee52c04667881cb0a9e1594f896b9109628c7036b58f599536a68",
+    "target/wp899/replace-equal-input-reuse-test-correction.json": "9e234ee2107808cfa46aee9c2996f593682ee9e7d12acb5899d5ab3a76d5bda0"
+  },
+  "validation_sha256": "de4e05a3580fad72f852973f0599f9941bbbbe1b277122f5dc45df9c12b39b32",
+  "final_reviews": {
+    "target/wp899/replace-equal-input-reuse-final-source.md": "a0e554aa502b669c308ed45798185d7979471f72cbbae8ac1f41a8e0994e5e74",
+    "target/wp899/replace-equal-input-reuse-final-ownership.md": "67aff29be00c61edccf88a7aef683bb90543ecfeaa01929cad6253644cf416b7",
+    "target/wp899/replace-equal-input-reuse-final-evidence.md": "a00569dc6f21263205cbec5563fda9b21d79e2dcb6226ae00bb7f688da213ba4"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "bd75a16fcc8a7eb063ef2ca35100a3b140cc5877eb18db25fde0c1f018d4c720",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "f089b9558be4397889a4cfdaa29d96372137964e903354b41755687a2b863261",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "11ff906c20e5385f68c777f1badfbd4111a35329a90bf382126a8d8a3dd841e2"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-format-check.json",
+      "sha256": "5a3f35eb64455de83929f6aea71e167c6fe4df92b800f06e385df24e8bb57bf2",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-archive-check.json",
+      "sha256": "09aa277edd5e077f99b918cd7f1f280226b38bb203827fa9a8ad8374a5628bfb",
+      "exit_code": 0,
+      "log_sha256": "f6ee8fc5665947bfbe9bc20e7f22f07bb05145d685ea75941c857d7072b9f77d"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-plan-check.json",
+      "sha256": "6d149f5944034bca59c894e11cb602b53e68dae40686529dfc8eeaac7c105ee3",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/replace-equal-input-reuse-diff-check.json",
+      "sha256": "eda4d74ede7c0543350462b5cfa4055ad0c2a5b0331c72e965f19b1cb72e4d24",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -12,9 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component borrows cquery lexical-validation names from the
-immutable AST instead of cloning them into temporary scope bindings. Shadowing,
-cleanup/order, diagnostics/spans and final owners remain.
+The latest accepted component reuses the existing native replacement input when
+old and new have equal bytes, after unchanged count validation. Different-text
+fallback, diagnostics, immutable string owners and tracing/freezing remain.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -23,45 +23,51 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted cquery lexical-name scratch borrowing contract
+## Accepted equal replacement input reuse contract
 
-Private validate_cquery_query_inner borrows root AST names into its existing
-phase-local SmallSet. Its explicit expression lifetime covers immutable Box/Arc
-children; the set drops before public unit/owned-error return. CompactString and
-borrowed str use identical byte Hash/Eq/Equivalent. Existing SmallMap occupied
-insertion retains the first equal key and replaces only unit value. Value-before-
-binding, shadow predicate, body result and conditional shift_remove stay verbatim,
-including all error cleanup; membership and order stay on linear/indexed paths.
-Public early configured guards, recursion, AST owners and diagnostics/spans remain.
-No helper/API/interner/cache/key/DICE/identity/unsafe/dependency/retained representation
-or donor import. Slug-native memory optimization preserves inherited lexical scope;
-local Bazel let references add no parity claim.
+Native replace returns its existing whole immutable StringValue when old==new,
+strictly after unchanged count validation. Each match removes and inserts identical
+bytes; empty equal patterns add nothing. Generated receiver/old/new/count decoding,
+negative count error and arity/keyword priority remain before the guard. Every
+other production byte, including different-text prefix/final concat fallback and
+speculative safety declaration, stays unchanged. Natural tracing/freezing preserves
+caller-owned strings; no substring retention or new helper/API/interner/cache/key/
+DICE/identity/unsafe/dependency/retained representation/donor. Slug-native memory
+optimization preserves inherited Rust bytes/Unicode/count/errors; local Bazel
+StringModule context adds no Java/UTF16/negative-count parity claim.
 
-Three DESIGNs/FINALs accept identical corrected 193-line tests: baseline 2/2,
-candidate 7/7 with five protected lexical/signed-integer/shared filter/count/visible
-controls. Twenty-six direct validations use one/forty seed keys, exceeding the
-32-key indexed threshold. Nested/shadowed/sibling scopes, preseeded names, value/body
-errors and wrappers preserve complete seed membership/order/heap payload pointers,
-AST debug/name buffers/capacities and cleanup. Fourteen direct/two compact public
-raw errors match exactly; long-name errors check complete messages/spans and a
-5,154-byte/capacity error clone survives AST/source/name/original-error drop.
-Initial baseline 0/2 came from fixtures: inline seed payload relocated when set
-metadata grew, and unquoted emoji label was outside existing grammar. Long seeded
-external alias and quoted label corrections preserve every assertion; original
-hash/failure/selection reconstruct exactly, before fresh corrected baseline/candidate
-compiles. Seventeen protected sources, pinned collection/hash sources, serial offline
-artifacts/exact preflights, default Core/CLI and format/archive/plan/diff pass.
-No assets/goldens; changes only private signature/insertion and sibling hook.
+Three DESIGNs/FINALs accept identical corrected 261-line tests: baseline two
+semantic passes/one intended sharing failure; candidate 10/10, including seven
+protected interner/speculative/string-carrier/replacement-prefix controls. Actual
+compiled native calls match Rust replacen in 16,374 comparisons, covering empty,
+overlapping, ASCII/Unicode/NUL patterns and zero/limited/unlimited/max counts.
+Ten complete raw diagnostics match baseline exactly. Four independently owned
+large ASCII/Unicode fixtures at counts one/unlimited share their inputs (baseline
+all false), with zero added public arena accounting. Fresh arenas isolate fixture
+observations. Explicit GC after source variables clear, frozen results/functions
+retained after source/module/clone drop, speculative constants and changed fallback
+outputs preserve bytes and lifetimes. Default Loading/Core/CLI checks and pinned
+serial offline compilation/exact preflight, rustfmt/archive/plan/diff pass.
 
-Acceptance removes one per-Let scratch clone site only. Scratch key metadata,
-physical storage and capacity may change; AST names/final errors remain owned.
-No allocator/count/quantified payload or memory/aggregate/peak/RSS/speed/source-fit
-claim. Windows remains minimal/deferred. Full WP899/M7A open and unwaived.
+Original baseline E0597 arose from callee handles declared after or inside the
+Evaluator lifetime; stable handles before evaluation fix it. Baseline-r2 exposed
+explicit None count rejection and spare arena chunks masking two growth readings.
+Unlimited fixtures now omit count; explicit None rejection remains covered and
+accounting fixtures have separate arenas. Original and r2 snapshots/hashes and
+all raw failed receipts are preserved. Second correction reassessment confirms
+the unchanged design; all semantic/lifecycle/pointer assertions remain.
+
+Acceptance proves whole-input sharing and fixed fixture public arena observations
+only. Source proof bypasses equal-text temporary String and final heap copying;
+no allocator/count/padded payload, aggregate/peak/RSS/speed/source-fit claim.
+Allocation/OOM failure sequencing is excluded. Different replacements/final errors
+remain owned. No assets/goldens. Windows minimal/deferred; full WP899/M7A unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Equal native replacement returns existing whole input after count validation; fallback/bytes/errors/speculation/tracing/freezing unchanged. Three DESIGNs/FINALs; corrected baseline two semantic passes/one sharing failure, candidate 10/10, 16,374 comparisons/ten equal raw errors, four large sharing/zero arena observations and retained frozen/GC controls; default Loading/Core/CLI. Original/r2 fixture failures preserved. Fixed fixture accounting only; no allocator/aggregate/RSS/speed claim | [Equal replacement input reuse](wp899-replace-equal-input-reuse-2026-10-06.json) |
 | Cquery lexical-validation scratch borrows immutable AST names; equal content hash, shadowing/cleanup/order, owned errors/spans and AST owners stay. Three DESIGNs/FINALs; corrected same baseline 2/2, candidate 7/7, twenty-six cases with one/forty seeds, sixteen captured equal errors and retained long clone, default Core/CLI. Inline seed pointer and unquoted Unicode fixture corrections preserved. One scratch clone-site bypass only; set metadata/capacity may change, no allocator/quantified memory/RSS/speed claim | [Cquery binding-name borrowing](wp899-query-binding-name-borrow-2026-10-06.json) |
 | Query integer slots omit successful numeric formatting/target-literal clone scratch; exact range/signed parsing, original error bytes/capacity/ownership, fallback parsing and caller order/spans remain. Three DESIGNs/FINALs; same extended baseline 2/2, candidate 8/8, 2,054 numeric/21 literal/four fallback/two numeric-display cases, nineteen raw/seventeen public equal errors, retained tight/spare error clones and default Core/CLI. Additive fallback test extension preserved. Source scratch-site proof only, no allocator/quantified memory/RSS/speed claim | [Query integer scratch](wp899-query-integer-scratch-2026-10-06.json) |
 | Query negative-token diagnostics borrow exact input slices through existing final join; scanning/UTF8/quote/three-token rules, public bytes/spans/priority and owned output remain. Three DESIGNs/FINALs; same tests baseline 2/2, candidate 6/6, thirty contexts/twelve negatives, eleven equal errors and two long retained error clones; default Core/CLI checks. Source copy-site proof only, no quantified memory/allocator/RSS/speed claim | [Query error token borrowing](wp899-query-error-token-borrow-2026-10-06.json) |

@@ -791,6 +791,9 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
             }
             None => usize::MAX,
         };
+        if old == new {
+            return Ok(this);
+        }
         // Build the replaced prefix, then copy the untouched suffix directly into the heap.
         let x = this.as_str();
         let mut result = String::new();
@@ -1402,3 +1405,7 @@ mod tests {
         assert::is_true("type('foo'.codepoints()) != type([])");
     }
 }
+
+#[cfg(test)]
+#[path = "replace_equal_input_reuse_tests.rs"]
+mod replace_equal_input_reuse_tests;
