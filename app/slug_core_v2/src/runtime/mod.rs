@@ -30,6 +30,8 @@ mod file_write_aquery_text;
 mod file_write_identity;
 mod generated_repository_definition;
 mod input_image;
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod native_output_file;
 mod path_observation;
 #[cfg(feature = "native-probe-observer")]
 pub mod probe_observer;
@@ -61,6 +63,8 @@ pub mod starlark;
 mod symlink_action_equivalence;
 mod symlink_aquery_text;
 mod workspace_status_inputs;
+#[allow(dead_code)]
+mod workspace_status_publication_file;
 
 pub use aquery_text::format_aquery_text_output_for_scope;
 pub use configured_output::configured_output_root;

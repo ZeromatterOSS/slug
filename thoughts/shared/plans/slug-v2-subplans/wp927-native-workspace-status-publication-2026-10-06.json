@@ -1,0 +1,626 @@
+{
+  "packet": "WP-7-226-m7a-native-workspace-status-publication-r1",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "0c5e028571ad5f4525f82369f028ac830e41e9e7",
+  "result": "Private native source-certified publication of original workspace-global stable/volatile status bytes; no downstream action/CLI execution activation.",
+  "contract": {
+    "path": "target/wp927/design.md",
+    "sha256": "b6bff079310bf445dc816f00846fb9ee824762a16cdd7a841b83f2dbb4c1da44",
+    "design_before_production": true,
+    "corrections_account": "target/wp927/static-review-account.md",
+    "inherited_manifest_at_baseline": "0c5e028571ad5f4525f82369f028ac830e41e9e7:thoughts/shared/plans/slug-v2-subplans/current-packet.md"
+  },
+  "source_basis": {
+    "bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "discovery": "target/wp926/successor-source.md",
+    "sha256": "2e1bd7235349904ce91b407a985fc3e3679d9d90584019ca62675b2a9a127bb5",
+    "anchors": "BazelWorkspaceStatusModule160-170/205-215; FileSystemUtils711-712/745-765"
+  },
+  "compatibility": {
+    "exact": "Original complete status UTF8 buffers, workspace-global role names and ordinary equal stable no-write/inode/mtime/ctime behavior; volatile write even equal.",
+    "slug_native": "Linux GNU readable single-link regular no-symlink policy, structural capture/graph/source/revision ownership, 0444 mode and same-parent atomic replacement. No speculative visible deletion.",
+    "deferred": "Bazel symlink/stream/hardlink/arbitrary unreadable helper parity; Windows beyond Unsupported; volatile action-cache/dirtiness; status input-image/BuildInfo/action-chain/Cpp/REAPI execution; full-root/M7A/whole-workload fit."
+  },
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/action_output_staging/linux.rs": {
+      "sha256": "8679caa68b101d0b4c4afc3d7136cc294912437da4583d7873e8f99e89edddd6",
+      "lines": 533
+    },
+    "app/slug_core_v2/src/runtime/dice.rs": {
+      "sha256": "a2465aa4274010d68898115e17308d549dd7912d8a3a480cc94c8d527554400a",
+      "lines": 14056
+    },
+    "app/slug_core_v2/src/runtime/mod.rs": {
+      "sha256": "5b86d08cfd117c7036d429351611a19f544dea6f5a3c978189d7f3126f9718ff",
+      "lines": 529
+    },
+    "app/slug_core_v2/src/runtime/tests/workspace_status_inputs_tests.rs": {
+      "sha256": "bd1616f5b0820a4d43ee556376917eda85edc98944c74951b9b28fb000cbded3",
+      "lines": 957
+    },
+    "app/slug_core_v2/src/runtime/native_output_file.rs": {
+      "sha256": "3d99b3436ad2390ff32cb3d965a546fb0a234d02cab036e8d7c624d020726ba8",
+      "lines": 62
+    },
+    "app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs": {
+      "sha256": "43e2e8017ec910264661d62d676770287ea71c2ffcf0eb8b6376b58407a2b5b3",
+      "lines": 773
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication.rs": {
+      "sha256": "8bce20a9d95005389fd02da318075532d9f0b73f43168a8afcb568f725287cc4",
+      "lines": 143
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication_file.rs": {
+      "sha256": "ec2b5c740e5de1b24d6a8780c3661a359bc798c0bb9f79a50a9d9304a0c75e2c",
+      "lines": 74
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs": {
+      "sha256": "0887f3a162f0e23d6ed6b402bf9247b162834c068f99d60949328354166e8bf3",
+      "lines": 296
+    }
+  },
+  "ownership": {
+    "semantic": "Original WP926 combined BuildInfo template/capture/status Arcs and original header; no new key/semantic filesystem owner.",
+    "completion": "Delegate original Arc/transaction capture completion then validate real typed workspace descriptors/full certificate and reject any observed bazel-out demand before stage IO. Genuine build preparation creates marker namespace before certification.",
+    "publication": "Attempt scratch prepared outside DICE/revision owner; both roles preflight and stable compare bounded at synchronous publish after current-equivalent/source validation and selected revision commit. Equal stable preserved; volatile always replaced.",
+    "release": "Pending stages drop on normal retry/abort/final clone; successful facade inner=None retires all FDs even through shared scratch clones. Held semantic metadata retains original graph intentionally.",
+    "failure": "No outcome/accepted terminal if second rename fails; earlier output and DICE revision may already change. Identity-read/keep/unlink IO failure may leave unclaimed scratch; no foreign filename cleanup authority/crash durability/transactional external mutation guarantee."
+  },
+  "allocation": {
+    "counts": "Fixed2 role/name/stage array, six persistent FDs(workspace,bazel-out,2 stageparent,2 stagefile), at most2 transient validation handles, fixed1024-byte stack comparison desiredlen+1.",
+    "bodies": "Borrow original stable/volatile buffers, no heap read body/map/catalog copy/global interner/cache. New staged disk bodies stable<=8235/volatile<=69 bytes; preexisting exchanged bodies can be larger.",
+    "strings": "Role names static; original canonical label/config owners/interner unchanged. Unique temporary names remain local Strings and retire with native scratch.",
+    "qualification": "Source-level bounded storage and tested normal release, not measured heap savings or whole-workload fit. Original memory refusal, profile and resource/source16/17/18 caps preserved."
+  },
+  "validation": {
+    "unique_core_passes": 39,
+    "preserved_protected": 33,
+    "current_new": 6,
+    "not_single_current39_batch": true,
+    "preservation_basis": "Initial exact39 had37passes and2 fixture assertion failures. Only new sibling first-creation namespace assumption and typed error assertion changed afterward; production and all33 protected tests unchanged. All6 new owner gates rerun.",
+    "initial_results": {
+      "tests": [
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_real_producer_fields_scopes_and_borrowed_owners",
+          "exit_code": 0,
+          "elapsed_seconds": 0.04030871391296387,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_restores_held_results_and_owned_text",
+          "exit_code": 0,
+          "elapsed_seconds": 0.03589168598409742,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::build_info_aquery_metadata_guards_info_identity_and_priority",
+          "exit_code": 0,
+          "elapsed_seconds": 0.03069253300782293,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_prerequisites::tests::build_info_transforms_and_constant_outputs_refuse_before_prerequisite_traversal",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004707730025984347,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_prerequisites::tests::workspace_status_requires_a_real_producer_before_execution_planning",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004721240955404937,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::workspace_status_descriptors_reject_before_source_staging",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0025106699904426932,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::build_only_observations_survive_the_narrow_source_certificate",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0020513590425252914,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::native_source_staging_tracks_sources_and_rejects_conflicting_roots",
+          "exit_code": 0,
+          "elapsed_seconds": 0.2676390290725976,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_command_tests::observed_build_identity_and_epoch_union_are_restricted_and_left_stable",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004487560014240444,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::installed_templates_retain_main_external_target_exec_catalog_owners_and_configuration_aba",
+          "exit_code": 0,
+          "elapsed_seconds": 0.1212356440955773,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::catalog_template_preparation_preserves_need_and_rejects_root_local_missing_directory",
+          "exit_code": 0,
+          "elapsed_seconds": 0.02484887803439051,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::template_preparation_rejects_absent_owner_ordinal_family_and_uninstalled_metadata",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0345331389689818,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::native_template_preparation_certifies_current_frontier_ignores_shadow_and_refuses_revoked_route",
+          "exit_code": 0,
+          "elapsed_seconds": 0.19824825902469456,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::repository_host_input_tests::repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot",
+          "exit_code": 0,
+          "elapsed_seconds": 0.007748242933303118,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::repository_host_input_tests::cancelled_command_revokes_a_current_only_present_name",
+          "exit_code": 0,
+          "elapsed_seconds": 0.006383138010278344,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::repository_host_input_tests::repository_environment_snapshot_tracks_full_a_b_a_and_empty_revisions",
+          "exit_code": 0,
+          "elapsed_seconds": 0.006138546974398196,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::request_revision::tests::overlapping_post_demand_requests_discard_v1_and_accept_only_v2",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003694745944812894,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::request_revision::tests::one_waiter_and_last_waiter_cancellation_release_request_state",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003656605025753379,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::status_raw_conversion_has_exact_utf8_sorted_buffers_dates_and_refusal_priority",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002280420041643083,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::status_capture_raw_aba_and_overlapping_versions_keep_structural_request_ownership",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0029384929221123457,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::genuine_native_status_shares_capture_across_configurations_renders_complete_headers_and_releases",
+          "exit_code": 0,
+          "elapsed_seconds": 0.2086242230143398,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::native_status_retry_new_request_cancellation_and_foreign_capture_refuse_without_publication",
+          "exit_code": 0,
+          "elapsed_seconds": 0.2780732539249584,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::genuine_native_present_empty_source_date_epoch_refuses_and_revokes_capture",
+          "exit_code": 0,
+          "elapsed_seconds": 0.19226514303591102,
+          "environment_override": {
+            "SOURCE_DATE_EPOCH": ""
+          },
+          "passed_one": true
+        },
+        {
+          "name": "runtime::request_revision::tests::native_output_publication_runs_under_owner_after_revision_commit",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004242917988449335,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::request_revision::tests::native_source_and_version_retries_never_invoke_output_publication",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003729115938767791,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::selected_file_tree_replacement_modes_empty_dirs_and_configuration_a_b_a",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003949197009205818,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::staging_rejects_escape_type_conflicts_missing_outputs_and_cleans_sealed_trees",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0032307239016517997,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::namespace_ancestor_symlinks_are_rejected_without_touching_outside",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0034022550098598003,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::changed_destination_or_root_fails_preflight_before_any_output_changes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0031667440198361874,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::late_rename_failure_reports_partial_publication_and_cleans_retired_outputs",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0037927859229967,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::retired_tree_cleanup_unlinks_symlinks_without_following_them",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003249583998695016,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::tree_relative_depth_limit_excludes_private_staging_prefix",
+          "exit_code": 0,
+          "elapsed_seconds": 0.04917850298807025,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::action_output_staging::tests::empty_selected_output_set_seals_and_publishes_without_artifact_writes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0031838940922170877,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_creates_preserves_rewrites_and_shares_global_paths",
+          "exit_code": 101,
+          "elapsed_seconds": 0.19123581796884537,
+          "environment_override": {},
+          "passed_one": false
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_source_retry_drops_pending_before_any_visible_write",
+          "exit_code": 0,
+          "elapsed_seconds": 0.21139545505866408,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_refuses_links_special_alias_unreadable_and_swapped_names",
+          "exit_code": 0,
+          "elapsed_seconds": 0.028726234915666282,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_clone_cleanup_and_second_failure_are_attributed",
+          "exit_code": 0,
+          "elapsed_seconds": 0.01774729590397328,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_abort_and_failed_publish_preserve_acceptance",
+          "exit_code": 101,
+          "elapsed_seconds": 0.20380794303491712,
+          "environment_override": {},
+          "passed_one": false
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_refuses_foreign_capture_wrong_descriptor_and_observed_output_namespace",
+          "exit_code": 0,
+          "elapsed_seconds": 0.22665577102452517,
+          "environment_override": {},
+          "passed_one": true
+        }
+      ],
+      "selected": 39,
+      "passed": 37,
+      "elapsed_seconds": 2.4444587629986927,
+      "max_child_rss_kib": 84444
+    },
+    "current_preflight": {
+      "exit_code": 0,
+      "output": "Verified 6 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21327577298507094,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "f1026a71270f5cb56d78e88dce098cd3d9edbfe8e9219a6fcfb68fed1c421ed2",
+      "selected": 6,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "current_results": {
+      "tests": [
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_creates_preserves_rewrites_and_shares_global_paths",
+          "exit_code": 0,
+          "elapsed_seconds": 0.24515503097791225,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_source_retry_drops_pending_before_any_visible_write",
+          "exit_code": 0,
+          "elapsed_seconds": 0.21242273005191237,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_refuses_links_special_alias_unreadable_and_swapped_names",
+          "exit_code": 0,
+          "elapsed_seconds": 0.029250877094455063,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_clone_cleanup_and_second_failure_are_attributed",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0183731890283525,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_abort_and_failed_publish_preserve_acceptance",
+          "exit_code": 0,
+          "elapsed_seconds": 0.22200692107435316,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_refuses_foreign_capture_wrong_descriptor_and_observed_output_namespace",
+          "exit_code": 0,
+          "elapsed_seconds": 0.23080994002521038,
+          "environment_override": {},
+          "passed_one": true
+        }
+      ],
+      "selected": 6,
+      "passed": 6,
+      "elapsed_seconds": 0.9580426680622622,
+      "max_child_rss_kib": 81836
+    },
+    "current_prep": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.879542774986476,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "cli": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.515128058032133,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "checks": {
+      "diff": {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.00882533797994256,
+        "output": ""
+      },
+      "archive": {
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03343784506432712,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_core_v2/src/runtime/action_output_staging/linux.rs\n M app/slug_core_v2/src/runtime/dice.rs\n M app/slug_core_v2/src/runtime/mod.rs\n M app/slug_core_v2/src/runtime/tests/workspace_status_inputs_tests.rs\n?? app/slug_core_v2/src/runtime/native_output_file.rs\n?? app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication_file.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs\n"
+      },
+      "plan": {
+        "command": [
+          "python3",
+          "scripts/v2_plan_status.py"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.01431866199709475,
+        "output": "Packet: WP-7-226-m7a-native-workspace-status-publication-r1\n"
+      },
+      "format": {
+        "exit_code": 0,
+        "output": ""
+      }
+    },
+    "new_selectors": [
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_creates_preserves_rewrites_and_shares_global_paths",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_source_retry_drops_pending_before_any_visible_write",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_refuses_links_special_alias_unreadable_and_swapped_names",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::status_stage_clone_cleanup_and_second_failure_are_attributed",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_abort_and_failed_publish_preserve_acceptance",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::native_status_publication_refuses_foreign_capture_wrong_descriptor_and_observed_output_namespace"
+    ],
+    "old_unproved_bare_fixture": "Inherited WP925 uncached BCR guard remains unproved offline and not retried.",
+    "no_actual_cli_binary_or_oracle": "No binary/oracle/network/acquisition/JVM invoked; default CLI compile dependent check only.",
+    "final_integration_checks": {
+      "diff": {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "output": ""
+      },
+      "archive": {
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_core_v2/src/runtime/action_output_staging/linux.rs\n M app/slug_core_v2/src/runtime/dice.rs\n M app/slug_core_v2/src/runtime/mod.rs\n M app/slug_core_v2/src/runtime/tests/workspace_status_inputs_tests.rs\n M thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md\n M thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md\n M thoughts/shared/plans/slug-v2-subplans/bootstrap-readiness.md\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n?? app/slug_core_v2/src/runtime/native_output_file.rs\n?? app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication_file.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs\n?? thoughts/shared/plans/slug-v2-subplans/wp927-native-workspace-status-publication-2026-10-06.json\n"
+      },
+      "plan": {
+        "command": [
+          "python3",
+          "scripts/v2_plan_status.py"
+        ],
+        "exit_code": 0,
+        "output": "Packet: WP-7-227-m7a-native-workspace-status-file-inputs-r1\n"
+      },
+      "format": {
+        "exit_code": 0,
+        "output": ""
+      }
+    }
+  },
+  "growth": {
+    "production_new": 513,
+    "shared_extracted": 62,
+    "test_new": 773,
+    "review": "Crosses480/750 estimates; distinct wrapper/platform/Linux/sharedhelper responsibilities and finite Local six-case probe remain cohesive; three independent FINAL accepted."
+  },
+  "reviews": {
+    "design": {
+      "source": {
+        "path": "target/wp927/design-source.md",
+        "sha256": "03e3929ce58e6e39a1d41aac7ceeaf974c63e876ea4e8f6facac91ede0c496f7",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp927/design-ownership.md",
+        "sha256": "c874082027ee74ba0a340119f0ecfcae3e0d78d8aed45d7dbe1156602de22a6b",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp927/design-evidence.md",
+        "sha256": "7b07b9b9b0f4fc3909baac136b2fce2a35e4b90c83ff219745fe4a9c110891e6",
+        "verdict": "ACCEPT"
+      }
+    },
+    "final": {
+      "source": {
+        "path": "target/wp927/final-source.md",
+        "sha256": "de4a3eb0bd9fe1ec195e3660898cf5f9db38e8978a83fab3c098d1be0e76a1f3",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp927/final-ownership.md",
+        "sha256": "79aface6a63f12c0270ecc475cad6ee0e80d65a3b3a82bccbe14045123e637e1",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp927/final-evidence.md",
+        "sha256": "8ca68d93533324aa51f2b896772dd81b6d6bbb3e29c5728cc51502e2b6b03270",
+        "verdict": "ACCEPT"
+      }
+    }
+  },
+  "operations": {
+    "path": "target/wp927",
+    "elapsed_seconds_from_start": 1433.8521177768707,
+    "compile_seconds": 74.72712397994474,
+    "review_time": "Not separately measured; no speedup claim",
+    "hash_index": "target/wp927/operational-hashes.json",
+    "operational_files": 83,
+    "hash_index_sha256": "b5d321dfa6517d18d242a5b0d443c27d9a224aaff2f3a1623fdc0e12da0bf621",
+    "elapsed_seconds_from_recorded_start": 1741.3926861286163
+  },
+  "successor": {
+    "packet": "WP-7-227-m7a-native-workspace-status-file-inputs-r1",
+    "operations": "WP928",
+    "source_note": "target/wp927/successor-source.md",
+    "source_sha256": "91dc15e67c2a6c30149a81044a22deae644aea06032d19c0c3d0c59439c45c76",
+    "decision": "Published physical status input correspondence precedes header output publication. Prefer actual readonly receipt consumption in same synchronous current-source callback; freeze full API/request/credit contract and three DESIGN before code."
+  }
+}

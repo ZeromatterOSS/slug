@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::io::{self};
-use std::os::fd::AsRawFd;
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::OpenOptionsExt;
@@ -23,7 +22,6 @@ use nix::sys::stat::Mode;
 use nix::sys::stat::SFlag;
 use nix::sys::stat::fchmod;
 use nix::sys::stat::fstatat;
-use nix::sys::stat::mkdirat;
 use nix::unistd::UnlinkatFlags;
 use nix::unistd::unlinkat;
 use slug_build_api_v2::ActionOutput;
@@ -31,39 +29,18 @@ use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::DerivedArtifactRoot;
 use tempfile::NamedTempFile;
 
+use crate::runtime::native_output_file::Entry;
+use crate::runtime::native_output_file::directory;
+use crate::runtime::native_output_file::entry;
+use crate::runtime::native_output_file::fd_path;
+use crate::runtime::native_output_file::identity;
+
 mod alias;
 mod runfiles;
 mod source_backing;
 pub(super) use runfiles::validate_runfiles;
 pub(super) use source_backing::SourceBacking;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct Identity(u64, u64);
-fn identity(file: &File) -> io::Result<Identity> {
-    let value = file.metadata()?;
-    Ok(Identity(value.dev(), value.ino()))
-}
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct Entry {
-    identity: Identity,
-    kind: SFlag,
-}
-fn entry(parent: &File, name: &str) -> io::Result<Option<Entry>> {
-    match fstatat(parent, name, AtFlags::AT_SYMLINK_NOFOLLOW) {
-        Ok(stat) => {
-            let kind = SFlag::from_bits_truncate(stat.st_mode) & SFlag::S_IFMT;
-            if kind != SFlag::S_IFREG && kind != SFlag::S_IFDIR && kind != SFlag::S_IFLNK {
-                return Err(io::Error::other("output namespace contains special file"));
-            }
-            Ok(Some(Entry {
-                identity: Identity(stat.st_dev, stat.st_ino),
-                kind,
-            }))
-        }
-        Err(Errno::ENOENT) => Ok(None),
-        Err(error) => Err(error.into()),
-    }
-}
 fn component_path(path: &str) -> io::Result<Vec<&str>> {
     let parts: Vec<_> = path.split('/').collect();
     if parts.len() > 256
@@ -78,22 +55,6 @@ fn component_path(path: &str) -> io::Result<Vec<&str>> {
     }
     Ok(parts)
 }
-fn directory(parent: &File, name: &str, create: bool) -> io::Result<File> {
-    if create {
-        match mkdirat(parent, name, Mode::from_bits_truncate(0o755)) {
-            Ok(()) | Err(Errno::EEXIST) => {}
-            Err(error) => return Err(error.into()),
-        }
-    }
-    openat(
-        parent,
-        name,
-        OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC,
-        Mode::empty(),
-    )
-    .map(File::from)
-    .map_err(Into::into)
-}
 fn walk(parent: &File, parts: &[&str], create: bool) -> io::Result<File> {
     let mut current = parent.try_clone()?;
     for part in parts {
@@ -101,10 +62,6 @@ fn walk(parent: &File, parts: &[&str], create: bool) -> io::Result<File> {
     }
     Ok(current)
 }
-fn fd_path(file: &File) -> PathBuf {
-    PathBuf::from(format!("/proc/self/fd/{}", file.as_raw_fd()))
-}
-
 /// Configuration markers use the same canonical collision contract as the
 /// old writer, but every parent and final read is descriptor-confined.
 fn claim_marker(bazel: &File, projection: &str, canonical: &[u8]) -> io::Result<()> {

@@ -474,8 +474,18 @@ real DICE cancellation/abort recovery and held/final owner release pass. USER/ke
 identity and fixed English UTC are qualified native domains; SOURCE_DATE_EPOCH presence
 and nondefault policies refuse. Twenty-three unique Core controls (18 preserved protected
 plus5 current), default CLI and three FINAL reviews accept this content prerequisite.
-Status writing/mtime, volatile execution/cache policy, module tools and full cc_toolchain
-remain unproved; local buffers/Arc sharing do not establish whole-workload fit. The unrelated legacy bare frontier fixture requires an
+[WP927](wp927-native-workspace-status-publication-2026-10-06.json) accepts private native
+source-certified publication of both workspace-global status files. Genuine prepared
+namespace/full bytes/configuration sharing, equal stable inode/mtime/ctime preservation,
+equal volatile rewrite, actual source retry/no early output, typed partial failure,
+preflight refusal/capture association and normal stage/held-owner release pass. Linux
+GNU readable regular single-link/no-symlink destinations and 0444 atomic replacement
+are qualified native policy. Thirty-nine distinct Core controls (33 preserved protected
+plus6 current), default CLI and three FINAL reviews pass; this is not one fresh39 batch.
+Unclaimed scratch on identity-read/keep/unlink IO failure, concurrent filesystem race
+and partial revision-before-publication qualifications remain. Volatile cache/invalidation,
+BuildInfo execution/input-image integration, module tools and full cc_toolchain remain
+unproved; bounded buffers/Arc sharing do not establish whole-workload fit. The unrelated legacy bare frontier fixture requires an
 uncached registry dependency and remains unproved offline; its guard was not changed.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.

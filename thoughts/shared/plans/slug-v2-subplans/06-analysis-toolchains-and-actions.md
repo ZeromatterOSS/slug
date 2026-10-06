@@ -516,8 +516,23 @@ Latin1 consumer. Original-Arc/transaction/source validation precedes native acce
 selected, ordinary and abort paths revoke capture while held historical bytes survive.
 Actual cancellation/drain and final owner release pass. Bounded text/direct buffers and
 local date scratch add no global interner/pool or whole map; held metadata still retains
-its graph. Nondefault status policies/epoch, file writing/mtime/volatile cache, arbitrary
-or Java callbacks, execution, installed module tools and full cc_toolchain stay deferred.
+its graph. [WP927](wp927-native-workspace-status-publication-2026-10-06.json) adds a
+private certified native publication root over that original combined producer.
+Attempt-local fixed two-role stages borrow the original buffers; existing descriptor
+helpers are shared with configured output staging. Linux GNU readable single-link
+regular destinations publish equal stable without writing and volatile unconditionally.
+Same-parent replacement and 0444 mode are native policies, not Bazel inode/link parity.
+Both roles preflight under current-source finalization after revision commit; later IO
+may be partial and cannot return an accepted terminal. Original capture, full frontier,
+namespace admission and current source validation remain required. Stages retire on
+normal retry/abort/last-Drop and immediately after success even through held clones;
+initial identity-read/keep/unlink failures may leave unclaimed scratch. Native build
+preparation establishes the marker namespace before certification; real source edits
+exercise retry, without fabricating a cold-directory retry. No payload copy/global
+interner or semantic filesystem cache is added. Thirty-nine distinct Core controls
+(33 preserved protected plus6 current), default CLI and three FINAL reviews pass.
+Nondefault status policies/epoch, volatile cache/invalidation, arbitrary or Java callbacks,
+BuildInfo/action-chain execution, installed module tools and full cc_toolchain stay deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is

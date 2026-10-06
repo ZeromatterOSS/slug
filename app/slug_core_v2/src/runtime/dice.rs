@@ -3191,6 +3191,9 @@ mod build_info_native_inputs;
 #[allow(dead_code)]
 #[path = "workspace_status_content.rs"]
 mod workspace_status_content;
+#[allow(dead_code)]
+#[path = "workspace_status_publication.rs"]
+mod workspace_status_publication;
 
 #[path = "action_chain_staging.rs"]
 mod action_chain_staging;

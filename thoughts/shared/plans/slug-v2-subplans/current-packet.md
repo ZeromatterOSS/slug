@@ -1,121 +1,107 @@
 # Slug V2 current work packet
 
-Packet: WP-7-226-m7a-native-workspace-status-publication-r1
-Status: Native default status inputs accepted; source-certified status publication selected
+Packet: WP-7-227-m7a-native-workspace-status-file-inputs-r1
+Status: Native status publication accepted; physical status input correspondence selected
 
 ## Observable result and source basis
 
-Publish genuine workspace-global stable and volatile status files from the accepted
-native DICE producer, through a real checked BuildInfo consumer and the existing
-current-source finalization boundary. This supplies a demanded physical-input
-prerequisite; it does not admit BuildInfo/action-chain execution. Root freezes
-destination/provisional-write/failure API, exact allowlist and three DESIGN reviews
-before code (operations WP927).
+Connect genuine published workspace-global status files to the selected checked
+BuildInfo consumer through an original producer/request-bound readonly capability.
+Full physical bytes must supply both unchanged checked recipes and catalog templates;
+precomputed DICE header bytes alone do not prove a physical input read. Header-file
+publication and generic action-chain execution stay deferred. Root freezes the concrete
+receipt/read/provenance/lifetime protocol, exact allowlist and three DESIGN reviews
+before code (operations WP928).
 
-Immutable Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-BazelWorkspaceStatusModule160–170/205–215 and FileSystemUtils711–712/745–765.
-target/wp926/successor-source.md pins file hashes and inspected current owners.
-Equal stable bytes leave the existing file untouched; volatile writes unconditionally
-even when bytes equal. Exact default UTF8 bytes, fixed role paths and admitted ordinary
-file equality/mtime behavior; Slug-native identity, native request/capture and selected
-publication/atomic replacement. Bazel follows links and overwrites streams; do not
-claim arbitrary filesystem/inode/Java sequencing parity. Initial Linux GNU regular,
-anchored no-symlink destination slice; unsupported Windows/stubs only.
+Pinned Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
+BuildInfoFileWriteAction99–103 reads actual status input,118–184 calls the selected
+callback/substitutions and expands the template to the declared nonexecutable output;
+WorkspaceStatusAction120–134 parses actual Latin1 bytes. target/wp927/successor-source.md
+pins file hashes and actual current owner gaps. Exact admitted status/template/header
+bytes and selected physical-role correspondence; Slug-native structural paths/capture,
+Linux descriptor/read policy and current-source publication sequencing. No arbitrary
+Bazel link/Java/action-cache/inode sequencing parity or Windows growth.
 
-## Semantic owner and checkpoint
+## Semantic owner and protocol checkpoint
 
-Keep WorkspaceStatusContentKey configuration-independent, owning original captured
-native fields and stable/volatile buffers. Original combined BuildInfo metadata owns
-the real action/template/status and complete frontier/certificate. A private native
-wrapper delegates status capture, compute, exact original-capture completion and source
-association, then prepares pending filesystem stages outside DICE and outside the
-revision owner. Existing NativeCommandRoot::publish runs synchronously only after
-current-transaction/source validation and selected revision publication. No compute
-or await under its owner, status-only uncertified root, fake path observation,
-configuration or output root.
+WorkspaceStatusContentKey continues to own original immutable bytes/capture/descriptors.
+BuildInfoTemplatePreparationKey and combined native inputs retain actual configured
+owner/action/callback/catalog bytes and full frontier/certificate. No fake Source,
+DerivedArtifactRoot, generating action, filesystem observation or status-only uncertified
+root. Generic WorkspaceStatus/BuildInfo/Constant planning/source/raw guards stay closed.
 
-WorkspaceStatus fixed paths are bazel-out/stable-status.txt and
-bazel-out/volatile-status.txt under their typed workspace root. Current configured
-ActionOutput stager cannot serve those roles by forging a DerivedArtifactRoot. Freeze
-a small role-specific publisher; reuse/narrowly extract existing Linux parent/regular
-file/temp/preflight/rename primitives where their ownership fits, rather than copying
-the whole writer/planner. Names never depend on consumer configuration.
+WP927 publisher currently reports outcomes and retires its FDs; it lacks a retained
+readonly physical-input correspondence owner. Add only a private issued receipt from
+actual successful publication, bound to exact original workspace/role/capture/content,
+anchored parent/name and readonly regular-file identity/fingerprint. Equal stable keeps
+its identity; volatile replacement requires a newly issued receipt. Original producer
+buffers are expected content, not a second copied payload map or ambient path authority.
 
-At publication recheck both anchored parent/named-file identities and stages. Stable
-comparison must occur or be revalidated there, through bounded regular-file reads
-(desired length+1); an earlier equal decision cannot preserve a subsequently changed
-file. Preserve equal stable bytes/inode/mtime/ctime by doing no write. Missing/unequal
-stable creates/replaces; volatile always replaces/writes even equal content. Refuse
-symlink/special/unreadable/alias/stage mutation according to the frozen native slice;
-no hidden permissive fallback. Freeze directory/file mode and permission behavior from
-the actual owned writer, no invented Bazel umask guarantee.
+Resolve the current-request protocol before implementation. Selected commit revokes the
+injected capture, and no DICE compute/await may run in publish. Preferred bounded route:
+status publication issues readonly receipts, and the same synchronous native publication
+callback verifies and consumes physical bytes under the existing current-source owner,
+after original capture completion and version/source validation. It calls only the
+unchanged pure checked renderer with original catalog bytes, without DICE reentry.
+Root must prove original request association through that exact callback and refuse held
+historical receipts as new-request authority; do not reopen a fixed path later or accept
+a warm precomputed header as physical consumption. If this requires a different owner,
+resolve that precise protocol before DESIGN rather than add an ambient fallback.
 
-No visible volatile deletion during speculative prepare: selected source-validated
-publication differs from literal Bazel interruption/error sequencing. Two-file rename
-is not a single atomic commit. Preserve existing finalizer's revision-before-publish
-and later-I/O partial-failure qualification; no fake rollback of files/revision or
-accepted terminal after failure. Pending stage cleanup must drop before retry/abort
-and survive only through actual publish/final handle ownership. Concurrent commands
-remain Busy; existing finalization source/version retries never publish outputs.
+Both status roles must publish successfully before consumption can grant a result.
+Failed/partial publication grants no receipt/result or accepted terminal. Read/validation
+failure after publication may leave published files/committed revision; retain explicit
+partial/after-publication attribution, no fabricated rollback. Published historical FD
+bytes may remain held only as attributable old data; current named identity and exact
+request are required for a new grant. Root freezes readonly FD handoff, parent/final
+rechecks, mode/alias policy, bounded read/EOF/byte association and stage retirement.
 
-ConstantMetadata remains an output/cache policy separate from content production and
-unconditional volatile rewrite. Stable-file invalidation/action cache, full workspace
-status action/error-event breadth, input-image integration, BuildInfo header/output
-execution, action-chain/Cpp/REAPI and full-root/M7A remain deferred. Existing
-WorkspaceStatus/BuildInfo/Constant source/planner/raw execution refusals stay closed.
+## Allocation, scope and evidence
 
-## Allocation and scope
+Reuse original Arc/Dupe metadata, normalized workspace, descriptors and canonical
+label/configuration string owners/interners. New native receipts and read scratch belong
+to the command/publication phase, outside DICE history. Freeze FD/reservation/byte/growth
+counts before allocation; use one bounded read scratch/body only if the slice-based
+renderer requires it, and release it before retained result publication. Independent
+actual header bytes retain their own ownership. No extra whole map/catalog copy,
+global unique clock/temp interner, cache, service graph or filesystem scan. Do not claim
+RSS savings/full-workload fit from bounded receipt or small fixtures. Preserve prior
+memory refusal/profile/resource caps and spent source16/17/18 attempts.
 
-Borrow both existing content buffers and share original capture/template/status Arcs.
-No copied map/catalog payload, global clock interner, new graph/cache/sampler or unique
-request-key history. Pending file/descriptor/staging data are native attempt scratch,
-not semantic DICE values; held metadata keeps its original graph/content intentionally.
-Freeze bounded descriptor/temp/read-buffer credit and cancellation/retry/failed publish/
-history/final-Drop release. Existing memory refusal/caps, bounded equal-payload/profile
-resume and whole-workload-fit qualification persist; no measured reduction/whole-fit claim.
+Likely exact allowlist after DESIGN: small runtime/workspace_status_file_inputs.rs;
+minimal WP927 publication root/facade/Linux readonly transfer and accessors; a focused
+native BuildInfo physical consumption wrapper/helper, private module glue and nested
+focused tests reusing WP925–927 finite Local fixtures. No Analysis/BuildAPI/source
+acquisition/generic planner/source staging/input image/action transport/CLI/dependency
+changes. Root freezes responsibility estimates before code; no forged source-image,
+SourceBacking/runfiles or configured-output authority from path spelling.
 
-Concrete allowlist follows DESIGN: small new runtime/workspace_status_publication.rs
-and Linux sibling or native publication-root sibling; limited private module/root glue;
-minimal extraction from action_output_staging/linux.rs only if actual shared primitive
-reuse requires it; one focused nested test sibling reusing WP925/WP926 finite Local
-fixture. No generic planner/source-staging/input-image/Analysis/BuildAPI/CLI/source-route
-or dependency changes. Root freezes responsibility/growth estimates before code.
-No source16/17/18 retries, corpus/registry acquisition or Java runtime/callback.
+Discriminate genuine successful producer/publication/original role and request; complete
+streamed bytes and independently checked both headers; configuration-independent status
+sharing; equal stable identity and refreshed volatile receipt; new request refuses old
+receipt even with equal bytes while held old data remains attributable. Same-byte inode
+substitution, changed bytes, parent/final symlink/hardlink/special/mode/unreadable changes,
+foreign/revoked capture and failed/partial publication/source/version changes refuse
+without ambient fallback. Actual cancellation/refusal/drop retire native FDs/read credits
+and final held metadata. Protect WP927 publication/retry/partial/refusal/clone release,
+WP926 capture/real pending DICE cancellation, WP925 catalog and generic planner guards.
+No old bare uncached BCR fixture retry or registry/corpus acquisition.
 
-## Evidence and validation
-
-Genuine native request plus actual producer/template: full bytes at both fixed paths;
-main/external Target/Exec consumers share global names; create/equal stable unchanged
-inode/mtime/ctime/changed stable; volatile rewrite on deliberately equal existing bytes
-using deterministic past mtimes, without clock-tick sleeps. Old held metadata remains
-full-byte correct. Source edit before commit retries without visible final-file changes
-and retains request sample; new request replaces capture. Foreign/stale capture and
-wrong descriptors refuse. Parent/final symlink/special/swap/alias/stage mutation and
-inaccessible destination refuse before early changes; later injected I/O failure is
-attributed as potentially partial, with no accepted terminal. Abort/cancel clears temps,
-Busy remains and final stage/content Weak/owner release passes.
-
-Protect native_output_publication_runs_under_owner_after_revision_commit and
-native_source_and_version_retries_never_invoke_output_publication, WP926 capture/
-revocation/retry/complete/cancel/lifetime, WP925 catalog/source association and existing
-WorkspaceStatus/Constant planner refusals. Closed finite Local fixtures only; legacy
-bare BCR guard stays unproved offline and is not retried.
-
-Serial pinned offlineJSON preparation<=60s TERM3 jobs1, explicit invocation-only
---config profile.dev.package.{slug_bzlmod_v2,slug_loading_v2,slug_core_v2,slug_analysis_v2}
-opt0/debug0 for heavy owner tests; default CLI check. Exact current nonignored preflight
-before serial10s TERM3 gates, bounded2s cleanup. Fmt/diff/archive/plan checks, three
-FINAL reviews, compact receipt and local commit. Existing source-attempt/resource
-limits, original memory refusal, authentic full-root/runtime/M7A/whole-fit and minimal
-Windows qualifications remain.
+Serial pinned offlineJSON preparation<=60s TERM3 jobs1 with existing explicit invocation
+profile overrides for heavy owner tests, default CLI compile dependent, current exact
+nonignored preflight and serial10s TERM3 gates with2s cleanup. Fmt/diff/archive/plan checks,
+three FINAL reviews, compact receipt and local commit. Actual CLI binary/oracle rebuild
+only if genuinely invoked. Full-root/M7A/whole-workload fit stays open; Windows Unsupported.
 
 ## Immediate predecessor
 
-[WP926](wp926-native-workspace-status-inputs-2026-10-06.json) owns actual per-request
-USER/kernel hostname/uid/time/epoch observations and computes default sorted UTF8 status
-inside DICE. Original captures survive retries and share across configurations; selected/
-ordinary/abort paths revoke. Certified checked templates produce complete independent
-headers, while current original-Arc/version/source validation and final release pass.
-Twenty-three unique Core gates (18 preserved protected+5 current), default CLI and three
-FINAL reviews accept the bounded native domain. Status-file publication, execution and
-whole-workload memory fit remain separate gates.
+[WP927](wp927-native-workspace-status-publication-2026-10-06.json) publishes full original
+stable/volatile bytes through actual current-source finalization. Equal stable remains
+untouched; volatile always replaces. Genuine first status-file creation uses the existing
+configured marker namespace; real source edits exercise retry/no early writes. Normal
+stage/held-clone release, typed partial error, capture/refusal and full owner lifetime
+pass. Thirty-nine unique Core controls are33 preserved protected+6 current, not a fresh39
+batch; default CLI and three FINAL reviews accept only the bounded native domain.
+Physical input correspondence, header output execution/cache and whole-workload fit
+remain separate gates. Identity-read/keep/unlink IO may leave unclaimed scratch; filesystem
+mutation is not transactional and two-file publication can be partial after revision commit.

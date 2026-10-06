@@ -949,3 +949,9 @@ fn genuine_native_present_empty_source_date_epoch_refuses_and_revokes_capture() 
     assert_snapshot_same(&runtime, &before);
     revoked(&runtime);
 }
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod publication {
+    use super::*;
+    include!("workspace_status_publication_tests.rs");
+}

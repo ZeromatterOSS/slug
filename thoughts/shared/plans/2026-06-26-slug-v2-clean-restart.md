@@ -34,23 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-226-m7a-native-workspace-status-publication-r1
-Status: Native default status inputs accepted; source-certified status publication selected
+Packet: WP-7-227-m7a-native-workspace-status-file-inputs-r1
+Status: Native status publication accepted; physical status input correspondence selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects workspace-global
-stable/volatile file publication through the existing current-source native finalizer.
-Root must freeze the bounded destination/staging/failure API and three DESIGN reviews
-before activation. Stable equal content preserves the file; volatile writes every time.
-[WP926](./slug-v2-subplans/wp926-native-workspace-status-inputs-2026-10-06.json) owns genuine
-per-request native identity/clock/epoch observations and computes sorted UTF8 status
-inside DICE. Original owners share across consumer configurations/retries; selected,
-ordinary and abort paths revoke. Certified checked templates produce complete independent
-headers, with real cancellation/association and held/final release proof. Twenty-three
-unique Core gates (18 preserved protected+5 current), default CLI and three FINAL reviews
-pass. Native USER/kernel/English UTC policy remains qualified; nondefault policies/epoch
-and Windows unsupported. File writing/cache/execution/full-root/M7A/whole-workload fit
-remain open. Allocation/interner discipline, prior memory/resource/source16/17/18 caps
-and the old unproved offline bare registry guard persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects original-producer/
+request-bound readonly status file inputs for the unchanged checked BuildInfo consumer.
+Root freezes the publication/physical-read protocol and bounded allocation/FD API with
+three DESIGN reviews before activation. Precomputed header bytes alone do not prove
+physical file consumption. [WP927](./slug-v2-subplans/wp927-native-workspace-status-publication-2026-10-06.json)
+accepts genuine current-source status publication, equal stable preservation and
+unconditional volatile replacement, with real source retry/refusal/partial-error and
+held owner release. Thirty-nine unique Core controls (33 preserved protected+6 current),
+default CLI and three FINAL reviews pass; no fresh39-batch claim. Linux regular/no-link/
+0444 replacement and request/source sequencing remain qualified native policy. Initial
+identity-read/keep/unlink IO can leave unclaimed scratch, and later publication failure
+may be partial after revision commit. Physical input correspondence, header/action-chain
+execution/cache, full-root/M7A/whole-workload fit remain open. Allocation/interner discipline,
+prior memory/resource/source16/17/18 caps and old unproved offline bare guard persist.
 
 ### Ready and blocked queue
 
