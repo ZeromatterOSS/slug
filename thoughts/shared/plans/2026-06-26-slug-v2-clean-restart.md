@@ -73,10 +73,15 @@ observes one normal offline public-probe command at63,960KiB/0.211s under lower1
 image/scratch budgets: first scope NetworkDisabled,1registryattempt/zero admitted
 bytes, outer observed_terminal error.3protected+1observer tests and Core/CLI
 preparation pass; scope retirement passes. Denied URL/module and mismatch subtype
-were not recorded. Next freeze borrowed existing-recorder attribution/subtype
-reporting with small controls; no repeated root or acquisition is selected. No
-wholeworkloadfit or publicproducer admission follows; transitive/module/generated
-prerequisites remain open.
+were not recorded. [WP939](./slug-v2-subplans/wp939-borrowed-registry-attribution-2026-10-06.json)
+accepts borrowed exact rows from the existing scoped credited slab and six mismatch
+labels, with nine ordinary passes (1.748 s; 37,320 KiB peak), Core preparation (36.746 s),
+CLI check (7.373 s) and two FINAL
+reviews. No retained strings/storage are added; pointer/domain/order/partial-history,
+panic recovery and final credit/Weak retirement pass. Next freeze one new instrumented
+offline attribution hypothesis under unchanged caps, before edits/launch; no command,
+acquisition or success retry is selected. Wholeworkloadfit/publicproducer admission and
+transitive/module/generated prerequisites remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

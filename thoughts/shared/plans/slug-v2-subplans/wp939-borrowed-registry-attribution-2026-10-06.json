@@ -1,0 +1,249 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP939",
+  "baseline": "197009e53bb3187ee45f0f9875c5759c104335da",
+  "status": "accepted",
+  "observable": "Borrow existing credited registry identities in first-distinct order and report all six terminal mismatch subtypes.",
+  "compatibility": {
+    "request_byte_domains": "exact existing representation",
+    "diagnostics": "Slug-native",
+    "production_source_and_public_producer": "unproved"
+  },
+  "allocation": {
+    "storage": "unchanged credited slab, bounded row array and scoped credit",
+    "projection": "scalar snapshot and borrowed callback; no URL/path heap dump",
+    "discipline": "Borrow or transfer first; use existing scoped interners for repeated immutable strings when lifetime/cleanup fit. No global pool for unique temporary strings.",
+    "retirement": "Direct slab pointer equality; repeated visits preserve live/peak credit; poisoned-lock recovery and final recorder/scope Weak expiry asserted.",
+    "scope": "These controls do not establish allocation-global absence or whole-workload fit."
+  },
+  "memory": {
+    "passed": 9,
+    "elapsed_seconds": 1.747711846139282,
+    "peak_rss_kib": 37320,
+    "preflight": 9,
+    "normal_command_executions": 0
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304
+  },
+  "executable": {
+    "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+    "sha256": "11846cea6cd6442d38186adfe62441c804bf1a928aad67230e714a8aae788d6e"
+  },
+  "preparation": [
+    {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 36.74567435099743,
+      "stdout_sha256": "5b9ea4f42bd8847e9dd78f6c22f5af0ae6859a61d69d39881546f7986aa8c00d",
+      "stderr_sha256": "b944e189ad17006886c9f664be03ed52eb6c461f54c3fd7e452bc6ba66941943"
+    },
+    {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.373263443936594,
+      "stdout_sha256": "83fa49b882c3e5d6576bf4bcb48fd1267d2f682caabcf9c5180ec1c3de171968",
+      "stderr_sha256": "5548abadd31c2b2ac86133d5425351cb2f32f446c5e3ee0f02e079a76d01c7a4"
+    }
+  ],
+  "preflight": {
+    "verified": 9,
+    "executed": 0,
+    "sha256": "faa70087e9a220dc877ef48b35390b891e9f8ef0c44faac8ef299305e84932a1"
+  },
+  "tests": [
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::exact_registry_routes_repeats_supplied_non_utf8_paths_and_unarmed_controls",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.1951673700241372,
+      "peak_rss_kib": 31944,
+      "receipt_sha256": "92948aec22b356dbcced3400e32c17369c74207a2f73257e56ed94a52fa57d7d"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_bytes",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.1927055580308661,
+      "peak_rss_kib": 35760,
+      "receipt_sha256": "fd2ceaedb9b826b74df40fb2c6d2a53db8587ee18e4107c2e645cf15a584cc92"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::actual_root_256_distinct_then_257_refuses_before_io_and_preserves_origin",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19418317603413016,
+      "peak_rss_kib": 37320,
+      "receipt_sha256": "931eb7ab98b6a1ce469184cd1c06d778d003cce7c6b48f5eef16cc7f236b8f89"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19654194603208452,
+      "peak_rss_kib": 29932,
+      "receipt_sha256": "4ebf395cc02974440aa481bee61c90e16c8894dbd5035c470358a51e8fa573f4"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_history",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.1925567069556564,
+      "peak_rss_kib": 28260,
+      "receipt_sha256": "e75ed9f947b579f2b438b90c786b83ac9457761bcef0fce854d39d10f9f87464"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::registry_association_credit_pressure_weak_attachment_and_clone_last_drop",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19166063307784498,
+      "peak_rss_kib": 30736,
+      "receipt_sha256": "7758952f2f845a3abfb4ccd2950d41c1a5121b2c217eaada21c44990a1f5f4c7"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::borrowed_registry_rows_preserve_distinct_order_domains_and_credit_lifecycle",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19716397894080728,
+      "peak_rss_kib": 28536,
+      "receipt_sha256": "58cf95fcb34cd429ac5545ea4bd82a82d92c0e1a4506a8465d511a7ce2a81e62"
+    },
+    {
+      "selector": "runtime::dice::source_service::registry_association::tests::borrowed_registry_rows_preserve_partial_history_after_callback_panic",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19508916896302253,
+      "peak_rss_kib": 29072,
+      "receipt_sha256": "5a092b271d95319cb6e4804e0775c1a4b7a60b1dab0285d23bb1d9e62b9c125c"
+    },
+    {
+      "selector": "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::terminal_mismatch_subtypes_preserve_original_scope_refusal",
+      "selected": 1,
+      "passed": 1,
+      "exit_code": 0,
+      "seconds": 0.19264330808073282,
+      "peak_rss_kib": 25504,
+      "receipt_sha256": "ca54e7e1b38c1eecc3478e83350f6fcb375639118903068cf94eca86800cf24c"
+    }
+  ],
+  "bindings": {
+    "app/slug_core_v2/src/runtime/source_service/registry_association.rs": "4004d98bb02ae1bd360942d588598ee5bfc1bfd1af69939423197287202c9224",
+    "app/slug_core_v2/src/runtime/source_service/registry_association/tests.rs": "c6910297e8103550d0ad1ed32ee45cfceb9d2bffb1a98081ca933a7c8c2b8ebd",
+    "app/slug_core_v2/src/runtime/tests/rules_rust_public_source_prerequisite_tests.rs": "8b0b184b1633ae825df27be89f3c1de7c81b9748576466749f23de464f02d157",
+    "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e": "11846cea6cd6442d38186adfe62441c804bf1a928aad67230e714a8aae788d6e",
+    "scripts/v2_test_preflight.py": "b7a7087a469acb8c9508236a6103b8cc23943120d76d7b9c65205ba7d4ca851f",
+    "target/wp939/design.md": "a6e5cb69b775eb546d802d9b5af50c9868687f22615c21372407490ca4a36cbe",
+    "target/wp939/design-source.md": "e38edf20430bd38216692fd42e8de2cec0267da3c7b209179397f1906269af46",
+    "target/wp939/design-evidence.md": "636e7615ff81cdd8ca3e8b36921dacca01522056cf6610b6fe5b7c691dbedfee",
+    "target/wp939/helper-evidence.md": "cf558bf46c685ca3d33b1b45be1fa225a63f92c1f86d022e17275317e2315e6c",
+    "target/wp939/toolchain.json": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07",
+    "target/wp939/compile.json": "45ed2be6933809609eb50d05e55189512e4484da9df93417414352746e7a94ea",
+    "target/wp939/prepare.py": "ca1be78fe474863842cd83a46ef2223f2ab0f68b8003895761ff8fd40341df59",
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "f123896aa4617edab87db55b1d50f22ce21b115d0a5c7c0c85ebcc7d06020c78",
+    "app/slug_core_v2/src/runtime/source_service/registry.rs": "b7322f3906b1c76af38df28c69741be43c3bf51ee120d409bd411d52d8583ecd",
+    "app/slug_core_v2/src/runtime/dice.rs": "6c7889d431b4b0ec619ae11468a393e05b9453859f14d3672bcea71ed10ee827"
+  },
+  "design_sha256": "a6e5cb69b775eb546d802d9b5af50c9868687f22615c21372407490ca4a36cbe",
+  "supervisor_sha256": "cbe8fc2bf04493d8c16c4ea02463d561cb844bb8e54371429dfcbcd2e9c5ea34",
+  "inputs_sha256": "c17088d93343c22af40046f96e47e5a1432278e1d8925a1a90634180c103fa4e",
+  "changes": {
+    "owner_added_lines": 35,
+    "association_test_added_lines": 192,
+    "subtype_added_lines": 65,
+    "subtype_removed_lines": 1,
+    "growth_reason": "Formatted pointer/domain/accounting, immediate post-panic snapshot and final clone/Weak assertions cover the two new lifecycle cases; no fixture corpus or storage/harness growth."
+  },
+  "corrections": [
+    "Before launch, helper review corrected SIGKILL exit races and required executable/preflight/source pin membership; initial review retained. No Rust or runtime failures. ordinary-7 stderr is an intentional caught callback panic."
+  ],
+  "next": "Freeze one newly instrumented normal offline prerequisite hypothesis using this visitor, fixed stack identity scratch and exact mismatch labels. No operation is selected by WP939; historical WP938 URL/subtype remain unknown.",
+  "open": [
+    "Exact current transitive/module/generated-repository/registration/provider readiness",
+    "Normal retained public Rustc action producer",
+    "Whole-workload memory fit and M7A"
+  ],
+  "packet_elapsed_seconds": 683.5835778713226,
+  "reviews": [
+    {
+      "path": "target/wp939/final-source.md",
+      "verdict": "ACCEPT",
+      "sha256": "0b04e257d92ccb1f09a8e9756899fa45b83ad3b1b880fba8ea8db25ee13658f5"
+    },
+    {
+      "path": "target/wp939/final-evidence.md",
+      "verdict": "ACCEPT",
+      "sha256": "0fb98d5b9dab476c4a6894d7bdb1b8c885a5eb06813b91fa6f6229853839e1eb"
+    }
+  ],
+  "replan_reason": null,
+  "gate_advanced": "Existing-owner borrowed request attribution and exact test diagnostic subtype are implemented and reviewed."
+}

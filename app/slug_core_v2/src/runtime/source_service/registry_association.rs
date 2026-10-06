@@ -42,6 +42,15 @@ impl RegistryRequestRef<'_> {
     }
 }
 
+/// One retained distinct admission identity; not per-call chronology or source authority.
+#[derive(Clone, Copy)]
+pub(in crate::runtime) struct RegistryRequestRowRef<'a> {
+    pub(in crate::runtime) row_ordinal: u64,
+    pub(in crate::runtime) admissions: u64,
+    pub(in crate::runtime) raw_url: &'a [u8],
+    pub(in crate::runtime) local_path: Option<&'a [u8]>,
+}
+
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(in crate::runtime) enum RegistryLimitRelation {
     #[default]
@@ -163,6 +172,9 @@ impl RegistryRequestAssociation {
     }
     pub(in crate::runtime) fn snapshot(&self) -> RegistryAssociationSnapshot {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        self.snapshot_observation(&state)
+    }
+    fn snapshot_observation(&self, state: &AssociationState) -> RegistryAssociationSnapshot {
         let mut snapshot = state.snapshot;
         let (counters, timeout, buffer) = self.credit.registry_observation();
         snapshot.scope_admitted_entries = counters.registry_attempts;
@@ -171,6 +183,29 @@ impl RegistryRequestAssociation {
         snapshot.complete &= snapshot.scope_admitted_entries == snapshot.admitted_entries;
         if !snapshot.complete {
             snapshot.first_limit_relation = RegistryLimitRelation::Unknown;
+        }
+        snapshot
+    }
+    /// Visits slab borrows in first-distinct admission order under the existing lock.
+    /// The synchronous callback must be bounded: no recorder reentry, IO, blocking,
+    /// await, or DICE computation. Rows can be partial when the snapshot is incomplete.
+    pub(in crate::runtime) fn visit_retained_rows(
+        &self,
+        mut visit: impl for<'row> FnMut(RegistryRequestRowRef<'row>),
+    ) -> RegistryAssociationSnapshot {
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let snapshot = self.snapshot_observation(&state);
+        for index in 0..snapshot.retained_rows as usize {
+            let row = state.rows[index];
+            let base = index * ROW_BYTES;
+            visit(RegistryRequestRowRef {
+                row_ordinal: index as u64 + 1,
+                admissions: row.admissions,
+                raw_url: &state.slab[base..base + row.url_length],
+                local_path: row.local_length.map(|length| {
+                    &state.slab[base + IDENTITY_BYTES..base + IDENTITY_BYTES + length]
+                }),
+            });
         }
         snapshot
     }

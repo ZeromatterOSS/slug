@@ -88,23 +88,34 @@ source live buffers are0 and scope weak expiry passes; descriptor peak5,352B wit
 reported used/image/scratch0. This early refusal fits caps; no complete producer/graph
 or whole-workload fit follows. The first test-only namespace compile error is preserved.
 
-Next freeze [the bounded attribution seam](../../../../target/wp938/successor-source.md):
-borrowed request-row projection over the existing optional scoped recorder and exact
-ObservedTerminalMismatch subtype reporting. Prove its allocation/identity/retirement
-with small existing-owner controls. WP938 did not arm the recorder, so the blocked
-request cannot be recovered from this receipt. No blind module/cache guess, repeated
-root command, acquisition or source16–18/F3/fullroot retry is selected. Source/module/
-materialization/registration/provider/public Rustc/M7A remain open.
+[WP939](wp939-borrowed-registry-attribution-2026-10-06.json) accepts the existing scoped
+recorder's synchronous borrowed request-row visitor and six exact mismatch subtype
+labels. Nine ordinary controls pass in 1.748 s at 37,320 KiB conservative peak; Core
+preparation (36.746 s), CLI check (7.373 s) and two FINAL reviews pass. Direct slab pointers,
+Url/Local(empty/nonUTF8) domains, first-distinct order/repeats, flagged partial history,
+poisoned-lock recovery and final credit/Weak release are asserted. No retained storage
+or URL/path heap dump is added; source/module/public producer or whole-fit is unproved.
+
+Next freeze [the new attribution hypothesis](../../../../target/wp939/successor-source.md):
+one newly instrumented offline prerequisite observation, arming the existing recorder
+before charges and staging its first row into bounded stack scratch before reporting
+outside the lock. Explicitly account its approximately 0.3 MiB recorder reservation under
+the same 16 MiB live allowance and preserve all prior caps. This recommendation selects
+no operation; independent DESIGN must freeze actual ownership/effects/inputs/guards
+before edits or launch. WP938's omitted URL/subtype cannot be recovered. No blind
+module/cache guess, acquisition, success retry or source16–18/F3/fullroot repeat is
+selected. Source/module/materialization/registration/provider/public Rustc/M7A remain open.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. WP938 accepted allowlist:
-ignored target/wp938 operations/reviews, the small Core
-runtime/tests/rules_rust_public_source_prerequisite_tests.rs and its Linux test-only
-include in runtime/dice.rs, plus canonical/current/bootstrap and one compact receipt.
-The next bounded attribution design must freeze its existing recorder owner and exact
-allowlist before editing; no runtime operation follows from the recommendation. Any minimal shared fixture
+source/evidence review before dependent Rust work. WP939's accepted allowlist was the
+existing Linux test-only source_service/registry_association.rs and its tests, plus the
+Core public source-prerequisite test's scalar mismatch formatter/unit case; its compact
+receipt preserves source/design/artifact/gate bindings. The next instrumentation contract
+must freeze the smallest shared normal test body and bounded stack reporter, current
+pins and ordinary controls before selecting a new ignored observation. No normal command
+or source acquisition is currently selected. Any minimal shared fixture
 adapter needs its exact existing owner/path and growth reason frozen before editing;
 prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.
 Fixture/expected files remain unchanged references. No new production API is justified

@@ -75,13 +75,77 @@ fn native_kind(error: &NativeDemandSessionError) -> &'static str {
         NativeDemandSessionError::OutputPublicationAbort { .. } => "output_publication_abort",
         NativeDemandSessionError::MissingSelectedPath(_) => "missing_selected_path",
         NativeDemandSessionError::PathEpoch(_) => "path_epoch",
-        NativeDemandSessionError::ObservedTerminal(_) => "observed_terminal",
+        NativeDemandSessionError::ObservedTerminal(mismatch) => match mismatch {
+            ObservedTerminalMismatch::RepositoryRequests => "observed_terminal_repository_requests",
+            ObservedTerminalMismatch::RepositoryValidations => {
+                "observed_terminal_repository_validations"
+            }
+            ObservedTerminalMismatch::Length => "observed_terminal_length",
+            ObservedTerminalMismatch::Demand => "observed_terminal_demand",
+            ObservedTerminalMismatch::Value => "observed_terminal_value",
+            ObservedTerminalMismatch::ResultArc => "observed_terminal_result_arc",
+        },
         NativeDemandSessionError::Effect(_) => "effect",
         NativeDemandSessionError::ForeignEffects => "foreign_effects",
         NativeDemandSessionError::Computation(_) => "computation",
         NativeDemandSessionError::Injection(_) => "injection",
         NativeDemandSessionError::Restoration(_) => "restoration",
     }
+}
+
+#[test]
+fn terminal_mismatch_subtypes_preserve_original_scope_refusal() {
+    use crate::runtime::dice::source_service::SourceServiceError;
+
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let scope = SourceServiceScope::new_for_test(
+        NormalizedAbsolutePath::new("/terminal-mismatch-diagnostic").unwrap(),
+        deadline,
+        deadline + Duration::from_secs(1),
+        SourceServiceLimits::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        scope.poison(SourceServiceError::NetworkDisabled),
+        SourceServiceError::NetworkDisabled
+    );
+    for (mismatch, expected) in [
+        (
+            ObservedTerminalMismatch::RepositoryRequests,
+            "observed_terminal_repository_requests",
+        ),
+        (
+            ObservedTerminalMismatch::RepositoryValidations,
+            "observed_terminal_repository_validations",
+        ),
+        (ObservedTerminalMismatch::Length, "observed_terminal_length"),
+        (ObservedTerminalMismatch::Demand, "observed_terminal_demand"),
+        (ObservedTerminalMismatch::Value, "observed_terminal_value"),
+        (
+            ObservedTerminalMismatch::ResultArc,
+            "observed_terminal_result_arc",
+        ),
+    ] {
+        assert_eq!(
+            native_kind(&NativeDemandSessionError::ObservedTerminal(mismatch)),
+            expected
+        );
+        assert_eq!(
+            scope.first_error_for_test(),
+            Some(SourceServiceError::NetworkDisabled)
+        );
+    }
+    assert_eq!(
+        native_kind(&NativeDemandSessionError::SourceService(
+            SourceServiceError::NetworkDisabled
+        )),
+        "source_service"
+    );
+    assert_eq!(
+        scope.poison(SourceServiceError::Cancelled),
+        SourceServiceError::NetworkDisabled
+    );
+    assert_eq!(scope.check(), Err(SourceServiceError::NetworkDisabled));
 }
 
 fn resources(

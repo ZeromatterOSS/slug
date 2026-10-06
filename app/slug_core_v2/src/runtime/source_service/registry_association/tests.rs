@@ -562,3 +562,195 @@ fn registry_association_credit_pressure_weak_attachment_and_clone_last_drop() {
     drop(results);
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 }
+
+#[test]
+fn borrowed_registry_rows_preserve_distinct_order_domains_and_credit_lifecycle() {
+    let owner = scope(8);
+    let ledger = owner.arm_registry_association_for_test().unwrap();
+    let name = url("test:exact-raw-identity");
+    let empty = Path::new("");
+    let non_utf8 = Path::new(std::ffi::OsStr::from_bytes(b"p-\xff"));
+    charge(&owner, &name).unwrap();
+    for path in [empty, non_utf8] {
+        owner
+            .charge_registry_request_for_test(RegistryRequestRef::Local { url: &name, path })
+            .unwrap();
+    }
+    charge(&owner, &name).unwrap();
+    owner
+        .charge_registry_request_for_test(RegistryRequestRef::Local {
+            url: &name,
+            path: non_utf8,
+        })
+        .unwrap();
+    let before = owner.snapshot();
+    let charged = ledger.snapshot().charged_bytes;
+    let (base, length, capacity) = {
+        let state = ledger.state.lock().unwrap();
+        (
+            state.slab.as_ptr() as usize,
+            state.slab.len(),
+            state.slab.capacity(),
+        )
+    };
+    let expected: [(u64, Option<&[u8]>); 3] = [(2, None), (1, Some(b"")), (2, Some(b"p-\xff"))];
+    for _ in 0..2 {
+        let mut seen = 0;
+        let observed = ledger.visit_retained_rows(|row| {
+            assert!(seen < expected.len());
+            assert_eq!(row.row_ordinal, seen as u64 + 1);
+            assert_eq!(row.admissions, expected[seen].0);
+            assert_eq!(row.raw_url, name.as_str().as_bytes());
+            assert_eq!(row.local_path, expected[seen].1);
+            assert_eq!(row.raw_url.as_ptr() as usize, base + seen * ROW_BYTES);
+            if let Some(path) = row.local_path {
+                assert_eq!(
+                    path.as_ptr() as usize,
+                    base + seen * ROW_BYTES + IDENTITY_BYTES
+                );
+            }
+            seen += 1;
+        });
+        assert_eq!(seen, 3);
+        assert!(observed.complete);
+        assert_eq!(
+            (
+                observed.admitted_entries,
+                observed.scope_admitted_entries,
+                observed.admitted_distinct,
+                observed.admitted_repeated,
+                observed.retained_rows
+            ),
+            (5, 5, 3, 2, 3)
+        );
+        assert_eq!(observed.charged_bytes, charged);
+        let after = owner.snapshot();
+        assert_eq!(
+            (
+                after.live_buffer_bytes,
+                after.peak_buffer_bytes,
+                after.registry_attempts
+            ),
+            (
+                before.live_buffer_bytes,
+                before.peak_buffer_bytes,
+                before.registry_attempts
+            )
+        );
+        let state = ledger.state.lock().unwrap();
+        assert_eq!(
+            (
+                state.slab.as_ptr() as usize,
+                state.slab.len(),
+                state.slab.capacity()
+            ),
+            (base, length, capacity)
+        );
+    }
+    let ledger_weak = Arc::downgrade(&ledger);
+    let scope_weak = Arc::downgrade(&owner);
+    let clone = ledger.clone();
+    drop(ledger);
+    assert_eq!(owner.snapshot().live_buffer_bytes, charged);
+    drop(clone);
+    assert!(ledger_weak.upgrade().is_none());
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    drop(owner);
+    assert!(scope_weak.upgrade().is_none());
+}
+
+#[test]
+fn borrowed_registry_rows_preserve_partial_history_after_callback_panic() {
+    let owner = scope(8);
+    let ledger = owner.arm_registry_association_for_test().unwrap();
+    let a = url("test:partial-a");
+    let b = url("test:partial-b");
+    charge(&owner, &a).unwrap();
+    charge(&owner, &url(&"x".repeat(IDENTITY_BYTES + 1))).unwrap();
+    owner.charge(SourceCounter::RegistryAttempts, 1).unwrap();
+    charge(&owner, &b).unwrap();
+    let before = ledger.snapshot();
+    assert!(!before.complete);
+    assert_eq!(before.first_limit_relation, RegistryLimitRelation::Unknown);
+    assert_eq!(
+        (
+            before.attempted_entries,
+            before.admitted_entries,
+            before.scope_admitted_entries,
+            before.retained_rows
+        ),
+        (3, 3, 4, 2)
+    );
+    let base = ledger.state.lock().unwrap().slab.as_ptr() as usize;
+    let charged = before.charged_bytes;
+    let buffers = owner.snapshot();
+    let panic = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        ledger.visit_retained_rows(|row| {
+            assert_eq!(row.row_ordinal, 1);
+            assert_eq!(row.raw_url, a.as_str().as_bytes());
+            panic!("bounded registry visitor panic");
+        });
+    }));
+    assert!(panic.is_err());
+    assert!(ledger.state.is_poisoned());
+    let recovered = ledger.snapshot();
+    assert_eq!(
+        (
+            recovered.complete,
+            recovered.attempted_entries,
+            recovered.admitted_entries,
+            recovered.scope_admitted_entries,
+            recovered.retained_rows,
+            recovered.charged_bytes
+        ),
+        (
+            before.complete,
+            before.attempted_entries,
+            before.admitted_entries,
+            before.scope_admitted_entries,
+            before.retained_rows,
+            before.charged_bytes
+        )
+    );
+    for repeated in [false, true] {
+        if repeated {
+            charge(&owner, &a).unwrap(); // Poisoned association lock recovers unchanged storage.
+        }
+        let mut seen = 0;
+        let observed = ledger.visit_retained_rows(|row| {
+            let expected = if seen == 0 { &a } else { &b };
+            assert!(seen < 2);
+            assert_eq!(row.row_ordinal, seen as u64 + 1);
+            assert_eq!(row.raw_url, expected.as_str().as_bytes());
+            assert_eq!(row.raw_url.as_ptr() as usize, base + seen * ROW_BYTES);
+            assert_eq!(row.local_path, None);
+            assert_eq!(row.admissions, if repeated && seen == 0 { 2 } else { 1 });
+            seen += 1;
+        });
+        assert_eq!(seen, 2);
+        assert!(!observed.complete);
+        assert_eq!(
+            observed.first_limit_relation,
+            RegistryLimitRelation::Unknown
+        );
+        assert_eq!(observed.retained_rows, 2);
+        assert_eq!(observed.admitted_distinct, 2);
+        assert_eq!(observed.admitted_repeated, u64::from(repeated));
+        assert_eq!(observed.admitted_entries, 3 + u64::from(repeated));
+        assert_eq!(observed.scope_admitted_entries, 4 + u64::from(repeated));
+        assert_eq!(observed.charged_bytes, charged);
+        let after = owner.snapshot();
+        assert_eq!(
+            (after.live_buffer_bytes, after.peak_buffer_bytes),
+            (buffers.live_buffer_bytes, buffers.peak_buffer_bytes)
+        );
+        assert_eq!(owner.first_error_for_test(), None);
+    }
+    let ledger_weak = Arc::downgrade(&ledger);
+    let scope_weak = Arc::downgrade(&owner);
+    drop(ledger);
+    assert!(ledger_weak.upgrade().is_none());
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    drop(owner);
+    assert!(scope_weak.upgrade().is_none());
+}
