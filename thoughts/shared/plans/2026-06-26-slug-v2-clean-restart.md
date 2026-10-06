@@ -39,12 +39,13 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: temporary loading-manifest sets borrow canonical labels,
-removing seven scratch clone sites while preserving full identity, first-seen
-records, fingerprint bytes and final owned/frozen outputs.
-Next: select a proved redundant copy or existing interner reuse at local string
-owners through a bounded design checkpoint. No source observation,
-network-dependent retry, cap growth or runtime activation is selected.
+Latest accepted change: native lower()/upper() reuse existing unchanged ASCII
+strings. Original changed-ASCII/Unicode conversion, errors, speculative behavior
+and GC/frozen ownership are preserved; both 96 KiB fixtures show input sharing
+and zero additional public heap accounting.
+Next: select a proved redundant local copy or existing interner reuse through a
+bounded design checkpoint. No source observation, network-dependent retry,
+cap growth or runtime activation is selected.
 Windows remains minimal/deferred.
 Completed observations and superseded launch instructions are retained in the
 [pinned history index](./plan-history.md#october-5-wp899-scheduling-compaction).

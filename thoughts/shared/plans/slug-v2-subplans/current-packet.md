@@ -12,10 +12,10 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component borrows canonical labels in temporary manifest
-SmallSets instead of deep-cloning them. Seven scratch clone sites are removed;
-full structural identity, first-seen records, fingerprints and final owned/frozen
-outputs remain unchanged. Slug-native scratch only. Next: select a proved redundant
+The latest accepted component reuses existing strings for unchanged ASCII
+lower()/upper(). Changed ASCII and every non-ASCII input preserve original
+conversion and final heap allocation. Both 96 KiB fixtures share their inputs
+with zero additional public heap accounting. Next: select a proved redundant
 local copy or existing interner reuse through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
@@ -23,34 +23,37 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted manifest label scratch borrowing contract
+## Accepted unchanged ASCII case input reuse contract
 
-Seven temporary SmallSet inserts across BzlLoadManifest construction, package
-fingerprint/direct roots/call sources and frozen lifetime closure borrow existing
-labels. Full CanonicalLabel Eq/Hash including mapping ID, first-seen order,
-capacities, fingerprint implementation and all final identity/provenance/frozen
-handle clones remain unchanged. Scratch references end synchronously; an explicit
-set drop after deduplication ends the root borrow before final transfer. No new
-helper/API/interner/cache/key/unsafe/dependency/retained representation or DICE change.
+Native lower()/upper() return the existing StringValue only when every byte is
+ASCII and already in the requested case. Changed ASCII and every non-ASCII input
+retain the original Rust conversion through the same heap allocator. Public
+string type, zero visible arguments, speculative annotation, tracing/freezing,
+interner code and final ownership remain unchanged. No new helper, API, interner,
+cache, key, unsafe code, dependency or retained representation is introduced.
 
-Three DESIGNs/FINALs accept exact source proof. Identical new semantic controls
-pass baseline 3/3 and candidate 3/3; candidate 8/8 as 6 lib + 2 BUILD includes three
-existing injected DICE recursive/A/B/A controls and lexical/defining Label owners.
-Independent equal buffers/conflicting metadata, diamonds/root repetition/empty
-inputs, equal display with distinct mapping IDs, fingerprint projection and owned
-outputs/frozen values after input/handle drop pass. Default Loading/Core/CLI
-alltargets compile. Initial E0505 compiler evidence is preserved; corrected fresh
-build/exact preflight precedes all candidate execution. Serial pinned offline
-prep60s/tests30s and hygiene pass. The large existing bzl_module owner receives
-only seven insert substitutions, scratch drop and testhook; a 272-line sibling
-covers the five helpers. Seven scratch clone sites only: final clones/set metadata
-remain; no allocator-count, quantified memory/capacity/aggregate/peak/RSS/speed/
-source-fit claim. Full WP899/M7A remains open.
+Three DESIGNs/FINALs accept exact source proof and the same corrected tests.
+Baseline has two semantic passes and one intended pointer-sharing failure;
+candidate passes 8/8, including 32,768 ASCII comparisons, explicit Unicode and
+four byte-identical error records. Mutable results survive explicit GC, freezing
+and source/module/handle drop; speculative execution and internal string carrier
+controls pass. Default Loading/Core/CLI alltargets compile offline. Preserved
+E0597 and repr-assumption failures were test-only corrections; fresh corrected
+builds and exact artifact preflights precede execution. Format/archive/plan/diff
+hygiene passes. The owner receives only two method changes and a test hook,
+with a 188-line sibling.
+
+Each 98,304-byte fixture changes from an unshared result to sharing its input;
+observed public Heap::allocated_bytes() growth changes from 204,736/409,536 to
+0/0. These are fixed-fixture arena observations, excluding exact allocator or
+payload counts, retained capacity, aggregate/peak/RSS/speed and source-fit claims.
+All fallback/final storage remains. Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Native lower()/upper() reuse unchanged ASCII inputs; all changed ASCII/Unicode conversion, public types/errors, GC/frozen ownership and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one intended sharing failure, candidate 8/8 and 32,768 ASCII comparisons plus default dependents. Both 96 KiB fixtures share with zero additional public heap accounting; fixture observations only | [ASCII case input reuse](wp899-ascii-case-reuse-2026-10-05.json) |
 | Manifest temporary SmallSets borrow full canonical labels; seven scratch clone sites removed, first-seen/full structural identity/fingerprints/final owned and frozen outputs preserved. Three DESIGNs/FINALs; identical baseline 3/3 and candidate 8/8 as 6 lib + 2 BUILD, default Loading/Core/CLI checks. Explicit scratch drop resolves preserved compiler E0505; no allocator/capacity/RSS/speed claim | [Manifest label borrowing](wp899-manifest-label-borrow-2026-10-05.json) |
 | Loading Label collectors format directly and external workspace_root copies into final heap; three scratch construction sites removed, bytes/identity/mapping/final ownership unchanged. Three DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, default Loading/Core/CLI checks. Source proof only; no allocation/capacity/RSS/speed claim | [Label renderer scratch removal](wp899-starlark-label-render-2026-10-05.json) |
 | Compiler method calls move owned receiver instead of deep-cloning; optimizer order/IR/spans/args/fallback/frozen ownership preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure; 3 Symbol buffers share owners (15,384 content bytes). Fifteen gates as 14 preserved + 1 reviewed stale golden correction, independently baseline-reproduced; default Loading/Core/CLI checks pass. Generic IR spare capacity remains possible; no aggregate/RSS/speed claim | [Method receiver transfer](wp899-method-receiver-move-2026-10-05.json) |

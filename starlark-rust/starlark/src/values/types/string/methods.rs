@@ -584,8 +584,15 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn lower(this: &str) -> anyhow::Result<String> {
-        Ok(this.to_lowercase())
+    fn lower<'v>(this: StringValue<'v>, heap: Heap<'v>) -> anyhow::Result<StringValue<'v>> {
+        if this
+            .bytes()
+            .all(|byte| byte.is_ascii() && !byte.is_ascii_uppercase())
+        {
+            Ok(this)
+        } else {
+            Ok(heap.alloc_str(&this.to_lowercase()))
+        }
     }
 
     /// [string.join](
@@ -1204,8 +1211,15 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// # "#);
     /// ```
     #[starlark(speculative_exec_safe)]
-    fn upper(this: &str) -> anyhow::Result<String> {
-        Ok(this.to_uppercase())
+    fn upper<'v>(this: StringValue<'v>, heap: Heap<'v>) -> anyhow::Result<StringValue<'v>> {
+        if this
+            .bytes()
+            .all(|byte| byte.is_ascii() && !byte.is_ascii_lowercase())
+        {
+            Ok(this)
+        } else {
+            Ok(heap.alloc_str(&this.to_uppercase()))
+        }
     }
 
     /// [string.removeprefix](
@@ -1272,6 +1286,10 @@ mod replace_prefix_tests;
 #[cfg(test)]
 #[path = "whitespace_split_tests.rs"]
 mod whitespace_split_tests;
+
+#[cfg(test)]
+#[path = "ascii_case_reuse_tests.rs"]
+mod ascii_case_reuse_tests;
 
 #[cfg(test)]
 mod tests {
