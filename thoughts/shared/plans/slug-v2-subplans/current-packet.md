@@ -1,77 +1,67 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-205-m7a-compression-leaf-build-validation-r1
-Status: Current producer inventory accepted; bounded compression-leaf compilation selected
+Packet: WP-7-206-m7a-current-cli-root-build-r1
+Status: Compression leaf built; one bounded current CLI-root compilation selected
 
 ## Observable outcome and compatibility
 
-Validate the newly introduced lzma-sys0.1.20 dependency through its ordinary Bazel
-library/build-script producers. Current Cargo CLI compression closure adds xz2,
-lzma-sys and pkg-config; their exact local sources are prepared but never built
-by this work. One focused library build establishes actual compiler/build-script
-success or a concrete producer/environment failure before a full root compile.
-Compatibility: Slug-native preparation evidence from external pinned Bazel9.2;
-no Slug semantic activation, compiler execution admission, full root build or M7A.
-Root owns invocation, evidence/status and integration.
+Build the current production //app/slug_cli_v2:slug root using ordinary pinned
+Bazel9.2 after accepted configured inventory and compression-leaf preparation.
+This proves current compiler/generated source coverage or isolates a concrete
+normal producer failure. Compatibility: Slug-native preparation evidence; no Slug
+semantic/runtime/REAPI admission, full source-memory fit, fixed point or M7A close.
+Root owns invocation, observations, selection/status and integration.
 
-Reuse WP903 archive/spec/member verification and WP904/905 current configured
-producer/feature/input evidence. The actual generated lzma BUILD is the retained
-Bzlmod RepoSpec inline text. BuildScript Rust source and rules_rust runner own the
-actual flags/env/native-library outputs; no hand-generated Rust, fixture substitute,
-synthetic BUILD or feature change. Additional toolchain C++ allocator declarations
-have no captured consumer into the requested CLI compiler forest; do not activate
-their discovery/execution capabilities. Dynamic native compilation inside the named
-build script is part of its ordinary declared action, not absent from execution by
-this graph observation.
+Reuse WP900/901 declarations/planned units, WP904 direct features, WP905 complete
+configured family/producer inventory and WP906 actual compression library build.
+Root constructor paths remain ordinary generated inline BUILD owners. No fixture
+substitute, synthetic graph, feature change or C++ discovery/execution activation.
+The captured allocator C++ component has no consumer into the CLI compiler forest;
+native compilation inside a normal build-script Spawn remains part of that action.
 
-## Selected operation and caps
+## Operation, inputs and resources
 
-One pinned Bazel batch build of
-@@rules_rust++crate+slug_crates__lzma-sys-0.1.20//:lzma_sys,
-with nofetch/downloader disabled/lockfileerror/no RC/explicit nightly, loading
-threads2, jobs2. It executes ordinary declared compile/build-script actions;
-no Slug source request, tests, backend/network acquisition or query retry.
-Pin tracked Cargo/BUILD/bzl/locks/MODULE/toolchain/binary plus current selected
-RepoSpec/BUILD/archive/source/marker and cached compiler/runner sources before
-launch. Use unchanged reviewed retained-leader WNOWAIT lifecycle and exclusive
-one-claim control. Fresh exact platform review covers compiler/cache writes.
+Select one batch build //app/slug_cli_v2:slug using exact pinned Bazel binary,
+ignore RC, nofetch/downloader disabled/lockfileerror, explicit nightly, loading2,
+jobs2 and standalone local actions without persistent workers. No tests, backend
+or network acquisition/Slug source request. Pin all tracked Rust/Cargo/BUILD/bzl
+sources, locks/MODULE/toolchain plus selected cached compiler/runner Rust/bzl,
+RepoSpecs and prepared compression sources before launch. Preserve known scheduling
+edits and exact inputs. Reuse accepted WP906 WNOWAIT lifecycle/census unchanged.
 
-Preparation cap60s, cleanup3s, each output16MiB, JVM2GiB; jobs2 bounds parallel
-compilers. This is a separate new compilation operation, not an increase to a
-spent query/source/test cap. The focused real producer build is required because
-analysis and miniature string fixtures cannot prove its source/tool/env/compiler
-and generated native-link outputs. It contains no test; user12s guideline is not
-a compilation hard deadline. Preserve timeout/nonzero/unknown cleanup without
-retrying or enlarging limits. Slug source AS/RSS/disk/string budgets unchanged.
+Compilation60s/cleanup3s, JVM2GiB, each output16MiB. Jobs2 bounds declared action
+dispatch, not nested native subprocesses or total memory. The real production
+root compile is required for Stage10; prior queries and a leaf compile cannot
+prove it. This is compilation, not a long test or cap increase/retry. Preserve
+nonzero/resource/unknown cleanup without automatic retry/cap growth. Group and
+named process snapshots retain their observed scope, not escaped-descendant proof.
+All Slug source/string AS/RSS/disk limits and allocation discipline persist.
 
-## Evidence and validation
+## Validation and scope
 
-After owned join/group-empty, inspect exact child output/exit and input/authority
-stability. A named successful library build is the compilation gate; preserve all
-cache/local environment limits. Verify actual normal compiler output is nonempty
-at its configured path and collect bounded regular generated flags/env/link files
-plus out_dir manifest/hash under the known configured producer paths. Preserve
-ordered bytes and exact producer/consumer membership; reject symlink/unbounded or
-unowned output reads. Do not equate these bytes with full root generated inputs,
-REAPI execution, hermetic system native-tool identity or whole-workload memory fit.
-On failure select its concrete normal producer gap; no adjacent annotations or
-code changes without evidence and a bounded reviewed contract.
+After natural owned join/groupempty and no observed compiler leftovers, inspect
+named root build exit/output/input facts. Verify nonempty exact configured executable
+via bounded chunk hashing at its normal output path; don't load executable bytes.
+Capture bounded generated metadata/tree observations only where needed to classify
+an actual failure or a finite source gap. Use descriptor-anchored expected paths,
+O_NOFOLLOW and O_NONBLOCK regular opens with FD/named identity/size checks; reject
+special/symlink paths. Preserve zero generated contents as valid when producer permits.
+No generated path guessing, system-library probing or test execution.
 
-Independent final reviews cover real compiler/build-script output correspondence,
-lifecycle/input facts and scope. Reuse prior source/lifecycle contracts, no new
-framework or broad tests. Tracked allowlist: manifest/canonical/compact receipt,
-Stage10/readiness only reusable evidence. Operational target/wp906. No production,
-lock/BUILD/toolchain edit selected. Run plan/diff checks; commit actual outcome and
-next bounded owner. Allocation/interner discipline persists; Windows minimal.
+Independent final reviews check actual root/compiler output, source/scope and
+lifecycle/pin facts; accepted controllers/source contracts inherited. Tracked
+allowlist manifest/canonical/compact receipts, Stage10/readiness for reusable gate
+change; operational target/wp907. No production/lock/BUILD/toolchain edit selected.
+On failure choose its actual natural producer/diagnostic before implementation.
+Run plan/diff checks and commit actual outcome. Windows minimal/deferred.
 
 ## Immediate predecessor
 
-WP905 at55b32d048 ran once0/2.838s, naturaljoin/groupempty,702 unchanged pins and
-zero processes/actions.2164 records/16 families,all581 prior compiler/run records
-structurally equal,1633 wrapper files nowselectedproducer-bound. All graph refs
-resolve;6 identical Symlink pairs preserved. CLI artifact walk1385 records has
-no allocator C++ action. See
-[producer receipt](wp905-configured-producer-inventory-2026-10-06.json).
-Generated bytes/source/fullroot/M7A remain open; original memory REFUSED and
-source16/17/18 spent. No Slug source retry or runtime activation; all prior limits
-and user string-allocation guidance remain in force. Sibling directories reference.
+WP906 at63bc12368 built lzma-sys0.1.20 once0/22.195s with naturaljoin/groupempty,
+1117 unchanged enumerated pins and no observed compiler leftovers. Exact rlib,
+five script metadata outputs plus one separate env-extractor file and bundled
+native73objects/archive verified. See
+[leaf receipt](wp906-compression-leaf-build-2026-10-06.json). No final native link,
+complete runner pin/hermeticity/source fit/Slug execution claimed. Full root/source
+M7A remain open; original memory REFUSED/source16/17/18 spent. No Slug source retry;
+AGENTS allocation/interner guidance persists; sibling directories reference.

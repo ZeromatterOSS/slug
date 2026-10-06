@@ -1,0 +1,159 @@
+{
+  "schema": 1,
+  "base": "63bc12368639679253651712bf62696f83e5f3f1",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "build",
+    "@@rules_rust++crate+slug_crates__lzma-sys-0.1.20//:lzma_sys",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--jobs=2",
+    "--spawn_strategy=standalone",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 60,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": " M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": true,
+  "tests_requested": false,
+  "compiler_census_before": [],
+  "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+  "downloads_requested": false,
+  "elapsed_seconds": 22.194678207975812,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "compiler_census_after": [],
+  "unexplained_compiler_processes_observed": false,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "549608b62aa753e94c7a261c5ce1774b26cac63b68d5eb474f10669f9f74f7d2"
+    },
+    "stderr.log": {
+      "bytes": 1747,
+      "sha256": "ecc2cd8eb2680e45acb54698ea103274080155faf78091c159a40f70cdc17b69"
+    }
+  },
+  "packet": "WP-7-205-m7a-compression-leaf-build-validation-r1",
+  "disposition": "ACCEPTED_FOCUSED_COMPRESSION_LIBRARY_BUILD",
+  "input_pin_count": 1117,
+  "reported_actions": {
+    "total": 263,
+    "internal": 167,
+    "local": 96
+  },
+  "library_output": {
+    "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/liblzma_sys-2633182171.rlib",
+    "artifact_id": 4180,
+    "producer_action_index": 371,
+    "bytes": 1331708,
+    "sha256": "ef4a2e0e8f075bd94447c4bfb75f386c8b59d0d7302c5c3a41160e6578fe9e1d"
+  },
+  "metadata_files": [
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.env",
+      "artifact_id": 8425,
+      "producer_action_index": 953,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "utf8_content": ""
+    },
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.flags",
+      "artifact_id": 8426,
+      "producer_action_index": 953,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "utf8_content": ""
+    },
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.linkflags",
+      "artifact_id": 8424,
+      "producer_action_index": 953,
+      "bytes": 13,
+      "sha256": "2a0286dce77cc08dfe699ed709529f89711d4310f4c918c12fc529fdb072e1af",
+      "utf8_content": "-lstatic=lzma"
+    },
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.linksearchpaths",
+      "artifact_id": 35,
+      "producer_action_index": 953,
+      "bytes": 113,
+      "sha256": "ce06cca624ec34fc42c6275a4dfbfe14a5b4a0941a50c6dee471ae7f3b55f929",
+      "utf8_content": "-Lnative=${pwd}/${bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.out_dir}"
+    },
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.depenv",
+      "artifact_id": 14952,
+      "producer_action_index": 953,
+      "bytes": 311,
+      "sha256": "da68f1c61b6b61c2c7c8325368726a04a9c753281fd7c56f446e126eec6f600c",
+      "utf8_content": "DEP_LZMA_ROOT=${pwd}/bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.out_dir\nDEP_LZMA_INCLUDE=${pwd}/bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.cargo_runfiles/rules_rust++crate+slug_crates__lzma-sys-0.1.20/xz-5.2/src/liblzma/api"
+    },
+    {
+      "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/cargo_toml_env_vars.env",
+      "artifact_id": 8427,
+      "producer_action_index": 735,
+      "bytes": 609,
+      "sha256": "adaf81d94398437796b2985905ae98a8275436338a94fa158c2126798460fdbf",
+      "utf8_content": "CARGO_PKG_VERSION=0.1.20\nCARGO_PKG_VERSION_MAJOR=0\nCARGO_PKG_VERSION_MINOR=1\nCARGO_PKG_VERSION_PATCH=20\nCARGO_PKG_VERSION_PRE=\nCARGO_PKG_NAME=lzma-sys\nCARGO_PKG_AUTHORS=Alex Crichton <alex@alexcrichton.com>\nCARGO_PKG_DESCRIPTION=Raw bindings to liblzma which contains an implementation of LZMA and xz stream\\\nencoding/decoding.\\\n\\\nHigh level Rust bindings are available in the `xz2` crate.\\\n\nCARGO_PKG_HOMEPAGE=https://github.com/alexcrichton/xz2-rs\nCARGO_PKG_REPOSITORY=https://github.com/alexcrichton/xz2-rs\nCARGO_PKG_LICENSE=MIT/Apache-2.0\nCARGO_PKG_LICENSE_FILE=\nCARGO_PKG_RUST_VERSION=\nCARGO_PKG_README=\n"
+    }
+  ],
+  "out_dir": {
+    "path": "bazel-out/k8-fastbuild/bin/external/rules_rust++crate+slug_crates__lzma-sys-0.1.20/_bs.out_dir",
+    "artifact_id": 3933,
+    "producer_action_index": 953,
+    "entry_count": 74,
+    "regular_bytes": 2560304,
+    "native_object_count": 73,
+    "native_archive": {
+      "path": "liblzma.a",
+      "bytes": 1286232,
+      "sha256": "843b50b3c322d6d22b3873c9dcb1b7fd0c8a1a31bee560fe9706e97438677c36"
+    }
+  },
+  "scope": "One ordinary Bazel library success and bounded producer output bytes. No final executable native-link, hermetic tools, full root, Slug execution or memory/source fit proof.",
+  "pin_qualification": "Actual 1117 pre/post input pins cover enumerated tracked authority, cached bzl/options and all lzma archive members. Runner bin.rs/lib.rs hashes exist in separate predesign source review, not actual wrapper pre/post pin set; no complete tool/source freshness or hermeticity claimed.",
+  "scanner_qualification": "Actual observed outputs were regular and bounded. Original scanner opens before regular fstat without O_NONBLOCK; no general refusal guarantee for substituted FIFOs. Improve ordinary no-block open in future output scanner, without invalidating actual captured regular output evidence.",
+  "next_decision": "Select one current CLI-root Bazel build under separately bounded60s compile operation, serial with prior operation; preserve source/runtime/memory-fit and M7A boundaries.",
+  "evidence_sha256": {
+    "target/wp906/build-observe.py": "5d5c672050d393f0d108fc9653e2e92181599ba40de82f316b924b68a71f29d0",
+    "target/wp906/observation.json": "a30a67e1a5137c715c9765c5b6c151bb767c4f8e73d94fab25c94827d295495a",
+    "target/wp906/claim.json": "1b48a6b12d341eb623d8ee01085e31457d03f95057d6b835ba0c721e448b9c66",
+    "target/wp906/stdout.log": "549608b62aa753e94c7a261c5ce1774b26cac63b68d5eb474f10669f9f74f7d2",
+    "target/wp906/stderr.log": "ecc2cd8eb2680e45acb54698ea103274080155faf78091c159a40f70cdc17b69",
+    "target/wp906/outputs.py": "c4b50fa5bf34534f786aaa425031272e6310cfd9919f53f94595618bd26166d2",
+    "target/wp906/outputs.json": "c0185160ded9cb74bcfda05e3f4644d396157cd184aa2fcf0fc3cd2860c32c8d",
+    "target/wp906/analysis.json": "fb167a099113aaecac97b1999536082a87af03bb66b3311160d6546467868ba8",
+    "target/wp906/design-source.md": "d95c425123e0e48d8138c71b8060183f27973b28d7069faf5fbe014ba1d981d2",
+    "target/wp906/design-ownership.md": "29915b9bc1c12a31f66c941a96590997c70c8506b311fca92cb351bc09bfa660",
+    "target/wp906/final-source.md": "7d9374f17fb51427a7fa41c9b1175edfcadf96aec7c21a99d60a1f2b8c8a0989",
+    "target/wp906/final-evidence.md": "a7cf9859495bba6756ca4554d6555d888977a084ededd56aaac0868f42459541",
+    "target/wp906/final-ownership.md": "f22011a98ea354267ffdeb5eba6caf4c04b6cce17085872931333406834bdcf6"
+  },
+  "independent_final_reviews": {
+    "target/wp906/final-source.md": "7d9374f17fb51427a7fa41c9b1175edfcadf96aec7c21a99d60a1f2b8c8a0989",
+    "target/wp906/final-evidence.md": "a7cf9859495bba6756ca4554d6555d888977a084ededd56aaac0868f42459541",
+    "target/wp906/final-ownership.md": "f22011a98ea354267ffdeb5eba6caf4c04b6cce17085872931333406834bdcf6"
+  }
+}
