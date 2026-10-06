@@ -9,6 +9,7 @@
  */
 
 use std::fmt;
+use std::fmt::Write;
 use std::hash::Hash;
 
 use allocative::Allocative;
@@ -58,12 +59,12 @@ starlark::starlark_simple_value!(StarlarkLabel);
 #[starlark_value(type = "Label")]
 impl<'v> StarlarkValue<'v> for StarlarkLabel {
     fn collect_str(&self, collector: &mut String) {
-        collector.push_str(&self.0.to_string());
+        write!(collector, "{}", self.0).unwrap();
     }
 
     fn collect_repr(&self, collector: &mut String) {
         collector.push_str("Label(\"");
-        collector.push_str(&self.0.to_string());
+        write!(collector, "{}", self.0).unwrap();
         collector.push_str("\")");
     }
 
@@ -89,11 +90,11 @@ impl<'v> StarlarkValue<'v> for StarlarkLabel {
             "workspace_root" => {
                 let repository = self.0.package().repo().as_str();
                 let root = if repository.is_empty() {
-                    String::new()
+                    heap.alloc_str("")
                 } else {
-                    format!("external/{repository}")
+                    heap.alloc_str_concat("external/", repository)
                 };
-                Some(heap.alloc_str(&root).to_value())
+                Some(root.to_value())
             }
             _ => None,
         }
@@ -179,3 +180,7 @@ pub(crate) fn label_globals(builder: &mut GlobalsBuilder) {
             .alloc_simple(StarlarkLabel::new(resolve_label(raw, source)?)))
     }
 }
+
+#[cfg(test)]
+#[path = "starlark_label/render_tests.rs"]
+mod render_tests;

@@ -1,0 +1,166 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e7e690423",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_loading_v2/src/starlark_label.rs": "4ebf537881ccef16dea448fbdc1b263519bfe56aa18fef57a1b9b7f7a805e8e2",
+    "app/slug_loading_v2/src/starlark_label/render_tests.rs": "9765fcf9990b77905c34644eaf4d1684b6ea1c68335751f3673aa0758a4557be",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_loading_v2/src/module_extension.rs": "17c14557c46a84195c73d47d0b0cfb5ad44ef1b00313e42df2e2ae339a45d279",
+    "app/slug_loading_v2/src/module_extension_label_tests.rs": "43e2fffdb3314ffdd742c10a3e0d24ff35358c988831ea1f13bca6070dc25877",
+    "starlark-rust/starlark/src/values/traits.rs": "7a79a43417bc733274b67e2c9ca7ab7d9d3e91e5858bf36a4136516eeda50fb0",
+    "starlark-rust/starlark/src/values/layout/avalues/str_.rs": "8f08110a3d77772b8b8645cb95f1820ed75e1fce77ea7bebb766c13ea06b2930"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+    "artifact_sha256": "517eadd356eab0e1b221597a1757fcf7199e0a302901e3b321ea24e9ea8677a2",
+    "selectors": [
+      "starlark_label::render_tests::collectors_preserve_prefixed_root_external_unicode_and_long_text",
+      "starlark_label::render_tests::workspace_root_strings_survive_label_drop_and_module_freeze",
+      "module_extension::tests::scalar_none_label_and_exact_read_only_abi_are_visible",
+      "module_extension::tests::forbidden_abi_and_cross_context_captured_tags_fail_closed",
+      "module_extension::tests::complete_tag_values_are_frozen_ordered_and_publicly_named",
+      "module_extension::label_tests::extension_label_uses_imported_function_source_mapping_and_records_typed_calls",
+      "module_extension::label_tests::extension_label_fails_closed_for_mapping_unmanifested_frame_and_no_frame_string"
+    ],
+    "source_sha256": {
+      "app/slug_loading_v2/src/starlark_label.rs": "4ebf537881ccef16dea448fbdc1b263519bfe56aa18fef57a1b9b7f7a805e8e2",
+      "app/slug_loading_v2/src/starlark_label/render_tests.rs": "9765fcf9990b77905c34644eaf4d1684b6ea1c68335751f3673aa0758a4557be"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/starlark-label-render-baseline-compile.json",
+      "sha256": "81d70ba2763dad1156f0c4c58dac0db4179336fbe7d90711a0ad2499963dbe07",
+      "exit_code": 0,
+      "elapsed_seconds": 11.835108570987359,
+      "log_sha256": "bdefd755a6237ed86b2b1396f9a695e817554950c260cbffb5727851c65f5a3c"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/starlark-label-render-baseline-preflight.json",
+      "sha256": "9d0c6762b43301fa3838c58597f6f07f60c3a09c2e6090c5616e9aaaaf1505ee",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024510497984010726,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/starlark-label-render-baseline-controls.json",
+      "sha256": "f04fd1fb754dc6dd0267c86b852f809e0d9b5a1669fdce653d34a19c1bf83ae2",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002674582996405661,
+      "log_sha256": "8af31976b3682e5c54b6f799aca757180a1c72f27fa6bff6cfda3726e3c9f513"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/starlark-label-render-candidate-compile.json",
+      "sha256": "83b810ee35fbde21a3e61555768dc1ad571d41908241b84ea5cac187e738ebe6",
+      "exit_code": 0,
+      "elapsed_seconds": 14.399098840018269,
+      "log_sha256": "111422a68c8d5879961e533b0e3dce4438c1a38a5f82b77a778585d807f98ce9"
+    },
+    "candidate-preflight-corrected": {
+      "receipt": "target/wp899/starlark-label-render-candidate-preflight-corrected.json",
+      "sha256": "5536d5867412f4156eb258add0ff5182af067525593206dc29c8e307553b4f88",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022447529016062617,
+      "log_sha256": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/starlark-label-render-candidate-controls.json",
+      "sha256": "e73f645fbd24d0b0bd2765b3d37e118e3ca3131369bc98156dd61b39edb8d975",
+      "exit_code": 0,
+      "elapsed_seconds": 0.00803588901180774,
+      "log_sha256": "5b1efe445b4dc2b645b6f5d37959c132f4eb79cc56efbc7f537f9d5e8b612c7a"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/starlark-label-render-dependents-check.json",
+      "sha256": "70f7a01634b5bcfb8db7551b78bcdc9a9b8d07d8353a64309ac189ac91b820fe",
+      "exit_code": 0,
+      "elapsed_seconds": 4.833061038050801,
+      "log_sha256": "bf5cecda5f836745ecea6b87ac12094e024fc9d1dd491beb0642e9f08a3dd3fb"
+    }
+  },
+  "design_sha256": "8f8085df8828282de72c1f09880c066f8b442d8ac88e100ea2b18a25d32fc523",
+  "design_reviews": {
+    "target/wp899/starlark-label-render-design-source.md": "ba6b90da01db93052b260020a3ca11138ec9a9411d4c04ebf46840c629dfc0c3",
+    "target/wp899/starlark-label-render-design-ownership.md": "9ff39493151285c68450be12400d89872e15ae90ec56a0e58c2130330f209aff",
+    "target/wp899/starlark-label-render-design-evidence.md": "e9eb2abcf1438b8627d016e48e9a63785dc8ab53cc61741c8b6479990bb36c2b"
+  },
+  "invocation_correction": "Initial candidate preflight used file stem instead of module_extension::label_tests module path for two protected selectors. Zero tests executed, raw failed preflight/selection retained; corrected fresh preflight selects all7. No source/recompile/design change.",
+  "proof": "Entire owner comparison permits only fmt::Write import, two direct collector writes, workspace_root heap-concat substitution and testhook. Canonical Display, trait defaults, heap helper and all protected controls unchanged. Two identical new semantic tests pass baseline/candidate. Source proof establishes removal of two canonical to_string temporary sites and one nonroot format temporary site, without runtime allocator measurement.",
+  "pass_counts": {
+    "baseline_new_semantic": 2,
+    "candidate_new_semantic": 2,
+    "candidate_protected": 5,
+    "candidate_total": 7
+  },
+  "limits": "Collector growth and final owned output/heap storage remain. No allocator-count, quantified memory, capacity, aggregate, peak/RSS, speed or source-fit claim. Root empty heap constant path preserved. No public API/cache/interner/key/unsafe/dependency/identity/retained-representation change.",
+  "growth": "45-line sibling test module preserves small cohesive Label owner; no fixtures or upstream imports.",
+  "test_profile": "Pinned nightly-2025-09-14 default Loading lib, default Loading/Core/CLI alltargets offline; serial Cargo prep60s/tests30s and exact fresh executable preflights.",
+  "scope": "Local string ownership/basic memory only; Windows minimal/deferred; source integration deferred. Full WP899/M7A unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/starlark-label-render-baseline-compile.json": "81d70ba2763dad1156f0c4c58dac0db4179336fbe7d90711a0ad2499963dbe07",
+    "target/wp899/starlark-label-render-baseline-compile.jsonl": "bdefd755a6237ed86b2b1396f9a695e817554950c260cbffb5727851c65f5a3c",
+    "target/wp899/starlark-label-render-baseline-controls.json": "f04fd1fb754dc6dd0267c86b852f809e0d9b5a1669fdce653d34a19c1bf83ae2",
+    "target/wp899/starlark-label-render-baseline-controls.jsonl": "8af31976b3682e5c54b6f799aca757180a1c72f27fa6bff6cfda3726e3c9f513",
+    "target/wp899/starlark-label-render-baseline-preflight.json": "9d0c6762b43301fa3838c58597f6f07f60c3a09c2e6090c5616e9aaaaf1505ee",
+    "target/wp899/starlark-label-render-baseline-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/starlark-label-render-baseline-selectors.json": "f921b0f4d3c7c768196476620dc4ebe9b2c6b028fb91061d3db20bdc442afe42",
+    "target/wp899/starlark-label-render-candidate-compile.json": "83b810ee35fbde21a3e61555768dc1ad571d41908241b84ea5cac187e738ebe6",
+    "target/wp899/starlark-label-render-candidate-compile.jsonl": "111422a68c8d5879961e533b0e3dce4438c1a38a5f82b77a778585d807f98ce9",
+    "target/wp899/starlark-label-render-candidate-controls.json": "e73f645fbd24d0b0bd2765b3d37e118e3ca3131369bc98156dd61b39edb8d975",
+    "target/wp899/starlark-label-render-candidate-controls.jsonl": "5b1efe445b4dc2b645b6f5d37959c132f4eb79cc56efbc7f537f9d5e8b612c7a",
+    "target/wp899/starlark-label-render-candidate-invocation-selectors.json": "d4dfda52247aae302913a13e953712bc0ceb33467ce6cebc6da278fdde05079b",
+    "target/wp899/starlark-label-render-candidate-preflight-corrected.json": "5536d5867412f4156eb258add0ff5182af067525593206dc29c8e307553b4f88",
+    "target/wp899/starlark-label-render-candidate-preflight-corrected.jsonl": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520",
+    "target/wp899/starlark-label-render-candidate-preflight.json": "4cc04c47f32a60a383514d0cb4948774d59ef7a6b641e52e4045787b56356be2",
+    "target/wp899/starlark-label-render-candidate-preflight.jsonl": "0bc8f4a60dd325379839b9876d95f86adb17ee67078ac7bb1b7c26f230076e50",
+    "target/wp899/starlark-label-render-candidate-selectors.json": "94390b74fa0e93d33d2e5683f226a69dbaaf428e31f369eaa958166cedf764a3",
+    "target/wp899/starlark-label-render-controls.py": "5f1bfbc136823b19be4fa76d915021b280ecab97afe113df4d042877158d809c",
+    "target/wp899/starlark-label-render-dependents-check.json": "70f7a01634b5bcfb8db7551b78bcdc9a9b8d07d8353a64309ac189ac91b820fe",
+    "target/wp899/starlark-label-render-dependents-check.jsonl": "bf5cecda5f836745ecea6b87ac12094e024fc9d1dd491beb0642e9f08a3dd3fb",
+    "target/wp899/starlark-label-render-design-evidence.md": "e9eb2abcf1438b8627d016e48e9a63785dc8ab53cc61741c8b6479990bb36c2b",
+    "target/wp899/starlark-label-render-design-ownership.md": "9ff39493151285c68450be12400d89872e15ae90ec56a0e58c2130330f209aff",
+    "target/wp899/starlark-label-render-design-source.md": "ba6b90da01db93052b260020a3ca11138ec9a9411d4c04ebf46840c629dfc0c3",
+    "target/wp899/starlark-label-render-design.md": "8f8085df8828282de72c1f09880c066f8b442d8ac88e100ea2b18a25d32fc523",
+    "target/wp899/starlark-label-render-record.py": "362596106211f32abdd16266a79476572ada92180f3014119f4c64f580869780",
+    "target/wp899/starlark-label-render-start.json": "677ea9ec0031bb035150d1b038c6ef60acb8df91263c8bc198437f402ba24117"
+  },
+  "timing": {
+    "compile_seconds": 31.067268449056428,
+    "test_seconds": 0.0107104720082134,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 284.213743686676
+  },
+  "validation_sha256": "99fd1b5167d60c1826e59eb5020836d66838108d4dd53f194609bf38429f1a7e",
+  "final_reviews": {
+    "target/wp899/starlark-label-render-final-source.md": "644e3ae166e3f697d6c1974c7cf6f05e2760b1b0e02dfc663bc2270b946e30a3",
+    "target/wp899/starlark-label-render-final-ownership.md": "5024f2db52ec2d495dc30f548ccad6b6fce9c2cd2e18a2717d920e6de9e35a35",
+    "target/wp899/starlark-label-render-final-evidence.md": "33c7ffa44f7e82a7985b4f9309cff53272788d875b87e06297cb8a15602e9936"
+  },
+  "receipt_correction": "Immutable validation estimated test sibling at48lines; actual formatted file45lines. Source/test/artifact hashes and all semantics/evidence unchanged. Durable receipt corrects the count.",
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/starlark-label-render-format-check.json",
+      "sha256": "c1d9fabdc56e2d50b0f6aa7c5b53f773e5495a93db633918a81d20e453871a36",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/starlark-label-render-archive-check.json",
+      "sha256": "9cd46ff6607b50b57e429e08d6bd0f4cce25c2f7cb34bbd3da35d148b3b01863",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/starlark-label-render-plan-check.json",
+      "sha256": "1ebc324ad974737f6c64e42e0cf507198271e52f3c0f377e14732aa6d51beebc",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/starlark-label-render-diff-check.json",
+      "sha256": "b23e970d73d54114c6980193ee5718bdb367985b3eca67d0671637c96bac6fc7",
+      "exit_code": 0
+    }
+  }
+}
