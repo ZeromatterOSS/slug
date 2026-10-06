@@ -44,33 +44,38 @@ REAPI and M7A/full-root remain open.
 
 ## Current finite source-availability checkpoint
 
-[WP933](wp933-finite-source-availability-2026-10-06.json) accepted one closed
-finite observation:11 controls pass;8 unchanged reference files match their pins
-(206,598B). All5 external candidates refuse directory_symlink rules_rust+ before
-body reads.13 completed decisions are not13 source admissions. Observed child peak
-18,968KiB and trace peak1,586,993B/retained1,484,476B cover eight reference reads and
-zero external AST bodies; trace excludes encoding, process RSS includes it. Normal
-source/public producer/full-workload memory fit remain unproved. No identical retry.
+[WP935](wp935-explicit-local-source-2026-10-06.json) accepts13 individually
+bracketed rows:8 exact references206,598B+5 upstream files119,073B,total325,671B.
+Three old source hashes match; current defs/repository_utils hashes and all five
+partial syntaxfacts are recorded.11 unchanged controls reused with currentpins;
+actual source read/parse0.092s,peakRSS22,848KiB,traced peak4,300,734B/retained1,845,810B.
+Bodies/text/AST retire perfile; trace excludes encoding,RSS includes it. This proves
+finite explicit-root reads only,not native sources/module/provider/wholeworkloadfit.
+[WP934](wp934-explicit-root-alias-2026-10-06.json) supplies the exact absolute root
+spelling from a closed anchored metadata observation; the original WP933 logical
+alias refusal remains closed. No implicit cache certificate or oldpathretry.
 
-Next use [the source recommendation](../../../../target/wp933/successor-source.md),
-SHA2568deff2a0aa665ef3861c9b30b04668f5e6a34b646f05c0ff52fdf6b5520bd7b9,
-to observe metadata for the one refused rules_rust+ alias. Anchor the exact absolute
-parent chain with DIRECTORY/NOFOLLOW, bracket each FD/named identity, lstat/readlink
-that single leaf twice and verify exact unchanged link identity/target. No source
-body/target follow-through, canonicalize fallback, directory census or acquisition.
-Retain only compact identity/target metadata;10s TERM3/512MiBAS/256MiBRSS/1MiBlog/4MiB
-report caps remain. Freeze the metadata design and temporary controls before one
-actual observation. Then separately select the observed absolute lexical target as
-an explicit local module root through existing CommandModuleOverrides; no new API or
-implicit Bazel cache certificate. Unknown/relative/mutated aliases stay typed until
-the exact path derivation and source-read allowlist are frozen. This continuation
-preserves WP933's refusal and all source16–18/F3/BCR/full-root limits.
+Next freeze16 notyetobserved direct local import candidates from
+[the exact fact table](../../../../target/wp935/next-inputs.json),SHA256
+76e5b34ba185e08c8a27ac2e9c537056dc7cb28c2cf5f4efd1069a29d7db156d,
+and [the source recommendation](../../../../target/wp935/successor-source.md),SHA256
+ebd53b46206a8438c6b60f2f094e45860496f20e9722241d10b79651ae290a43.
+28 ordered edges retain raw labels/callerhash/lines:25local(4alreadyobserved,21edges
+to16newfiles),3external(@bazel_features once,@bazel_tools twice) stay unmapped.
+Sevennondev/3dev original MODULE declarations are literal requests,not selectedMVS
+versions or available dependencyroots. repository_utils now has actual requiredload
+edges at extensions13/repositories8. Same strict streaming/bracket/body/AST/caps apply;
+no auto-recursion,tree/census/archive/acquisition/source16–18/F3/BCR/fullroot retry.
+Normal public producer uses the existing [retained command seam](../../../../target/wp934/producer-seam.md)
+only after its genuine source/import/extension/generated tool/registration/provider
+prerequisites. Borrow retained action/context and existinginterned owners; no copied
+sourcefixture or secondsemanticcache. Full Slug-workload memory fit remains open.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp933
-source/availability/design/input/operation/hash records, a focused Core sibling
+source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp935
+source/design/input/control/operation/hash records, a focused Core sibling
 runtime/tests/rustc_producer_aquery_tests.rs, its test-only include in runtime/dice.rs,
 and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture
 adapter needs its exact existing owner/path and growth reason frozen before editing;

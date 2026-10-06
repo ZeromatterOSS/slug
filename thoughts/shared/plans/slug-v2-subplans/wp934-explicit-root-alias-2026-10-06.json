@@ -1,0 +1,115 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP934 explicit source-root alias metadata",
+  "date": "2026-10-06",
+  "status": "accepted metadata only",
+  "baseline": "c9dd3b6029dfca1ca2b9e553b2a52993cd049047",
+  "contract": {
+    "path": "target/wp934/design.md",
+    "sha256": "14e995c9f591e3e82847601cd19a29687cdb684fadd863e8c816c3f41a913f3a"
+  },
+  "result": "One anchored symlink witness and named readlink agree on187B absolute target spelling; target not followed,zero source body bytes.",
+  "target_spelling": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+  "metadata": {
+    "path": "target/wp934/result.json",
+    "sha256": "6fe313becbf839874a89e9ac15aaa40855bab27b62da67c28f9fd4f4344cc8dc"
+  },
+  "source_pins": {
+    "target/wp934/link.py": "b36b75c631203aa9e445ea30fe783cbeda4212693a125c9bdb1739e00e0e7068",
+    "target/wp934/link_controls.py": "5f129c6545152a331bb20aa19e3cfd0571ed54eca8c1d842927193d4010d52cf",
+    "target/wp934/bounded.py": "65f939b8ea494e29152240c8cac73a2acff8cf1629f51204d555b2c0bcb9f01d",
+    "target/wp934/input.json": "e66004dde30df4c84aacf76af870a185522bca86b8367b338d428bc01914b526",
+    "target/wp934/design.md": "14e995c9f591e3e82847601cd19a29687cdb684fadd863e8c816c3f41a913f3a",
+    "target/wp934/../wp933/read.py": "b1449695dce5f24f7fa34db8131b4ad4dd8cf67776c36753d57d365d0c943b13"
+  },
+  "validation": {
+    "controls": {
+      "selected": 4,
+      "passed": 4,
+      "elapsed_seconds": 0.05164119403343648,
+      "operation": {
+        "path": "target/wp934/controls-operation.json",
+        "sha256": "c7bbb0c3567d680884efba3968830497a03a9b55493fa65199e1947a49807360"
+      },
+      "raw": {
+        "path": "target/wp934/controls.stderr",
+        "sha256": "327a239e937fcd63fff4ca776af42b224d930054679df1b620dc3519d3099280"
+      }
+    },
+    "metadata": {
+      "selected": 1,
+      "completed": 1,
+      "elapsed_seconds": 0.031208741012960672,
+      "operation": {
+        "path": "target/wp934/metadata-operation.json",
+        "sha256": "3ca57f0bee106ae7b539afd60ced9f267ef9935017d3da29698c46296a4b5dcc"
+      }
+    },
+    "all_groups_empty_joined": true
+  },
+  "allocation": {
+    "strategy": "Two bounded raw link spellings,one decoded target and compact identities; all held FDs and transient spellings retired. No body/string corpus or interner.",
+    "trace": {
+      "loaded_current": 1175945,
+      "loaded_peak": 1181447,
+      "retained": 1175136,
+      "peak": 1192464,
+      "tracing_excludes_encoding": true
+    },
+    "rss_peak_kib": 17984,
+    "controls_rss_peak_kib": 24600,
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304
+    },
+    "qualification": "4096B length is admission,not syscall allocation ceiling. Trace excludes interpreter/modulecompile/initialtracemalloc andencoding; RSSincludesencoding. Metadataonly,no Slug savings/source/workloadfit."
+  },
+  "compatibility": {
+    "exact": "No changed fixture/compatibility surface.",
+    "slug_native": "Explicit local source-root diagnostic provenance.",
+    "deferred": "Target/source/import/module/materialization/provider/normalpublicRustc/fullfit/M7A;Windowsminimal."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp934/design-source.md",
+      "sha256": "b64aa259f049a5b1a8da057559e24c9283aa4dfe17a154c11e067dc7cc236318"
+    },
+    "design-evidence": {
+      "path": "target/wp934/design-evidence.md",
+      "sha256": "bae3a5d7db6122c51851f6ed9d1c546db84e18ad65b58638705dda392f3619be"
+    },
+    "preflight-source": {
+      "path": "target/wp934/preflight-source.md",
+      "sha256": "8b09c29dffa2486c4cef35a615683c351657ada19207ef55e69a4daf5403c708"
+    },
+    "preflight-evidence": {
+      "path": "target/wp934/preflight-evidence.md",
+      "sha256": "9f5a7b4cda0b012e07194109bade87c317fe837072ae1f1070b2fe790dec3105"
+    },
+    "final-source": {
+      "path": "target/wp934/final-source.md",
+      "sha256": "e459c6ed10402d3a2cb112d5be5249f9df9862cb0ca6cbc003e49624427d1d02"
+    },
+    "final-evidence": {
+      "path": "target/wp934/final-evidence.md",
+      "sha256": "70031f1d301bb8129d29a3d7cd218eeb01ee3506d2a10ee13df0a167452ff90a"
+    }
+  },
+  "next": {
+    "recommendation": {
+      "path": "target/wp934/successor-source.md",
+      "sha256": "8fbd5387c3459483fe25c405ec654cc6ae998d0559a49b76558d5d339ad9b979"
+    },
+    "producer_seam": {
+      "path": "target/wp934/producer-seam.md",
+      "sha256": "e8553b906e19b51933d8f1dc4d81c4235c6cf815a136c77b53b40b6eaa086578"
+    },
+    "gate": "WP935 freezes exact observed absolute target and same13 rows through unchanged accepted WP933 stream/fact engine,with exact11 control evidence/currentpins reused. No implicit certificate or old logicalpathretry.",
+    "packet_continues": true,
+    "source_public_producer_whole_fit_unproved": true
+  }
+}

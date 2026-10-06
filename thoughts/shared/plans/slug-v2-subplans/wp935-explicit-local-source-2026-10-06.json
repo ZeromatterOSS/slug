@@ -1,0 +1,232 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP935 explicit local source file availability",
+  "date": "2026-10-06",
+  "status": "accepted finite source facts only",
+  "baseline": "c9dd3b6029dfca1ca2b9e553b2a52993cd049047",
+  "contract": {
+    "path": "target/wp935/design.md",
+    "sha256": "573e6a0cbf7ec705714e4223a73785eb6b4dc4d18f022bcb9c490f0b38cc942a"
+  },
+  "result": "13 observed individually bracketed rows:8 exact references206598B+5 upstream files119073B,total325671B. Three old source hashes match; all five external syntaxfacts are partial. No sourcegraph/materialization/provider/publicproducer admission.",
+  "explicit_root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+  "source_pins": {
+    "target/wp935/read.py": "1c295ed88626a6bc9e6c0177ee0774b0fbec1b9b5504efbed21ab3c2d377770b",
+    "target/wp935/bounded.py": "5fe3be9295df94a6516d5c3035574ae63c43ba51033fe5dc4c43b07debc53244",
+    "target/wp935/inputs.json": "19e175178e33819e8295c6f5331d527aab12a4d82d02c486225b4b42591b63f8",
+    "target/wp935/design.md": "573e6a0cbf7ec705714e4223a73785eb6b4dc4d18f022bcb9c490f0b38cc942a",
+    "target/wp933/read.py": "b1449695dce5f24f7fa34db8131b4ad4dd8cf67776c36753d57d365d0c943b13",
+    "target/wp933/facts.py": "19ce415b75d77e667c846807650cfbe41120cbed7f80e48c2e978236b6f1e429",
+    "target/wp933/reader_controls.py": "a74b6762ad0ef2a9182b62b2724ead97e23a94c437f5e35f4bb601699cc82ddd",
+    "target/wp933/fact_controls.py": "4ac9568502600f73facae5a7618c049db5150d3d2bf87e782cd994af9e3328e3",
+    "target/wp933/bounded.py": "fd49ad59bfa727e6a0bae7548436c65f6aeefbda13080e56f298b5d840cb2aa2",
+    "target/wp933/inputs.json": "361f7ae08a6117a9e1588c9339d8b348dafd53907080d5286193ca5a67ba7462",
+    "target/wp933/design.md": "1abbac83ac7ceec8cd08908fcc0a905e3818d38bed2ff42d89220b00e16594a1",
+    "target/wp933/preflight.json": "838be3abe7438e253611135d2ad4f10163a9c0da2ce224864993800eb7f3b8df",
+    "target/wp933/controls-operation.json": "7fa9fba9b5d51be74c8b7604987f35629aaef219e0092912e0584186ddfe4d84",
+    "target/wp933/controls.stderr": "001f12f6483ae91eba640ac615b115e3966e82ca798d74c3d964cfedc2082ddc",
+    "target/wp934/result.json": "6fe313becbf839874a89e9ac15aaa40855bab27b62da67c28f9fd4f4344cc8dc",
+    "target/wp934/metadata-operation.json": "3ca57f0bee106ae7b539afd60ced9f267ef9935017d3da29698c46296a4b5dcc",
+    "target/wp934/final-source.md": "e459c6ed10402d3a2cb112d5be5249f9df9862cb0ca6cbc003e49624427d1d02",
+    "target/wp934/final-evidence.md": "70031f1d301bb8129d29a3d7cd218eeb01ee3506d2a10ee13df0a167452ff90a"
+  },
+  "observed_sources": [
+    {
+      "path": "MODULE.bazel",
+      "bytes": 4481,
+      "sha256": "25e3b077128612754c4add1b4c90d20a6be06566b623dee6e32038d0e8f93062",
+      "role": "selected_source"
+    },
+    {
+      "path": "rust/defs.bzl",
+      "bytes": 6092,
+      "sha256": "5b71e4344a6c6ee04ade488c741784479f392b71d42f2102eedc5e4993654512",
+      "role": "selected_source"
+    },
+    {
+      "path": "rust/extensions.bzl",
+      "bytes": 17554,
+      "sha256": "442d1ed351f8237ab1081ba43582ceb032fd218d4d6d083896bdaeb3a4040b78",
+      "role": "selected_source"
+    },
+    {
+      "path": "rust/private/repositories.bzl",
+      "bytes": 49771,
+      "sha256": "e8848b1e61ea79b04761bbab843453d6d1aa0e8325cc9727cffbb23f5665250f",
+      "role": "selected_source"
+    },
+    {
+      "path": "rust/private/repository_utils.bzl",
+      "bytes": 41175,
+      "sha256": "1fead25a1ef03f25802d0277addd6857b0abf4115c339b87ee4c5e5c7f476b23",
+      "role": "exploratory"
+    }
+  ],
+  "module_declarations": [
+    {
+      "line": 12,
+      "column": 0,
+      "attributes": {
+        "name": "bazel_features",
+        "version": "1.50.0"
+      }
+    },
+    {
+      "line": 13,
+      "column": 0,
+      "attributes": {
+        "name": "bazel_skylib",
+        "version": "1.8.2"
+      }
+    },
+    {
+      "line": 14,
+      "column": 0,
+      "attributes": {
+        "name": "platforms",
+        "version": "1.1.0"
+      }
+    },
+    {
+      "line": 15,
+      "column": 0,
+      "attributes": {
+        "name": "rules_cc",
+        "version": "0.2.4"
+      }
+    },
+    {
+      "line": 16,
+      "column": 0,
+      "attributes": {
+        "name": "rules_license",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "line": 17,
+      "column": 0,
+      "attributes": {
+        "name": "rules_shell",
+        "version": "0.6.1"
+      }
+    },
+    {
+      "line": 18,
+      "column": 0,
+      "attributes": {
+        "name": "apple_support",
+        "version": "1.24.1"
+      }
+    },
+    {
+      "line": 90,
+      "column": 0,
+      "attributes": {
+        "name": "rules_python",
+        "version": "1.5.1",
+        "dev_dependency": true
+      }
+    },
+    {
+      "line": 91,
+      "column": 0,
+      "attributes": {
+        "name": "rules_testing",
+        "version": "0.7.0",
+        "dev_dependency": true
+      }
+    },
+    {
+      "line": 92,
+      "column": 0,
+      "attributes": {
+        "name": "bazel_ci_rules",
+        "version": "1.0.0",
+        "dev_dependency": true
+      }
+    }
+  ],
+  "repository_utils": "Previously exploratory file now has literal load edges extensions.bzl:13 and repositories.bzl:8; native import mapping/evaluation remains unproved.",
+  "validation": {
+    "reused_controls": 11,
+    "new_tests": 0,
+    "selected_rows": 13,
+    "observed_rows": 13,
+    "completed_decisions": 13,
+    "elapsed_seconds": 0.09210333693772554,
+    "operation": {
+      "path": "target/wp935/availability-operation.json",
+      "sha256": "de30df5934ef5ccea24e6409f75c394ec097c961d05a2ae5939b533588cb7829"
+    },
+    "report": {
+      "path": "target/wp935/result.json",
+      "sha256": "24f1dc348871a7b6e5b17c1bd7c1a080b7b2132922d6a3c69718827f46686c3a"
+    },
+    "preflight": {
+      "path": "target/wp935/preflight.json",
+      "sha256": "a1be7535f80ff3a885bf92d9d4f9120c9536523156f8e561c69373dcfdf7c0de"
+    },
+    "all_groups_empty_joined": true
+  },
+  "allocation": {
+    "strategy": "Unchanged stream/facts reader;64KiB reused scratch,one256KiB fact body retired perfile with decoded text/tree. Compact identities/facts/helpers retained; no sourcecorpus/global pool.",
+    "actual_read_bytes": 325671,
+    "overflow_probe_bytes": 0,
+    "trace": {
+      "loaded_current": 1769628,
+      "loaded_peak": 1769628,
+      "retained_compact_helpers_and_facts": 1845810,
+      "peak_through_retirement": 4300734,
+      "tracing_excludes_encoding": true
+    },
+    "rss_peak_kib": 22848,
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304
+    },
+    "source_bytes_limit": 16777216,
+    "qualification": "Five actual upstream parses under enclosing AS/RSS caps;8192node limit is postparse. Trace excludes initial interpreter/launcher compile/tracemalloc import and encoding,RSS includesencoding. Finite reader fit only,no Slug savings/fullworkloadfit."
+  },
+  "compatibility": {
+    "exact": "Unchanged8reference/threeupstreampins; new currentbody hashes fordefs/repository_utils.",
+    "slug_native": "Explicit local-module provenance and partialliteral sourcefact reports.",
+    "deferred": "Remaining local/external imports,MVS/dependency roots/extension/materialization/registration/provider/public Rustc producer/fullfit/M7A;Windowsminimal."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp935/design-source.md",
+      "sha256": "b0f368470b9c062f9b2a6959c2ae8d372f6ac388c8d1160be70e8a2fd913424a"
+    },
+    "design-evidence": {
+      "path": "target/wp935/design-evidence.md",
+      "sha256": "b4cd2f8f6eff32e2503a8f9143baddba1d4ca7a42e05c7d530ff13921e756d7a"
+    },
+    "final-source": {
+      "path": "target/wp935/final-source.md",
+      "sha256": "ea7f9a7674663a5805df400e4f6ad98ba7b1e79397139a577c2567be4f34df6b"
+    },
+    "final-evidence": {
+      "path": "target/wp935/final-evidence.md",
+      "sha256": "a811182a4f2259cffcab2e18575cf3cb146c16ca883f1602bbdffb8697d74dd2"
+    }
+  },
+  "next": {
+    "recommendation": {
+      "path": "target/wp935/successor-source.md",
+      "sha256": "ebd53b46206a8438c6b60f2f094e45860496f20e9722241d10b79651ae290a43"
+    },
+    "gate": "Freeze16 unobserved direct internal load candidates; retain28 ordered edges/externallabel and7nondev3dev declarations as partialfacts. No guessed externalroots/MVS/effectivetoolchain/certificate or old logicalpathretry.",
+    "packet_continues": true,
+    "public_producer_whole_fit_unproved": true,
+    "input_table": {
+      "path": "target/wp935/next-inputs.json",
+      "sha256": "76e5b34ba185e08c8a27ac2e9c537056dc7cb28c2cf5f4efd1069a29d7db156d"
+    }
+  },
+  "packet_elapsed_seconds": 256.1290123462677
+}

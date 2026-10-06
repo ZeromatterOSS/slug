@@ -49,9 +49,19 @@ accepts scoped offline HTTP policy with8 focused gates/current CLIcheck.
 verifies8 unchanged reference files (206,598B), while5 upstream candidates stop at
 the rules_rust+ directory symlink with zero external bodies read.11 controls pass;
 18,968KiB observed child peak establishes only finite-reader fit. The next concrete
-prerequisite is exact alias metadata and explicit local root selection via existing
-module overrides, then source/import/generated-tool and normal producer proof.
-No full-workload memory fit or source/root retry is admitted.
+prerequisite is explicit local source/import/generated-tool and normal producer proof.
+[WP934](./slug-v2-subplans/wp934-explicit-root-alias-2026-10-06.json)
+accepts4 controls and one anchored187B absolute alias spelling with zero target/body
+reads,17,984KiB process peak. WP935 now selects that exact absolute target and the
+unchanged13 source/reference rows via the accepted stream/fact reader and11 reused
+controls. Existing module overrides retain explicit local provenance; metadata is
+not a source certificate.
+[WP935](./slug-v2-subplans/wp935-explicit-local-source-2026-10-06.json)
+observes all13 finite rows325,671B,including119,073B of five current upstream sources.
+Three old hashes match;11 current controls reused.0.092s/22,848KiB process peak and
+4,300,734B trace peak through perfile retirement establish finite-reader fit only.
+Next are16 literal local import candidates and unmapped external/module/generated
+prerequisites; no full-workload fit or normal public producer admission follows.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
