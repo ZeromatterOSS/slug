@@ -1,0 +1,193 @@
+{
+  "packet": "WP-7-222-m7a-supplied-workspace-status-values-r1",
+  "operational_packet": "WP923",
+  "date": "2026-10-06",
+  "base": "4f150c63d588f605ba864b5e6177076cdab2dcc5",
+  "status": "accepted",
+  "outcome": "Pure supplied workspace-status byte parsing into independently owned canonical compact map values, composing with both existing checked BuildInfo string recipes.",
+  "compatibility": {
+    "exact": "Pinned Latin1 mapping, LF-only lines, first ASCII space, last valid duplicate, empty fields and raw CR/NUL/high bytes over supplied bytes.",
+    "slug_native": "Existing deterministic sorted map representation and structural status/action/configuration identity unchanged.",
+    "deferred": "Observed status artifacts/production/update/cache policy, Latin1 template/output bytes, tracked template/source reads, arbitrary callback execution, REAPI, Windows breadth, authentic full-root/M7A and aggregate memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "file": "src/main/java/com/google/devtools/build/lib/analysis/WorkspaceStatusAction.java",
+    "sha256": "2e05526a947d4643a5e9b5cc45ee5c938ecd6fc133941e87a02147a2953a9db8",
+    "lines": "126-141 parseValues",
+    "provenance": "Immutable Git object; mutable sibling checkout not used as source pin. Pinned-source regression sufficient; no oracle or new fixture/corpus."
+  },
+  "ownership": {
+    "api": "WorkspaceStatusArtifacts::parse_supplied_values(&[u8]) -> CanonicalStringMap, role-independent associated function with no workspace/descriptor access.",
+    "storage": "Borrow LF/first-space slices, decode valid-line segments directly into CompactStrings, lazily transfer pairs into existing constructor. No whole-file decoded String/extra pair Vec. ASCII from_utf8 is guarded; high bytes collect char::from. Returned map owns compact values after source release. Duplicate candidate key/displaced old value drop; existing tree/Vec/Arc container transfers remain. No new cache/interner/pool/key/graph/DICE/lock/async/source authority.",
+    "cost": "High Latin1 UTF8 expansion may grow compact buffers. Pair/old-new duplicate values and constructor containers overlap transiently. No exact capacity, one-allocation, zero-copy, speedup or whole-fit claim. Unique payloads stay outside global interners; scoped producer interning unchanged."
+  },
+  "discriminators": "All256/ASCII128 numeric codepoints, empty and valid/invalid UTF8 bytewise decoder. Five complete sorted literal maps cover empty/malformed/empty key/value, first/extra space, LF/CRLF/no finalLF, tabs/CR/NUL/highbyte keys/values, duplicates and malformed later non-erasure. Repeats/input immutability and576Bkey/512highbyte value map after source/snapshot release. Checked Info/Version whole headers/rawCR/Latin1 native values/last timestamp/present-empty/missing error for no-token/empty templates. Original3 status baseline prefix+5 renderer guards protected.",
+  "source_sha256": {
+    "app/slug_build_api_v2/src/workspace_status.rs": "87dac6c2c6875f19d5dd4bc310ab402aa1ae49db71161650213f0e89685709c9",
+    "app/slug_build_api_v2/src/workspace_status/tests.rs": "2ec3f9c024fa02a865387332bcb171fccb3bf3a5bda76303e086368f49268c63"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved nightly-2025-09-14, offline Cargo JSON jobs1 preparations<=60s TERM3; exact nonignored preflight before serial10s TERM3 runtimes.",
+    "compiles": {
+      "cli-check": {
+        "exit_code": 0,
+        "seconds": 7.937773016979918,
+        "receipt": "target/wp923/cli-check.json"
+      },
+      "build-api-tests": {
+        "exit_code": 0,
+        "seconds": 11.409637173986994,
+        "receipt": "target/wp923/build-api-tests.json"
+      }
+    },
+    "owner": {
+      "selected": 11,
+      "passed": 11,
+      "elapsed_seconds": 0.017868521041236818,
+      "max_child_rss_kib": 12216
+    },
+    "preflight": {
+      "exit_code": 0,
+      "output": "Verified 11 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.06934406305663288,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_build_api_v2-31b6e4cd11657155",
+      "executable_sha256": "560189e47699a10e53f8b5b61ea352666796fd2350db74ed82b6678c5093d14f",
+      "selected": 11,
+      "artifact_profile": {
+        "opt_level": "1",
+        "debuginfo": 2,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "selected_names": [
+      "actions::build_info_transform::tests::build_info_specs_preserve_all_owned_inputs_and_metadata",
+      "actions::build_info_transform::tests::constant_metadata_is_orthogonal_and_cannot_enter_other_action_families",
+      "actions::build_info_transform::tests::build_info_registration_is_ordered_atomic_and_conflicts_across_metadata",
+      "actions::build_info_transform::tests::build_info_callback_render_preserves_defaults_order_and_errors",
+      "actions::build_info_transform::tests::build_info_callback_render_outputs_outlive_borrowed_unicode_inputs",
+      "workspace_status::tests::workspace_status_identity_metadata_and_projections_are_structural",
+      "workspace_status::tests::workspace_status_preserves_nonunicode_workspace_identity",
+      "workspace_status::tests::workspace_status_runfiles_refuse_before_resolver",
+      "workspace_status::tests::supplied_status_latin1_decoder_maps_every_byte_without_utf8_interpretation",
+      "workspace_status::tests::supplied_status_values_preserve_literal_separators_duplicates_and_ownership",
+      "workspace_status::tests::supplied_status_values_compose_with_checked_build_info_recipes"
+    ],
+    "checks": [
+      {
+        "name": "rustfmt",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "--check",
+          "app/slug_build_api_v2/src/workspace_status.rs",
+          "app/slug_build_api_v2/src/workspace_status/tests.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.007131721940822899
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0028039629105478525
+      },
+      {
+        "name": "archive-status",
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03433504397980869
+      }
+    ],
+    "integration": [
+      {
+        "name": "final-diff-check",
+        "exit_code": 0,
+        "elapsed_seconds": 0.0053092739544808865,
+        "output": ""
+      },
+      {
+        "name": "plan-status",
+        "exit_code": 0,
+        "elapsed_seconds": 0.014288834994658828,
+        "output": "Packet: WP-7-223-m7a-build-info-supplied-byte-render-r1\n"
+      }
+    ],
+    "protected_prefix": {
+      "file": "app/slug_build_api_v2/src/workspace_status/tests.rs",
+      "baseline_sha256": "0a733d0f9d8b79b54ec107787d6f451d449ffa1b9ee2e4d7c0a80319c45d3955",
+      "baseline_bytes": 3729,
+      "unchanged_prefix": true
+    },
+    "scope": "Owner11/11 (8protected+3new), default CLI compile check; no other production owner or actual binary/oracle/runtime invocation."
+  },
+  "design_reviews": {
+    "source": {
+      "receipt": "target/wp923/design-source.md",
+      "sha256": "5f87de43dfdc7405e611fd2326d9adb6eef304bb1d5a57e7387cda9b10d3b22c"
+    },
+    "ownership": {
+      "receipt": "target/wp923/design-ownership.md",
+      "sha256": "a683fd1d19880ccefe21410c2efe75143e0d74654fe5f6c54393f894a7d61866"
+    },
+    "evidence": {
+      "receipt": "target/wp923/design-evidence.md",
+      "sha256": "66284f55ec7d6657e320b76e54626f7992f29f7d66772d6bd1dcd1341a0b12a6"
+    }
+  },
+  "reviews": {
+    "source": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp923/final-source.md",
+      "sha256": "39c3140c514c2202198bbc886a856ed0f30445ca7428b2870944e394465186a8"
+    },
+    "ownership": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp923/final-ownership.md",
+      "sha256": "75e5891a18873ef013c7f45bbcbdfaf07723ff698fb2436a4c9dc03e73f80a6e"
+    },
+    "evidence": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp923/final-evidence.md",
+      "sha256": "a7bf9599a96c33d1cc3f9fa77da519500d93b307aa0e2d23ca761d897bc78e68"
+    }
+  },
+  "growth": "22 production added lines and139 appended unit lines within80/180 estimates; natural111-line production owner with three decoder/parser-release/composition controls. No new assets/harness/corpus/utility module/dependency or copied matrix.",
+  "corrections": "No compile/preflight/runtime failure or semantic correction. Rust files frozen through validation and FINAL reviews.",
+  "memory_readiness": {
+    "inherited_receipt": "wp899-memory-readiness-2026-10-06.json",
+    "qualification": "Controlled64round/131072-string readiness within512MiBAS/256MiBRSS remains bounded; original64KiB postdrop refusal and full-source/whole-workload-fit gap persist. Parser adds caller-owned output/synchronous scratch only; test RSS is not fit proof."
+  },
+  "successor": {
+    "packet": "WP-7-223-m7a-build-info-supplied-byte-render-r1",
+    "basis": "Complete pure supplied status/template bytes to header bytes via existing parser, compact Latin1 decoder and checked renderer, without producer/artifact/volatile/execution authority.",
+    "source_note": "target/wp923/successor-source.md",
+    "sha256": "32122509025c94024e704596069eecfd0f3a41f1dbfc699e809a1e648e33ebf1"
+  },
+  "remaining": "Artifact/status producers, tracked template observations/certificates, stable/volatile policy, runtime/input-tree/REAPI, authentic source/full-root/M7A and aggregate fit open; caps/refusals/spent source16/17/18 unchanged.",
+  "timing": {
+    "compile_seconds": 19.34741019096691,
+    "runtime_seconds": 0.017868521041236818,
+    "observed_since_recorded_start_seconds": 727.6794841130031,
+    "qualification": "Start after predecessor selection; review duration not independently measured."
+  },
+  "operational_evidence": {
+    "directory": "target/wp923",
+    "hash_index": "target/wp923/operational-hashes.json",
+    "index_sha256": "c2086d37f443707f921d44ae5401a864e691cb4bae22f49e7bb5816607207cc3"
+  }
+}

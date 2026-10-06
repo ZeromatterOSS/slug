@@ -1,6 +1,8 @@
-//! Workspace-global status descriptors, not status contents or execution authority.
+//! Workspace-global status descriptors and pure parsing of supplied status bytes.
 use allocative::Allocative;
+use compact_str::CompactString;
 use dupe::Dupe;
+use slug_configuration_v2::CanonicalStringMap;
 use slug_workspace_v2::NormalizedAbsolutePath;
 
 /// Configuration-independent build-data root. Normalization remains owned by
@@ -64,6 +66,17 @@ pub struct WorkspaceStatusArtifacts {
 }
 
 impl WorkspaceStatusArtifacts {
+    /// Parse supplied Latin1 status bytes using the pinned first-space/last-value
+    /// rules. This does not read, produce or observe workspace status artifacts.
+    pub fn parse_supplied_values(bytes: &[u8]) -> CanonicalStringMap {
+        CanonicalStringMap::from_pairs(bytes.split(|byte| *byte == b'\n').filter_map(|line| {
+            let separator = line.iter().position(|byte| *byte == b' ')?;
+            Some((
+                decode_latin1(&line[..separator]),
+                decode_latin1(&line[separator + 1..]),
+            ))
+        }))
+    }
     pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         let root = WorkspaceStatusRoot(workspace);
         Self {
@@ -82,6 +95,14 @@ impl WorkspaceStatusArtifacts {
     }
     pub fn volatile(&self) -> &WorkspaceStatusArtifact {
         &self.volatile
+    }
+}
+
+fn decode_latin1(bytes: &[u8]) -> CompactString {
+    if bytes.is_ascii() {
+        CompactString::from(std::str::from_utf8(bytes).expect("ASCII is valid UTF8"))
+    } else {
+        bytes.iter().copied().map(char::from).collect()
     }
 }
 

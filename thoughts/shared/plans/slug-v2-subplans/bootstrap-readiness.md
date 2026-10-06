@@ -455,8 +455,12 @@ prerequisite. [WP922](wp922-build-info-recipe-render-2026-10-06.json) now render
 checked finite recipes from supplied borrowed status/template strings, preserving
 ordered literal replacement, defaults and missing timestamp errors. Real installed
 main/external Target/Exec recipes produce complete supplied ASCII headers.
-Actual status bytes/producer, Latin1 conversion, tracked template reads, volatile
-execution/cache policy, module tools and full cc_toolchain remain unproved.
+[WP923](wp923-supplied-workspace-status-values-2026-10-06.json) supplies pure status-byte
+parsing with exact Latin1/LF/first-space/last-value semantics and owned compact maps.
+Parsed supplied content composes with both checked string recipes, without observing
+status artifacts. Actual status producer/observations, Latin1 template/output byte
+conversion, tracked template reads, volatile execution/cache policy, module tools
+and full cc_toolchain remain unproved.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun

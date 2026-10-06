@@ -490,9 +490,14 @@ rendering on these checked recipes over borrowed supplied status/template string
 It preserves ordered literal replacement, callback defaults and the exact missing
 timestamp diagnostic; the returned String owns its bytes after input release.
 Three borrowed pairs and local output buffers add no retained cache or interner.
-The native Unicode domain remains Slug-native; raw status parsing/production,
-Latin1 artifact conversion, tracked template reads, arbitrary or Java callbacks,
-execution/cache policy, installed module tools and full cc_toolchain remain deferred.
+The native Unicode rendering domain remains Slug-native.
+[WP923](wp923-supplied-workspace-status-values-2026-10-06.json) adds a pure supplied-byte
+status parser on WorkspaceStatusArtifacts: LF and first-space delimiters, last-value
+duplicates, exact Latin1 mapping, and independent compact map ownership. It streams
+borrowed slices into existing owned compact values without a whole-file decoded
+String or extra pair Vec. Actual status production/observation, Latin1 template/output
+conversion, tracked template reads, arbitrary or Java callbacks, execution/cache
+policy, installed module tools and full cc_toolchain remain deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is
