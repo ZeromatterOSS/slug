@@ -698,8 +698,15 @@ impl ExprCompiled {
     }
 
     fn add(l: IrSpanned<ExprCompiled>, r: IrSpanned<ExprCompiled>) -> ExprCompiled {
-        if let (Some(l), Some(r)) = (l.as_short_list(), r.as_short_list()) {
-            return ExprCompiled::List(l.as_exprs().into_iter().chain(r.as_exprs()).collect());
+        if let (Some(_), Some(_)) = (l.as_short_list(), r.as_short_list()) {
+            let into_exprs = |expression: IrSpanned<ExprCompiled>| match expression {
+                IrSpanned {
+                    node: ExprCompiled::List(xs),
+                    ..
+                } => xs,
+                expression => expression.as_short_list().unwrap().as_exprs(),
+            };
+            return ExprCompiled::List(into_exprs(l).into_iter().chain(into_exprs(r)).collect());
         }
         ExprCompiled::Builtin2(Builtin2::Add, Box::new((l, r)))
     }
@@ -1499,3 +1506,6 @@ mod double_not_memory_tests;
 
 #[cfg(test)]
 mod type_equality_memory_tests;
+
+#[cfg(test)]
+mod list_add_memory_tests;

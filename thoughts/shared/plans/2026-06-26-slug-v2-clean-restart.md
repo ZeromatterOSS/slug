@@ -39,12 +39,13 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: compiler type equality folding transfers its owned
-type(x) argument after unchanged guards in both operand orders. Rejected operands
-and pointers, helper IR/spans/frozen type-name ownership and ordered fallback
-remain. Nineteen controls and default dependent checks pass. Three Symbol buffers
-transfer per orientation (15,384 content bytes each); generic IR spare capacity
-may survive, with no aggregate/RSS/speed claim.
+Latest accepted change: compiler list addition folding transfers owned elements
+after unchanged per-operand 1000 guards. Ordered fallback, element spans and
+frozen constant conversion remain. Twelve controls and default dependent checks
+pass; fifteen Symbol buffers transfer across four fixtures. An existing golden
+span mismatch is independently baseline-proved and corrected. Output collection
+remains; output/nested IR capacity is not promised equal, with no aggregate/RSS/
+speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.

@@ -1,0 +1,357 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e9a22d215",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "107abcab4bf6698d99c1a7fc50978dd4055178393a48e39d63690c5177cd44c4",
+    "starlark-rust/starlark/src/eval/compiler/expr/list_add_memory_tests.rs": "65e6fe2bf6bf771aec42581e57b24f08d588e1dcd3caa6f57dc8df794cf6c372",
+    "starlark-rust/starlark/src/tests/bc/golden/opt_list_of_expr_add.golden": "526cfeb8748fca526a50db5659648e20c93f009d3f34ef19b36dfc286acafdc8",
+    "starlark-rust/starlark/src/collections/symbol/symbol.rs": "8301dd1d265979baffdae5660ca89628e7ed4b4dd7c228fde7735c2f7d895453",
+    "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+    "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "bdb6cdd2378c1de24e9f9d2c24863fda0c4960809e548e33cc8369228fed986c",
+    "starlark-rust/starlark/src/eval/compiler/args.rs": "d0a2e05c8fe7a815430ece5b6e23696bc6afa48d61a0e42963be4c9052df36c2",
+    "starlark-rust/starlark/src/eval/compiler/expr/type_equality_memory_tests.rs": "ac09e2c7f010ea753dc2d624d11cdb0bba5fc10d096717c05ed8bc9b0dcaa0b2",
+    "starlark-rust/starlark/src/eval/compiler/expr/double_not_memory_tests.rs": "ea8ec78e1e553d37be4dbb5aad5cb4c454bd115e85749cffd711b94446eabbb4",
+    "starlark-rust/starlark/src/tests/opt.rs": "c9e2c5366fc541aaf3e2ced1c3c90b1634fca27afaeca675224560645994ab3e",
+    "starlark-rust/starlark/src/tests/opt/list_add.rs": "db9eecc257b0ef1fa6fea5646e54aef5a2b4f87e0443ef24e375b727677f4561",
+    "starlark-rust/starlark/src/tests/opt/constant_folding.rs": "5712bddd0ce82b14010560a23ca27680968cbadc146e0acc56be4bee42954a10",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/values/owned.rs": "edf16c1a7488868f332b1536bce5b78cdf0627f1d755ba39a8df870e7416ef2f",
+    "starlark-rust/starlark/src/values/types/list/alloc.rs": "4da1cb1f17fc395a6911de974fcc2116623b892a7d244610dc0bef6c62ca2832",
+    "starlark-rust/starlark/src/values/types/list/refs.rs": "f4aa14c677495a1b94883ff6408d51f4debce64a9887a596b61a15df91c3ea39",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "f674365cc1d251a85dd00379e765253d817a88dd15e5a367e366741eff4850be",
+    "selectors": [
+      "eval::compiler::expr::list_add_memory_tests::list_add_moves_symbols_and_preserves_elements_spans_and_frozen_constants",
+      "eval::compiler::expr::list_add_memory_tests::list_add_preserves_size_guards_and_rejected_operand_ownership",
+      "eval::compiler::expr::list_add_memory_tests::list_add_preserves_effects_errors_and_retained_frozen_functions",
+      "tests::opt::list_add::test_list_of_const_add_opt",
+      "tests::opt::list_add::test_list_of_expr_add",
+      "tests::opt::constant_folding::test_fold_list_add",
+      "tests::opt::constant_folding::test_fold_list_add_too_large",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_transfers_symbols_in_both_orders_and_preserves_ir_spans",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_rejections_preserve_operands_pointers_and_constant_fallbacks",
+      "eval::compiler::expr::type_equality_memory_tests::type_equality_preserves_effects_errors_and_retained_frozen_functions",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "107abcab4bf6698d99c1a7fc50978dd4055178393a48e39d63690c5177cd44c4",
+      "starlark-rust/starlark/src/eval/compiler/expr/list_add_memory_tests.rs": "65e6fe2bf6bf771aec42581e57b24f08d588e1dcd3caa6f57dc8df794cf6c372"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "e01a3983052a4242c06d66c998e6fb92a8c9ddc2551869bcb26f11308be89d14",
+    "selectors": [
+      "eval::compiler::expr::list_add_memory_tests::list_add_moves_symbols_and_preserves_elements_spans_and_frozen_constants",
+      "eval::compiler::expr::list_add_memory_tests::list_add_preserves_size_guards_and_rejected_operand_ownership",
+      "eval::compiler::expr::list_add_memory_tests::list_add_preserves_effects_errors_and_retained_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/expr.rs": "a8bd5223b35be1479829a587ded31fdf151de26f1d62ea5ed55098e87696ffd1",
+      "starlark-rust/starlark/src/eval/compiler/expr/list_add_memory_tests.rs": "65e6fe2bf6bf771aec42581e57b24f08d588e1dcd3caa6f57dc8df794cf6c372"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/list-add-arg-move-baseline-compile.json",
+      "sha256": "59eeafe561a62573e16c808e76ead1f5a8e852102504bf12265e9450f0f48376",
+      "exit_code": 101,
+      "elapsed_seconds": 2.0916303410194814,
+      "log_sha256": "03ade8175005beedb23fd176a5b3b10ca935b9cd0494e9ec27f87278af85e7b4"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/list-add-arg-move-baseline-r2-compile.json",
+      "sha256": "4419499489b2c58e3d2b573b04845dad55266ca826f050ba858ddfc96e4f50a5",
+      "exit_code": 0,
+      "elapsed_seconds": 6.869119947019499,
+      "log_sha256": "d8ccf01f77e7b4cb7f0cf4aee4c42f39baf67050c5e37250b580bc5edd67e0b4"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/list-add-arg-move-baseline-r2-preflight.json",
+      "sha256": "db073f401197c9544df8899035f6ee511c27445252e5d7cfa2701bb384364fb8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022223457985091954,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/list-add-arg-move-baseline-r2-controls.json",
+      "sha256": "40ec148d739606eee8fd9b81554700e77e800c7bb97c964a93f96da939d338c1",
+      "exit_code": 101,
+      "elapsed_seconds": 0.007084565004333854,
+      "log_sha256": "eb3ade256d77538cb300f62e3e4be37ade0d5e781811521f3963b2e3ae6e8b83"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-compile.json",
+      "sha256": "420ad1a141ed3faaa6fe7eecdb5e377b6cfba3456b73239dd6954d57ad9cf6f6",
+      "exit_code": 0,
+      "elapsed_seconds": 4.232670861005317,
+      "log_sha256": "5c9a8b4b269a82e364687b6aa5abb316e9d011f254c6fef2264d6308639c193a"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-preflight.json",
+      "sha256": "f5f21fbfa6978c3b77c022ab225a45516f806f4ab617dcb8094dda6025d19204",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020125717972405255,
+      "log_sha256": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-controls.json",
+      "sha256": "fc56c6ad49aac0b8920eeb9d7c4828300829322d7e5de8e0ef2146c0d463b50f",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0317441740189679,
+      "log_sha256": "0068ee8750e2108cf31f84680dded487464e331a5434180a600050f470b69750"
+    },
+    "golden-baseline-compile": {
+      "receipt": "target/wp899/list-add-arg-move-golden-baseline-compile.json",
+      "sha256": "6e1952d68677e0142cc4eb069f7ef681bb26a923294451cf18a370528ea7f580",
+      "exit_code": 0,
+      "elapsed_seconds": 4.0846498209866695,
+      "log_sha256": "1ba9a3e95b6a4cbaa9c52967542ba74391fbc7664964f705808baa60cc4f62e7"
+    },
+    "golden-baseline-preflight": {
+      "receipt": "target/wp899/list-add-arg-move-golden-baseline-preflight.json",
+      "sha256": "4fd7780e2673209b11c46b26e571344d95aeae50c193f5c8282dd63cf8f63b31",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022942701005376875,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "golden-baseline-controls": {
+      "receipt": "target/wp899/list-add-arg-move-golden-baseline-controls.json",
+      "sha256": "a2eb9135424b1ac86106c031d918cb486b3c359e560a4fee6e0c0dc9241abba1",
+      "exit_code": 101,
+      "elapsed_seconds": 0.004507281992118806,
+      "log_sha256": "0202ad671042b74072c398382626b03365168a0c4dfaa1adee05b398e3d918c4"
+    },
+    "candidate-r2-compile": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-r2-compile.json",
+      "sha256": "45ba12d6ea3b477e2e2340d5590ba1d81d1d6d3eb51dab10e3cd0dc72f88b4b9",
+      "exit_code": 0,
+      "elapsed_seconds": 4.0927732810378075,
+      "log_sha256": "571dd56fcfba63c8c1b28154a321e6090d20f591694a78f1ec00577e59f750df"
+    },
+    "candidate-r2-preflight": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-r2-preflight.json",
+      "sha256": "34fb1aae28b333dcd4a9a86354728514093b1f1cdb864cb153b09112fd1740fb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020553929964080453,
+      "log_sha256": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92"
+    },
+    "candidate-r2-controls": {
+      "receipt": "target/wp899/list-add-arg-move-candidate-r2-controls.json",
+      "sha256": "54898000bd1ecbf140c1584ab86e48f2f46630746799560f91ff90bd98f8f22d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.031599334033671767,
+      "log_sha256": "1ec1c8d995d5f8a88585abd99cb8140d69a7cc031fac9f6ee38de4d6c3a87605"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/list-add-arg-move-dependents-check.json",
+      "sha256": "f4407f2e85c83ab5829700ce5fd073fe333d6b1b4ad39f685ce66abbbdbbdea9",
+      "exit_code": 0,
+      "elapsed_seconds": 7.630072243977338,
+      "log_sha256": "bc0bc8cc0df7b1ec0ea5e19799a0f8ce567bb57cb79ae8796986552948fb8aef"
+    }
+  },
+  "proof": "Whole expr.rs equals baseline plus sibling hook and only successful add conversion replacement. Exact tuple guards/1000 per-operand limits remain; after both succeed local conversion moves owned List elements, otherwise unchanged constant conversion copies FrozenValue handles/assigns original operand span. Existing helpers/bin_op preceding constant folding/left-right iterator chain/ordered fallback remain baseline-identical; fifteen protected source files and identical corrected tests. Existing list-expression golden span failure independently reproduced on baseline with byte-identical mismatch; only five stale call-site ranges manually corrected to current point spans, bytecode otherwise unchanged. No new helper/API/interner/cache/key/unsafe/dependency/retained representation or donor.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_gate_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 9,
+    "candidate_total": 12,
+    "rejected_full_add_cases": 8,
+    "admitted_1000_per_operand_combinations": 4,
+    "exact_equal_error_records": 4
+  },
+  "ownership_fixtures": {
+    "baseline-r2": [
+      {
+        "route": 0,
+        "symbols": 6,
+        "content_bytes": 30765,
+        "reused_buffers": 0
+      },
+      {
+        "route": 1,
+        "symbols": 3,
+        "content_bytes": 15381,
+        "reused_buffers": 0
+      },
+      {
+        "route": 2,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 0
+      },
+      {
+        "route": 3,
+        "symbols": 3,
+        "content_bytes": 15381,
+        "reused_buffers": 0
+      }
+    ],
+    "candidate-r2": [
+      {
+        "route": 0,
+        "symbols": 6,
+        "content_bytes": 30765,
+        "reused_buffers": 6
+      },
+      {
+        "route": 1,
+        "symbols": 3,
+        "content_bytes": 15381,
+        "reused_buffers": 3
+      },
+      {
+        "route": 2,
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 3
+      },
+      {
+        "route": 3,
+        "symbols": 3,
+        "content_bytes": 15381,
+        "reused_buffers": 3
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      joined([], struct())\nerror: Object of type `struct` has no attribute `first`\n --> assert.bzl:6:13\n  |\n6 |     return [seen(log, \"left\", value).first] + [seen(log, \"right\", value).second]\n  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      joined([], struct(first=1))\nerror: Object of type `struct` has no attribute `second`\n --> assert.bzl:6:48\n  |\n6 |     return [seen(log, \"left\", value).first] + [seen(log, \"right\", value).second]\n  |                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      ordinary([], 1)\nerror: Operation `+` not supported for types `list` and `int`\n  --> assert.bzl:10:12\n   |\n10 |     return left + right\n   |            ^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      ordinary(1, [])\nerror: Operation `+` not supported for types `int` and `list`\n  --> assert.bzl:10:12\n   |\n10 |     return left + right\n   |            ^^^^^^^^^^^^\n   |\n"
+  ],
+  "fixture_correction": {
+    "original_test_sha256": "8e00ab2b4c24e2a8f83cfd0abeb4fbfd9342e94fdc1ca85bb6aece324e165a04",
+    "old": "FrozenValue::new_int(17)",
+    "new": "module.frozen_heap().alloc(17)",
+    "reason": "E0308: FrozenValue::new_int requires InlineInt; use existing safe frozen heap integer allocation. Production unchanged; failed baseline compile preserved."
+  },
+  "golden_correction": {
+    "path": "starlark-rust/starlark/src/tests/bc/golden/opt_list_of_expr_add.golden",
+    "original_sha256": "07d213189e89cf9da39cd7ff6dbdb55b7b38f88a9f4822a9ab7dcc587141b61d",
+    "candidate_sha256": "526cfeb8748fca526a50db5659648e20c93f009d3f34ef19b36dfc286acafdc8",
+    "replacements": {
+      "instrs.star.bzl:2:13-19 ->&1": "instrs.star.bzl:2:17 ->&1",
+      "instrs.star.bzl:2:21-27 ->&2": "instrs.star.bzl:2:25 ->&2",
+      "instrs.star.bzl:2:32-38 ->&3": "instrs.star.bzl:2:36 ->&3",
+      "instrs.star.bzl:2:40-46 ->&4": "instrs.star.bzl:2:44 ->&4",
+      "instrs.star.bzl:2:48-54 ->&5": "instrs.star.bzl:2:52 ->&5"
+    },
+    "reason": "Baseline e9a22d215 independently reproduces byte-identical mismatch. Only five stale source call-site ranges updated to actual point spans; bytecode order/opcodes/registers/offsets unchanged. No golden regeneration. Initial reverse-direction replacement assertion failed before mutation; corrected after inspecting actual golden file."
+  },
+  "limits": "One borrowed expression-list deep-clone conversion site bypassed on successful owned operands. Fifteen fixed Symbol buffers transfer across four independent routes; baseline0 and candidate6/3/3/3. Output collect/constants conversion/final bytecode/frozen owners remain. Generic nested IR Vec spare capacity may survive where clone discarded it, and output Vec capacity is not promised equal. No unchanged-capacity, reduced total retained/aggregate memory, allocation count, peak/RSS/speed/source-fit claim.",
+  "growth": {
+    "test_sibling_lines": 273,
+    "estimate": "220-320lines; three tests/no assets.",
+    "production": "Bounded local conversion closure in existing add plus cfg sibling hook; existing expression owner remains cohesive."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline Starlark lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/list-add-arg-move-archive-check.json": "4ce7f8798fc71d1323a2f83c175c64a3ef553b4e50937351b408fa3a409049f1",
+    "target/wp899/list-add-arg-move-archive-check.jsonl": "8ab93bb5d52943bb934809fe1973c49d8ffb98c47048e4e03142790b0d5a1893",
+    "target/wp899/list-add-arg-move-baseline-compile.json": "59eeafe561a62573e16c808e76ead1f5a8e852102504bf12265e9450f0f48376",
+    "target/wp899/list-add-arg-move-baseline-compile.jsonl": "03ade8175005beedb23fd176a5b3b10ca935b9cd0494e9ec27f87278af85e7b4",
+    "target/wp899/list-add-arg-move-baseline-r2-compile.json": "4419499489b2c58e3d2b573b04845dad55266ca826f050ba858ddfc96e4f50a5",
+    "target/wp899/list-add-arg-move-baseline-r2-compile.jsonl": "d8ccf01f77e7b4cb7f0cf4aee4c42f39baf67050c5e37250b580bc5edd67e0b4",
+    "target/wp899/list-add-arg-move-baseline-r2-controls.json": "40ec148d739606eee8fd9b81554700e77e800c7bb97c964a93f96da939d338c1",
+    "target/wp899/list-add-arg-move-baseline-r2-controls.jsonl": "eb3ade256d77538cb300f62e3e4be37ade0d5e781811521f3963b2e3ae6e8b83",
+    "target/wp899/list-add-arg-move-baseline-r2-preflight.json": "db073f401197c9544df8899035f6ee511c27445252e5d7cfa2701bb384364fb8",
+    "target/wp899/list-add-arg-move-baseline-r2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/list-add-arg-move-baseline-r2-selectors.json": "b94080136a5c075a6f1fa540dedabad66ebadf79d84edbc6e6b7dd6af5e19499",
+    "target/wp899/list-add-arg-move-candidate-compile.json": "420ad1a141ed3faaa6fe7eecdb5e377b6cfba3456b73239dd6954d57ad9cf6f6",
+    "target/wp899/list-add-arg-move-candidate-compile.jsonl": "5c9a8b4b269a82e364687b6aa5abb316e9d011f254c6fef2264d6308639c193a",
+    "target/wp899/list-add-arg-move-candidate-controls.json": "fc56c6ad49aac0b8920eeb9d7c4828300829322d7e5de8e0ef2146c0d463b50f",
+    "target/wp899/list-add-arg-move-candidate-controls.jsonl": "0068ee8750e2108cf31f84680dded487464e331a5434180a600050f470b69750",
+    "target/wp899/list-add-arg-move-candidate-owner.rs": "107abcab4bf6698d99c1a7fc50978dd4055178393a48e39d63690c5177cd44c4",
+    "target/wp899/list-add-arg-move-candidate-preflight.json": "f5f21fbfa6978c3b77c022ab225a45516f806f4ab617dcb8094dda6025d19204",
+    "target/wp899/list-add-arg-move-candidate-preflight.jsonl": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92",
+    "target/wp899/list-add-arg-move-candidate-r2-compile.json": "45ba12d6ea3b477e2e2340d5590ba1d81d1d6d3eb51dab10e3cd0dc72f88b4b9",
+    "target/wp899/list-add-arg-move-candidate-r2-compile.jsonl": "571dd56fcfba63c8c1b28154a321e6090d20f591694a78f1ec00577e59f750df",
+    "target/wp899/list-add-arg-move-candidate-r2-controls.json": "54898000bd1ecbf140c1584ab86e48f2f46630746799560f91ff90bd98f8f22d",
+    "target/wp899/list-add-arg-move-candidate-r2-controls.jsonl": "1ec1c8d995d5f8a88585abd99cb8140d69a7cc031fac9f6ee38de4d6c3a87605",
+    "target/wp899/list-add-arg-move-candidate-r2-preflight.json": "34fb1aae28b333dcd4a9a86354728514093b1f1cdb864cb153b09112fd1740fb",
+    "target/wp899/list-add-arg-move-candidate-r2-preflight.jsonl": "4c2dfdbfac17c80f484507adbce5a73600c2c949ea3a5b0b7f212055029a0c92",
+    "target/wp899/list-add-arg-move-candidate-r2-selectors.json": "141e1ba205e8f8bd1e5a27ba51cf0ff9a2c4714344209808b25a9c4d25dcf995",
+    "target/wp899/list-add-arg-move-candidate-selectors.json": "141e1ba205e8f8bd1e5a27ba51cf0ff9a2c4714344209808b25a9c4d25dcf995",
+    "target/wp899/list-add-arg-move-controls.py": "19fbb6cf2cb6fa873aab182de141af6c454ac9c6a5cdde43d64ea8174a5e3fba",
+    "target/wp899/list-add-arg-move-dependents-check.json": "f4407f2e85c83ab5829700ce5fd073fe333d6b1b4ad39f685ce66abbbdbbdea9",
+    "target/wp899/list-add-arg-move-dependents-check.jsonl": "bc0bc8cc0df7b1ec0ea5e19799a0f8ce567bb57cb79ae8796986552948fb8aef",
+    "target/wp899/list-add-arg-move-design-evidence.md": "fb2c7bf51e87a139ee914e810597556c8c7e1f6bb57ae7707fbd55cbfc6c00ad",
+    "target/wp899/list-add-arg-move-design-ownership.md": "5a196587737aa92b8cdee41262b8dd2918738a3ad5a4693a72fcea0e241b6eec",
+    "target/wp899/list-add-arg-move-design-source.md": "b8accd96106c4d4a793a3860065cf275f0e592d4a58e6024e267ed15a50cb5c4",
+    "target/wp899/list-add-arg-move-design.md": "a26e69cc42ab4835b1f36c7cdca80bf07db5b1dae57a7f055a04524fbdc63b9a",
+    "target/wp899/list-add-arg-move-fixture-correction.json": "0da54e4e09d016165439a4918f5fb9a73c8dcf763fd8554c27f811a68c1ef7ba",
+    "target/wp899/list-add-arg-move-format-check.json": "392f95613c3ecbccf50bf9f8237db2675db3d2828feb11bc5707ae7e0b75dfe9",
+    "target/wp899/list-add-arg-move-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/list-add-arg-move-golden-baseline-compile.json": "6e1952d68677e0142cc4eb069f7ef681bb26a923294451cf18a370528ea7f580",
+    "target/wp899/list-add-arg-move-golden-baseline-compile.jsonl": "1ba9a3e95b6a4cbaa9c52967542ba74391fbc7664964f705808baa60cc4f62e7",
+    "target/wp899/list-add-arg-move-golden-baseline-controls.json": "a2eb9135424b1ac86106c031d918cb486b3c359e560a4fee6e0c0dc9241abba1",
+    "target/wp899/list-add-arg-move-golden-baseline-controls.jsonl": "0202ad671042b74072c398382626b03365168a0c4dfaa1adee05b398e3d918c4",
+    "target/wp899/list-add-arg-move-golden-baseline-preflight.json": "4fd7780e2673209b11c46b26e571344d95aeae50c193f5c8282dd63cf8f63b31",
+    "target/wp899/list-add-arg-move-golden-baseline-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/list-add-arg-move-golden-baseline-proof.json": "02161c9ea76b654415cc67260c7d224ee5a60405666e85ffac870183d8dd295b",
+    "target/wp899/list-add-arg-move-golden-baseline-selection.json": "46693197c59fe1741a4b244bc0e866c63b84c1f6442dc39fd08847d124251a45",
+    "target/wp899/list-add-arg-move-golden-baseline-source.json": "c091950a17863f179f5561d3e4d78ea0c657213e25c5e564e73ca8fd21e7177f",
+    "target/wp899/list-add-arg-move-golden-correction.json": "8dc7df6fbfad33544c489ce0301eb010ccb746e88820a72f71e63419d00a9480",
+    "target/wp899/list-add-arg-move-record.py": "fa4aead821e952f25eddd69ef254e7f953050eba8889a666b73ad765a19ce575",
+    "target/wp899/list-add-arg-move-start.json": "3f8f1f76ea06f4cb9f8edf73c8ddab65450663fb83ae7d813e8a913954c4b5b8"
+  },
+  "start": {
+    "started_at": "2026-10-06T02:34:51.282780+00:00",
+    "baseline": "e9a22d2153839043164ef7c8bc0ced068642bf8b"
+  },
+  "timing": {
+    "compile_seconds": 29.000916495046113,
+    "test_seconds": 0.07493535504909232,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 536.681053
+  },
+  "validation_sha256": "73296fbb56499e4193b1254a917a6fe617ac637aef2240db5cb4fe2a4a9b546b",
+  "final_reviews": {
+    "target/wp899/list-add-arg-move-final-source.md": "279044d9c415ef38a2c8635b8f1e5c587ec3c6d638050ebead5beb3237703234",
+    "target/wp899/list-add-arg-move-final-ownership.md": "95f5e3c22fe46dc890095fa7dfebb105dee004447f3b7637a62e771f7f3c44aa",
+    "target/wp899/list-add-arg-move-final-evidence.md": "e7943a1269e24c1b1e39824e57274cb9c1a6a02eb9769127e69e21efecd45185"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "61eb0922e1873d3c71cefc56dee797d906d80d195fab224d600bee1c4c24cb88",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "11fdbf6d21997082ac57e3795effed7c6448e681f6058ac593115ae262521bd0",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "cd53f8cc7374b97fa3558221c87cc0700a4fd067c4d29796879f6786580b3609"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/list-add-arg-move-format-check.json",
+      "sha256": "392f95613c3ecbccf50bf9f8237db2675db3d2828feb11bc5707ae7e0b75dfe9",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/list-add-arg-move-archive-check.json",
+      "sha256": "4ce7f8798fc71d1323a2f83c175c64a3ef553b4e50937351b408fa3a409049f1",
+      "exit_code": 0,
+      "log_sha256": "8ab93bb5d52943bb934809fe1973c49d8ffb98c47048e4e03142790b0d5a1893"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/list-add-arg-move-plan-check.json",
+      "sha256": "222344b3ebe7c530576b924ce33c63f6007159fbbacde4e1dc8fe8bc2bf82c89",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/list-add-arg-move-diff-check.json",
+      "sha256": "8b1343b1d0e10fba6fecee348115c3e7964d54bf5cafd01a80b7e3fd6562b3e4",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
