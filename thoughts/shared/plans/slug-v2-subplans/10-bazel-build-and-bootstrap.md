@@ -137,6 +137,24 @@ compiler flags and generated flag bytes remain unproved. Historical raw graphs
 are absent and locks have changed since8f3ddef8b; do not promote old observations
 into current action evidence. Three FINALs accept planned-unit accounting only.
 
+The [current configured receipt](wp904-configured-rustc-accounting-2026-10-06.json)
+adds one2.855s nofetch/download-disabled CLI query after three checksum-pinned
+local repositories were prepared. No build action ran. The581 selected actions
+include514 Rustc and67 CargoBuildScriptRun. All36 local packages have configured
+compiler owners; all38 normal local compiler feature sets match current BUILD
+attributes. All353 external normal compiler direct feature sets match Linux lock
+declarations across316 selected packages; tool configuration is preserved apart
+from Cargo host role. No undeclared direct feature or missing local owner was
+found. The79 additional rules_rust support actions are retained separately.
+All graph references resolve, with no fragment/depset cycles;1633 wrapper file
+bindings are exact inputs,1234 with selected build-script-run producers and399
+cargo_toml_env_vars.env producers excluded by this query filter. Recorded paramFiles
+are absent, which does not exclude virtual Args. Generated file contents, complete
+producer/action-family accounting, exact Cargo-role correspondence, fresh warned
+repositories, compilation and actual Slug source fit remain open. Historical flag
+receipts are not promoted into current generated-byte proof. Three FINALs accept
+this configured direct accounting only; full M7A remains open.
+
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 
 The historical 33-package receipt above is unchanged. The live Cargo root now
