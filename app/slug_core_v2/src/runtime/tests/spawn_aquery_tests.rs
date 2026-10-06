@@ -355,6 +355,7 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
     let mut targets = evaluation.targets.to_vec();
     targets[0].analysis = Some(malformed.clone());
     let altered = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: targets.into(),
         action_closure: super::ValidatedActionClosure::new(

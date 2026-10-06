@@ -908,6 +908,7 @@ async fn resolved_run_view_reuses_exact_executable_filewrite_relation() {
         let mut target = analyzed.targets[0].clone();
         target.analysis = Some(requested);
         BuildCommandEvaluation {
+            workspace: analyzed.workspace.dupe(),
             anchor: analyzed.anchor.clone(),
             targets: vec![target].into(),
             action_closure: super::ValidatedActionClosure::new(closure.into()).unwrap(),
@@ -1031,6 +1032,7 @@ async fn resolved_file_write_view_borrows_immutable_owner_context_without_closur
         Some("toolchain")
     );
     let without_platform = BuildCommandEvaluation {
+        workspace: base.workspace.dupe(),
         anchor: base.anchor.clone(),
         targets: base.targets.clone(),
         action_closure: super::ValidatedActionClosure::new(
@@ -1097,6 +1099,7 @@ async fn filewrite_aquery_text_matches_frozen_baseline() {
     );
 
     let missing = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: Vec::new().into(),
         action_closure: evaluation.action_closure.clone(),
@@ -1106,6 +1109,7 @@ async fn filewrite_aquery_text_matches_frozen_baseline() {
         Err("FileWrite aquery requires exactly one requested analysis")
     );
     let duplicated = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: vec![evaluation.targets[0].clone(), evaluation.targets[0].clone()].into(),
         action_closure: evaluation.action_closure.clone(),
@@ -2890,9 +2894,18 @@ impl PublicMultiFixture {
         fs::create_dir_all(&stable_parent_root).unwrap();
         let stable_parent = tempfile::tempdir_in(stable_parent_root).unwrap();
         let workspace = tempfile::tempdir_in(stable_parent.path()).unwrap();
+        external_source_fixture::write(workspace.path());
+        let prerequisites = fs::read_to_string(workspace.path().join("MODULE.bazel"))
+            .unwrap()
+            .lines()
+            .filter(|line| {
+                !line.starts_with("module(") && !line.starts_with("register_execution_platforms(")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
         fs::write(
             workspace.path().join("MODULE.bazel"),
-            configured_test_module("print('MODULE')\nmodule(name = 'multi')\n"),
+            format!("print('MODULE')\nmodule(name = 'multi')\n{prerequisites}\n"),
         )
         .unwrap();
         let good_defs = "print('BZL')\ndef _leaf(ctx):\n    print('LEAF_ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _leaf)\ndef _impl(ctx):\n    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n";
@@ -2976,9 +2989,25 @@ fn public_multi_cold_aggregates_targets_and_repository_inputs() {
             .iter()
             .map(|request| request.id.canonical_repo.to_string())
             .collect::<Vec<_>>(),
-        ["@@platforms", "@@platforms+"]
+        [
+            "@@abseil-cpp+",
+            "@@apple_support+",
+            "@@bazel_features+",
+            "@@buildozer+",
+            "@@platforms",
+            "@@platforms+",
+            "@@protobuf+",
+            "@@rules_apple+",
+            "@@rules_cc+",
+            "@@rules_java+",
+            "@@rules_license+",
+            "@@rules_python+",
+            "@@rules_shell+",
+            "@@rules_swift+",
+            "@@zlib+",
+        ]
     );
-    assert_eq!(snapshot.selected.repository_validations().len(), 1);
+    assert_eq!(snapshot.selected.repository_validations().len(), 14);
 }
 
 #[test]
@@ -4091,15 +4120,18 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         runtime: &WorkspaceRuntime,
         key: &BuildCommandRootObservationKey,
         epoch: PathObservationEpoch,
+        known: &PathObservationEpoch,
         tracker: Arc<ObservedBuildTracker>,
     ) -> ObservedBuildOutcome {
         let mut data = runtime.user_computation_data(None).unwrap();
         data.activation_tracker = Some(tracker);
         let mut updater = runtime.dice.updater_with_data(data);
-        updater.changed_to(path_observation_shards(&epoch)).unwrap();
-        updater
-            .changed_to(vec![(PathObservationEpochKey, epoch)])
-            .unwrap();
+        slug_workspace_v2::inject_path_observation_inputs(
+            &mut updater,
+            &epoch,
+            known.observations().keys().map(Dupe::dupe),
+        )
+        .unwrap();
         let mut transaction = updater.commit().await;
         runtime.request_revision.bind_cycle_detector(&transaction);
         transaction.compute(key).await.unwrap()
@@ -4109,6 +4141,7 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         &runtime,
         &observed_key,
         without("dep/pkg/BUILD.bazel"),
+        &snapshot.path_observations,
         tracker.dupe(),
     ));
     assert!(matches!(package_need, PreparationOutcome::Need(_)));
@@ -4140,6 +4173,7 @@ fn public_external_single_uses_observed_family_and_full_source_certificate() {
         &runtime,
         &observed_key,
         without("dep/pkg/source.txt"),
+        &snapshot.path_observations,
         tracker.dupe(),
     ));
     assert!(matches!(source_need, PreparationOutcome::Need(_)));

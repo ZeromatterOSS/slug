@@ -10,6 +10,7 @@ use std::fmt::Write;
 
 use slug_analysis_v2::ConfigurationKind;
 use slug_analysis_v2::ConfiguredActionView;
+use slug_analysis_v2::ConfiguredBuildInfoActionView;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredRunfilesSupportActionView;
 use slug_analysis_v2::ConfiguredSolibActionView;
@@ -18,8 +19,10 @@ use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 use slug_query_v2::AqueryScope;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark_map::small_set::SmallSet;
 
+use super::build_info_aquery_text::append_build_info;
 use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
@@ -37,9 +40,13 @@ pub fn format_aquery_text_output_for_scope(
 ) -> Result<String, &'static str> {
     // Preserve the old FileWrite guard-before-render error priority across all
     // selected owners. This pass only constructs borrowed views.
-    visit_owners(evaluation, scope, validate_owner)?;
+    visit_owners(evaluation, scope, |owner| {
+        validate_owner(owner, evaluation.workspace())
+    })?;
     let mut output = String::new();
-    visit_owners(evaluation, scope, |owner| append_owner(&mut output, owner))?;
+    visit_owners(evaluation, scope, |owner| {
+        append_owner(&mut output, owner, evaluation.workspace())
+    })?;
     if output.is_empty() {
         return Err("FileWrite aquery text requires at least one resolved action");
     }
@@ -62,7 +69,10 @@ fn visit_owners(
     }
 }
 
-fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
+fn validate_owner(
+    owner: &ConfiguredNodeResult,
+    workspace: &NormalizedAbsolutePath,
+) -> Result<(), &'static str> {
     for action in owner.actions() {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             ConfiguredActionView::from_configured_action(action)?;
@@ -72,6 +82,8 @@ fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
             ConfiguredRunfilesSupportActionView::from_configured_action(action)?;
         } else if action.solib_symlink_spec().is_some() {
             ConfiguredSolibActionView::from_configured_action(action)?;
+        } else if action.build_info_transform_spec().is_some() {
+            ConfiguredBuildInfoActionView::from_configured_action(action, workspace)?;
         } else {
             ConfiguredSpawnActionView::from_configured_action(action)?;
         }
@@ -79,7 +91,11 @@ fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn append_owner(output: &mut String, owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
+fn append_owner(
+    output: &mut String,
+    owner: &ConfiguredNodeResult,
+    workspace: &NormalizedAbsolutePath,
+) -> Result<(), &'static str> {
     for action in owner.actions() {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             let view = ResolvedFileWriteSemanticView::from_configured_action(
@@ -101,6 +117,11 @@ fn append_owner(output: &mut String, owner: &ConfiguredNodeResult) -> Result<(),
             append_solib(
                 output,
                 ConfiguredSolibActionView::from_configured_action(action)?,
+            )?;
+        } else if action.build_info_transform_spec().is_some() {
+            append_build_info(
+                output,
+                ConfiguredBuildInfoActionView::from_configured_action(action, workspace)?,
             )?;
         } else {
             append_spawn(

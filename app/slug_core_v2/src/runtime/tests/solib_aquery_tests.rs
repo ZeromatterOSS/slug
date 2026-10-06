@@ -468,6 +468,7 @@ async fn solib_aquery_metadata_guards_literal_progress_multiplicity_and_priority
     assert!(closure.execution_representative(0, 0));
     assert!(!closure.execution_representative(1, 0));
     let altered = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: evaluation.targets.clone(),
         action_closure: closure,
@@ -514,6 +515,7 @@ async fn solib_aquery_metadata_guards_literal_progress_multiplicity_and_priority
     let mut targets = evaluation.targets.to_vec();
     targets[0].analysis = Some(invalid.clone());
     let rejected = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: targets.into(),
         action_closure: super::ValidatedActionClosure::new(Arc::from([invalid])).unwrap(),

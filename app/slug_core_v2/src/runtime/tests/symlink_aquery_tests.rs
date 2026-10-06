@@ -332,6 +332,7 @@ async fn symlink_aquery_shared_owners_keep_progress_and_restore_conflicts() {
     let mut targets = held.targets[..1].to_vec();
     targets[0].analysis = Some(duplicated.clone());
     let synthetic = BuildCommandEvaluation {
+        workspace: held.workspace.dupe(),
         anchor: held.anchor.clone(),
         targets: targets.into(),
         action_closure: ValidatedActionClosure::new(Arc::from([duplicated])).unwrap(),

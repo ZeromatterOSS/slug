@@ -3219,6 +3219,7 @@ enum BuildCommandRequestError {
 
 #[derive(Clone, Eq, PartialEq, Allocative)]
 pub struct BuildCommandEvaluation {
+    workspace: NormalizedAbsolutePath,
     anchor: RootModuleLoadingAnchor,
     targets: Arc<[BuildRequestedTarget]>,
     action_closure: ValidatedActionClosure,
@@ -3550,6 +3551,11 @@ impl SingletonRootSingleBuildCommandKey {
 }
 
 impl BuildCommandEvaluation {
+    /// Immutable command-key workspace storage; no path reconstruction or read.
+    pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+
     /// Plan declared prerequisites from this validated closure only. This view
     /// neither observes input bytes nor authorizes execution or publication.
     pub fn action_prerequisites(
@@ -4424,6 +4430,7 @@ async fn compute_singleton_package_all(
             observations,
         ))) => singleton_package_all_complete(
             Ok(BuildCommandEvaluation {
+                workspace: key.workspace.dupe(),
                 anchor,
                 targets: Arc::from([BuildRequestedTarget {
                     pattern: key.targets[0].dupe(),
@@ -5544,6 +5551,7 @@ async fn compute_singleton_root_single(
     };
     singleton_root_single_complete(
         Ok(BuildCommandEvaluation {
+            workspace: key.workspace.dupe(),
             anchor,
             targets,
             action_closure,
@@ -5674,6 +5682,7 @@ impl Key for BuildCommandRootKey {
                     }
                     Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(action_closure))) => {
                         build_complete(Ok(BuildCommandEvaluation {
+                            workspace: self.workspace.dupe(),
                             anchor,
                             targets,
                             action_closure,
@@ -5743,6 +5752,7 @@ async fn compute_external_single_observed(
     .map(|value| {
         value.map(|(result, observations)| ObservedBuildCommandRoot {
             result: Arc::new(result.map(|target| BuildCommandEvaluation {
+                workspace: key.workspace.dupe(),
                 anchor,
                 targets: Arc::from([target]),
                 action_closure: ValidatedActionClosure::empty(),
@@ -5865,6 +5875,7 @@ async fn compute_observed_multi_build_root(
     };
     observed_build_root_complete_with_certificate(
         Ok(BuildCommandEvaluation {
+            workspace: key.workspace.dupe(),
             anchor,
             targets,
             action_closure,
@@ -13976,5 +13987,9 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
 
     mod solib_aquery_tests {
         include!("tests/solib_aquery_tests.rs");
+    }
+
+    mod build_info_aquery_tests {
+        include!("tests/build_info_aquery_tests.rs");
     }
 }

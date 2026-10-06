@@ -19,6 +19,7 @@ pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;
 pub use action_prerequisites::RequestedActionPrerequisitePlan;
 mod aquery_text;
+mod build_info_aquery_text;
 mod configured_action_closure;
 mod configured_output;
 mod demands;

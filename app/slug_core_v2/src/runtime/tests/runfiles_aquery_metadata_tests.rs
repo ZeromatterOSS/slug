@@ -314,6 +314,7 @@ async fn runfiles_aquery_metadata_guards_identity_environment_and_priority() {
     let mut targets = evaluation.targets.to_vec();
     targets[0].analysis = Some(malformed.clone());
     let altered = BuildCommandEvaluation {
+        workspace: evaluation.workspace.dupe(),
         anchor: evaluation.anchor.clone(),
         targets: targets.into(),
         action_closure: super::ValidatedActionClosure::new(vec![malformed].into()).unwrap(),

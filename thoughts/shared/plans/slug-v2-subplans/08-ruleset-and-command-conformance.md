@@ -428,6 +428,14 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   consumer. Semantic query multiplicity and duplicate prerequisite refusal remain
   intact. Source/constant libraries, ActionKeys, execution and full-root fit remain
   deferred; no retained pool or graph representation is added.
+- [WP917 BuildInfo text query](wp917-build-info-aquery-2026-10-06.json) borrows genuine
+  stable/volatile TranslateBuildInfo metadata, fixed progress/tool suffix and inherited
+  owner info, with concrete empty environment and no executable/template/constant
+  fields. Exact command workspace identity shares one existing Arc path handle at all
+  five successful evaluation constructors and is checked by borrow. Sixty distinct
+  focused gates pass by qualified55+4+1 union and defaultCLI compiles; fixture topology
+  and current per-demand revocation corrections are explicit. No callback/status/template
+  execution, retained pool, source retry, full-root/M7A or whole-memory-fit admission.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command

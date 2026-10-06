@@ -34,16 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-216-m7a-build-info-query-projection-r1
-Status: Borrowed Solib query accepted; typed TranslateBuildInfo query selected
+Packet: WP-7-217-m7a-cpp-compile-query-projection-r1
+Status: Borrowed BuildInfo query accepted; regular CppCompile metadata query selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects borrowed typed
-TranslateBuildInfo query metadata with a concrete field/workspace design checkpoint.
-[WP916](./slug-v2-subplans/wp916-solib-aquery-2026-10-06.json) accepts generated
-ordinary-File Solib query, literal null-progress fallback and class omissions.
-All50 distinct focused checks pass (47 protected plus3 fixture-corrected), CLI compile
-passes and three final reviews accept. No retained string pool is added. Full-root
-query, authentic source/runtime, whole-workload memory fit and M7A remain open.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects concrete CppCompile
+field/owner design and a guarded regular-file metadata projection.
+[WP917](./slug-v2-subplans/wp917-build-info-aquery-2026-10-06.json) accepts genuine
+TranslateBuildInfo fields/omissions, workspace identity sharing and callback-provenance
+preservation. All60 distinct controls pass by qualified55+4+1 union, defaultCLI compiles
+and three final reviews accept. Hermetic module census/per-demand fixture corrections
+are explicit; no failed gate is waived. No retained string pool is added. Full-root,
+authentic source/runtime, whole-workload memory fit and M7A remain open.
 Allocation/interner discipline, source16/17/18 and source caps persist; Windows minimal.
 
 ### Ready and blocked queue
@@ -55,7 +56,7 @@ priorities stay queued until their concrete prerequisites and owners are ready.
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects typed TranslateBuildInfo query metadata; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects typed regular CppCompile query metadata; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
