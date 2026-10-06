@@ -33,9 +33,25 @@ fn root_bytes(bytes: &[u8]) -> bool {
     bytes.len() == 426 && sha2::Sha256::digest(bytes).as_slice() == ROOT_SHA
 }
 
+const FEATURES_SHA: [u8; 32] = [
+    0x20, 0x83, 0xef, 0x9c, 0x7a, 0x46, 0x9f, 0x52, 0x08, 0x90, 0x48, 0x3c, 0xcf, 0x8e, 0x01, 0x89,
+    0xd6, 0xe7, 0x1e, 0x21, 0x17, 0xe7, 0x75, 0x2e, 0x15, 0xe6, 0x55, 0x44, 0x33, 0xd5, 0xae, 0x3e,
+];
+const RULES_SHA: [u8; 32] = [
+    0x25, 0xe3, 0xb0, 0x77, 0x12, 0x86, 0x12, 0x75, 0x4c, 0x4a, 0xdd, 0x1b, 0x4c, 0x90, 0xd2, 0x0a,
+    0x6b, 0xe0, 0x65, 0x66, 0xb6, 0x23, 0xde, 0xe6, 0xe3, 0x20, 0x38, 0xd0, 0xe8, 0xf9, 0x30, 0x62,
+];
+fn features_bytes(bytes: &[u8]) -> bool {
+    bytes.len() == 346 && sha2::Sha256::digest(bytes).as_slice() == FEATURES_SHA
+}
+struct FourthModule {
+    root: NormalizedAbsolutePath,
+    file: NormalizedAbsolutePath,
+}
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
+    fourth: Option<FourthModule>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -47,7 +63,40 @@ impl Bodies {
         let files = roots
             .each_ref()
             .map(|root| NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap());
-        Self { roots, files }
+        Self {
+            roots,
+            files,
+            fourth: None,
+        }
+    }
+    fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
+        let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
+        self.fourth = Some(FourthModule { root, file });
+        self
+    }
+    fn roots(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
+        self.roots
+            .iter()
+            .chain(self.fourth.iter().map(|binding| &binding.root))
+    }
+    fn files(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
+        self.files
+            .iter()
+            .chain(self.fourth.iter().map(|binding| &binding.file))
+    }
+    fn bindings(
+        &self,
+    ) -> impl Iterator<Item = (&'static str, &'static str, &NormalizedAbsolutePath)> {
+        [
+            ("rules_rust", "rules_rust+", &self.roots[1]),
+            ("platforms", "platforms+", &self.roots[2]),
+        ]
+        .into_iter()
+        .chain(
+            self.fourth
+                .iter()
+                .map(|binding| ("bazel_features", "bazel_features+", &binding.root)),
+        )
     }
     fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
         let refusal = |family| Denied { family, path: None };
@@ -73,12 +122,9 @@ impl Bodies {
             let RepositoryMaterializationKind::Local { logical_root } = &request.kind else {
                 return Err(refusal("materialization"));
             };
-            let expected = ["rules_rust+", "platforms+"]
-                .iter()
-                .zip(&self.roots[1..])
-                .any(|(name, root)| {
-                    request.id.canonical_repo.as_str() == *name && logical_root == root
-                });
+            let expected = self.bindings().any(|(_, canonical, root)| {
+                request.id.canonical_repo.as_str() == canonical && logical_root == root
+            });
             let label = &request.repo_spec.rule_id.bzl_file;
             let attributes = &request.repo_spec.attributes;
             let path_matches = matches!(attributes.get("path"), Some(OverrideAttributeValue::String(path)) if Path::new(path.as_str()) == logical_root.as_path());
@@ -107,13 +153,11 @@ impl Bodies {
                 let path = demand.path().as_path();
                 let allowed = match demand.operation() {
                     PathObservationOperation::FileBytes | PathObservationOperation::FileDigest => {
-                        self.files.iter().any(|file| file.as_path() == path)
+                        self.files().any(|file| file.as_path() == path)
                     }
                     PathObservationOperation::Lstat => {
-                        self.files
-                            .iter()
-                            .any(|file| file.as_path().starts_with(path))
-                            || self.roots.iter().any(|root| {
+                        self.files().any(|file| file.as_path().starts_with(path))
+                            || self.roots().any(|root| {
                                 path.parent() == Some(root.as_path())
                                     && matches!(
                                         path.file_name().and_then(|n| n.to_str()),
@@ -138,6 +182,9 @@ struct Milestones {
     preparations: u64,
     effective_empty: bool,
     source: Option<Weak<[u8]>>,
+    features_source: Option<Weak<[u8]>>,
+    features_bytes: Option<(usize, bool)>,
+    selected_reported: bool,
     bytes: usize,
     hash_match: bool,
     anchor: Option<&'static str>,
@@ -207,14 +254,11 @@ impl NativeCommandRoot for ModuleRoot {
             })
             .await
             .map_err(|_| refusal())?;
-        let exact = ["rules_rust", "platforms"]
-            .iter()
-            .zip(&self.bodies.roots[1..])
-            .all(|(name, root)| {
-                policy
-                    .command_module_overrides()
-                    .any(|(actual, path)| actual == *name && path == root.as_path())
-            });
+        let exact = self.bodies.bindings().all(|(name, _, root)| {
+            policy
+                .command_module_overrides()
+                .any(|(actual, path)| actual == name && path == root.as_path())
+        });
         let mode = tx
             .compute(&slug_bzlmod_v2::RootModuleLockfileModeKey {
                 workspace: self.bodies.roots[0].as_path().to_owned(),
@@ -300,10 +344,24 @@ impl NativeCommandRoot for ModuleRoot {
             }
             SourcePreparationOutcome::Complete(Ok(mapping)) => mapping,
         };
+        if let Some(binding) = &self.bodies.fourth {
+            if let Some(bytes) = observed_bytes(mapping.observations(), &binding.file) {
+                let mut state = self.milestones.lock().unwrap();
+                state
+                    .features_source
+                    .get_or_insert_with(|| Arc::downgrade(bytes));
+                state.features_bytes = Some((bytes.len(), features_bytes(bytes)));
+            }
+        }
         if let Err(error) = mapping.result().as_ref() {
             let mut state = self.milestones.lock().unwrap();
             state.mapping = Some("semantic_refusal");
             state.refusal = Some(error.selected_source_refusal());
+            if self.bodies.fourth.is_some() {
+                state.selected_reported = true;
+                drop(state);
+                report_selected(error.selected_module_registry_file());
+            }
             return Err(refusal());
         }
         let covered = mapping.observations().observations().iter().any(|(demand, value)| {
@@ -317,7 +375,16 @@ impl NativeCommandRoot for ModuleRoot {
                 && demand.operation() == PathObservationOperation::FileBytes
                 && matches!(value.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if root_bytes(bytes) && Arc::ptr_eq(bytes, &source))
         });
-        if !covered || !root_covered {
+        let fourth_covered = self.bodies.fourth.as_ref().is_none_or(|binding| {
+            observed_bytes(mapping.observations(), &binding.file)
+                .is_some_and(|bytes| features_bytes(bytes))
+                && observed_bytes(mapping.observations(), &self.bodies.files[1]).is_some_and(
+                    |bytes| {
+                        bytes.len() == 4481 && sha2::Sha256::digest(bytes).as_slice() == RULES_SHA
+                    },
+                )
+        });
+        if !covered || !root_covered || !fourth_covered {
             self.milestones.lock().unwrap().mapping = Some("coverage_refusal");
             return Err(refusal());
         }
@@ -333,6 +400,51 @@ impl NativeCommandRoot for ModuleRoot {
             certificate,
         }))
     }
+}
+
+fn observed_bytes<'a>(
+    epoch: &'a PathObservationEpoch,
+    path: &NormalizedAbsolutePath,
+) -> Option<&'a Arc<[u8]>> {
+    epoch.observations().iter().find_map(|(demand, value)| {
+        if demand.namespace() == PathObservationNamespace::Host
+            && demand.path() == path
+            && demand.operation() == PathObservationOperation::FileBytes
+        {
+            if let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) =
+                value.as_ref()
+            {
+                return Some(bytes);
+            }
+        }
+        None
+    })
+}
+fn report_selected(selected: Option<(&str, &str, &slug_bzlmod_v2::RegistryFileUrl)>) {
+    let Some((name, version, url)) = selected else {
+        println!(
+            "WP945_SELECTED capture=missing name_len=none name_hex=none version_len=none version_hex=none url_len=none url_hex=none"
+        );
+        return;
+    };
+    let values = [name.as_bytes(), version.as_bytes(), url.as_str().as_bytes()];
+    let captured = values
+        .iter()
+        .all(|value| value.len() <= REGISTRY_IDENTITY_BYTES);
+    println!(
+        "WP945_SELECTED capture={} name_len={} name_hex={} version_len={} version_hex={} url_len={} url_hex={}",
+        if captured {
+            "captured"
+        } else {
+            "bounds_refused"
+        },
+        values[0].len(),
+        RegistryHex(captured.then_some(values[0])),
+        values[1].len(),
+        RegistryHex(captured.then_some(values[1])),
+        values[2].len(),
+        RegistryHex(captured.then_some(values[2]))
+    );
 }
 
 #[test]
@@ -501,8 +613,137 @@ fn complete_need_admission_refuses_mixed_and_wrong_operation_before_progress() {
 }
 
 #[test]
+fn fourth_module_need_admission_is_opt_in_and_exact() {
+    let normalized = |path: &str| NormalizedAbsolutePath::new(Path::new(path)).unwrap();
+    let bodies = Bodies::new([
+        normalized("/fixture"),
+        normalized("/rules"),
+        normalized("/platforms"),
+    ]);
+    let need = |path: &str, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            normalized(path),
+            operation,
+        )))
+    };
+    let body = need(
+        "/features/MODULE.bazel",
+        PathObservationOperation::FileBytes,
+    );
+    let local = (*local_native_request(&bodies.roots[0], "bazel_features+", "/features")).clone();
+    assert!(bodies.admit(&body).is_err());
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_err()
+    );
+    let bodies = bodies.with_fourth(normalized("/features"));
+    assert!(bodies.admit(&body).is_ok());
+    assert!(
+        bodies
+            .admit(&need(
+                "/features/MODULE.bazel",
+                PathObservationOperation::FileDigest
+            ))
+            .is_ok()
+    );
+    for path in [
+        "/features",
+        "/features/MODULE.bazel",
+        "/features/BUILD",
+        "/features/BUILD.bazel",
+        "/features/.bazelignore",
+    ] {
+        assert!(
+            bodies
+                .admit(&need(path, PathObservationOperation::Lstat))
+                .is_ok()
+        );
+    }
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_ok()
+    );
+    let original = need("/fixture/MODULE.bazel", PathObservationOperation::FileBytes);
+    let foreign =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(2),
+            ),
+            normalized("/features/MODULE.bazel"),
+            PathObservationOperation::FileBytes,
+        )));
+    let mut progress_calls = 0;
+    for excluded in [
+        need(
+            "/features_extra/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        need("/features/BUILD.bazel", PathObservationOperation::FileBytes),
+        need("/features/REPO.bazel", PathObservationOperation::Lstat),
+        need("/features/MODULE.bazel", PathObservationOperation::ReadLink),
+        need("/features", PathObservationOperation::DirectoryEntries),
+        foreign,
+    ] {
+        let mixed = original.try_union(&excluded).unwrap();
+        if bodies.admit(&mixed).is_ok() {
+            progress_calls += 1;
+        }
+        assert!(bodies.admit(&mixed).is_err());
+    }
+    for case in 0..7 {
+        let mut wrong = local.clone();
+        match case {
+            0 => {
+                wrong.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("bazel_features").unwrap()
+            }
+            1 => wrong.id.workspace = normalized("/other"),
+            2 => wrong.kind = RepositoryMaterializationKind::Immutable,
+            3 => {
+                wrong.kind = RepositoryMaterializationKind::Local {
+                    logical_root: normalized("/other"),
+                }
+            }
+            4 => wrong.repo_spec.rule_id.rule_name = "http_archive".into(),
+            5 => {
+                Arc::make_mut(&mut wrong.repo_spec.attributes).insert(
+                    "path".into(),
+                    OverrideAttributeValue::String("/other".into()),
+                );
+            }
+            6 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other//tools/build_defs/repo:local.bzl").unwrap()
+            }
+            _ => unreachable!(),
+        }
+        let mixed = original
+            .try_union(&SourcePreparationNeeds::repository(wrong))
+            .unwrap();
+        if bodies.admit(&mixed).is_ok() {
+            progress_calls += 1;
+        }
+        assert!(bodies.admit(&mixed).is_err());
+    }
+    assert_eq!(progress_calls, 0);
+}
+
+#[test]
 #[ignore = "frozen scoped native MODULE preparation observation"]
 fn native_root_module_and_normal_mapping_prerequisite() {
+    observe_native_modules(false);
+}
+
+#[test]
+#[ignore = "frozen scoped four-root native MODULE readiness observation"]
+fn native_four_root_local_module_and_mapping_prerequisite() {
+    observe_native_modules(true);
+}
+
+fn observe_native_modules(with_features: bool) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -516,11 +757,19 @@ fn native_root_module_and_normal_mapping_prerequisite() {
         assert_eq!(normalized.as_path(), Path::new(&spelling));
         normalized
     };
-    let bodies = Arc::new(Bodies::new([
+    let mut bodies = Bodies::new([
         workspace.clone(),
         root("SLUG_NATIVE_RULES_RUST_ROOT"),
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
-    ]));
+    ]);
+    if with_features {
+        bodies = bodies.with_fourth(root("SLUG_NATIVE_BAZEL_FEATURES_ROOT"));
+        println!(
+            "WP945_REQUEST bazel_features_root={}",
+            bodies.fourth.as_ref().unwrap().root.as_path().display()
+        );
+    }
+    let bodies = Arc::new(bodies);
     println!(
         "WP942_REQUEST workspace={} rules_root={} platforms_root={} registry=https://bcr.bazel.build/ lockfile=off local_overrides=true",
         workspace.as_path().display(),
@@ -590,14 +839,21 @@ fn native_root_module_and_normal_mapping_prerequisite() {
     let mut outcome = None;
     if let Some(runtime) = &runtime {
         let overrides = [
-            format!("rules_rust={}", bodies.roots[1].as_path().display()),
-            format!("platforms={}", bodies.roots[2].as_path().display()),
+            Some(format!(
+                "rules_rust={}",
+                bodies.roots[1].as_path().display()
+            )),
+            Some(format!("platforms={}", bodies.roots[2].as_path().display())),
+            bodies
+                .fourth
+                .as_ref()
+                .map(|binding| format!("bazel_features={}", binding.root.as_path().display())),
         ];
         match BzlmodCommandPolicyKey::from_flags_with_module_overrides(
             None,
             false,
             workspace.as_path(),
-            overrides.iter().map(String::as_str),
+            overrides.iter().filter_map(Option::as_deref),
         ) {
             Err(_) => policy_error = true,
             Ok(policy) => {
@@ -642,8 +898,21 @@ fn native_root_module_and_normal_mapping_prerequisite() {
         ),
         None => println!("WP942_NATIVE kind=unavailable attempts=unavailable roots=unavailable"),
     }
-    let source_weak = {
+    let (source_weak, features_weak) = {
         let state = milestones.lock().unwrap();
+        if with_features {
+            match state.features_bytes {
+                Some((bytes, hash_match)) => {
+                    println!("WP945_SOURCE seen=true bytes={bytes} hash_match={hash_match}")
+                }
+                None => {
+                    println!("WP945_SOURCE seen=false bytes=unavailable hash_match=unavailable")
+                }
+            }
+            if !state.selected_reported {
+                report_selected(None);
+            }
+        }
         println!(
             "WP942_ROOT_SOURCE seen={} calls={} policy_checked={} bytes={} hash_match={} anchor={} outer_variant={:?}",
             state.preparations != 0,
@@ -695,7 +964,7 @@ fn native_root_module_and_normal_mapping_prerequisite() {
                 "missing"
             }
         );
-        state.source.clone()
+        (state.source.clone(), state.features_source.clone())
     };
     let counters = scope.snapshot();
     println!(
@@ -735,6 +1004,9 @@ fn native_root_module_and_normal_mapping_prerequisite() {
         || source_weak
             .as_ref()
             .is_some_and(|weak| weak.upgrade().is_some())
+        || features_weak
+            .as_ref()
+            .is_some_and(|weak| weak.upgrade().is_some())
         || recorder_weak
             .as_ref()
             .is_some_and(|weak| weak.upgrade().is_some()))
@@ -753,6 +1025,11 @@ fn native_root_module_and_normal_mapping_prerequisite() {
             .as_ref()
             .is_none_or(|weak| weak.upgrade().is_none())
     );
+    assert!(
+        features_weak
+            .as_ref()
+            .is_none_or(|weak| weak.upgrade().is_none())
+    );
     if let Some((image, scratch)) = &budgets {
         assert_eq!(image.descriptor_budget().used_bytes(), 0);
         assert_eq!(image.logical_bytes_used(), 0);
@@ -768,4 +1045,10 @@ fn native_root_module_and_normal_mapping_prerequisite() {
         "WP942_RETIREMENT source_weak_seen={} source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
         source_weak.is_some()
     );
+    if with_features {
+        println!(
+            "WP945_RETIREMENT source_weak_seen={} source_weak_expired=true",
+            features_weak.is_some()
+        );
+    }
 }

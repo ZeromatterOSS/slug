@@ -87,6 +87,14 @@ Two unparsed directives and selected identity/provenance remain unknown. Next fr
 normal native Host/local-materializer readiness with this exact fourth source and borrowed
 actual error reporting; no native/import/acquisition/spent-source operation selected.
 Module/mapping/provider/public producer and whole-fit gates remain open.
+[WP945](./slug-v2-subplans/wp945-native-borrowed-dependency-readiness-2026-10-06.json)
+accepts the opt-in four-root normal native observer and actual borrowed bazel_skylib1.8.2
+discovery request. Six controls1.191s/55,480KiB and native0.241s/67,312KiB pass; original
+root426B/hash/Weak and zero final credits qualify readiness. Four parent source brackets
+cover5669B; sibling refusal precedes bazel_features native source/evaluation. Separate
+Core preparation16.238s/CoreCLI check7.334s pass, no production/fixture changes. Next ground
+that actual request's local source and continue normal loading. Mapping/provider/public
+Rustc/M7A/full-workload gates remain open; no new source/acquisition/retry selected.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

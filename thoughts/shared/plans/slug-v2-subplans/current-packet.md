@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bazel_features local MODULE observed; normal native dependency readiness continues
+Status: normal native root ready; actual bazel_skylib1.8.2 request preserved
 
 ## Observable and source basis
 
@@ -119,9 +119,33 @@ MODULEs, plus borrowed semantic-error reporting. Only original observed source/e
 Weak milestones qualify native readiness; a sibling error may occur before this new
 module is read. No new native/import/acquisition/spent-source operation is selected.
 
+[WP945](wp945-native-borrowed-dependency-readiness-2026-10-06.json) accepts the
+opt-in four-root native observer under the normal Host/Local/request-policy owners.
+The existing three-root default is preserved in one shared test body. Six ordinary
+controls pass in1.191s/55,480KiB; separate Core preparation16.238s and direct Core/CLI
+check7.334s pass. The once-only native observation passes in0.241s at conservative
+67,312KiB RSS, with53 current pins and four held-FD parent MODULE brackets totaling
+5669B. Genuine native root426B/fullhash/firstWeak succeeds; all scope/recorder/source
+credits and original observed owners retire. Preparation memory remains separately
+reported; these finite runtime results do not establish full-workload fit.
+
+Normal mapping returns the actual semantic RegistryFileTransport prerequisite. While
+its original error is held, the borrowed tuple records bazel_skylib1.8.2 and its outer
+63B MODULE request; this is a retained discovery request, not completed MVS/BCR proof.
+The separate diagnostic recorder row remains unqualified. NetworkDisabled admits no
+transferred/decoded/written registry bytes. A sibling error arrives before the new
+bazel_features source enters the returned native epoch: its source/bytes/hash/evaluation
+remain unavailable. No mapping certificate/generated provider/public Rustc is admitted.
+
+Next use [the source owner recommendation](../../../../target/wp945/successor-source.md)
+to ground this precise request against independent saved declarations and exact local
+source availability, then continue ordinary native loading. All earlier spent-source,
+acquisition, full-root and memory limits remain unchanged; no new operation is selected.
+
 ## Ownership, scope and allocation
 
-The latest checkpoint reuses unchanged bounded source readers; no production change.
+The latest checkpoint adds an optional fourth binding, borrowed diagnostic reporting and
+a focused whole-Need control in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
 error; version.normalized() exposes its already parsed canonical spelling, not an authored
@@ -137,9 +161,9 @@ root/platforms sources and root Arc identity. That branch remains source-reviewe
 unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
 
-Root owns bounded wrappers, integration and the compact receipt. The next contract must
-select the exact retained diagnostic owner or independently grounded source locator
-before edits or operation. Consequential ownership/representation/operation changes
+Root owns bounded wrappers, integration and compact receipts. The next contract must
+freeze the independently grounded source-specific correction for the actual bazel_skylib
+request before another source/native operation. Consequential ownership/representation/operation changes
 receive independent design and final review. Prefer existing natural owners and bounded
 companions to copied large harnesses; record any concrete shared-boundary growth reason.
 
