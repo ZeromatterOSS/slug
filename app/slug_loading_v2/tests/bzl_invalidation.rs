@@ -2180,7 +2180,16 @@ probe = rule(implementation = _impl, attrs = {
     else {
         panic!("expected Starlark rules")
     };
-    assert_eq!(initial_rule, equivalent_rule);
+    // Equivalent outputs still retain distinct provenance after the source edit.
+    assert_ne!(initial_rule, equivalent_rule);
+    assert_eq!(
+        initial_rule.predeclared_outputs,
+        equivalent_rule.predeclared_outputs
+    );
+    assert_eq!(
+        initial_rule.output_to_genfiles,
+        equivalent_rule.output_to_genfiles
+    );
     write(&defs, schema_v1);
 
     write(

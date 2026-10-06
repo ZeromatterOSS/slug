@@ -12,49 +12,45 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component borrows existing frozen local/module/global names
-for compiler typo matching, removing per-name scratch Strings. Candidate order,
-duplicates, tie selection and final owned diagnostics remain unchanged. This is
-Slug-native scratch ownership with admitted behavior unchanged. Next: select a
-proved redundant copy or existing interner reuse at local string owners through
-a bounded design checkpoint.
+The latest accepted component borrows existing attribute and target strings for
+rule output templates, removing per-element projection, placeholder and temporary
+dedup key copies. Exact outputs, errors, order and final ownership remain unchanged.
+This is Slug-native scratch ownership with admitted behavior unchanged. Next:
+select a proved redundant copy or existing interner reuse at local string owners
+through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted diagnostic name memory contract
+## Accepted output-template string memory contract
 
-Both private compiler suggestion helpers borrow existing frozen local/module/
-global name bytes within self lifetimes. Synchronous matching keeps reversed
-locals, module/global order, duplicates, unknown Globals None and first ties.
-Selected suggestion and missing identifier stay owned in published errors;
-normal frozen owners remain alive during comparison. No public API/cache/interner/
-key/unsafe/dependency or retained representation change.
+Private projected_values/single_value and temporary SmallSet borrow immutable
+coerced attribute strings and canonical-label target fragments through synchronous
+append. Projection/extension rules, content dedup, first-seen order, cardinality,
+target slices and exact errors remain unchanged; final CompactString names/keys/
+labels and errors stay owned. No public API/interner/cache/key/unsafe/dependency/
+retained representation changes. All six source shapes and four placeholders
+share owner pointers; same-test baseline has one semantic pass/two pointer failures.
 
-Three DESIGN/FINAL reviews accept the component. Same-test baseline exact bytes/
-ordering and six retained diagnostic message/span cases pass, then two pointer
-assertions fail. Candidate 22/22 includes global/nested-scope pointer, unknown/
-empty globals, ties and retained errors after source/module/Globals heap drops;
-protected matching, scope/capture/comprehension and actual carrier controls pass.
-Default Loading/Core/CLI alltarget check passes. Fixed32x1024B global name content
-is borrowed: pointer matches0→32; ordered visible matches0→14. Source/type/pointers
-prove removed copies, not aggregate allocated capacity/RSS. Cold diagnostic path;
-vectors, matching work, final errors and frozen source owners remain. No peak/
-speed/whole-workload/source-fit claim.
-
-Root owns edits, serial Cargo and commits. Pinned nightly-2025-09-14, serial offline
-Starlark no-run Cargo JSON/fresh exact preflight/focused tests; preparation60s/
-tests30s, goldens CARGO_MANIFEST_DIR and no regeneration. Format and plan/archive/
-diff checks. Keep future changes bounded at existing string owners with reviewed
-design and focused discriminators. Join estimates remain unselected. Full WP899/
-M7A/source and integration gates remain unwaived/unaccepted.
+Three DESIGNs/FINALs accept nine required controls as 5+3+1 and default Core/CLI
+checks. The complete DICE restoration control exposed an unchanged stale whole-rule
+Eq assertion after a source edit. A separately reviewed one-site correction asserts
+distinct full source identity plus equivalent output facts; production Eq and all
+later restoration checks remain intact. Rebuilt only that artifact; preserved
+passing artifacts and attributed failed evidence. Source/type/pointers prove
+scratch-copy removal only; vectors/set metadata/final/error/coerced owners remain.
+No aggregate capacity/peak/RSS/speed/source-fit claim. Serial pinned offline
+validation with exact artifact preflights and format/plan/archive/diff checks is
+recorded in the receipt below. Join capacity remains unselected; full WP899/M7A/
+source/integration requirements remain unwaived/unaccepted.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Rule output templates borrow existing attribute/target strings and temporary dedup keys; all six shapes/four placeholders, exact order/errors and owned outputs preserved. Three DESIGNs/FINALs; baseline 1 semantic pass/2 pointer failures, candidate 9 controls as5+3+1 and default Core/CLI checks. Reviewed stale DICE assertion correction preserves changed source identity and equivalent output facts. Scratch copies only; no aggregate/RSS/speed claim | [Output-template borrowing](wp899-output-template-borrow-2026-10-05.json) |
 | Compiler typo matching borrows existing frozen names; reversed-local/module/global order, duplicates, ties and owned diagnostics preserved. Three DESIGNs/FINALs, baseline 1 semantic pass/2 pointer failures; candidate 22/22 and default dependent checks. Fixed32x1024B global payloads now borrowed, owner matches0→32 and nested visible matches0→14. Cold scratch only, vectors/matching/final errors remain | [Scope-name borrowing](wp899-scope-name-borrow-2026-10-05.json) |
 | Native nonstring formatting copies untouched suffix directly into final owned string; prefix and renderer callback preserved. Three DESIGNs/FINALs, same-test baseline 2 semantic passes/1 capacity failure, candidate 30/30 and default dependent checks. Fixed 1MiB suffix initial scratch capacity 1,048,589B→13B; render growth/final storage/peak/RSS/speed excluded | [Formatter suffix direct copy](wp899-format-suffix-direct-2026-10-05.json) |
 | Empty-segment native formatting reuses existing StringValue, including percent single-tuple delegation; compiler own frozen interning unchanged. Three DESIGNs/FINALs, baseline pointer/arena failures, candidate 23/23 and default dependent checks pass. Fixed 64KiB cases share inputs with zero arena growth; chunks/padding excluded from exact payload/RSS/speed claims | [Empty-format input reuse](wp899-empty-format-reuse-2026-10-05.json) |

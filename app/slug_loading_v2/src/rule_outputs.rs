@@ -66,20 +66,20 @@ fn substitute_template(
         let value = single_value(placeholder, target_name, attributes)?.ok_or_else(|| {
             anyhow::anyhow!("For attribute '{key}' in outputs: Invalid placeholder(s) in template")
         })?;
-        output.push_str(&value);
+        output.push_str(value);
         remaining = &after[end + 1..];
     }
     output.push_str(remaining);
     Ok(output.into())
 }
 
-fn single_value(
+fn single_value<'a>(
     name: &str,
-    target_name: &str,
-    attributes: &[AttributeValue],
-) -> anyhow::Result<Option<CompactString>> {
+    target_name: &'a str,
+    attributes: &'a [AttributeValue],
+) -> anyhow::Result<Option<&'a str>> {
     if let Some(value) = target_placeholder(name, target_name) {
-        return Ok(Some(value.into()));
+        return Ok(Some(value));
     }
     let Some(value) = attributes
         .iter()
@@ -100,28 +100,26 @@ fn target_placeholder<'a>(name: &str, target: &'a str) -> Option<&'a str> {
     }
 }
 
-fn projected_values(
+fn projected_values<'a>(
     name: &str,
-    value: &CoercedAttributeValue,
-) -> anyhow::Result<Vec<CompactString>> {
-    let remove_extension = |label: &CanonicalLabel| {
+    value: &'a CoercedAttributeValue,
+) -> anyhow::Result<Vec<&'a str>> {
+    let remove_extension = |label: &'a CanonicalLabel| {
         let target = label.target().as_str();
         let slash = target.rfind('/').map_or(0, |index| index + 1);
         target[slash..]
             .rfind('.')
             .map_or(target, |dot| &target[..slash + dot])
-            .into()
     };
     let values = match value {
-        CoercedAttributeValue::String(value) => vec![value.clone()],
-        CoercedAttributeValue::StringList(values) => values.to_vec(),
+        CoercedAttributeValue::String(value) => vec![value.as_str()],
+        CoercedAttributeValue::StringList(values) => values.iter().map(|v| v.as_str()).collect(),
         CoercedAttributeValue::Label(label) => vec![remove_extension(label)],
         CoercedAttributeValue::LabelList(labels) => labels.iter().map(remove_extension).collect(),
-        CoercedAttributeValue::Output(label) => vec![label.target().as_str().into()],
-        CoercedAttributeValue::OutputList(labels) => labels
-            .iter()
-            .map(|label| CompactString::new(label.target().as_str()))
-            .collect(),
+        CoercedAttributeValue::Output(label) => vec![label.target().as_str()],
+        CoercedAttributeValue::OutputList(labels) => {
+            labels.iter().map(|label| label.target().as_str()).collect()
+        }
         CoercedAttributeValue::Selector { .. } | CoercedAttributeValue::Concatenation(_, _) => {
             anyhow::bail!("Attribute {name} is configurable and cannot be used in outputs");
         }
@@ -140,7 +138,7 @@ fn projected_values(
     let mut seen = SmallSet::new();
     Ok(values
         .into_iter()
-        .filter(|value| seen.insert(value.clone()))
+        .filter(|value| seen.insert(*value))
         .collect())
 }
 
@@ -149,6 +147,10 @@ fn unsupported<T>(name: &str, kind: &'static str) -> anyhow::Result<T> {
         "For attribute '{name}' in outputs: Attributes of type {kind} cannot be used in an outputs substitution template"
     )
 }
+
+#[cfg(test)]
+#[path = "rule_output_memory_tests.rs"]
+mod rule_output_memory_tests;
 
 #[cfg(test)]
 mod tests {

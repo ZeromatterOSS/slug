@@ -1,0 +1,390 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e10420399",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_loading_v2/src/rule_outputs.rs": "b9deed1d03a256632ae3718c120f2272e972a309a17e6bec1debef11d9947b49",
+    "app/slug_loading_v2/src/rule_output_memory_tests.rs": "ec2138ed08901e8db11a68a594ac5871bdb2a9d2236cbcffe77ddacb0825d836",
+    "app/slug_loading_v2/tests/bzl_invalidation.rs": "56f21b7c94cf80493e794df7d048bf58423d5bbb6d23c6646c9c4cb33894fa14"
+  },
+  "design_sha256": "81b1bb409638f242741a25d800221cabc7ce0a97838578941056303d03c842f4",
+  "design_reviews": {
+    "target/wp899/output-template-borrow-design-source.md": "fa044a65f39a77c4b787fd3928556c2b4dcf806586045096e42aff9e2a9fdb3d",
+    "target/wp899/output-template-borrow-design-input.md": "cf32bab5c16abdd74302042009a444323bd9adfb93e44a9d4009d158c78590b1",
+    "target/wp899/output-template-borrow-design-evidence.md": "8e53046a108be1994467369b56f47c27a87e235e0868105f1a24dd2762d56796"
+  },
+  "correction_design_sha256": "1c2b6a1391f99b6f976ce477247e2b030761aa81746d751b39c77b0b4cdfcfab",
+  "correction_design_reviews": {
+    "target/wp899/output-template-borrow-restoration-design-source.md": "6e412dfaa90bb05bf379c2f487d5fa67796b53e9909e95b97508a0ed35002f1b",
+    "target/wp899/output-template-borrow-restoration-design-input.md": "7f74b1535d69cc07d0ac9d49d7557a473fc41797df012cead11d72551594b93d",
+    "target/wp899/output-template-borrow-restoration-design-evidence.md": "e903417e55f298157c38bf65fb71091a41d0a15e1ea0b08c04371a89890dc86f"
+  },
+  "ownership_proof": "Exact entire-file comparison proves only borrowed projection and single-value signatures/branches, copied SmallSet refs, synchronous append and test hook. Final output names/keys remain CompactString owned; attributes/label targets live during borrow. Same new-owner tests baseline/candidate. Exact restoration-test comparison proves only reviewed full-identity inequality plus equal output/flag assertions; all remaining restoration checks untouched.",
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/output-template-borrow-baseline-compile.json",
+      "receipt_sha256": "6303f96403ccdd56af7f41f7bd4a070173e79a4b30f0f85221367f099ad16e56",
+      "exit_code": 0,
+      "elapsed_seconds": 20.94736766401911,
+      "log_sha256": "156de0a372c2597985ed839e174145100b7ff68b93c685d1a97959c1dabd0604"
+    },
+    "baseline-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/output-template-borrow-baseline-slug_loading_v2-preflight.json",
+      "receipt_sha256": "9a60b5ffaa43d5abea12832ec18ac9dcbe2d846747d070964790d42832622c08",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022459248022641987,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-slug_loading_v2-controls": {
+      "receipt": "target/wp899/output-template-borrow-baseline-slug_loading_v2-controls.json",
+      "receipt_sha256": "ce76e1ede7749a549631516f4d4a019af5ddf72e3a0b85e8a5d74aab9c059f78",
+      "exit_code": 101,
+      "elapsed_seconds": 0.002806612988933921,
+      "log_sha256": "bb37d563a1a82ade5185d2f38ccbb4c8aed07627dfef84464ceb5133b8784bd9"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/output-template-borrow-candidate-compile.json",
+      "receipt_sha256": "62024421b4aacad16c85d87e8d433cd53b6ffb8525c977804bda4d950770ed91",
+      "exit_code": 0,
+      "elapsed_seconds": 33.40121340699261,
+      "log_sha256": "efb35d3bed8555ded519a6f663e20b25a2bf146b6b10959fed4db92667c24707"
+    },
+    "candidate-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/output-template-borrow-candidate-slug_loading_v2-preflight.json",
+      "receipt_sha256": "f6a1148e5be4cebdc4728edfb76a205cf7cc2ad96346a2e5faa3421e3c203897",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022364486008882523,
+      "log_sha256": "5973eb858aa5727b937d3b66f199adc893ad134aa1ab7a4e2baab7fb7fed92ae"
+    },
+    "candidate-slug_loading_v2-controls": {
+      "receipt": "target/wp899/output-template-borrow-candidate-slug_loading_v2-controls.json",
+      "receipt_sha256": "4b75ffed233f8576ea713f92e1eed38630a8ce5d944fd1bc20eb0c95d42b8655",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0026002019876614213,
+      "log_sha256": "5c1a1479a4cf4888dc6edb2e5d84e014502c394a289b8ed0625ef4421679d8a4"
+    },
+    "candidate-build_file_loading-preflight": {
+      "receipt": "target/wp899/output-template-borrow-candidate-build_file_loading-preflight.json",
+      "receipt_sha256": "4c0814d3c5a561cef91903bb062e6f10851444631699577b5121f9610692c8c9",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01918406196637079,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "candidate-build_file_loading-controls": {
+      "receipt": "target/wp899/output-template-borrow-candidate-build_file_loading-controls.json",
+      "receipt_sha256": "26c5690b015239f9491112109504adfd419def417d0b9b08da5884267117c95d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.027273209998384118,
+      "log_sha256": "703b133b2b161853a7b9c98f4f6c285e2650d9d8a4195b139fbee6fd40bbbf9a"
+    },
+    "candidate-bzl_invalidation-preflight": {
+      "receipt": "target/wp899/output-template-borrow-candidate-bzl_invalidation-preflight.json",
+      "receipt_sha256": "51b673030a1b3bce6349c3cbe27bc52ff012827f7ca4c0a883d2f80ca8690452",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021742702985648066,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "candidate-bzl_invalidation-controls": {
+      "receipt": "target/wp899/output-template-borrow-candidate-bzl_invalidation-controls.json",
+      "receipt_sha256": "5a5b545fc79f534b235bfc6176e911110a9103ed0e942f2c009972b1fe1ca2f4",
+      "exit_code": 101,
+      "elapsed_seconds": 0.012890301004517823,
+      "log_sha256": "c1521446e9becb395cdd967bc72590d8ce6e09f9be847d1d754a2bf4d827acb8"
+    },
+    "restoration-r1-compile": {
+      "receipt": "target/wp899/output-template-borrow-restoration-r1-compile.json",
+      "receipt_sha256": "0418d92ab0e7fb26102584d6c2e8cca443027bafe3c99a732290e5eb78c16a64",
+      "exit_code": 0,
+      "elapsed_seconds": 1.7660692100180313,
+      "log_sha256": "b01ba16cbfef3cdb1e287ba7da0a428c400a762a70f954ff88ab9abac1c562fa"
+    },
+    "restoration-r1-preflight": {
+      "receipt": "target/wp899/output-template-borrow-restoration-r1-preflight.json",
+      "receipt_sha256": "649aca023660326bce4d833058a92fadc70de514e973bce8392fd71aea752335",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021914165001362562,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "restoration-r1-controls": {
+      "receipt": "target/wp899/output-template-borrow-restoration-r1-controls.json",
+      "receipt_sha256": "426c4d734f08f454a6cc61c43b9233d048b2e0e2af28284fdc6f7c1c3e8cecd7",
+      "exit_code": 0,
+      "elapsed_seconds": 0.015639544988516718,
+      "log_sha256": "c160a505592daf0d9a325bfa2c3e900801cfdd22b848bfcfd5b4acb653a00ecb"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/output-template-borrow-dependents-check.json",
+      "receipt_sha256": "2997123018c19704db4177d565933c40f52fdc87e9433796e1412b67cb0160b3",
+      "exit_code": 0,
+      "elapsed_seconds": 4.51341690303525,
+      "log_sha256": "e6ceb099b312b4b35f5b1d688cec1f5ac90328920c61584e02ff0cbaeaed2254"
+    }
+  },
+  "final_artifacts": [
+    {
+      "target": "slug_loading_v2",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+      "artifact_sha256": "3c83fec06f12672ecc69760338dc8e226f7f159bfd315d91a1a00d98171a2ab5",
+      "selectors": [
+        "rule_outputs::rule_output_memory_tests::projected_values_share_all_six_source_shapes_and_first_duplicate_owners",
+        "rule_outputs::rule_output_memory_tests::single_placeholders_share_target_and_attribute_bytes",
+        "rule_outputs::rule_output_memory_tests::projected_output_semantics_and_owned_results_survive_input_drop",
+        "rule_outputs::tests::templates_preserve_order_literals_specials_and_distinct_single_values",
+        "rule_outputs::tests::templates_reject_missing_unsupported_configurable_and_non_single_values"
+      ]
+    },
+    {
+      "target": "build_file_loading",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/build_file_loading-ddc2c87810e6583a",
+      "artifact_sha256": "c61635f89c65a485980c2d85459f147b5b4897da0d71681f802fd46c5df84e96",
+      "selectors": [
+        "rule_predeclared_outputs_resolve_static_and_callback_declarations",
+        "imported_output_callbacks_receive_every_attribute_carrier_once_in_parameter_order",
+        "rule_predeclared_outputs_reject_invalid_bindings_templates_callbacks_and_collisions"
+      ]
+    },
+    {
+      "target": "bzl_invalidation",
+      "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/bzl_invalidation-74bf98a6ea2ad3ed",
+      "artifact_sha256": "7dfa8783582ce4f694705f50a26fd1a1d887c3db5cfa315eceb29f9752974481",
+      "selectors": [
+        "same_dice_attribute_and_rule_output_edits_are_semantic_and_recreate_cleanly"
+      ],
+      "test_source_sha256": "56f21b7c94cf80493e794df7d048bf58423d5bbb6d23c6646c9c4cb33894fa14"
+    }
+  ],
+  "invalidated_artifact": "Initial candidate bzl_invalidation artifact was rebuilt after the reviewed assertion correction. Its failure record remains attributed; lib and build_file_loading artifacts/selection/output are unchanged and reused.",
+  "baseline_result": "Exact projection bytes/first-seen duplicates/placeholders and final-owned semantic/error control pass; only2 pointer controls fail as expected.",
+  "pass_counts": {
+    "new_owner_tests": 3,
+    "existing_owner_tests": 2,
+    "package_wrapper_tests": 3,
+    "corrected_dice_restoration_test": 1,
+    "unique_candidate_controls": 9,
+    "execution_groups": [
+      5,
+      3,
+      1
+    ]
+  },
+  "metrics": {
+    "baseline": {
+      "projections": [
+        {
+          "shape": "string",
+          "count": 1,
+          "source_pointer_matches": 0
+        },
+        {
+          "shape": "strings",
+          "count": 2,
+          "source_pointer_matches": 0
+        },
+        {
+          "shape": "label",
+          "count": 1,
+          "source_pointer_matches": 0
+        },
+        {
+          "shape": "labels",
+          "count": 2,
+          "source_pointer_matches": 0
+        },
+        {
+          "shape": "output",
+          "count": 1,
+          "source_pointer_matches": 0
+        },
+        {
+          "shape": "outputs",
+          "count": 2,
+          "source_pointer_matches": 0
+        }
+      ],
+      "single": [
+        {
+          "placeholder": "name",
+          "content_bytes": 15361,
+          "source_pointer_reused": false
+        },
+        {
+          "placeholder": "dirname",
+          "content_bytes": 7169,
+          "source_pointer_reused": false
+        },
+        {
+          "placeholder": "basename",
+          "content_bytes": 8192,
+          "source_pointer_reused": false
+        },
+        {
+          "placeholder": "text",
+          "content_bytes": 5125,
+          "source_pointer_reused": false
+        }
+      ]
+    },
+    "candidate": {
+      "projections": [
+        {
+          "shape": "string",
+          "count": 1,
+          "source_pointer_matches": 1
+        },
+        {
+          "shape": "strings",
+          "count": 2,
+          "source_pointer_matches": 2
+        },
+        {
+          "shape": "label",
+          "count": 1,
+          "source_pointer_matches": 1
+        },
+        {
+          "shape": "labels",
+          "count": 2,
+          "source_pointer_matches": 2
+        },
+        {
+          "shape": "output",
+          "count": 1,
+          "source_pointer_matches": 1
+        },
+        {
+          "shape": "outputs",
+          "count": 2,
+          "source_pointer_matches": 2
+        }
+      ],
+      "single": [
+        {
+          "placeholder": "name",
+          "content_bytes": 15361,
+          "source_pointer_reused": true
+        },
+        {
+          "placeholder": "dirname",
+          "content_bytes": 7169,
+          "source_pointer_reused": true
+        },
+        {
+          "placeholder": "basename",
+          "content_bytes": 8192,
+          "source_pointer_reused": true
+        },
+        {
+          "placeholder": "text",
+          "content_bytes": 5125,
+          "source_pointer_reused": true
+        }
+      ]
+    }
+  },
+  "corrections": [
+    "Serial nocapture emits measurements on test status lines; corrected failure-list accounting and reused unchanged baseline test output, no source/test rerun.",
+    "Protected restoration test line2183 asserted complete Eq after a static-to-callback .bzl source edit. Unchanged baseline Eq includes exact source provenance; logged compared fields differ only source digest. All3 independent correction DESIGNs accepted full identity inequality plus equal output/flag, preserving all other assertions. Rebuilt/preflighted/executed only corrected artifact:1/1 pass; previous5+3 passing artifacts preserved."
+  ],
+  "attributed_failure": {
+    "baseline": "e10420399",
+    "failure": "Protected test line2183 expects complete rule Eq after changing static-output source into callback-output source.",
+    "attribution": "Only semantic compared-field difference is source provenance digest. Current unchanged PartialEq includes source_identities_by_filename; baseline files exactly match. Borrowed projection returns identical owned predeclared outputs.",
+    "digests": [
+      "22, 17, 53, 48, 117, 129, 207, 12, 171, 234, 176, 98, 162, 197, 223, 18, 87, 174, 66, 153, 88, 82, 24, 228, 169, 50, 83, 48, 145, 177, 132, 135",
+      "10, 54, 206, 61, 185, 125, 166, 156, 150, 205, 73, 3, 17, 40, 231, 247, 216, 249, 237, 27, 151, 64, 143, 1, 197, 209, 118, 100, 238, 136, 86, 41"
+    ],
+    "normal_outputs_equal": true,
+    "unchanged_baseline_sources": {
+      "app/slug_loading_v2/src/package.rs": "fb965919aafdab8b019f294a510447169df2381da4a2a6cc9e322afe04866a9e",
+      "app/slug_loading_v2/src/bzl_module.rs": "ff9700fa25992570a8036ef2521c77589a2cc18a0d2095eee708b586dacc0e1a",
+      "app/slug_loading_v2/tests/bzl_invalidation.rs": "aad5820e75604ee1ddd75d7b4a34d28e49c143dd41d8e16ac54b95e8095f0499"
+    }
+  },
+  "limits": "Source/type and actual owner pointers prove removed per-element projection/placeholder/temporary dedup key payload copies. Input/coerced/label owners, vectors/set metadata, output String/final CompactStrings and errors remain. No aggregate allocated capacity/peak/RSS/timing/workload/source-fit claim.",
+  "test_profile": "Pinned nightly-2025-09-14 default offline Loading lib/build_file_loading/bzl_invalidation, default Core/CLI alltargets. Serial Cargo prep60s, focused tests30s, fixture tests threads1. Fresh exact per-artifact preflight, regeneration absent.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. FullWP899/M7A/source/integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/output-template-borrow-baseline-accounting.json": "875e8d7b22ee3f693a670792a048b066748e3e421a53e2f1c0f79fac403d6dcc",
+    "target/wp899/output-template-borrow-baseline-compile.json": "6303f96403ccdd56af7f41f7bd4a070173e79a4b30f0f85221367f099ad16e56",
+    "target/wp899/output-template-borrow-baseline-compile.jsonl": "156de0a372c2597985ed839e174145100b7ff68b93c685d1a97959c1dabd0604",
+    "target/wp899/output-template-borrow-baseline-selectors.json": "deea889337fb2ff54409762b2e4cc28bb9672e8c2eb7bcbc95a1dc139c34517b",
+    "target/wp899/output-template-borrow-baseline-slug_loading_v2-controls.json": "ce76e1ede7749a549631516f4d4a019af5ddf72e3a0b85e8a5d74aab9c059f78",
+    "target/wp899/output-template-borrow-baseline-slug_loading_v2-controls.jsonl": "bb37d563a1a82ade5185d2f38ccbb4c8aed07627dfef84464ceb5133b8784bd9",
+    "target/wp899/output-template-borrow-baseline-slug_loading_v2-preflight.json": "9a60b5ffaa43d5abea12832ec18ac9dcbe2d846747d070964790d42832622c08",
+    "target/wp899/output-template-borrow-baseline-slug_loading_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/output-template-borrow-candidate-build_file_loading-controls.json": "26c5690b015239f9491112109504adfd419def417d0b9b08da5884267117c95d",
+    "target/wp899/output-template-borrow-candidate-build_file_loading-controls.jsonl": "703b133b2b161853a7b9c98f4f6c285e2650d9d8a4195b139fbee6fd40bbbf9a",
+    "target/wp899/output-template-borrow-candidate-build_file_loading-preflight.json": "4c0814d3c5a561cef91903bb062e6f10851444631699577b5121f9610692c8c9",
+    "target/wp899/output-template-borrow-candidate-build_file_loading-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/output-template-borrow-candidate-bzl_invalidation-controls.json": "5a5b545fc79f534b235bfc6176e911110a9103ed0e942f2c009972b1fe1ca2f4",
+    "target/wp899/output-template-borrow-candidate-bzl_invalidation-controls.jsonl": "c1521446e9becb395cdd967bc72590d8ce6e09f9be847d1d754a2bf4d827acb8",
+    "target/wp899/output-template-borrow-candidate-bzl_invalidation-preflight.json": "51b673030a1b3bce6349c3cbe27bc52ff012827f7ca4c0a883d2f80ca8690452",
+    "target/wp899/output-template-borrow-candidate-bzl_invalidation-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/output-template-borrow-candidate-compile.json": "62024421b4aacad16c85d87e8d433cd53b6ffb8525c977804bda4d950770ed91",
+    "target/wp899/output-template-borrow-candidate-compile.jsonl": "efb35d3bed8555ded519a6f663e20b25a2bf146b6b10959fed4db92667c24707",
+    "target/wp899/output-template-borrow-candidate-selectors.json": "dde8789ce9c2190cc35e149bf68d7d9307ac63680787c5ebf821a3bc961d14e1",
+    "target/wp899/output-template-borrow-candidate-slug_loading_v2-controls.json": "4b75ffed233f8576ea713f92e1eed38630a8ce5d944fd1bc20eb0c95d42b8655",
+    "target/wp899/output-template-borrow-candidate-slug_loading_v2-controls.jsonl": "5c1a1479a4cf4888dc6edb2e5d84e014502c394a289b8ed0625ef4421679d8a4",
+    "target/wp899/output-template-borrow-candidate-slug_loading_v2-preflight.json": "f6a1148e5be4cebdc4728edfb76a205cf7cc2ad96346a2e5faa3421e3c203897",
+    "target/wp899/output-template-borrow-candidate-slug_loading_v2-preflight.jsonl": "5973eb858aa5727b937d3b66f199adc893ad134aa1ab7a4e2baab7fb7fed92ae",
+    "target/wp899/output-template-borrow-controls.py": "9818ca396639f770f19c2e5de54d7ffa4c97a22e17e72fc79eca2ae209f84c2c",
+    "target/wp899/output-template-borrow-dependents-check.json": "2997123018c19704db4177d565933c40f52fdc87e9433796e1412b67cb0160b3",
+    "target/wp899/output-template-borrow-dependents-check.jsonl": "e6ceb099b312b4b35f5b1d688cec1f5ac90328920c61584e02ff0cbaeaed2254",
+    "target/wp899/output-template-borrow-design-evidence.md": "8e53046a108be1994467369b56f47c27a87e235e0868105f1a24dd2762d56796",
+    "target/wp899/output-template-borrow-design-input.md": "cf32bab5c16abdd74302042009a444323bd9adfb93e44a9d4009d158c78590b1",
+    "target/wp899/output-template-borrow-design-source.md": "fa044a65f39a77c4b787fd3928556c2b4dcf806586045096e42aff9e2a9fdb3d",
+    "target/wp899/output-template-borrow-design.md": "81b1bb409638f242741a25d800221cabc7ce0a97838578941056303d03c842f4",
+    "target/wp899/output-template-borrow-record.py": "7bc269e565e0b34dbdae2eb3d5a3eff5441cb43b7bd2bcf659fed0ccc38b9f2d",
+    "target/wp899/output-template-borrow-restoration-attribution.json": "4292901668e1b7a054e4737d3c75ea4b6d3e7a8e67ebccff6369f1c26a0a459e",
+    "target/wp899/output-template-borrow-restoration-controls.py": "92b0aec54c445aa37c510403d46d140f17c2afaa00b53adc646b36d3bcb0f906",
+    "target/wp899/output-template-borrow-restoration-design-evidence.md": "e903417e55f298157c38bf65fb71091a41d0a15e1ea0b08c04371a89890dc86f",
+    "target/wp899/output-template-borrow-restoration-design-input.md": "7f74b1535d69cc07d0ac9d49d7557a473fc41797df012cead11d72551594b93d",
+    "target/wp899/output-template-borrow-restoration-design-source.md": "6e412dfaa90bb05bf379c2f487d5fa67796b53e9909e95b97508a0ed35002f1b",
+    "target/wp899/output-template-borrow-restoration-design.md": "1c2b6a1391f99b6f976ce477247e2b030761aa81746d751b39c77b0b4cdfcfab",
+    "target/wp899/output-template-borrow-restoration-r1-compile.json": "0418d92ab0e7fb26102584d6c2e8cca443027bafe3c99a732290e5eb78c16a64",
+    "target/wp899/output-template-borrow-restoration-r1-compile.jsonl": "b01ba16cbfef3cdb1e287ba7da0a428c400a762a70f954ff88ab9abac1c562fa",
+    "target/wp899/output-template-borrow-restoration-r1-controls.json": "426c4d734f08f454a6cc61c43b9233d048b2e0e2af28284fdc6f7c1c3e8cecd7",
+    "target/wp899/output-template-borrow-restoration-r1-controls.jsonl": "c160a505592daf0d9a325bfa2c3e900801cfdd22b848bfcfd5b4acb653a00ecb",
+    "target/wp899/output-template-borrow-restoration-r1-preflight.json": "649aca023660326bce4d833058a92fadc70de514e973bce8392fd71aea752335",
+    "target/wp899/output-template-borrow-restoration-r1-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/output-template-borrow-restoration-r1-selectors.json": "778a02e1161ee1e5a3156d22387e91ac8c216c0e0ab2217ef61d16d1a6318d11",
+    "target/wp899/output-template-borrow-start.json": "72dc259a19a07e08b5b03f4e17f548a36a48778833149de3945de9f774b30907"
+  },
+  "timing": {
+    "compile_seconds": 60.628067184065,
+    "test_seconds": 0.061209870968014,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 784.4872200489044
+  },
+  "validation_sha256": "a9df72c85faf2cfeefafe40e762dd4df113ebeca1dc62c0813ae3af0bf76471d",
+  "final_reviews": {
+    "target/wp899/output-template-borrow-final-source.md": "af3644e86c2ba2ae6bb377ad747d385c9e589a216badfc6057a92fcf7c06e478",
+    "target/wp899/output-template-borrow-final-input.md": "7cee041ae03de5698d22ef0ca13dc62e5b2ec0d7c11c71b863532a7cdb9ad45a",
+    "target/wp899/output-template-borrow-final-evidence.md": "e43eb648346eab1ff76d0421bbe716b4d0d425464e5806065840b53361c85935"
+  },
+  "test_growth": "221-line sibling covers all six source shapes, first-owner dedup, target placeholders, exact errors and retained final ownership; existing production owner remains cohesive. One protected DICE assertion site corrected with full source identity preserved.",
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/output-template-borrow-format-check.json",
+      "sha256": "28be85518d8d7624959eb20af51f47bf9704926a405d137f72991437fdbd3512",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/output-template-borrow-diff-check.json",
+      "sha256": "5917e3c613cebd19e022b021ac07cfb05a49e687b4db0e2141839e15dcaa4f82",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/output-template-borrow-plan-check.json",
+      "sha256": "3e3008923eb675e1e237aed9c57020a87a075bdc8b2bd452c283b2577153edb6",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/output-template-borrow-archive-check.json",
+      "sha256": "e77aa7802a67759ddbafdfe7fee39356fa7525848003ad188ef421c03858de6e",
+      "exit_code": 0
+    }
+  }
+}
