@@ -412,7 +412,14 @@ allocator compiler arguments or execution. WP770 adds pure typed command/environ
 expansion from published recipes, including fresh argv versus original environment
 cache scopes and explicit client-environment resolution. Complete command tests
 cover inert public C/C++ PIC/main/external/target/exec recipes and same-DICE
-restoration; they do not establish production allocator commands. WP771 supplies
+restoration; they do not establish production allocator commands.
+[WP921](wp921-public-compile-query-2026-10-06.json) connects the unchanged public caller
+through actual main/external Target/selected Exec closures to the accepted typed query.
+Fourteen recipes preserve optimized Exec PIC then NOPIC, fixed PATH/env, borrowed input
+roles and roots, ordered full records and source/configuration A/B/A release. Its 71
+Core checks use qualified69+1+1 union plus three Analysis controls; production and retained
+storage are unchanged. Actual allocator flags, discovery/execution and whole memory
+fit remain open. WP771 supplies
 regular-file input sets and pure supplied-dotd reconciliation with explicit source
 resolution and action-configuration inclusion policy. Synthetic dependency bytes
 over real published recipes are not compiler-output evidence. Core discovery

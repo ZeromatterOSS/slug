@@ -34,32 +34,32 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-220-m7a-public-compile-query-correspondence-r1
-Status: External FileWrite query accepted; public compile producer/query proof selected
+Packet: WP-7-221-m7a-build-info-recipe-render-r1
+Status: Public compile producer/query accepted; finite BuildInfo recipe renderer selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects normal public compile
-producer-to-query correspondence using existing published command/owner controls.
-[WP920](./slug-v2-subplans/wp920-external-file-write-aquery-2026-10-06.json) accepts
-external-owned scalar FileWrite projection through genuine main-root dependencies,
-with retained canonical prefixes/labels/roots, Target/Exec and complete generic/family
-Deps. All69 distinct Core controls pass by qualified68+1 union, CLI compiles and three
-FINAL reviews accept. Standalone external-rule source requests retain their exact
-exported-source-only refusal; no source dispatch or shared owner/identity/execution
-change. Paths remain borrowed and scratch action-local, including existing identity
-content-byte copies. No retained pool is added. Full-root, authentic source/runtime,
-whole-workload memory fit and M7A remain open; allocation/interner discipline,
-source16/17/18/caps and minimal Windows scope persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects pure finite BuildInfo
+recipe rendering on supplied borrowed status/template strings, preserving the tracked
+status/template/volatile execution prerequisites. [WP921](./slug-v2-subplans/wp921-public-compile-query-2026-10-06.json)
+proves unchanged public compile callers reach typed query with fourteen actual main/
+external Target/selected Exec recipes, including ordered Exec PIC and NOPIC actions.
+Complete class records, borrowed roles/context roots, fixed env/recipe-last info and
+source/configuration A/B/A release pass. All71 distinct Core controls pass by qualified
+69+1+1 union, three Analysis controls pass and three FINAL reviews accept. Only test
+helper/sibling wiring changes; production and retained storage are unchanged. The
+separate Analysis direct-to_exec twelve-case proof keeps its fastbuild provenance.
+Full-root, authentic source/runtime, whole-workload memory fit and M7A remain open;
+allocation/interner discipline, source16/17/18 caps and minimal Windows scope persist.
 
 ### Ready and blocked queue
 
-The current packet selects demanded action-query coverage under priority3; the remaining
+The current packet selects demanded finite BuildInfo rendering under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects public compile producer/query correspondence; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects finite BuildInfo recipe rendering; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

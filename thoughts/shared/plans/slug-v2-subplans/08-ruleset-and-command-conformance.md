@@ -470,6 +470,17 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   64 controls plus9 BuildAPI gates/defaultCLI; genuine restricted constructor/source
   route corrections preserve assertions. No discovery/execution, ActionKey, source retry,
   retained pool, full-root/M7A or whole-memory-fit admission.
+- [WP921 public compile/query proof](wp921-public-compile-query-2026-10-06.json)
+  couples unchanged public cc_common.compile callers to the admitted borrowed query
+  view. Fourteen genuine C/C++/PIC recipes cover main/external Target/selected Exec;
+  optimized Exec PIC owners retain ordered PIC then NOPIC. Complete ordered class
+  records, strict fixed PATH versus feature/inherited env, recipe-last info, own roots,
+  source/configuration A/B/A and final text after owner/engine release pass. The older
+  twelve-case Analysis direct-to_exec proof keeps its separate fastbuild provenance.
+  Seventy-one distinct Core checks pass by qualified69+1+1 union and three Analysis
+  controls pass. Only shared test helpers and one nested sibling change; production,
+  scoped interners and retained storage stay unchanged. Inert toolchain/query proof
+  does not establish actual allocator commands, discovery, execution or whole fit.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command

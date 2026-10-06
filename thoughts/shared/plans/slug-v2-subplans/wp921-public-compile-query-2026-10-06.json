@@ -1,0 +1,236 @@
+{
+  "packet": "WP-7-220-m7a-public-compile-query-correspondence-r1",
+  "operational_packet": "WP921",
+  "date": "2026-10-06",
+  "base": "ae8e2ffc2e51060453930d3559f4f81cecece92c",
+  "status": "accepted",
+  "outcome": "Normal public cc_common.compile correspondence to existing typed CppCompile query over genuine main/external Target/selected Exec closures; fourteen complete ordered public recipe records and source/configuration restoration.",
+  "compatibility": {
+    "exact": "Inherited WP918 pinned class/input/options/fixed-env/info algorithms within Default Unix pre-discovery/no-paramfile admitted slice. No new formatter behavior.",
+    "slug_native": "Canonical labels/configuration/path tokens, action publication/structural identity and ordering domains unchanged.",
+    "deferred": "Actual allocator/toolchain/compiler command correspondence, discovery/execution/ActionKey, authentic source/runtime/full-root/M7A, Latin1 or Windows breadth and whole-workload memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "basis": "Existing WP918 CppCompileAction class source and unchanged44-body public constructor corpus; cc_helper_internal333\u2013357 /compile.bzl228\u2013231,1431,1468 prove Targetfastbuild PIC and selectedExecopt PIC+NOPIC emission. Separate Analysis directto_exec twelve-case controls retain fastbuild provenance."
+  },
+  "ownership": {
+    "production": "Zero production/API/retained representation/key/cache/interner/graph/identity/publication/locking changes. One private test owner with borrowed additional epoch inputs and shared normal Local-first exact selected Immutable completion protocol; old defaults/control bodies unchanged.",
+    "scratch": "Existing query borrows tool/context/path owners, fresh options remain action-local and final text owns bytes. Unique Source identities still copy through inherited visitor loans; no zero-copy or workload-fit claim. Test snapshots deliberately retain Arc owners until explicit release."
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/tests/cpp_compile_aquery_tests.rs": "0f63c24ade0ed782603ba8d53c802e9818c410010a0c80e229d1c7ea6147cd2f",
+    "app/slug_core_v2/src/runtime/tests/cpp_compile_public_aquery_tests.rs": "492b3188e6e1e664cc8d2b8add101c54c74409cac77b32f2115b6b5b6da33a09"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved nightly-2025-09-14, offlineJSON <=60s TERM3, jobs1 four-package invocation-only opt0/debug0; exact nonignored preflight, serial10s TERM3 runtime. No concurrent Cargo/native fixtures.",
+    "compiles": {
+      "core-tests-caller-corrected": {
+        "exit": 0,
+        "seconds": 8.341174689936452,
+        "receipt": "target/wp921/core-tests-caller-corrected.json"
+      },
+      "core-tests-ordered": {
+        "exit": 0,
+        "seconds": 8.789952860912308,
+        "receipt": "target/wp921/core-tests-ordered.json"
+      },
+      "analysis-tests-prepared": {
+        "exit": 0,
+        "seconds": 5.389018501969986,
+        "receipt": "target/wp921/analysis-tests-prepared.json"
+      },
+      "analysis-tests": {
+        "exit": 101,
+        "seconds": 0.07588453905191272,
+        "receipt": "target/wp921/analysis-tests.json"
+      },
+      "core-tests-environment": {
+        "exit": 101,
+        "seconds": 1.5502325319685042,
+        "receipt": "target/wp921/core-tests-environment.json"
+      },
+      "core-tests-corrected": {
+        "exit": 0,
+        "seconds": 6.503796339966357,
+        "receipt": "target/wp921/core-tests-corrected.json"
+      },
+      "core-tests-environment-corrected": {
+        "exit": 0,
+        "seconds": 8.345142688951455,
+        "receipt": "target/wp921/core-tests-environment-corrected.json"
+      },
+      "core-tests-diagnostic": {
+        "exit": 0,
+        "seconds": 7.876862918026745,
+        "receipt": "target/wp921/core-tests-diagnostic.json"
+      },
+      "analysis-tests-corrected": {
+        "exit": 124,
+        "seconds": 60.00422202597838,
+        "receipt": "target/wp921/analysis-tests-corrected.json"
+      },
+      "core-tests": {
+        "exit": 0,
+        "seconds": 9.498180162045173,
+        "receipt": "target/wp921/core-tests.json"
+      }
+    },
+    "core_distinct_passed": 71,
+    "core_qualification": "69 initial protected passes +1 ordered lifecycle +1 caller corrected fields; not final71 rerun. Lifecycle byte-identical to passing ordered source; parent defaults/protected original three test bodies preserved. All production unchanged.",
+    "core_receipts": [
+      {
+        "receipt": "core-results.json",
+        "selected": 71,
+        "passed": 69,
+        "elapsed_seconds": 3.0236714569618925,
+        "max_child_rss_kib": 117852
+      },
+      {
+        "receipt": "core-results-corrected.json",
+        "selected": 2,
+        "passed": 1,
+        "elapsed_seconds": 0.798655471066013,
+        "max_child_rss_kib": 119172
+      },
+      {
+        "receipt": "core-results-caller-corrected.json",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.3797191280173138,
+        "max_child_rss_kib": 119116
+      }
+    ],
+    "final_core_preflight": {
+      "exit_code": 0,
+      "output": "Verified 71 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21189755701925606,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "f8c6ddc5ced5c4e9c3c7a7590fdbb83a50dda19f8495447d4bdbad7a03b12040",
+      "selected": 71,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "analysis": {
+      "selected": 3,
+      "passed": 3,
+      "seconds": 1.6294599620159715,
+      "max_child_rss_kib": 101556,
+      "receipt": "target/wp921/analysis-results.json",
+      "preflight": {
+        "exit_code": 0,
+        "output": "Verified 3 exact nonignored test(s); no tests executed.\n",
+        "elapsed_seconds": 0.16726651892531663,
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-3e0b37736bfde50c",
+        "executable_sha256": "5622cf6c4bd42e298cce23ffb583fabcc1c4c5cf15bed8a0457982493104908e",
+        "selected": 3,
+        "artifact_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false
+      },
+      "provenance": "First2 normalpublic compile command+restoration; third restricted lifecycle.bzl fresh dotted-cache gate, not public constructor proof."
+    },
+    "checks": [
+      {
+        "name": "rustfmt",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "--check",
+          "app/slug_core_v2/src/runtime/tests/cpp_compile_aquery_tests.rs",
+          "app/slug_core_v2/src/runtime/tests/cpp_compile_public_aquery_tests.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.01537543092854321
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0031827539205551147
+      },
+      {
+        "name": "archive-status",
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03436320589389652
+      }
+    ],
+    "cli": "No production changes; no additional CLI build justified."
+  },
+  "discriminators": "Four actual root bridges expose three public owners each. Target3/selectedExec4 compiler actions for main/external; exact per-owner PIC bits/modes/counts, complete ordered blocks and root Literal prefix/Deps concatenation. Tool/options/object/dotd/inputrole union, mandatory-first header versus source, fixedPATH versus effective FEATURE_ONLY/PWD/inherited environment and nonempty recipe-last requirements, all borrowed pointers/own roots/Default/aspect/group/platform/no-scanning/module/param guards. Actual observed BUILD flags A/B/A with duplicates/empty and structural Copt A/B/A on same engine, held owner/spec/Variables unchanged, final text after outcomes/snapshots/transactions/engine drop.",
+  "corrections": {
+    "preparation": "Nonexistent Cargo target rustc_map_each corrected to owning starlark_rule;60s large integration preparation timeout published current Analysis library, then missing executable completed5.389s with same cap/profile. Selector preflight omitted ::tests:: for2new names corrected before runtime. Failures/logs preserved.",
+    "fixture": "Both new controls initially failed root-level epoch parent assumption before analysis; borrowed root parent handling corrected, old nested spellings unchanged. Source review strengthened same-mnemonic fullblock ordering. PATH expected block corrected to actual source-derived strictfixed Unix PATH; original public producer/query guards unchanged.",
+    "caller": "Actual selected cfg=exec uses host modeopt and emits ordered PIC/NOPIC unlike older directto_exec fastbuild control. Three bounded correction DESIGN reviews accept fourteen explicit recipes, keeping every real action; no feature tweak or fabricated context. Lifecycle body byte-identical to its prior pass; only missing fields rerun.",
+    "receipts": [
+      "target/wp921/preparation-correction.md",
+      "target/wp921/fixture-correction.md",
+      "target/wp921/caller-correction.md",
+      "target/wp921/lifecycle-body-hash.json",
+      "target/wp921/protected-body-hashes.json"
+    ]
+  },
+  "provenance": "Finite authored observed source/registry/normal Local+selected Immutable request completion fixture; unchanged public subject/toolmaker are borrowed by include_str, inert tool-provider bridge only. No copied corpus/protocol, fake positive spec, external requested evaluation, source/materializer/certificate/compiler execution claim. External rules consumed via actual root dependencies; standalone exported-source-only rule refusal unchanged.",
+  "reviews": {
+    "source": {
+      "receipt": "target/wp921/final-source.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "6e26916ac4abaf30d3e3994c3497830aee711e4cfd5a3436f20c4a3fb447d98e"
+    },
+    "ownership": {
+      "receipt": "target/wp921/final-ownership.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "090d9bf93d61442a8bb6e13e8e02d2ba734bb0400c6c0ed5eb651aebcb6ae036"
+    },
+    "evidence": {
+      "receipt": "target/wp921/final-evidence.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "b0b20a311e48a58f465edddf08f51a90df7e0e3d139743ac68cf5a6f047edd68"
+    }
+  },
+  "growth": {
+    "production": "0",
+    "tests": "645-line nested sibling plus bounded parent private helper factoring. Reviewed independent full command/class oracle, authored declarations, borrowed/policy/input facts and two fields/lifecycle controls; no duplicate registry/module/materialization/source table, new assets or public fixture API. Above250estimate accepted by root/three FINAL responsibilities."
+  },
+  "timing": {
+    "compile_seconds": 116.37446725880727,
+    "recorded_runtime_seconds": 6.337847035960294,
+    "observed_since_recorded_start_seconds": 2012.0408550739521,
+    "start_qualification": "Start recorded after predecessor selection/discovery, not whole goal elapsed.",
+    "review_seconds": "not independently measured"
+  },
+  "successor": {
+    "packet": "WP-7-221-m7a-build-info-recipe-render-r1",
+    "basis": "Four demanded TranslateBuildInfo rows, existing checked finite builtin recipe registration/query and missing source-derived pure supplied-string rendering prerequisite. Borrow status/template into independent final String; status producer/read/Latin1/volatile/runtime remain separately gated.",
+    "source_note": "target/wp921/successor-source.md"
+  },
+  "remaining": "Original memory refusal/capped cache+transport qualifications persist; unique/history/whole-workload fit unknown. Focused childRSS<=119172KiB is not wholefit proof. Source16/17/18 spent/caps unchanged; full-root/runtime/M7A remain open.",
+  "operational_evidence": {
+    "directory": "target/wp921",
+    "hash_index": "target/wp921/operational-hashes.json",
+    "index_sha256": "266b09024b7b8546ae0f3d68d74028198e92933e76002c588697f382c61c0c7e"
+  }
+}

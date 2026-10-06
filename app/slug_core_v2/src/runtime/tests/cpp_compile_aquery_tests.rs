@@ -169,6 +169,15 @@ fn cpp_dice() -> Arc<Dice> {
 }
 
 fn cpp_epoch(revision: i64, marker: &str) -> PathObservationEpoch {
+    cpp_epoch_with(revision, marker, &[], None)
+}
+
+fn cpp_epoch_with(
+    revision: i64,
+    marker: &str,
+    additional_files: &[(&str, &str)],
+    root_build: Option<&str>,
+) -> PathObservationEpoch {
     let mut epoch = BuildRootEpoch::base(revision);
     let mut module =
         "module(name='root')\nregister_execution_platforms('//:platform')\n".to_owned();
@@ -215,13 +224,17 @@ fn cpp_epoch(revision: i64, marker: &str) -> PathObservationEpoch {
             .len(),
         44
     );
-    for (path, body) in files.into_iter().chain([
-        (
-            "rules_cc/cc/private/toolchain_proof.bzl",
-            include_str!("../../../../slug_analysis_v2/tests/rustc_map_each/cc_toolchain.bzl"),
-        ),
-        ("rules_cc/cc/private/query_compile.bzl", CPP_DEFS),
-    ]) {
+    for (path, body) in files
+        .into_iter()
+        .chain([
+            (
+                "rules_cc/cc/private/toolchain_proof.bzl",
+                include_str!("../../../../slug_analysis_v2/tests/rustc_map_each/cc_toolchain.bzl"),
+            ),
+            ("rules_cc/cc/private/query_compile.bzl", CPP_DEFS),
+        ])
+        .chain(additional_files.iter().copied())
+    {
         let absolute = format!("/workspace/{path}");
         let parent = absolute.rsplit_once('/').unwrap().0;
         let mut ancestor = Path::new(parent);
@@ -233,7 +246,14 @@ fn cpp_epoch(revision: i64, marker: &str) -> PathObservationEpoch {
             );
             ancestor = ancestor.parent().unwrap();
         }
-        epoch.package(parent.strip_prefix("/workspace/").unwrap(), "", revision);
+        epoch.package(
+            parent
+                .strip_prefix("/workspace")
+                .unwrap()
+                .trim_start_matches('/'),
+            "",
+            revision,
+        );
         epoch.file(&absolute, body, revision);
     }
     for path in [
@@ -247,12 +267,23 @@ fn cpp_epoch(revision: i64, marker: &str) -> PathObservationEpoch {
     ] {
         epoch.file(&format!("/workspace/{path}"), "inert", revision);
     }
-    epoch.package("",&format!("load('@rules_cc//cc/private:query_compile.bzl','compile_rule','wrapper')\nplatform(name='platform')\nexports_files(['source-a.cc','source-a.c','extra.h','cache.h','header.h','static.a','dynamic.so'])\ncompile_rule(name='compile',source='source-a.cc',c_source='source-a.c',extra='extra.h',cache='cache.h',header='header.h',static_file='static.a',dynamic_file='dynamic.so',revision='{marker}')\nwrapper(name='wrapper',dep=':compile')\n"),revision);
+    let default_build = root_build.is_none().then(|| format!("load('@rules_cc//cc/private:query_compile.bzl','compile_rule','wrapper')\nplatform(name='platform')\nexports_files(['source-a.cc','source-a.c','extra.h','cache.h','header.h','static.a','dynamic.so'])\ncompile_rule(name='compile',source='source-a.cc',c_source='source-a.c',extra='extra.h',cache='cache.h',header='header.h',static_file='static.a',dynamic_file='dynamic.so',revision='{marker}')\nwrapper(name='wrapper',dep=':compile')\n"));
+    epoch.package(
+        "",
+        root_build.unwrap_or_else(|| default_build.as_deref().unwrap()),
+        revision,
+    );
     epoch.build()
 }
 
 async fn cpp_transaction(dice: &Arc<Dice>, revision: i64, marker: &str) -> dice::DiceTransaction {
-    let base = cpp_epoch(revision, marker);
+    cpp_transaction_for_epoch(dice, cpp_epoch(revision, marker)).await
+}
+
+async fn cpp_transaction_for_epoch(
+    dice: &Arc<Dice>,
+    base: PathObservationEpoch,
+) -> dice::DiceTransaction {
     let mut observations = base
         .observations()
         .iter()
@@ -994,4 +1025,8 @@ async fn cpp_compile_aquery_metadata_guards_environment_identity_and_priority() 
             );
         }
     }
+}
+
+mod public_compile_query_tests {
+    include!("cpp_compile_public_aquery_tests.rs");
 }
