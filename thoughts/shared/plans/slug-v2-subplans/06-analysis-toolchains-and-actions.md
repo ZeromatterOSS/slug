@@ -531,6 +531,19 @@ preparation establishes the marker namespace before certification; real source e
 exercise retry, without fabricating a cold-directory retry. No payload copy/global
 interner or semantic filesystem cache is added. Thirty-nine distinct Core controls
 (33 preserved protected plus6 current), default CLI and three FINAL reviews pass.
+[WP928](wp928-native-workspace-status-file-inputs-2026-10-06.json) connects that
+publisher to an original producer/request-bound readonly correspondence owner.
+The genuine selected native root reads actual bounded status-file bytes into the
+unchanged checked callback with original catalog bytes; its independent header Vec
+is distinct from precomputed metadata. Immutable compute-issued metadata/root Arcs
+supply the full frontier and issuance binding; a shared permit spends on success
+and every error before any further effect. Historical FDs cannot grant a new request.
+Four readonly receipt FDs retire on last Drop;8236 stack bytes replace no semantic
+owner or string interner. Original precomputed header/graph remain intentionally
+retained. All44 current Core controls (39 protected+5 new), default CLI and three
+FINAL reviews pass. Capture-phase IO and finite renderer errors are source-only
+propagation proof; actual source retry/abort, partial rename, physical mutations/read
+refusal and four-FD/Weak release pass. Header-file publication remains deferred.
 Nondefault status policies/epoch, volatile cache/invalidation, arbitrary or Java callbacks,
 BuildInfo/action-chain execution, installed module tools and full cc_toolchain stay deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked

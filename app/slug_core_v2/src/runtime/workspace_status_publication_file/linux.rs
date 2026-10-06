@@ -28,6 +28,9 @@ use crate::runtime::native_output_file::entry;
 use crate::runtime::native_output_file::fd_path;
 use crate::runtime::native_output_file::identity;
 
+mod receipt;
+pub(super) use receipt::PublishedStatusFiles;
+
 const NAMES: [&str; 2] = ["stable-status.txt", "volatile-status.txt"];
 const MAX_STABLE: usize = 43 + 4096 + 4096;
 const MAX_VOLATILE: usize = 69;
@@ -288,6 +291,14 @@ impl Staging {
                 StablePublication::Replaced
             },
         })
+    }
+    pub(super) fn capture_files(
+        &self,
+        workspace: &Path,
+        outcome: PublicationOutcome,
+        lengths: [usize; 2],
+    ) -> io::Result<PublishedStatusFiles> {
+        PublishedStatusFiles::capture(self, workspace, outcome, lengths)
     }
     #[cfg(test)]
     pub(super) fn names(&self) -> [&str; 2] {

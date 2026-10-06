@@ -487,6 +487,18 @@ and partial revision-before-publication qualifications remain. Volatile cache/in
 BuildInfo execution/input-image integration, module tools and full cc_toolchain remain
 unproved; bounded buffers/Arc sharing do not establish whole-workload fit. The unrelated legacy bare frontier fixture requires an
 uncached registry dependency and remains unproved offline; its guard was not changed.
+[WP928](wp928-native-workspace-status-file-inputs-2026-10-06.json) accepts actual
+physical status-input consumption within the same certified native publication
+callback. Original metadata/root/producer bindings, both complete role headers under
+covered configured frontiers, equal stable/new volatile receipts, historical/current
+refusal, binding/phase-error grant exhaustion, nine physical mutation families,
+source retry/abort/partial/read-error recovery and four-FD/Weak final release pass.
+All44 current controls (39 protected+5 new), default CLI and three FINAL reviews
+accept this private GNU/Linux domain. Capture-time IO/finite render-error propagation
+is source-only; no executed-negative claim.8236 stack bytes and shared original
+owners add no status-body/catalog/whole-string copy or global pool; original metadata
+header retention and full-workload-fit limits remain explicit. Header output-file
+publication, generic action chains and cache/REAPI remain unproved.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun

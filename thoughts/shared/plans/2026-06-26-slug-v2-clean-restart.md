@@ -34,34 +34,35 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-227-m7a-native-workspace-status-file-inputs-r1
-Status: Native status publication accepted; physical status input correspondence selected
+Packet: WP-7-228-m7a-native-build-info-header-publication-r1
+Status: Physical status inputs accepted; actual checked header output publication selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects original-producer/
-request-bound readonly status file inputs for the unchanged checked BuildInfo consumer.
-Root freezes the publication/physical-read protocol and bounded allocation/FD API with
-three DESIGN reviews before activation. Precomputed header bytes alone do not prove
-physical file consumption. [WP927](./slug-v2-subplans/wp927-native-workspace-status-publication-2026-10-06.json)
-accepts genuine current-source status publication, equal stable preservation and
-unconditional volatile replacement, with real source retry/refusal/partial-error and
-held owner release. Thirty-nine unique Core controls (33 preserved protected+6 current),
-default CLI and three FINAL reviews pass; no fresh39-batch claim. Linux regular/no-link/
-0444 replacement and request/source sequencing remain qualified native policy. Initial
-identity-read/keep/unlink IO can leave unclaimed scratch, and later publication failure
-may be partial after revision commit. Physical input correspondence, header/action-chain
-execution/cache, full-root/M7A/whole-workload fit remain open. Allocation/interner discipline,
-prior memory/resource/source16/17/18 caps and old unproved offline bare guard persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects native publication
+of the actual physical-input-derived header into its retained configured output.
+Root freezes nonexecutable scalar sealing, original current grant/output binding,
+ordered-substitution resource bounds and partial-failure sequencing with three DESIGN
+reviews before code. [WP928](./slug-v2-subplans/wp928-native-workspace-status-file-inputs-2026-10-06.json)
+accepts genuine readonly physical status consumption and independent checked headers.
+All44 current Core controls (39protected+5new), default CLI and three FINAL reviews
+pass; capture/render IO errors remain source-only propagation proof. Error-exhausted
+clones, historical/current receipt refusal, actual source retry/partial/read failure
+and four-FD/Weak release pass. Original owners/interner use and8236 stack scratch avoid
+new status/catalog/whole-string copies; original precomputed header/graph remain
+retained. Linux readonly regular/no-link sequencing, partial revision/filesystem mutation
+and IO orphan/race qualifications persist. Header-file publication, generic execution/
+cache/REAPI, full-root/M7A/whole-workload fit and prior memory/resource/source16/17/18
+limits remain open; old unproved offline bare guard persists.
 
 ### Ready and blocked queue
 
-The current packet selects source-certified workspace-status publication under priority3; the remaining
+The current packet selects actual checked header output publication under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects source-certified workspace-status publication; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects actual checked header output publication; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

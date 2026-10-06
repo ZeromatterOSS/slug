@@ -19,6 +19,39 @@ pub(super) struct WorkspaceStatusPublicationTerminal {
     pub(super) outcome: Option<PublicationOutcome>,
 }
 
+impl WorkspaceStatusPublicationRoot {
+    pub(super) fn publish_with_files(
+        &self,
+        terminal: &mut WorkspaceStatusPublicationTerminal,
+    ) -> io::Result<Arc<super::workspace_status_file_inputs::WorkspaceStatusFileInputs>> {
+        if terminal.outcome.is_some() {
+            return Err(io::Error::other("status publication already completed"));
+        }
+        let pending = terminal
+            .pending
+            .as_ref()
+            .ok_or_else(|| io::Error::other("status publication has no stage"))?;
+        let mut stage = pending
+            .lock()
+            .map_err(|_| io::Error::other("status stage lock poisoned"))?;
+        let status = &terminal.inputs.status;
+        let (outcome, files) = stage.publish_with_files(
+            self.0.0.workspace().as_path(),
+            &status.stable,
+            &status.volatile,
+        )?;
+        terminal.outcome = Some(outcome);
+        drop(stage);
+        terminal.pending = None;
+        Ok(Arc::new(
+            super::workspace_status_file_inputs::WorkspaceStatusFileInputs::issued(
+                status.clone(),
+                files,
+            ),
+        ))
+    }
+}
+
 pub(super) fn validate_publication_namespace(
     workspace: &NormalizedAbsolutePath,
     certificate: &SourceCertificate,

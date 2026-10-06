@@ -771,3 +771,9 @@ fn native_status_publication_refuses_foreign_capture_wrong_descriptor_and_observ
     }
     assert_eq!(final_bytes(workspace.path()), bytes);
 }
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod file_inputs {
+    use super::*;
+    include!("workspace_status_file_inputs_tests.rs");
+}

@@ -1,0 +1,310 @@
+{
+  "packet": "WP-7-227-m7a-native-workspace-status-file-inputs-r1",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "dead2d75c2d1f8b044d9fef4adf9ce23db088b50",
+  "result": "Genuine source-certified native status publication supplies actual readonly physical bytes to unchanged checked BuildInfo recipes/catalog, retaining independently owned header bytes. No header output-file/generic action/CLI execution activation.",
+  "contract": {
+    "path": "target/wp928/design.md",
+    "sha256": "fd57df4e8b6679fa755af717fd3f7911c3c7082cc0677a8b6a7f57584ab87e8e",
+    "design_before_production": true,
+    "inherited_manifest": "dead2d75c:thoughts/shared/plans/slug-v2-subplans/current-packet.md",
+    "corrections": {
+      "path": "target/wp928/static-account.md",
+      "sha256": "62498c5e9241cdd7c6f9d9faf177ed5aeb702512ee65beccccd9a4f4f77ca4c7"
+    }
+  },
+  "source_basis": {
+    "bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "source_note": "target/wp927/successor-source.md",
+    "source_sha256": "91dc15e67c2a6c30149a81044a22deae644aea06032d19c0c3d0c59439c45c76",
+    "anchors": "BuildInfoFileWriteAction99-103/118-184; WorkspaceStatusAction120-134"
+  },
+  "compatibility": {
+    "exact": "Complete selected physical status bytes/roles into admitted checked Latin1 callback and catalog template; independently owned complete headers.",
+    "slug_native": "Original compute-issued metadata/root/capture/current-source publication protocol, Linux GNU anchored readonly readable regular singlelink no-symlink fixed receipt/fingerprint/EOF policy.",
+    "deferred": "Header-file publication, arbitrary Bazel filesystem/link/inode sequencing, Windows beyond Unsupported, generic action chains/cache/REAPI/Cpp execution, full-root/M7A/whole-workload fit."
+  },
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/dice.rs": {
+      "sha256": "954731a813d36054aae183c250b0213f63195f0c3379087df7ce05a0892d2424",
+      "lines": 14062
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication.rs": {
+      "sha256": "8214b42189f18a8119d3669f74f66945beb0e3329a72a9e52e187b00f82e17aa",
+      "lines": 176
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication_file.rs": {
+      "sha256": "c689043d2e89aa0d8b3583e929039d29619e2a641974ffaaae9aa9494f6d3344",
+      "lines": 138
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs": {
+      "sha256": "0ffaec6377372445b739a36f10da4379a73903f50134cabea6c8f9a0bf7c9439",
+      "lines": 307
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_publication_file/linux/receipt.rs": {
+      "sha256": "6be676663d1ddc73bf5c76c588e7b9eae2a53dbc4e6ffc4c4a44f1bbc26b6b19",
+      "lines": 155
+    },
+    "app/slug_core_v2/src/runtime/workspace_status_file_inputs.rs": {
+      "sha256": "2adac2608fd16da410f9fefca9bb4b75d6bc2a106970b3133d8fa48dba7715cf",
+      "lines": 68
+    },
+    "app/slug_core_v2/src/runtime/build_info_file_inputs.rs": {
+      "sha256": "ce0cf58f68786ad11b09b1ec62e0f35d2b503b675ca0fee48617e365c1ccb419",
+      "lines": 218
+    },
+    "app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs": {
+      "sha256": "2cb67e1a232f9a9baabbdba515dc03fcb2d603dfb5c6c97ec33900f8fe9d1d75",
+      "lines": 779
+    },
+    "app/slug_core_v2/src/runtime/tests/workspace_status_file_inputs_tests.rs": {
+      "sha256": "046be80fa9f5ad94118b62ef4494b2d43a47f4accf0c8e94a337ab0cc32b05c8",
+      "lines": 923
+    }
+  },
+  "ownership": {
+    "semantic": "Original BuildInfoNativeInputs/WorkspaceStatusContent/template/capture/catalog/graph Arcs and actual full selected key unchanged; no new DICE key/cache/image/source authority.",
+    "issuance": "Private immutable compute-issued root and metadata Arc witnesses supply original frontier/certificate and guard completion/effects. Inherited capture completion separately checks original command/transaction Arc, not metadata Arc.",
+    "permit": "One shared Option nonClone Prepared/Published permit across terminal clones. Take before metadata/root/phase checks; every attempted use spends including error. No lock across compute, no DICE/await under synchronous publish.",
+    "read": "Both successful role publications precede readonly capture. Original stable or staged inode selected; root/currentnames/FD fingerprint/readonly flags bracket actual read_at, exact expectedlen+EOF/full byte comparison. Actual scratch slice, never producer/precomputed header, reaches unchanged recipe with original catalog bytes.",
+    "result": "ConsumedBuildInfo constructed only after authorized physical read/render. Original inputs/files Arcs retained and header Vec independently owned; historical file-only reads supply old attributable candidate data, no new current grant.",
+    "release": "Successful handoff retires all stage FDs immediately even through held scratch clones. Four receipt FDs close on final Drop; original metadata/capture Weaks release after held result/runtime cleanup. Native retry/normal abort/failure spend/release slots and provisional stages.",
+    "failure": "Record publication outcome before read; no accepted consumed result on publish/read/render error. Revision/files may already change; no rollback/external-writer exclusion/mid-syscall-cancellation claim. Initial identity-read/keep/unlink may leave unclaimed scratch."
+  },
+  "allocation": {
+    "fixed": "Four retained receipt FDs; six staging + four receipt during handoff, at most two validation reopen handles (12 peak); fixed two role records/static names.",
+    "scratch": "8236-byte stack read buffer; stable<=8235/volatile<=69 bytes, expectedlen+one EOF; no heap status body/map/catalog/whole decoded String copy.",
+    "strings": "Reuse original canonical label/config/string/interner owners and borrowed normalized workspace; unique stage names local existing Strings, no global temp/clock interner/registry.",
+    "retention": "Original precomputed header and graph remain intentionally retained with actual independent header; no heap/RSS savings or full-fit claim. Native receipt/result phase outside DICE history.",
+    "qualified_memory": "WP89964KiB postdrop refusal, controlled profile/resource caps, DICE payload release evidence and actual source/whole-workload-fit limits unchanged; source16/17/18 spent, no retry."
+  },
+  "validation": {
+    "current_batch": true,
+    "unique_current_passes": 44,
+    "protected": 39,
+    "new": 5,
+    "preflight": {
+      "exit_code": 0,
+      "output": "Verified 44 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21284855692647398,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "0e3a3ca8116d50d55ed3558bcc5b9afd256cfe49f1e8341ca3efc961c003fefe",
+      "selected": 44,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "runtime_summary": {
+      "selected": 44,
+      "passed": 44,
+      "elapsed_seconds": 5.189956352114677,
+      "max_child_rss_kib": 82704
+    },
+    "results": {
+      "path": "target/wp928/core-results.json",
+      "sha256": "c2515945b4cb1ebc7357c6bdf70b851bee322f464e7a06cca89ca84a299d4e86"
+    },
+    "selectors": {
+      "path": "target/wp928/core-selectors.json",
+      "sha256": "077ce206f93271b08739b086816bed4ba8115299db56198ede9bca8d50168d44"
+    },
+    "new_selectors": [
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::file_inputs::native_file_inputs_read_both_roles_cover_configurations_and_release_four_readonly_fds",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::file_inputs::native_file_inputs_old_receipts_are_history_and_cannot_grant_equal_new_status",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::file_inputs::native_file_inputs_refuse_same_capture_metadata_and_foreign_root_before_effects",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::file_inputs::native_file_inputs_actual_read_refuses_inode_bytes_modes_alias_links_and_parent_changes",
+      "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::publication::file_inputs::native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_grant_nothing"
+    ],
+    "current_compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 38.159608555957675,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "cli_current": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.570992205990478,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "checks": {
+      "diff": {
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.011294631054624915,
+        "output": ""
+      },
+      "archive": {
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03241381491534412,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_core_v2/src/runtime/dice.rs\n M app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs\n M app/slug_core_v2/src/runtime/workspace_status_publication.rs\n M app/slug_core_v2/src/runtime/workspace_status_publication_file.rs\n M app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs\n M thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md\n M thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md\n M thoughts/shared/plans/slug-v2-subplans/bootstrap-readiness.md\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n?? app/slug_core_v2/src/runtime/build_info_file_inputs.rs\n?? app/slug_core_v2/src/runtime/tests/workspace_status_file_inputs_tests.rs\n?? app/slug_core_v2/src/runtime/workspace_status_file_inputs.rs\n?? app/slug_core_v2/src/runtime/workspace_status_publication_file/linux/receipt.rs\n?? thoughts/shared/plans/slug-v2-subplans/wp928-native-workspace-status-file-inputs-2026-10-06.json\n"
+      },
+      "plan": {
+        "command": [
+          "python3",
+          "scripts/v2_plan_status.py"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.014147422974929214,
+        "output": "Packet: WP-7-228-m7a-native-build-info-header-publication-r1\n"
+      },
+      "format": {
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--check",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "app/slug_core_v2/src/runtime/dice.rs",
+          "app/slug_core_v2/src/runtime/workspace_status_publication.rs",
+          "app/slug_core_v2/src/runtime/workspace_status_publication_file.rs",
+          "app/slug_core_v2/src/runtime/workspace_status_publication_file/linux.rs",
+          "app/slug_core_v2/src/runtime/workspace_status_publication_file/linux/receipt.rs",
+          "app/slug_core_v2/src/runtime/workspace_status_file_inputs.rs",
+          "app/slug_core_v2/src/runtime/build_info_file_inputs.rs",
+          "app/slug_core_v2/src/runtime/tests/workspace_status_publication_tests.rs",
+          "app/slug_core_v2/src/runtime/tests/workspace_status_file_inputs_tests.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.10716439096722752,
+        "output": ""
+      }
+    },
+    "compile_history": {
+      "path": "target/wp928/diagnostic-account.json",
+      "sha256": "5f7b8e74c43025da501b1ffae7c9dddfa2bd23006176347985d48e36f06ecd0f"
+    },
+    "compile_attribution": "Initial core-prepare101/18.013s has test-only E0609 and E0716; core-current101/17.971s remaining test E0716; corrected original catalog borrowing passes. Production had no diagnostic.",
+    "source_only_negatives": "Capture-time IO no-return/RAII and finite render-error propagation source-proved only; no executed capture/render-error claim or artificial failure fixture.",
+    "executed_negatives": "Same-capture identical metadata copies, other actions/origins before/after permit; restore-after-error and wrong-phase spent clones; old receipt/current equivalent bytes and copied producer/foreign descriptor; nine physical inode/bytes/truncation/mode/alias/link/FIFO/unreadable/parent mutations; real source retry, after-stage normal abort, typed partial second rename, small read scratch refusal and recovery.",
+    "cancellation": "New normal abort/Drop; genuine pending DICE worker cancellation preserved through unchanged WP926 protected selector.",
+    "old_unproved": "Legacy WP925 bare uncached BCR guard remains unproved offline, not retried or waived.",
+    "no_actual_binary_or_oracle": "Default CLI compile dependent only; no actual CLI/oracle/network/JVM/acquisition/platform expansion."
+  },
+  "growth": {
+    "new_production": 441,
+    "existing_production_glue": 114,
+    "new_tests": 923,
+    "test_registration": 6,
+    "review": "Existing114 glue exceeds100 estimate by14 and923test sibling exceeds750 by173; three FINALs accept distinct private root/association/Linux receipt responsibilities and one finite real-root test adapter, no generic framework/corpus. dice.rs only6registration lines despite large owner file."
+  },
+  "reviews": {
+    "design": {
+      "source": {
+        "path": "target/wp928/design-source.md",
+        "sha256": "e9cd527033750c5a06397e8935a44202a1f8704d2f3c8e3ad77769c0fe5f21fc",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp928/design-ownership.md",
+        "sha256": "d895bc4c10aab6e4c2ae9494a7875c902b387ef108e1f3661ebb07f05fec597e",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp928/design-evidence.md",
+        "sha256": "46275fe5f0f70bde57df96be3900079817bc476bb7ec725fc3aa6924c68e8cfa",
+        "verdict": "ACCEPT"
+      }
+    },
+    "final": {
+      "source": {
+        "path": "target/wp928/final-source.md",
+        "sha256": "c197e1889d7eff8b4bf870523567ee830b5751040f178c9214a2887440bb2e49",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp928/final-ownership.md",
+        "sha256": "3d4cd07cdf4092a77fede80125f13c7c85d0621746cc55e3ea32478b5c06d932",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp928/final-evidence.md",
+        "sha256": "70570645ab98d419cb7c4f018427ba252597fe2cb1900b9920aac71a3d5c2d7b",
+        "verdict": "ACCEPT"
+      }
+    }
+  },
+  "operations": {
+    "path": "target/wp928",
+    "elapsed_seconds_from_recorded_start": 1880.2598476409912,
+    "compile_seconds": 97.92989763908554,
+    "review_time": "Not separately measured; no speedup claim",
+    "hash_index": "target/wp928/operational-hashes.json",
+    "hash_index_sha256": "07c9e27da229f7767c686c9179dee1b9df98be8d7489a00bef8965493f3d27dd",
+    "operational_files": 80
+  },
+  "successor_source": {
+    "path": "target/wp928/successor-source.md",
+    "sha256": "a49bca1130e71025fa5cd0aee250b2d2517b751e76842fad8379976e5002159a"
+  },
+  "successor": {
+    "packet": "WP-7-228-m7a-native-build-info-header-publication-r1",
+    "operations": "WP929",
+    "source_note": "target/wp928/successor-source.md",
+    "source_sha256": "a49bca1130e71025fa5cd0aee250b2d2517b751e76842fad8379976e5002159a",
+    "decision": "Publish actual physical-input-derived header in real retained configured output within same current callback; freeze private nonexecutable scalar policy, ordered-expansion resource bound and cross-stage partial sequencing before three DESIGN/code."
+  }
+}

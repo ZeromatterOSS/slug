@@ -3186,11 +3186,17 @@ pub use runfiles_manifest::PreparedRunfilesManifests;
 mod build_info_template_inputs;
 
 #[allow(dead_code)]
+#[path = "build_info_file_inputs.rs"]
+mod build_info_file_inputs;
+#[allow(dead_code)]
 #[path = "build_info_native_inputs.rs"]
 mod build_info_native_inputs;
 #[allow(dead_code)]
 #[path = "workspace_status_content.rs"]
 mod workspace_status_content;
+#[allow(dead_code)]
+#[path = "workspace_status_file_inputs.rs"]
+mod workspace_status_file_inputs;
 #[allow(dead_code)]
 #[path = "workspace_status_publication.rs"]
 mod workspace_status_publication;
