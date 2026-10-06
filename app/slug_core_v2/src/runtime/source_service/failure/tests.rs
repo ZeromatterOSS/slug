@@ -82,6 +82,10 @@ fn scope_projection_is_total_and_retains_exact_counter_and_message() {
             SourceServiceError::UnsupportedSourceOwner,
             RegistryRefusalScopeFailure::UnsupportedSourceOwner,
         ),
+        (
+            SourceServiceError::NetworkDisabled,
+            RegistryRefusalScopeFailure::NetworkDisabled,
+        ),
     ] {
         let failure = SourceTransportFailure::scope(error).into_registry();
         assert_eq!(failure.message.as_str(), error.to_string());

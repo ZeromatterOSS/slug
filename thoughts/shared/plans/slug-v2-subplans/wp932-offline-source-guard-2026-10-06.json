@@ -1,0 +1,158 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP932 offline scoped HTTP prerequisite",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "751efc7d1d8de0485d43b5b8f9a9186ccc9d8b42",
+  "result": "Private scope-owned allow_network policy defaults true; false refuses common registry/archive HTTP before parser/DNS while retaining ordinary local reads and independent Arc bytes. NetworkDisabled is typed with new stable code12. No public producer/source observation.",
+  "contract": {
+    "path": "target/wp932/design.md",
+    "sha256": "31a66761f3e12f67bd754174a0425410f200420b73cf46cb020a4e7a0a8d636d"
+  },
+  "compatibility": {
+    "exact": "Existing codes1\u201311, default scoped/Native behavior, total typed projection and selected local byte ownership preserved.",
+    "slug_native": "Immutable operational scoped policy and typed NetworkDisabled/code12.",
+    "deferred": "Exact local module/import/generated-tool/registration/provider readiness, public rules_rust producer, whole-workload memory fit, full-root/M7A/execution/REAPI/cache; Windows minimal."
+  },
+  "source_pins": {
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": "f123896aa4617edab87db55b1d50f22ce21b115d0a5c7c0c85ebcc7d06020c78",
+    "app/slug_core_v2/src/runtime/source_service/http.rs": "1d94868f96ccbc270b2c2319d99fd8bbfc0ae1ec8982090ec0d4db9f29abadab",
+    "app/slug_core_v2/src/runtime/source_service/failure.rs": "a0f69f7d16b1e88f1fdd610f5a3a0c7f042aceeb7f4e7b663df4568aa8eb991a",
+    "app/slug_core_v2/src/runtime/source_service/failure/tests.rs": "e79ae9c5e1b7f684d869391bc1075716579d3907b80576884ad43c9d178a3458",
+    "app/slug_core_v2/src/runtime/source_service/tests.rs": "d154f3f300ea3f05c5241d95f7ca735734d5cc33cff678cbaf859a986ad72ddf",
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": "e79d5bf05665b8541dcd91a01997e6a8daffd0378c1565719b26edef0cbb0fc5",
+    "app/slug_bzlmod_v2/src/registry_dice/refusal.rs": "276886a04ed5c7d7eac1d52b2eef37e35690a745d12263984d00054d2b618953",
+    "app/slug_bzlmod_v2/src/registry_dice/refusal_tests.rs": "7187f5574cc45356f38f11224f30a73b2986381c6661f266279f7ebfa5332bdd"
+  },
+  "allocation": {
+    "new_storage": "Scalar policy in existing service limits and scalar error variant only; no source/string pool, interner, second cache or semantic/DICE key. Tests borrow static426B MODULE and actual Arc byte slices; retained result remains independent after scope/adapter release, then last weak owner expires.",
+    "boundary": "Zero parser credits/counters applies to direct common HTTP leaf. Higher registry caller retains ordinary earlier URL/address/attempt accounting. Zero scratch reservations does not retire successful retained Arc bytes.",
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes": 1048576
+    },
+    "conservative_core_child_peak_kib": 33136,
+    "bzlmod_child_peak_kib": 9208,
+    "qualified": "Child rusage cumulative within each supervisor; fast sampled RSS516KiB is not actual peak. Finite unit processes only; no allocation savings, complete heap or full-workload fit claim."
+  },
+  "validation": {
+    "selected": 8,
+    "passed": 8,
+    "core": {
+      "preflight": {
+        "path": "target/wp932/core-preflight.json",
+        "sha256": "00e7a76ed1bcee17988dce5624f9a599e2e544e25b14d2c524878ea2d320af7c"
+      },
+      "results": {
+        "path": "target/wp932/core-results.json",
+        "sha256": "0066ecf0b5bdf808a334e6da41087d67aa489d525f34273a01e8a4a5352733a5"
+      },
+      "selectors": [
+        "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+        "runtime::dice::source_service::tests::scoped_offline_http_refuses_registry_and_archive_before_parser",
+        "runtime::dice::source_service::tests::source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling",
+        "runtime::dice::source_service::tests::source_scope_inclusive_counters_first_poison_and_no_refund",
+        "runtime::dice::source_service::tests::source_scope_buffer_peak_history_last_drop_and_closed_export",
+        "runtime::dice::source_service::tests::source_scope_validates_finite_limits_and_url_before_io",
+        "runtime::dice::source_service::failure::tests::scope_projection_is_total_and_retains_exact_counter_and_message"
+      ],
+      "elapsed_seconds": 0.07435453811194748
+    },
+    "bzlmod": {
+      "preflight": {
+        "path": "target/wp932/bzlmod-preflight.json",
+        "sha256": "70d02f7e80172dc181f8bc12569918b5562eb34a8e4a0afb122e884d6c3a9f98"
+      },
+      "results": {
+        "path": "target/wp932/bzlmod-results.json",
+        "sha256": "390e3bdd826e7754b6f7f6ff000bc466114887b5207cbe5be2aa4727ff31f1d4"
+      },
+      "selectors": [
+        "registry_dice::refusal_tests::cause_is_inline_and_scalar_codes_are_stable"
+      ],
+      "elapsed_seconds": 0.010720639023929834
+    },
+    "preparation": [
+      {
+        "receipt": {
+          "path": "target/wp932/core-prepare.json",
+          "sha256": "5dce6b934b1919d7b31bddeba687ff61ce3649ca0bc4782958d0f8bca75bc6ff"
+        },
+        "exit_code": 124,
+        "elapsed_seconds": 60.00376276602037
+      },
+      {
+        "receipt": {
+          "path": "target/wp932/bzlmod-prepare.json",
+          "sha256": "440d47c0945cee4ea85104d8a76edd9488bf831c1f72198e5814dcce9327f4ad"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 40.156369970995
+      },
+      {
+        "receipt": {
+          "path": "target/wp932/core-owner-prepare.json",
+          "sha256": "4c5e669f01704dfa9a392eb1dc269d706382ec6b69711ddd4b9fedaf515bebfa"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 32.032798020052724
+      },
+      {
+        "receipt": {
+          "path": "target/wp932/cli-current.json",
+          "sha256": "298fa3ca66469f1d9cc94cb5caf22fda6bcda75688def269ca1f6aa09d18da19"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 25.751502346014604
+      }
+    ],
+    "preparation_qualification": "Mixed dependency preparation hit60s/124 without compiler errors. Completed Bzlmod/Loading/Query/Analysis artifacts reused for smaller bounded owner preparations; no semantic failure, cap increase or runtime evidence from timeout.",
+    "summary": {
+      "path": "target/wp932/validation-summary.json",
+      "sha256": "9db23011cea4e88854598afe168e6ba7721e97a37d0f5aeab11b214d1a263de3"
+    },
+    "all_test_groups_empty_and_joined": true,
+    "toolchain": {
+      "path": "target/wp932/toolchain.json",
+      "sha256": "22ee33f578ace5445c78dd16656f64291901cb4a17414b90029afc181c2976c7"
+    }
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp932/design-source.md",
+      "sha256": "f17544504b045f8e423fec0be0a687a944c679f37d2053fbcac8098c5689a4af"
+    },
+    "design-evidence": {
+      "path": "target/wp932/design-evidence.md",
+      "sha256": "6e9404e8b17983a2d749e67c726e88de8f8d566194b83c01d1d9f85787fba3fc"
+    },
+    "final-source": {
+      "path": "target/wp932/final-source.md",
+      "sha256": "29f12b85a717c4ed46ba4a017130e6778a855d05d259c31c83c7a15ccc6573b3"
+    },
+    "final-evidence": {
+      "path": "target/wp932/final-evidence.md",
+      "sha256": "eba20175f8f65945e115d8e3d4e62c631c5d518dfa78f771663c5f2e52d11898"
+    }
+  },
+  "growth": {
+    "production_added": 19,
+    "production_removed": 1,
+    "test_added": 162,
+    "review": "Two local-byte-lifetime and common-leaf priority/accounting tests, plus existing profile/projection/code controls; one unchanged source asset; no network fixture/corpus."
+  },
+  "next": {
+    "packet_continues": true,
+    "recommendation": {
+      "path": "target/wp932/successor-source.md",
+      "sha256": "d9e6dd58b580c99c99a4bb68109872f6ff0f4102c46b71d64b846c4310bf4ac8"
+    },
+    "gate": "Freeze descriptor-anchored finite MODULE/defs/extensions/repository import availability at exact recorded local root.64KiB stream scratch/16MiB aggregate/10s512MiBAS256MiBRSS4MiBreport. Derive exact dependency allowlist from actual MODULE; no implicit cached-root certificate.",
+    "initial_source_observation_unconsumed": true,
+    "public_producer_unproved": true
+  },
+  "packet_elapsed_seconds": 1331.16068649292
+}

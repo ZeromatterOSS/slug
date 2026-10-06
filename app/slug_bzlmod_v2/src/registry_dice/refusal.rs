@@ -92,6 +92,7 @@ pub enum RegistryRefusalScopeFailure {
     BufferLimit,
     Allocation,
     UnsupportedSourceOwner,
+    NetworkDisabled,
 }
 #[doc(hidden)]
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Allocative)]
@@ -209,6 +210,7 @@ impl RegistryRefusalScopeFailure {
             Self::BufferLimit => 9,
             Self::Allocation => 10,
             Self::UnsupportedSourceOwner => 11,
+            Self::NetworkDisabled => 12,
         }
     }
 }

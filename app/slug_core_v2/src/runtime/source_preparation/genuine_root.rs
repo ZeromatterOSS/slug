@@ -497,6 +497,7 @@ fn poison_code(error: Option<SourceServiceError>) -> u64 {
         Some(SourceServiceError::BufferLimit) => 9,
         Some(SourceServiceError::Allocation) => 10,
         Some(SourceServiceError::UnsupportedSourceOwner) => 11,
+        Some(SourceServiceError::NetworkDisabled) => 12,
     }
 }
 fn outer_code(error: &NativeDemandSessionError) -> u64 {

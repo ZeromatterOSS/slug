@@ -186,7 +186,9 @@ pub(in crate::runtime) async fn request_scoped_typed(
     url: &url::Url,
     admission: SourceHttpAdmission,
 ) -> Result<ScopedHttpResponse, SourceTransportFailure> {
-    scope.check().map_err(SourceTransportFailure::scope)?;
+    scope
+        .check_network()
+        .map_err(SourceTransportFailure::scope)?;
     if url.as_str().len() > 8192 {
         return Err(SourceTransportFailure::scope(scope.poison_buffer_limit_at(
             SourceBufferSite::HttpUrlLength,

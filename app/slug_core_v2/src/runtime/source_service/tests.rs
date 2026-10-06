@@ -26,10 +26,12 @@ fn scope(limits: SourceServiceLimits) -> Arc<SourceServiceScope> {
 #[cfg(target_os = "linux")]
 fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() {
     let defaults = SourceServiceLimits::default();
+    assert!(defaults.allow_network);
     assert_eq!(defaults.registry_attempts, 128);
     assert_eq!(defaults.live_buffer_bytes, 16 << 20);
     assert_eq!(defaults.blocking_threads, None);
     let profile = SourceServiceLimits::actual_root();
+    assert!(profile.allow_network);
     assert_eq!(profile.registry_attempts, 256);
     assert_eq!(profile.live_buffer_bytes, 40 << 20);
     assert_eq!(profile.blocking_threads, Some(2));
@@ -363,6 +365,160 @@ fn source_scope_validates_finite_limits_and_url_before_io() {
     );
     assert!(super::http::bounded_addresses(&owner, std::iter::repeat_n(address, 65)).is_err());
     assert_eq!(owner.check(), Err(SourceServiceError::BufferLimit));
+}
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn scoped_offline_registry_keeps_local_bytes_and_refuses_http() {
+    const MODULE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/MODULE.bazel"
+    ));
+    assert_eq!(MODULE.len(), 426);
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("MODULE.bazel");
+    std::fs::write(&path, MODULE).unwrap();
+    let owner = scope(SourceServiceLimits {
+        allow_network: false,
+        ..SourceServiceLimits::default()
+    });
+    let weak_scope = Arc::downgrade(&owner);
+    let adapter = ScopedRegistryIo::new(owner.clone());
+    let RegistryIoOutcome::Found(retained) = adapter
+        .read_exact(&RegistryFileUrl::new(format!("file://{}", path.display())))
+        .await
+        .unwrap()
+    else {
+        panic!("original local MODULE is required");
+    };
+    let diagnostic_url = RegistryFileUrl::new("https://unread.invalid/diagnostic-only");
+    let RegistryIoOutcome::Found(supplied_path) = adapter
+        .read_local_exact(&diagnostic_url, &path)
+        .await
+        .unwrap()
+    else {
+        panic!("supplied original MODULE path is required");
+    };
+    assert_eq!(supplied_path.as_ref(), MODULE.as_bytes());
+    drop(supplied_path);
+    assert_eq!(
+        adapter
+            .read_local_exact(&diagnostic_url, &directory.path().join("missing"))
+            .await
+            .unwrap(),
+        RegistryIoOutcome::NotFound
+    );
+    assert_eq!(owner.check(), Ok(()));
+    assert_eq!(owner.snapshot().registry_attempts, 3);
+    assert_eq!(owner.snapshot().registry_admitted_bytes, 852);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    let error = adapter
+        .read_exact(&diagnostic_url)
+        .await
+        .err()
+        .expect("HTTP must be refused");
+    assert_eq!(
+        error.message.as_str(),
+        SourceServiceError::NetworkDisabled.to_string()
+    );
+    assert_eq!(
+        error.cause,
+        Some(SourceTransportFailure::scope(SourceServiceError::NetworkDisabled).cause())
+    );
+    assert_eq!(owner.check(), Err(SourceServiceError::NetworkDisabled));
+    assert_eq!(owner.snapshot().registry_attempts, 4);
+    assert_eq!(owner.snapshot().registry_admitted_bytes, 852);
+    assert_eq!(owner.snapshot().source_attempts, 0);
+    assert_eq!(owner.snapshot().transferred_bytes, 0);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    assert!(owner.snapshot().peak_buffer_bytes > 0);
+    let weak_bytes = Arc::downgrade(&retained);
+    drop(adapter);
+    drop(owner);
+    assert!(weak_scope.upgrade().is_none());
+    assert_eq!(retained.as_ref(), MODULE.as_bytes());
+    drop(retained);
+    assert!(weak_bytes.upgrade().is_none());
+}
+
+#[tokio::test]
+async fn scoped_offline_http_refuses_registry_and_archive_before_parser() {
+    fn untouched(owner: &SourceServiceScope) {
+        let counters = owner.snapshot();
+        assert_eq!(
+            (
+                counters.registry_attempts,
+                counters.registry_admitted_bytes,
+                counters.source_attempts,
+                counters.transferred_bytes,
+                counters.decoded_bytes,
+                counters.written_bytes,
+                counters.live_buffer_bytes,
+                counters.peak_buffer_bytes
+            ),
+            (0, 0, 0, 0, 0, 0, 0, 0)
+        );
+    }
+    let limits = SourceServiceLimits {
+        allow_network: false,
+        ..SourceServiceLimits::default()
+    };
+    for (address, admission) in [
+        (
+            "http://unread.invalid/registry",
+            SourceHttpAdmission::Registry,
+        ),
+        (
+            "https://unread.invalid/archive",
+            SourceHttpAdmission::Archive,
+        ),
+        ("file:///not-an-http-address", SourceHttpAdmission::Registry),
+        (
+            "http://unread.invalid/not-an-https-archive",
+            SourceHttpAdmission::Archive,
+        ),
+    ] {
+        let owner = scope(limits);
+        let error = request_scoped_typed(&owner, &url::Url::parse(address).unwrap(), admission)
+            .await
+            .err()
+            .expect("offline common transport leaf must refuse");
+        assert_eq!(
+            error.cause(),
+            SourceTransportFailure::scope(SourceServiceError::NetworkDisabled).cause()
+        );
+        assert_eq!(owner.check(), Err(SourceServiceError::NetworkDisabled));
+        assert_eq!(
+            owner.poison(SourceServiceError::Allocation),
+            SourceServiceError::NetworkDisabled
+        );
+        untouched(&owner);
+    }
+    for first in [
+        SourceServiceError::Cancelled,
+        SourceServiceError::AcquisitionClosed,
+        SourceServiceError::BufferLimit,
+    ] {
+        let owner = scope(limits);
+        match first {
+            SourceServiceError::Cancelled => owner.cancel(),
+            SourceServiceError::AcquisitionClosed => owner.close_acquisition().unwrap(),
+            _ => {
+                assert_eq!(owner.poison(first), first);
+            }
+        }
+        let error = request_scoped_typed(
+            &owner,
+            &url::Url::parse("file:///invalid").unwrap(),
+            SourceHttpAdmission::Archive,
+        )
+        .await
+        .err()
+        .expect("existing scope refusal must win");
+        assert_eq!(error.cause(), SourceTransportFailure::scope(first).cause());
+        assert_eq!(owner.check(), Err(first));
+        untouched(&owner);
+    }
 }
 
 async fn duplex_response(

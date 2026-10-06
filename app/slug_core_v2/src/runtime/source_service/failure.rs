@@ -146,6 +146,7 @@ fn scope_failure(error: SourceServiceError) -> RegistryRefusalScopeFailure {
         SourceServiceError::InvalidLimits => R::InvalidLimits,
         SourceServiceError::ForeignScope => R::ForeignScope,
         SourceServiceError::AcquisitionClosed => R::AcquisitionClosed,
+        SourceServiceError::NetworkDisabled => R::NetworkDisabled,
         SourceServiceError::Cancelled => R::Cancelled,
         SourceServiceError::WorkDeadline => R::WorkDeadline,
         SourceServiceError::CleanupDeadline => R::CleanupDeadline,

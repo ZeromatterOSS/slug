@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated compiler files accepted; normal public Rust producer prerequisite selected
+Status: Offline scoped source guard accepted; normal public Rust source readiness continues
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -43,6 +43,14 @@ probe fixture and existing Spawn view/query APIs. First prove exact offline sour
 generated mapping and provider readiness, then normal configured action ownership.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
+[WP932](./slug-v2-subplans/wp932-offline-source-guard-2026-10-06.json)
+adds an immutable local-only scoped HTTP policy and typed code12 while preserving
+local reads and retained Arc byte lifetime. Eight focused gates and CLI check pass;
+Core unit process peak33,136KiB remains below256MiB. The initial mixed compilation
+hit60s; completed dependencies were reused in separate bounded preparations. This
+is an operational prerequisite only. The unchanged public fixture's exact local
+module/import/generated-tool availability and normal producer remain next under
+WP-7-231; no source/root attempt or whole-workload fit is claimed.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

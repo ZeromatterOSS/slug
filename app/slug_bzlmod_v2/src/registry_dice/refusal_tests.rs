@@ -36,6 +36,8 @@ fn cause_is_inline_and_scalar_codes_are_stable() {
         Some(RegistryRefusalScopeCounter::WrittenBytes)
     );
     assert_eq!(RegistryRefusalScopeFailure::Cancelled.counter(), None);
+    assert_eq!(RegistryRefusalScopeFailure::NetworkDisabled.code(), 12);
+    assert_eq!(RegistryRefusalScopeFailure::NetworkDisabled.counter(), None);
 }
 
 #[test]

@@ -38,6 +38,8 @@ pub(in crate::runtime) enum SourceCounter {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) struct SourceServiceLimits {
+    /// Fixed operational policy for this scoped diagnostic owner.
+    pub(in crate::runtime) allow_network: bool,
     pub(in crate::runtime) registry_object_bytes: u64,
     pub(in crate::runtime) registry_attempts: u64,
     pub(in crate::runtime) registry_admitted_bytes: u64,
@@ -52,6 +54,7 @@ pub(in crate::runtime) struct SourceServiceLimits {
 impl Default for SourceServiceLimits {
     fn default() -> Self {
         Self {
+            allow_network: true,
             registry_object_bytes: 1 << 20,
             registry_attempts: 128,
             registry_admitted_bytes: 128 << 20,
@@ -122,6 +125,7 @@ pub(in crate::runtime) enum SourceServiceError {
     InvalidLimits,
     ForeignScope,
     AcquisitionClosed,
+    NetworkDisabled,
     Cancelled,
     WorkDeadline,
     CleanupDeadline,
@@ -281,6 +285,14 @@ impl SourceServiceScope {
     }
     pub(in crate::runtime) fn check(&self) -> Result<(), SourceServiceError> {
         self.check_locked(&mut self.state(), false)
+    }
+    pub(super) fn check_network(&self) -> Result<(), SourceServiceError> {
+        self.check()?;
+        if self.limits.allow_network {
+            Ok(())
+        } else {
+            Err(self.poison(SourceServiceError::NetworkDisabled))
+        }
     }
     pub(in crate::runtime) fn poison(&self, error: SourceServiceError) -> SourceServiceError {
         self.poison_at(error, SourceTimeoutOrigin::unattributed())

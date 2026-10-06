@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated compiler files accepted; normal public Rust producer prerequisite selected
+Status: Offline scoped source guard accepted; normal public Rust source readiness continues
 
 ## Observable and source basis
 
@@ -41,6 +41,52 @@ deferred/native ActionKey allowance and preserve all accepted exact projections.
 fixture's opaque key restoration is not exact cross-system fingerprint admission.
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
+
+## Selected offline prerequisite checkpoint
+
+WP932 accepted the offline prerequisite after read-only discovery found no selective
+offline scoped transport policy: empty
+registry inputs cannot prohibit extension/archive HTTP, while closing the whole scope
+also refuses local path/source progress. The reviewed contract is
+[target/wp932/design.md](../../../../target/wp932/design.md). Implement an immutable
+allow_network scalar in existing SourceServiceLimits, default true, with a common
+scoped HTTP check before parser allocation/DNS/connect. False selects sticky typed
+NetworkDisabled with new inline code12; existing codes1–11 and Native services retain
+behavior. This operational guard is Slug-native and changes no DICE semantic key.
+No fixture/root/source observation is selected at this checkpoint.
+
+Correction allowlist: Core runtime/source_service/{scope.rs,http.rs,failure.rs,
+failure/tests.rs,tests.rs}; runtime/source_preparation/genuine_root.rs exhaustive
+scalar attribution arm only; Bzlmod registry_dice/{refusal.rs,refusal_tests.rs}; prior
+scheduling/receipt and ignored target/wp932 records. No second corpus/cache/interner
+or owned source clone. Local426-byte MODULE read controls prove only ordinary local
+transport and retained Arc lifetime. Direct common-leaf registry/archive refusal
+controls establish zero parser reservation and counters at that boundary; upstream
+registry parsing/attempt bookkeeping may precede it. Default profiles, first refusal,
+cleanup/retirement and stable code/projection gates protect behavior.
+
+Unit runtime10s TERM3/512MiBAS/256MiBRSS/1MiBlog, expected below1s per named case;
+compile/check offline separately60s using pinned nightly and prior owner profile.
+Independent DESIGN before edits and FINAL actual diff/evidence, exact selectors and
+normal checks required. These unit resource observations do not establish complete
+source or workload fit. Before any dependent public-root proof, freeze exact native
+module override/file-registry provenance and generated-tool requests under the
+original availability contract; no implicit Bazel-cache fallback is supported.
+
+[Accepted WP932 receipt](wp932-offline-source-guard-2026-10-06.json):7 Core/1 Bzlmod
+named unit gates and current CLI check pass;33,136KiB conservative Core process peak,
+all runtime groups joined. Initial mixed preparation124/60s is preserved; separate
+Bzlmod40.156s/Core32.033s/CLI25.752s preparation gates pass with unchanged60s bounds.
+No source availability observation was consumed. Continue this packet with the
+[first-file recommendation](../../../../target/wp932/successor-source.md), SHA256
+d9e6dd58b580c99c99a4bb68109872f6ff0f4102c46b71d64b846c4310bf4ac8:
+freeze only exact MODULE/defs/extensions/repository import files at the named existing
+local root, descriptor-anchored streamed hashes and small source facts,16MiB aggregate
+including fixture/reference inputs,64KiB reusable scratch and original10s/512MiBAS/
+256MiBRSS/4MiBreport caps. No entire archive/tree/binary or implicit cache certificate.
+Derive the exact additional module/import allowlist from current observed MODULE;
+missing/unparsed imports remain typed prerequisites. Source readiness still precedes
+any dependent public producer proof, which needs a separately frozen Core contract.
 
 ## Ownership, scope and allocation
 
