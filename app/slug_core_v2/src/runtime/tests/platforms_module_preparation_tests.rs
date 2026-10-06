@@ -1,0 +1,771 @@
+use std::mem::Discriminant;
+use std::os::unix::ffi::OsStrExt;
+use std::sync::Weak;
+
+use sha2::Digest;
+use slug_bzlmod_v2::HostRootRepositoryMappingObservationKey;
+use slug_bzlmod_v2::ObservedHostRootRepositoryMapping;
+use slug_bzlmod_v2::OverrideAttributeValue;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
+use slug_bzlmod_v2::RootModuleCommandPolicyKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
+use slug_bzlmod_v2::SelectedSourceRefusal;
+use slug_bzlmod_v2::SourcePreparationNeeds;
+use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_workspace_v2::NeedPathObservations;
+use slug_workspace_v2::ObservedPathFrontierError;
+
+use super::*;
+
+const PLATFORMS_SHA: [u8; 32] = [
+    0x1c, 0x0c, 0x09, 0xf5, 0xbd, 0xcf, 0x4b, 0x3f, 0x92, 0x47, 0x20, 0xd2, 0x47, 0x8a, 0x37, 0x11,
+    0xcb, 0x39, 0xf4, 0x97, 0x70, 0x19, 0xca, 0x59, 0x88, 0x68, 0x5e, 0x5b, 0x7e, 0x18, 0xb3, 0xd2,
+];
+fn platforms_bytes(bytes: &[u8]) -> bool {
+    bytes.len() == 416 && sha2::Sha256::digest(bytes).as_slice() == PLATFORMS_SHA
+}
+
+const ROOT_SHA: [u8; 32] = [
+    0xa3, 0x57, 0x13, 0x30, 0x30, 0xb9, 0x43, 0x60, 0xb3, 0x70, 0x61, 0xf3, 0x80, 0x98, 0x4c, 0xaa,
+    0x37, 0x4f, 0x73, 0x83, 0x84, 0x1f, 0xab, 0xdc, 0x8c, 0x5d, 0x26, 0xbc, 0x11, 0x4e, 0x3b, 0x10,
+];
+fn root_bytes(bytes: &[u8]) -> bool {
+    bytes.len() == 426 && sha2::Sha256::digest(bytes).as_slice() == ROOT_SHA
+}
+
+struct Bodies {
+    roots: [NormalizedAbsolutePath; 3],
+    files: [NormalizedAbsolutePath; 3],
+}
+#[derive(Debug)]
+struct Denied {
+    family: &'static str,
+    path: Option<NormalizedAbsolutePath>,
+}
+impl Bodies {
+    fn new(roots: [NormalizedAbsolutePath; 3]) -> Self {
+        let files = roots
+            .each_ref()
+            .map(|root| NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap());
+        Self { roots, files }
+    }
+    fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
+        let refusal = |family| Denied { family, path: None };
+        if needs.scratch_elf_metadata_requests().is_some() {
+            return Err(refusal("scratch"));
+        }
+        if needs
+            .root_module_bootstrap_request()
+            .is_some_and(|r| r.workspace != self.roots[0])
+        {
+            return Err(refusal("bootstrap"));
+        }
+        if needs.repository_environment().is_some() {
+            return Err(refusal("environment"));
+        }
+        if !needs.selected_extension_downloads().is_empty() {
+            return Err(refusal("download"));
+        }
+        if !needs.repository_executes().is_empty() {
+            return Err(refusal("execute"));
+        }
+        for (_, request) in needs.repository_materializations().iter() {
+            let RepositoryMaterializationKind::Local { logical_root } = &request.kind else {
+                return Err(refusal("materialization"));
+            };
+            let expected = ["rules_rust+", "platforms+"]
+                .iter()
+                .zip(&self.roots[1..])
+                .any(|(name, root)| {
+                    request.id.canonical_repo.as_str() == *name && logical_root == root
+                });
+            let label = &request.repo_spec.rule_id.bzl_file;
+            let attributes = &request.repo_spec.attributes;
+            let path_matches = matches!(attributes.get("path"), Some(OverrideAttributeValue::String(path)) if Path::new(path.as_str()) == logical_root.as_path());
+            if request.id.workspace != self.roots[0]
+                || !expected
+                || attributes.len() != 1
+                || !path_matches
+                || request.repo_spec.rule_id.rule_name != "local_repository"
+                || label.mapping_id().is_some()
+                || label.package().repo().as_str() != "bazel_tools"
+                || label.package().package().as_str() != "tools/build_defs/repo"
+                || label.target().as_str() != "local.bzl"
+            {
+                return Err(refusal("materialization"));
+            }
+        }
+        if let Some(paths) = needs.path_observations() {
+            for demand in paths.demands() {
+                let deny = |family| Denied {
+                    family,
+                    path: Some(demand.path().dupe()),
+                };
+                if demand.namespace() != PathObservationNamespace::Host {
+                    return Err(deny("namespace"));
+                }
+                let path = demand.path().as_path();
+                let allowed = match demand.operation() {
+                    PathObservationOperation::FileBytes | PathObservationOperation::FileDigest => {
+                        self.files.iter().any(|file| file.as_path() == path)
+                    }
+                    PathObservationOperation::Lstat => {
+                        self.files
+                            .iter()
+                            .any(|file| file.as_path().starts_with(path))
+                            || self.roots.iter().any(|root| {
+                                path.parent() == Some(root.as_path())
+                                    && matches!(
+                                        path.file_name().and_then(|n| n.to_str()),
+                                        Some(".bazelignore" | "BUILD" | "BUILD.bazel")
+                                    )
+                            })
+                    }
+                    _ => return Err(deny("operation")),
+                };
+                if !allowed {
+                    return Err(deny("path"));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Default)]
+struct Milestones {
+    calls: u64,
+    preparations: u64,
+    effective_empty: bool,
+    source: Option<Weak<[u8]>>,
+    bytes: usize,
+    hash_match: bool,
+    anchor: Option<&'static str>,
+    anchor_outer: Option<Discriminant<ObservedPathFrontierError>>,
+    mapping: Option<&'static str>,
+    refusal: Option<SelectedSourceRefusal>,
+    denied: Option<Denied>,
+}
+#[derive(Clone)]
+struct ModuleRoot {
+    bodies: Arc<Bodies>,
+    milestones: Arc<Mutex<Milestones>>,
+}
+#[derive(Clone)]
+struct ModuleTerminal {
+    mapping: ObservedHostRootRepositoryMapping,
+    source: Arc<[u8]>,
+    certificate: SourceCertificate,
+}
+fn refusal() -> NativeDemandSessionError {
+    NativeDemandSessionError::Computation(anyhow::anyhow!("bounded module prerequisite refusal"))
+}
+impl ModuleRoot {
+    fn need(
+        &self,
+        needs: SourcePreparationNeeds,
+    ) -> Result<SourcePreparationOutcome<ModuleTerminal>, NativeDemandSessionError> {
+        if let Err(denied) = self.bodies.admit(&needs) {
+            self.milestones.lock().unwrap().denied = Some(denied);
+            return Err(refusal());
+        }
+        Ok(SourcePreparationOutcome::Need(needs))
+    }
+}
+#[async_trait]
+impl NativeCommandRoot for ModuleRoot {
+    type Terminal = ModuleTerminal;
+    fn initializes_request_revision(&self) -> bool {
+        true
+    }
+    fn allows_empty_terminal(&self) -> bool {
+        true
+    }
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        ObservedSelectionAssociation::SelectedDependencySuperset
+    }
+    fn event_reconciliation_policy(&self, _: &Self::Terminal) -> EventReconciliationPolicy {
+        EventReconciliationPolicy::SourceCertifiedCurrentClosure
+    }
+    fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        Some(terminal.mapping.observations())
+    }
+    fn source_certificate<'a>(
+        &self,
+        terminal: &'a Self::Terminal,
+    ) -> Option<&'a SourceCertificate> {
+        Some(&terminal.certificate)
+    }
+    async fn compute(
+        &self,
+        tx: &mut dice::DiceTransaction,
+    ) -> Result<SourcePreparationOutcome<ModuleTerminal>, NativeDemandSessionError> {
+        self.milestones.lock().unwrap().calls += 1;
+        let policy = tx
+            .compute(&RootModuleCommandPolicyKey {
+                workspace: self.bodies.roots[0].as_path().to_owned(),
+            })
+            .await
+            .map_err(|_| refusal())?;
+        let exact = ["rules_rust", "platforms"]
+            .iter()
+            .zip(&self.bodies.roots[1..])
+            .all(|(name, root)| {
+                policy
+                    .command_module_overrides()
+                    .any(|(actual, path)| actual == *name && path == root.as_path())
+            });
+        let mode = tx
+            .compute(&slug_bzlmod_v2::RootModuleLockfileModeKey {
+                workspace: self.bodies.roots[0].as_path().to_owned(),
+            })
+            .await
+            .map_err(|_| refusal())?;
+        if !exact || mode != slug_bzlmod_v2::RootModuleLockfileMode::from(LockfileMode::Off) {
+            return Err(refusal());
+        }
+        self.milestones.lock().unwrap().effective_empty = true;
+        self.milestones.lock().unwrap().anchor = Some("need");
+        let anchor = tx
+            .compute(&RootModuleLoadingAnchorObservationKey::new(
+                self.bodies.roots[0].dupe(),
+            ))
+            .await
+            .map_err(|_| {
+                self.milestones.lock().unwrap().anchor = Some("compute_refusal");
+                refusal()
+            })?;
+        let anchor = match anchor {
+            SourcePreparationOutcome::Need(needs) => return self.need(needs),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                let mut state = self.milestones.lock().unwrap();
+                state.anchor = Some("outer_refusal");
+                state.anchor_outer = Some(std::mem::discriminant(&error));
+                return Err(refusal());
+            }
+            SourcePreparationOutcome::Complete(Ok(anchor)) => anchor,
+        };
+        if anchor.result().is_err() {
+            self.milestones.lock().unwrap().anchor = Some("semantic_refusal");
+            return Err(refusal());
+        }
+        let source = anchor
+            .observations()
+            .observations()
+            .iter()
+            .find_map(|(demand, value)| {
+                if demand.namespace() == PathObservationNamespace::Host
+                    && demand.path() == &self.bodies.files[0]
+                    && demand.operation() == PathObservationOperation::FileBytes
+                {
+                    if let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) =
+                        value.as_ref()
+                    {
+                        if root_bytes(bytes) {
+                            return Some(bytes.clone());
+                        }
+                    }
+                }
+                None
+            });
+        let Some(source) = source else {
+            self.milestones.lock().unwrap().anchor = Some("coverage_refusal");
+            return Err(refusal());
+        };
+        {
+            let mut state = self.milestones.lock().unwrap();
+            state.preparations += 1;
+            state.source.get_or_insert_with(|| Arc::downgrade(&source));
+            state.bytes = source.len();
+            state.hash_match = root_bytes(&source);
+            state.anchor = Some("complete");
+            if !state.hash_match {
+                return Err(refusal());
+            }
+            state.mapping = Some("need");
+        }
+        let observed = tx
+            .compute(&HostRootRepositoryMappingObservationKey::new(
+                self.bodies.roots[0].dupe(),
+            ))
+            .await
+            .map_err(|_| refusal())?;
+        let mapping = match observed {
+            SourcePreparationOutcome::Need(needs) => return self.need(needs),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                let mut state = self.milestones.lock().unwrap();
+                state.mapping = Some("outer_refusal");
+                state.refusal = Some(error.selected_source_refusal());
+                return Err(refusal());
+            }
+            SourcePreparationOutcome::Complete(Ok(mapping)) => mapping,
+        };
+        if let Err(error) = mapping.result().as_ref() {
+            let mut state = self.milestones.lock().unwrap();
+            state.mapping = Some("semantic_refusal");
+            state.refusal = Some(error.selected_source_refusal());
+            return Err(refusal());
+        }
+        let covered = mapping.observations().observations().iter().any(|(demand, value)| {
+            demand.namespace() == PathObservationNamespace::Host && demand.path() == &self.bodies.files[2]
+                && demand.operation() == PathObservationOperation::FileBytes
+                && matches!(value.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if platforms_bytes(bytes))
+        });
+        let root_covered = mapping.observations().observations().iter().any(|(demand, value)| {
+            demand.namespace() == PathObservationNamespace::Host
+                && demand.path() == &self.bodies.files[0]
+                && demand.operation() == PathObservationOperation::FileBytes
+                && matches!(value.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if root_bytes(bytes) && Arc::ptr_eq(bytes, &source))
+        });
+        if !covered || !root_covered {
+            self.milestones.lock().unwrap().mapping = Some("coverage_refusal");
+            return Err(refusal());
+        }
+        let certificate =
+            SourceCertificate::from_epoch(mapping.observations().dupe()).map_err(|_| {
+                self.milestones.lock().unwrap().mapping = Some("certificate_refusal");
+                refusal()
+            })?;
+        self.milestones.lock().unwrap().mapping = Some("complete");
+        Ok(SourcePreparationOutcome::Complete(ModuleTerminal {
+            mapping,
+            source,
+            certificate,
+        }))
+    }
+}
+
+#[test]
+fn complete_need_admission_refuses_mixed_and_wrong_operation_before_progress() {
+    let normalized = |path: &str| NormalizedAbsolutePath::new(Path::new(path)).unwrap();
+    let bodies = Bodies::new([
+        normalized("/fixture"),
+        normalized("/rules"),
+        normalized("/platforms"),
+    ]);
+    let paths = |path: &str, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            normalized(path),
+            operation,
+        )))
+    };
+    let body = paths(
+        "/platforms/MODULE.bazel",
+        PathObservationOperation::FileBytes,
+    );
+    assert!(bodies.admit(&body).is_ok());
+    for path in [
+        "/",
+        "/platforms",
+        "/platforms/MODULE.bazel",
+        "/rules/BUILD.bazel",
+        "/fixture/.bazelignore",
+    ] {
+        assert!(
+            bodies
+                .admit(&paths(path, PathObservationOperation::Lstat))
+                .is_ok()
+        );
+    }
+    assert!(
+        bodies
+            .admit(&paths(
+                "/rules/MODULE.bazel",
+                PathObservationOperation::FileDigest
+            ))
+            .is_ok()
+    );
+    let mut progress_calls = 0;
+    for excluded in [
+        paths("/platforms/REPO.bazel", PathObservationOperation::Lstat),
+        paths(
+            "/platforms/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        paths(
+            "/platforms/MODULE.bazel",
+            PathObservationOperation::ReadLink,
+        ),
+        paths("/platforms", PathObservationOperation::DirectoryEntries),
+        paths(
+            "/platforms/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        )
+        .try_union(&SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: normalized("/other"),
+            },
+        ))
+        .unwrap(),
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(1),
+            ),
+            normalized("/platforms/MODULE.bazel"),
+            PathObservationOperation::FileBytes,
+        ))),
+    ] {
+        let mixed = body.try_union(&excluded).unwrap();
+        if bodies.admit(&mixed).is_ok() {
+            progress_calls += 1;
+        }
+        assert!(bodies.admit(&mixed).is_err());
+    }
+    let mut local = (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone();
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_ok()
+    );
+    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms").unwrap();
+    assert!(
+        bodies
+            .admit(
+                &body
+                    .try_union(&SourcePreparationNeeds::repository(local.clone()))
+                    .unwrap()
+            )
+            .is_err()
+    );
+    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms+").unwrap();
+    local.kind = RepositoryMaterializationKind::Immutable;
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_err()
+    );
+    local.kind = RepositoryMaterializationKind::Local {
+        logical_root: normalized("/other"),
+    };
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_err()
+    );
+    local.kind = RepositoryMaterializationKind::Local {
+        logical_root: normalized("/platforms"),
+    };
+    local.id.workspace = normalized("/other");
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_err()
+    );
+    local.id.workspace = normalized("/fixture");
+    local.repo_spec.rule_id.rule_name = "http_archive".into();
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local))
+            .is_err()
+    );
+    let budget = slug_workspace_v2::ImageDescriptorBudget::new(4096);
+    let anchor =
+        slug_workspace_v2::ImageChargedPath::pin_existing(normalized("/platforms"), &budget)
+            .unwrap();
+    let leaf = slug_workspace_v2::ImageChargedPath::pin_existing(
+        normalized("/platforms/MODULE.bazel"),
+        &budget,
+    )
+    .unwrap();
+    let image = PathObservationDemand::input_image(
+        PathObservationNamespace::Host,
+        leaf,
+        slug_workspace_v2::ImageObservationRequest::new(
+            anchor,
+            slug_workspace_v2::ImageObservationOperation::Lstat,
+        ),
+    )
+    .unwrap();
+    assert!(
+        bodies
+            .admit(
+                &body
+                    .try_union(&SourcePreparationNeeds::path(
+                        NeedPathObservations::singleton(image)
+                    ))
+                    .unwrap()
+            )
+            .is_err()
+    );
+    assert_eq!(progress_calls, 0);
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::root_module_bootstrap(
+                slug_bzlmod_v2::RootModuleBootstrapRequest {
+                    workspace: normalized("/fixture")
+                }
+            ))
+            .is_ok()
+    );
+}
+
+#[test]
+#[ignore = "frozen scoped native MODULE preparation observation"]
+fn native_root_module_and_normal_mapping_prerequisite() {
+    phase("baseline");
+    let workspace = NormalizedAbsolutePath::new(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace"),
+    )
+    .unwrap();
+    let root = |name| {
+        let spelling = std::env::var(name).expect("frozen supervisor root");
+        assert!(spelling.len() <= 1024 && !spelling.chars().any(char::is_whitespace));
+        let normalized = NormalizedAbsolutePath::new(Path::new(&spelling)).unwrap();
+        assert_eq!(normalized.as_path(), Path::new(&spelling));
+        normalized
+    };
+    let bodies = Arc::new(Bodies::new([
+        workspace.clone(),
+        root("SLUG_NATIVE_RULES_RUST_ROOT"),
+        root("SLUG_NATIVE_PLATFORMS_ROOT"),
+    ]));
+    println!(
+        "WP942_REQUEST workspace={} rules_root={} platforms_root={} registry=https://bcr.bazel.build/ lockfile=off local_overrides=true",
+        workspace.as_path().display(),
+        bodies.roots[1].as_path().display(),
+        bodies.roots[2].as_path().display()
+    );
+    let start = Instant::now();
+    let scope = SourceServiceScope::new_for_test(
+        workspace.clone(),
+        start + Duration::from_secs(5),
+        start + Duration::from_secs(8),
+        SourceServiceLimits {
+            allow_network: false,
+            registry_object_bytes: 1 << 20,
+            registry_attempts: 16,
+            registry_admitted_bytes: 16 << 20,
+            source_attempts: 16,
+            transferred_bytes: 16 << 20,
+            decoded_bytes: 16 << 20,
+            written_bytes: 16 << 20,
+            live_buffer_bytes: 16 << 20,
+            blocking_threads: Some(2),
+        },
+    )
+    .unwrap();
+    let scope_weak = Arc::downgrade(&scope);
+    let (recorder, arm_error) = match scope.arm_registry_association_for_test() {
+        Ok(r) => (Some(r), None),
+        Err(e) => (None, Some(e)),
+    };
+    let recorder_weak = recorder.as_ref().map(Arc::downgrade);
+    let (mut runtime, constructor_error) = if arm_error.is_none() {
+        match WorkspaceRuntime::new_with_source_services(
+            workspace.as_path(),
+            ProcessHostOwner::native(),
+            WorkspaceSourceServices::Diagnostic(scope.clone()),
+        ) {
+            Ok(r) => (Some(r), None),
+            Err(e) => (None, Some(e)),
+        }
+    } else {
+        (None, None)
+    };
+    let budgets = runtime.as_mut().map(|runtime| {
+        let descriptor = slug_workspace_v2::ImageDescriptorBudget::new(16 << 20);
+        runtime.image_resources =
+            crate::runtime::input_image::WorkspaceImageResources::new(descriptor.clone(), 16 << 20);
+        runtime.scratch_resources = slug_bzlmod_v2::SelectedScratchResources::new(
+            slug_bzlmod_v2::SelectedScratchPayloadBudget::new(16 << 20),
+            descriptor,
+        );
+        assert!(
+            runtime
+                .image_resources
+                .descriptor_budget()
+                .same_instance(runtime.scratch_resources.descriptor_budget())
+        );
+        (
+            runtime.image_resources.clone(),
+            runtime.scratch_resources.clone(),
+        )
+    });
+    phase("after_runtime");
+    resources("before_command", budgets.as_ref());
+    let milestones = Arc::new(Mutex::new(Milestones::default()));
+    let mut policy_error = false;
+    let mut outcome = None;
+    if let Some(runtime) = &runtime {
+        let overrides = [
+            format!("rules_rust={}", bodies.roots[1].as_path().display()),
+            format!("platforms={}", bodies.roots[2].as_path().display()),
+        ];
+        match BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            workspace.as_path(),
+            overrides.iter().map(String::as_str),
+        ) {
+            Err(_) => policy_error = true,
+            Ok(policy) => {
+                let mut request = NativeDemandRequestInputBundle::normalized_initial();
+                request.command_policy = policy;
+                request.lockfile_mode = LockfileMode::Off;
+                request.registry_urls = RegistryUrls::new(["https://bcr.bazel.build/"]);
+                outcome = Some(runtime.drive_command(
+                    request,
+                    ModuleRoot {
+                        bodies,
+                        milestones: milestones.clone(),
+                    },
+                ));
+            }
+        }
+    }
+    phase("after_command");
+    let stage = if arm_error.is_some() {
+        "arm_refusal"
+    } else if constructor_error.is_some() {
+        "constructor_refusal"
+    } else if policy_error {
+        "policy_refusal"
+    } else if matches!(outcome, Some(Ok(_))) {
+        "mapping_complete"
+    } else {
+        "native_refusal"
+    };
+    println!("WP942_STAGE {stage}");
+    match &outcome {
+        Some(Ok(driven)) => {
+            assert!(root_bytes(&driven.accepted.terminal().source));
+            println!(
+                "WP942_NATIVE kind=complete attempts={} roots={}",
+                driven.attempts, driven.terminal_root_count
+            );
+        }
+        Some(Err(error)) => println!(
+            "WP942_NATIVE kind={} attempts=unavailable roots=unavailable",
+            native_kind(error)
+        ),
+        None => println!("WP942_NATIVE kind=unavailable attempts=unavailable roots=unavailable"),
+    }
+    let source_weak = {
+        let state = milestones.lock().unwrap();
+        println!(
+            "WP942_ROOT_SOURCE seen={} calls={} policy_checked={} bytes={} hash_match={} anchor={} outer_variant={:?}",
+            state.preparations != 0,
+            state.calls,
+            state.effective_empty,
+            state.bytes,
+            state.hash_match,
+            state.anchor.unwrap_or("not_started"),
+            state.anchor_outer
+        );
+        print!(
+            "WP942_MAPPING state={} codes=",
+            state.mapping.unwrap_or("not_started")
+        );
+        if let Some(refusal) = state.refusal {
+            if refusal.codes().is_empty() {
+                print!("none");
+            }
+            for (i, code) in refusal.codes().iter().enumerate() {
+                if i != 0 {
+                    print!(",");
+                }
+                print!("{code:?}");
+            }
+            println!(
+                " termination={:?} native_detail={}",
+                refusal.termination(),
+                refusal.native_detail_observed()
+            );
+        } else {
+            println!("none termination=none native_detail=false");
+        }
+        let bytes = state
+            .denied
+            .as_ref()
+            .and_then(|d| d.path.as_ref())
+            .map(|path| path.as_path().as_os_str().as_bytes());
+        let captured = bytes.is_some_and(|bytes| bytes.len() <= REGISTRY_IDENTITY_BYTES);
+        println!(
+            "WP942_DENIED family={} path_len={} path_hex={} capture={}",
+            state.denied.as_ref().map_or("none", |d| d.family),
+            bytes.map_or_else(|| "none".to_owned(), |b| b.len().to_string()),
+            RegistryHex(bytes.filter(|_| captured)),
+            if captured {
+                "captured"
+            } else if bytes.is_some() {
+                "bounds_refused"
+            } else {
+                "missing"
+            }
+        );
+        state.source.clone()
+    };
+    let counters = scope.snapshot();
+    println!(
+        "WP938_SCOPE {:?} {} {} {} {} {} {} {} {}",
+        scope.first_error_for_test(),
+        counters.registry_attempts,
+        counters.registry_admitted_bytes,
+        counters.source_attempts,
+        counters.transferred_bytes,
+        counters.decoded_bytes,
+        counters.written_bytes,
+        counters.live_buffer_bytes,
+        counters.peak_buffer_bytes
+    );
+    println!("WP940_ARM {arm_error:?}");
+    if let Some(recorder) = &recorder {
+        report_registry_association(recorder, &counters, scope.first_error_for_test());
+    } else {
+        println!("WP940_ASSOCIATION unavailable");
+        println!("WP940_FIRST_ROW unavailable");
+    }
+    resources("after_command", budgets.as_ref());
+    drop(outcome);
+    drop(constructor_error);
+    drop(milestones);
+    phase("after_terminal_drop");
+    drop(runtime);
+    phase("after_runtime_drop");
+    resources("after_runtime_drop", budgets.as_ref());
+    drop(recorder);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while (budgets.as_ref().is_some_and(|(image, scratch)| {
+        image.descriptor_budget().used_bytes() != 0
+            || image.logical_bytes_used() != 0
+            || scratch.payload_budget().used_bytes() != 0
+    }) || scope.snapshot().live_buffer_bytes != 0
+        || source_weak
+            .as_ref()
+            .is_some_and(|weak| weak.upgrade().is_some())
+        || recorder_weak
+            .as_ref()
+            .is_some_and(|weak| weak.upgrade().is_some()))
+        && Instant::now() < deadline
+    {
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+    assert!(
+        source_weak
+            .as_ref()
+            .is_none_or(|weak| weak.upgrade().is_none())
+    );
+    assert!(
+        recorder_weak
+            .as_ref()
+            .is_none_or(|weak| weak.upgrade().is_none())
+    );
+    if let Some((image, scratch)) = &budgets {
+        assert_eq!(image.descriptor_budget().used_bytes(), 0);
+        assert_eq!(image.logical_bytes_used(), 0);
+        assert_eq!(scratch.payload_budget().used_bytes(), 0);
+    }
+    drop(scope);
+    while scope_weak.upgrade().is_some() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(1));
+    }
+    assert!(scope_weak.upgrade().is_none());
+    phase("after_scope_drop");
+    println!(
+        "WP942_RETIREMENT source_weak_seen={} source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+        source_weak.is_some()
+    );
+}

@@ -44,31 +44,33 @@ REAPI and M7A/full-root remain open.
 
 ## Current source-readiness checkpoint
 
-[WP941](wp941-platforms-local-module-readiness-2026-10-06.json) connects the
-unchanged426B fixture's production RootModuleFilesKey evaluation to WP940's complete
-60-byte forward URL, with a unique eligible candidate and structural same-workspace
-preparation identity. One existing integration-owner test borrows dependency fields;
-no production API, string pool or extra semantic cache is added. All three exact Rust
-tests pass (0.309s,19,024KiB peak). Corrected offline preparation18.581s and direct
-Core check6.834s pass; the initial invocation's60s cap is preserved.
+[WP942](wp942-native-local-module-readiness-2026-10-06.json) accepts genuine native
+root MODULE loading/evaluation through public RootModuleLoadingAnchorObservationKey,
+then preserves the normal HostRootRepositoryMappingObservationKey registry transport
+prerequisite. The original426B Host source matches its full hash; its first Weak and
+all recorder/scope credits retire. Five focused ordinary tests and one supervised native
+observer pass, Core preparation9.537s and direct CLI check7.358s pass. The native case
+runs0.226s at conservative66,816KiB RSS under the unchanged256MiB cap. Parent held-FD
+brackets verify all three pinned MODULE files; only the root native milestone succeeds.
 
-Pinned Bazel9.2 source independently selects canonical `external/platforms`.
-Four current link controls pass; one metadata observation records its187-byte absolute
-source root (0.031s,17,536KiB), then one strict MODULE.bazel read observes416B with SHA
-`1c0c09f5bdcf4b3f924720d2478a3711cb39f4977019ca5988685e5b7e18b3d2`
-(0.052s,18,572KiB). Eleven unchanged reader/fact controls are reused with current pins.
-Literal partial facts declare platforms1.1.0, package_metadata0.0.3, rules_license0.0.7
-and dev rules_shell0.6.1; two directives remain unparsed. Exact target spelling and
-FD/name brackets are in the receipt. Trace peaks1,826,848B through perfile retirement;
-compact facts/helpers retain1,685,863B. These are current individual file facts, not
-native MODULE evaluation, resolved MVS/registry provenance or a source certificate.
+Mapping ends in the typed RegistryFileTransport classification chain with first scope
+NetworkDisabled. The first retained diagnostic URL is the complete66B
+`https://bcr.bazel.build/modules/bazel_features/1.50.0/MODULE.bazel`; recorder sole-offline
+qualification is false. It does not identify the selected typed leaf, current MVS or
+registry provenance. Scope transfer/decode/write and source-attempt counters are zero,
+separate from the actual native Host root read. No mapping certificate, normal platforms
+evaluation, generated provider/toolchain or public Rustc action is admitted. Full-workload
+fit remains open; representative parser and native source operations fit their caps.
 
-Next freeze this exact root/MODULE pin at the existing native source/module preparation
-owner, then proceed toward normal materialization, generated registration/providers
-and the retained public Rustc producer. Keep actual source readiness and producer
-requirements together. No import body, normal command, acquisition or spent-source
-retry is currently selected. Candidate request correspondence does not identify the
-historical caller. Missing native prerequisites remain typed.
+Next ground the precise typed request origin or exact local-source availability using
+existing source owners and the independently recorded rules_rust declaration. The
+[source recommendation](../../../../target/wp942/successor-source.md) identifies the
+already-retained typed error association and the missing borrowed public projection.
+Freeze that concrete contract before implementation or another source operation. No
+new root replay, locator/alias guess, acquisition or spent-source retry is selected.
+[WP941](wp941-platforms-local-module-readiness-2026-10-06.json) remains the preceding
+root-declaration/forward-request and individually bracketed platforms416B source basis;
+its partial facts do not certify normal evaluation or registry/MVS provenance.
 
 Reusable source/memory evidence: [WP934 alias](wp934-explicit-root-alias-2026-10-06.json),
 [WP935 finite reads](wp935-explicit-local-source-2026-10-06.json),
@@ -85,15 +87,21 @@ All earlier refused guards/replays remain closed.
 
 ## Ownership, scope and allocation
 
-The latest change is one test-only addition in Bzlmod's existing
-`tests/root_module_dice.rs`. Root owns the strict observation wrappers and compact
-receipt; fixture/expected/production files remain unchanged. The next source-specific
-contract must select the existing native preparation/materializer owner and exact
-actual-root/import allowlist before Rust work or operation. Saved partial facts do not
-justify new exports, path-provenance APIs or fabricated source/provider certificates.
-Prefer a bounded companion to growing Loading's39k-line host_package_load_tests; any
-shared adapter names its natural existing owner and concrete growth reason. Consequential
-ownership/representation/operation changes receive independent design and final review.
+The latest change is a cohesive771-line Core test companion and five nested include
+lines, reusing existing private reporting/resource helpers. Production APIs, fixtures,
+interner ownership and dependency manifests remain unchanged. The actual native root
+anchor and mapping share one normal scoped DICE request; whole-Need admission permits
+only three exact MODULE bodies and finite metadata/Local roles. A successful terminal
+would require the original covered mapping epoch, exact root/platforms sources and root
+Arc identity before source certification. That success branch remains source-reviewed,
+not exercised by the accepted refusal. No injected snapshot, bootstrap, private export,
+fabricated source/provider certificate or public-build substitute is admitted.
+
+Root owns bounded wrappers, integration and the compact receipt. The next contract must
+select the exact retained diagnostic owner or independently grounded source locator
+before edits or operation. Consequential ownership/representation/operation changes
+receive independent design and final review. Prefer existing natural owners and bounded
+companions to copied large harnesses; record any concrete shared-boundary growth reason.
 
 DICE owns all selected source/module/configuration/action facts. Do not transplant
 Bazel graphs, use a standalone external-rule evaluator, bypass source/frontier guards,

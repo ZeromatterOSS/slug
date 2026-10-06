@@ -60,11 +60,18 @@ unchanged caps. [WP941](./slug-v2-subplans/wp941-platforms-local-module-readines
 proves evaluated root declaration/forward URL correspondence and observes one local
 platforms MODULE416B with partial literal1.1.0 declaration/dependencies. Seven
 checks pass (one new test case); first source read0.052s/18,572KiB, corrected preparation18.581s
-and Core check6.834s pass. Next freeze actual native source/module preparation using
-this exact root/hash, then advance generated prerequisites and normal retained Rustc
-ownership. Physical bytes and a matching candidate do not certify MVS/registry provenance,
-normal module/source authority or whole fit. No normal command/acquisition/spent-source
-retry is selected; public producer and transitive/generated prerequisites remain open.
+and Core check6.834s pass. Its partial candidate facts do not certify registry/MVS provenance.
+[WP942](./slug-v2-subplans/wp942-native-local-module-readiness-2026-10-06.json)
+accepts genuine native426B root MODULE loading/evaluation and preserves the normal
+mapping's classified offline registry transport prerequisite. Five focused tests and one
+native observer pass; Core preparation9.537s and CLI check7.358s pass. Native0.226s peaks
+66,816KiB under256MiB, with original source/recorder/scope Weak and buffer-credit retirement.
+The first retained raw URL spells modules/bazel_features/1.50.0/MODULE.bazel, but
+sole-offline qualification is false and its selected typed caller/MVS provenance remains unproved. Next ground that
+association or exact local availability before another source operation. Normal platforms
+mapping/certification, generated prerequisites and retained public Rustc production remain
+open. Representative memory gates permit this broader readiness work; whole-workload fit
+and all spent source/acquisition/full-root limits remain unchanged.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

@@ -745,3 +745,8 @@ fn observe_normal_rules_rust_public_probe(arm_registry: bool) {
         println!("WP938_RETIREMENT live_buffer_zero=true scope_weak_expired=true");
     }
 }
+
+#[cfg(target_os = "linux")]
+mod platforms_module_preparation_tests {
+    include!("platforms_module_preparation_tests.rs");
+}
