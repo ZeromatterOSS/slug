@@ -1,101 +1,112 @@
 # Slug V2 current work packet
 
-Packet: WP-7-230-m7a-generated-compiler-env-file-correspondence-r1
-Status: Saved argument projection accepted; demanded generated environment inputs selected
+Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
+Status: Generated compiler files accepted; normal public Rust producer prerequisite selected
 
-## Observable, demand and source basis
+## Observable and source basis
 
-Continue canonical priority1's configured compiler input coverage. Account for and
-observe only the446 unique generated environment-file artifacts consumed through466
-ordered --env-file occurrences by411 of the513 saved Rustc owners. All379
-ExtractCargoTomlEnvVars and67 CargoBuildScriptRun producers are in the original
-1385-action root0 artifact closure. Root0 itself has no env-file argument; its
-transitive compiler forest supplies this demand. Preserve original action/artifact,
-producer/path/configuration/isTool and occurrence associations; no basename or Cargo
-host-role inference.
+Continue canonical priority1 toward a retained Slug compiler graph produced through
+normal rule analysis. Reuse unchanged
+[the Bazel9.2 rules_rust0.73 fixture](../../../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/fixture.toml):
+public //pkg:probe rust_binary with //pkg:support rust_library and data.txt, extension-
+generated rust_toolchains registration, edition2024/nightly2025-09-14 and platforms1.1.0.
+The existing196,649-byte oracle records eleven analysis/query commands, including
+warm2024, changed2021 and restored2024 Rustc/runfiles/provider results. It proves no
+compiler execution. Do not replace it with older9.1.1/rules_rust0.71 basic evidence.
 
-[The source recommendation](../../../../target/wp930/successor-source.md), SHA256
-c501ca6ab8b202e0571f0fbee4552e5b7381877abb0fe23b0262d270b721dbfb,
-pins the saved graph/references and cached rules_rust source. Read these source
-anchors before freezing the concrete helper: options.rs214–237/320–331/443–469,
-util.rs36–65, rustc.bzl848–855/1053–1056, cargo_toml_env_vars.bzl3–25 and
-cargo_build_script_runner/lib.rs162–177. Reuse the accepted pure LF/CRLF/backslash/EOF
-decoder, without invoking its old acquisition reader. Split env records at first
-ASCII equals; retain empty fields, refuse absent equals, apply later-record/file
-key overwrite, then raw OUT_DIR override. Preserve source-defined value substitution
-order and runtime-domain uncertainty; no recursive shell interpretation.
+[The source recommendation](../../../../target/wp931/successor-source.md), SHA256
+d83170e1c6f1ac5ba129266a13b2da1da68eace04f2776adf902652e0f17ca54,
+pins fixture/MODULE/BUILD/oracle and names existing producer/query owners. First freeze
+exact fixture source/import/generated-repository/materialization/toolchain-provider
+availability under an offline bounded source gate. Version names and historical oracle
+bytes do not authenticate current module bytes or generated mappings. Reuse Loading's
+existing host_package_load source corpus/import identities; never copy a large module/
+registry harness or fabricate providers/registration/source certificates.
 
-Exact claims cover admitted source transformations over supplied bytes and saved
-artifact/order joins. The inventory is Slug-native operational metadata. New cached
-output reads are qualified current local observations joined to a historical graph,
-never historical environment or current producer-freshness certification. Inherited
-process environment, historical cwd/canonicalization, stamp bytes, Cargo host-role
-identity, actual current compiler execution and full-root/M7A remain deferred.
+After source readiness is proved, obtain //pkg:probe's Rustc action through ordinary
+BuildCommandRootKey/loading/bzlmod/configured rule ownership. Preserve its support/data
+production inputs and registered execution platform. Use existing ConfiguredSpawnActionView
+and query dispatch, borrowing actual action/spec/context. Compare source-proved crate/
+edition argv, executable artifact ownership, configured source/generated inputs/outputs,
+platform, order and actual runfiles support against the existing saved class fields.
+Include warm/A→B→A provider/metadata/recipe lifetime within the same DICE engine. Generic
+hand-authored ctx.actions.run tests do not establish this public upstream constructor.
+Source readiness alone does not close the normal-producer proof; record any exact typed
+missing prerequisite before selecting its source-specific correction.
 
-## Owner, scope and allocation
+Exact claims are limited to admitted source/oracle class fields. Configuration/output
+paths and semantic identity remain Slug-native and structurally owned; never normalize
+via display hashes, regex, basename or global replacement. Freeze current per-family
+deferred/native ActionKey allowance and preserve all accepted exact projections. The
+fixture's opaque key restoration is not exact cross-system fingerprint admission.
+Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
+REAPI and M7A/full-root remain open.
 
-No production/DICE/interner/execution grant changes. Root freezes a minimal ignored
-reader/analyzer and serial capped runner in target/wp931; one worker may own finite
-pure controls, with independent source and evidence DESIGN/FINAL reviews. Exact
-allowlist: ignored helpers/source/input/operation/result/hash records, canonical/current/
-bootstrap scheduling/evidence and one compact tracked receipt. Helper roughly200–350
-lines and controls100–200 are review triggers. No Rust, loading, backend/cache/CLI,
-query/build, wrapper invocation, .expanded write or corpus growth is selected.
+## Ownership, scope and allocation
 
-Use only original fixed saved-input pins and446 exact declared generated paths under
-WP911's recorded execroot provenance. Validate the root and walk componentwise through
-regular directory descriptors without following symlinks; only regular nofollow
-leaves, descriptor/named identity and size brackets. Record per-file bytes/hash and
-original producer provenance. A successful old root build does not certify current
-outputs. Missing/type/identity/size/source-pin failure records refusal without recovery,
-new build, acquisition or inference from locks. No ambient environment/RC reading.
+Root first freezes the smallest source-readiness and proof design, with independent
+source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp932
+source/availability/design/input/operation/hash records, a focused Core sibling
+runtime/tests/rustc_producer_aquery_tests.rs, its test-only include in runtime/dice.rs,
+and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture
+adapter needs its exact existing owner/path and growth reason frozen before editing;
+prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.
+Fixture/expected files remain unchanged references. No new production API is justified
+by the saved file bytes; a demonstrated normal-constructor field/guard gap requires a
+reviewed source-specific correction/allowlist before activation, or a typed REPLAN.
 
-Keep original decoded strings shared by unique file index; process one consumer's
-ordered overwrite/projection scratch and retire it before the next. Retain compact
-key/origin/domain references and incremental digests rather than duplicated complete
-maps for411 consumers. Borrow or transfer existing storage; no global pool for temporary
-or unique strings. Measure actual load/projection/retention and whole-operation RSS,
-with explicit release boundaries and encoding interval qualification.
+DICE owns all selected source/module/configuration/action facts. Do not transplant
+Bazel graphs, use a standalone external-rule evaluator, bypass source/frontier guards,
+invoke compiler/wrapper/backend, or add path-provenance APIs speculatively. A typed
+borrowed Args occurrence visitor may be a later comparator prerequisite; it is not this
+packet's substitute for a real retained producer. Execution grants/run/cache/.expanded
+writes, source16/17/18/F3/full-genuine-root retries and network/BCR/archive acquisition
+are excluded. A missing local source/request/provider stays a typed prerequisite with
+no fallback or recovery. Existing source/whole-fit refusals remain separate.
 
-## Fixed limits and acceptance
+Keep existing interned module/label/attribute/artifact owners and Arc/Dupe retained
+recipes. Borrow action views and transfer fixture storage; no repeated deep source or
+argv copies, unique/temporary global pool or second semantic cache. Account actual
+source/proof retention and RSS under the existing memory policy; a finite fixture does
+not establish current full-source/whole-workload fit. Linux remains priority; Windows
+may remain minimal Unsupported.
 
-Separate pure controls from one serial bounded observation. Preserve10s TERM3,
-512MiB address space/256MiB monitored RSS; each saved input<=16MiB, each generated
-file<=1MiB and total generated bytes<=16MiB, checked before parsing/growth. Compact
-report<=4MiB checked during incremental encoding. Do not silently raise a cap.
-A resource refusal leaves that gate unproved; preserve it and select the smallest
-source-ready next decision. Source16/17/18 and the legacy unproved offline BCR guard
-have no retry. Linux remains priority; Windows may remain minimal Unsupported.
+## Validation and decision boundaries
 
-Discriminate exact decoder/first-equals/empty/malformed semantics; duplicate keys
-within/across repeated files; direct fixed/file precedence on supplied pure maps;
-raw OUT_DIR override; ordered substitutions/introduced markers/sticky runtime domains;
-missing/type/identity/hash/per-file/aggregate refusal. Verify all446 producer artifacts,
-466 ordered occurrences and411 consumer memberships through the original declared
-root walk, exact saved configurations and source-owned outputs. Do not interpret
-absence of observed keys as absence from the inherited effective environment.
+Pin all unchanged fixture/oracle and selected source/module bytes before use. Initial
+offline source-readiness observation:10s TERM3,512MiB AS/256MiB monitored RSS,16MiB per
+saved/source input,4MiB compact report. No silent limit increase or identical refusal
+retry. Freeze the actual Core proof's selected names/source ownership, caps/environment
+and expected costs before running; reuse accepted Rust validation preparation bounds,
+compile separately within60s and resolve pinned nightly cargo/rustc/rustdoc/rustfmt.
+No code/runtime test is authorized as a hidden retry of a spent source probe.
 
-Freeze source/implementation pins and meaningful named nonzero controls before the
-measured observation. Independent source/evidence FINAL reviews inspect actual code
-and bounded receipts, not just hashes/counts; no duplicate runtime. Run source/diff/
-archive/plan checks, record caps/time/retention/failure attribution and commit locally.
-No Cargo is required without a Rust change. Genuine design/provenance prerequisites
-remain a source-ready decision; unavailable bytes never authorize recovery or ambient
-context substitution. No Slug whole-workload memory-fit claim follows from this reader.
+Discriminate missing/mismatched source, generated mapping/provider provenance and exact
+selected registration; normal public probe/support/edition/data action ownership;
+actual executable/input/output/configuration/platform and runfiles fields; warm reuse,
+edition A→B→A restoration and original-source changes under the same DICE owner. Reject
+foreign/forged/partial source or authored empty toolchain envelopes. Reuse accepted
+source, virtual Args/paramfile and ordinary Spawn query evidence, adding only demonstrated
+gaps. If readiness fails, preserve the exact typed prerequisite and select its normal
+owner; do not mark the genuine producer accepted from a refusal-only control.
+
+Use focused owner tests/direct dependent validation appropriate to the actual diff,
+meaningful named nonzero preflight, independent DESIGN/FINAL review, source/diff/archive/
+plan checks, compact receipt and local commit. No broad suite/new Bazel oracle is needed
+without an evidence gap. No 513-owner graph or fullM7A/whole-fit completion follows from
+this finite prerequisite.
 
 ## Immediate predecessor
 
-[WP930](wp930-effective-compiler-arguments-2026-10-06.json) accepts source-supplied
-historical literal projections for all513 saved Rustc owners (511 native/two shell),
-201 shared vectors and1167 ordered bindings.16 source-derived controls and the
-2.267s bounded workload pass, with two independent FINAL accepts. Whole-run observed
-RSS99,844KiB stays under256MiB; post-input-release trace3,741,750B retains compact
-report/classifier/shared leaves. Peak34,299,583B stops before encoding. These are
-Python saved-workload observations, not Slug aggregate savings or full fit.
-1082 recognized projected cfgs include68 generated bare/valued records and zero
-generated named features; all513 streams remain qualified.466 env declarations
-establish no actual environment bytes. Raw out_dir and executable uncertainty fixes
-are directly tested; the initial identity-counter assertion failure is preserved.
-Previous native header capability remains accepted, with zero saved root consumers;
-more header/C++ execution needs concrete demand. M7A/authentic Slug/whole-fit and all
-prior memory/source/resource qualifications remain open.
+[WP931](wp931-generated-compiler-env-files-2026-10-06.json) accepts individually
+bracketed current reads of all446 generated env files (190,700B) linked to466 ordered
+bindings/411 historical compiler owners:379 ExtractCargoTomlEnvVars/67 CargoBuildScriptRun.
+13 controls and the2.233s observation pass with two independent FINAL accepts.5215 records
+and19 shared key names yield5561 file/OUT_DIR subset entries;67 insertedOUT_DIR values
+retain pwd uncertainty. No plaintext full environments or411-map cache is retained.
+Conservative process peak120,588KiB stays under256MiB; trace peak39,162,623B through
+retirement excludes encoding, with4,848,642B compact report/helpers/shared leaves retained.
+These are Python observations, not Slug savings/full fit. Actual inherited/fixed-action
+environment, historical context and producer freshness remain unknown. WP930's qualified
+argument projection and WP929's native header capability remain accepted; zero saved
+header consumers select no further C++ execution. All prior caps/refusals stay unwaived.

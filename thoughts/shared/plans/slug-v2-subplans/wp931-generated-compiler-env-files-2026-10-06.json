@@ -1,0 +1,310 @@
+{
+  "packet": "WP-7-230-m7a-generated-compiler-env-file-correspondence-r1",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "9525f53687be0ac91f2801b4d710d55cf70c7f79",
+  "result": "All446 declared generated environment files observed through individually bracketed current local reads and reconciled to466 ordered bindings/411 saved compiler consumers. Source-defined file/OUT_DIR subset projection only; no production change.",
+  "contract": {
+    "path": "target/wp931/design.md",
+    "sha256": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+  },
+  "source_basis": {
+    "recommendation_path": "target/wp930/successor-source.md",
+    "recommendation_sha256": "c501ca6ab8b202e0571f0fbee4552e5b7381877abb0fe23b0262d270b721dbfb",
+    "input_pins": {
+      "target/wp905/graph.json": {
+        "sha256": "15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c",
+        "bytes": 6746234
+      },
+      "target/wp905/references.json": {
+        "sha256": "f1e0cab91450f87f8c2c8782c61549890027dc09a7f085aa42887a19476ecf04",
+        "bytes": 1397614
+      },
+      "target/wp911/selection.json": {
+        "sha256": "f4a6cc64a54770a8dff5ccca4b2df8455fd4d2773b9bace0308c69e4dd8e2a1a",
+        "bytes": 334066
+      },
+      "target/wp911/read.py": {
+        "sha256": "5ca936040fed9b3ef93c69e5b097482170165c9706232df8eb06f25cc9e1bfe6",
+        "bytes": 13009
+      },
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/options.rs": {
+        "sha256": "b8a9208a3ced5be6cebd72a5fa82d19a85c64b0935585edff0e2546466c24b03",
+        "bytes": 21342
+      },
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/util.rs": {
+        "sha256": "2365f126d9270c1c87419c9435c64cef0cce7c6bc9bd40235ee1f2048c6865f8",
+        "bytes": 3637
+      },
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/rust/private/rustc.bzl": {
+        "bytes": 145040,
+        "sha256": "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4"
+      },
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/cargo/private/cargo_toml_env_vars.bzl": {
+        "bytes": 1558,
+        "sha256": "4ff5a97e807c1d2d70418f704a00e1710189aa5f7d00c2110e7e23783630a20d"
+      },
+      "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/cargo/private/cargo_build_script_runner/lib.rs": {
+        "bytes": 20648,
+        "sha256": "54e90953ecd2016994b08fc51330b75cf9cdaf155c27163229f7bb506070ce4b"
+      },
+      "target/wp930/analyze.py": {
+        "bytes": 16653,
+        "sha256": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad"
+      },
+      "target/wp930/result.json": {
+        "bytes": 618567,
+        "sha256": "fdbab69fa7b77e49434bc53a5e8f3ba9666d34071a5207344e92cc6ce080e613"
+      },
+      "target/wp930/successor-source.md": {
+        "bytes": 5738,
+        "sha256": "c501ca6ab8b202e0571f0fbee4552e5b7381877abb0fe23b0262d270b721dbfb"
+      }
+    },
+    "rules": "Pinned rules_rust options214\u2013237/320\u2013331/443\u2013469,util36\u201365,rustc848\u2013855/1053\u20131056,cargo_toml_env_vars3\u201325,build_script_runner162\u2013177; pinned WP911 pure LF/backslash decoder and WP930 flag/token/replace helpers."
+  },
+  "compatibility": {
+    "exact": "Admitted strictUTF8/LF/CRLF/continuation/EOF decoder, first-equals records, last writer and OUT_DIR precedence, values-only ordered literal passes over supplied bytes, exact saved input/artifact/configuration/producer joins. Supplied pure context controls discriminate complete small vectors.",
+    "slug_native": "Current per-file local read/hash/identity receipt joined to historical graph; key indices and sorted length-framed diagnostic subset digests.",
+    "deferred": "Atomic/historical collection snapshot, current producer freshness, inherited/fixed-action effective environment, stamp/runtime-context bytes, child process/environment validity and compiler behavior, Cargo role equivalence, authentic Slug execution/M7A/full-root/current whole-memory fit, Windows beyond minimal Unsupported."
+  },
+  "observed": {
+    "selected_actions": 1385,
+    "selected_compilers": 513,
+    "consumer_count": 411,
+    "occurrence_count": 466,
+    "file_count": 446,
+    "file_bytes": 190700,
+    "producer_families": {
+      "CargoBuildScriptRun": 67,
+      "ExtractCargoTomlEnvVars": 379
+    },
+    "projection_counts": {
+      "projected_entries": 5561,
+      "qualified_entries": 67,
+      "residual_entries": 67,
+      "out_dir_overrides": 67
+    },
+    "maximum_leaf_bytes": 755
+  },
+  "account": {
+    "counts": {
+      "nonempty_files": 381,
+      "record_count": 5215,
+      "pending_eof_files": 0,
+      "empty_pair_files": 65,
+      "distinct_keys": 19,
+      "owners_with_conditional_entries": 67,
+      "file_map_subset_owners_without_conditional_values": 344
+    },
+    "conditional": "All67 qualified entries are source-inserted OUT_DIR with pwd dependency. Exact file-subset projected values for344 owners do not prove complete effective child environment.",
+    "no_plaintext_env_values_in_report": true
+  },
+  "allocation": {
+    "ownership": "One decoded pair vector per distinct file, shared borrowed key/value strings; last-writer per-consumer maps and transformed values retire before next. Only19 local report key strings are shared by index. Compact file/owner/origin/domain entries and digests remain; no plaintext full env values,411-map cache or global temporary interner.",
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576
+    },
+    "saved_input_cap": 16777216,
+    "generated_file_cap": 1048576,
+    "generated_aggregate_cap": 16777216,
+    "report_cap": 4194304,
+    "report_bytes": 1448533,
+    "tracemalloc_through_retirement": {
+      "loaded_current": 36099140,
+      "loaded_peak": 36163168,
+      "scratch_retired_current": 39161879,
+      "scratch_retired_peak": 39162623,
+      "inputs_released_current": 4848642,
+      "traced_peak": 39162623,
+      "max_rss_kib": 120588
+    },
+    "qualified": "Trace starts before pinned helper loading and covers saved input/file/projection loading and retirement through GC, but stops before report encoding. Whole-run sampled RSS118356KiB and child rusage120588KiB include encoding; retain both, conservative process peak120588KiB. Post-drop4848642B includes compact files/rows/shared keys/provenance and pure-helper namespaces; not zero input-origin retention or Slug savings/current whole-fit."
+  },
+  "validation": {
+    "preflight": {
+      "path": "target/wp931/preflight.json",
+      "sha256": "35fe5511d9470ba04d943f8d01c76ec905f5936c3ab88a578527bdfc6a573214"
+    },
+    "controls": {
+      "mode": "controls",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp931/controls.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05134570400696248,
+      "selected_count": 13,
+      "pass_count": 13,
+      "max_observed_rss_kib": 27160,
+      "child_rusage_max_rss_kib": 27252,
+      "stop_reason": null,
+      "caps": {
+        "seconds": 10,
+        "term_seconds": 3,
+        "as_bytes": 536870912,
+        "rss_bytes": 268435456,
+        "log_bytes_each": 1048576
+      },
+      "owned_group_empty": true,
+      "joined": true,
+      "pins_before": {
+        "target/wp931/analyze.py": "1715b34f05d808a21ccf99540d08569548eb1edbe930284ee3fec2f2e769dbcf",
+        "target/wp931/controls.py": "3b9c46dd0e57f577af10b0cf4beb584b65e83200d9e1ae4d02c9b9e52192dc91",
+        "target/wp931/bounded.py": "45167536572e1b2765174d8f9f65160c80894f8af232a21f269a46cb9cda317d",
+        "target/wp931/input-pins.json": "33cdc25c27e1aa2fbbc9467cd3e8387eff269933365cb112f40d9111a8b52312",
+        "target/wp931/design.md": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+      },
+      "pins_after": {
+        "target/wp931/analyze.py": "1715b34f05d808a21ccf99540d08569548eb1edbe930284ee3fec2f2e769dbcf",
+        "target/wp931/controls.py": "3b9c46dd0e57f577af10b0cf4beb584b65e83200d9e1ae4d02c9b9e52192dc91",
+        "target/wp931/bounded.py": "45167536572e1b2765174d8f9f65160c80894f8af232a21f269a46cb9cda317d",
+        "target/wp931/input-pins.json": "33cdc25c27e1aa2fbbc9467cd3e8387eff269933365cb112f40d9111a8b52312",
+        "target/wp931/design.md": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+      },
+      "logs": {
+        "target/wp931/controls.stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target/wp931/controls.stderr": {
+          "bytes": 2093,
+          "sha256": "dcb4457691b25c7e868689acdf58355880cfabdf8a7c9f6ed30bcc6bac5b353e"
+        }
+      }
+    },
+    "inventory": {
+      "mode": "inventory",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp931/analyze.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.2333679620642215,
+      "selected_count": 411,
+      "pass_count": 411,
+      "max_observed_rss_kib": 118356,
+      "child_rusage_max_rss_kib": 120588,
+      "stop_reason": null,
+      "caps": {
+        "seconds": 10,
+        "term_seconds": 3,
+        "as_bytes": 536870912,
+        "rss_bytes": 268435456,
+        "log_bytes_each": 1048576
+      },
+      "owned_group_empty": true,
+      "joined": true,
+      "pins_before": {
+        "target/wp931/analyze.py": "1715b34f05d808a21ccf99540d08569548eb1edbe930284ee3fec2f2e769dbcf",
+        "target/wp931/controls.py": "3b9c46dd0e57f577af10b0cf4beb584b65e83200d9e1ae4d02c9b9e52192dc91",
+        "target/wp931/bounded.py": "45167536572e1b2765174d8f9f65160c80894f8af232a21f269a46cb9cda317d",
+        "target/wp931/input-pins.json": "33cdc25c27e1aa2fbbc9467cd3e8387eff269933365cb112f40d9111a8b52312",
+        "target/wp931/design.md": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+      },
+      "pins_after": {
+        "target/wp931/analyze.py": "1715b34f05d808a21ccf99540d08569548eb1edbe930284ee3fec2f2e769dbcf",
+        "target/wp931/controls.py": "3b9c46dd0e57f577af10b0cf4beb584b65e83200d9e1ae4d02c9b9e52192dc91",
+        "target/wp931/bounded.py": "45167536572e1b2765174d8f9f65160c80894f8af232a21f269a46cb9cda317d",
+        "target/wp931/input-pins.json": "33cdc25c27e1aa2fbbc9467cd3e8387eff269933365cb112f40d9111a8b52312",
+        "target/wp931/design.md": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+      },
+      "logs": {
+        "target/wp931/inventory.stdout": {
+          "bytes": 855,
+          "sha256": "5ea6a52372c6fb9bd08a2a39333e952ba7eb16b1e55f88640e72d0029913c73d"
+        },
+        "target/wp931/inventory.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "inventory_inner_seconds": 2.187843354069628,
+    "rust_cargo": "Not required: no Rust, CLI, DICE or production change.",
+    "bookkeeping": {
+      "path": "target/wp931/bookkeeping.json",
+      "sha256": "f9186ccf159c1d6ad918b149d76937f5ecbdf8ae4cc138e156156e85f9ec4793",
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "scripts/v2_plan_status.py"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "bash",
+            "scripts/v2_archive_status.sh"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp931/design-source.md",
+      "sha256": "e4f6695d691d4fdb9bb49aaa77bdadfc334a132acf5299536488e7422206fa02",
+      "verdict": "ACCEPT"
+    },
+    "design-evidence": {
+      "path": "target/wp931/design-evidence.md",
+      "sha256": "e5e7a53acc168889c5cd0a2f84ec6f50622d26c017eb1f7aecd8cd58dc6d1e0e",
+      "verdict": "ACCEPT"
+    },
+    "final-source": {
+      "path": "target/wp931/final-source.md",
+      "sha256": "9b0e103186e5c539445ae9983c63a8ca3381047505f53a252c6e32d9a9f7eb9d",
+      "verdict": "ACCEPT"
+    },
+    "final-evidence": {
+      "path": "target/wp931/final-evidence.md",
+      "sha256": "1a9b4040a8f1c05bb814164bb73f0dd3257e4801e95d5e263a38798adfe0c8ab",
+      "verdict": "ACCEPT"
+    }
+  },
+  "boundaries": "Source16/17/18 spent, no acquisition/BCR retry; original WP899 memory refusal/profiles and DICE retention evidence remain qualified; legacy offline bare guard remains unproved; no M7A/full-root/whole-fit completion.",
+  "operations": {
+    "path": "target/wp931",
+    "hash_index": "target/wp931/hashes.json",
+    "hash_index_sha256": "0e51b89ac87c4afbb768b4dea9b936a4a2244f82a3212bd811947e4d0210b89f",
+    "artifact_count": 22,
+    "qualified": "Ignored local operational source/log/result files remain available; tracked receipt pins complete index."
+  },
+  "timing": {
+    "packet_elapsed_seconds_at_record": 703.3259708881378,
+    "compile_seconds": 0,
+    "current_controls_seconds": 0.05134570400696248,
+    "current_inventory_seconds": 2.2333679620642215,
+    "review_seconds": "Not instrumented; DESIGN/FINAL receipts retained.",
+    "packet_elapsed_seconds_at_acceptance_record": 1420.708401441574
+  },
+  "implementation": {
+    "target/wp931/analyze.py": "1715b34f05d808a21ccf99540d08569548eb1edbe930284ee3fec2f2e769dbcf",
+    "target/wp931/controls.py": "3b9c46dd0e57f577af10b0cf4beb584b65e83200d9e1ae4d02c9b9e52192dc91",
+    "target/wp931/bounded.py": "45167536572e1b2765174d8f9f65160c80894f8af232a21f269a46cb9cda317d",
+    "target/wp931/input-pins.json": "33cdc25c27e1aa2fbbc9467cd3e8387eff269933365cb112f40d9111a8b52312",
+    "target/wp931/design.md": "3a280c9f9a8ff33f66c3deded57544fd8b2334ff4b590dfc7bd526570cb804e8"
+  },
+  "successor": {
+    "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+    "source_note": "target/wp931/successor-source.md",
+    "source_note_sha256": "d83170e1c6f1ac5ba129266a13b2da1da68eace04f2776adf902652e0f17ca54",
+    "selected_fixture": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner",
+    "gate": "First exact offline source/generated mapping/toolchain provider readiness, then normal retained public Rustc producer/query correspondence using existing view APIs. No new production API or current compiler graph is justified yet."
+  }
+}

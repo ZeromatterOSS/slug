@@ -34,38 +34,37 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-230-m7a-generated-compiler-env-file-correspondence-r1
-Status: Saved argument projection accepted; demanded generated environment inputs selected
+Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
+Status: Generated compiler files accepted; normal public Rust producer prerequisite selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects the remaining
-actual generated compiler environment inputs:446 unique artifacts,466 ordered
-bindings and411 consumers in the saved requested-root artifact closure. It permits
-one capped local observation and source-derived correspondence, with no ambient
-context, build/acquisition or source16/17/18/BCR retry. Current local bytes remain
-qualified against a historical graph; producer freshness and effective inherited
-environment remain unknown.
-[WP930](./slug-v2-subplans/wp930-effective-compiler-arguments-2026-10-06.json)
-accepts all513 saved source-supplied literal compiler projections,201 shared vectors
-and1167 ordered bindings.16 controls, a2.267s workload run and two FINAL reviews pass.
-Observed RSS99,844KiB is below256MiB; post-input-release traced retention3,741,750B
-includes the compact report/shared leaves. This bounds the Python saved workload,
-with no Slug whole-fit conclusion. All513 argument streams remain qualified;68
-generated cfgs add no named features. Runtime paths, actual environment and freshness
-remain open. The accepted native header capability in
+The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
+retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
+probe fixture and existing Spawn view/query APIs. First prove exact offline source,
+generated mapping and provider readiness, then normal configured action ownership.
+Historical oracle bytes do not certify current sources; missing prerequisites stay
+typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
+[WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
+accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
+saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
+vectors/19 report key names and per-consumer retirement keep conservative peak RSS
+120,588KiB under256MiB; traced post-drop4,848,642B retains compact report/helper leaves.
+The observations establish file/OUT_DIR subset correspondence, not Slug whole-memory
+fit or inherited effective environment/producer freshness. All67 insertedOUT_DIR values
+retain pwd uncertainty. [WP930](./slug-v2-subplans/wp930-effective-compiler-arguments-2026-10-06.json)
+keeps all513 argument projections qualified. The accepted native header capability
 [WP929](./slug-v2-subplans/wp929-native-build-info-header-publication-2026-10-06.json)
-shares its original consumed owner; no saved root consumer selects further header/C++
-execution. M7A/full-root/whole-workload fit, generic execution/cache/REAPI and prior
-memory/source limits remain open.
+has no saved root consumer selecting more header/C++ execution. M7A/full-root/whole-fit,
+authentic compiler execution/cache/REAPI and prior memory/source limits remain open.
 
 ### Ready and blocked queue
 
-The current packet selects demanded generated compiler environment inputs under priority1. Declared
+The current packet selects normal retained compiler producer readiness under priority1. Declared
 header/C++ capabilities do not select execution without requested-root demand; the
 remaining priorities stay queued until concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; saved ordered literal arguments reconciled; current packet observes demanded generated env files; runtime context/current freshness remain qualified |
+| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; saved argument/file-env subsets reconciled; current packet selects normal retained compiler producer readiness; runtime context/current freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | native header producer accepted with zero saved root consumers; demanded execution rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
