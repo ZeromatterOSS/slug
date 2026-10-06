@@ -485,7 +485,13 @@ typed matching transform may own a constant output. Ordered input deduplication
 does not erase the distinct status/template roles. These are exact admitted
 construction semantics with Slug-native structural identity, not an ActionKey
 claim. Core and raw projection/materialization entrypoints fail closed before
-execution effects. Status bytes/production, rendering, arbitrary or Java callbacks,
+execution effects. [WP922](wp922-build-info-recipe-render-2026-10-06.json) adds pure
+rendering on these checked recipes over borrowed supplied status/template strings.
+It preserves ordered literal replacement, callback defaults and the exact missing
+timestamp diagnostic; the returned String owns its bytes after input release.
+Three borrowed pairs and local output buffers add no retained cache or interner.
+The native Unicode domain remains Slug-native; raw status parsing/production,
+Latin1 artifact conversion, tracked template reads, arbitrary or Java callbacks,
 execution/cache policy, installed module tools and full cc_toolchain remain deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash

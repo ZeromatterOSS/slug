@@ -1,8 +1,10 @@
-//! Finite authenticated build-info registration, never callback execution.
+//! Checked finite build-info recipes and pure rendering of supplied strings.
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use allocative::Allocative;
 use dupe::Dupe;
+use slug_configuration_v2::CanonicalStringMap;
 use slug_identity_v2::CanonicalLabel;
 
 use crate::ActionOutput;
@@ -48,6 +50,56 @@ impl BuildInfoCallbackRecipe {
             source,
             digest,
         })
+    }
+    /// Render the two pinned callback recipes over supplied Unicode strings.
+    /// This does not read artifacts, parse status bytes or execute the action.
+    pub fn render_template(
+        &self,
+        status: &CanonicalStringMap,
+        template: &str,
+    ) -> Result<String, &'static str> {
+        let substitutions = match self.kind {
+            BuildInfoTransformKind::Info => [
+                (
+                    "{BUILD_EMBED_LABEL}",
+                    status.get("BUILD_EMBED_LABEL").unwrap_or(""),
+                ),
+                (
+                    "{BUILD_HOST}",
+                    status.get("BUILD_HOST").unwrap_or("hostname"),
+                ),
+                (
+                    "{BUILD_USER}",
+                    status.get("BUILD_USER").unwrap_or("username"),
+                ),
+            ],
+            BuildInfoTransformKind::Version => {
+                // Presence is required even when the template contains no key.
+                let timestamp = status.get("BUILD_TIMESTAMP").ok_or(
+                    "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found.",
+                )?;
+                [
+                    (
+                        "{BUILD_SCM_REVISION}",
+                        status.get("BUILD_SCM_REVISION").unwrap_or("0"),
+                    ),
+                    (
+                        "{BUILD_SCM_STATUS}",
+                        status.get("BUILD_SCM_STATUS").unwrap_or(""),
+                    ),
+                    ("{BUILD_TIMESTAMP}", timestamp),
+                ]
+            }
+        };
+        let mut output = Cow::Borrowed(template);
+        for (key, value) in substitutions {
+            if key != value && output.contains(key) {
+                // Literal replacement skips this pass's inserted text; later
+                // passes see it. A matching pass briefly owns old/new buffers.
+                output = Cow::Owned(output.replace(key, value));
+            }
+        }
+        Ok(output.into_owned())
     }
     pub fn kind(&self) -> BuildInfoTransformKind {
         self.kind

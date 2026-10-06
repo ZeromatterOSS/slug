@@ -1,0 +1,216 @@
+{
+  "packet": "WP-7-221-m7a-build-info-recipe-render-r1",
+  "operational_packet": "WP922",
+  "date": "2026-10-06",
+  "base": "544c8b129a094ddb0b7687b036bf09806736cbc1",
+  "status": "accepted",
+  "outcome": "Pure rendering on existing checked finite BuildInfo recipes over borrowed supplied status/template strings, with independent output and exact defaults, timestamp error and ordered literal replacement.",
+  "compatibility": {
+    "exact": "Pinned finite callback order/default/error and sequential nonrecursive literal substitution algorithms over supplied strings.",
+    "slug_native": "Valid-Unicode strings, deterministic status-map ordering and unchanged structural action/configuration/path identity.",
+    "deferred": "Latin1 artifact conversion, raw status parsing/production, tracked template reads, volatile caching, arbitrary callback evaluator, action/REAPI execution, Windows breadth, authentic source/full-root/M7A and whole-workload memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "source_basis": "Complete source/evaluated digest and exact callsite authenticated in Loading; builtin Info/Version callbacks and ASCII templates, BuildInfoFileWriteAction and LocalTemplateExpansionStrategy in WP921 source discovery. Existing constructor/admission guards unchanged.",
+    "callback_digest": "72cc98ddc39e4c7c66d23541c7b18e10b70fde6008e2883144554b7487e97514",
+    "template_sha256": {
+      "non_volatile_file.h.template": "4d014ba8408a9a1e5cc9aca57183dee8bda0561ee92d4732bf174d0392218269",
+      "volatile_file.h.template": "83f47681c317f7b1249b6dcc9fa23a089233cf2f3a3801fedaca82869def8807"
+    }
+  },
+  "ownership": {
+    "api": "BuildInfoCallbackRecipe::render_template(&CanonicalStringMap, &str) -> Result<String, &'static str>; kind/source/digest remain private checked recipe facts.",
+    "allocation": "Three ordered stack pairs borrow keys/defaults/status values. Cow initially borrows template; absent/identical passes skip allocation, matching pass uses standard literal replacement and drops old buffer on assignment. Later passes can transiently hold old/new full outputs; final String owns bytes even without a match. No owned substitution map, recipe/status clone, new retained cache/interner/pool/key/graph, DICE/lock or execution change.",
+    "qualification": "Intermediate amplification and allocator capacity remain; no single-allocation, zero-copy, quantified performance or whole-memory fit claim. Unique local scratch is not globally interned; existing scoped producer interners remain unchanged."
+  },
+  "discriminators": "Fourteen independent complete-string cases: both defaults/fullheaders/empty/unknown values, repeated/adjacent keys, forward/backward/self cascades, cross-insertion boundary, no-match/empty, exact missing timestamp priority, raw nonnumeric/CRLF. Unicode accents/supplementary/CJK/quotes/backslash/NUL/whitespace, growing/shrinking/repeated output, unchanged inputs and output after all recipe/map/template/snapshot owners drop. Actual installed/main/external Target/Exec retained recipes render complete unchanged supplied ASCII headers twice, preserve full spec/action/group/status/root/configuration/refusal gates; catalog-authority refusal remains.",
+  "source_sha256": {
+    "app/slug_build_api_v2/src/actions/build_info_transform.rs": "1c9ed7aabfc6557298ff3413bfc6c839ed34a67543a05ce012565f8509186e31",
+    "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs": "ccd4b75851e6fa9d7c31010133de113b82f2a3008903d5013620de5c6edb1922",
+    "app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs": "e574a3d739001f518bc0942e1b2352772d9fc732610cad7b702c82110aa828c6"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved nightly-2025-09-14, offline Cargo JSON jobs1 <=60s TERM3 preparations; Analysis invocation-only four-package opt0/debug0 profile; fresh exact nonignored preflight before serial10s TERM3 runtime.",
+    "compiles": {
+      "cli-check": {
+        "exit": 0,
+        "seconds": 28.512796488008462,
+        "receipt": "target/wp922/cli-check.json"
+      },
+      "build-api-tests": {
+        "exit": 0,
+        "seconds": 19.023019618005492,
+        "receipt": "target/wp922/build-api-tests.json"
+      },
+      "analysis-tests": {
+        "exit": 0,
+        "seconds": 33.675950872013345,
+        "receipt": "target/wp922/analysis-tests.json"
+      }
+    },
+    "build_api": {
+      "selected": 5,
+      "passed": 5,
+      "elapsed_seconds": 0.012395263067446649,
+      "max_child_rss_kib": 12504
+    },
+    "analysis": {
+      "selected": 3,
+      "passed": 3,
+      "elapsed_seconds": 0.48042942001484334,
+      "max_child_rss_kib": 105320
+    },
+    "preflights": {
+      "build-api": {
+        "exit_code": 0,
+        "output": "Verified 5 exact nonignored test(s); no tests executed.\n",
+        "elapsed_seconds": 0.06929178698919713,
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_build_api_v2-31b6e4cd11657155",
+        "executable_sha256": "cf6cd9093c173b690f9d54a561dbb42069b6e22db53e6b4843574a33aa777701",
+        "selected": 5,
+        "artifact_profile": {
+          "opt_level": "1",
+          "debuginfo": 2,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false
+      },
+      "analysis": {
+        "exit_code": 0,
+        "output": "Verified 3 exact nonignored test(s); no tests executed.\n",
+        "elapsed_seconds": 0.1650341770146042,
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-3e0b37736bfde50c",
+        "executable_sha256": "42d95f65407058f1bf17cc739bbffcdb3678de7f9e9163a8c1e47a0fb4d16ca3",
+        "selected": 3,
+        "artifact_profile": {
+          "opt_level": "0",
+          "debuginfo": 0,
+          "debug_assertions": true,
+          "overflow_checks": true,
+          "test": true
+        },
+        "fresh": false
+      }
+    },
+    "checks": [
+      {
+        "name": "rustfmt",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt",
+          "--edition",
+          "2024",
+          "--config",
+          "skip_children=true",
+          "--check",
+          "app/slug_build_api_v2/src/actions/build_info_transform.rs",
+          "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs",
+          "app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.010532444925047457,
+        "output": ""
+      },
+      {
+        "name": "diff-check",
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.0034589950228109956,
+        "output": ""
+      },
+      {
+        "name": "archive-status",
+        "command": [
+          "bash",
+          "scripts/v2_archive_status.sh"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 0.03343101299833506,
+        "output": "OK: slug-v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: v1-archive resolves to e218054d4c796655939b968d90208b185decb352\nOK: archive tag and branch point at the same commit\nOK: V1_ARCHIVE.md exists\nOK: V1_ARCHIVE.md records V1 commit\nOK: V1_ARCHIVE.md records archive ref names\nOK: no physical v1-archive/ directory\nOK: HEAD does not track a v1-archive directory\nOK: no tracked V1-only root paths\nOK: root MODULE.bazel is fresh Slug V2 metadata\nOK: root BUILD.bazel owns Slug V2 dependency inputs\nOK: only V2 repo-local skills are tracked under .codex/\nOK: only V2 app crates are tracked under app/\nOK: only V2 test infrastructure is tracked under tests/\nOK: only V2 oracle tools are tracked under tools/\nOK: only V2 plans and prompts are tracked under thoughts/\nOK: only retained DICE docs are tracked under docs/\nOK: canonical V2 plan is referenced from root/plans\nINFO: working tree has active changes:\n M app/slug_analysis_v2/tests/rustc_map_each/compile_context/provider/build_info_transform.rs\n M app/slug_build_api_v2/src/actions/build_info_transform.rs\n M app/slug_build_api_v2/src/actions/build_info_transform/tests.rs\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n"
+      }
+    ],
+    "plan_status": {
+      "command": [
+        "python3",
+        "scripts/v2_plan_status.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.014375112019479275,
+      "output": "Packet: WP-7-222-m7a-supplied-workspace-status-values-r1\n"
+    },
+    "protected_baseline": {
+      "file": "app/slug_build_api_v2/src/actions/build_info_transform/tests.rs",
+      "baseline_sha256": "efa25d3eb742277fd0365ebd510904e2fbf1f35974f654bd909579c0db99f9f2",
+      "baseline_bytes": 8790,
+      "unchanged_prefix": true
+    },
+    "cli": "Default production CLI compile check passed; no binary/oracle invocation requiring a separate executable rebuild."
+  },
+  "reviews": {
+    "source": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp922/final-source.md",
+      "sha256": "72155ed89a11df018d46345980f4aaf29dea7e900f40985a80240e7619538979"
+    },
+    "ownership": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp922/final-ownership.md",
+      "sha256": "87484373b5b5a77dc0d7749cfc09b38adca9d93e1d34cd89b1cb913d2d87802b"
+    },
+    "evidence": {
+      "verdict": "FINAL ACCEPT",
+      "receipt": "target/wp922/final-evidence.md",
+      "sha256": "0c7057f0d625f59f97f1c0761f56c0218d342d70635a96011c585e56f42a1c92"
+    }
+  },
+  "design_reviews": {
+    "source": {
+      "receipt": "target/wp922/design-source-contract.md",
+      "sha256": "9331cc2424697d2a4eee42e8dc7c74351c3609a3adc8b10a6f3e90763181c91e"
+    },
+    "ownership": {
+      "receipt": "target/wp922/design-ownership-contract.md",
+      "sha256": "ff0ba3d8ca79f21f7dc6e1ef1471ffb7a63fabc86f24f9ff930836b28c3f3c97"
+    },
+    "evidence": {
+      "receipt": "target/wp922/design-evidence-contract.md",
+      "sha256": "71d85ca1f2a72c0067782e8f6def2e82c03aa2ee59e80dc07484370e0f648a1a"
+    }
+  },
+  "growth": "54 production added lines under100 estimate, 233 new unit lines and44-line real-header helper plus invocation. Root/three FINAL reviews accept cohesive independent oracle/order/Unicode/lifetime responsibilities above provisional200 estimate. No assets/corpus/producer harness or utility import. Removed12 unnecessary temporary literal Strings from fixture builders; map still owns compact values.",
+  "corrections": "No compile or runtime failure; literal-builder cleanup and formatting preserved all independent expectations and baseline tests. Immutable successor source SHA verified from pinned Git object rather than mutable Bazel checkout.",
+  "memory_readiness": {
+    "inherited_receipt": "wp899-memory-readiness-2026-10-06.json",
+    "qualification": "Existing controlled64round/131072-string readiness remains within512MiBAS/256MiBRSS envelope; original64KiB postdrop refusal preserved and broader authentic workload fit unproved. Renderer adds local scratch only; no change to retained representations or interners. Focused test RSS is observation, not renderer/workload memory proof."
+  },
+  "successor": {
+    "packet": "WP-7-222-m7a-supplied-workspace-status-values-r1",
+    "basis": "Demanded status-byte parsing prerequisite; pure LF/firstASCIIspace/lastduplicate/Latin1 decoding beside existing status owner, no artifact/status producer authority.",
+    "source_note": "target/wp922/successor-source.md",
+    "pinned_source": {
+      "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+      "file": "src/main/java/com/google/devtools/build/lib/analysis/WorkspaceStatusAction.java",
+      "sha256": "2e05526a947d4643a5e9b5cc45ee5c938ecd6fc133941e87a02147a2953a9db8",
+      "qualified": "Immutable Git source pin, not current Bazel checkout bytes; identical parseValues body."
+    }
+  },
+  "remaining": "Prior caps/refusals and spent source16/17/18 attempts persist. Runtime producer/template/volatile/cache/input-tree/REAPI, authentic full-root/M7A and whole-memory fit remain open.",
+  "timing": {
+    "compile_seconds": 81.2117669780273,
+    "runtime_seconds": 0.49282468308229,
+    "observed_since_recorded_start_seconds": 1164.1526523060165,
+    "qualification": "Start was recorded after predecessor/discovery; review duration not independently measured."
+  },
+  "operational_evidence": {
+    "directory": "target/wp922",
+    "hash_index": "target/wp922/operational-hashes.json",
+    "index_sha256": "21d54b3389c44170a235b8e262ae31fb8282fb17807883d6a819e45a5ecd0e88"
+  }
+}

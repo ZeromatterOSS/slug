@@ -34,32 +34,30 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-221-m7a-build-info-recipe-render-r1
-Status: Public compile producer/query accepted; finite BuildInfo recipe renderer selected
+Packet: WP-7-222-m7a-supplied-workspace-status-values-r1
+Status: Finite BuildInfo rendering accepted; supplied-byte status parser selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects pure finite BuildInfo
-recipe rendering on supplied borrowed status/template strings, preserving the tracked
-status/template/volatile execution prerequisites. [WP921](./slug-v2-subplans/wp921-public-compile-query-2026-10-06.json)
-proves unchanged public compile callers reach typed query with fourteen actual main/
-external Target/selected Exec recipes, including ordered Exec PIC and NOPIC actions.
-Complete class records, borrowed roles/context roots, fixed env/recipe-last info and
-source/configuration A/B/A release pass. All71 distinct Core controls pass by qualified
-69+1+1 union, three Analysis controls pass and three FINAL reviews accept. Only test
-helper/sibling wiring changes; production and retained storage are unchanged. The
-separate Analysis direct-to_exec twelve-case proof keeps its fastbuild provenance.
-Full-root, authentic source/runtime, whole-workload memory fit and M7A remain open;
-allocation/interner discipline, source16/17/18 caps and minimal Windows scope persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects pure supplied-byte
+workspace-status parsing on the existing status owner, preserving tracked artifact,
+producer and volatile execution prerequisites. [WP922](./slug-v2-subplans/wp922-build-info-recipe-render-2026-10-06.json)
+adds rendering on existing checked recipes using borrowed supplied status/template
+strings and three ordered pairs, with independent output and exact defaults/errors.
+Five BuildAPI and three actual installed-rule Analysis controls pass; the default CLI
+compile check and three FINAL reviews accept. No retained cache, pool or graph value
+is added. Replacement passes may transiently own old/new buffers. Whole-workload
+memory fit, authentic source/full-root/runtime and M7A remain open; allocation/interner
+discipline, prior memory/resource caps, source16/17/18 limits and minimal Windows scope persist.
 
 ### Ready and blocked queue
 
-The current packet selects demanded finite BuildInfo rendering under priority3; the remaining
+The current packet selects demanded supplied-byte status parsing under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects finite BuildInfo recipe rendering; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects supplied-byte status parsing; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

@@ -451,10 +451,14 @@ into the existing authentic toolchain-helper/public-compile proof. Finite recipe
 authenticate the complete pinned callback source and callsite; no callbacks run
 in analysis. Full structural action identity includes workspace/status, template,
 configuration/root and orthogonal output metadata. This removes a construction
-prerequisite, not a production execution gate: actual status bytes/producer,
-rendering, volatile execution/cache policy, module tools and full cc_toolchain
-remain unproved. Execution and raw projection/materialization paths for these
-descriptors/transforms remain closed.
+prerequisite. [WP922](wp922-build-info-recipe-render-2026-10-06.json) now renders the
+checked finite recipes from supplied borrowed status/template strings, preserving
+ordered literal replacement, defaults and missing timestamp errors. Real installed
+main/external Target/Exec recipes produce complete supplied ASCII headers.
+Actual status bytes/producer, Latin1 conversion, tracked template reads, volatile
+execution/cache policy, module tools and full cc_toolchain remain unproved.
+Execution and raw projection/materialization paths for these descriptors/transforms
+remain closed; pure rendering does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun
 prerequisite used by the four implicit tool dependencies, preserving real file,
 runfiles and output-group providers and selected target/exec ownership. It does

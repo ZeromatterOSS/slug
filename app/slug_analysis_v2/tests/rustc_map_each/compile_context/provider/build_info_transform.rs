@@ -1,4 +1,4 @@
-//! Installed rule construction only: no status bytes, callback invocation or IO.
+//! Installed rule construction and pure rendering from supplied template/status strings.
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::BuildInfoCallbackRecipe;
@@ -45,6 +45,49 @@ fn group(result: &ConfiguredNodeResult, name: &str) -> Vec<AnalysisArtifact> {
         .collect()
 }
 
+fn check_rendered_header(spec: &slug_build_api_v2::BuildInfoTransformSpec) {
+    let status = slug_configuration_v2::CanonicalStringMap::from_pairs([
+        ("BUILD_EMBED_LABEL", "release"),
+        ("BUILD_HOST", "builder"),
+        ("BUILD_USER", "user"),
+        ("BUILD_SCM_REVISION", "abc123"),
+        ("BUILD_SCM_STATUS", "clean"),
+        ("BUILD_TIMESTAMP", "123456"),
+    ]);
+    // Supplied immutable catalog bodies, not runtime template-read authority.
+    let (template, expected) = match spec.callback().kind() {
+        BuildInfoTransformKind::Info => (
+            include_str!(
+                "../../../../../slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/build_info/templates/non_volatile_file.h.template"
+            ),
+            "#define BUILD_EMBED_LABEL \"release\"\n#define BUILD_HOST \"builder\"\n#define BUILD_USER \"user\"\n",
+        ),
+        BuildInfoTransformKind::Version => (
+            include_str!(
+                "../../../../../slug_bzlmod_v2/builtin/bazel_tools/tools/build_defs/build_info/templates/volatile_file.h.template"
+            ),
+            "#define BUILD_SCM_REVISION \"abc123\"\n#define BUILD_SCM_STATUS \"clean\"\n#define BUILD_TIMESTAMP 123456\n",
+        ),
+    };
+    let before = spec.clone();
+    for _ in 0..2 {
+        assert_eq!(
+            spec.callback().render_template(&status, template).unwrap(),
+            expected
+        );
+        assert_eq!(spec, &before);
+    }
+    if spec.callback().kind() == BuildInfoTransformKind::Version {
+        assert_eq!(
+            spec.callback()
+                .render_template(&Default::default(), template),
+            Err(
+                "timestamp information is missing from workspace status file, BUILD_TIMESTAMP key not found."
+            )
+        );
+    }
+}
+
 fn check(result: &ConfiguredNodeResult, root: &std::path::Path, configuration: &ConfigurationKey) {
     let key = result.configured_target_key().unwrap();
     let owner = key.artifact_owner();
@@ -79,6 +122,7 @@ fn check(result: &ConfiguredNodeResult, root: &std::path::Path, configuration: &
         let spec = action
             .build_info_transform_spec()
             .expect("typed transform in source order");
+        check_rendered_header(spec);
         assert_eq!(action.mnemonic(), "TranslateBuildInfo");
         assert_eq!(spec.callback().kind(), kind);
         assert_eq!(

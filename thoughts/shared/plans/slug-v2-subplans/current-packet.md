@@ -1,83 +1,89 @@
 # Slug V2 current work packet
 
-Packet: WP-7-221-m7a-build-info-recipe-render-r1
-Status: Public compile producer/query accepted; finite BuildInfo recipe renderer selected
+Packet: WP-7-222-m7a-supplied-workspace-status-values-r1
+Status: Finite BuildInfo rendering accepted; supplied-byte status parser selected
 
 ## Observable result and source basis
 
-Implement pure rendering on the existing authenticated BuildInfoCallbackRecipe:
-a borrowed supplied status string map and template produce one independent header
-String, or the exact missing BUILD_TIMESTAMP diagnostic. Saved WP905 has four
-TranslateBuildInfo rows. WP778 checked registration and WP917 class query are accepted;
-finite callback/template rendering remains a concrete runtime prerequisite.
-Reuse pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a callback, templates,
-BuildInfoFileWriteAction and LocalTemplateExpansionStrategy anchors from
-[WP921 discovery](wp921-public-compile-query-2026-10-06.json), with the complete branch,
-order and authentication report at target/wp921/successor-source.md.
+Add a pure supplied-byte workspace-status parser beside the existing BuildAPI
+workspace-status owner. It returns independently owned CanonicalStringMap values
+that can feed the accepted checked recipe renderer. Saved WP905 has four demanded
+TranslateBuildInfo rows; raw status parsing is a named remaining prerequisite in
+bootstrap-readiness.md. This packet removes only that pure parsing prerequisite.
 
-Exact finite callback and literal replacement algorithms apply to supplied strings;
-the valid-Unicode String domain remains Slug-native. Latin1 artifact conversion,
-raw status parsing/production, tracked template reads, volatile execution/cache policy,
-general callback evaluation, REAPI/execution, Windows breadth and authentic full-root/
-M7A/whole-workload memory fit remain deferred. Rendering does not waive these prerequisites.
+Pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a,
+WorkspaceStatusAction.java126–141 parseValues, reads Latin1, splits only LF,
+splits each line at its first ASCII space, ignores lines without that separator,
+and retains the last value for duplicate keys. Empty keys/values are permitted;
+extra spaces, CR and NUL are retained, without validation or trimming. Source
+SHA2562e05526a947d4643a5e9b5cc45ee5c938ecd6fc133941e87a02147a2953a9db8
+and bounded discovery at target/wp922/successor-source.md anchor the algorithm.
+Every byte maps to U+0000..U+00FF; even valid UTF8 bytes decode individually.
+Exact key/value parsing and Latin1 mapping apply to supplied bytes. Deterministic
+map ordering and existing structural identity remain Slug-native; this is not
+filesystem observation, status production or original header output-byte parity.
 
-## Ownership, allocation and scope
+## Owner, allocation and scope
 
-The checked recipe owns kind/canonical source/digest. Loading already verifies callback
-shape, full recorded/evaluated source identity and exact callsites in the capture-free
-builtin module. Implement only its finite Info/Version branches, without name-based
-fallback or a general evaluator. Existing transform identity/metadata, query and Core
-execution guards stay unchanged. No DICE keys, ownership or locks change.
+Select WorkspaceStatusArtifacts::parse_supplied_values(bytes: &[u8]) ->
+CanonicalStringMap as a role-independent associated pure function. A method with
+no descriptor or workspace access cannot assert observation authority. Keep full
+workspace/role/constant-metadata identity and every execution guard unchanged.
+No DICE keys, observations, source certificates, retained cache/interner/graph,
+locking, filesystem, clock, user/host lookup or status command is introduced.
 
-Status/template inputs are borrowed synchronously; output owns all bytes after their
-drop. Use fixed ordered borrowed key/value pairs, without an owned substitution map,
-retained cache/interner/key/graph or global pool. Review buffer growth and copy costs in
-the concrete contract. Reuse a literal utility only if it preserves nonrecursive
-same-pass insertion and later-pass substitution. Existing scoped producer interners
-remain appropriate for retained repeated immutable values; unique status/template
-scratch must not be globally interned. Prior allocation refusal and explicit caps persist.
+Split borrowed byte slices before decoding. Reuse existing compact strings and
+CanonicalStringMap::from_pairs, whose exact sorted keys and last-wins insertion
+are already implemented. Stream pairs into that constructor, avoiding an extra
+pair Vec or whole-file decoded String. Decode each surviving segment directly
+into its final CompactString: ASCII from borrowed str after ASCII check, high
+bytes via byte-to-char conversion into one owned compact buffer, then transfer
+storage to the map. No from_utf8_lossy or UTF8 interpretation of high bytes.
+Review peak temporary buffers, duplicate replacement release, inline versus heap
+storage and returned-map ownership before implementation. Unique input scratch
+must not be globally interned; existing scoped producer interners remain intact.
+No one-allocation, speedup or whole-workload memory-fit claim follows from this leaf.
 
-Provisional allowlist: BuildAPI src/actions/build_info_transform.rs and its tests.rs;
-Analysis tests/rustc_map_each/compile_context/provider/build_info_transform.rs for a few
-assertions through actual installed checked recipes and unchanged builtin ASCII templates.
-Freeze the exact API/map/error/utility boundary with three DESIGN reviews before editing.
-Production estimate<100 lines; new tests<200 lines, with responsibility review for growth.
-No builtin/corpus/Loading/Core/query/CLI edits. Root owns contract/integration/compile/
-commit; independent source/ownership/evidence DESIGN and FINAL reviews. Operations live
-in target/wp922. No network, external oracle, source16/17/18 retry or action/tool execution.
+Allowlist: app/slug_build_api_v2/src/workspace_status.rs and its existing
+tests.rs. A small composition assertion stays in that test owner using existing
+checked recipes and supplied ASCII template; no new corpus or fixture harness.
+Production estimate<80 lines, new tests<180 lines; inspect coherent growth.
+Root owns API/implementation/compile/integration/commit. Three independent
+source, ownership/allocation and evidence DESIGN reviews precede edits, then
+FINAL reviews use actual tests. Operations: target/wp923. Reuse orchestration
+and utility skills; no donor copy/new utility dependency or Stage9 import.
 
 ## Discriminators and validation
 
-Info substitutes EMBED_LABEL (empty default), HOST (hostname) and USER (username), in
-that order. Version first requires TIMESTAMP presence, then substitutes REVISION (0),
-STATUS (empty) and TIMESTAMP. Empty values stay empty, unknown keys are ignored, and no
-trimming, C escaping or numeric validation occurs. The timestamp diagnostic also applies
-to an empty template or one without its placeholder. Replace all literal occurrences;
-an inserted same key does not recurse in its pass, later passes see introduced keys,
-and unselected placeholders remain. Compare independent full headers including final LF,
-unchanged borrowed inputs, repeat equality and output after input/recipe release.
-Preserve source/digest/wrong-role/output-metadata negatives. Supplied string-map tests do
-not establish LF/CRLF/duplicate status-file parsing or original Latin1 artifact-byte parity.
+Protect all three existing status identity/metadata/projection/nonUnicode/runfiles
+controls. New full-map checks cover missing space/empty bytes, empty key/value,
+first-space versus subsequent spaces, LF/CRLF/no finalLF, duplicate valid/malformed
+lines and exact last value. Check the private decoder against an independent all256-byte Latin1 vector,
+and distinguish parser LF/space boundaries from retained NUL/high bytes, invalidUTF8
+and validUTF8 bytewise decoding. Assert
+input immutability, repeat equality and map use after input release. Compose
+supplied parsing with existing Info/Version rendering for full independently
+expected strings and missing versus present-empty timestamp, without promoting
+supplied bytes into authentic artifact or template observations.
 
-Use normal installed/main/external producers with real checked recipes; no synthetic
-status/materialization/certificate. Preserve stamped non_redacted action ordering and
-separate redacted symlink group regardless --stamp, plus existing callback refusals.
-Resolve pinned nightly tools; separate offlineJSON no-run preparation <=60s TERM3 for
-BuildAPI and Analysis direct dependent. Compile the default CLI when production changes.
-Fresh exact nonignored preflight precedes serial10s TERM3 runtime. Run protected BuildAPI
-registration controls and new renderer cases, plus the two Analysis selectors:
-installed_build_info_and_unchanged_main_external_instances_register_real_actions and
-installed_build_info_restores_full_configuration_and_rejects_java_callbacks.
-No concurrent Cargo/shared target or ancestor-sensitive native fixtures. Reuse nonstale
-passes and correct only missing gates; format/diff/archive/status/compact receipt/root
-commit. REPLAN only for an observed evaluator/source/retained-owner/runtime prerequisite.
+Resolve pinned nightly tools; offlineJSON owner no-run preparation <=60s TERM3,
+jobs1 shared target serial. Compile default CLI for public production change.
+Fresh exact nonignored preflight precedes serial10s TERM3 owner runtime including
+protected status/renderer controls; no broad suites or daemon-sensitive fixtures.
+Format, diff/archive/status checks, compact receipt and root local commit.
+Invocation corrections stay in this packet. REPLAN only if exact parser semantics
+require an unmodeled owner/retained representation or artifact/execution authority.
+
+Raw status production, Latin1 template decode/output encoding, tracked template
+reads/materialization, stable/volatile update/cache policy, arbitrary callback
+execution, REAPI, Windows breadth, authentic source/full-root/M7A and aggregate
+memory fit remain open. Source16/17/18 attempts and prior memory/resource caps persist.
 
 ## Immediate predecessor
 
-WP921 proves public cc_common.compile to typed query with fourteen recipes across main/
-external Target/selected Exec. Optimized Exec PIC owners retain ordered PIC then NOPIC;
-the separate Analysis direct to_exec twelve-case proof retains its fastbuild provenance.
-Complete ordered class blocks, fixed PATH/env/recipe-last info, borrowed roles/context
-roots, source/configuration A/B/A and released owned text pass. Seventy-one distinct Core
-checks are proved by qualified69+1+1 union, plus three Analysis gates. Production and
-retained storage remain unchanged; authentic source/runtime/full-root/M7A/whole fit stay open.
+[WP922](wp922-build-info-recipe-render-2026-10-06.json) adds render_template to the
+existing checked recipe: three ordered borrowed pairs, literal replacement and
+independent output with exact defaults/timestamp error. Five BuildAPI and three
+actual installed-rule Analysis controls pass, default CLI compiles and three FINAL
+reviews accept. Matching passes may transiently hold old/new buffers; no retained
+storage or pool is added. Supplied Unicode rendering keeps artifact/runtime gates open.
