@@ -1252,16 +1252,16 @@ where
         })
 }
 
-fn split_test_tags(tags: &[CompactString]) -> (SmallSet<CompactString>, SmallSet<CompactString>) {
+fn split_test_tags(tags: &[CompactString]) -> (SmallSet<&str>, SmallSet<&str>) {
     let mut required = SmallSet::new();
     let mut excluded = SmallSet::new();
     for tag in tags {
         if let Some(tag) = tag.strip_prefix('-') {
-            excluded.insert(CompactString::new(tag));
+            excluded.insert(tag);
         } else if let Some(tag) = tag.strip_prefix('+') {
-            required.insert(CompactString::new(tag));
+            required.insert(tag);
         } else if tag != "manual" {
-            required.insert(tag.clone());
+            required.insert(tag.as_str());
         }
     }
     (required, excluded)
@@ -1269,11 +1269,12 @@ fn split_test_tags(tags: &[CompactString]) -> (SmallSet<CompactString>, SmallSet
 
 fn include_test(
     test: &TestTargetInfo,
-    required: &SmallSet<CompactString>,
-    excluded: &SmallSet<CompactString>,
+    required: &SmallSet<&str>,
+    excluded: &SmallSet<&str>,
 ) -> bool {
-    let has_tag = |tag: &CompactString| {
-        test.tags.iter().any(|candidate| candidate == tag) || test.size.as_ref() == Some(tag)
+    let has_tag = |tag: &&str| {
+        test.tags.iter().any(|candidate| candidate.as_str() == *tag)
+            || test.size.as_deref() == Some(*tag)
     };
     excluded.iter().all(|tag| !has_tag(tag)) && required.iter().all(has_tag)
 }
@@ -2401,3 +2402,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "generic/query_suite_tag_memory_tests.rs"]
+mod query_suite_tag_memory_tests;

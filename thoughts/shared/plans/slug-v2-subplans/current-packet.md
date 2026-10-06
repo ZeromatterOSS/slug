@@ -12,61 +12,63 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component reuses the existing native replacement input when
-old and new have equal bytes, after unchanged count validation. Different-text
-fallback, diagnostics, immutable string owners and tracing/freezing remain.
-Next: select a proved redundant local copy or existing interner reuse through a
-bounded design checkpoint.
+The latest accepted component borrows query test-suite tag names from their
+immutable suite owner instead of copying them into temporary filtering sets.
+Prefix/manual rules, content hash/order, filtering, caller awaits and final owners
+remain. Next: select a proved redundant local copy or existing interner reuse
+through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted equal replacement input reuse contract
+## Accepted query suite-tag scratch borrowing contract
 
-Native replace returns its existing whole immutable StringValue when old==new,
-strictly after unchanged count validation. Each match removes and inserts identical
-bytes; empty equal patterns add nothing. Generated receiver/old/new/count decoding,
-negative count error and arity/keyword priority remain before the guard. Every
-other production byte, including different-text prefix/final concat fallback and
-speculative safety declaration, stays unchanged. Natural tracing/freezing preserves
-caller-owned strings; no substring retention or new helper/API/interner/cache/key/
-DICE/identity/unsafe/dependency/retained representation/donor. Slug-native memory
-optimization preserves inherited Rust bytes/Unicode/count/errors; local Bazel
-StringModule context adds no Java/UTF16/negative-count parity claim.
+Private split_test_tags borrows ordinary immutable suite tags and existing one-byte
+prefix-stripped slices into its two phase-local SmallSets. Minus-before-plus,
+one-prefix removal, bare manual omission, empty/prefix-only keys, duplicates,
+first equal key/order and conflicts remain. CompactString Hash/Eq projects the
+same str bytes; linear/indexed membership stays. Private include_test compares
+borrowed full bytes with existing test tags and optional size; candidate-before-
+size search and excluded-before-required short circuit stay. No new helper/API/
+interner/cache/key/DICE/identity/unsafe/dependency/retained representation/donor.
+Slug-native memory optimization preserves inherited tests() compatibility; local
+Bazel context adds no parity surface.
 
-Three DESIGNs/FINALs accept identical corrected 261-line tests: baseline two
-semantic passes/one intended sharing failure; candidate 10/10, including seven
-protected interner/speculative/string-carrier/replacement-prefix controls. Actual
-compiled native calls match Rust replacen in 16,374 comparisons, covering empty,
-overlapping, ASCII/Unicode/NUL patterns and zero/limited/unlimited/max counts.
-Ten complete raw diagnostics match baseline exactly. Four independently owned
-large ASCII/Unicode fixtures at counts one/unlimited share their inputs (baseline
-all false), with zero added public arena accounting. Fresh arenas isolate fixture
-observations. Explicit GC after source variables clear, frozen results/functions
-retained after source/module/clone drop, speculative constants and changed fallback
-outputs preserve bytes and lifetimes. Default Loading/Core/CLI checks and pinned
-serial offline compilation/exact preflight, rustfmt/archive/plan/diff pass.
+The unchanged boxed Send TestsFunction future owns suite_info and its immutable
+Arc tag array across every iteration-local set and existing explicit/implicit
+member/info await. Nested suites retain their separate owned metadata. Borrowed
+keys never escape into targets, pending suites, errors or graph state. Safe Rust
+compilation/source proof covers suspension/error/cancellation ownership; no forced
+Pending/wake or cancellation runtime coverage is claimed. Final query targets,
+error construction, caller order/delivery/strict policy and suite edges remain.
 
-Original baseline E0597 arose from callee handles declared after or inside the
-Evaluator lifetime; stable handles before evaluation fix it. Baseline-r2 exposed
-explicit None count rejection and spare arena chunks masking two growth readings.
-Unlimited fixtures now omit count; explicit None rejection remains covered and
-accounting fixtures have separate arenas. Original and r2 snapshots/hashes and
-all raw failed receipts are preserved. Second correction reassessment confirms
-the unchanged design; all semantic/lifecycle/pointer assertions remain.
+Three DESIGNs/FINALs accept identical 167-line tests: baseline one semantic pass/
+one intended pointer failure plus three integration passes; candidate 5/5.
+All 123 long independently owned ordinary/positive/negative keys share exact first
+source/suffix pointers (baseline zero), across two/eighty required and one/forty
+excluded keys. Actual hashes/contains/order and original source bytes/capacities/
+pointers stay. 6,669 filtering comparisons match an independent original algorithm
+and fourteen explicit manual/prefix/empty/duplicate/conflict/Unicode/NUL/tag/size
+edges. Three actual loading_query controls preserve all twenty-one non-BUILD
+oracle rows, source-critical nested/literal-plus/request strictness and recorded
+suite-evaluation edges. Protected fixture/helper/payload/oracle bytes are unchanged;
+each test checks existing whole-payload and named projection hashes. No fixture
+correction, assets or goldens. Pinned serial offline fresh artifacts/exact preflights,
+default Core/CLI and format/archive/plan/diff pass.
 
-Acceptance proves whole-input sharing and fixed fixture public arena observations
-only. Source proof bypasses equal-text temporary String and final heap copying;
-no allocator/count/padded payload, aggregate/peak/RSS/speed/source-fit claim.
-Allocation/OOM failure sequencing is excluded. Different replacements/final errors
-remain owned. No assets/goldens. Windows minimal/deferred; full WP899/M7A unwaived.
+Acceptance removes three alternative scratch copy sites only. Scratch key metadata,
+physical storage and capacity may change; original suite tags/final targets/errors
+remain owned. No allocator/count/quantified payload/retained/aggregate/peak/RSS/speed/
+source-fit claim; OOM sequencing excluded. Windows minimal/deferred; full WP899/M7A
+and source integration remain open/unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Query tests() tag filtering scratch borrows immutable suite-owned names/suffixes; hash/dedup/order, manual/prefix/tag/size filtering, caller awaits/strict policy/edges and final owners remain. Three DESIGNs/FINALs; same baseline one semantic pass/one pointer failure + three integrations, candidate 5/5, 123 source pointers and 6,669 filters, twenty-one existing oracle rows/default Core/CLI. Async lifetime is source/type proof. Three alternative scratch copy sites only; set storage may change, no quantified memory/RSS/speed claim | [Query suite-tag borrowing](wp899-query-suite-tag-borrow-2026-10-06.json) |
 | Equal native replacement returns existing whole input after count validation; fallback/bytes/errors/speculation/tracing/freezing unchanged. Three DESIGNs/FINALs; corrected baseline two semantic passes/one sharing failure, candidate 10/10, 16,374 comparisons/ten equal raw errors, four large sharing/zero arena observations and retained frozen/GC controls; default Loading/Core/CLI. Original/r2 fixture failures preserved. Fixed fixture accounting only; no allocator/aggregate/RSS/speed claim | [Equal replacement input reuse](wp899-replace-equal-input-reuse-2026-10-06.json) |
 | Cquery lexical-validation scratch borrows immutable AST names; equal content hash, shadowing/cleanup/order, owned errors/spans and AST owners stay. Three DESIGNs/FINALs; corrected same baseline 2/2, candidate 7/7, twenty-six cases with one/forty seeds, sixteen captured equal errors and retained long clone, default Core/CLI. Inline seed pointer and unquoted Unicode fixture corrections preserved. One scratch clone-site bypass only; set metadata/capacity may change, no allocator/quantified memory/RSS/speed claim | [Cquery binding-name borrowing](wp899-query-binding-name-borrow-2026-10-06.json) |
 | Query integer slots omit successful numeric formatting/target-literal clone scratch; exact range/signed parsing, original error bytes/capacity/ownership, fallback parsing and caller order/spans remain. Three DESIGNs/FINALs; same extended baseline 2/2, candidate 8/8, 2,054 numeric/21 literal/four fallback/two numeric-display cases, nineteen raw/seventeen public equal errors, retained tight/spare error clones and default Core/CLI. Additive fallback test extension preserved. Source scratch-site proof only, no allocator/quantified memory/RSS/speed claim | [Query integer scratch](wp899-query-integer-scratch-2026-10-06.json) |
