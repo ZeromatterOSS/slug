@@ -180,10 +180,199 @@ async fn selected_source_refusal_successful_predecessor_is_not_a_failure_path() 
         workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
         inner: PrivateRootRepositoryMappingError::Predecessor(success.predecessor.dupe()),
     };
+    assert!(error.selected_module_registry_file().is_none());
     let refusal = error.selected_source_refusal();
     assert_eq!(
         refusal.termination(),
         crate::SelectedSourceRefusalTermination::UnexpectedSuccess
     );
     assert!(!refusal.variant_path_complete() && refusal.native_cause().is_none());
+}
+
+// The test constructor keeps private graph fields at their existing owner.
+fn registry_discovery_root(graph: HostSelectedModuleGraphError) -> HostRootRepositoryMappingError {
+    HostRootRepositoryMappingError {
+        workspace: NormalizedAbsolutePath::new("/registry-association").unwrap(),
+        inner: PrivateRootRepositoryMappingError::Predecessor(Arc::new(Err(
+            HostSelectedExtensionMappingsError::Routes(HostSelectedModuleRoutesError::Graph(graph)),
+        ))),
+    }
+}
+
+fn registry_discovery_fixture(name: &str, version: &str) -> HostRootRepositoryMappingError {
+    registry_discovery_root(HostSelectedModuleGraphError::DiscoveryLeaf {
+        module: HostGraphModuleKey::Module {
+            name: name.into(),
+            version: crate::module_version::BazelModuleVersion::parse(version).unwrap(),
+        },
+        error: crate::source_preparation::HostDiscoveredModuleError::SourcePreparation(
+            crate::source_preparation::ModuleSourcePreparationError::RegistryFile {
+                url: RegistryFileUrl::new("https://registry.invalid/outer/MODULE.bazel"),
+                prior_not_found_attempts: Arc::from([RegistryModuleFileAttempt {
+                    url: RegistryFileUrl::new("https://prior.invalid/other/MODULE.bazel"),
+                    sha256: None,
+                }]),
+                error: RegistryFileError::Transport {
+                    url: RegistryFileUrl::new("https://nested.invalid/different/MODULE.bazel"),
+                    message: "opaque transport detail".into(),
+                    cause: None,
+                },
+            },
+        ),
+    })
+}
+
+#[test]
+fn selected_module_registry_file_borrows_discovery_identity_and_outer_request() {
+    for (name, spelling, canonical) in [
+        ("bazel_features", "1.50.0+build", "1.50.0"),
+        (
+            "a_long_module_name_for_borrowed_identity",
+            "1.2.3-long-prerelease-for-borrowing+build",
+            "1.2.3-long-prerelease-for-borrowing",
+        ),
+    ] {
+        let owner = registry_discovery_fixture(name, spelling);
+        let before = owner.selected_source_refusal();
+        let unrelated = RegistryFileUrl::new("https://unrelated.invalid/first-row/MODULE.bazel");
+        let (selected_name, version, requested) = owner.selected_module_registry_file().unwrap();
+        assert_eq!(selected_name, name);
+        assert_eq!(version, canonical);
+        assert_eq!(
+            requested.as_str(),
+            "https://registry.invalid/outer/MODULE.bazel"
+        );
+        assert_ne!(requested, &unrelated);
+        let PrivateRootRepositoryMappingError::Predecessor(predecessor) = &owner.inner else {
+            panic!("fixture predecessor");
+        };
+        let Err(HostSelectedExtensionMappingsError::Routes(HostSelectedModuleRoutesError::Graph(
+            HostSelectedModuleGraphError::DiscoveryLeaf {
+                module:
+                    HostGraphModuleKey::Module {
+                        name,
+                        version: stored_version,
+                    },
+                error:
+                    crate::source_preparation::HostDiscoveredModuleError::SourcePreparation(
+                        crate::source_preparation::ModuleSourcePreparationError::RegistryFile {
+                            url,
+                            prior_not_found_attempts,
+                            error: RegistryFileError::Transport { url: nested, .. },
+                        },
+                    ),
+            },
+        ))) = predecessor.as_ref()
+        else {
+            panic!("fixture discovery leaf");
+        };
+        assert!(std::ptr::eq(selected_name, name.as_str()));
+        assert!(std::ptr::eq(version, stored_version.normalized()));
+        assert!(std::ptr::eq(requested, url));
+        assert!(std::ptr::eq(requested.as_str(), url.as_str()));
+        assert_ne!(requested, nested);
+        assert_ne!(requested, &prior_not_found_attempts[0].url);
+        assert_eq!(before, owner.selected_source_refusal());
+        assert!(!before.native_detail_observed());
+        assert_eq!(
+            before.codes().last(),
+            Some(&crate::SelectedSourceRefusalCode::RegistryFileTransport)
+        );
+    }
+}
+
+#[test]
+fn selected_module_registry_file_requires_exact_retained_error_chain() {
+    use crate::source_preparation::HostDiscoveredModuleError as Discovery;
+    use crate::source_preparation::ModuleSourcePreparationError as Preparation;
+    let message = "https://registry.invalid/outer/MODULE.bazel";
+    let module = || HostGraphModuleKey::Module {
+        name: "bazel_features".into(),
+        version: crate::module_version::BazelModuleVersion::parse("1.50.0").unwrap(),
+    };
+    let transport = || RegistryFileError::Transport {
+        url: RegistryFileUrl::new(message),
+        message: message.into(),
+        cause: None,
+    };
+    for error in [
+        Discovery::SourcePreparationCompute(message.into()),
+        Discovery::RootModuleFiles(message.into()),
+        Discovery::SourcePreparation(Preparation::RegistryFileCompute {
+            url: RegistryFileUrl::new(message),
+            prior_not_found_attempts: Arc::from([]),
+            message: message.into(),
+        }),
+        Discovery::SourcePreparation(Preparation::RegistryPolicy(transport())),
+        Discovery::SourcePreparation(Preparation::MissingVersion),
+    ] {
+        let owner = registry_discovery_root(HostSelectedModuleGraphError::DiscoveryLeaf {
+            module: module(),
+            error,
+        });
+        assert!(owner.selected_module_registry_file().is_none());
+    }
+    let root = refusal_registry_root(transport(), "root-key");
+    assert!(root.selected_module_registry_file().is_none());
+    let compute = registry_discovery_root(HostSelectedModuleGraphError::DiscoveryCompute {
+        module: module(),
+        message: message.into(),
+    });
+    assert!(compute.selected_module_registry_file().is_none());
+    let owner = registry_discovery_fixture("bazel_features", "1.50.0");
+    let PrivateRootRepositoryMappingError::Predecessor(predecessor) = owner.inner else {
+        panic!("fixture predecessor");
+    };
+    for inner in [
+        PrivateRootRepositoryMappingError::Compute(message.into()),
+        PrivateRootRepositoryMappingError::Invalid {
+            predecessor,
+            reason: RootMappingInvalid::Missing,
+        },
+        PrivateRootRepositoryMappingError::Predecessor(Arc::new(Err(
+            HostSelectedExtensionMappingsError::RoutesCompute(message.into()),
+        ))),
+        PrivateRootRepositoryMappingError::Predecessor(Arc::new(Err(
+            HostSelectedExtensionMappingsError::Routes(
+                HostSelectedModuleRoutesError::GraphCompute(message.into()),
+            ),
+        ))),
+        PrivateRootRepositoryMappingError::Predecessor(Arc::new(Err(
+            HostSelectedExtensionMappingsError::Routes(HostSelectedModuleRoutesError::RepoSpecs(
+                HostSelectedRegistryRepoSpecsError::RegistryFile {
+                    module: module(),
+                    url: RegistryFileUrl::new(message),
+                    error: transport(),
+                },
+            )),
+        ))),
+    ] {
+        let owner = HostRootRepositoryMappingError {
+            workspace: NormalizedAbsolutePath::new("/registry-association").unwrap(),
+            inner,
+        };
+        assert!(owner.selected_module_registry_file().is_none());
+    }
+}
+
+#[test]
+fn selected_module_registry_file_view_does_not_retain_predecessor() {
+    let owner = registry_discovery_fixture("bazel_features", "1.50.0");
+    let PrivateRootRepositoryMappingError::Predecessor(predecessor) = &owner.inner else {
+        panic!("fixture predecessor");
+    };
+    let weak = Arc::downgrade(predecessor);
+    let before = Arc::strong_count(predecessor);
+    let first = owner.selected_module_registry_file().unwrap();
+    for _ in 0..16 {
+        let next = owner.selected_module_registry_file().unwrap();
+        assert!(std::ptr::eq(first.0, next.0));
+        assert!(std::ptr::eq(first.1, next.1));
+        assert!(std::ptr::eq(first.2, next.2));
+    }
+    assert_eq!(Arc::strong_count(predecessor), before);
+    assert_eq!(first.0, "bazel_features");
+    assert_eq!(first.1, "1.50.0");
+    drop(owner);
+    assert!(weak.upgrade().is_none());
 }

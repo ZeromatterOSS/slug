@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Offline scoped source guard accepted; normal public Rust source readiness continues
+Status: Native root and borrowed request association accepted; dependency readiness continues
 
 ## Observable and source basis
 
@@ -85,17 +85,35 @@ Representative native parses peak23,932/44,236KiB; WP940 normal offline refusal 
 These operations fit unchanged memory caps; full source/module/whole-workload fit is open.
 All earlier refused guards/replays remain closed.
 
+[WP943](wp943-borrowed-module-registry-association-2026-10-06.json) accepts
+HostRootRepositoryMappingError::selected_module_registry_file: a borrowed tuple of the
+actual retained discovery Module name, existing canonical version and outer RegistryFileUrl.
+The fixed typed chain distinguishes root/compute/policy/invalid/sibling errors; no new
+string storage, Arc increment, parsing, interner, DICE behavior or private-key export.
+Three new association/pointer/lifetime controls and three protected classifier gates pass
+in0.727s at30,940KiB conservative ordinary peak. Offline owner preparation5.636s and
+serial direct Core/CLI check8.203s pass. Preparation memory is separate from the ordinary
+runtime caps. No native/source operation was executed and the accessor does not upgrade
+WP942's diagnostic row into a current selected identity or completed MVS/provenance proof.
+Next ground one exact current local source locator or observe the retained typed request
+under a separately frozen instrumentation contract, then advance normal source readiness.
+
 ## Ownership, scope and allocation
 
-The latest change is a cohesive771-line Core test companion and five nested include
-lines, reusing existing private reporting/resource helpers. Production APIs, fixtures,
-interner ownership and dependency manifests remain unchanged. The actual native root
-anchor and mapping share one normal scoped DICE request; whole-Need admission permits
-only three exact MODULE bodies and finite metadata/Local roles. A successful terminal
-would require the original covered mapping epoch, exact root/platforms sources and root
-Arc identity before source certification. That success branch remains source-reviewed,
-not exercised by the accepted refusal. No injected snapshot, bootstrap, private export,
-fabricated source/provider certificate or public-build substitute is admitted.
+The latest change is a26-line accessor on the existing Bzlmod mapping-error owner and
+189 lines in its existing private test companion. All tuple references borrow the original
+error; version.normalized() exposes its already parsed canonical spelling, not an authored
+build suffix. The original outer request is distinct from nested transport/prior-attempt
+or recorder URLs. Exact typed RegistryFile identity remains available when native cause
+detail is opaque. Representation, equality/invalidation/Need policies and existing
+interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
+
+WP942's actual native root anchor and mapping share one normal scoped DICE request;
+whole-Need admission permits only three exact MODULE bodies and finite metadata/Local
+roles. Successful certification would require the original covered mapping epoch, exact
+root/platforms sources and root Arc identity. That branch remains source-reviewed,
+unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
+or fabricated source/provider certificate is admitted.
 
 Root owns bounded wrappers, integration and the compact receipt. The next contract must
 select the exact retained diagnostic owner or independently grounded source locator

@@ -1,0 +1,349 @@
+{
+  "checkpoint": "WP943",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "36b02a2fe4b79396963ed33bcb44c11035cdc51d",
+  "previous_goal_turn": "progress",
+  "outcome": "Callable borrowed retained discovery module/canonical-version/outer registry request association; precise typed chain and owner lifetime verified. No new native/source operation or current selected identity/source availability proof.",
+  "compatibility": {
+    "slug_native": "Borrowed diagnostic association on existing Slug-native mapping-error owner.",
+    "exact": "Unmodified spellings of actual retained name, existing canonical version and original outer requested URL; no new Bazel parity claim.",
+    "deferred": [
+      "current native selected leaf/recorder causal association",
+      "completed MVS/registry provenance",
+      "exact local module availability/evaluation/mapping certificate",
+      "generated toolchains/providers and retained public Rustc producer",
+      "M7A/full-root/whole-workload fit"
+    ]
+  },
+  "change": {
+    "files": [
+      {
+        "path": "app/slug_bzlmod_v2/src/selected_repo_spec.rs",
+        "sha256": "1a83ff09c02ce87a980a3ae36c6ab63de6ad211a43aed6f31ba370c562cf12b2"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/selected_source_refusal/tests.rs",
+        "sha256": "ab0930312352bedba54794b978dd50ffdbf88e58bde88543468fc3f44321a37c"
+      }
+    ],
+    "production_lines_added": 26,
+    "test_lines_added": 189,
+    "new_cases": 3,
+    "protected_cases": 3,
+    "fixture_growth": 0,
+    "representation_change": false,
+    "api": "HostRootRepositoryMappingError::selected_module_registry_file(&self) -> Option<(&str, &str, &RegistryFileUrl)>",
+    "ownership": "Existing retained error solely owns fields. Three references borrow it; no new Arc increment/string storage/parser/global pool/cache/private graph export or DICE dependency/equality/locking/policy/certificate change.",
+    "semantics": "Only Predecessor(Err) / ExtensionMappings.Routes / ModuleRoutes.Graph / DiscoveryLeaf(Module) / SourcePreparation / RegistryFile. Existing canonical version is already normalized by its owner; outer preparation URL precedes nested Transport/prior attempts/unrelated rows. Opaque native cause still permits typed request identity; unrelated/root/compute/policy/invalid/success shapes None."
+  },
+  "design": {
+    "path": "target/wp943/design.md",
+    "sha256": "3813d67375443296ecda8c89dbcb3098eda7aa2352cae32d191b1d03b02ded0e"
+  },
+  "design_reviews": [
+    {
+      "path": "target/wp943/design-source.md",
+      "sha256": "c7646de59169ee5665ef0d2a7fbbb730306d67a019383903e6c048a7b2eec414"
+    },
+    {
+      "path": "target/wp943/design-evidence.md",
+      "sha256": "1967450c09c66d2fde0ee096c5a0c96f15a41f3ce7559fdf2d9d1f8180b84a33"
+    }
+  ],
+  "final_reviews": [
+    {
+      "path": "target/wp943/final-source.md",
+      "sha256": "9eb514845831700a509255dd1d6bf4468238075cf7237555d7594c8eeecef577"
+    },
+    {
+      "path": "target/wp943/final-evidence.md",
+      "sha256": "01255bfd9a26d22ac7b3f97d5747cebe9bcc51a408ba9e541cd458c438521c7a"
+    }
+  ],
+  "static_coverage": {
+    "path": "target/wp943/code-coverage.md",
+    "sha256": "868adcb2c6c70d7ce542dbfd039255341aebfa6891ce5d6f5beef9d4bcc95b49"
+  },
+  "toolchain": {
+    "path": "target/wp943/toolchain.json",
+    "sha256": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07"
+  },
+  "supervisor": {
+    "path": "target/wp943/run.py",
+    "sha256": "3267f2cea17e31b24c7c9a82433b678411a7ee56643734fcd4841e710e0f37dc"
+  },
+  "executable": {
+    "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+    "sha256": "31e71f6cb35d9b977a53213c1267fbfb51db45aa78524fb475442472a64d9510"
+  },
+  "validation": {
+    "preflight": {
+      "verified": 6,
+      "executed": 0,
+      "operation": {
+        "path": "target/wp943/preflight.json",
+        "sha256": "02b0f16e6059d71656d0df88df38597e4ed4862e31ec11ae8824fae69fb6e89a"
+      }
+    },
+    "ordinary_selected": 6,
+    "ordinary_passes": 6,
+    "ordinary_elapsed_total_seconds": 0.726765060913749,
+    "ordinary_conservative_peak_rss_kib": 30940,
+    "ordinary": [
+      {
+        "selector": "selected_repo_spec::tests::selected_module_registry_file_borrows_discovery_identity_and_outer_request",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.11896942998282611,
+        "conservative_peak_rss_kib": 15556,
+        "operation": {
+          "path": "target/wp943/ordinary-0.json",
+          "sha256": "901740669b3ead53c46bb1348e030aeb68914243c132d7edc2d35f00f0d87de9"
+        }
+      },
+      {
+        "selector": "selected_repo_spec::tests::selected_module_registry_file_requires_exact_retained_error_chain",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.12038236693479121,
+        "conservative_peak_rss_kib": 15372,
+        "operation": {
+          "path": "target/wp943/ordinary-1.json",
+          "sha256": "a5511048c223dfd8d352150fa8e1d6e087050824b43243a92ed128831c11dc90"
+        }
+      },
+      {
+        "selector": "selected_repo_spec::tests::selected_module_registry_file_view_does_not_retain_predecessor",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.12301946897059679,
+        "conservative_peak_rss_kib": 14876,
+        "operation": {
+          "path": "target/wp943/ordinary-2.json",
+          "sha256": "3d099f27ce3cdf5e4f727df931566fef9cfe06cbc06d7e15ef913d5f9c470614"
+        }
+      },
+      {
+        "selector": "selected_repo_spec::tests::selected_source_refusal_preserves_only_selected_typed_registry_cause",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.12245298607740551,
+        "conservative_peak_rss_kib": 14996,
+        "operation": {
+          "path": "target/wp943/ordinary-3.json",
+          "sha256": "74c884082dae82dd405e1febeba3234bb4475fe8eb2bfe879d604fa89aa584ec"
+        }
+      },
+      {
+        "selector": "selected_repo_spec::tests::selected_source_refusal_depth_unknown_and_observation_do_not_invent_detail",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.12087859900202602,
+        "conservative_peak_rss_kib": 12640,
+        "operation": {
+          "path": "target/wp943/ordinary-4.json",
+          "sha256": "12f3b5e5ea529b52f7cba9766abd36e2db01319b7c34707e36c9f5c304bc8c14"
+        }
+      },
+      {
+        "selector": "selected_repo_spec::tests::selected_source_refusal_successful_predecessor_is_not_a_failure_path",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.1210622099461034,
+        "conservative_peak_rss_kib": 30940,
+        "operation": {
+          "path": "target/wp943/ordinary-5.json",
+          "sha256": "b5f335fa99874c6e279890d4c63a7a18f5dd12b471b1f9642224ad871685afee"
+        }
+      }
+    ],
+    "preparation": [
+      {
+        "mode": "compile",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_bzlmod_v2",
+          "--lib",
+          "--no-run",
+          "--offline",
+          "--message-format=json",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 5.635514524998143,
+        "child_rusage_peak_rss_kib": 1611432,
+        "operation": {
+          "path": "target/wp943/compile.json",
+          "sha256": "bcec482bebc57297254020872368dd23223dbe7efd09515fef9ea4098d22879b"
+        }
+      },
+      {
+        "mode": "check",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "check",
+          "-p",
+          "slug_core_v2",
+          "-p",
+          "slug_cli_v2",
+          "--offline",
+          "--message-format=json",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0"
+        ],
+        "exit_code": 0,
+        "elapsed_seconds": 8.202846412896179,
+        "child_rusage_peak_rss_kib": 729436,
+        "operation": {
+          "path": "target/wp943/check.json",
+          "sha256": "e4028d5e6702cbd59e97a8f25722814b3ef41affd19776c4ef9521c3c308db8c"
+        }
+      }
+    ],
+    "all_joined_owned_groups_empty": true,
+    "all_source_artifact_helper_pins_stable": true,
+    "all_stop_reasons_none": true,
+    "ordinary_caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "file_bytes": 16777216,
+      "report_bytes": 4194304
+    },
+    "preparation_caps": {
+      "seconds": 60,
+      "term_seconds": 3,
+      "offline": true,
+      "jobs": 1
+    },
+    "qualification": "Preparation RSS is recorded separately; ordinary512MiBAS/256MiBRSS caps do not apply to compiler preparation. Exact ordinary counts are six cases, three new. Passing synthetic retained owner controls does not identify the WP942 real selected leaf, locate/acquire a module or prove native producer/whole fit."
+  },
+  "discriminators": [
+    "short/heap-backed original field/object/slice pointers and canonical build suffix behavior",
+    "original outer URL differs from nested transport, prior-not-found and unrelated row",
+    "opaque native cause independence with unchanged redacted classifier",
+    "same-URL unrelated RepoSpecs sibling and Root/compute/policy/invalid/success None",
+    "repeated accessor does not change predecessor strong count; final owner drop expires original Weak"
+  ],
+  "checks": [
+    "formatted changed Rust",
+    "source/artifact/helper/raw-log pins",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "scripts/v2_plan_status.py"
+  ],
+  "next": "Ground a source-specific current locator using independently saved declaration and pinned canonical policy, or freeze a genuinely new typed native request observation. No locator/body/native retry/acquisition is selected by this receipt; all prior caps/refusals remain intact.",
+  "started": {
+    "baseline": "36b02a2fe4b79396963ed33bcb44c11035cdc51d",
+    "previous_goal_turn": "progress",
+    "utc": "2026-10-06T22:24:52Z"
+  },
+  "recorded_utc": "2026-10-06T22:30:35.919630+00:00",
+  "raw_logs": [
+    {
+      "path": "target/wp943/compile.stdout",
+      "sha256": "3b013750fa8294eb70a5c0431fd1e2a165943f352119d05f4ad8f16401751185"
+    },
+    {
+      "path": "target/wp943/compile.stderr",
+      "sha256": "0f8cd59010407394fb2012ca568973a6d5d783d002c2771576138a5521d623d8"
+    },
+    {
+      "path": "target/wp943/check.stdout",
+      "sha256": "5a07df22cad578b48ecd290b53ae12a1e568af66b4d004bfdc5a54214344cd43"
+    },
+    {
+      "path": "target/wp943/check.stderr",
+      "sha256": "916b5084c25a472b611a2b63b1874855f9d4c8169b15ee885e5e30c7e1684a9d"
+    },
+    {
+      "path": "target/wp943/preflight.stdout",
+      "sha256": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e"
+    },
+    {
+      "path": "target/wp943/preflight.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-0.stdout",
+      "sha256": "bdf6c4dcac8dda788d8665dd31f66018be11aaba6b2cd4cc70d7236242e9b526"
+    },
+    {
+      "path": "target/wp943/ordinary-0.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-1.stdout",
+      "sha256": "2d20c19615498fc1ac80aaeb124d94c922568673303f85f89b995890e8e1debc"
+    },
+    {
+      "path": "target/wp943/ordinary-1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-2.stdout",
+      "sha256": "b67c131ee118e09ca2d0133a6679aa0aff021b2e6453f62de54c11d4ba15b3af"
+    },
+    {
+      "path": "target/wp943/ordinary-2.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-3.stdout",
+      "sha256": "47828770c11eae7f22dd9c6d98956a126ceeb3cee11e5e7d69e82f0b6c5cbdaa"
+    },
+    {
+      "path": "target/wp943/ordinary-3.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-4.stdout",
+      "sha256": "b1afcf3785836b4a7289d456bd4a1a3f45d34d8fab45590b2390d8d713415610"
+    },
+    {
+      "path": "target/wp943/ordinary-4.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "target/wp943/ordinary-5.stdout",
+      "sha256": "0deabb5e784ecb4408770d590c3bd04d984b386334e9c313027c4fc51800550c"
+    },
+    {
+      "path": "target/wp943/ordinary-5.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

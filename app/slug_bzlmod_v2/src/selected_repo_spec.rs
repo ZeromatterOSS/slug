@@ -16552,6 +16552,32 @@ impl HostSelectedRegistryRepoSpecsObservationError {
 }
 
 impl HostRootRepositoryMappingError {
+    /// Borrows the module name, canonical version and outer registry request
+    /// retained by this discovery failure. This is not completed MVS or source
+    /// provenance; native transport detail may independently be unavailable.
+    #[doc(hidden)]
+    pub fn selected_module_registry_file(&self) -> Option<(&str, &str, &RegistryFileUrl)> {
+        use crate::source_preparation::HostDiscoveredModuleError;
+        use crate::source_preparation::ModuleSourcePreparationError;
+
+        let PrivateRootRepositoryMappingError::Predecessor(predecessor) = &self.inner else {
+            return None;
+        };
+        let Err(HostSelectedExtensionMappingsError::Routes(HostSelectedModuleRoutesError::Graph(
+            HostSelectedModuleGraphError::DiscoveryLeaf {
+                module: HostGraphModuleKey::Module { name, version },
+                error:
+                    HostDiscoveredModuleError::SourcePreparation(
+                        ModuleSourcePreparationError::RegistryFile { url, .. },
+                    ),
+            },
+        ))) = predecessor.as_ref()
+        else {
+            return None;
+        };
+        Some((name.as_str(), version.normalized(), url))
+    }
+
     #[doc(hidden)]
     pub fn selected_source_refusal(&self) -> crate::SelectedSourceRefusal {
         let mut builder = crate::selected_source_refusal::SelectedSourceRefusalBuilder::new();
