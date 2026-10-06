@@ -1,0 +1,247 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "8fe28ac9b",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "3b32889f06e69d882f56774f42d3249c88cd72a6039d87a8233d54263c1457ab",
+    "starlark-rust/starlark/src/values/types/string/splitlines_input_reuse_tests.rs": "0ef57b84f8bc9c777fea514f1c3301f3067e55b5659e2a8fd343254bd2dc6dc5",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/types/string/str_type.rs": "a476b73bdc0845592fee35732c419338d2c108328b8656df14383af1061fc812",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/values/types/string/ascii_case_reuse_tests.rs": "487d516515ed7f57d6ce943a8200725e931a178f95529b28e7334b3054d57457"
+  },
+  "artifact": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "6a0f8bd46118fa4e9292a64416d164a7287240d9eecf0172a8d17e3eb8a6b21c",
+    "selectors": [
+      "values::types::string::methods::splitlines_input_reuse_tests::unsplit_lines_share_whole_input_and_avoid_payload_growth",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_bytes_lists_parameters_and_exact_errors_are_preserved",
+      "values::types::string::methods::splitlines_input_reuse_tests::splitlines_lists_and_functions_survive_gc_freeze_and_source_drop",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through",
+      "values::types::string::methods::ascii_case_reuse_tests::unchanged_ascii_case_reuses_input_without_heap_growth",
+      "values::types::string::methods::ascii_case_reuse_tests::ascii_pairs_unicode_fallback_types_and_exact_errors_are_preserved",
+      "values::types::string::methods::ascii_case_reuse_tests::case_results_and_functions_survive_gc_freeze_and_module_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/methods.rs": "3b32889f06e69d882f56774f42d3249c88cd72a6039d87a8233d54263c1457ab",
+      "starlark-rust/starlark/src/values/types/string/splitlines_input_reuse_tests.rs": "0ef57b84f8bc9c777fea514f1c3301f3067e55b5659e2a8fd343254bd2dc6dc5"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/splitlines-input-reuse-baseline-compile.json",
+      "sha256": "9caf4ce36d2fd30bd124f5ca77d967697a21e366be8ff7733a6fde6e9ca8a5d2",
+      "exit_code": 0,
+      "elapsed_seconds": 6.261706691002473,
+      "log_sha256": "fc8936020f7e18b78b647f2c2082261fa6b54d5019e40af3f67dccb2aef8425b"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/splitlines-input-reuse-baseline-preflight.json",
+      "sha256": "f048a6d357b7cfd9b6b746327846633ff9bd7c1b31978d60634ed4fb5f6da031",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02221147099044174,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/splitlines-input-reuse-baseline-controls.json",
+      "sha256": "743a5381308a833a04d348c4c79f2b38387c82016ef1cf4c573b294aa0e80082",
+      "exit_code": 101,
+      "elapsed_seconds": 0.010904554976150393,
+      "log_sha256": "5f5d66fe20ff6d5f1e38be38e1b5013fc00666dd7b3b67ad32891730330c78ec"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/splitlines-input-reuse-candidate-compile.json",
+      "sha256": "d8d0d0ee9d34fbde71b9d548cc01fb3e5d01ed7631c164f8f0eef18bfa8d9b00",
+      "exit_code": 0,
+      "elapsed_seconds": 3.2720517109846696,
+      "log_sha256": "a134bdb30847bcffec9c9830a6b75962ad6ee1ffd8209e013614d64041715b45"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/splitlines-input-reuse-candidate-preflight.json",
+      "sha256": "940fec3698f618c0926264ee5c4ffcbe5525ede83080bd2670a232ae31e67991",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02192249003564939,
+      "log_sha256": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/splitlines-input-reuse-candidate-controls.json",
+      "sha256": "996762394a2c28367865dff4e289cb68662c0e565762353d8bd91f0b683e5b27",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02047390298685059,
+      "log_sha256": "9bef5fbd43f6cb95e3cb2df54e6e3f92f70c58224fbebae463de798595ea48ba"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/splitlines-input-reuse-dependents-check.json",
+      "sha256": "3a88d13e666ab040ad77b3fbe17023e3fd85a0b3ac591defde17865fed583e9a",
+      "exit_code": 0,
+      "elapsed_seconds": 7.53498907701578,
+      "log_sha256": "2b84d55088cd8eafee5dcd256bee39a7827cdebfb13672995406c1ca3ab3f68b"
+    }
+  },
+  "design_sha256": "909d7b10121bd3d803092717e60e637059fdd0cbc021a49f37256c70a95244e2",
+  "design_reviews": {
+    "target/wp899/splitlines-input-reuse-design-source.md": "7fd89c903a51dde5c0668c400720d6d752fda1bb033fedd8f62ce5a944f8cb71",
+    "target/wp899/splitlines-input-reuse-design-ownership.md": "50146247c03fe2cf446ae712d1dc9c6a0efccdb667e0c522d67f93a0d914381f",
+    "target/wp899/splitlines-input-reuse-design-evidence.md": "6516f366fa8646cc54c90098b9397b0af2883dc5c1466a0372e72a4129bdab62"
+  },
+  "proof": "Entire methods.rs comparison allows only splitlines StringValue receiver, as_str cursor, whole-input reuse when nonempty tail and lines.is_empty(), and sibling hook. Each delimiter unconditionally pushes, so empty lines prove no delimiter consumed. All docs/speculative annotations/other methods/delimiter logic/list return remain unchanged. Archive loop baseline-identical. Same tests baseline/candidate. No new retained state/interner/cache/API/key/unsafe/dependency.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 8,
+    "candidate_total": 11,
+    "splitlines_comparisons_per_variant": 5602,
+    "prior_ascii_case_comparisons_candidate": 32768,
+    "exact_equal_error_records": 4
+  },
+  "metrics": {
+    "baseline": [
+      {
+        "kind": "ascii",
+        "keepends": false,
+        "input_bytes": 102400,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 212928
+      },
+      {
+        "kind": "ascii",
+        "keepends": true,
+        "input_bytes": 102400,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 425920
+      },
+      {
+        "kind": "unicode",
+        "keepends": false,
+        "input_bytes": 86016,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "kind": "unicode",
+        "keepends": true,
+        "input_bytes": 86016,
+        "input_pointer_shared": false,
+        "public_heap_growth_bytes": 851904
+      }
+    ],
+    "candidate": [
+      {
+        "kind": "ascii",
+        "keepends": false,
+        "input_bytes": 102400,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "kind": "ascii",
+        "keepends": true,
+        "input_bytes": 102400,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "kind": "unicode",
+        "keepends": false,
+        "input_bytes": 86016,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      },
+      {
+        "kind": "unicode",
+        "keepends": true,
+        "input_bytes": 86016,
+        "input_pointer_shared": true,
+        "public_heap_growth_bytes": 0
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:3, in extra\n      def extra(s): return s.splitlines(False, False)\nerror: Wrong number of positional arguments, expected between 0 and 1, got 2\n --> assert.bzl:3:22\n  |\n3 | def extra(s): return s.splitlines(False, False)\n  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:4, in named\n      def named(s): return s.splitlines(keepends = True)\nerror: Found `keepends` extra named parameter(s) for call to function\n --> assert.bzl:4:22\n  |\n4 | def named(s): return s.splitlines(keepends = True)\n  |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\n  * assert.bzl:5, in wrong_bool\n      def wrong_bool(s): return s.splitlines(1)\nerror: Type of parameter `keepends` doesn't match, expected `bool`, actual `int (repr: 1)`\n --> assert.bzl:5:27\n  |\n5 | def wrong_bool(s): return s.splitlines(1)\n  |                           ^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Value `1` of type `int` does not match the type annotation `str` for argument `s`\n"
+  ],
+  "limits": "Reuse only full nonempty input without CR/LF; all actually split substrings retain owned allocations. Fixed ASCII 102400-byte and Unicode 86016-byte fixtures, each both keepends modes, have recorded public Heap::allocated_bytes growth; list allocations remain. Baseline Unicode false copy fits existing arena with zero growth despite unshared pointer. Candidate all share with zero added public accounting, not zero list allocations/exact payload/Rust allocator count or general capacity/aggregate/peak/RSS/speed/source-fit benefit. GC disabled only for isolated accounting/comparison probes; explicit GC, frozen results/functions and drop tested separately.",
+  "growth": {
+    "test_sibling_lines": 252,
+    "estimated_test_lines": "180-220; actual 252 after rustfmt, no fixture assets or production helpers",
+    "owner_boundary": "Three local splitlines edits and sibling hook; large cohesive string owner remains. No donor import."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14, default Starlark lib plus default Loading/Core/CLI alltargets offline; serial Cargo prep60s/tests30s/exact fresh preflight; CARGO_MANIFEST_DIR set, no golden regeneration.",
+  "scope": "Local strings/basic memory only; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/splitlines-input-reuse-archive-reference.rs": "2b6a43e8b5a59140e7d73b6e2b0b08329825585a9ef1c76d1dafe4664f9a4fa9",
+    "target/wp899/splitlines-input-reuse-baseline-compile.json": "9caf4ce36d2fd30bd124f5ca77d967697a21e366be8ff7733a6fde6e9ca8a5d2",
+    "target/wp899/splitlines-input-reuse-baseline-compile.jsonl": "fc8936020f7e18b78b647f2c2082261fa6b54d5019e40af3f67dccb2aef8425b",
+    "target/wp899/splitlines-input-reuse-baseline-controls.json": "743a5381308a833a04d348c4c79f2b38387c82016ef1cf4c573b294aa0e80082",
+    "target/wp899/splitlines-input-reuse-baseline-controls.jsonl": "5f5d66fe20ff6d5f1e38be38e1b5013fc00666dd7b3b67ad32891730330c78ec",
+    "target/wp899/splitlines-input-reuse-baseline-preflight.json": "f048a6d357b7cfd9b6b746327846633ff9bd7c1b31978d60634ed4fb5f6da031",
+    "target/wp899/splitlines-input-reuse-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/splitlines-input-reuse-baseline-selectors.json": "eccbde503fd0f5b845728026b3a08320296077666566ed0bd6f7a5802c5d6642",
+    "target/wp899/splitlines-input-reuse-candidate-compile.json": "d8d0d0ee9d34fbde71b9d548cc01fb3e5d01ed7631c164f8f0eef18bfa8d9b00",
+    "target/wp899/splitlines-input-reuse-candidate-compile.jsonl": "a134bdb30847bcffec9c9830a6b75962ad6ee1ffd8209e013614d64041715b45",
+    "target/wp899/splitlines-input-reuse-candidate-controls.json": "996762394a2c28367865dff4e289cb68662c0e565762353d8bd91f0b683e5b27",
+    "target/wp899/splitlines-input-reuse-candidate-controls.jsonl": "9bef5fbd43f6cb95e3cb2df54e6e3f92f70c58224fbebae463de798595ea48ba",
+    "target/wp899/splitlines-input-reuse-candidate-preflight.json": "940fec3698f618c0926264ee5c4ffcbe5525ede83080bd2670a232ae31e67991",
+    "target/wp899/splitlines-input-reuse-candidate-preflight.jsonl": "353c553a12381d06fc49273d253cc313c4f9607d5469b7c2f568c22a30bc9aff",
+    "target/wp899/splitlines-input-reuse-candidate-selectors.json": "0a944a692b5094e38ca2766b769d363fbd9664b262708fac6031fccc113b5863",
+    "target/wp899/splitlines-input-reuse-controls.py": "f465dfe402630849b3da065a2f57d7513f570e7c536f79e2b17a32827af66298",
+    "target/wp899/splitlines-input-reuse-dependents-check.json": "3a88d13e666ab040ad77b3fbe17023e3fd85a0b3ac591defde17865fed583e9a",
+    "target/wp899/splitlines-input-reuse-dependents-check.jsonl": "2b84d55088cd8eafee5dcd256bee39a7827cdebfb13672995406c1ca3ab3f68b",
+    "target/wp899/splitlines-input-reuse-design-evidence.md": "6516f366fa8646cc54c90098b9397b0af2883dc5c1466a0372e72a4129bdab62",
+    "target/wp899/splitlines-input-reuse-design-ownership.md": "50146247c03fe2cf446ae712d1dc9c6a0efccdb667e0c522d67f93a0d914381f",
+    "target/wp899/splitlines-input-reuse-design-source.md": "7fd89c903a51dde5c0668c400720d6d752fda1bb033fedd8f62ce5a944f8cb71",
+    "target/wp899/splitlines-input-reuse-design.md": "909d7b10121bd3d803092717e60e637059fdd0cbc021a49f37256c70a95244e2",
+    "target/wp899/splitlines-input-reuse-record.py": "2d529b3ee252f5916e618ae12b2ed0c9231e78aad9167efefafbcd0e7f24bda6",
+    "target/wp899/splitlines-input-reuse-start.json": "73ea704c5688aed726571f1d43e97bfb766fd500d7c42bb1511826b89ec1b5b4"
+  },
+  "timing": {
+    "compile_seconds": 17.068747479002923,
+    "test_seconds": 0.03137845796300098,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 330.57738399505615
+  },
+  "validation_sha256": "7b41ee4dd9fb71586df0501dc3f4be91f5cf9c471eb7d55536fcf8799887d6d0",
+  "final_reviews": {
+    "target/wp899/splitlines-input-reuse-final-source.md": "11bc183b57464bd6795d6aafee199db7f003ec06b7322d2350aba35ed3531e3a",
+    "target/wp899/splitlines-input-reuse-final-ownership.md": "a5d5b5660f2a6992b7e4c32bcaf82c7a33d8b685f0e262fec61826b5c078429b",
+    "target/wp899/splitlines-input-reuse-final-evidence.md": "b657f7050fc4fbc217d4b40386634d6c21bad761c82f5270b064dedc36111494"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/splitlines-input-reuse-format-check.json",
+      "sha256": "3be67dac62f691c0c45783957624f6f602b7c54fc3b861f351a15695d3f8dba3",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/splitlines-input-reuse-archive-check.json",
+      "sha256": "725948faae879a503855a8d4fa575a6318976c2e40e3537826451f1cb175b9d9",
+      "exit_code": 0,
+      "log_sha256": "ea79dc8f15fc16bc3ad95803c53889623a33e60c2b299d7405ab7d1123b755a7"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/splitlines-input-reuse-plan-check.json",
+      "sha256": "77d576767c73d247d1289bd9b06b8e442e21fe96c47eafbc19dff00deb045176",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/splitlines-input-reuse-diff-check.json",
+      "sha256": "48dd4cb0ccd3064ad60685be688bacb85cd6fe4d3b02c9d751b7a44db1dcaff5",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

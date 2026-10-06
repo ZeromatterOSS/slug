@@ -1075,11 +1075,11 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
     /// ```
     #[starlark(speculative_exec_safe)]
     fn splitlines<'v>(
-        this: &str,
+        this: StringValue<'v>,
         #[starlark(require = pos, default = false)] keepends: bool,
         heap: Heap<'v>,
     ) -> anyhow::Result<Vec<StringValue<'v>>> {
-        let mut s = this;
+        let mut s = this.as_str();
         let mut lines: Vec<StringValue> = Vec::new();
         loop {
             if let Some(x) = s.find(['\n', '\r']) {
@@ -1099,7 +1099,11 @@ pub(crate) fn string_methods(builder: &mut MethodsBuilder) {
                 s = s.get(x..).unwrap();
             } else {
                 if !s.is_empty() {
-                    lines.push(heap.alloc_str(s));
+                    lines.push(if lines.is_empty() {
+                        this
+                    } else {
+                        heap.alloc_str(s)
+                    });
                 }
                 return Ok(lines);
             }
@@ -1290,6 +1294,10 @@ mod whitespace_split_tests;
 #[cfg(test)]
 #[path = "ascii_case_reuse_tests.rs"]
 mod ascii_case_reuse_tests;
+
+#[cfg(test)]
+#[path = "splitlines_input_reuse_tests.rs"]
+mod splitlines_input_reuse_tests;
 
 #[cfg(test)]
 mod tests {

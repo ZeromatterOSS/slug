@@ -12,47 +12,52 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component reuses existing strings for unchanged ASCII
-lower()/upper(). Changed ASCII and every non-ASCII input preserve original
-conversion and final heap allocation. Both 96 KiB fixtures share their inputs
-with zero additional public heap accounting. Next: select a proved redundant
-local copy or existing interner reuse through a bounded design checkpoint.
+The latest accepted component reuses complete nonempty splitlines inputs when
+no CR/LF delimiter is present. The result list and all actual split-line
+allocations remain. Four large ASCII/Unicode cases share their inputs; exact
+outputs, parameters and GC/frozen ownership remain unchanged. Next: select a
+proved redundant local copy or existing interner reuse through a bounded design
+checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted unchanged ASCII case input reuse contract
+## Accepted unsplit splitlines input reuse contract
 
-Native lower()/upper() return the existing StringValue only when every byte is
-ASCII and already in the requested case. Changed ASCII and every non-ASCII input
-retain the original Rust conversion through the same heap allocator. Public
-string type, zero visible arguments, speculative annotation, tracing/freezing,
-interner code and final ownership remain unchanged. No new helper, API, interner,
-cache, key, unsafe code, dependency or retained representation is introduced.
+Native splitlines uses the existing StringValue only in its nonempty tail when
+no delimiter has pushed a line. Every delimiter branch pushes, including empty
+lines, so this reuses the complete input. Empty input, CR/LF/CRLF pairing,
+trailing/consecutive terminators, keepends parameters, exact errors and ordered
+list[str] result remain unchanged. Every actual split-line allocation and the
+result Vec/list remain. No added scan, helper, API, interner, cache, key, unsafe
+code, dependency or retained representation; tracing/freezing follow normal
+list ownership. Archived Buck2-derived loop comparison is baseline-identical.
 
-Three DESIGNs/FINALs accept exact source proof and the same corrected tests.
-Baseline has two semantic passes and one intended pointer-sharing failure;
-candidate passes 8/8, including 32,768 ASCII comparisons, explicit Unicode and
-four byte-identical error records. Mutable results survive explicit GC, freezing
-and source/module/handle drop; speculative execution and internal string carrier
-controls pass. Default Loading/Core/CLI alltargets compile offline. Preserved
-E0597 and repr-assumption failures were test-only corrections; fresh corrected
-builds and exact artifact preflights precede execution. Format/archive/plan/diff
-hygiene passes. The owner receives only two method changes and a test hook,
-with a 188-line sibling.
+Three DESIGNs/FINALs accept exact whole-owner source proof and identical tests.
+Baseline has two semantic passes and one intended sharing failure; candidate
+passes 11/11, including 5,602 independent character comparisons per variant and
+four byte-identical error records. Mutable list/type, nonspeculative mutable
+input source-drop/explicit GC, frozen results/functions after module/handle drop,
+speculative constants, interner/carrier and prior ASCII reuse controls pass.
+Default Loading/Core/CLI alltargets check offline. Fresh artifacts/exact
+preflights, pinned serial prep60s/tests30s and format/archive/plan/diff hygiene
+pass. Three local edits and test hook remain in the cohesive owner; reviewers
+accept the 252-line sibling above the 180-220 estimate as discriminating coverage.
 
-Each 98,304-byte fixture changes from an unshared result to sharing its input;
-observed public Heap::allocated_bytes() growth changes from 204,736/409,536 to
-0/0. These are fixed-fixture arena observations, excluding exact allocator or
-payload counts, retained capacity, aggregate/peak/RSS/speed and source-fit claims.
-All fallback/final storage remains. Full WP899/M7A remains open.
+ASCII 102,400-byte and Unicode 86,016-byte inputs in both keepends modes change
+from unshared to shared. Observed public Heap::allocated_bytes() growth changes
+from [212928,425920,0,851904] to [0,0,0,0]. The baseline zero-growth copy fits
+existing arena capacity; these observations do not count allocations. Lists and
+all other storage remain; no exact allocator/payload, general capacity,
+aggregate/peak/RSS/speed or source-fit claim. Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Native splitlines reuses complete nonempty inputs without CR/LF; list and actual split-line allocations, bytes/parameters/errors, GC/frozen and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one sharing failure, candidate 11/11, 5,602 character comparisons per variant and default dependents. Four large ASCII/Unicode cases share; observed zero added arena accounting excludes allocator/aggregate/speed claims | [Splitlines input reuse](wp899-splitlines-input-reuse-2026-10-05.json) |
 | Native lower()/upper() reuse unchanged ASCII inputs; all changed ASCII/Unicode conversion, public types/errors, GC/frozen ownership and speculative behavior preserved. Three DESIGNs/FINALs; baseline two semantic passes/one intended sharing failure, candidate 8/8 and 32,768 ASCII comparisons plus default dependents. Both 96 KiB fixtures share with zero additional public heap accounting; fixture observations only | [ASCII case input reuse](wp899-ascii-case-reuse-2026-10-05.json) |
 | Manifest temporary SmallSets borrow full canonical labels; seven scratch clone sites removed, first-seen/full structural identity/fingerprints/final owned and frozen outputs preserved. Three DESIGNs/FINALs; identical baseline 3/3 and candidate 8/8 as 6 lib + 2 BUILD, default Loading/Core/CLI checks. Explicit scratch drop resolves preserved compiler E0505; no allocator/capacity/RSS/speed claim | [Manifest label borrowing](wp899-manifest-label-borrow-2026-10-05.json) |
 | Loading Label collectors format directly and external workspace_root copies into final heap; three scratch construction sites removed, bytes/identity/mapping/final ownership unchanged. Three DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, default Loading/Core/CLI checks. Source proof only; no allocation/capacity/RSS/speed claim | [Label renderer scratch removal](wp899-starlark-label-render-2026-10-05.json) |

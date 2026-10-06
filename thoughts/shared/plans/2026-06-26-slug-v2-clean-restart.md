@@ -39,10 +39,10 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: native lower()/upper() reuse existing unchanged ASCII
-strings. Original changed-ASCII/Unicode conversion, errors, speculative behavior
-and GC/frozen ownership are preserved; both 96 KiB fixtures show input sharing
-and zero additional public heap accounting.
+Latest accepted change: splitlines reuses complete nonempty inputs without CR/LF.
+The result list and actual split-line allocations remain; bytes, parameters,
+errors and GC/frozen ownership are preserved. Four large ASCII/Unicode cases
+share their inputs with zero observed additional public heap accounting.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
