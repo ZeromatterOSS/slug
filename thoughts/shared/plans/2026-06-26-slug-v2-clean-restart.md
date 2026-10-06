@@ -79,6 +79,14 @@ DICE behavior; six owner gates pass in0.727s/30,940KiB, owner preparation5.636s 
 Core/CLI check8.203s pass. Next ground exact current source availability or a separately
 frozen typed request observation. No new native/source/acquisition operation was run;
 current selected identity/provenance, module/provider/producer and whole-fit remain open.
+[WP944](./slug-v2-subplans/wp944-bazel-features-local-source-2026-10-06.json)
+observes one187B bazel_features+ link and its exact MODULE346B/SHA2083ef9c… with
+partial literal1.50.0 declaration. Two source operations0.031s/17,652KiB and0.042s/18,776KiB
+pass their bounds; fifteen preserved controls reused, no Rust/test/fixture growth.
+Two unparsed directives and selected identity/provenance remain unknown. Next freeze
+normal native Host/local-materializer readiness with this exact fourth source and borrowed
+actual error reporting; no native/import/acquisition/spent-source operation selected.
+Module/mapping/provider/public producer and whole-fit gates remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Native root and borrowed request association accepted; dependency readiness continues
+Status: bazel_features local MODULE observed; normal native dependency readiness continues
 
 ## Observable and source basis
 
@@ -98,9 +98,31 @@ WP942's diagnostic row into a current selected identity or completed MVS/provena
 Next ground one exact current local source locator or observe the retained typed request
 under a separately frozen instrumentation contract, then advance normal source readiness.
 
+[WP944](wp944-bazel-features-local-source-2026-10-06.json) observes the one
+source-grounded bazel_features+ link (187B raw absolute target,0.031s/17,652KiB), then
+exactly its first MODULE346B/fullSHA
+`2083ef9c7a469f520890483ccf8e0189d6e71e2117e7752e15e6554433d5ae3e`
+(0.042s/18,776KiB). Literal facts declare bazel_features1.50.0, bazel_skylib1.6.1 and
+protobuf33.6 with dev_dependency=true; two directives remain unparsed. Each operation
+has independent current FD/name/ancestor brackets and stable source/result/raw pins,
+joined empty process group and unchanged caps. Fifteen old controls are reused with
+current exact pins/raw outcomes; zero new tests or Rust/fixture changes. Body/parse
+trace peaks1,822,501B through retirement, retaining1,685,969B compact facts/helpers;
+encoding is excluded from tracing and these are Python observations, not Slug savings.
+
+This establishes individually bracketed physical candidate/version correspondence,
+not current selected native identity, shared output-base graph/BCR/MVS provenance,
+normal evaluation, mapping certification or producer/full-workload fit. Next use the
+[source owner recommendation](../../../../target/wp944/successor-owner.md) to freeze
+ordinary native Host loading and the actual Local materializer with four exact roots/
+MODULEs, plus borrowed semantic-error reporting. Only original observed source/epoch/
+Weak milestones qualify native readiness; a sibling error may occur before this new
+module is read. No new native/import/acquisition/spent-source operation is selected.
+
 ## Ownership, scope and allocation
 
-The latest change is a26-line accessor on the existing Bzlmod mapping-error owner and
+The latest checkpoint reuses unchanged bounded source readers; no production change.
+WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
 error; version.normalized() exposes its already parsed canonical spelling, not an authored
 build suffix. The original outer request is distinct from nested transport/prior-attempt

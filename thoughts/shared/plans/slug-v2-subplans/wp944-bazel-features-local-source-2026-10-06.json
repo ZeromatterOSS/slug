@@ -1,0 +1,330 @@
+{
+  "checkpoint": "WP944",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "8afb9ef8fdbfed01c406e6298e2ca88d2dcf3ca9",
+  "previous_goal_turn": "progress",
+  "outcome": "Exactly one current source-grounded bazel_features+ link observed, then its exact raw target MODULE346B/fullhash with partial literal bazel_features1.50.0 correspondence. Physical source availability, not native evaluation or producer completion.",
+  "compatibility": {
+    "exact": "Raw187B target spelling and complete observed346B MODULE/SHA.",
+    "slug_native": "Individual physical FD/name-bracketed observations and partial literal facts.",
+    "deferred": [
+      "actual current selected module/recorder causal-row association",
+      "fixture/current shared output-base graph/multiplicity/canonical alias provenance",
+      "BCR/MVS provenance and source certificate",
+      "normal native module evaluation/mapping and generated providers/toolchains",
+      "public retained Rustc producer/M7A/full-root/whole-workload fit"
+    ]
+  },
+  "source_basis": {
+    "path": "target/wp943/successor-source.md",
+    "sha256": "fc3b1c58abe6b8cc3ffe5d82323a8e459b895c54cab48010285c0a2d84223264"
+  },
+  "independent_candidate": "Saved rules_rust MODULE declares bazel_features1.50.0, pinned fixture has no multiple_version_override; immutable Bazel9.2 ModuleKey/actual graph caller/Selection and fetch/directory joining policy ground one conditional ordinary-name+ address under independently saved historical output base. No first-row URL interpretation or version-from-alias claim.",
+  "design": {
+    "path": "target/wp944/design.md",
+    "sha256": "3e22623e4d4a6db3d2d37a9149993d99a153dcf98acebe3f505827c50ad3f734"
+  },
+  "design_reviews": [
+    {
+      "path": "target/wp944/design-source.md",
+      "sha256": "031384b39b9258bb17e6ebbe2340c705869c7c789ca2bbb183e5372adedd5d49"
+    },
+    {
+      "path": "target/wp944/design-evidence.md",
+      "sha256": "27ea56f51ea49aa5e758994b7256d6b046d6dab55624fbe2213777ec3193cc23"
+    }
+  ],
+  "launch_reviews": [
+    {
+      "path": "target/wp944/launch-metadata-source.md",
+      "sha256": "7ee57079f966562002ee3befda9c15879b0672edee6589b7a5d4da028fd8c35a"
+    },
+    {
+      "path": "target/wp944/launch-metadata-evidence.md",
+      "sha256": "1165e8bf8aa704f3574878d8b78cfc059bb490792dd242854985310577662da4"
+    },
+    {
+      "path": "target/wp944/launch-module-source.md",
+      "sha256": "6514dbd7d8d99e02d94a21f85dc073eb2dcdf72754c833b7d5eaacebc4fb56f3"
+    },
+    {
+      "path": "target/wp944/launch-module-evidence.md",
+      "sha256": "9c9a6854c71032d90bbe416fd4d30c782e4ddbaf786d9c90f648cfdbcd8aad40"
+    }
+  ],
+  "final_reviews": [
+    {
+      "path": "target/wp944/final-source.md",
+      "sha256": "21285becb5aa1cc408a0282d8d61bc7600814dc374359e8908b7c3aac73adb32"
+    },
+    {
+      "path": "target/wp944/final-evidence.md",
+      "sha256": "de6efbb42a7cab9beade051478a15cf418e0e03836daf06f68e8236f97faa0c9"
+    }
+  ],
+  "supervisor": {
+    "path": "target/wp944/run.py",
+    "sha256": "ee43139a3bf06271478d6645a1bdfff75cfcf5e1912be4c830182d21bb171d77"
+  },
+  "wrapper": {
+    "path": "target/wp944/observe.py",
+    "sha256": "0fb4c20bd8e69075be1c85a4ee836b7e14a86bbbefcb7e3317004e93cf2df4c6"
+  },
+  "module_launch_design": {
+    "path": "target/wp944/module/design.md",
+    "sha256": "4021f0384f5f3c577d8542734520ede15fdf8e28fac009b9e60d3bee72fb6cc3"
+  },
+  "steps": [
+    {
+      "stage": "metadata",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp944/observe.py",
+        "metadata"
+      ],
+      "exit_code": 0,
+      "completed_count": 1,
+      "pass_count": null,
+      "elapsed_seconds": 0.03139822802040726,
+      "conservative_rss_kib": 17652,
+      "material_and_review_pin_count": 30,
+      "operation": {
+        "path": "target/wp944/metadata/operation.json",
+        "sha256": "31e0009dfa9e6a3564ae0881cd02aec64d5e232af6884569148085dd5e09befb"
+      },
+      "result": {
+        "path": "target/wp944/metadata/result.json",
+        "sha256": "aab833ed302f2bdce48face48a30c23c8480d3237d59fc49c1c265595e422709"
+      },
+      "stdout": {
+        "path": "target/wp944/metadata/stdout",
+        "sha256": "73b041f26ec9f7941cddcf25eaae55d99e7323cac2d44aa6404b913ce79917f9"
+      },
+      "stderr": {
+        "path": "target/wp944/metadata/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "input": {
+        "path": "target/wp944/metadata/input.json",
+        "sha256": "12d871baaf76921bfef181695708e6606b4fdb1495aca3d38af2b9f2cc1a84d2"
+      }
+    },
+    {
+      "stage": "module",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp944/observe.py",
+        "module"
+      ],
+      "exit_code": 0,
+      "completed_count": 1,
+      "pass_count": null,
+      "elapsed_seconds": 0.041566206025891006,
+      "conservative_rss_kib": 18776,
+      "material_and_review_pin_count": 38,
+      "operation": {
+        "path": "target/wp944/module/operation.json",
+        "sha256": "b4641ea9be398d0f6d85508d3b1abf1ce8b315f891c0943ee51eda66b5ed0406"
+      },
+      "result": {
+        "path": "target/wp944/module/result.json",
+        "sha256": "e8040a3a6b930ce8bd96c40551ac8dc3a0d8d298dedae054269c5dc9745940f0"
+      },
+      "stdout": {
+        "path": "target/wp944/module/stdout",
+        "sha256": "767edae597c38cfdd432ffca5bbd55249f384bf6fcbaa1a96cbd613b89c6b0f4"
+      },
+      "stderr": {
+        "path": "target/wp944/module/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "input": {
+        "path": "target/wp944/module/inputs.json",
+        "sha256": "a9a416233d7c411bad198690561489cd8ce1115edacf55040fde9389174c3fd4"
+      }
+    }
+  ],
+  "metadata": {
+    "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/bazel_features+",
+    "target_spelling": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+    "target_bytes": 187,
+    "link_identity": [
+      66308,
+      125699276,
+      41471,
+      1787694582179409330,
+      1787694582179409330,
+      187
+    ],
+    "root_identity": [
+      107,
+      2735372,
+      16749,
+      1784689720849914319,
+      1784689720849914319
+    ],
+    "parent_components": 10,
+    "target_followed": false,
+    "source_body_bytes": 0,
+    "source_certificate": false,
+    "memory": {
+      "loaded_current": 1189085,
+      "loaded_peak": 1194645,
+      "retained": 1187630,
+      "peak": 1204491,
+      "tracing_excludes_encoding": true
+    }
+  },
+  "module": {
+    "root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+    "path": "MODULE.bazel",
+    "bytes": 346,
+    "sha256": "2083ef9c7a469f520890483ccf8e0189d6e71e2117e7752e15e6554433d5ae3e",
+    "identity": [
+      66308,
+      125699243,
+      33188,
+      1787694582177114870,
+      1787694582177329921,
+      346
+    ],
+    "ancestor_components": 14,
+    "descriptors_opened": 16,
+    "facts": {
+      "syntax_ok": true,
+      "partial": true,
+      "module": [
+        {
+          "line": 1,
+          "column": 0,
+          "attributes": {
+            "name": "bazel_features",
+            "version": "1.50.0"
+          }
+        }
+      ],
+      "bazel_dep": [
+        {
+          "line": 6,
+          "column": 0,
+          "attributes": {
+            "name": "bazel_skylib",
+            "version": "1.6.1"
+          }
+        },
+        {
+          "line": 11,
+          "column": 0,
+          "attributes": {
+            "name": "protobuf",
+            "version": "33.6",
+            "dev_dependency": true
+          }
+        }
+      ],
+      "loads": [],
+      "unparsed": [
+        {
+          "line": 8,
+          "column": 0,
+          "kind": "Assign",
+          "reason": "unsupported_top_level"
+        },
+        {
+          "line": 9,
+          "column": 0,
+          "kind": "Expr",
+          "reason": "unsupported_top_level"
+        }
+      ]
+    },
+    "actual_bytes": 346,
+    "overflow_probe_bytes": 0,
+    "collection_atomic": false,
+    "normal_source_certificate": false,
+    "native_producer_proved": false,
+    "memory": {
+      "loaded_current": 1762607,
+      "loaded_peak": 1762607,
+      "retained_compact_helpers_and_facts": 1685969,
+      "peak_through_retirement": 1822501,
+      "tracing_excludes_encoding": true
+    }
+  },
+  "ownership": "Unchanged WP934 link and WP933 reader/facts own descriptor retirement and perfile body/text/AST retirement. One64KiB scratch,256KiB fact-body cap, source16MiB. Compact facts/helpers remain; tracing excludes encoding and is not Slug savings. No source plaintext, native input injection, new string interner/retained representation/cache/DICE key or policy changed.",
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "controls": {
+    "reused_count": 15,
+    "new_test_cases": 0,
+    "executed_now": 0,
+    "link": {
+      "count": 4,
+      "operation": {
+        "path": "target/wp941/controls-operation.json",
+        "sha256": "bed9130a7e73f9b858a35ebac5accb17972c43260a9e17cd5fc0685acae89aba"
+      },
+      "stdout": {
+        "path": "target/wp941/controls.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "target/wp941/controls.stderr",
+        "sha256": "327a239e937fcd63fff4ca776af42b224d930054679df1b620dc3519d3099280"
+      }
+    },
+    "reader_facts": {
+      "count": 11,
+      "operation": {
+        "path": "target/wp933/controls-operation.json",
+        "sha256": "7fa9fba9b5d51be74c8b7604987f35629aaef219e0092912e0584186ddfe4d84"
+      },
+      "preflight": {
+        "path": "target/wp933/preflight.json",
+        "sha256": "838be3abe7438e253611135d2ad4f10163a9c0da2ce224864993800eb7f3b8df"
+      },
+      "stdout": {
+        "path": "target/wp933/controls.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "target/wp933/controls.stderr",
+        "sha256": "001f12f6483ae91eba640ac615b115e3966e82ca798d74c3d964cfedc2082ddc"
+      }
+    },
+    "qualification": "Current original source/control/input/design pins and each exact raw named outcome verified before both operations; preserved controls reused, not new passes. Two completed availability decisions are not Rust/test passes."
+  },
+  "growth": {
+    "production_rust": 0,
+    "test_rust": 0,
+    "fixture_files": 0,
+    "ignored_wrappers_only": true
+  },
+  "next": {
+    "owner_recommendation": {
+      "path": "target/wp944/successor-owner.md",
+      "sha256": "0333a1ccc229c34ab1fe3f80dcda2ca408c5eb2d3cadce89c6a9d11e4aee22b3"
+    },
+    "action": "Freeze a normal native four-root Host MODULE/local-materializer guard and new actual borrowed semantic-error reporting hypothesis using the exact newly witnessed346B/hash. Root/sibling-first semantic errors may precede this module acquisition; only genuine original Host source/epoch/Weak milestones qualify native readiness. No operation selected here.",
+    "excluded": "Spent source16\u201318/F3/BCR/full-root/public-build/acquisition/Windows scopes and resource caps remain unchanged."
+  },
+  "checks": [
+    "source/control/current raw/result/helper pins",
+    "git diff --check",
+    "scripts/v2_archive_status.sh",
+    "scripts/v2_plan_status.py"
+  ],
+  "started": {
+    "baseline": "8afb9ef8fdbfed01c406e6298e2ca88d2dcf3ca9",
+    "previous_goal_turn": "progress",
+    "started_utc": "2026-10-06T22:35:28.506471+00:00"
+  },
+  "recorded_utc": "2026-10-06T22:50:05.128264+00:00"
+}
