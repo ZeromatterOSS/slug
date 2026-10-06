@@ -35,12 +35,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-200-m7a-current-production-inventory-r1
-Status: Ready for bounded offline CLI dependency inventory reconciliation
+Status: Offline inventory accepted; current Linux unit-feature reconciliation is next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) selects current Linux
 normal/build CLI inventory reconciliation under canonical priority1, using one
-locked/offline metadata observation and static declared producers. Classify live
-local/external, generated-input and pin deltas before semantic implementation.
+locked/offline metadata observation and static declared producers. The accepted view has36 local/316 external packages and977 edges, with complete
+static lock membership and declared source/pin correspondence. Next reconcile
+Linux CLI unit features before selecting configured-action evidence. See the
+[inventory receipt](./slug-v2-subplans/wp900-production-inventory-2026-10-06.json).
 Metadata features are not unit/configured compiler flags; M7A remains partial.
 
 Controlled64-round string lifecycle and lexer evidence permits bounded broader

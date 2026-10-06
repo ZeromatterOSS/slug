@@ -107,6 +107,23 @@ crate universe. This is the accepted inventory, not a fresh audit of every
 current Cargo change. Before bootstrap admission, reconcile live Cargo/Bazel
 coverage against it and record any delta in the readiness matrix.
 
+#### Current offline CLI inventory (2026-10-06)
+
+[WP900 receipt](wp900-production-inventory-2026-10-06.json) reconciles the current
+Linux normal/build CLI dependency view at25ebe9f22. One locked/offline metadata
+command exited0 in0.164s without compilation/network, preserving429 source pins.
+The closure has36 local/316 external packages and977 directed dependency rows.
+Relative to the accepted35-local inventory, cache leaf slug_reapi_cache_v2 is
+added with no removal; it replaces slug_reapi_v2 as the REAPI build-script owner.
+All selected local BUILD files contain parsed literal Rust declarations and all
+selected local/external package name/version keys occur in Cargo.Bazel.lock.
+All316 metadata source strings match Cargo.lock;315 registry checksum/archive
+URL pairs and the one Git remote/revision match their generated declarations.
+These are declared correspondence facts, not fetched bytes, Git subdirectory
+content, configured reachability, unit features or compilation. Current Linux
+unit-feature and configured-action correspondence remain to be reconciled.
+Three independent FINALs accept the bounded inventory; full M7A stays open.
+
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 
 The historical 33-package receipt above is unchanged. The live Cargo root now

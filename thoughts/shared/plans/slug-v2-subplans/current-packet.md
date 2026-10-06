@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-200-m7a-current-production-inventory-r1
-Status: Ready for bounded offline CLI dependency inventory reconciliation
+Status: Offline inventory accepted; current Linux unit-feature reconciliation is next
 
 ## Observable outcome and scope
 
@@ -11,6 +11,13 @@ production inventory and current static Bazel declarations. Classify a concrete
 missing producer or stale evidence before choosing semantic implementation.
 This is evidence accounting, not configured/action/compilation or M7A acceptance.
 Compatibility: Slug-native inventory; existing exact admission remains unchanged.
+
+The selected metadata observation is complete and spent; do not rerun it.
+[Accepted inventory](wp900-production-inventory-2026-10-06.json) reports36 local/316
+external packages,977 edges, full static name/version membership and declared
+source/checksum/remote-revision correspondence. No missing static BUILD or lock
+owner was found. Next select a bounded Linux CLI unit-feature reconciliation
+before configured-action evidence; this packet does not yet invoke unit-graph.
 
 Root owns selection, analysis, scheduling and commits. Read Stage10's accepted
 production inventory and live cache-core delta, and bootstrap-readiness's finite
