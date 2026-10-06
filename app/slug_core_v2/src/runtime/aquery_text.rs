@@ -12,6 +12,7 @@ use slug_analysis_v2::ConfigurationKind;
 use slug_analysis_v2::ConfiguredActionView;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredRunfilesSupportActionView;
+use slug_analysis_v2::ConfiguredSolibActionView;
 use slug_analysis_v2::ConfiguredSpawnActionView;
 use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionKind;
@@ -24,6 +25,7 @@ use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
 use super::file_write_aquery_text::format_file_write_aquery_text;
 use super::runfiles_support_aquery_text::append_runfiles_support;
+use super::solib_aquery_text::append_solib;
 use super::spawn_query_inputs::visit_declared_artifacts;
 use super::symlink_aquery_text::append_symlink;
 
@@ -68,6 +70,8 @@ fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
             ConfiguredSymlinkActionView::from_configured_action(action)?;
         } else if action.runfiles_support_spec().is_some() {
             ConfiguredRunfilesSupportActionView::from_configured_action(action)?;
+        } else if action.solib_symlink_spec().is_some() {
+            ConfiguredSolibActionView::from_configured_action(action)?;
         } else {
             ConfiguredSpawnActionView::from_configured_action(action)?;
         }
@@ -92,6 +96,11 @@ fn append_owner(output: &mut String, owner: &ConfiguredNodeResult) -> Result<(),
             append_runfiles_support(
                 output,
                 ConfiguredRunfilesSupportActionView::from_configured_action(action)?,
+            )?;
+        } else if action.solib_symlink_spec().is_some() {
+            append_solib(
+                output,
+                ConfiguredSolibActionView::from_configured_action(action)?,
             )?;
         } else {
             append_spawn(

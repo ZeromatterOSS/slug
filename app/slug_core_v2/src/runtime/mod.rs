@@ -52,6 +52,7 @@ mod root_apparent_repository_source_path_input;
 mod root_bootstrap;
 mod runfiles_support_aquery_text;
 mod scoped_cycle_detector;
+mod solib_aquery_text;
 mod source_input;
 mod spawn_query_inputs;
 pub mod starlark;

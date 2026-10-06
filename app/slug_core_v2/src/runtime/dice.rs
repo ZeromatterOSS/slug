@@ -13973,4 +13973,8 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod runfiles_aquery_tests {
         include!("tests/runfiles_aquery_tests.rs");
     }
+
+    mod solib_aquery_tests {
+        include!("tests/solib_aquery_tests.rs");
+    }
 }
