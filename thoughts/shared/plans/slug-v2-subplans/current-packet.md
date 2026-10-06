@@ -12,42 +12,46 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component formats canonical Label text directly into existing
-collectors and constructs external workspace_root directly in the existing heap.
-Three temporary string construction sites are removed; str/repr bytes, canonical
-identity, source mapping and final ownership remain unchanged. Slug-native scratch
-only. Next: select a proved redundant local copy or existing interner reuse through
-a bounded design checkpoint.
+The latest accepted component borrows canonical labels in temporary manifest
+SmallSets instead of deep-cloning them. Seven scratch clone sites are removed;
+full structural identity, first-seen records, fingerprints and final owned/frozen
+outputs remain unchanged. Slug-native scratch only. Next: select a proved redundant
+local copy or existing interner reuse through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted loading Label renderer scratch contract
+## Accepted manifest label scratch borrowing contract
 
-Distinct str/repr overrides write canonical Display directly into existing
-collectors; repr framing is unchanged. Nonroot workspace_root uses existing heap
-concatenation; root keeps the empty constant path. All other production code,
-parsing/mapping/hash/equality and retained representations are unchanged. No new
-helper/API/interner/cache/key/unsafe/dependency. Canonical owners are borrowed only
-during synchronous formatting/copy; final collector and heap strings remain owned.
+Seven temporary SmallSet inserts across BzlLoadManifest construction, package
+fingerprint/direct roots/call sources and frozen lifetime closure borrow existing
+labels. Full CanonicalLabel Eq/Hash including mapping ID, first-seen order,
+capacities, fingerprint implementation and all final identity/provenance/frozen
+handle clones remain unchanged. Scratch references end synchronously; an explicit
+set drop after deduplication ends the root borrow before final transfer. No new
+helper/API/interner/cache/key/unsafe/dependency/retained representation or DICE change.
 
-Three DESIGNs/FINALs accept source-proved removal of two to_string sites and one
-nonroot format site. Identical new tests pass baseline 2/2 and candidate 2/2; all 7
-candidate controls pass, including 5 unchanged ABI/mapping/frozen/passthrough
-controls. Root/external, empty package, long/Unicode, prefixed collectors and
-workspace-root lifetime through Label/repository/module drop and freeze pass.
-Default Loading/Core/CLI alltargets compile. Serial pinned offline Cargo JSON and
-exact fresh preflights; one corrected module-path selector preflight is attributed
-with zero tests executed before correction. A 45-line sibling preserves the small
-owner. Collector growth/final strings remain; no allocator-count, quantified memory,
-capacity, aggregate, peak/RSS, speed or source-fit claim. Full WP899/M7A is open.
+Three DESIGNs/FINALs accept exact source proof. Identical new semantic controls
+pass baseline 3/3 and candidate 3/3; candidate 8/8 as 6 lib + 2 BUILD includes three
+existing injected DICE recursive/A/B/A controls and lexical/defining Label owners.
+Independent equal buffers/conflicting metadata, diamonds/root repetition/empty
+inputs, equal display with distinct mapping IDs, fingerprint projection and owned
+outputs/frozen values after input/handle drop pass. Default Loading/Core/CLI
+alltargets compile. Initial E0505 compiler evidence is preserved; corrected fresh
+build/exact preflight precedes all candidate execution. Serial pinned offline
+prep60s/tests30s and hygiene pass. The large existing bzl_module owner receives
+only seven insert substitutions, scratch drop and testhook; a 272-line sibling
+covers the five helpers. Seven scratch clone sites only: final clones/set metadata
+remain; no allocator-count, quantified memory/capacity/aggregate/peak/RSS/speed/
+source-fit claim. Full WP899/M7A remains open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Manifest temporary SmallSets borrow full canonical labels; seven scratch clone sites removed, first-seen/full structural identity/fingerprints/final owned and frozen outputs preserved. Three DESIGNs/FINALs; identical baseline 3/3 and candidate 8/8 as 6 lib + 2 BUILD, default Loading/Core/CLI checks. Explicit scratch drop resolves preserved compiler E0505; no allocator/capacity/RSS/speed claim | [Manifest label borrowing](wp899-manifest-label-borrow-2026-10-05.json) |
 | Loading Label collectors format directly and external workspace_root copies into final heap; three scratch construction sites removed, bytes/identity/mapping/final ownership unchanged. Three DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, default Loading/Core/CLI checks. Source proof only; no allocation/capacity/RSS/speed claim | [Label renderer scratch removal](wp899-starlark-label-render-2026-10-05.json) |
 | Compiler method calls move owned receiver instead of deep-cloning; optimizer order/IR/spans/args/fallback/frozen ownership preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure; 3 Symbol buffers share owners (15,384 content bytes). Fifteen gates as 14 preserved + 1 reviewed stale golden correction, independently baseline-reproduced; default Loading/Core/CLI checks pass. Generic IR spare capacity remains possible; no aggregate/RSS/speed claim | [Method receiver transfer](wp899-method-receiver-move-2026-10-05.json) |
 | Apparent-label formatting borrows existing repository bytes; root spelling, flags, errors, identity and final owned output preserved. Three DESIGNs/FINALs; baseline 2 semantic passes/1 pointer failure, candidate 10 controls as 3+4+3 and default Loading/Core/CLI checks. A 20,491-byte repository shares its owner at the sink. One temporary String removed; no aggregate/RSS/speed claim | [Apparent-label display borrowing](wp899-apparent-label-display-borrow-2026-10-05.json) |

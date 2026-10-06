@@ -1,0 +1,208 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "ea3f2a636",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_loading_v2/src/bzl_module.rs": "003e6700361c7337fc5640dcf9f3edfb4fda0449674cfe92f9c46c85ab684891",
+    "app/slug_loading_v2/src/manifest_label_memory_tests.rs": "7f1b6725be9f7f08309ac79abc5a8f7fc9493ed9eee465bf726f1fc6c943ce50",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/package.rs": "a715fc400f471241ebc77f78b6c18ffb8ef8766e2fec4cbfcb4e78b7f1d3ae6a",
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_identity_v2/src/repo_mapping.rs": "650c239ca0fc869197a57f5858ff836a7475df37eb7f4978926e1696969af319",
+    "app/slug_loading_v2/tests/build_file_loading.rs": "e237097c6a2709f214ff878a8aebda4723f5687c8c4d1504ac7b6b4ed61b70ce",
+    "starlark-rust/starlark_map/src/small_set.rs": "e7e745499298d983bf6a1eef11c92648d057ffa769ca1da76249eed8eb91c113",
+    "starlark-rust/starlark_map/src/small_map.rs": "181ffff237d064464484b1d8ab12d61f216634bb6f91d2c9a6a01ac9928aea78"
+  },
+  "artifacts": {
+    "artifacts": [
+      {
+        "target": "slug_loading_v2",
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "5596d54068baee3cc3700f7274f01b977c9cb50225c34499993661668d147a76",
+        "selectors": [
+          "bzl_module::manifest_label_memory_tests::manifest_helpers_preserve_first_seen_diamonds_and_owned_results",
+          "bzl_module::manifest_label_memory_tests::mapping_identity_and_existing_fingerprint_projection_stay_distinct",
+          "bzl_module::manifest_label_memory_tests::empty_manifest_helpers_preserve_root_and_absent_sources",
+          "bzl_module::module_extension_definition_loading_tests::host_bzl_context_is_recursive_and_structural_for_legacy_and_observed_keys",
+          "bzl_module::module_extension_definition_loading_tests::external_bzl_context_is_recursive_for_root_and_mapped_canonical_children",
+          "bzl_module::module_extension_definition_loading_tests::observed_bzl_module_retains_recursive_arcs_events_and_a_b_a_identity"
+        ]
+      },
+      {
+        "target": "build_file_loading",
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/build_file_loading-ddc2c87810e6583a",
+        "artifact_sha256": "6f76285a24695635a0138769a2ebcf55c532d6845d4b903c6e56b1928cf22270",
+        "selectors": [
+          "native_direct_label_parameters_preserve_defining_label_identity",
+          "imported_bzl_defs_resolve_label_from_the_lexical_source"
+        ]
+      }
+    ],
+    "source_sha256": {
+      "app/slug_loading_v2/src/bzl_module.rs": "003e6700361c7337fc5640dcf9f3edfb4fda0449674cfe92f9c46c85ab684891",
+      "app/slug_loading_v2/src/manifest_label_memory_tests.rs": "7f1b6725be9f7f08309ac79abc5a8f7fc9493ed9eee465bf726f1fc6c943ce50"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/manifest-label-borrow-baseline-compile.json",
+      "sha256": "0f7bf0eaa35b24c9ece371a3e0f9cc15ff710c1a951faa18ab8bb4d32b890fed",
+      "exit_code": 0,
+      "elapsed_seconds": 16.35921118099941,
+      "log_sha256": "0266fabca9cfe3d2012dc23ecd9af7495411a247f4013f78f02d6cf385f812aa"
+    },
+    "baseline-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-preflight.json",
+      "sha256": "158cafd00f20b5125c52384a0d2ea9f081b701488e46e38e04588e86901938f3",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03362372302217409,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-slug_loading_v2-controls": {
+      "receipt": "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-controls.json",
+      "sha256": "763e0abb722e1c4329f92ccaa907bdf6fa2fe63b61b3489b75920af3cecc6f61",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002475452027283609,
+      "log_sha256": "c6c10ed2cacb472ab327a9910a59bf0f87ae8f9d184458608e02f555da056a56"
+    },
+    "candidate-compile-corrected": {
+      "receipt": "target/wp899/manifest-label-borrow-candidate-compile-corrected.json",
+      "sha256": "5362353d977e9ec339262156798cb92beeeef8ce44ce7dd9562386c42a6a27c7",
+      "exit_code": 0,
+      "elapsed_seconds": 23.33913288702024,
+      "log_sha256": "5442ce17081cd8a0ed79cc9186b2c293bef52ec71325ae1886a3a99b812814cc"
+    },
+    "candidate-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-preflight.json",
+      "sha256": "afa134ebc1529dfa1b6f866540e9f6d9b8fcc1e21708bf75b05245c7d22edb5a",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022315348032861948,
+      "log_sha256": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e"
+    },
+    "candidate-slug_loading_v2-controls": {
+      "receipt": "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-controls.json",
+      "sha256": "439596558c390534c045c1471c63f510cf80a1838f49c879048601ee16d08c5c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.013357465039007366,
+      "log_sha256": "8bd5089149ad3270e83a6a337b511ff695559bdf8e169d7bf7eb45c70f972a28"
+    },
+    "candidate-build_file_loading-preflight": {
+      "receipt": "target/wp899/manifest-label-borrow-candidate-build_file_loading-preflight.json",
+      "sha256": "e2dccdc652be155ec0274e6c027b0f5d113fd2b02af09c4f60c4c1da55d35672",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021572574973106384,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "candidate-build_file_loading-controls": {
+      "receipt": "target/wp899/manifest-label-borrow-candidate-build_file_loading-controls.json",
+      "sha256": "f043df0802ada0bfc477fa5fa678375456c6aac4e70e094d996e574cbc7849df",
+      "exit_code": 0,
+      "elapsed_seconds": 0.007641377043910325,
+      "log_sha256": "8145d3ca96fef3340979e763b11cca538019feac711a45628029a584c937fd86"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/manifest-label-borrow-dependents-check.json",
+      "sha256": "eabf98f531df987fd300c70017ecf7090ca1427c48febceaf3d15289c7992689",
+      "exit_code": 0,
+      "elapsed_seconds": 7.339243278023787,
+      "log_sha256": "130a53d0569aa4ff1352104e166d927fdbded6ddb0a7cdba9bd9dc7ee8a02585"
+    }
+  },
+  "design_sha256": "37c774b79270565fa115e4b34f38b95114087a0c895aac762b4123066c91af46",
+  "design_reviews": {
+    "target/wp899/manifest-label-borrow-design-source.md": "a0b4feb90ad478fe75de66b6493c73937d2e65c7ed1acbac4272c40bdf51ed89",
+    "target/wp899/manifest-label-borrow-design-ownership.md": "a23cbb6e54bd25936534e2d2a0b252fff9b8dc742a8ef727017c991732aa4a1c",
+    "target/wp899/manifest-label-borrow-design-evidence.md": "17c79a034a2484a57f50d30e4bb972f006cf62885b9eaf3c4be42f4f02b8793f"
+  },
+  "proof": "Entire owner comparison permits only seven temporary SmallSet insert clone\u2192reference substitutions plus explicit dedup-set drop before root move and sibling hook. Exact full-value derived Eq/Hash including mapping ID retained; all output identity/provenance clones, frozen handles, set capacities, traversal and fingerprint implementations unchanged. Identical new semantic controls pass baseline/candidate, source proof only for scratch clone-site removal.",
+  "compile_correction": "Initial candidate compile E0505: SmallSet destructor keeps root.label borrow until drop. Explicit drop(seen_labels) after deduplication and before fingerprint/root move ends scratch lifetime; original failed compile evidence retained. No test execution before successful corrected compile.",
+  "pass_counts": {
+    "baseline_new_semantic": 3,
+    "candidate_new_semantic": 3,
+    "candidate_existing_injected_DICE": 3,
+    "candidate_existing_BUILD": 2,
+    "candidate_total": 8,
+    "passing_groups": [
+      6,
+      2
+    ]
+  },
+  "limits": "Seven scratch clone sites removed. Final owned identity/provenance/frozen handles and scratch set metadata remain. No runtime allocator-count, quantified memory, capacity, aggregate, peak/RSS, speed or source-fit claim. No public API/interner/cache/key/unsafe/dependency/semantic identity/retained representation change.",
+  "fingerprint_projection": "Mapping ID retains full structural dedup identity but is not separately serialized by existing fingerprint_identity; label display/path/repository-mapping entries and child fingerprint remain original bytes/order.",
+  "growth": {
+    "test_sibling_lines": 272,
+    "owner_boundary": "Large bzl_module.rs retains cohesive five private synchronous manifest helpers; production delta seven inserts/explicit scratch drop/testhook only, all new tests in sibling; no new fixtures/donor import."
+  },
+  "test_profile": "Pinned nightly-2025-09-14 default Loading lib plus BUILD integration, default Loading/Core/CLI alltargets offline. Serial Cargo prep60s/tests30s and exact fresh artifact preflights.",
+  "scope": "Local string ownership/basic memory only; Windows minimal/deferred. Source integration and full WP899/M7A remain unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/manifest-label-borrow-baseline-compile.json": "0f7bf0eaa35b24c9ece371a3e0f9cc15ff710c1a951faa18ab8bb4d32b890fed",
+    "target/wp899/manifest-label-borrow-baseline-compile.jsonl": "0266fabca9cfe3d2012dc23ecd9af7495411a247f4013f78f02d6cf385f812aa",
+    "target/wp899/manifest-label-borrow-baseline-selectors.json": "afd62072d914eaf3435713492070bdbdaedf4879cc351c6950068fa82a5b61d9",
+    "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-controls.json": "763e0abb722e1c4329f92ccaa907bdf6fa2fe63b61b3489b75920af3cecc6f61",
+    "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-controls.jsonl": "c6c10ed2cacb472ab327a9910a59bf0f87ae8f9d184458608e02f555da056a56",
+    "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-preflight.json": "158cafd00f20b5125c52384a0d2ea9f081b701488e46e38e04588e86901938f3",
+    "target/wp899/manifest-label-borrow-baseline-slug_loading_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/manifest-label-borrow-candidate-build_file_loading-controls.json": "f043df0802ada0bfc477fa5fa678375456c6aac4e70e094d996e574cbc7849df",
+    "target/wp899/manifest-label-borrow-candidate-build_file_loading-controls.jsonl": "8145d3ca96fef3340979e763b11cca538019feac711a45628029a584c937fd86",
+    "target/wp899/manifest-label-borrow-candidate-build_file_loading-preflight.json": "e2dccdc652be155ec0274e6c027b0f5d113fd2b02af09c4f60c4c1da55d35672",
+    "target/wp899/manifest-label-borrow-candidate-build_file_loading-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/manifest-label-borrow-candidate-compile-corrected.json": "5362353d977e9ec339262156798cb92beeeef8ce44ce7dd9562386c42a6a27c7",
+    "target/wp899/manifest-label-borrow-candidate-compile-corrected.jsonl": "5442ce17081cd8a0ed79cc9186b2c293bef52ec71325ae1886a3a99b812814cc",
+    "target/wp899/manifest-label-borrow-candidate-compile.json": "8c61d29b8305868d97595b54d2ee38828cd103f0e4950677f1357a95b310b0cb",
+    "target/wp899/manifest-label-borrow-candidate-compile.jsonl": "6028b10372c874be5ce9501c2f9a21223a4f0e84a3ee5ec9cd182e74613bb399",
+    "target/wp899/manifest-label-borrow-candidate-selectors.json": "707575056589b7f4213af201bb812a5726335158b263da86ebd8b99450f4c5f3",
+    "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-controls.json": "439596558c390534c045c1471c63f510cf80a1838f49c879048601ee16d08c5c",
+    "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-controls.jsonl": "8bd5089149ad3270e83a6a337b511ff695559bdf8e169d7bf7eb45c70f972a28",
+    "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-preflight.json": "afa134ebc1529dfa1b6f866540e9f6d9b8fcc1e21708bf75b05245c7d22edb5a",
+    "target/wp899/manifest-label-borrow-candidate-slug_loading_v2-preflight.jsonl": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e",
+    "target/wp899/manifest-label-borrow-compile-correction.md": "111db3519e6d681298a9c196ac7b27c2651bce257e45dda97a1113b5a6d56384",
+    "target/wp899/manifest-label-borrow-controls.py": "9032518ecfbc106f1fc133daf7f7aea0a2771d5f8c5aeaf726545691996bd9bb",
+    "target/wp899/manifest-label-borrow-dependents-check.json": "eabf98f531df987fd300c70017ecf7090ca1427c48febceaf3d15289c7992689",
+    "target/wp899/manifest-label-borrow-dependents-check.jsonl": "130a53d0569aa4ff1352104e166d927fdbded6ddb0a7cdba9bd9dc7ee8a02585",
+    "target/wp899/manifest-label-borrow-design-evidence.md": "17c79a034a2484a57f50d30e4bb972f006cf62885b9eaf3c4be42f4f02b8793f",
+    "target/wp899/manifest-label-borrow-design-ownership.md": "a23cbb6e54bd25936534e2d2a0b252fff9b8dc742a8ef727017c991732aa4a1c",
+    "target/wp899/manifest-label-borrow-design-source.md": "a0b4feb90ad478fe75de66b6493c73937d2e65c7ed1acbac4272c40bdf51ed89",
+    "target/wp899/manifest-label-borrow-design.md": "37c774b79270565fa115e4b34f38b95114087a0c895aac762b4123066c91af46",
+    "target/wp899/manifest-label-borrow-record.py": "b2086f3ad2b69f2fc909e340b5a09e875161f080fa7fca49b68654079bbf26d7",
+    "target/wp899/manifest-label-borrow-start.json": "485c0b2488a9a3eb4409523e33b21dee3aac7c75f62c6cf5c3d626ce00d04bfc"
+  },
+  "timing": {
+    "compile_seconds": 26.863541891973,
+    "test_seconds": 0.0234742941102013,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 502.30973720550537,
+    "initial_failed_compile_seconds": 3.1650874329498038,
+    "compile_time_basis": "All measured baseline/corrected builds, initial E0505 compile and dependent check."
+  },
+  "validation_sha256": "46c8bdfa8c4a510d3af9898aa699ad6d9e9e5cd63f7da5099262d6bb6144338a",
+  "final_reviews": {
+    "target/wp899/manifest-label-borrow-final-source.md": "f6152590b3b08f6131c18636e48acceabd0037a0f123698db101aeba6ba50154",
+    "target/wp899/manifest-label-borrow-final-ownership.md": "d46a743a8eebdddb537de27c15c406c3632226f1bd08bcddd1c720638139830e",
+    "target/wp899/manifest-label-borrow-final-evidence.md": "eb7bf42af25f3087ae1add9299d03f6790b3ecfa355249ce2a9d24fe650bd53b"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/manifest-label-borrow-format-check.json",
+      "sha256": "b46b0aa697b2b130999fddbbdf5c615582a779b70f748dc2f4607ed1de194161",
+      "exit_code": 0
+    },
+    "archive-check": {
+      "receipt": "target/wp899/manifest-label-borrow-archive-check.json",
+      "sha256": "9d92d392592bd188f664743bf3a71be70bc2fc612a249502f20bf9ef047dd4c1",
+      "exit_code": 0
+    },
+    "plan-check": {
+      "receipt": "target/wp899/manifest-label-borrow-plan-check.json",
+      "sha256": "584d2772578d44e52fb9700a1bded13d1540bf750617fbd25ab1306d2ba74d68",
+      "exit_code": 0
+    },
+    "diff-check": {
+      "receipt": "target/wp899/manifest-label-borrow-diff-check.json",
+      "sha256": "d52c21c13146868169d6fdd8ee77179f5cc10d62feb2be7694ba668f935553bc",
+      "exit_code": 0
+    }
+  }
+}

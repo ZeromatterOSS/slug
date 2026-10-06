@@ -625,21 +625,22 @@ impl BzlLoadManifest {
         let mut direct_seen_labels = SmallSet::with_capacity(direct_modules.len());
         for (index, module) in direct_modules.iter().enumerate() {
             let identity = &module.borrow().manifest.root;
-            if direct_seen_labels.insert(identity.label.clone()) {
+            if direct_seen_labels.insert(&identity.label) {
                 direct_children.push(identity.clone());
                 direct_indices.push(index);
             }
         }
         let mut reachable = vec![BzlModuleSourceProvenance::new(root.clone(), source_digest)];
         let mut seen_labels = SmallSet::with_capacity(direct_children.len() + 1);
-        seen_labels.insert(root.label.clone());
+        seen_labels.insert(&root.label);
         for module in &direct_modules {
             for provenance in module.borrow().manifest.reachable.iter() {
-                if seen_labels.insert(provenance.identity.label.clone()) {
+                if seen_labels.insert(&provenance.identity.label) {
                     reachable.push(provenance.clone());
                 }
             }
         }
+        drop(seen_labels);
         let fingerprint = manifest_fingerprint(
             source_digest,
             direct_indices
@@ -8013,7 +8014,7 @@ fn package_load_fingerprint<'a>(direct_loads: &'a [(String, FrozenBzlModule)]) -
     hasher.update(b"slug-v2-package-load-manifest\0");
     let mut seen_labels = SmallSet::with_capacity(direct_loads.len());
     for (_, module) in direct_loads {
-        if seen_labels.insert(module.manifest.root.label.clone()) {
+        if seen_labels.insert(&module.manifest.root.label) {
             fingerprint_identity(&mut hasher, &module.manifest.root);
             hasher.update(module.manifest.fingerprint);
         }
@@ -8046,7 +8047,7 @@ fn first_seen_direct_roots(loaded_modules: &[(String, FrozenBzlModule)]) -> Vec<
         .iter()
         .filter_map(|(_, module)| {
             seen_labels
-                .insert(module.manifest.root.label.clone())
+                .insert(&module.manifest.root.label)
                 .then(|| module.manifest.root.clone())
         })
         .collect()
@@ -8059,7 +8060,7 @@ fn package_bzl_call_sources(
     let sources = loaded_modules
         .iter()
         .flat_map(|(_, module)| module.manifest.reachable.iter())
-        .filter(|identity| seen_labels.insert(identity.identity.label.clone()))
+        .filter(|identity| seen_labels.insert(&identity.identity.label))
         .map(|identity| {
             let source = starlark_source_name(&identity.identity.workspace_path)
                 .expect("manifest paths were accepted as Starlark source names");
@@ -8082,7 +8083,7 @@ fn flattened_lifetime_closure(
     let mut entries = Vec::new();
     for (_, loaded_module) in loaded_modules {
         for (identity, module) in loaded_module.lifetime_modules() {
-            if seen_labels.insert(identity.label.clone()) {
+            if seen_labels.insert(&identity.label) {
                 entries.push(FrozenBzlLifetimeEntry {
                     identity: identity.clone(),
                     module,
@@ -8096,6 +8097,10 @@ fn flattened_lifetime_closure(
 #[cfg(test)]
 #[path = "repository_child_load_memory_tests.rs"]
 mod repository_child_load_memory_tests;
+
+#[cfg(test)]
+#[path = "manifest_label_memory_tests.rs"]
+mod manifest_label_memory_tests;
 
 #[cfg(test)]
 #[path = "bzl_source_memory_tests.rs"]
