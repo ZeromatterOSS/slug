@@ -1700,7 +1700,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
                 require_executable: is_executable,
                 use_exec_root_for_source: false,
             },
-            progress_message,
+            progress_message.or(Some("Creating symlink %{output}")),
         );
         self.register(|actions| actions.register_symlink(spec))
     }

@@ -428,6 +428,13 @@ policy, Directory targets, unresolved Symlink outputs and SolibSymlink remain de
 The focused proofs cover source chmod/content restoration, generated modefalse, missing or
 corrupt CAS, physical replacement, cleanup confinement and post-CLI-exit MANIFEST backing.
 
+[WP913 Symlink query](wp913-symlink-aquery-2026-10-06.json) adds metadata text for
+regular Artifact-target ordinary/executable and absolute-target SymlinkAction over
+validated owners, without changing any alias execution guard. Absolute metadata
+query does not admit physical absolute-link creation. Ordinary same-output Symlink
+closure equivalence remains typed unsupported; its six demanded producer pairs need
+a reviewed equivalence prerequisite before production-root query can complete.
+
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies
 `ValidatedActionClosure` at the handoff; consume it without reconstructing or

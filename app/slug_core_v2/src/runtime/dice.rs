@@ -13965,4 +13965,8 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod spawn_aquery_tests {
         include!("tests/spawn_aquery_tests.rs");
     }
+
+    mod symlink_aquery_tests {
+        include!("tests/symlink_aquery_tests.rs");
+    }
 }

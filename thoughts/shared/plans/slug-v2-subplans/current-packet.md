@@ -1,82 +1,84 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-212-m7a-symlink-action-query-projection-r1
-Status: Spawn query accepted; typed Symlink query projection selected
+Packet: WP-7-213-m7a-symlink-output-equivalence-r1
+Status: Symlink query accepted; demanded duplicate-output equivalence prerequisite selected
 
 ## Observable outcome, demand and owner
 
-Add owner-complete aquery projection/text for retained typed SymlinkSpec actions,
-including Artifact-target ordinary/executable variants and configured AbsolutePath
-unresolved links where complete producer facts exist. WP905 root walk demands
-Symlink/ExecutableSymlink records; six byte-identical producer pairs remain distinct
-query records. Current generic consumer admits ordinary Spawn and accepted
-FileWrite only. Query the existing validated configured closure, preserving owner,
-configuration, group/platform, declaration order and structural multiplicity; do
-not use execution representatives, prerequisite plans or filesystem target reads.
-SolibSymlink and runfiles-support families remain separate unsupported rows.
+Admit source-derived equivalence of ordinary typed Artifact-target Symlink and
+ExecutableSymlink producers within the existing validated configured closure,
+where complete structural target/output/context facts establish identical action
+semantics. WP905 inventories six duplicate-output producer pairs; WP913's actual
+requested-two-owner discriminator currently returns UnsupportedEquivalence before
+query. Preserve both retained semantic owners/query records while selecting one
+execution representative only for a proven equivalent pair. Different target,
+executable/source policy, output kind/metadata or semantic context must not share.
+Other overlapping paths keep the existing conflict/refusal behavior.
 
-Compatibility: pinned Bazel9.2 exact admitted fields, existing Slug-native
-configuration/path/label/order domains. Symlink ActionKey remains explicit M9
-omission without a substitute token. Preserve accepted FileWrite/Spawn text and
-unsupported-field behavior, including old FileWrite diagnostics. This does not
-close production root aquery, authentic execution, full memory fit or M7A.
+Compatibility: pinned Bazel9.2 SymlinkAction/Actions semantics with existing
+Slug-native structural configuration/artifact identity and traversal domains.
+Progress is presentation metadata and owner-complete text must retain each
+producer's progress. Do not compare only display paths, action tokens or hashes.
+Keep genuine unresolved outputs, AbsolutePath execution, unsupported source policy,
+Directory/runfiles targets, Solib/runfiles/Spawn equivalence breadth and ActionKey
+M9 separate. This does not close root aquery, M7A or authentic source/memory fit.
 
 ## Design checkpoint and implementation
 
-Read the orchestration skill, DICE ownership instructions and relevant Stage6/7/8
-owner sections only for this boundary. Pin SymlinkAction/UnresolvedSymlinkAction,
-AbstractAction and ActionGraphTextOutputFormatterCallback from Bazel tag9.2.0
-8220c6198837d5c13d53fea211cf3282aa12408a. Independently review the concrete borrowed
-view, complete field table and consumer/controls before edits. Ordinary versus
-executable mnemonic/progress, input/output kinds, absolute-target text and original
-primary-input requirements must come from retained SymlinkSpec/context producers.
-Any unavailable producer becomes typed unsupported with a named prerequisite;
-no formatter-side metadata or path repair. Source-scope rules are not transport
-or execution permission. No new DICE key/cache/lock/string registry.
+Read orchestration skill, DICE ownership instructions and current closure/alias
+owners. Reuse WP913 source and failure evidence, WP905 six-pair inventory, existing
+BuildAPI artifact-symlink registration/coalescing and Solib/FileWrite closure tests.
+Pin Bazel tag9.2.0 commit8220c6198837d5c13d53fea211cf3282aa12408a
+SymlinkAction computeKey,
+Actions sharing/conflict checks and relevant owner/context semantics. Independently
+review the complete comparison table and effect on prerequisite planning, selected
+artifacts, representative lookup and publication before activation. The closure
+owns this proof; no formatter bypass, new DICE key/cache/lock or identity repair.
 
-Borrow retained fields; transfer storage where lifetimes fit. Use existing interning
-only when semantic owner/scope and release fit; unique temporary text is action
-scratch. Input membership dedups exact artifact identity before path projection,
-not display strings or hashes alone. Source-key clones are qualified one-action
-scratch; avoid duplicates and release before subsequent expansions. Stream into
-one command-owned output buffer. Keep Linux priority, Windows minimal unsupported.
+Use a focused borrowed family comparison helper plus minimal existing exact-output
+validator glue. Structural input identity must retain exact Source canonical label
+or Derived producer/output ownership, configuration/root/kind/metadata; review
+source policy, selected execution context and executable facts individually.
+Determine whether context differences are semantically irrelevant from pinned
+source rather than assuming complete context equality or omitting it. Any unavailable
+fact stays typed unsupported with a named prerequisite. Do not silently admit
+absolute/unsupported variants just because their output overlaps.
 
-## Bounded allowlist and validation
+Borrow comparison fields with no owned string/key graph copies. Existing semantic
+closure/duplicate-coordinate storage owns the result and release; avoid temporary
+string maps and new global interners. No new async transfer, filesystem observation,
+REAPI/backend behavior or lock across DICE awaits. Linux priority; Windows minimal.
 
-Candidates: focused Analysis configured_symlink_action_view.rs and lib.rs minimal
-export; Core focused symlink_aquery_text.rs, aquery_text.rs family dispatch/shared
-helper visibility, mod.rs registration; no owner logic appended to huge dice.rs.
-Server already consumes generic formatter; change only if actual glue is missing.
-Tests: focused runtime/tests/symlink_aquery_tests.rs plus dice.rs include glue,
-reuse admitted Symlink and equal-owner fixtures; operational files target/wp913.
-Read physical sizes before edits. Production growth estimate <300 lines, focused
-test growth <250; a size overage triggers responsibility review, not permission.
-Allowlist widening requires actual prerequisite/root reconciliation. Exclude CLI
-flags, locks/toolchains/profiles, new execution/backends, source16/17/18 retry,
-C++ activation, runfiles breadth, Windows expansion and new global interners.
+## Allowlist, controls and caps
 
-Reuse pinned source regression and existing producer controls; add discriminators
-for ordinary/executable/absolute target, tree/type restrictions, progress/header,
-input/output order/escaping, literal/deps/multiplicity and target/path A/B/A with
-old-result lifetime. Source-derived unsupported negatives must be explicit. Only
-an actual field gap justifies one pinned Bazel query without acquisition/actions;
-reuse existing 60s/3s/JVM2GiB/log16MiB supervision. Serialize Rust preparation
-<=60s; use the established WP899 four-package opt-level0/debug0/jobs1 invocation
-for focused Core tests, not changed repository profiles. Compile --no-run JSON,
-preflight exact nonignored selectors, run minimal semantic controls and named
-Server/CLI direct compile dependent. No broad suite or identical cap retry before
-an actual prerequisite/invocation change. Independent final reviews, rustfmt,
-archive/diff/status checks and compact receipt precede acceptance/commit.
+Candidates: Core configured_action_closure.rs minimal family dispatch and focused
+symlink_action_equivalence.rs; focused closure/prerequisite/query tests (new sibling
+or existing owner tests) and include glue only. Analysis/BuildAPI change only if a
+concrete missing retained prerequisite is reviewed and root reconciles allowlist.
+Operational files target/wp914. Production estimate <220 lines and focused tests
+<250; overage triggers responsibility review. No owner algorithm added to dice.rs,
+profiles/toolchains/CLI flags/backend/source16/17/18 retries or Windows expansion.
+
+Controls: equal Artifact-target output pairs preserve two semantic/query owners and
+one representative; unequal target/require_executable/source policy/configuration/
+output kind/metadata/context do not share; colliding displayed path with distinct
+artifact identity is not equality. Preserve first semantic order and each progress,
+requested-root conflict-before-effects, selected producer/prerequisite lookup,
+held-result A/B/A and existing FileWrite/Solib sharing/refusal and Symlink query
+bytes. Qualify unsupported negative variants rather than waive them. Reuse pinned
+source evidence before any new oracle. Compile separately <=60s with established
+four-package opt0/debug0/jobs1 invocation for Core tests, JSON --no-run, fresh exact
+nonignored preflight and minimal serial runtimes; direct CLI/Server compile check.
+No broad replay or cap growth. Three independent DESIGN/FINAL reviews, rustfmt,
+archive/diff/status and compact receipt precede acceptance/commit.
 
 ## Immediate predecessor
 
-WP912 accepts ordinary typed Spawn text over borrowed configured actions, full
-unspilled Args and exact declared artifact identity, preserving FileWrite bytes.
-17/17 controls pass in0.536s; final Core prepare6.347s and CLI check6.936s. Six
-capped default/profile preparations and first15/17 failures remain preserved;
-lighter existing test settings and narrow test/import corrections resolve the
-selected gates. Three FINALs accept; native config/path, source-only tool header,
-unsupported original-primary-input progress/ActionKey, other query families and
-whole-workload source/memory gates remain explicit. See
-[Spawn query receipt](wp912-spawn-aquery-2026-10-06.json). Allocation discipline and
-all source resource caps persist; no source/backend activation occurred.
+[WP913](wp913-symlink-aquery-2026-10-06.json) accepts borrowed Symlink text fields
+and producer-owned omitted-progress default, with26/26 focused passes in0.722s,
+final Core preparation4.257s and CLI check19.547s. First21/26 and second24/26
+failures remain preserved: host fixture/UTF8 internal-string observation mismatch,
+mixed-family omission assertion and unsupported equivalence assumption. Narrow
+fixture corrections and explicit closure refusal resolve gates without production
+sharing/formatting repairs. Whole-workload fit and original source/cap refusals
+remain; no source/backend activation or global interner was introduced.

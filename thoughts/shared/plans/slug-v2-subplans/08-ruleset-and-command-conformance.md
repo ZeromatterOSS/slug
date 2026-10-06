@@ -404,6 +404,12 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   inputs. Spawn ActionKey and progress `%{input}` remain explicit prerequisites.
   Scratch is action-local, output command-owned, and no retained pool/key is added.
   Other action families/root comparison and M7A stay open.
+- [WP913 Symlink text aquery](wp913-symlink-aquery-2026-10-06.json) adds borrowed
+  ordinary/executable Artifact-target and absolute-target SymlinkAction fields,
+  original singleton input progress and producer-owned default messages. Admitted
+  distinct-output owners retain query multiplicity; equal-output ordinary Symlink
+  closure equivalence remains a typed prerequisite. Genuine unresolved/Solib/runfiles
+  query and ActionKeys stay deferred; no execution or source gate is widened.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command

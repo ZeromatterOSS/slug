@@ -12,6 +12,7 @@ use slug_analysis_v2::ConfigurationKind;
 use slug_analysis_v2::ConfiguredActionView;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredSpawnActionView;
+use slug_analysis_v2::ConfiguredSymlinkActionView;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 use slug_query_v2::AqueryScope;
@@ -22,6 +23,7 @@ use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
 use super::file_write_aquery_text::format_file_write_aquery_text;
 use super::spawn_query_inputs::visit_declared_artifacts;
+use super::symlink_aquery_text::append_symlink;
 
 /// Only final command text is owned beyond one action's projection scratch.
 /// Unsupported families fail the complete command; no partial output escapes.
@@ -60,6 +62,8 @@ fn validate_owner(owner: &ConfiguredNodeResult) -> Result<(), &'static str> {
     for action in owner.actions() {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             ConfiguredActionView::from_configured_action(action)?;
+        } else if action.symlink_spec().is_some() {
+            ConfiguredSymlinkActionView::from_configured_action(action)?;
         } else {
             ConfiguredSpawnActionView::from_configured_action(action)?;
         }
@@ -75,6 +79,11 @@ fn append_owner(output: &mut String, owner: &ConfiguredNodeResult) -> Result<(),
             );
             output.push_str(&format_file_write_aquery_text(&view)?);
             output.push_str("\n\n");
+        } else if action.symlink_spec().is_some() {
+            append_symlink(
+                output,
+                ConfiguredSymlinkActionView::from_configured_action(action)?,
+            )?;
         } else {
             append_spawn(
                 output,
@@ -232,7 +241,7 @@ fn append_inputs(
     Ok(())
 }
 
-fn append_list(output: &mut String, field: &str, values: &[impl AsRef<str>]) {
+pub(super) fn append_list(output: &mut String, field: &str, values: &[impl AsRef<str>]) {
     write!(output, "  {field}: [").unwrap();
     for (index, value) in values.iter().enumerate() {
         if index != 0 {
@@ -243,7 +252,7 @@ fn append_list(output: &mut String, field: &str, values: &[impl AsRef<str>]) {
     output.push_str("]\n");
 }
 
-fn escaped_unicode(value: &str) -> Cow<'_, str> {
+pub(super) fn escaped_unicode(value: &str) -> Cow<'_, str> {
     if value.bytes().all(|byte| (0x20..=0x7e).contains(&byte)) {
         return Cow::Borrowed(value);
     }

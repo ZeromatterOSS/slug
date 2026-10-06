@@ -1,0 +1,197 @@
+{
+  "packet": "WP-7-212-m7a-symlink-action-query-projection-r1",
+  "operational_packet": "WP913",
+  "date": "2026-10-06",
+  "base": "cc2db664b3caa0ecf5072dbe2945998657827bcd",
+  "status": "accepted",
+  "outcome": "Borrowed ordinary/executable Artifact-target and absolute-target SymlinkAction text aquery over existing validated configured closure; producer-owned public default progress. No execution/source or closure-equivalence activation.",
+  "compatibility": {
+    "exact": "Pinned Bazel9.2 family mnemonic/progress substitution and Some-only tool suffix, singleton declared/original inputs, absolute empty input/no unresolved field, field framing/omissions and reused Unicode escaping within admitted Rust strings. Existing FileWrite/Spawn output preserved.",
+    "slug_native": "Existing structural configuration, artifact/owner identity, config display/path/label and declaration/closure order.",
+    "unsupported_deferred": [
+      "same-output ordinary Symlink closure equivalence: six WP905 duplicate pairs remain prerequisite",
+      "Symlink ActionKey to M9; no substitute token",
+      "genuine UnresolvedSymlinkAction, Solib/runfiles query families",
+      "WorkspaceStatus/Directory/Symlink/RunfilesTree target or nonregular/constant output, alternate source-root policy",
+      "aspects/Windows boundary",
+      "whole root query, authentic execution/source/memory fit and M7A"
+    ]
+  },
+  "ownership": {
+    "retained": "ConfiguredAction/SymlinkSpec/context retain semantic facts. Checked view contains only reference, all accessors borrow. Public artifact producer owns default Creating symlink %{output}; Some empty/custom and absolute/manual None stay distinct. Default is retained metadata correction, not allocation reduction.",
+    "query": "Existing two-pass borrowed validation then command render preserves FileWrite guard priority, owner/action order, no representative collapse and no partial output on error. One final String independent after closure/transaction/DICE drops.",
+    "allocation": "No Source-key clone, new pool/interner/cache/key/lock. Singleton path Cow and actual packaged primary-input substitution/escape/progress scratch consumed per action; Derived bytes borrowed. Existing allocation/interner discipline retained. No whole-workload fit or allocation-comparison claim.",
+    "execution": "All staging/prerequisite/alias publication/equivalence guards unchanged. Absolute query is metadata only."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "method": "Three independent pinned-source DESIGN/FINAL reviews, no new Bazel query/acquisition/actions. SymlinkAction, AbstractAction, StarlarkActionFactory, Artifact, CcStarlarkInternal and text callback anchors/hashes pinned in design field/source files. Existing accepted producer/prerequisite/escaping themes reused.",
+    "absolute_distinction": "Existing cc_internal regular File AbsolutePath corresponds SymlinkAction.toAbsolutePath, not UnresolvedSymlinkAction (which needs declared Symlink output/target-type facts)."
+  },
+  "source_sha256": {
+    "app/slug_analysis_v2/src/configured_symlink_action_view.rs": "72e7730cf2a9695150a44682c0c5866b0d9faa5ef3fa78da5ad44eed06431aea",
+    "app/slug_analysis_v2/src/lib.rs": "059ff11ac3a009a7dc74f6e3663bd44bf1936f49a30e92f27fb1b54b50e48bb7",
+    "app/slug_analysis_v2/src/starlark_rule.rs": "b050f51fadcd995d2d2081a8ddf3e5cffadec6b9f1d8ac15daf5f3c56e0ad79e",
+    "app/slug_core_v2/src/runtime/symlink_aquery_text.rs": "f305eb03cfd658fc710c4298df5c84ef852b3562f633cca17d93f200c1a03db5",
+    "app/slug_core_v2/src/runtime/aquery_text.rs": "a81e93226bc62764c7f7098d6024f2773f4209e057e6f5d2cb2d07be0dc43be5",
+    "app/slug_core_v2/src/runtime/mod.rs": "970db419469d720b1486eae72ca4cc6fa674991b0c11dda67f05333bd5a4991b",
+    "app/slug_core_v2/src/runtime/dice.rs": "4063ce64e4ebf222c26caa8e10604d8802b5f6866ad9a757073e4d82fe2ac4c6",
+    "app/slug_core_v2/src/runtime/tests/symlink_aquery_tests.rs": "1004d037e82915936397cffb993009d4a564ece3f3e7b8587c8e2e338315b67c"
+  },
+  "validation": {
+    "toolchain": "nightly-2025-09-14 binaries resolved through rustup which",
+    "compile_attempts": {
+      "candidate-cli-check": {
+        "exit_code": 0,
+        "elapsed_seconds": 19.547066494007595,
+        "receipt": "target/wp913/candidate-cli-check.json",
+        "receipt_sha256": "0104330e5f7eecbc2a29c5261a6700c3b924eff61bc08210ede023be18ec1900",
+        "log_sha256": "b12c79f9c7c9dc401601a253124f9d36ece8e2953068e7913d6aa60cb72301e7"
+      },
+      "core-tests": {
+        "exit_code": 0,
+        "elapsed_seconds": 40.67182600009255,
+        "receipt": "target/wp913/core-tests.json",
+        "receipt_sha256": "7398f74b359d493edaeefb94a1707351cff2699e876ccd46b64850986aa37b3b",
+        "log_sha256": "d44a542a5c971a4699c68b3bcaedbf33f1b5b5c63a53c07adbb2bf319f18f881"
+      },
+      "core-tests-final": {
+        "exit_code": 0,
+        "elapsed_seconds": 7.999441844061948,
+        "receipt": "target/wp913/core-tests-final.json",
+        "receipt_sha256": "580637365c4211e77f375aee1f695e95c10b035fedae8f1701c33270e065f68d",
+        "log_sha256": "771f31d3561483698c1cb3ac6fced5291ec1d1287cedfeb96363aa475617f470"
+      },
+      "core-tests-diagnostic": {
+        "exit_code": 0,
+        "elapsed_seconds": 7.679417575942352,
+        "receipt": "target/wp913/core-tests-diagnostic.json",
+        "receipt_sha256": "c8baa979a22f47e21dbc3cbb5f537ffc23da743831ed891519f482f4314796af",
+        "log_sha256": "34bf37fa07c6d2483d3e5c155ca7dcbd4a63525095f175fa7e3f47045d3108fe"
+      },
+      "core-tests-corrected": {
+        "exit_code": 0,
+        "elapsed_seconds": 5.632323149009608,
+        "receipt": "target/wp913/core-tests-corrected.json",
+        "receipt_sha256": "d8c226ef0bb78c76050a6d835b8414e2b27674b6e0f03dcd47b4a3c6695dd4d1",
+        "log_sha256": "b207b22bdfad85d0ae7a7320b6d1c13d6791bd41fc21261b7477614dbb62a162"
+      },
+      "core-tests-accepted-candidate": {
+        "exit_code": 0,
+        "elapsed_seconds": 8.294326013070531,
+        "receipt": "target/wp913/core-tests-accepted-candidate.json",
+        "receipt_sha256": "1a78a5c2e0542817871dc7ee79fc3d77a808838ffbac923d7a232d72ffbeaccc",
+        "log_sha256": "c5f892e995bea81d024c60e1247e12f21a4bee3333286ed8f7dc0ce85ff5fe69"
+      },
+      "core-tests-terminal-corrected": {
+        "exit_code": 0,
+        "elapsed_seconds": 4.256696015945636,
+        "receipt": "target/wp913/core-tests-terminal-corrected.json",
+        "receipt_sha256": "aa1593ba320052e7f93997d04209c593eea8bc55c4cadaff2766ab4946337a9c",
+        "log_sha256": "0eef38d843c3788305492cb5056b332b09ec32053aae8f9333fb599fa195439b"
+      }
+    },
+    "compile_settings": "Core --lib --no-run --offline JSON, jobs1, existing four package opt-level0/debug0 invocation overrides; tracked profiles/features/toolchain unchanged. CLI default check covers Analysis/Core/Server/CLI. Preparation <=60s; none hit cap.",
+    "preflight": {
+      "exit_code": 0,
+      "output": "Verified 26 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.2098615450086072,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "55d53095f1cab2bfe6e3672f2fdd07d4e8892ae716ca60852a2f2b090e5fe8e4",
+      "selected": 26
+    },
+    "runtime": {
+      "selected": 26,
+      "passed": 26,
+      "elapsed_seconds": 0.7215047919889912,
+      "max_child_rss_kib": 79916
+    },
+    "selectors": [
+      "runtime::aquery_text::tests::declared_inputs_dedup_identity_before_equal_path_display",
+      "runtime::aquery_text::tests::fields_sort_after_unicode_escape_and_execution_info_keeps_raw_values",
+      "runtime::aquery_text::tests::pinned_bazel_unicode_then_shell_bytes",
+      "runtime::dice::source_staging::tests::build_only_observations_survive_the_narrow_source_certificate",
+      "runtime::dice::source_staging::tests::native_source_staging_tracks_sources_and_rejects_conflicting_roots",
+      "runtime::dice::source_staging::tests::resource_metadata_refuses_before_malformed_declared_inputs",
+      "runtime::dice::source_staging::tests::workspace_status_descriptors_reject_before_source_staging",
+      "runtime::dice::tests::build_command_tests::filewrite_aquery_text_keeps_root_order_and_excludes_dependency_actions",
+      "runtime::dice::tests::build_command_tests::filewrite_aquery_text_matches_frozen_baseline",
+      "runtime::dice::tests::configured_action_conflicts_tests::configured_action_conflicts_equal_filewrites_keep_owners_but_share_execution",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_fields_restore_without_mutating_retained_results",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_files_to_run_and_named_group_keep_declared_owners",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_mixed_scope_order_and_unspilled_recipes",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_preserves_filewrite_validation_before_render_priority",
+      "runtime::file_write_aquery_text::tests::aquery_labels_use_bazel_root_and_canonical_external_spelling",
+      "runtime::file_write_aquery_text::tests::formatter_boundary_rejects_unadmitted_action_shapes",
+      "runtime::file_write_aquery_text::tests::output_path_validation_is_fail_closed_for_unescaped_text",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_keeps_distinct_owners_and_preserves_equivalence_refusal",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_real_producers_have_exact_fields_and_scopes",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_target_output_progress_and_type_restore_with_old_results",
+      "runtime::symlink_aquery_text::tests::absent_empty_and_absolute_progress_remain_distinct",
+      "runtime::symlink_aquery_text::tests::absolute_targets_and_none_tool_headers_preserve_retained_owners",
+      "runtime::symlink_aquery_text::tests::checked_symlink_view_rejects_unadmitted_kinds_and_source_policy",
+      "runtime::symlink_aquery_text::tests::progress_uses_original_source_root_and_sequential_substitution",
+      "runtime::action_prerequisites::tests::symlink_tests::alias_edges_preserve_exact_producers_and_reject_cycles_kinds_and_source_policy",
+      "runtime::action_prerequisites::tests::symlink_tests::nested_aliases_defer_manifest_tree_completion_and_preserve_selected_spawn_behavior"
+    ],
+    "gates": "17 protected FileWrite/Spawn/staging + two existing Symlink prerequisites + four direct metadata/negative/source-root controls + three actual observed-DICE producer/lifetime/distinct-owner/refusal controls. Every exact selector passes one nonignored test serially with10s+TERM3 supervision.",
+    "checks": [
+      "pinned rustfmt --check changed Rust passed",
+      "git diff --check passed",
+      "v2_archive_status passed",
+      "v2_plan_status canonical/manifest WP7-213 match"
+    ]
+  },
+  "preserved_failures": [
+    {
+      "first": "21/26 in0.622050s: three new DICE fixtures Needs before fields; two synthetic host configs MissingExecutionHostOs. Protected gates passed.",
+      "correction": "Host fixture uses existing default_target/default_exec with host facts. Narrow diagnostic exposed raw UTF8 Starlark internal-string spelling mismatch with observed Unicode file. ASCII actual producer fixture avoids parser scope; existing shared encoder controls prove Unicode. No guessed path/prod fix."
+    },
+    {
+      "diagnostic": "One DICE Needs explained by exact missing Lstat path; two corrected synthetic units passed; source snapshot/logs preserved."
+    },
+    {
+      "second": "24/26 in0.711850s: Symlink omission negative included FileWrite IsExecutable; same-output Symlink expected sharing but existing closure returned UnsupportedEquivalence.",
+      "correction": "Three DESIGNs accepted narrowed validated-closure contract before edits: Symlink-only omissions, two distinct output owners/Deps records and exact same-output ActionClosure(UnsupportedEquivalence), terminal unsupported_action_equivalence/2. Six pairs now named prerequisite, guard unchanged."
+    },
+    {
+      "compile_only": "Terminal test expectation spelling corrected against existing producer before runtime; final rebuilt/preflight artifact. All invocation/fixture records preserved, no cap growth."
+    }
+  ],
+  "review": {
+    "design": "source/fields/ownership accepted concrete contract plus narrowed equivalence scope before dependent edits",
+    "final": "three FINAL ACCEPT actual latest diff, fresh artifact/result attribution and controls; no reruns by reviewers",
+    "physical_responsibility": "Analysis view102 lines; Core formatter391 incl cfgtest (106 production before cfgtest); DICE fixture310 lines. Aggregate test estimate exceeded; independently accepted synthetic metadata/guards vs actual producer/invalidation/distinct-owner responsibility. Large dice only4 include lines; starlark_rule only default expression."
+  },
+  "fixture_growth": "No oracle assets/files added. Focused Rust controls only, ASCII actual DICE fixture; absolute/None/tool direct configured metadata is synthetic, not private bridge/execution. Raw/effective platform/aspect and first equivalent registration guard proof source-only.",
+  "operational_sha256": {
+    "design-contract.md": "10288fb928b14ef194725cfa3e834e224750a432f893e6db1a9b25e82b8165eb",
+    "design-source.md": "eb66f46506f53e95cb4ef3bf18e6c03d94043c1babe6f8941bbf6816a9199803",
+    "design-fields.md": "99a2b1c02730f13698e59f3f325ff7026e8b97c5eaf4789bda648cab7dd1f3ac",
+    "design-ownership.md": "5d68885614dc8722cd3a7debc305301f293b6ab633bd5d3ec99c397909a9a47f",
+    "final-source.md": "1ddc56030cb35ccfa6477bc9dafe7753cb835233f70d9c965e2da865ceb4f405",
+    "final-fields.md": "e7293238cc6978d3581f02221d70f61c9d46f631bb03d40ddb3ec5fee9094fd7",
+    "final-ownership.md": "fd6015b00c88de3937ba62c8eec4461bbdaee860ea87de85ac4d027b24caace4",
+    "fixture-correction.md": "1179c9be86f63fe42395b073747dd0aa04b521c3073e8d8fcb7feb4b68945cda",
+    "first-core-results.json": "2240b3dfe820c342b1bcbcaef1714fad8376d14bbcb1eb2b66b151ee707d9480",
+    "first-core-preflight.json": "5eefd9c59730788d4681148dff64ffa30ddaeb618f7998b77e27f695ab49aa53",
+    "second-core-results.json": "6c8c96716afabb679a1cf3fce5b71ee28e8dc8aed6fb9f74ffe28b4f73ee333b",
+    "second-core-preflight.json": "422af154fb44c5c7bcf872063814e4874bdae0df4411fa8cb0c4a2dbb1f03e68",
+    "diagnostic-results.json": "cd2f3b451b0c7138533122919c23d279fc7fd1468a0cac5a1faf8338828908cb",
+    "diagnostic-preflight.txt": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "core-preflight.json": "0d8070587c895bc255e6799150f81c613d80cfdfba22386854ef4ce8c486fb21",
+    "core-results.json": "db24c963f74a410271aae7093adc776c0a8fc3977f1c46423d6bce02bb7c66e5",
+    "core-selectors.json": "fa715ab718e9dac4f45e82838a854225a74489acb2a5146f0ac63e975836870b",
+    "compile.py": "30d6122d049986c6c55243502bec888c5df38ee3caae8ec8d0cf788568af19d6",
+    "run-tests.py": "9336905f2c7fe742c3661591e7e2c2d0e703afcc0432d51f1df5fda2bc022024"
+  },
+  "timing": {
+    "compile_seconds_total": 94.08109709213022,
+    "accepted_runtime_seconds": 0.7215047919889912,
+    "packet_elapsed": "not independently measured",
+    "review_elapsed": "not independently measured"
+  },
+  "successor": "WP-7-213-m7a-symlink-output-equivalence-r1: six demanded duplicate pairs are the next concrete closure prerequisite; runfiles-support query queued.",
+  "remaining": "Original64KiB postdrop refusal and bounded cache-growth qualification preserved; source16/17/18 spent/caps unchanged. No source retry/network/backend/Windows expansion, full 40GiB/workload fit or milestone closure."
+}
