@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: query integer slots omit successful decimal-string and
-target-literal clone scratch. Range/signed parsing, rejected bytes/capacities,
-fallback parsing, diagnostics/spans and owned results remain. Eight controls,
-2,054 numeric cases, nineteen raw/seventeen public equal errors, retained clones
-and default Core/CLI checks pass. Source proof only; no quantified memory/allocator/
-RSS/speed claim.
+Latest accepted change: cquery lexical validation borrows existing AST names,
+omitting temporary scope-name clones. Content hash, shadowing/cleanup/order,
+diagnostics/spans and final ownership remain. Seven controls, twenty-six scope
+cases on linear/indexed sets, sixteen captured equal errors, retained clones and
+Core/CLI checks pass. Scratch metadata/capacity may change; no allocator/quantified
+memory/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.

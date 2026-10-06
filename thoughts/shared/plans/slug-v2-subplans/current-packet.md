@@ -12,9 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component omits successful query integer-conversion scratch.
-Numeric AST values convert directly; target literals borrow the unchanged parser.
-Rejected raw values/capacities, fallback parsing, diagnostics/spans and owners remain.
+The latest accepted component borrows cquery lexical-validation names from the
+immutable AST instead of cloning them into temporary scope bindings. Shadowing,
+cleanup/order, diagnostics/spans and final owners remain.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -23,43 +23,46 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted query integer-conversion scratch contract
+## Accepted cquery lexical-name scratch borrowing contract
 
-QueryExpression::java_integer_literal converts Integer(u64) directly via i32
-TryFrom, allocating the identical decimal CompactString only on failure. Its
-positive range equals prior decimal i32 parsing, without narrowing u64 AST values.
-TargetLiteral borrows the original str for unchanged Rust i32 parsing, with the
-original CompactString clone only on failure. Signs/leading zeroes/Unicode/NUL/
-whitespace/overflow keep original interpretation. Every other kind retains Display,
-CompactString construction and parsing, including numeric fallback displays.
-Normal argument validators/configured specs/generic depth/count/deps retain order,
-negative constraints, error priority and exact raw errors/spans. AST source pointers/
-capacities and owned final diagnostics remain. No helper/API/interner/cache/key/
-DICE/identity/unsafe/dependency/retained representation or donor import. Slug-native
-memory implementation preserves inherited slots; no widened Bazel/Java parity.
+Private validate_cquery_query_inner borrows root AST names into its existing
+phase-local SmallSet. Its explicit expression lifetime covers immutable Box/Arc
+children; the set drops before public unit/owned-error return. CompactString and
+borrowed str use identical byte Hash/Eq/Equivalent. Existing SmallMap occupied
+insertion retains the first equal key and replaces only unit value. Value-before-
+binding, shadow predicate, body result and conditional shift_remove stay verbatim,
+including all error cleanup; membership and order stay on linear/indexed paths.
+Public early configured guards, recursion, AST owners and diagnostics/spans remain.
+No helper/API/interner/cache/key/DICE/identity/unsafe/dependency/retained representation
+or donor import. Slug-native memory optimization preserves inherited lexical scope;
+local Bazel let references add no parity claim.
 
-Three DESIGNs/FINALs accept identical 200-line tests: extended baseline 2/2 and
-candidate 8/8, including six unchanged configured depth/reverse/count/order/error
-and signed-integer/validator controls. 2,054 numeric boundary/sample values,
-21 literal cases/four fallback AST displays and two numeric fallback displays pass.
-Nineteen raw errors and seventeen complete loading/configured diagnostics match
-byte-for-byte, with exact capacities/spans and unchanged AST/debug/payload owners.
-Two long tight/spare input errors and clones retain 47,104-byte/capacity outputs
-after AST/source/original-error drop. The original 191-line baseline pass/hash
-remains; nine additive fallback lines address DESIGN review before production,
-then identical extended variants were freshly compiled/preflighted. Sixteen
-protected sources, serial pinned offline lib/integration artifacts, Core/CLI
-alltargets and format/archive/plan/diff checks pass. No failures/assets/goldens.
+Three DESIGNs/FINALs accept identical corrected 193-line tests: baseline 2/2,
+candidate 7/7 with five protected lexical/signed-integer/shared filter/count/visible
+controls. Twenty-six direct validations use one/forty seed keys, exceeding the
+32-key indexed threshold. Nested/shadowed/sibling scopes, preseeded names, value/body
+errors and wrappers preserve complete seed membership/order/heap payload pointers,
+AST debug/name buffers/capacities and cleanup. Fourteen direct/two compact public
+raw errors match exactly; long-name errors check complete messages/spans and a
+5,154-byte/capacity error clone survives AST/source/name/original-error drop.
+Initial baseline 0/2 came from fixtures: inline seed payload relocated when set
+metadata grew, and unquoted emoji label was outside existing grammar. Long seeded
+external alias and quoted label corrections preserve every assertion; original
+hash/failure/selection reconstruct exactly, before fresh corrected baseline/candidate
+compiles. Seventeen protected sources, pinned collection/hash sources, serial offline
+artifacts/exact preflights, default Core/CLI and format/archive/plan/diff pass.
+No assets/goldens; changes only private signature/insertion and sibling hook.
 
-Acceptance proves two successful scratch-construction sites bypassed only. Invalid
-and fallback raw strings, final diagnostics and AST owners remain. No pointer/
-allocator witness, quantified memory/payload/count, aggregate/peak/RSS/speed/source-
-fit claim. Windows minimal/deferred. Full WP899/M7A integration open and unwaived.
+Acceptance removes one per-Let scratch clone site only. Scratch key metadata,
+physical storage and capacity may change; AST names/final errors remain owned.
+No allocator/count/quantified payload or memory/aggregate/peak/RSS/speed/source-fit
+claim. Windows remains minimal/deferred. Full WP899/M7A open and unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Cquery lexical-validation scratch borrows immutable AST names; equal content hash, shadowing/cleanup/order, owned errors/spans and AST owners stay. Three DESIGNs/FINALs; corrected same baseline 2/2, candidate 7/7, twenty-six cases with one/forty seeds, sixteen captured equal errors and retained long clone, default Core/CLI. Inline seed pointer and unquoted Unicode fixture corrections preserved. One scratch clone-site bypass only; set metadata/capacity may change, no allocator/quantified memory/RSS/speed claim | [Cquery binding-name borrowing](wp899-query-binding-name-borrow-2026-10-06.json) |
 | Query integer slots omit successful numeric formatting/target-literal clone scratch; exact range/signed parsing, original error bytes/capacity/ownership, fallback parsing and caller order/spans remain. Three DESIGNs/FINALs; same extended baseline 2/2, candidate 8/8, 2,054 numeric/21 literal/four fallback/two numeric-display cases, nineteen raw/seventeen public equal errors, retained tight/spare error clones and default Core/CLI. Additive fallback test extension preserved. Source scratch-site proof only, no allocator/quantified memory/RSS/speed claim | [Query integer scratch](wp899-query-integer-scratch-2026-10-06.json) |
 | Query negative-token diagnostics borrow exact input slices through existing final join; scanning/UTF8/quote/three-token rules, public bytes/spans/priority and owned output remain. Three DESIGNs/FINALs; same tests baseline 2/2, candidate 6/6, thirty contexts/twelve negatives, eleven equal errors and two long retained error clones; default Core/CLI checks. Source copy-site proof only, no quantified memory/allocator/RSS/speed claim | [Query error token borrowing](wp899-query-error-token-borrow-2026-10-06.json) |
 | Compiler type expression-statement lowering transfers its owned sole argument under the unchanged exact guard; earlier branches, inner IR/spans/frozen owners and rejected full IR/pointers stay. Three DESIGNs/FINALs; corrected same-test baseline two semantic passes/one ownership failure, candidate 10/10, three Symbol buffers per compiled/owned freeze-optimized route (15,384 content bytes each), nine rejection shapes/seven equal errors/default dependents. Fixture static-checking correction and two independently baseline-proved single-span golden corrections preserved. Generic IR capacity caveat; no retained/aggregate/RSS/speed claim | [Type statement argument transfer](wp899-type-statement-arg-move-2026-10-06.json) |

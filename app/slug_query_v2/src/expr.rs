@@ -377,9 +377,9 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
     validate_cquery_query_inner(expression, &mut bindings)
 }
 
-fn validate_cquery_query_inner(
-    expression: &QueryExpression,
-    bindings: &mut SmallSet<CompactString>,
+fn validate_cquery_query_inner<'a>(
+    expression: &'a QueryExpression,
+    bindings: &mut SmallSet<&'a str>,
 ) -> Result<(), QueryParseError> {
     match &expression.kind {
         QueryExpressionKind::TargetLiteral(literal) => match literal.strip_prefix('$') {
@@ -404,7 +404,7 @@ fn validate_cquery_query_inner(
         QueryExpressionKind::Let { name, value, body } => {
             validate_cquery_query_inner(value, bindings)?;
             let shadows_existing = bindings.contains(name.value.as_str());
-            bindings.insert(name.value.clone());
+            bindings.insert(name.value.as_str());
             let result = validate_cquery_query_inner(body, bindings);
             if !shadows_existing {
                 bindings.shift_remove(name.value.as_str());
@@ -1030,3 +1030,7 @@ impl fmt::Display for QueryExpression {
 #[cfg(test)]
 #[path = "expr/query_integer_memory_tests.rs"]
 mod query_integer_memory_tests;
+
+#[cfg(test)]
+#[path = "expr/query_binding_memory_tests.rs"]
+mod query_binding_memory_tests;
