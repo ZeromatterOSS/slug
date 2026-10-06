@@ -103,6 +103,14 @@ actual borrowed semantic prerequisite is rules_cc0.2.4/outer59B MODULE request. 
 Core37.015s/CoreCLI7.265s pass. Representative runtime memory fits unchanged caps; continue
 source-specific normal loading toward public Rustc with borrowing/scoped interning discipline.
 Mapping/provider/public producer/MVS/provenance/whole-workload gates remain open.
+[WP947](./slug-v2-subplans/wp947-native-local-version-readiness-2026-10-06.json)
+accepts the explicit Local0.2.17 rules_cc body1181B after preserving failed0.2.4 registry
+correspondence and reviewing normal empty-effective-version semantics. Version1control,
+8Corecontrols1.602s/56,112KiB and native0.241s/64,864KiB pass; six parent bindings7239B,
+root/hash/Weak and final credits succeed. All3extras remain unseen in the native epoch.
+Separate Core10.095s/CoreCLI7.324s pass. Actual next request is rules_license1.0.0/outer64B.
+Continue its normal source owner under borrowing/scoped interning and unchanged caps;
+mapping/provenance/provider/public Rustc/full-workload fit remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

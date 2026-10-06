@@ -45,14 +45,31 @@ const SKYLIB_SHA: [u8; 32] = [
     0x69, 0xad, 0x69, 0x27, 0x09, 0x83, 0x16, 0x84, 0x8b, 0x34, 0xa9, 0x14, 0x2b, 0xcc, 0x97, 0x5e,
     0x01, 0x8b, 0xa2, 0x7f, 0x08, 0xc4, 0xff, 0x40, 0x3f, 0x50, 0xc1, 0xb6, 0xe6, 0x46, 0xca, 0x67,
 ];
-const ADDITIONAL_IDENTITIES: [(&str, &str); 2] = [
+// This exact local body declares 0.2.17; it is not the prior registry 0.2.4 source.
+const CC_SHA: [u8; 32] = [
+    0x18, 0x49, 0x60, 0x2c, 0x86, 0xcb, 0x60, 0xda, 0x86, 0x13, 0xd2, 0xde, 0x88, 0x7f, 0x95, 0x66,
+    0xa6, 0xd3, 0x54, 0xa6, 0xdf, 0x6d, 0x70, 0x09, 0xf9, 0xd0, 0x4a, 0x14, 0x40, 0x2f, 0x9a, 0x84,
+];
+const ADDITIONAL_IDENTITIES: [(&str, &str); 3] = [
     ("bazel_features", "bazel_features+"),
     ("bazel_skylib", "bazel_skylib+"),
+    ("rules_cc", "rules_cc+"),
+];
+const ADDITIONAL_ENV: [&str; 3] = [
+    "SLUG_NATIVE_BAZEL_FEATURES_ROOT",
+    "SLUG_NATIVE_BAZEL_SKYLIB_ROOT",
+    "SLUG_NATIVE_RULES_CC_ROOT",
+];
+const ADDITIONAL_MARKERS: [(&str, &str); 3] = [
+    ("WP945", "bazel_features_root"),
+    ("WP946", "bazel_skylib_root"),
+    ("WP947", "rules_cc_root"),
 ];
 fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
     let (size, hash) = match slot {
         0 => (346, FEATURES_SHA),
         1 => (389, SKYLIB_SHA),
+        2 => (1181, CC_SHA),
         _ => unreachable!(),
     };
     bytes.len() == size && sha2::Sha256::digest(bytes).as_slice() == hash
@@ -62,6 +79,7 @@ enum ModuleMode {
     Three,
     Four,
     Five,
+    Six,
 }
 impl ModuleMode {
     fn additional_count(self) -> usize {
@@ -69,6 +87,7 @@ impl ModuleMode {
             Self::Three => 0,
             Self::Four => 1,
             Self::Five => 2,
+            Self::Six => 3,
         }
     }
 }
@@ -79,7 +98,7 @@ struct AdditionalModule {
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
-    additional: [Option<AdditionalModule>; 2],
+    additional: [Option<AdditionalModule>; 3],
 }
 #[derive(Debug)]
 struct Denied {
@@ -94,7 +113,7 @@ impl Bodies {
         Self {
             roots,
             files,
-            additional: [None, None],
+            additional: [None, None, None],
         }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
@@ -109,6 +128,15 @@ impl Bodies {
         );
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
         self.additional[1] = Some(AdditionalModule { root, file });
+        self
+    }
+    fn with_sixth(mut self, root: NormalizedAbsolutePath) -> Self {
+        assert!(
+            self.additional[..2].iter().all(Option::is_some),
+            "sixth binding requires fourth and fifth"
+        );
+        let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
+        self.additional[2] = Some(AdditionalModule { root, file });
         self
     }
     fn roots(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
@@ -234,8 +262,8 @@ struct Milestones {
     preparations: u64,
     effective_empty: bool,
     source: Option<Weak<[u8]>>,
-    additional_source: [Option<Weak<[u8]>>; 2],
-    additional_bytes: [Option<(usize, bool)>; 2],
+    additional_source: [Option<Weak<[u8]>>; 3],
+    additional_bytes: [Option<(usize, bool)>; 3],
     selected_reported: bool,
     bytes: usize,
     hash_match: bool,
@@ -795,6 +823,56 @@ fn fourth_module_need_admission_is_opt_in_and_exact() {
 
 #[test]
 fn fifth_module_need_admission_is_opt_in_and_exact() {
+    additional_module_need_admission(ModuleMode::Five);
+}
+
+#[test]
+fn sixth_module_need_admission_is_opt_in_and_exact() {
+    additional_module_need_admission(ModuleMode::Six);
+}
+
+fn additional_module_need_admission(mode: ModuleMode) {
+    let slot = match mode {
+        ModuleMode::Five => 1,
+        ModuleMode::Six => 2,
+        _ => unreachable!(),
+    };
+    let roots = ["/features", "/skylib", "/cc"];
+    let paths = match mode {
+        ModuleMode::Five => [
+            "/",
+            "/skylib",
+            "/skylib/MODULE.bazel",
+            "/skylib/BUILD",
+            "/skylib/BUILD.bazel",
+            "/skylib/.bazelignore",
+        ],
+        ModuleMode::Six => [
+            "/",
+            "/cc",
+            "/cc/MODULE.bazel",
+            "/cc/BUILD",
+            "/cc/BUILD.bazel",
+            "/cc/.bazelignore",
+        ],
+        _ => unreachable!(),
+    };
+    let excluded_paths = match mode {
+        ModuleMode::Five => [
+            "/skylib_extra/MODULE.bazel",
+            "/skylib/BUILD.bazel",
+            "/skylib/REPO.bazel",
+            "/skylib/MODULE.bazel",
+        ],
+        ModuleMode::Six => [
+            "/cc_extra/MODULE.bazel",
+            "/cc/BUILD.bazel",
+            "/cc/REPO.bazel",
+            "/cc/MODULE.bazel",
+        ],
+        _ => unreachable!(),
+    };
+    let (name, canonical) = ADDITIONAL_IDENTITIES[slot];
     let normalized = |path: &str| NormalizedAbsolutePath::new(Path::new(path)).unwrap();
     let base = || {
         Bodies::new([
@@ -810,10 +888,23 @@ fn fifth_module_need_admission_is_opt_in_and_exact() {
             operation,
         )))
     };
-    let body = need("/skylib/MODULE.bazel", PathObservationOperation::FileBytes);
-    let local =
-        (*local_native_request(&normalized("/fixture"), "bazel_skylib+", "/skylib")).clone();
-    for bodies in [base(), base().with_fourth(normalized("/features"))] {
+    let configured = |count| {
+        let mut bodies = base();
+        if count >= 1 {
+            bodies = bodies.with_fourth(normalized(roots[0]));
+        }
+        if count >= 2 {
+            bodies = bodies.with_fifth(normalized(roots[1]));
+        }
+        if count >= 3 {
+            bodies = bodies.with_sixth(normalized(roots[2]));
+        }
+        bodies
+    };
+    let body = need(paths[2], PathObservationOperation::FileBytes);
+    let local = (*local_native_request(&normalized("/fixture"), canonical, roots[slot])).clone();
+    for count in 0..=slot {
+        let bodies = configured(count);
         assert!(bodies.admit(&body).is_err());
         assert!(
             bodies
@@ -821,27 +912,24 @@ fn fifth_module_need_admission_is_opt_in_and_exact() {
                 .is_err()
         );
     }
-    assert!(std::panic::catch_unwind(|| base().with_fifth(normalized("/skylib"))).is_err());
-    let bodies = base()
-        .with_fourth(normalized("/features"))
-        .with_fifth(normalized("/skylib"));
+    for count in 0..slot {
+        assert!(
+            std::panic::catch_unwind(|| match mode {
+                ModuleMode::Five => configured(count).with_fifth(normalized(roots[slot])),
+                ModuleMode::Six => configured(count).with_sixth(normalized(roots[slot])),
+                _ => unreachable!(),
+            })
+            .is_err()
+        );
+    }
+    let bodies = configured(slot + 1);
     assert!(bodies.admit(&body).is_ok());
     assert!(
         bodies
-            .admit(&need(
-                "/skylib/MODULE.bazel",
-                PathObservationOperation::FileDigest
-            ))
+            .admit(&need(paths[2], PathObservationOperation::FileDigest))
             .is_ok()
     );
-    for path in [
-        "/",
-        "/skylib",
-        "/skylib/MODULE.bazel",
-        "/skylib/BUILD",
-        "/skylib/BUILD.bazel",
-        "/skylib/.bazelignore",
-    ] {
+    for path in paths {
         assert!(
             bodies
                 .admit(&need(path, PathObservationOperation::Lstat))
@@ -855,13 +943,10 @@ fn fifth_module_need_admission_is_opt_in_and_exact() {
     );
     let original = need("/fixture/MODULE.bazel", PathObservationOperation::FileBytes);
     for excluded in [
-        need(
-            "/skylib_extra/MODULE.bazel",
-            PathObservationOperation::FileBytes,
-        ),
-        need("/skylib/BUILD.bazel", PathObservationOperation::FileBytes),
-        need("/skylib/REPO.bazel", PathObservationOperation::Lstat),
-        need("/skylib/MODULE.bazel", PathObservationOperation::ReadLink),
+        need(excluded_paths[0], PathObservationOperation::FileBytes),
+        need(excluded_paths[1], PathObservationOperation::FileBytes),
+        need(excluded_paths[2], PathObservationOperation::Lstat),
+        need(excluded_paths[3], PathObservationOperation::ReadLink),
     ] {
         assert!(
             bodies
@@ -869,17 +954,18 @@ fn fifth_module_need_admission_is_opt_in_and_exact() {
                 .is_err()
         );
     }
-    for case in 0..10 {
+    for case in 0..(if slot == 2 { 12 } else { 10 }) {
         let mut wrong = local.clone();
         match case {
-            0 => {
-                wrong.id.canonical_repo =
-                    slug_identity_v2::CanonicalRepoName::new("bazel_skylib").unwrap()
-            }
+            0 => wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(name).unwrap(),
             1 => wrong.id.workspace = normalized("/other"),
             2 => wrong.kind = RepositoryMaterializationKind::Immutable,
-            3 | 8 => {
-                let path = if case == 3 { "/other" } else { "/features" };
+            3 | 8 | 11 => {
+                let path = if case == 3 {
+                    "/other"
+                } else {
+                    roots[if case == 8 { slot - 1 } else { 0 }]
+                };
                 wrong.kind = RepositoryMaterializationKind::Local {
                     logical_root: normalized(path),
                 };
@@ -897,9 +983,11 @@ fn fifth_module_need_admission_is_opt_in_and_exact() {
                 wrong.repo_spec.rule_id.bzl_file =
                     CanonicalLabel::parse("@@other//tools/build_defs/repo:local.bzl").unwrap()
             }
-            7 => {
-                wrong.id.canonical_repo =
-                    slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap()
+            7 | 10 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    ADDITIONAL_IDENTITIES[if case == 7 { slot - 1 } else { 0 }].1,
+                )
+                .unwrap()
             }
             9 => {
                 Arc::make_mut(&mut wrong.repo_spec.attributes)
@@ -937,6 +1025,12 @@ fn native_five_root_local_module_and_mapping_prerequisite() {
     observe_native_modules(ModuleMode::Five);
 }
 
+#[test]
+#[ignore = "frozen scoped six-root explicit local MODULE readiness observation"]
+fn native_six_root_local_module_and_mapping_prerequisite() {
+    observe_native_modules(ModuleMode::Six);
+}
+
 fn observe_native_modules(mode: ModuleMode) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
@@ -956,23 +1050,18 @@ fn observe_native_modules(mode: ModuleMode) {
         root("SLUG_NATIVE_RULES_RUST_ROOT"),
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
     ]);
-    if mode.additional_count() >= 1 {
-        bodies = bodies.with_fourth(root("SLUG_NATIVE_BAZEL_FEATURES_ROOT"));
+    for slot in 0..mode.additional_count() {
+        let extra_root = root(ADDITIONAL_ENV[slot]);
+        bodies = match slot {
+            0 => bodies.with_fourth(extra_root),
+            1 => bodies.with_fifth(extra_root),
+            2 => bodies.with_sixth(extra_root),
+            _ => unreachable!(),
+        };
+        let (prefix, field) = ADDITIONAL_MARKERS[slot];
         println!(
-            "WP945_REQUEST bazel_features_root={}",
-            bodies.additional[0]
-                .as_ref()
-                .unwrap()
-                .root
-                .as_path()
-                .display()
-        );
-    }
-    if mode.additional_count() == 2 {
-        bodies = bodies.with_fifth(root("SLUG_NATIVE_BAZEL_SKYLIB_ROOT"));
-        println!(
-            "WP946_REQUEST bazel_skylib_root={}",
-            bodies.additional[1]
+            "{prefix}_REQUEST {field}={}",
+            bodies.additional[slot]
                 .as_ref()
                 .unwrap()
                 .root
@@ -1049,19 +1138,10 @@ fn observe_native_modules(mode: ModuleMode) {
     let mut policy_error = false;
     let mut outcome = None;
     if let Some(runtime) = &runtime {
-        let overrides = [
-            Some(format!(
-                "rules_rust={}",
-                bodies.roots[1].as_path().display()
-            )),
-            Some(format!("platforms={}", bodies.roots[2].as_path().display())),
-            bodies.additional[0]
-                .as_ref()
-                .map(|binding| format!("bazel_features={}", binding.root.as_path().display())),
-            bodies.additional[1]
-                .as_ref()
-                .map(|binding| format!("bazel_skylib={}", binding.root.as_path().display())),
-        ];
+        let mut overrides: [Option<String>; 5] = Default::default();
+        for (slot, (name, _, root)) in bodies.bindings().enumerate() {
+            overrides[slot] = Some(format!("{name}={}", root.as_path().display()));
+        }
         match BzlmodCommandPolicyKey::from_flags_with_module_overrides(
             None,
             false,
@@ -1113,7 +1193,7 @@ fn observe_native_modules(mode: ModuleMode) {
     }
     let (source_weak, additional_weak) = {
         let state = milestones.lock().unwrap();
-        for (slot, prefix) in ["WP945", "WP946"]
+        for (slot, (prefix, _)) in ADDITIONAL_MARKERS
             .into_iter()
             .take(mode.additional_count())
             .enumerate()
@@ -1264,7 +1344,7 @@ fn observe_native_modules(mode: ModuleMode) {
         "WP942_RETIREMENT source_weak_seen={} source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
         source_weak.is_some()
     );
-    for (slot, prefix) in ["WP945", "WP946"]
+    for (slot, (prefix, _)) in ADDITIONAL_MARKERS
         .into_iter()
         .take(mode.additional_count())
         .enumerate()

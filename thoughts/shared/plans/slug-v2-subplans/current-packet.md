@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bounded native memory/lifecycle gates pass; actual rules_cc0.2.4 prerequisite
+Status: bounded native memory/lifecycle gates pass; actual rules_license1.0.0 prerequisite
 
 ## Observable and source basis
 
@@ -168,9 +168,37 @@ and reviewed normal binding extension. Existing memory limits and source exclusi
 These representative operations fit their caps, allowing source-specific implementation
 of the broader producer plan to continue; retain allocation discipline at every step.
 
+## Accepted WP947 continuation
+
+[WP947](wp947-native-local-version-readiness-2026-10-06.json) observes one exact rules_cc+ target187B and
+MODULE1181B/fullSHA1849602c… at0.031s/17,280KiB and0.052s/18,600KiB. The body declares
+rules_cc0.2.17/compatibility1 with6unsupported directives, so original requested0.2.4
+correspondence fails. A separately reviewed explicit Local replan uses its actual bytes:
+normal nonregistry effective version is empty, name must match, declared version stays
+0.2.17. Immutable Bazel source and existing Slug owners agree; the existing discriminating
+empty/nonempty expected-key test passes0.122s/24,932KiB. No registry0.2.4 equivalence or
+shared graph/BCR/MVS provenance is inferred.
+
+The shared companion adds a third fixed optional binding and closed Six mode, reusing
+request/source/cleanup loops and the Five/Six control matrix (net80lines; production0).
+Eight Core controls pass1.602s/56,112KiB; separate Core compile10.095s and direct Core/CLI
+check7.324s pass. One six-root native observer passes0.241s at conservative64,864KiB RSS,
+with72current pins and6parent MODULE brackets7239B. Original root426B/hash/Weak and all
+tracked scope/recorder/credit retirement succeed. All three added sources remain unseen
+in the returned epoch: source/hash/evaluation unavailable, extra Weak expiry vacuous.
+
+The actual held semantic mapping error now reports rules_license1.0.0/outer64B MODULE
+request. It remains a retained discovery association, not completed selection/provenance.
+Scope1registryattempt/0bytes and recorder11attempts/1admitted/10refused/unqualified remain
+separate. Ten Rust checks comprise9ordinary (8Core+1version) and1native;2physical decisions
+are observations.15availability and3FD controls are reused with0reruns. Representative
+runtime operations fit unchanged caps; mapping/providers/public Rustc/full fit stay open.
+Next follow [the source recommendation](../../../../target/wp947/native/successor-source.md)
+to ground the actual rules_license prerequisite before its separately frozen source step.
+
 ## Ownership, scope and allocation
 
-The latest checkpoint shares two fixed optional bindings, borrowed diagnostic reporting and
+The latest checkpoint shares three fixed optional bindings, borrowed diagnostic reporting and
 focused whole-Need controls in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
@@ -181,14 +209,14 @@ detail is opaque. Representation, equality/invalidation/Need policies and existi
 interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
 
 WP942's actual native root anchor and mapping share one normal scoped DICE request;
-whole-Need admission preserves the three-root default and opt-in exact fourth/fifth
+whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth
 MODULE bodies with finite metadata/Local roles. Successful certification would require
 the original covered mapping epoch, exact root/platforms sources and root Arc identity. That branch remains source-reviewed,
 unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
 
 Root owns bounded wrappers, integration and compact receipts. The next contract must
-freeze the independently grounded source-specific correction for the actual rules_cc
+freeze the independently grounded source-specific correction for the actual rules_license
 request before another source/native operation. Consequential ownership/representation/operation changes
 receive independent design and final review. Prefer existing natural owners and bounded
 companions to copied large harnesses; record any concrete shared-boundary growth reason.
