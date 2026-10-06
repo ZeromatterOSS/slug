@@ -191,10 +191,15 @@ With those prerequisites and the corrected supervisor, the
 32 actions (2 internal/30 local),1352 cache hits,2829 unchanged enumerated pins,
 clean join/group emptiness and complete non-overflow logs. Its current regular
 executable is151,509,312B. Three FINALs accept current ordinary compilation/linking
-preparation. Authentic Slug source/runtime, generated argument-file cfg bytes,
-complete runfiles/dynamic demand, whole-source memory fit and M7A stay open. The
-next finite accounting reads only exact root-demanded generated arguments using
-saved producer mapping; no build or Slug source retry.
+preparation. The [generated-argument receipt](wp911-generated-argument-cfg-2026-10-06.json) now
+observes all201 selected files/2089B through1167 ordered bindings in the declared
+root walk.68cfg records contain no added named features/check-cfg;155 normal
+external comparisons cover observed tokens only.691 path substitutions preserve
+complete effective argv as unknown. Three FINALs accept byte/cfg accounting;
+0.173s timing excludes bounded encoding, with10s enforced through it. Authentic
+Slug source/runtime, complete runfiles/dynamic demand, whole-source memory fit and
+M7A stay open. Next admit the required Spawn query projection from its retained
+semantic producers; no Slug source retry.
 
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 

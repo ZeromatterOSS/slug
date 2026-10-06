@@ -1,66 +1,81 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-210-m7a-generated-argument-file-cfg-accounting-r1
-Status: Current CLI root compile accepted; generated argument-file bytes selected
+Packet: WP-7-211-m7a-spawn-action-query-projection-r1
+Status: Compiler preparation/accounting accepted; Spawn query projection selected
 
-## Observable outcome and source basis
+## Observable outcome, demand and owner
 
-Account for actual generated --arg-file cfg bytes consumed by compiler owners in
-the saved CLI artifact closure. WP904 proved current direct feature cfg membership;
-WP905 resolved all1633 wrapper file bindings and their ordinary producers, but
-contents remained unobserved. WP910 now proves the current ordinary CLI root
-compile. Reuse its outputs and WP905 graph/references; no new Bazel/Cargo operation.
-Compatibility: Slug-native local evidence only, no Slug semantic/runtime admission.
-Root owns integration; source/evidence/ownership finals inspect the finite delta.
+Add an owner-complete query projection for the already admitted Spawn actions,
+then integrate its bounded text aquery consumer without changing accepted
+FileWrite output. WP905's finite CLI artifact walk demands513 Rustc and67
+CargoBuildScriptRun action records. Those are ordinary executable Spawn owners;
+the current public aquery formatter exposes only FileWrite views. Stage8's
+functional per-family graph comparison remains an M7A gate independent of exact
+ActionKeys. Use the actual retained configured actions, execution platform facts,
+Args/FilesToRun/virtual-param recipes and validated root closure that execution
+already owns. No command-local rebuilt graph, filesystem metadata bypass or
+opaque Bazel graph as runtime input. Compatibility: exact admitted field bytes
+where pinned Bazel9.2 proves them; existing Slug-native configuration/path domains;
+Spawn ActionKey unsupported/deferred to M9 with explicit documented omission.
+No new action token without a reviewed domain contract.
 
-Root Rustc action0 produces artifact4321. Reconstruct its declared input-producer
-walk with shared depset identities and per-action scratch; preserve duplicate
-producer records and qualify this as declared artifact demand, not full default
-runfiles/dynamic execution closure. Restrict reads to that walk's process_wrapper
---arg-file bindings already mapped to exact input artifacts and producers. Process
-unique files once, preserve ordered binding occurrences per action/configuration.
-Do not assume that every row of the broader deps query was executed by the root.
+## Design checkpoint and implementation
 
-The pinned cached rules_rust process_wrapper options.rs args_from_file and util.rs
-read_file_to_array own line/escape handling; cargo_build_script_runner/lib.rs
-outputs_to_flags owns cfg/link output. Observe and pin those exact sources before
-classifying bytes. Do not use generic shell splitting or treat --check-cfg as an
-active --cfg. Preserve bare and valued cfg separately from named feature cfg,
-ordered argument tokens and wrappers' substitution/recursive-param boundaries.
-Unexpected syntax, nested file demands or missing outputs stay explicitly unknown;
-never widen the source-derived parser or retry automatically to fill them.
+Before production edits, independently review the concrete projection/view,
+field table, consumer integration and selected comparison controls. Read Stage6
+configured action owners and Stage8/7 contracts only for this boundary. Pin Bazel9.2
+ActionGraphTextOutputFormatterCallback, SpawnAction and their argument/input/env
+helpers. The natural unresolved choice is how aquery obtains complete expanded
+Spawn fields from retained recipes through the existing semantic producer; resolve
+it here before coding. Recipe/data ownership stays at configured action/Args
+producers, not formatter or CLI. No independent retained string registry/cache.
 
-## Bounded operation and allocation discipline
+The view must preserve semantic action multiplicity and declaration/owner order,
+normal and tool configurations, execution group/platform, expanded executable/
+argv/environment/input/output/tree identity and virtual parameter membership.
+Do not use execution-representative deduplication for query. Support the admitted
+executable/Shell/FilesToRun and Args behavior demanded by compiler actions; do not
+silently reduce it to raw scalar argv. Unavailable producer facts remain typed
+unsupported, with a named prerequisite rather than guessed values. Exact REAPI
+projection remains with Stage7. Keep every unadmitted family explicit; this one
+family does not claim full production root aquery or M7A completion.
 
-One root-only local reader under10s, no compiler/query/test/backend/network/Slug
-source request. Reuse descriptor-anchored NOFOLLOW/NONBLOCK regular reads and
-named/FD identity/type/size checks. Preselect1MiB per generated file/64MiB aggregate,
-4096 files and64KiB chunks. Graph/reference input16MiB each; output receipt16MiB.
-Require observed compiler snapshots empty and current tracked/pinned inputs stable.
-Read each unique file once; use shared indices/path references and per-owner scratch
-instead of multiplying expanded strings. No new pool, global retention or production
-memory owner. Original Slug source AS/RSS/disk/string caps remain unchanged.
+Preserve existing FileWrite literal/deps formatting and domain token byte-for-byte.
+Choose the existing command text consumer where complete projection is available;
+if integration needs another semantic owner, name it before widening scope.
+Use borrowing/shared retained strings and command-scoped sorted references rather
+than expanded owned copies. Render into the caller's output buffer where practical;
+returned text is command-owned. No evaluator scratch in retained views. Read DICE
+ownership instructions before touching keys/locking; no new key/lock is selected.
 
-## Acceptance and scope
+## Bounded allowlist and validation
 
-Report observed/missing files, bytes/hash/type/producer identity and cfg tokens by
-normal/compiler-buildscript/configuration owner. Compare any named generated
-feature cfg with its direct compiler membership/current lock declaration under
-that exact owner; retain other cfg without invented feature equivalence. Source
-and producer mapping plus bounded bytes establish this evidence gap only; absence
-of added features does not prove Cargo host-role equivalence, all effective argv,
-paramfiles, source freshness, authentic Slug evaluation, memory fit or M7A.
-No production/BUILD/lock/toolchain/fixture growth selected. On a gap choose the
-concrete producer before implementation. Tracked allowlist: compact receipt,
-manifest/canonical, Stage10/readiness reusable changes; operational target/wp911.
-Run plan/diff checks and commit accepted outcome. Windows minimal/deferred.
+Production candidates: slug_analysis_v2 result.rs minimal glue plus a focused
+sibling Spawn view module; slug_core_v2 runtime focused query projection/formatter
+module and mod.rs/dice.rs minimal access glue; slug_server_v2 aquery consumer only.
+Inspect exact source sizes before edits: dice.rs is oversized, so add no owner
+logic or test block there. Parser/CLI flags, locks/toolchains, production graph,
+C++ activation, Windows breadth and source16/17/18 retries excluded. Expand this
+allowlist only after an actual prerequisite is identified and root reconciles it.
+
+Reuse admitted configured Spawn/Args/FilesToRun fixtures and source pins; add only
+missing discriminators for field order/escaping, owner sharing, groups/platform,
+literal/deps and changed argv/env/input/output A/B/A. A focused pinned Bazel9.2
+query (no actions/acquisition) may fill an exact field gap once; existing wrappers
+and60s preparation/3s cleanup/JVM2GiB/log16MiB caps apply. Rust compile separate
+<=60s, serialized; preflight and batch the selected owner/dependent tests, keep
+runtime checks small. No broad suites before integration checkpoint. Independent
+design and final reviews cover source/semantic ownership, public output and
+allocation/lifetime invariants. Run rustfmt, plan status and diff checks; commit
+accepted code and compact evidence. Full authentic source, whole-workload memory
+fit, other query families and M7A remain open. Windows minimal/deferred.
 
 ## Immediate predecessor
 
-WP910 at adb8f4d4b built //app/slug_cli_v2:slug successfully in58.721s under60s cap:
-32 actions (2 internal/30 local),1352 cache hits,2829 unchanged pins, natural clean
-join/group emptiness and complete non-overflow logs. The current regular executable
-is151,509,312B under the preselected256MiB read cap. Three FINALs accept current
-ordinary compilation/linking preparation. See
-[root receipt](wp910-current-cli-root-build-2026-10-06.json). Broader source/runtime/
-M7A and original memory REFUSED/source16/17/18 remain open/spent; no source retry.
+WP911 at55a3f6636 observes all201 root-demanded generated argument files:2089B,
+1167 ordered bindings/216 consumers, no missing output.68cfg records (66bare/two
+valued) contain no named feature/check-cfg additions;155 normal external comparisons
+remain scoped to observed tokens.691 path substitutions keep complete effective
+argv unknown.2835 pins/clean snapshots stable;10s bounds include encoding. Optional
+empty lock attribute correction is preserved. Three FINALs accept bounded bytes/
+cfg only. See [generated-argument receipt](wp911-generated-argument-cfg-2026-10-06.json).

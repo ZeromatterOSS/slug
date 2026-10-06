@@ -34,27 +34,29 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-210-m7a-generated-argument-file-cfg-accounting-r1
-Status: Current CLI root compile accepted; generated argument-file bytes selected
+Packet: WP-7-211-m7a-spawn-action-query-projection-r1
+Status: Compiler preparation/accounting accepted; Spawn query projection selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects bounded local
-reads of generated compiler argument-file cfg bytes using the accepted root
-producer inventory. The [root receipt](./slug-v2-subplans/wp910-current-cli-root-build-2026-10-06.json)
-records58.721s ordinary CLI compilation success with unchanged inputs and clean
-completion. Compilation preparation now passes; authentic Slug source/runtime,
+The [current manifest](./slug-v2-subplans/current-packet.md) selects the complete
+semantic query projection of already admitted Spawn actions and its bounded
+text consumer, with an independent design checkpoint before code. Compiler
+preparation and direct/generated cfg accounting are accepted; the
+[generated-argument receipt](./slug-v2-subplans/wp911-generated-argument-cfg-2026-10-06.json)
+observes all201 selected files and no added named feature cfg. Complete effective
+argv remains unknown. Other action-query families, authentic Slug source/runtime,
 whole-workload memory fit and M7A remain open. Allocation/interner discipline,
-original memory REFUSED/source16/17/18 and source caps persist; Windows minimal.
+source16/17/18 and source caps persist; Windows minimal.
 
 ### Ready and blocked queue
 
-The current packet selects bounded generated-input accounting under priority1; the remaining
+The current packet selects demanded action-query coverage under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | current36 local owners and353 external normal direct-feature owners accepted; generated argument bytes remain open |
+| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects admitted Spawn query projection; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

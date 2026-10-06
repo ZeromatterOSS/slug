@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "base": "55a3f663621f3a63a121dfb0b001376197d77c6d",
+  "elapsed_seconds": 0.17255543905775994,
+  "input_pin_count": 2835,
+  "input_pins_sha256": "3e1e5c42a73fc6e950650e9b887f41c0c3980ef23683b0f5f37ee6a184349255",
+  "source_pins": {
+    "allocative/allocative/src/impls/hashbrown_util.rs": "20ce7b83ea3b8e3e0d343c02b44b8e46e4a3333943dbf27f203725492184c7c0",
+    "gazebo/dupe_derive/src/util.rs": "39c810716b2059c71b78e100927d419b0b4d624c53d530a2f565b9d360ecdf36",
+    "starlark-rust/starlark/src/tests/util.rs": "ee2531caf2ab961d8f2059441e1774bf37f39e712a7a20e8ecdfd8a6b2d37ec2",
+    "starlark-rust/starlark/src/util.rs": "4b0b9ba063311a40a24dd7f47a6e94df9accbf1ede53744f592cbaecc86e360d",
+    "starlark-rust/starlark/src/values/layout/heap/maybe_uninit_slice_util.rs": "18095c5e959dc5a75585b72c10ee6ad3138b730ad0da8c47e16adbf55aaa9947",
+    "starlark-rust/starlark_derive/src/module/util.rs": "bfe3967fd410c9b605458ced10a4e167e489a1ceb689a164c961588987c4b9aa",
+    "starlark-rust/starlark_derive/src/util.rs": "da39f8277a8cab4c33ce4c0d21f6c8610f3eb1c92f6e61c7e66e6c226e95db2b",
+    "starlark-rust/starlark_syntax/src/syntax/grammar_util.rs": "609ec138718fce3e8656eb81a2d7f33d9ed5839ec8b3673686a3e45322a690f3",
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/options.rs": "b8a9208a3ced5be6cebd72a5fa82d19a85c64b0935585edff0e2546466c24b03",
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/cargo/private/cargo_build_script_runner/lib.rs": "54e90953ecd2016994b08fc51330b75cf9cdaf155c27163229f7bb506070ce4b",
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/util.rs": "2365f126d9270c1c87419c9435c64cef0cce7c6bc9bd40235ee1f2048c6865f8"
+  },
+  "graph_sha256": "15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c",
+  "tracked_state_clean_unchanged": true,
+  "enumerated_inputs_unchanged": true,
+  "compiler_census_before": [],
+  "compiler_census_after": [],
+  "declared_root_action_count": 1385,
+  "selected_argfile_consumer_count": 216,
+  "selected_argfile_occurrence_count": 1167,
+  "unique_file_count": 201,
+  "observed_file_bytes": 2089,
+  "missing_file_indices": [],
+  "scope": "Actual bounded generated argument-file bytes and conservative cfg classification in declared root artifact demand only. No all-effective-argv/Cargo-role equivalence, all-fresh/system tools, Slug source/runtime fit or M7A claim.",
+  "automatic_retry": false,
+  "packet": "WP-7-210-m7a-generated-argument-file-cfg-accounting-r1",
+  "disposition": "ACCEPTED_CURRENT_GENERATED_ARGUMENT_BYTES_AND_CONSERVATIVE_CFG_ACCOUNTING",
+  "summary": {
+    "input_pin_count": 2835,
+    "files": 201,
+    "nonempty_files": 39,
+    "cfg_records": 68,
+    "check_cfg_records": 0,
+    "unknown_actions": 216,
+    "unknown_kinds": {
+      "substitution_token": 691
+    },
+    "normal_external_comparisons": 155,
+    "generated_feature_owners": 0,
+    "undeclared_generated_feature_owners": 0,
+    "dropped_pending_lines": 0
+  },
+  "initial_failure": {
+    "command": [
+      "python3",
+      "target/wp911/read.py"
+    ],
+    "exit_code": 1,
+    "output_promoted": false,
+    "error": "KeyError: crate_features",
+    "site": "current lock common_attrs optional omitted empty feature set",
+    "reader_sha256": "e260d7a765c83b22a8026aed2f5bbe9ea33261f0fc74c53b76fa3da9f3e506f0",
+    "correction": "Use the absent crate_features attribute as empty, matching accepted direct feature membership/normal generated BUILD semantics.",
+    "same_bounds": true
+  },
+  "timing_scope": "0.173s observation/classification before bounded JSON encoding;10s alarm/deadline applies through encoding.",
+  "fixture_growth": 0,
+  "production_change": false,
+  "evidence_sha256": {
+    "target/wp911/read.py": "5ca936040fed9b3ef93c69e5b097482170165c9706232df8eb06f25cc9e1bfe6",
+    "target/wp911/attempt1.json": "e496d5680a8488042cb6025edcddc1b0fd225da5d6819f1a8b62557c14f97310",
+    "target/wp911/result.json": "201e181e5ba77024136813bb4de89dac3b4ec7b43a9ded9a1baa883428130f8c",
+    "target/wp911/summary.json": "e74c53a47410654f57af36b606572dd2c8c96058a48c5bd3aac5b47989db21de",
+    "target/wp911/selection.json": "f4a6cc64a54770a8dff5ccca4b2df8455fd4d2773b9bace0308c69e4dd8e2a1a",
+    "target/wp911/selection-evidence.md": "0d1df02bfd794b1af9fccdf587e4ade4f77b55553feded16247e81e86d5fec19",
+    "target/wp911/source-fields.md": "d90b71cf3193c67b09a52e45ea62f2c26041d80a423ecfb7d60e5c95c887f018",
+    "target/wp911/parser-controls.py": "cbb769ac926b511b8c6a9be0d80946d5b445cb9edfe2e63138a60f36eb791f0b",
+    "target/wp911/parser-controls.json": "e2e8a0ae3d8d7255f92e9800cd46f7e8137c433e70bb702f5bebee1b9e786169",
+    "target/wp911/parser-corrections.py": "73cd4fd1b15750d322c3085913639afdbe8ef6d13ec22a4a7cfc073f2a3fbbe1",
+    "target/wp911/parser-corrections.json": "929f2ee23fa70d966f81d3f823c1efd0f4cd2e6dda62f64dfd998f79963afb16",
+    "target/wp911/design-ownership.md": "9bf93fe02ddca29b6df553ece260a1cea5340c1f36a02fa68ba018e2ca47efa7",
+    "target/wp911/design-code-ownership.md": "06862c05d499ee2ccef2d736c1c6b0b540a97a58110cf1e43afea88f8354165f",
+    "target/wp911/design-code-source.md": "2eee73f164e3a0635b469650cd03a5d2e170748f18a4bdd9d92def2f35cca2c8",
+    "target/wp911/correction-code-source.md": "45b4b3d7118bb8a4c1879897f34324130d9f88e70bcf8d1ddc6b62627f36892d",
+    "target/wp911/correction-code-ownership.md": "922b8a1d70442b8e996810b5723f363846b31e1f36b6329648ec2697649a31f7",
+    "target/wp911/final-source.md": "91337c22c0c75912751f7c31d205c852666ca3d43bf72eb9453025b8d003c97e",
+    "target/wp911/final-evidence.md": "84ad2f5a846762137f4688c01ad25535d388bc24b4ed06f56f12d59915ca934e",
+    "target/wp911/final-ownership.md": "97b19d0bf6a9275fcbcd2b86cd00fb06b08ddd6271d9e8c3f03e1e4c35c75446"
+  },
+  "independent_final_reviews": {
+    "target/wp911/final-source.md": "91337c22c0c75912751f7c31d205c852666ca3d43bf72eb9453025b8d003c97e",
+    "target/wp911/final-evidence.md": "84ad2f5a846762137f4688c01ad25535d388bc24b4ed06f56f12d59915ca934e",
+    "target/wp911/final-ownership.md": "97b19d0bf6a9275fcbcd2b86cd00fb06b08ddd6271d9e8c3f03e1e4c35c75446"
+  }
+}
