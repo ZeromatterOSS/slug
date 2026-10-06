@@ -42,100 +42,58 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Current finite source-availability checkpoint
+## Current source-readiness checkpoint
 
-[WP935](wp935-explicit-local-source-2026-10-06.json) accepts13 individually
-bracketed rows:8 exact references206,598B+5 upstream files119,073B,total325,671B.
-Three old source hashes match; current defs/repository_utils hashes and all five
-partial syntaxfacts are recorded.11 unchanged controls reused with currentpins;
-actual source read/parse0.092s,peakRSS22,848KiB,traced peak4,300,734B/retained1,845,810B.
-Bodies/text/AST retire perfile; trace excludes encoding,RSS includes it. This proves
-finite explicit-root reads only,not native sources/module/provider/wholeworkloadfit.
-[WP934](wp934-explicit-root-alias-2026-10-06.json) supplies the exact absolute root
-spelling from a closed anchored metadata observation; the original WP933 logical
-alias refusal remains closed. No implicit cache certificate or oldpathretry.
+[WP941](wp941-platforms-local-module-readiness-2026-10-06.json) connects the
+unchanged426B fixture's production RootModuleFilesKey evaluation to WP940's complete
+60-byte forward URL, with a unique eligible candidate and structural same-workspace
+preparation identity. One existing integration-owner test borrows dependency fields;
+no production API, string pool or extra semantic cache is added. All three exact Rust
+tests pass (0.309s,19,024KiB peak). Corrected offline preparation18.581s and direct
+Core check6.834s pass; the initial invocation's60s cap is preserved.
 
-[WP936](wp936-direct-local-imports-2026-10-06.json) accepts all16 new local
-file observations/5,092,301B,0overflow,0.173s.11 unchangedcontrols reused;
-31,180KiB peakRSS,traced9,555,071Bpeak/2,144,290Bretained with perfile retirement.
-14 partialfact tables admitted. rustc.bzl145,040B hits postparse node_limit;
-known_shas.bzl4,749,878B is streamedhashonly at fixedfact_body_limit. Neither
-empty/absent fact table proves noimports. Native initialization/wholeworkloadfit
-remain open; do notraise Python limits or retryidenticaldiagnosticguards.
+Pinned Bazel9.2 source independently selects canonical `external/platforms`.
+Four current link controls pass; one metadata observation records its187-byte absolute
+source root (0.031s,17,536KiB), then one strict MODULE.bazel read observes416B with SHA
+`1c0c09f5bdcf4b3f924720d2478a3711cb39f4977019ca5988685e5b7e18b3d2`
+(0.052s,18,572KiB). Eleven unchanged reader/fact controls are reused with current pins.
+Literal partial facts declare platforms1.1.0, package_metadata0.0.3, rules_license0.0.7
+and dev rules_shell0.6.1; two directives remain unparsed. Exact target spelling and
+FD/name brackets are in the receipt. Trace peaks1,826,848B through perfile retirement;
+compact facts/helpers retain1,685,863B. These are current individual file facts, not
+native MODULE evaluation, resolved MVS/registry provenance or a source certificate.
 
-[WP937](wp937-native-source-memory-2026-10-06.json) accepts two complete native
-BazelInternal parser profiles with exact input hashes and original source-owner
-retirement. rustc.bzl peaks at23,932KiB/0.159s, with12 ordered native loads and274B
-owned label capacity; known_shas.bzl peaks at44,236KiB/0.209s, with0 native loads.
-Source capacities145,040B/4,749,878B each have one separately accounted parser copy.
-Three FD controls and three protected Rust tests pass; offline Loading preparation
-58.834s and direct Core check42.899s pass. AST/code-map retirement is structural;
-original Arc weak expiry is asserted. RSS retention is not live-allocation proof.
-Both representative parses fit the existing256MiB RSS envelope; module evaluation,
-normal source certificates and whole-workload fit remain open. Python guard records
-remain closed; no limits were raised or identical diagnostics retried.
+Next freeze this exact root/MODULE pin at the existing native source/module preparation
+owner, then proceed toward normal materialization, generated registration/providers
+and the retained public Rustc producer. Keep actual source readiness and producer
+requirements together. No import body, normal command, acquisition or spent-source
+retry is currently selected. Candidate request correspondence does not identify the
+historical caller. Missing native prerequisites remain typed.
 
-[WP938](wp938-normal-offline-source-prerequisite-2026-10-06.json) then observes one
-ordinary native singleton //pkg:probe command using the unchanged fixture, native host,
-explicit rules_rust override and nightly setting. Coupled image/scratch and source-byte
-budgets remain16MiB; the offline scope excludes repository execution before Need progress.
-The first scope error is NetworkDisabled with1 registry attempt and0 admitted/transport/
-written bytes; the outer native error is observed_terminal. Its mismatch subtype and
-exact denied URL/module were not recorded, so do not infer either from counters.
-The0.211s observation peaks at63,960KiB including phase samples;3 protected tests and
-the native observer pass, corrected Core preparation9.340s/CLIcheck37.562s pass. Final
-source live buffers are0 and scope weak expiry passes; descriptor peak5,352B with final
-reported used/image/scratch0. This early refusal fits caps; no complete producer/graph
-or whole-workload fit follows. The first test-only namespace compile error is preserved.
-
-[WP939](wp939-borrowed-registry-attribution-2026-10-06.json) accepts the existing scoped
-recorder's synchronous borrowed request-row visitor and six exact mismatch subtype
-labels. Nine ordinary controls pass in 1.748 s at 37,320 KiB conservative peak; Core
-preparation (36.746 s), CLI check (7.373 s) and two FINAL reviews pass. Direct slab pointers,
-Url/Local(empty/nonUTF8) domains, first-distinct order/repeats, flagged partial history,
-poisoned-lock recovery and final credit/Weak release are asserted. No retained storage
-or URL/path heap dump is added; source/module/public producer or whole-fit is unproved.
-
-[WP940](wp940-exact-offline-registry-prerequisite-2026-10-06.json) accepts one newly
-instrumented normal offline observation. The complete sole Url row is exactly
-`https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel` (60 bytes), with one
-admission and first scope NetworkDisabled; the separate outer subtype is
-observed_terminal_demand. No source/admitted/transport bytes were acquired. The
-0.218 s observation peaks at 65,860 KiB; thirteen ordinary controls pass (2.524 s),
-Core preparation (36.196 s), CLI check (7.357 s) and two FINAL reviews pass. Recorder
-credit is 279,143 bytes with source peak 344,679 bytes under unchanged caps. One 16 KiB
-stack reporter streams hex after releasing the visitor lock; recorder credit, recorder
-Weak and scope Weak retirement pass. This identifies the unique request present at
-refusal, without proving a wrapped causal chain, typed module/file kind or availability.
-WP938's omitted facts remain unknown; no producer or whole-workload fit follows.
-
-Next freeze [source-specific typed readiness](../../../../target/wp940/successor-source.md):
-use the tracked root's evaluated declaration and existing ModuleKey/forward URL constructor
-to compare complete bytes, with the same workspace/preparation key. Candidate correspondence
-is not historical caller or MVS proof. Select local module policy only with an exact,
-independently evidenced root and first MODULE/import allowlist; no guessed cache alias,
-URL reverse parsing or source certificate. Keep source availability and normal producer
-requirements together in that bounded contract. No normal command, acquisition, success
-retry or source16–18/F3/fullroot repeat is selected. Source/module/materialization/
-registration/provider/public Rustc/M7A remain open.
+Reusable source/memory evidence: [WP934 alias](wp934-explicit-root-alias-2026-10-06.json),
+[WP935 finite reads](wp935-explicit-local-source-2026-10-06.json),
+[WP936 direct imports](wp936-direct-local-imports-2026-10-06.json),
+[WP937 native parser ownership](wp937-native-source-memory-2026-10-06.json),
+[WP938 offline command](wp938-normal-offline-source-prerequisite-2026-10-06.json),
+[WP939 borrowed attribution](wp939-borrowed-registry-attribution-2026-10-06.json) and
+[WP940 exact request](wp940-exact-offline-registry-prerequisite-2026-10-06.json).
+Detailed source history remains in those receipts and this manifest at8ea23765d.
+Representative native parses peak23,932/44,236KiB; WP940 normal offline refusal peaks
+65,860KiB with279,143B recorder credit/source peak344,679B and final credit/Weak release.
+These operations fit unchanged memory caps; full source/module/whole-workload fit is open.
+All earlier refused guards/replays remain closed.
 
 ## Ownership, scope and allocation
 
-Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. WP939's accepted allowlist was the
-existing Linux test-only source_service/registry_association.rs and its tests, plus the
-Core public source-prerequisite test's scalar mismatch formatter/unit case; its compact
-receipt preserves source/design/artifact/gate bindings. WP940's accepted allowlist was only the existing Core public source-prerequisite test:
-one shared normal body, fixed first-row stack reporter and one ordinary unit. The compact
-receipt pins the design, sources, exact artifact, thirteen prerequisite gates, launch reviews
-and once-only observation. The next source-specific contract must freeze its existing
-Bzlmod/root-declaration owner, typed correspondence and exact local root evidence before
-editing or selecting an operation. No normal command or acquisition is currently selected. Any minimal shared fixture
-adapter needs its exact existing owner/path and growth reason frozen before editing;
-prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.
-Fixture/expected files remain unchanged references. No new production API is justified
-by the saved file bytes; a demonstrated normal-constructor field/guard gap requires a
-reviewed source-specific correction/allowlist before activation, or a typed REPLAN.
+The latest change is one test-only addition in Bzlmod's existing
+`tests/root_module_dice.rs`. Root owns the strict observation wrappers and compact
+receipt; fixture/expected/production files remain unchanged. The next source-specific
+contract must select the existing native preparation/materializer owner and exact
+actual-root/import allowlist before Rust work or operation. Saved partial facts do not
+justify new exports, path-provenance APIs or fabricated source/provider certificates.
+Prefer a bounded companion to growing Loading's39k-line host_package_load_tests; any
+shared adapter names its natural existing owner and concrete growth reason. Consequential
+ownership/representation/operation changes receive independent design and final review.
 
 DICE owns all selected source/module/configuration/action facts. Do not transplant
 Bazel graphs, use a standalone external-rule evaluator, bypass source/frontier guards,

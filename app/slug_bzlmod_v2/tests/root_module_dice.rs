@@ -531,6 +531,158 @@ async fn root_graph_requires_explicit_injected_request_values() {
 }
 
 #[tokio::test]
+async fn tracked_rules_rust_root_declaration_matches_offline_registry_candidate() {
+    use slug_bzlmod_v2::ModuleKey;
+    use slug_bzlmod_v2::ModuleSourcePreparationKey;
+    use slug_bzlmod_v2::registry_module_file_url;
+
+    const SOURCE: &str = include_str!(
+        "../../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/MODULE.bazel"
+    );
+    // WP940's complete retained request, not a source of module identity.
+    const REQUEST: &str = "https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel";
+    const REGISTRY: &str = "https://bcr.bazel.build";
+    assert_eq!(SOURCE.len(), 426);
+    assert_eq!(REQUEST.len(), 60);
+    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace");
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(
+            WorkspaceSnapshotKey {
+                workspace: workspace.clone(),
+            },
+            Arc::new(WorkspaceSnapshot {
+                files: Arc::new(
+                    std::iter::once((
+                        workspace.join("MODULE.bazel"),
+                        WorkspaceFileValue::Present(Arc::new(SOURCE.to_owned())),
+                    ))
+                    .collect(),
+                ),
+            }),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        &workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Off,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let result = transaction
+        .compute(&RootModuleFilesKey {
+            workspace: workspace.clone(),
+        })
+        .await
+        .unwrap();
+    let files = result.as_ref().as_ref().unwrap();
+    assert_eq!(
+        files.module_file_paths.as_ref(),
+        [PathBuf::from("MODULE.bazel")]
+    );
+    assert_eq!(files.visible_lockfile, VisibleLockfileRead::Ignored);
+    let header = files.module.header.as_ref().unwrap();
+    assert_eq!(header.name, "rules_rust_073_toolchain_owner");
+    assert_eq!(header.version.as_deref(), Some("0.1.0"));
+    assert_eq!(files.module.dependencies.len(), 2);
+    for (dependency, (name, version)) in files
+        .module
+        .dependencies
+        .iter()
+        .zip([("rules_rust", "0.73.0"), ("platforms", "1.1.0")])
+    {
+        assert_eq!(dependency.name.as_str(), name);
+        assert_eq!(dependency.version.as_str(), version);
+        assert_eq!(dependency.repo_name.as_deref(), Some(name));
+        assert!(!dependency.nodep && !dependency.dev_dependency);
+    }
+    let mut candidates = files
+        .module
+        .dependencies
+        .iter()
+        .filter(|dependency| !dependency.nodep && !dependency.dev_dependency)
+        .filter(|dependency| {
+            registry_module_file_url(
+                REGISTRY,
+                &ModuleKey::new(dependency.name.as_str(), dependency.version.as_str()),
+            )
+            .as_bytes()
+                == REQUEST.as_bytes()
+        });
+    let dependency = candidates.next().expect("one eligible forward candidate");
+    assert!(candidates.next().is_none());
+    let module = ModuleKey::new(dependency.name.as_str(), dependency.version.as_str());
+    let url = registry_module_file_url(REGISTRY, &module);
+    assert_eq!(url.as_bytes(), REQUEST.as_bytes());
+    let key = ModuleSourcePreparationKey {
+        workspace: workspace.clone(),
+        module_name: dependency.name.clone(),
+        version: dependency.version.clone(),
+    };
+    assert_eq!(key.workspace, workspace);
+    assert_eq!(key.module_name.as_str(), dependency.name.as_str());
+    assert_eq!(key.version.as_str(), dependency.version.as_str());
+    let foreign_workspace = ModuleSourcePreparationKey {
+        workspace: workspace.join("other"),
+        ..key.clone()
+    };
+    assert_ne!(key, foreign_workspace);
+    // Equal URL bytes alone cannot establish workspace association.
+    assert_eq!(
+        registry_module_file_url(
+            REGISTRY,
+            &ModuleKey::new(
+                foreign_workspace.module_name.as_str(),
+                foreign_workspace.version.as_str(),
+            )
+        )
+        .as_bytes(),
+        REQUEST.as_bytes()
+    );
+    for changed in [
+        ModuleSourcePreparationKey {
+            module_name: "platforms_other".into(),
+            ..key.clone()
+        },
+        ModuleSourcePreparationKey {
+            version: "1.1.1".into(),
+            ..key.clone()
+        },
+    ] {
+        assert_ne!(key, changed);
+        assert_ne!(
+            registry_module_file_url(
+                REGISTRY,
+                &ModuleKey::new(changed.module_name.as_str(), changed.version.as_str(),)
+            )
+            .as_bytes(),
+            REQUEST.as_bytes()
+        );
+    }
+    assert_ne!(
+        registry_module_file_url("https://other.invalid", &module).as_bytes(),
+        REQUEST.as_bytes()
+    );
+    assert_ne!(url.as_bytes(), &REQUEST.as_bytes()[..REQUEST.len() - 1]);
+    assert_ne!(
+        url.as_bytes(),
+        b"https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel/"
+    );
+    assert_ne!(
+        url.as_bytes(),
+        b"https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel?x"
+    );
+}
+
+#[tokio::test]
 async fn request_input_helper_populates_the_complete_fail_closed_triplet() {
     let workspace = workspace();
     let dice = Dice::builder().build(DetectCycles::Enabled);

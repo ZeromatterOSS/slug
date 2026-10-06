@@ -1,0 +1,223 @@
+{
+  "checkpoint": "WP941",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "8ea23765d428d3e5c0b6530259408dec8be8985d",
+  "outcome": "Typed root declaration correspondence and one individually bracketed local platforms MODULE are proved; normal native module preparation and public Rustc producer remain open.",
+  "compatibility": {
+    "exact": "unchanged fixture and complete forward request bytes",
+    "slug_native": "operational finite local source observations",
+    "deferred": [
+      "current registry provenance/MVS",
+      "normal source certificate/module materialization",
+      "generated toolchains/providers",
+      "normal retained public Rustc action",
+      "M7A/full-root/whole-workload fit"
+    ]
+  },
+  "rust_change": {
+    "path": "app/slug_bzlmod_v2/tests/root_module_dice.rs",
+    "added_lines": 152,
+    "production_changes": 0,
+    "selector": "tracked_rules_rust_root_declaration_matches_offline_registry_candidate",
+    "owner": "RootModuleFilesKey over the pinned tracked fixture snapshot at its actual workspace",
+    "qualifications": "Snapshot injection is test evidence; no RootModuleGraphKey, repository implementation or native command is run. Full exact request correspondence is one declared candidate, not a historical caller/MVS claim.",
+    "allocation": "Borrow evaluated dependency fields; transfer initial426B String to existing Arc. Existing parser String copy is required; existing DICE retains source/snapshot/result until retirement. Tiny owned ModuleKey/URL constructors remain local; no global pool/new semantic cache or Weak/drop claim."
+  },
+  "source_basis": {
+    "note": "target/wp941/local-source-basis.md",
+    "sha256": "7b0ed7e0bf27b14d0bc06f80eae3730a064e50c983286f3e438c837c737e1045",
+    "bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "canonical_name": "platforms",
+    "qualification": "Special canonical name does not encode/authenticate a version."
+  },
+  "alias": {
+    "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/platforms",
+    "raw_target": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+    "target_bytes": 187,
+    "link_identity": [
+      66308,
+      125699136,
+      41471,
+      1787694582167969160,
+      1787694582167969160,
+      187
+    ],
+    "target_followed": false,
+    "body_bytes": 0,
+    "operation": "target/wp941/metadata-operation.json",
+    "operation_sha256": "85c1e09a47c7284043ac0c50a65b7e3dbd8e5ead0638d7eabb4ba5230c32a58d",
+    "result_sha256": "2d88a53d972ac4aeab11da81cdb41ef0ac3f2cc579769d2da46692b79a6d1fb8",
+    "elapsed_seconds": 0.031169960973784328,
+    "conservative_rss_kib": 17536,
+    "traced_memory": {
+      "loaded_current": 1189498,
+      "loaded_peak": 1194988,
+      "retained": 1188145,
+      "peak": 1204943,
+      "tracing_excludes_encoding": true
+    }
+  },
+  "first_module": {
+    "root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+    "path": "MODULE.bazel",
+    "bytes": 416,
+    "sha256": "1c0c09f5bdcf4b3f924720d2478a3711cb39f4977019ca5988685e5b7e18b3d2",
+    "identity": [
+      66308,
+      125699013,
+      33188,
+      1787694582162540287,
+      1787694582162791398,
+      416
+    ],
+    "facts": {
+      "syntax_ok": true,
+      "partial": true,
+      "module": [
+        {
+          "line": 1,
+          "column": 0,
+          "attributes": {
+            "name": "platforms",
+            "version": "1.1.0",
+            "compatibility_level": 1
+          }
+        }
+      ],
+      "bazel_dep": [
+        {
+          "line": 7,
+          "column": 0,
+          "attributes": {
+            "name": "package_metadata",
+            "version": "0.0.3"
+          }
+        },
+        {
+          "line": 8,
+          "column": 0,
+          "attributes": {
+            "name": "rules_license",
+            "version": "0.0.7"
+          }
+        },
+        {
+          "line": 9,
+          "column": 0,
+          "attributes": {
+            "name": "rules_shell",
+            "version": "0.6.1",
+            "dev_dependency": true
+          }
+        }
+      ],
+      "loads": [],
+      "unparsed": [
+        {
+          "line": 11,
+          "column": 0,
+          "kind": "Assign",
+          "reason": "unsupported_top_level"
+        },
+        {
+          "line": 12,
+          "column": 0,
+          "kind": "Expr",
+          "reason": "unsupported_top_level"
+        }
+      ]
+    },
+    "partial_facts": true,
+    "actual_bytes": 416,
+    "overflow_probe_bytes": 0,
+    "source_certificate": false,
+    "native_evaluation": false,
+    "operation": "target/wp941/source/availability-operation.json",
+    "operation_sha256": "3709b7e43002b19ba15876368626baa58143390bc9115a6de0b37d9fe8712d9d",
+    "result_sha256": "4b72ab1e381b68c8a3fb40df5554764dc4fdf9467ea8513fd39b2e9fcff4d240",
+    "elapsed_seconds": 0.05158957000821829,
+    "conservative_rss_kib": 18572,
+    "traced_memory": {
+      "loaded_current": 1762027,
+      "loaded_peak": 1762027,
+      "retained_compact_helpers_and_facts": 1685863,
+      "peak_through_retirement": 1826848,
+      "tracing_excludes_encoding": true
+    },
+    "retirement": "Accepted reader structurally retires body/text/AST/scratch; retained compact facts/helpers remain. Trace excludes report encoding; RSS includes it. RSS is not a live-allocation measure."
+  },
+  "validation": {
+    "link_controls": 4,
+    "rust_selected_passed": 3,
+    "reused_reader_fact_controls": 11,
+    "reused_controls_source": "target/wp933/controls-operation.json",
+    "source_observations": 2,
+    "rust_seconds": 0.30942181206773967,
+    "rust_conservative_rss_kib": 19024,
+    "exact_selectors": [
+      "tracked_rules_rust_root_declaration_matches_offline_registry_candidate",
+      "request_input_helper_populates_the_complete_fail_closed_triplet",
+      "root_graph_preserves_bazel_global_shapes_and_repository_mapping"
+    ],
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/root_module_dice-431802d1b54a7745",
+    "artifact_sha256": "ebfe4a7a432945ab08c2600e300de61cec31bc89b1bb43029c5ab7dc388bf3fb",
+    "batch_preflight": "target/wp941/rust-preflight.txt",
+    "compile": {
+      "first_exit": 124,
+      "first_seconds": 60.00381310097873,
+      "cause": "Invocation omitted the four previously accepted opt-level0/debug0 package overrides; preserved, no tests executed.",
+      "corrected_exit": 0,
+      "corrected_seconds": 18.58077961904928,
+      "command_receipt": "target/wp941/compile-corrected.json"
+    },
+    "direct_core_check": {
+      "exit_code": 0,
+      "seconds": 6.83443541394081
+    },
+    "runtime_caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "file_bytes": 16777216,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304
+    },
+    "preparation_cap_seconds": 60,
+    "per_file_and_aggregate_source_bytes": 16777216,
+    "metadata_target_limit_bytes": 4096,
+    "fact_body_limit_bytes": 262144,
+    "reader_scratch_bytes": 65536,
+    "final_pin_check_sha256": "5def3039cfc2b195b151275c9ffdd4939d3bc71ddb88a301491268d81205d439",
+    "distinct_current_pins": 34,
+    "pin_comparisons": 82,
+    "final_reviews": [
+      {
+        "path": "target/wp941/final-source.md",
+        "sha256": "e3a5da4a3a06c3e3028c144f91579c561388474663af5ab22e18970a27a3b202",
+        "verdict": "ACCEPT"
+      },
+      {
+        "path": "target/wp941/final-evidence.md",
+        "sha256": "5cc9a7fbcdc4964e7a21e69bd412c70076a56b72e24a92273490b7b03c11908f",
+        "verdict": "ACCEPT"
+      },
+      {
+        "path": "target/wp941/final-docs-source.md",
+        "sha256": "55608ed425d0d18441b41e4e473ebcd242ca84b04b9fb2446b71df8eeca6b1f2",
+        "verdict": "ACCEPT"
+      },
+      {
+        "path": "target/wp941/final-docs-evidence.md",
+        "sha256": "d90b495bf48c17452315a032575b68ae0593020dda0415f01fa2563d4ad9e8dc",
+        "verdict": "ACCEPT"
+      }
+    ],
+    "executed_checks": 7,
+    "new_test_cases": 1,
+    "hygiene": "v2_plan_status.py, v2_archive_status.sh and git diff --check pass; no archive changes."
+  },
+  "complexity": "One cohesive existing integration-owner test;152 formatted lines versus initial100-line estimate. No generic matching harness, copied source fixture, new production API or extra module owner.",
+  "elapsed": "Recorded operation, compile and test durations; total wall/review duration unavailable.",
+  "successor": "Freeze the actual same-workspace local ModuleSourcePreparationKey/native materializer or SelectedPreparationOwnerKey contract with this exactroot/MODULE pin before a new operation. Native initialization must handle actual MODULE directives/dependencies. No import bodies, normal command/acquisition/source16-18/F3/BCR/fullroot retry selected by this receipt."
+}

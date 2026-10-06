@@ -55,15 +55,16 @@ Detailed chronology remains in those receipts and this plan at commit4ddc6c29a;
 representative parsing fits the memory envelope, while module/provider/full graph
 readiness remains unproved and all spent refusals remain closed.
 [WP940](./slug-v2-subplans/wp940-exact-offline-registry-prerequisite-2026-10-06.json)
-records one newly armed offline observation: sole exact BCR request ending in
-`modules/platforms/1.1.0/MODULE.bazel`, first NetworkDisabled and separate Demand
-mismatch. Fourteen executed tests pass; native 0.218 s/65,860 KiB, recorder credit
-279,143 bytes and source peak 344,679 bytes under unchanged caps. Fixed 16 KiB scratch,
-credit and recorder/scope Weak retirement are proved; no source bytes acquired. Next
-freeze typed declaration/key/forward-request correspondence and independently evidenced
-local-source readiness. Raw URL is not module/caller/MVS or availability proof. No command,
-acquisition or success retry is selected; whole-fit/public producer and transitive/module/
-generated prerequisites remain open.
+records the sole complete platforms1.1.0 MODULE request at offline refusal, under
+unchanged caps. [WP941](./slug-v2-subplans/wp941-platforms-local-module-readiness-2026-10-06.json)
+proves evaluated root declaration/forward URL correspondence and observes one local
+platforms MODULE416B with partial literal1.1.0 declaration/dependencies. Seven
+checks pass (one new test case); first source read0.052s/18,572KiB, corrected preparation18.581s
+and Core check6.834s pass. Next freeze actual native source/module preparation using
+this exact root/hash, then advance generated prerequisites and normal retained Rustc
+ownership. Physical bytes and a matching candidate do not certify MVS/registry provenance,
+normal module/source authority or whole fit. No normal command/acquisition/spent-source
+retry is selected; public producer and transitive/generated prerequisites remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
