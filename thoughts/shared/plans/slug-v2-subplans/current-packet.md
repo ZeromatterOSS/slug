@@ -1,99 +1,101 @@
 # Slug V2 current work packet
 
-Packet: WP-7-229-m7a-effective-compiler-argument-reconciliation-r1
-Status: Native header capability accepted; recorded compiler argument reconciliation selected
+Packet: WP-7-230-m7a-generated-compiler-env-file-correspondence-r1
+Status: Saved argument projection accepted; demanded generated environment inputs selected
 
-## Observable and source basis
+## Observable, demand and source basis
 
-Return to priority1's recorded declared Rustc input closure. Reconcile the ordered
-child arguments of all513 recorded Rustc owners in the1385-action root0 artifact
-closure:511 native wrappers and two bootstrap shell wrappers, with216 argument-file
-consumers and297 direct-only owners. Preserve1167 ordered bindings to201 shared
-decoded vectors (2089 observed bytes,39 nonempty). Close only source-proved literal,
-order, cfg and provenance classifications;
-report runtime-context and nested-file dependencies explicitly. The WP905 graph and
-WP911 byte/parser receipts are historical pinned observations, not current source
-freshness, executed compiler argv, Cargo host-role equivalence or Slug runtime fit.
-No reread/acquisition/build/query is required to consume the saved token vectors.
+Continue canonical priority1's configured compiler input coverage. Account for and
+observe only the446 unique generated environment-file artifacts consumed through466
+ordered --env-file occurrences by411 of the513 saved Rustc owners. All379
+ExtractCargoTomlEnvVars and67 CargoBuildScriptRun producers are in the original
+1385-action root0 artifact closure. Root0 itself has no env-file argument; its
+transitive compiler forest supplies this demand. Preserve original action/artifact,
+producer/path/configuration/isTool and occurrence associations; no basename or Cargo
+host-role inference.
 
-Use the pinned cached rules_rust process_wrapper options.rs/util.rs and WP911 source
-interpretation, with immutable source pins and source-derived regression controls.
-[The successor source note](../../../../target/wp929/successor-source.md), SHA256
-435f8e39554ed0671fff5e68e29370e80864b4b5096740efdac5e0be00f05196, pins the exact
-source/observation owners. Ordered literal substitution follows append preparation; RHS exactly ${pwd}/${output_base}/${exec_root}
-depends on runtime cwd/canonicalization. Never fill these from an invented checkout,
-path spelling, current host cwd or another action's configuration. A symbolic/path-domain
-classification is qualified metadata, never exact historical absolute bytes or a new
-semantic identity. Bootstrap shell semantics are separate: physical pwd and first
-occurrence replacement, not native replace-all. Generated script bytes remain qualified.
-Keep normal library/proc-macro/run-script/tool/root roles and
-isTool separate. Unsupported source/context cases stay unknown rather than guessed.
-Exact claims cover only source-defined transformations over pinned supplied tokens;
-Slug-native inventory/domain classifications carry explicit provenance and unknowns.
-Historical absolute runtime argv/environment, current freshness and production execution
-remain unsupported/deferred by this packet.
+[The source recommendation](../../../../target/wp930/successor-source.md), SHA256
+c501ca6ab8b202e0571f0fbee4552e5b7381877abb0fe23b0262d270b721dbfb,
+pins the saved graph/references and cached rules_rust source. Read these source
+anchors before freezing the concrete helper: options.rs214–237/320–331/443–469,
+util.rs36–65, rustc.bzl848–855/1053–1056, cargo_toml_env_vars.bzl3–25 and
+cargo_build_script_runner/lib.rs162–177. Reuse the accepted pure LF/CRLF/backslash/EOF
+decoder, without invoking its old acquisition reader. Split env records at first
+ASCII equals; retain empty fields, refuse absent equals, apply later-record/file
+key overwrite, then raw OUT_DIR override. Preserve source-defined value substitution
+order and runtime-domain uncertainty; no recursive shell interpretation.
+
+Exact claims cover admitted source transformations over supplied bytes and saved
+artifact/order joins. The inventory is Slug-native operational metadata. New cached
+output reads are qualified current local observations joined to a historical graph,
+never historical environment or current producer-freshness certification. Inherited
+process environment, historical cwd/canonicalization, stamp bytes, Cargo host-role
+identity, actual current compiler execution and full-root/M7A remain deferred.
 
 ## Owner, scope and allocation
 
-This is a bounded source-supplied inventory/comparator step, with no Slug production,
-DICE key, execution grant, interner or runtime change. Reuse exact action/artifact IDs
-within the pinned saved graph and original decoded file vectors by shared index;
-preserve consumer occurrence/order instead of duplicating every generated path/body.
-Process temporary argument state per consumer and retire it before the next. Borrow
-existing decoded strings where possible; retain only compact classifications/provenance
-and explicit unknowns. Do not globally intern unique tokens, clocks or temporary paths.
+No production/DICE/interner/execution grant changes. Root freezes a minimal ignored
+reader/analyzer and serial capped runner in target/wp931; one worker may own finite
+pure controls, with independent source and evidence DESIGN/FINAL reviews. Exact
+allowlist: ignored helpers/source/input/operation/result/hash records, canonical/current/
+bootstrap scheduling/evidence and one compact tracked receipt. Helper roughly200–350
+lines and controls100–200 are review triggers. No Rust, loading, backend/cache/CLI,
+query/build, wrapper invocation, .expanded write or corpus growth is selected.
 
-Root first freezes the smallest operational parser/classifier against the source
-note and accepted WP911 helper. Exact allowlist: ignored target/wp930/analyze.py,
-controls.py, bounded operation/result/hash records; canonical/current/bootstrap and
-one compact acceptance receipt. No new tracked production API/helper is justified.
-New operational helper roughly200–350lines and controls100–200 are review triggers,
-not automatic stops. No Rust/Analysis/BuildAPI/loading/source acquisition,
-input image/planner/backend/cache/CLI, generated .expanded writes or corpus expansion.
-Any production prerequisite discovered is selected separately, not silently activated.
+Use only original fixed saved-input pins and446 exact declared generated paths under
+WP911's recorded execroot provenance. Validate the root and walk componentwise through
+regular directory descriptors without following symlinks; only regular nofollow
+leaves, descriptor/named identity and size brackets. Record per-file bytes/hash and
+original producer provenance. A successful old root build does not certify current
+outputs. Missing/type/identity/size/source-pin failure records refusal without recovery,
+new build, acquisition or inference from locks. No ambient environment/RC reading.
 
-Preserve explicit memory and operation caps. Offline inventory runtime10s TERM3,
-512MiB address space/256MiB RSS; each saved input<=16MiB and final compact report<=4MiB,
-checked before parsing/encoding, with incremental ordered output hashes and per-action
-scratch retirement. Record peak/retention for this actual saved workload. No silent
-cap increase, fresh source16/17/18 attempt or registry/BCR retry. A small parser control does not establish
-whole-workload fit. Current Linux priority and minimal Windows Unsupported remain.
+Keep original decoded strings shared by unique file index; process one consumer's
+ordered overwrite/projection scratch and retire it before the next. Retain compact
+key/origin/domain references and incremental digests rather than duplicated complete
+maps for411 consumers. Borrow or transfer existing storage; no global pool for temporary
+or unique strings. Measure actual load/projection/retention and whole-operation RSS,
+with explicit release boundaries and encoding interval qualification.
 
-## Discriminators and acceptance
+## Fixed limits and acceptance
 
-Test direct-plus-appended vector order, repeated/shared files, option/value context
-across boundaries, literal ordered substitutions and introduced-later markers,
-special RHS context dependencies, unchanged/self-valued mappings, malformed repeated
-and single flag shapes, empty/missing/unknown values, direct executable transformation,
-bootstrap first-versus-all replacement, optional unstable-feature insertion/suppression,
-nested @ demand and cfg/check-cfg syntax. Preserve full original cfg payloads
-and distinguish unresolved path tokens from active named features. Unknown substitutions
-cannot authorize a complete argv/feature-absence claim. Assert per-owner action/artifact
-provenance, configuration/role association and exact conserved bindings/counts; do not
-infer Cargo host semantics or current filesystem freshness from saved dump IDs.
-Recompute the source note's literal-only residual occurrences (output_base513/pwd556/
-exec_root513) by exact owner/token provenance, without treating counts as semantics.
-The466 env-file declarations establish no effective environment bytes/claim.
+Separate pure controls from one serial bounded observation. Preserve10s TERM3,
+512MiB address space/256MiB monitored RSS; each saved input<=16MiB, each generated
+file<=1MiB and total generated bytes<=16MiB, checked before parsing/growth. Compact
+report<=4MiB checked during incremental encoding. Do not silently raise a cap.
+A resource refusal leaves that gate unproved; preserve it and select the smallest
+source-ready next decision. Source16/17/18 and the legacy unproved offline BCR guard
+have no retry. Linux remains priority; Windows may remain minimal Unsupported.
 
-Use source-derived controls and one bounded recorded-workload reconciliation; independent
-source/evidence review of the concrete helper and claims, source/diff/archive/plan checks,
-compact receipt/local commit. No Cargo required without a Rust change. A parser/context
-failure is corrected within this owner; a missing runtime historical-context fact remains
-an explicit boundary or source-ready next decision, not permission for ambient inference.
-M7A/full-root/whole-workload fit and authentic Slug execution remain open.
+Discriminate exact decoder/first-equals/empty/malformed semantics; duplicate keys
+within/across repeated files; direct fixed/file precedence on supplied pure maps;
+raw OUT_DIR override; ordered substitutions/introduced markers/sticky runtime domains;
+missing/type/identity/hash/per-file/aggregate refusal. Verify all446 producer artifacts,
+466 ordered occurrences and411 consumer memberships through the original declared
+root walk, exact saved configurations and source-owned outputs. Do not interpret
+absence of observed keys as absence from the inherited effective environment.
+
+Freeze source/implementation pins and meaningful named nonzero controls before the
+measured observation. Independent source/evidence FINAL reviews inspect actual code
+and bounded receipts, not just hashes/counts; no duplicate runtime. Run source/diff/
+archive/plan checks, record caps/time/retention/failure attribution and commit locally.
+No Cargo is required without a Rust change. Genuine design/provenance prerequisites
+remain a source-ready decision; unavailable bytes never authorize recovery or ambient
+context substitution. No Slug whole-workload memory-fit claim follows from this reader.
 
 ## Immediate predecessor
 
-[WP929](wp929-native-build-info-header-publication-2026-10-06.json) accepts actual
-current native physical-status-derived Info/Version header writes at original
-configured singleton outputs. All55 current controls, default CLI and three
-FINAL reviews pass. The accepted result shares the same consumed header, no additional
-body copy/interner.2MiB checked admission covers the1,405,044-byte conservative bound;
-actual source-derived pure worst case1,400,909bytes. Source-proved12FD peak and9,260byte
-lexical scratch remain qualified. Original precomputed/renderer bodies remain retained.
-Actual rename EACCES closes all6header-stageFDs even through held cells, but readonly
-parent unlink can leave owned scratch; revision/status may already change on later error.
-Saved WP905 has zero consumers of all four TranslateBuildInfo outputs and no demanded
-C++ execution gap from those mnemonic rows. Further header/C++ integration therefore
-requires explicit requested-root demand. Historical freshness/memory/source attempt
-limits and the old unproved offline bare BCR guard persist.
+[WP930](wp930-effective-compiler-arguments-2026-10-06.json) accepts source-supplied
+historical literal projections for all513 saved Rustc owners (511 native/two shell),
+201 shared vectors and1167 ordered bindings.16 source-derived controls and the
+2.267s bounded workload pass, with two independent FINAL accepts. Whole-run observed
+RSS99,844KiB stays under256MiB; post-input-release trace3,741,750B retains compact
+report/classifier/shared leaves. Peak34,299,583B stops before encoding. These are
+Python saved-workload observations, not Slug aggregate savings or full fit.
+1082 recognized projected cfgs include68 generated bare/valued records and zero
+generated named features; all513 streams remain qualified.466 env declarations
+establish no actual environment bytes. Raw out_dir and executable uncertainty fixes
+are directly tested; the initial identity-counter assertion failure is preserved.
+Previous native header capability remains accepted, with zero saved root consumers;
+more header/C++ execution needs concrete demand. M7A/authentic Slug/whole-fit and all
+prior memory/source/resource qualifications remain open.

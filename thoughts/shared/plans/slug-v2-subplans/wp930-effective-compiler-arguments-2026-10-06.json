@@ -1,0 +1,301 @@
+{
+  "packet": "WP-7-229-m7a-effective-compiler-argument-reconciliation-r1",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "316f6acaa892f92d708966c0d35d3aa21c762a2b",
+  "result": "All 513 saved declared Rustc owners reconciled as qualified source-supplied literal argument projections with exact saved ordered file/provenance joins. No production change.",
+  "compatibility": {
+    "exact": "Pinned supplied-source flag parsing/order/literal substitutions and cfg recognition, discriminated by pure controls. Saved graph artifact/configuration/binding joins.",
+    "slug_native": "Operational historical projection/domain inventory and framed diagnostic digest.",
+    "deferred": "Runtime cwd/canonicalization, actual historical full argv/environment/script bytes, Cargo host-role equivalence, current source freshness, authentic Slug execution/M7A/full-root/whole-memory fit, Windows beyond minimal Unsupported."
+  },
+  "source_pins": {
+    "target/wp905/graph.json": {
+      "sha256": "15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c",
+      "bytes": 6746234
+    },
+    "target/wp905/references.json": {
+      "sha256": "f1e0cab91450f87f8c2c8782c61549890027dc09a7f085aa42887a19476ecf04",
+      "bytes": 1397614
+    },
+    "target/wp911/selection.json": {
+      "sha256": "f4a6cc64a54770a8dff5ccca4b2df8455fd4d2773b9bace0308c69e4dd8e2a1a",
+      "bytes": 334066
+    },
+    "target/wp911/result.json": {
+      "sha256": "201e181e5ba77024136813bb4de89dac3b4ec7b43a9ded9a1baa883428130f8c",
+      "bytes": 378964
+    },
+    "target/wp911/read.py": {
+      "sha256": "5ca936040fed9b3ef93c69e5b097482170165c9706232df8eb06f25cc9e1bfe6",
+      "bytes": 13009
+    },
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/flags.rs": {
+      "sha256": "36ee42819bbd59e95547fcf26a4569f8cc4578d3aad709f4af0db70c68ab271c",
+      "bytes": 9056
+    },
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/options.rs": {
+      "sha256": "b8a9208a3ced5be6cebd72a5fa82d19a85c64b0935585edff0e2546466c24b03",
+      "bytes": 21342
+    },
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/util.rs": {
+      "sha256": "2365f126d9270c1c87419c9435c64cef0cce7c6bc9bd40235ee1f2048c6865f8",
+      "bytes": 3637
+    },
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/private/process_wrapper.sh": {
+      "sha256": "62ff0823a3ab8505fd3ac394319f3b91d3aab5d055e7595e8debecac682f2446",
+      "bytes": 1232
+    },
+    "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/external/rules_rust+/util/process_wrapper/private/bootstrap_process_wrapper.bzl": {
+      "sha256": "7a4adbffd8b104d00941d4cdd0edc7743299cd2a78d28b2087d380574b04b62d",
+      "bytes": 2566
+    }
+  },
+  "contract": {
+    "path": "target/wp930/design.md",
+    "sha256": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+  },
+  "implementation": {
+    "target/wp930/analyze.py": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad",
+    "target/wp930/controls.py": "16ab018e42ce1b0a21c10437b9f2c70e034b272ba2ee6a43638e47b7e288e1ab",
+    "target/wp930/bounded.py": "d8ad93a47f91387967b878025f72fbc30f2f025dc95b823af78442e4fbfaada0",
+    "target/wp930/input-pins.json": "67d779592d155a982c343b9b0765e572460390819dea1910672e240eeb31c4fe",
+    "target/wp930/design.md": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+  },
+  "observed": {
+    "selected_action_closure": 1385,
+    "unique_vectors": 201,
+    "vector_bytes": 2089,
+    "counts": {
+      "native": 511,
+      "bindings": 1167,
+      "file_consumers": 216,
+      "env_file_declarations": 466,
+      "out_dir": 67,
+      "runtime_mappings": 1533,
+      "literal_mappings": 1472,
+      "identity_mappings": 1472,
+      "nested": 0,
+      "qualified_tokens": 1582,
+      "cfg_records": 1082,
+      "check_records": 0,
+      "generated_cfg_records": 68,
+      "bootstrap": 2
+    },
+    "residual_markers": {
+      "pwd": 556,
+      "output_base": 513,
+      "exec_root": 513
+    },
+    "cfg_kinds": {
+      "feature": 1014,
+      "bare": 66,
+      "valued": 2
+    },
+    "generated_cfg_kinds": {
+      "bare": 66,
+      "valued": 2
+    },
+    "unique_owner_rows": 513,
+    "owners_with_unknowns": 513,
+    "qualified_tokens": 1582,
+    "complete_effective_argv_owners": 0
+  },
+  "allocation": {
+    "ownership": "Original decoded vector strings shared per file; direct/generated temporary token refs and transformed strings retire per action. Compact cfg/provenance report retains required strings. Unchanged/self-valued replacements retain original string object. No 513 full-stream cache or global temporary interner.",
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576
+    },
+    "saved_input_cap_bytes": 16777216,
+    "compact_report_cap_bytes": 4194304,
+    "report_bytes": 618567,
+    "tracemalloc_through_input_retirement": {
+      "loaded_current": 30618645,
+      "loaded_peak": 32830763,
+      "scratch_retired_current": 34276119,
+      "scratch_retired_peak": 34299583,
+      "inputs_released_current": 3741750,
+      "traced_peak": 34299583,
+      "max_rss_kib": 99404
+    },
+    "qualified": "Python saved-workload accounting only. Tracemalloc fields stop before report encoding; whole-run RSS monitoring includes encoding. Input-release current includes compact report, pinned pure-classifier namespace and shared retained leaves; no zero input-origin retention claim. No Slug aggregate allocation savings/current full-fit conclusion."
+  },
+  "validation": {
+    "controls": {
+      "mode": "controls",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp930/controls.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.05119067395571619,
+      "selected_count": 16,
+      "pass_count": 16,
+      "max_observed_rss_kib": 26972,
+      "child_rusage_max_rss_kib": 26640,
+      "stop_reason": null,
+      "caps": {
+        "seconds": 10,
+        "term_seconds": 3,
+        "as_bytes": 536870912,
+        "rss_bytes": 268435456,
+        "log_bytes_each": 1048576
+      },
+      "owned_group_empty": true,
+      "joined": true,
+      "pins_before": {
+        "target/wp930/analyze.py": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad",
+        "target/wp930/controls.py": "16ab018e42ce1b0a21c10437b9f2c70e034b272ba2ee6a43638e47b7e288e1ab",
+        "target/wp930/bounded.py": "d8ad93a47f91387967b878025f72fbc30f2f025dc95b823af78442e4fbfaada0",
+        "target/wp930/input-pins.json": "67d779592d155a982c343b9b0765e572460390819dea1910672e240eeb31c4fe",
+        "target/wp930/design.md": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+      },
+      "pins_after": {
+        "target/wp930/analyze.py": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad",
+        "target/wp930/controls.py": "16ab018e42ce1b0a21c10437b9f2c70e034b272ba2ee6a43638e47b7e288e1ab",
+        "target/wp930/bounded.py": "d8ad93a47f91387967b878025f72fbc30f2f025dc95b823af78442e4fbfaada0",
+        "target/wp930/input-pins.json": "67d779592d155a982c343b9b0765e572460390819dea1910672e240eeb31c4fe",
+        "target/wp930/design.md": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+      },
+      "logs": {
+        "target/wp930/controls.stdout": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "target/wp930/controls.stderr": {
+          "bytes": 2841,
+          "sha256": "2d0bba4028b51b296fbbb651b7d81118bae89557c6f1dc953c55dc1f23ad374d"
+        }
+      }
+    },
+    "inventory": {
+      "mode": "inventory",
+      "command": [
+        "/usr/bin/python3",
+        "target/wp930/analyze.py"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.2673231990775093,
+      "selected_count": 513,
+      "pass_count": 513,
+      "max_observed_rss_kib": 99844,
+      "child_rusage_max_rss_kib": 99404,
+      "stop_reason": null,
+      "caps": {
+        "seconds": 10,
+        "term_seconds": 3,
+        "as_bytes": 536870912,
+        "rss_bytes": 268435456,
+        "log_bytes_each": 1048576
+      },
+      "owned_group_empty": true,
+      "joined": true,
+      "pins_before": {
+        "target/wp930/analyze.py": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad",
+        "target/wp930/controls.py": "16ab018e42ce1b0a21c10437b9f2c70e034b272ba2ee6a43638e47b7e288e1ab",
+        "target/wp930/bounded.py": "d8ad93a47f91387967b878025f72fbc30f2f025dc95b823af78442e4fbfaada0",
+        "target/wp930/input-pins.json": "67d779592d155a982c343b9b0765e572460390819dea1910672e240eeb31c4fe",
+        "target/wp930/design.md": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+      },
+      "pins_after": {
+        "target/wp930/analyze.py": "c9817012a64abdfe068556fb6afe17a672ed1ebe6c517570fdfcda54a47960ad",
+        "target/wp930/controls.py": "16ab018e42ce1b0a21c10437b9f2c70e034b272ba2ee6a43638e47b7e288e1ab",
+        "target/wp930/bounded.py": "d8ad93a47f91387967b878025f72fbc30f2f025dc95b823af78442e4fbfaada0",
+        "target/wp930/input-pins.json": "67d779592d155a982c343b9b0765e572460390819dea1910672e240eeb31c4fe",
+        "target/wp930/design.md": "559c06ffa6d073642c0687a98c6f97fa674ad0a5e600726a9daaaa5337b6e8a4"
+      },
+      "logs": {
+        "target/wp930/inventory.stdout": {
+          "bytes": 821,
+          "sha256": "51d4537b9d27d27165a04914762d47cf8a55b05bf4f1b2880c0c6bc7ab59683d"
+        },
+        "target/wp930/inventory.stderr": {
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      }
+    },
+    "inventory_inner_elapsed_seconds": 2.2380263860104606,
+    "initial_inventory": {
+      "path": "target/wp930/inventory-operation-attempt1.json",
+      "sha256": "971399f2a3bae4db5a2af883bc55493b0c283b18823875edda797197799063b4",
+      "disposition": "Ordinary assertion failure: census tested literal identity as RHS ${key}; correct discovered path=path predicate is v==k. Counter only, no altered projection/cap. Original failure logs retained; fresh current controls and workload pass on corrected pin."
+    },
+    "rust_cargo": "Not required: no Rust, DICE, CLI or production change.",
+    "bookkeeping": {
+      "path": "target/wp930/bookkeeping.json",
+      "sha256": "9cccd79a8f3690d8ef61b1111f963ed5f74cfdb284acc949f187770738f93cfe",
+      "checks": [
+        {
+          "command": [
+            "python3",
+            "scripts/v2_plan_status.py"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "bash",
+            "scripts/v2_archive_status.sh"
+          ],
+          "exit_code": 0
+        },
+        {
+          "command": [
+            "git",
+            "diff",
+            "--check"
+          ],
+          "exit_code": 0
+        }
+      ]
+    }
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp930/design-source.md",
+      "sha256": "e7b32b6ea3da4ef72dff2abbdb07c931d6567026d10205d11e2ccce9c8188ed1",
+      "verdict": "ACCEPT"
+    },
+    "design-evidence": {
+      "path": "target/wp930/design-evidence.md",
+      "sha256": "3f6f48b4fb6a9bc33a6ed3a0bea37fbd6cd78d0fcbbc93a97628e1c3f32017ae",
+      "verdict": "ACCEPT"
+    },
+    "final-source": {
+      "path": "target/wp930/final-source.md",
+      "sha256": "5bc560049703e791208e7bb4a3c5be5df418b37fedf77bf355b8e7e22506050b",
+      "verdict": "ACCEPT"
+    },
+    "final-evidence": {
+      "path": "target/wp930/final-evidence.md",
+      "sha256": "82425acff545e08f0aca54dd33c0aba80e8da85955ee96ad107b04e39f22c587",
+      "verdict": "ACCEPT"
+    }
+  },
+  "prior_boundaries": "WP899 refusal/profiles/DICE retention and whole-fit qualifications persist; source16/17/18 spent, no retry; legacy offline BCR guard unproved and not retried; M7A/full-root remain open.",
+  "operations": {
+    "path": "target/wp930",
+    "hash_index": "target/wp930/hashes.json",
+    "qualified": "Ignored local operational sources/logs/results remain available; this tracked receipt pins their complete hash index.",
+    "hash_index_sha256": "da69dd805f7ac56a823e625ae688d3903d64949185f21eec0f5c2d2789639ae4",
+    "artifact_count": 28
+  },
+  "successor": {
+    "packet": "WP-7-230-m7a-generated-compiler-env-file-correspondence-r1",
+    "source_note": "target/wp930/successor-source.md",
+    "source_note_sha256": "c501ca6ab8b202e0571f0fbee4552e5b7381877abb0fe23b0262d270b721dbfb",
+    "demand": "446 unique declared env-file artifacts,466 ordered bindings/411 Rustc consumers,379 ExtractCargoTomlEnvVars and67 CargoBuildScriptRun producer artifacts in original1385-action closure. Actual bytes/effective environment/freshness not yet observed."
+  },
+  "timing": {
+    "packet_elapsed_seconds_at_acceptance_record": 1168.3044302463531,
+    "compile_seconds": 0,
+    "current_controls_seconds": 0.05119067395571619,
+    "current_inventory_seconds": 2.2673231990775093,
+    "review_seconds": "Not instrumented; DESIGN and FINAL source/evidence checkpoints preserved."
+  }
+}
