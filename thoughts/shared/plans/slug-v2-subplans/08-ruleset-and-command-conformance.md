@@ -407,8 +407,10 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
 - [WP913 Symlink text aquery](wp913-symlink-aquery-2026-10-06.json) adds borrowed
   ordinary/executable Artifact-target and absolute-target SymlinkAction fields,
   original singleton input progress and producer-owned default messages. Admitted
-  distinct-output owners retain query multiplicity; equal-output ordinary Symlink
-  closure equivalence remains a typed prerequisite. Genuine unresolved/Solib/runfiles
+  owners retain query multiplicity; [WP914](wp914-symlink-equivalence-2026-10-06.json)
+  also preserves both admitted equal-output Artifact records and their progress,
+  while closure-proven duplicates share one planned producer. Full structural input/
+  output identity and platform-agnostic class proof govern this limited sharing. Genuine unresolved/Solib/runfiles
   query and ActionKeys stay deferred; no execution or source gate is widened.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the

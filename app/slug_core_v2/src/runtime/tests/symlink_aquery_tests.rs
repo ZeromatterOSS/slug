@@ -1,4 +1,5 @@
 use slug_analysis_v2::ConfiguredSymlinkActionView;
+use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::SymlinkTarget;
 use slug_query_v2::AqueryScope;
 
@@ -242,18 +243,19 @@ async fn symlink_aquery_target_output_progress_and_type_restore_with_old_results
 }
 
 #[tokio::test]
-async fn symlink_aquery_keeps_distinct_owners_and_preserves_equivalence_refusal() {
-    const DEFS: &str = "def _alias(ctx):\n    out = ctx.actions.declare_file(ctx.attr.out)\n    ctx.actions.symlink(output=out, target_file=ctx.file.src)\n    return [DefaultInfo(files=depset([out]))]\nalias = rule(implementation=_alias, attrs={'out':attr.string(), 'src':attr.label(allow_single_file=True)})\n";
-    let epoch = |revision, right: &str| {
+async fn symlink_aquery_shared_owners_keep_progress_and_restore_conflicts() {
+    const DEFS: &str = "def _alias(ctx):\n    out = ctx.actions.declare_file(ctx.attr.out)\n    ctx.actions.symlink(output=out, target_file=ctx.file.src, progress_message=ctx.attr.message)\n    return [DefaultInfo(files=depset([out]))]\nalias = rule(implementation=_alias, attrs={'out':attr.string(), 'src':attr.label(allow_single_file=True), 'message':attr.string()})\n";
+    let epoch = |revision, output: &str, input: &str, message: &str| {
         let mut epoch = BuildRootEpoch::base(revision);
         epoch.file(
             "/workspace/MODULE.bazel",
             "module(name='root')\nregister_execution_platforms('//:platform')\n",
             revision,
         );
-        epoch.package("", &format!("load(':defs.bzl','alias')\nplatform(name='platform')\nalias(name='left',out='left.link',src='input.txt')\nalias(name='right',out='{right}',src='input.txt')\n"), revision);
+        epoch.package("", &format!("load(':defs.bzl','alias')\nplatform(name='platform')\nalias(name='left',out='shared.link',src='input.txt',message='left progress')\nalias(name='right',out='{output}',src='{input}',message='{message}')\n"), revision);
         epoch.file("/workspace/defs.bzl", DEFS, revision);
         epoch.file("/workspace/input.txt", "source", revision);
+        epoch.file("/workspace/other.txt", "other", revision);
         epoch.build()
     };
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -266,12 +268,18 @@ async fn symlink_aquery_keeps_distinct_owners_and_preserves_equivalence_refusal(
         build_test_configuration("query"),
     )
     .unwrap();
-    let mut transaction = build_root_transaction(&dice, epoch(30, "right.link")).await;
-    let outcome = transaction.compute(&key).await.unwrap();
-    let evaluation = complete_symlink_evaluation(&outcome);
-    let text = symlink_text(evaluation, AqueryScope::Deps);
-    let records = symlink_records(&text);
+    let mut transaction = build_root_transaction(
+        &dice,
+        epoch(30, "shared.link", "input.txt", "right progress"),
+    )
+    .await;
+    let first = transaction.compute(&key).await.unwrap();
+    let held = complete_symlink_evaluation(&first);
+    let original = symlink_text(held, AqueryScope::Deps);
+    let records = symlink_records(&original);
     assert_eq!(records.len(), 2);
+    assert!(records[0].starts_with("action 'left progress'\n"));
+    assert!(records[1].starts_with("action 'right progress'\n"));
     for label in ["//:left", "//:right"] {
         assert_eq!(
             records
@@ -281,30 +289,137 @@ async fn symlink_aquery_keeps_distinct_owners_and_preserves_equivalence_refusal(
             1
         );
     }
-    assert_ne!(
-        evaluation.targets[0].analysis.as_ref().unwrap().actions()[0]
-            .context()
-            .owner(),
-        evaluation.targets[1].analysis.as_ref().unwrap().actions()[0]
-            .context()
-            .owner()
+    let plan = held.requested_action_prerequisites().unwrap();
+    assert_eq!(plan.selection().artifacts().len(), 2);
+    assert_eq!(plan.actions().len(), 1);
+    assert_eq!(plan.artifact_producers(), &[Some(0), Some(0)]);
+    assert!(std::ptr::eq(
+        plan.actions()[0].action(),
+        &held.action_closure.owners()[0].actions()[0]
+    ));
+    assert!(held.action_closure.execution_representative(0, 0));
+    assert!(!held.action_closure.execution_representative(1, 0));
+    let right = held.targets[1]
+        .analysis
+        .as_ref()
+        .unwrap()
+        .configured_target_key()
+        .unwrap();
+    assert!(std::ptr::eq(
+        held.action_prerequisites(right, 0).unwrap().actions()[0].action(),
+        plan.actions()[0].action()
+    ));
+    // Synthetic retained same-owner coordinates: public registration still
+    // coalesces repeats. This exercises the generic query/planner consumers.
+    let node = held.targets[0].analysis.as_ref().unwrap();
+    let spec = node.actions()[0].symlink_spec().unwrap();
+    let duplicated = Arc::new(
+        node.as_ref()
+            .clone()
+            .with_action_specs(
+                vec![
+                    ActionSpec::symlink(spec.clone()),
+                    ActionSpec::symlink(slug_build_api_v2::SymlinkSpec::new(
+                        spec.output().clone(),
+                        spec.target().clone(),
+                        Some("same-owner second"),
+                    )),
+                ],
+                vec![node.actions()[0].context().clone()],
+            )
+            .unwrap(),
+    );
+    let mut targets = held.targets[..1].to_vec();
+    targets[0].analysis = Some(duplicated.clone());
+    let synthetic = BuildCommandEvaluation {
+        anchor: held.anchor.clone(),
+        targets: targets.into(),
+        action_closure: ValidatedActionClosure::new(Arc::from([duplicated])).unwrap(),
+    };
+    let synthetic_text = symlink_text(&synthetic, AqueryScope::Deps);
+    let synthetic_records = symlink_records(&synthetic_text);
+    assert_eq!(synthetic_records.len(), 2);
+    assert!(synthetic_records[0].starts_with("action 'left progress'\n"));
+    assert!(synthetic_records[1].starts_with("action 'same-owner second'\n"));
+    assert_eq!(
+        synthetic
+            .requested_action_prerequisites()
+            .unwrap()
+            .actions()
+            .len(),
+        1
+    );
+    assert_eq!(
+        synthetic
+            .action_prerequisites(node.configured_target_key().unwrap(), 1)
+            .unwrap()
+            .actions()
+            .len(),
+        1
     );
     drop(transaction);
-    let mut transaction = build_root_transaction(&dice, epoch(31, "left.link")).await;
-    let refused = transaction.compute(&key).await.unwrap();
-    let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = refused else {
-        panic!("equivalence fixture retained Needs")
-    };
-    let error = value.as_ref().as_ref().unwrap_err();
-    assert!(matches!(
-        error.kind,
-        BuildCommandErrorKind::ActionClosure(
-            ConfiguredActionClosureError::UnsupportedEquivalence { .. }
+    for (index, (output, input, message)) in [
+        ("shared.link", "other.txt", "right progress"),
+        ("other.link", "input.txt", "right progress"),
+        ("shared.link", "input.txt", "changed progress"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut changed_tx =
+            build_root_transaction(&dice, epoch(31 + index as i64 * 2, output, input, message))
+                .await;
+        let changed = changed_tx.compute(&key).await.unwrap();
+        if index == 0 {
+            let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = changed else {
+                panic!("conflict retained Needs")
+            };
+            let error = value.as_ref().as_ref().unwrap_err();
+            assert!(matches!(
+                error.kind,
+                BuildCommandErrorKind::ActionClosure(
+                    ConfiguredActionClosureError::OutputConflict { .. }
+                )
+            ));
+            assert_eq!(error.terminal_error(), ("configured_action_conflict", 2));
+        } else {
+            let evaluation = complete_symlink_evaluation(&changed);
+            assert_ne!(symlink_text(evaluation, AqueryScope::Deps), original);
+            assert_eq!(
+                evaluation
+                    .requested_action_prerequisites()
+                    .unwrap()
+                    .actions()
+                    .len(),
+                if index == 1 { 2 } else { 1 }
+            );
+        }
+        assert_eq!(symlink_text(held, AqueryScope::Deps), original);
+        drop(changed_tx);
+        let mut restored_tx = build_root_transaction(
+            &dice,
+            epoch(
+                32 + index as i64 * 2,
+                "shared.link",
+                "input.txt",
+                "right progress",
+            ),
         )
-    ));
-    assert_eq!(
-        error.terminal_error(),
-        ("unsupported_action_equivalence", 2)
-    );
-    assert_eq!(symlink_text(evaluation, AqueryScope::Deps), text);
+        .await;
+        let restored = restored_tx.compute(&key).await.unwrap();
+        let restored = complete_symlink_evaluation(&restored);
+        assert_eq!(symlink_text(restored, AqueryScope::Deps), original);
+        assert_eq!(
+            restored
+                .requested_action_prerequisites()
+                .unwrap()
+                .actions()
+                .len(),
+            1
+        );
+    }
+    drop(first);
+    drop(dice);
+    assert!(original.contains("right progress"));
+    assert!(!original.contains("changed progress"));
 }

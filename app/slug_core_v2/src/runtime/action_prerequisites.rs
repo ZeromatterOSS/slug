@@ -13,6 +13,7 @@ use starlark_map::small_set::SmallSet;
 use super::configured_action_closure::ValidatedActionClosure;
 use super::configured_action_closure::scalar_file_write;
 use super::dice::source_staging::declared_artifacts;
+use super::symlink_action_equivalence::admitted_artifact_symlink;
 
 mod runfiles;
 pub(in crate::runtime) mod symlink;
@@ -147,7 +148,7 @@ fn plan_roots<'a>(
         .map(|owner| owner.configured_target_key().unwrap().artifact_owner())
         .collect::<Vec<_>>();
     let mut owner_index = SmallMap::new();
-    let mut declared = SmallMap::new();
+    let mut declared: SmallMap<_, Coordinate> = SmallMap::new();
     let mut physical = SmallMap::new();
     for (owner, node) in owners.iter().enumerate() {
         if owner_index.insert(&artifact_owners[owner], owner).is_some() {
@@ -155,11 +156,21 @@ fn plan_roots<'a>(
         }
         for (action, value) in node.actions().iter().enumerate() {
             for output in value.outputs() {
-                if declared
-                    .insert((&artifact_owners[owner], output), (owner, action))
-                    .is_some()
-                {
-                    return Err("ambiguous generated output producer".into());
+                let declared_key = (&artifact_owners[owner], output);
+                if let Some(&(previous_owner, previous_action)) = declared.get(&declared_key) {
+                    // Keep the first exact declaration. The closure has already
+                    // proved this later singleton alias an execution duplicate.
+                    if admitted_artifact_symlink(value).is_none()
+                        || admitted_artifact_symlink(
+                            &owners[previous_owner].actions()[previous_action],
+                        )
+                        .is_none()
+                        || closure.execution_representative(owner, action)
+                    {
+                        return Err("ambiguous generated output producer".into());
+                    }
+                } else {
+                    declared.insert(declared_key, (owner, action));
                 }
                 if closure.execution_representative(owner, action) {
                     physical.insert(
@@ -178,7 +189,7 @@ fn plan_roots<'a>(
             return Ok(coordinate);
         }
         let value = &owners[owner].actions()[action];
-        if !scalar_file_write(value) {
+        if !scalar_file_write(value) && admitted_artifact_symlink(value).is_none() {
             return Err("unsupported shared action prerequisite".into());
         }
         physical

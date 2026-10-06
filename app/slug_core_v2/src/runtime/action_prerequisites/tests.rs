@@ -720,3 +720,7 @@ mod solib_tests;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[path = "symlink_tests.rs"]
 mod symlink_tests;
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[path = "symlink_equivalence_tests.rs"]
+mod symlink_equivalence_tests;

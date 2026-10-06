@@ -1,0 +1,184 @@
+{
+  "packet": "WP-7-213-m7a-symlink-output-equivalence-r1",
+  "operational_packet": "WP914",
+  "date": "2026-10-06",
+  "base": "4bfd952e6e4262dcc13ce57c99a7883103c2ccff",
+  "status": "accepted",
+  "outcome": "Ordinary default Artifact-target Symlink/ExecutableSymlink structural sharing in validated closure and coupled exact declared duplicate producer planning; semantic/query actions and progress remain distinct.",
+  "compatibility": {
+    "exact": "Pinned Bazel9.2 platform-agnostic Symlink class and progress exclusion, ordinary/executable distinction, retained input/output comparison and closure-first validation. Actual ActionKey remains omitted to M9.",
+    "slug_native": "Full Source canonical label and Derived configured producer/output identity deliberately stricter than Bazel ownerless root/execpath sharing. Existing config/path/label/traversal domains retained.",
+    "unsupported": [
+      "AbsolutePath sharing, WorkspaceStatus/tree/constant metadata input or output, alternate source policy and custom action-level group/properties",
+      "future/unadmitted aspect producer (explicit Absent guard)",
+      "Solib/Spawn/runfiles sharing breadth and existing Solib duplicate planning refusal",
+      "authentic six saved typed producer rows, full production root query and execution",
+      "Windows execution, source/runtime/whole-workload memory fit and M7A"
+    ]
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "sources": {
+      "Actions.java": "bbad499d06a63cd9986cda628802cdb98559c27c3c51d6e49c3381ce041641d9",
+      "ActionKeyComputer.java": "2985db887f68d59760d94328c360f7ef3dbb7adadcb27cc98e5b04769ba51e39",
+      "SymlinkAction.java": "3579cdfa2b2eb7c96b040e34f4c2774e3e684725f940e7c7facb940862a0f7ce",
+      "Artifact.java": "03a69adfee1b171bcdf1ded4458d265386130264fc6b15e27db2fa170dd1bb52"
+    },
+    "method": "Pinned-source regression plus reused BuildAPI/closure/Symlink/Solib/query fixtures. No new query/action/network/acquisition. Concrete virtual overrides return EMPTY_PLATFORM_INFO and empty properties, so generic ActionKeyComputer owner-platform hypothesis was corrected before design acceptance/code.",
+    "demand": "WP905 graph hash15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c: all six equal rows in CLI1385 input walk, same owner/inputID/outputID/key/platform; three ordinary Symlink pairs in target and three in tool config. Saved graph does not own typed policy/progress/output metadata or prove native retained producer multiplicity."
+  },
+  "ownership": {
+    "comparison": "51-line borrowed helper, no key/string cloning, new map/cache/interner/lock/retained representation. Admit selected default typed singleton Source/Derived regular Ordinary Artifact aliases with false policy; full output+target equality; progress/context excluded. No display-path/hash-only identity.",
+    "closure": "Existing exact/prefix/root validation/stable ordinal and duplicate-coordinate storage retain all owners/actions, mark later proved coordinates only. Admitted unequal=>OutputConflict; unknown=>UnsupportedEquivalence.",
+    "planner": "Existing exact owner/output lookup precedes physical canonical lookup. Lookup-before-insert retains first declaration; same-owner later duplicate admitted only when BOTH retained predicates pass and closure marks later nonrepresentative. First local may itself be earlier-owner duplicate. Canonical guard uses same predicate, does not rebuild equivalence or execute aliases. Requested owner-qualified artifacts map to one planned ordinal.",
+    "preserved": "DFS cycles, source-selected nonrepresentative rejection, source-staging/alias Linux/input checks, requested grouping/publication containment, Solib refusal and root conflict-before-effects unchanged. No DICE key/cache/fs bypass or effect activation. Public registration still coalesces first equivalent index/message."
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/symlink_action_equivalence.rs": "079ccae508dccf7bdc0b545b00a04cd9a9bb0e623d8857895caba74c10543a52",
+    "app/slug_core_v2/src/runtime/configured_action_closure.rs": "6e2ae644ddb154becd417bb3460265858d56bb04581f8c20d86ef04b969fefcd",
+    "app/slug_core_v2/src/runtime/action_prerequisites.rs": "125826b1d885294cacbe7af163b2eabf37723e47b6126e4a00f8cd8dbc42fab1",
+    "app/slug_core_v2/src/runtime/mod.rs": "fbd624ad3526b59128bc75c57c5ac6f989a701e4ea55c88239b51261f9f913db",
+    "app/slug_core_v2/src/runtime/action_prerequisites/tests.rs": "151d2961db36d28ee05efaee12436c04a8c6f6ea59436ec360abf5ba52b59d3c",
+    "app/slug_core_v2/src/runtime/action_prerequisites/symlink_equivalence_tests.rs": "84144c3b0423a2065bed692b22fa96fe41de89888c10efabca70dbd5a34d247d",
+    "app/slug_core_v2/src/runtime/tests/symlink_aquery_tests.rs": "d5938ca55d62a734c53af30afbddfac04091ab684c1869db4213b12000a09182"
+  },
+  "validation": {
+    "toolchain": "nightly-2025-09-14 tool binaries resolved through rustup which",
+    "compile_attempts": {
+      "candidate-cli-check": {
+        "exit_code": 101,
+        "elapsed_seconds": 5.803309004055336,
+        "receipt": "target/wp914/candidate-cli-check.json",
+        "receipt_sha256": "74f6167916657345cd16062e0a384b5a989bf933f5577c5c0babdb22c9b05472",
+        "log_sha256": "958c6f21a2c59180a59fe630aec7aa6bf9577bebd1c1b882d2407906dd4da3fc"
+      },
+      "candidate-cli-check-corrected": {
+        "exit_code": 0,
+        "elapsed_seconds": 6.375313985045068,
+        "receipt": "target/wp914/candidate-cli-check-corrected.json",
+        "receipt_sha256": "1da90af5c516a230ec71bdcd7ff1a2ff62a5ec712a7f5eb4efdbb6a5b1e59eba",
+        "log_sha256": "ca9ec247f8d380ff91fa3eabe961dd1ca64d533001a4aebe03f6b98248ae1be5"
+      },
+      "core-tests": {
+        "exit_code": 101,
+        "elapsed_seconds": 1.5238487320020795,
+        "receipt": "target/wp914/core-tests.json",
+        "receipt_sha256": "f8e26f69466c8a360b2fd9d94397cdb81f639c9f3bbdbd67ec882bad47d3aa19",
+        "log_sha256": "b73b5fd02b5e1a3badeecf0ea750e89af22071606a8340f1197329114fb3c123"
+      },
+      "core-tests-corrected": {
+        "exit_code": 0,
+        "elapsed_seconds": 9.148637168109417,
+        "receipt": "target/wp914/core-tests-corrected.json",
+        "receipt_sha256": "5b616de51137c55d8400927b7e408f92f3ab251a7f94198ccbecf3ed825cedbf",
+        "log_sha256": "0f8a58eb97ff5dd5f7fffd906f959fc33ac23969891567cb5ed7defc83ee2a60"
+      }
+    },
+    "settings": "Core --lib --no-run offline JSON jobs1 and established four-package opt-level0/debug0 command overrides; repository toolchain/profiles/features unchanged. Default CLI check covers Core/Analysis/Server/CLI; production unchanged after corrected check. All preparation <=60s.",
+    "preflight": {
+      "exit_code": 0,
+      "output": "Verified 41 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21024315699469298,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "d0e98a25fe5f8c145fd751bb43991a27166df8550a143a06a9bd6efbb7623d59",
+      "selected": 41
+    },
+    "runtime": {
+      "selected": 41,
+      "passed": 41,
+      "elapsed_seconds": 1.0855996949831024,
+      "max_child_rss_kib": 79452
+    },
+    "selectors": [
+      "runtime::aquery_text::tests::declared_inputs_dedup_identity_before_equal_path_display",
+      "runtime::aquery_text::tests::fields_sort_after_unicode_escape_and_execution_info_keeps_raw_values",
+      "runtime::aquery_text::tests::pinned_bazel_unicode_then_shell_bytes",
+      "runtime::dice::source_staging::tests::build_only_observations_survive_the_narrow_source_certificate",
+      "runtime::dice::source_staging::tests::native_source_staging_tracks_sources_and_rejects_conflicting_roots",
+      "runtime::dice::source_staging::tests::resource_metadata_refuses_before_malformed_declared_inputs",
+      "runtime::dice::source_staging::tests::workspace_status_descriptors_reject_before_source_staging",
+      "runtime::dice::tests::build_command_tests::filewrite_aquery_text_keeps_root_order_and_excludes_dependency_actions",
+      "runtime::dice::tests::build_command_tests::filewrite_aquery_text_matches_frozen_baseline",
+      "runtime::dice::tests::configured_action_conflicts_tests::configured_action_conflicts_equal_filewrites_keep_owners_but_share_execution",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_fields_restore_without_mutating_retained_results",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_files_to_run_and_named_group_keep_declared_owners",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_mixed_scope_order_and_unspilled_recipes",
+      "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_preserves_filewrite_validation_before_render_priority",
+      "runtime::file_write_aquery_text::tests::aquery_labels_use_bazel_root_and_canonical_external_spelling",
+      "runtime::file_write_aquery_text::tests::formatter_boundary_rejects_unadmitted_action_shapes",
+      "runtime::file_write_aquery_text::tests::output_path_validation_is_fail_closed_for_unescaped_text",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_shared_owners_keep_progress_and_restore_conflicts",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_real_producers_have_exact_fields_and_scopes",
+      "runtime::dice::tests::symlink_aquery_tests::symlink_aquery_target_output_progress_and_type_restore_with_old_results",
+      "runtime::symlink_aquery_text::tests::absent_empty_and_absolute_progress_remain_distinct",
+      "runtime::symlink_aquery_text::tests::absolute_targets_and_none_tool_headers_preserve_retained_owners",
+      "runtime::symlink_aquery_text::tests::checked_symlink_view_rejects_unadmitted_kinds_and_source_policy",
+      "runtime::symlink_aquery_text::tests::progress_uses_original_source_root_and_sequential_substitution",
+      "runtime::action_prerequisites::tests::symlink_tests::alias_edges_preserve_exact_producers_and_reject_cycles_kinds_and_source_policy",
+      "runtime::action_prerequisites::tests::symlink_tests::nested_aliases_defer_manifest_tree_completion_and_preserve_selected_spawn_behavior",
+      "runtime::action_prerequisites::tests::symlink_equivalence_tests::symlink_equivalence_compares_identity_and_refuses_unadmitted_facts",
+      "runtime::action_prerequisites::tests::symlink_equivalence_tests::symlink_equivalence_keeps_progress_and_platform_agnostic_contexts",
+      "runtime::action_prerequisites::tests::symlink_equivalence_tests::symlink_equivalence_same_owner_coordinates_keep_first_canonical_producer",
+      "runtime::action_prerequisites::tests::symlink_equivalence_tests::symlink_equivalence_shared_derived_lookup_remains_exact_and_cycle_safe",
+      "runtime::action_prerequisites::tests::solib_tests::solib_collisions_compare_full_configured_input_and_reject_mixed_families",
+      "runtime::action_prerequisites::tests::solib_tests::solib_requested_outputs_and_spawn_inputs_remain_runtime_unsupported",
+      "runtime::action_prerequisites::tests::solib_tests::solib_sharing_preserves_owners_and_ignores_native_owner_platform_facts",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_compare_raw_platform_not_merged_owner_properties",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_complete_prefix_inventory_and_exact_order",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_inventory_prefix_and_typed_terminals",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_only_exempt_runfiles_manifest",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_prefixes_are_segment_strict",
+      "runtime::configured_action_closure::tests::configured_action_conflicts_unresolved_long_unicode_and_distinct_configuration",
+      "runtime::dice::source_execution::tests::closure_owned_representative_check_rejects_shared_duplicate",
+      "runtime::action_prerequisites::tests::missing_wrong_kind_cycles_and_unsupported_actions_reject_the_entire_plan"
+    ],
+    "coverage": "26 updated WP913 controls + four focused equivalence/planner tests + six closure + three Solib + source representative guard + missing/kind/cycle plan guard. 41 exact nonignored one-pass logs, serial10s/TERM3.",
+    "growth": "No new oracle assets. New focused unit383 lines plus existing DICE query sibling310->425. Independent responsibility review accepts comparison/unsupported matrix and coupled exactlookup/cycle controls distinct from actual observed DICE/query/planner A/B/A and explicitly synthetic same-owner generic projection. Production helper51 and minimal existing glue remain below220 estimate.",
+    "checks": [
+      "pinned rustfmt --check passed",
+      "git diff --check passed",
+      "archive checker passed",
+      "canonical/manifest planstatus match WP7-214"
+    ]
+  },
+  "corrections": [
+    {
+      "receipt": "candidate-cli-check.json",
+      "failure": "E0282 new declared.get-before-insert left map coordinate value type underconstrained",
+      "correction": "Explicit existing Coordinate value type SmallMap<_,Coordinate>; no representation/semantic change; correctedCLI0/6.375314."
+    },
+    {
+      "receipt": "core-tests.json",
+      "failure": "E0433 synthetic query fixture missing ActionSpec import",
+      "correction": "Added test-only import; correctedCore0/9.148637. No runtime failures or cap hits."
+    },
+    {
+      "design": "Initial evidence REVISE exposed two coupled planner blockers; concrete design reconciled before activation. Generic base platform hypothesis corrected against concrete Symlink virtual overrides. All three accepted actual contract before code."
+    }
+  ],
+  "reviews": "Three independent DESIGN and FINAL ACCEPT actual latest diff + fresh exact runtime/downstream attribution. Reviewers did not rerun tests. Source-key comparison borrowing, test growth and synthetic/authentic limitations explicitly reviewed.",
+  "operational_sha256": {
+    "design-contract.md": "12cda24ce235ac3552a3256ecf3cc8f3db63b6071526ca92b0b93ff386ec8a6c",
+    "design-source.md": "d5b20fdbeee67342683734bb8fbc356e8fc19ecf34c24615a2f92957561ba9d0",
+    "design-ownership.md": "595a1bc54a45fb0b5d64424501e5ec81e5d88e94d3749c2be65daf21b6ba115e",
+    "design-evidence.md": "1bca96f1b6d0de4e781597f4581379dfe22013824cf8bb10aa9a36a9765fba7e",
+    "design-evidence-initial.md": "bc354c1dd04cc43ea54c79746f0610cb61780b1189babdcf5456b80bcb6bb21a",
+    "final-source.md": "96db9a7488f47ffae984a17eab62a96366bb8f05442d669bfff94b9670103dda",
+    "final-ownership.md": "d87b60076002f97a345e13911ca11f5e4a96a7b292812a6aa980b99bd697c6af",
+    "final-evidence.md": "71a195a70d560a531deaf9eb477168ec3f1ed65195060dbd122c37326da93e82",
+    "core-results.json": "cd4025a4851ddd14b048141406a4c0981043450cad2438fd5cc8b3635b1085c5",
+    "core-preflight.json": "c275d3bccbae2f7a45cf8dd6ba1ec8e5eb5ab6c5feff62ff04bf11b396a505ae",
+    "core-selectors.json": "ef55ce6e601fef20555424dfe9b52ef7faf887fd0011a3ffc9aec223fdb7cdf0",
+    "compile.py": "c78c32431987dd47730dd5d64a79254ed139eca73742ce99265b48a9c137aee9",
+    "run-tests.py": "9336905f2c7fe742c3661591e7e2c2d0e703afcc0432d51f1df5fda2bc022024"
+  },
+  "timing": {
+    "compile_seconds_total": 22.8511088892119,
+    "runtime_seconds": 1.0855996949831024,
+    "packet_elapsed": "not independently measured",
+    "review_elapsed": "not independently measured"
+  },
+  "successor": "WP-7-214-m7a-runfiles-support-query-projection-r1: four demanded retained support query families, existing closure/admission preserved.",
+  "remaining": "Recorded child RSS79,452KiB is test-process observation only. Original64KiB postdrop refusal/cache-backed qualification/source16/17/18 spent/caps remain. No whole historical40GiB/current authentic workload fit, full root query, backend activation or milestone closure."
+}

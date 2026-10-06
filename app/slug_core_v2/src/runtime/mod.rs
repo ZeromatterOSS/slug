@@ -54,6 +54,7 @@ mod scoped_cycle_detector;
 mod source_input;
 mod spawn_query_inputs;
 pub mod starlark;
+mod symlink_action_equivalence;
 mod symlink_aquery_text;
 
 pub use aquery_text::format_aquery_text_output_for_scope;

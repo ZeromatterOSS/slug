@@ -431,9 +431,13 @@ corrupt CAS, physical replacement, cleanup confinement and post-CLI-exit MANIFES
 [WP913 Symlink query](wp913-symlink-aquery-2026-10-06.json) adds metadata text for
 regular Artifact-target ordinary/executable and absolute-target SymlinkAction over
 validated owners, without changing any alias execution guard. Absolute metadata
-query does not admit physical absolute-link creation. Ordinary same-output Symlink
-closure equivalence remains typed unsupported; its six demanded producer pairs need
-a reviewed equivalence prerequisite before production-root query can complete.
+query does not admit physical absolute-link creation. [WP914 ordinary Artifact equivalence](wp914-symlink-equivalence-2026-10-06.json)
+shares admitted full structural targets/outputs independently of progress and owner
+platform facts. It retains semantic/query records and maps duplicate exact declared
+producer lookups to one planned representative, including same-owner coordinates.
+Absolute/custom-policy/nonregular/constant metadata sharing stays unsupported.
+The six saved query pairs still lack authentic typed-producer activation evidence;
+this metadata/planner admission does not prove their production-root execution.
 
 Consume the retained Stage 6 action and owner context used by aquery. The
 accepted requested-root output-conflict R2 implementation supplies

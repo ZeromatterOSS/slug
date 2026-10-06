@@ -15,6 +15,8 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 
+use super::symlink_action_equivalence::equivalent_artifact_symlinks;
+
 /// The producer-owned, root-set-specific result of action output validation.
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub(super) struct ValidatedActionClosure {
@@ -199,7 +201,8 @@ fn validate_exact_outputs(
                 {
                     equivalent_file_write(first.action, row.action)
                 }
-                _ => return Err(error(true)),
+                _ => equivalent_artifact_symlinks(first.action, row.action)
+                    .ok_or_else(|| error(true))?,
             };
             if !equivalent {
                 return Err(error(false));
