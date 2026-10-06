@@ -1,0 +1,172 @@
+{
+  "schema": 1,
+  "base": "55b32d048feb700efc59836f83ac90f38d17516b",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "aquery",
+    "deps(\"//app/slug_cli_v2:slug\")",
+    "--output=jsonproto",
+    "--include_commandline",
+    "--include_artifacts",
+    "--include_param_files",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 15,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": false,
+  "downloads_requested": false,
+  "elapsed_seconds": 2.8377855779835954,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "outputs": {
+    "actions.json": {
+      "bytes": 8308024,
+      "sha256": "4810199ec6d56acd258980ef0db0fdcede7acf09e22461b16ac8ff4715dd1ae4"
+    },
+    "stderr.log": {
+      "bytes": 787,
+      "sha256": "5d9de2ac0c5052c564bc813b125e9e63d2a35081e2aa0e963f897a0e8165eb9c"
+    }
+  },
+  "packet": "WP-7-204-m7a-current-action-producer-inventory-r1",
+  "disposition": "ACCEPTED_CURRENT_CONFIGURED_PRODUCER_INVENTORY",
+  "input_pin_count": 702,
+  "graph_counts": {
+    "artifacts": 19900,
+    "actions": 2164,
+    "targets": 916,
+    "depSetOfFiles": 5039,
+    "configuration": 2,
+    "ruleClasses": 14,
+    "pathFragments": 23751
+  },
+  "action_family_counts": {
+    "Rustc": 514,
+    "RepoMappingManifest": 134,
+    "SourceSymlinkManifest": 134,
+    "SymlinkTree": 134,
+    "RunfilesTree": 134,
+    "Symlink": 565,
+    "ExecutableSymlink": 17,
+    "FileWrite": 69,
+    "TranslateBuildInfo": 4,
+    "CppCompile": 3,
+    "CppArchive": 3,
+    "CppLink": 2,
+    "SolibSymlink": 2,
+    "CargoBuildScriptRun": 67,
+    "ExtractCargoTomlEnvVars": 379,
+    "CopyFile": 3
+  },
+  "all_references_resolve": true,
+  "path_fragment_cycles": false,
+  "depset_cycles": false,
+  "previous_compiler_action_correspondence": {
+    "retained_unique_matching_actions": 581,
+    "missing_prior_actions": 0,
+    "additional_compiler_or_run_actions": 0,
+    "comparison_key": [
+      "target_label",
+      "rule_class",
+      "configuration_checksum",
+      "mnemonic",
+      "output_paths",
+      "primary_output_path"
+    ]
+  },
+  "generated_wrapper_binding_option_and_producer_counts": {
+    "arg_file_CargoBuildScriptRun": 1167,
+    "env_file_CargoBuildScriptRun": 67,
+    "env_file_ExtractCargoTomlEnvVars": 399
+  },
+  "recorded_parameter_file_rows": 0,
+  "byte_identical_duplicate_output_artifact_count": 6,
+  "root_compiler_artifact_edge_reachability": {
+    "target_label": "//app/slug_cli_v2:slug",
+    "action_record_count": 1385,
+    "action_family_counts": {
+      "Rustc": 513,
+      "RepoMappingManifest": 62,
+      "SourceSymlinkManifest": 62,
+      "SymlinkTree": 62,
+      "RunfilesTree": 62,
+      "ExecutableSymlink": 17,
+      "Symlink": 94,
+      "CargoBuildScriptRun": 67,
+      "ExtractCargoTomlEnvVars": 379,
+      "FileWrite": 67
+    },
+    "direct_input_artifact_count": 4320,
+    "direct_input_artifacts_with_selected_producer": 484,
+    "direct_input_artifacts_without_selected_producer": 3836,
+    "closure_unique_input_artifacts": 19045,
+    "closure_unique_input_artifacts_with_selected_producer": 1715,
+    "closure_unique_input_artifacts_without_selected_producer": 17330,
+    "scope": "Saved declared artifact edges from the root compiler action, not the complete deps() owner set or dynamic build-script/process demand. Unproduced artifacts can be source/tool inputs; counts are not missing-producer defects."
+  },
+  "allocator_build_info_family": {
+    "selected_family_action_counts": {
+      "TranslateBuildInfo": 4,
+      "CppCompile": 3,
+      "CppArchive": 3,
+      "CppLink": 2,
+      "SolibSymlink": 2
+    },
+    "selected_output_edges_to_actions_outside_selected_families": [],
+    "rustc_argv_allocator_action_indices": [],
+    "decision": "NO_DEMANDED_CPP_EXECUTION_GAP_FROM_THIS_GRAPH",
+    "retained_capability_limits": [
+      "WP756 Solib structural generated-File construction only; execution/REAPI/ActionKey deferred.",
+      "WP769-772 regular CppCompile construction/pure command/input/dotd preparation only; Core discovery/cache/execution deferred.",
+      "WP778 build-info construction only; actual status/render/volatile execution/cache gates remain open.",
+      "Full authentic Cc toolchain/rules and source loading remain independently unproved."
+    ]
+  },
+  "action_processes_reported": 0,
+  "scope": "Configured inventory/argument/path-owner correspondence only. No generated file content read, action execution, virtual parameter file universal absence, source/cache freshness or admission, memory/source fit or all-role Cargo/Bazel feature parity.",
+  "next_decision": "Select bounded ordinary Bazel build of lzma-sys0.1.20 library to validate the newly introduced compression leaf and actual generated build-script outputs. No broad C++ execution activation or Slug source retry.",
+  "evidence_sha256": {
+    "target/wp905/action-observe.py": "bf7fc49d17f00f12df7267a3d383fb8f38a526cb1f6fd32ebec61b52f48cacb0",
+    "target/wp905/observation.json": "b89dca0f5a5190485f7afa8b4674247849ee1316a9ce44a4d0b9fb2c91000784",
+    "target/wp905/claim.json": "ed688e9811aaa73101b97b2a2345af634a09bd78bd71b25988126d09b03d9609",
+    "target/wp905/actions.json": "4810199ec6d56acd258980ef0db0fdcede7acf09e22461b16ac8ff4715dd1ae4",
+    "target/wp905/stderr.log": "5d9de2ac0c5052c564bc813b125e9e63d2a35081e2aa0e963f897a0e8165eb9c",
+    "target/wp905/stdout-format.json": "4530629831ad5f8ee9328ee0dad946e51bada442c9540ace1cb5315fe76e9207",
+    "target/wp905/graph.json": "15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c",
+    "target/wp905/references.py": "c1672431fb1d9b8e4e65488ad228450eaddd3ea6e29472335eb1424fdcaab662",
+    "target/wp905/references.json": "f1e0cab91450f87f8c2c8782c61549890027dc09a7f085aa42887a19476ecf04",
+    "target/wp905/compiler-correspondence.json": "c2bb880fc6519fd8710e8f365769f7ad7b5e1f122bc0a57f0c490124d76844e3",
+    "target/wp905/family-source.json": "1615f27c7674a6604da8a70d7e8c09e69c1cd7fd8455ac1c9afcae4d43d8e377",
+    "target/wp905/final-source.md": "210979e4173ad22611671069225786ad1912991133626aa7affeabe01a99a6c1",
+    "target/wp905/final-evidence.md": "08c9342751c1b89257ae68c3ca455faaf83ff64995c592045648adb5d86c0b16",
+    "target/wp905/final-ownership.md": "487d3a270c95bfc2de5fa126fe4c3d4df9227c3d6fc9bad9f9d9ceb2e5705b2d"
+  },
+  "independent_final_reviews": {
+    "target/wp905/final-source.md": "210979e4173ad22611671069225786ad1912991133626aa7affeabe01a99a6c1",
+    "target/wp905/final-evidence.md": "08c9342751c1b89257ae68c3ca455faaf83ff64995c592045648adb5d86c0b16",
+    "target/wp905/final-ownership.md": "487d3a270c95bfc2de5fa126fe4c3d4df9227c3d6fc9bad9f9d9ceb2e5705b2d"
+  }
+}

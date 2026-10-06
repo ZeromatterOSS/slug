@@ -1,69 +1,77 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-204-m7a-current-action-producer-inventory-r1
-Status: Direct compiler accounting accepted; finite action-family/producer inventory selected
+Packet: WP-7-205-m7a-compression-leaf-build-validation-r1
+Status: Current producer inventory accepted; bounded compression-leaf compilation selected
 
-## Observable outcome and source basis
+## Observable outcome and compatibility
 
-Complete current Linux CLI configured action-family and generated input producer
-inventory. Accepted WP904 direct compiler query omits399 cargo_toml_env_vars.env
-producers by mnemonic filtering; generated/runtime argument bytes remain unknown.
-Select one unfiltered deps("//app/slug_cli_v2:slug") aquery, then enumerate actual
-families and join exact generated/compiler input artifacts to actual producers.
-Choose a finite demanded owner gap for implementation/validation. Compatibility:
-Slug-native configured accounting; no Slug runtime/action semantic activation or
-full M7A claim. Root owns selection, observation, analysis/status and commits.
+Validate the newly introduced lzma-sys0.1.20 dependency through its ordinary Bazel
+library/build-script producers. Current Cargo CLI compression closure adds xz2,
+lzma-sys and pkg-config; their exact local sources are prepared but never built
+by this work. One focused library build establishes actual compiler/build-script
+success or a concrete producer/environment failure before a full root compile.
+Compatibility: Slug-native preparation evidence from external pinned Bazel9.2;
+no Slug semantic activation, compiler execution admission, full root build or M7A.
+Root owns invocation, evidence/status and integration.
 
-Reuse WP902 pinned Bazel9.2 schema/emitter/source field map and WP904 current
-configured direct features/owners. Cached rules_rust cargo/private/cargo_toml_env_vars.bzl
-runs the normal ExtractCargoTomlEnvVars action; pin that producer before analysis.
-Do not invent a FileWrite producer from an env filename. The full query reveals
-other demanded action families instead of presuming the compiler filter is complete.
+Reuse WP903 archive/spec/member verification and WP904/905 current configured
+producer/feature/input evidence. The actual generated lzma BUILD is the retained
+Bzlmod RepoSpec inline text. BuildScript Rust source and rules_rust runner own the
+actual flags/env/native-library outputs; no hand-generated Rust, fixture substitute,
+synthetic BUILD or feature change. Additional toolchain C++ allocator declarations
+have no captured consumer into the requested CLI compiler forest; do not activate
+their discovery/execution capabilities. Dynamic native compilation inside the named
+build script is part of its ordinary declared action, not absent from execution by
+this graph observation.
 
-## Selected operation, inputs and ownership
+## Selected operation and caps
 
-Reuse accepted WNOWAIT retained-leader wrapper unchanged. Pin tracked current
-Cargo/BUILD/bzl authority, locks/MODULE/toolchain, exact Bazel9.2 binary, selected
-cached compiler/producer sources/RepoSpecs and the three prepared source/BUILD
-marker inputs. Check process overlap. One batch aquery of CLI deps with jsonproto,
-commandline/artifact/param-file output, nofetch, downloader disabled, lockfileerror,
-no RC, explicit nightly and loading threads2. JVM2GiB, operation15s/cleanup3s,
-each output16MiB. Fresh exact platform cache-write review applies. No build/test,
-compiler/backend action or network download. Preserve failures/unknown cleanup;
-no automatic retry/cap growth. All Slug source limits remain unchanged.
+One pinned Bazel batch build of
+@@rules_rust++crate+slug_crates__lzma-sys-0.1.20//:lzma_sys,
+with nofetch/downloader disabled/lockfileerror/no RC/explicit nightly, loading
+threads2, jobs2. It executes ordinary declared compile/build-script actions;
+no Slug source request, tests, backend/network acquisition or query retry.
+Pin tracked Cargo/BUILD/bzl/locks/MODULE/toolchain/binary plus current selected
+RepoSpec/BUILD/archive/source/marker and cached compiler/runner sources before
+launch. Use unchanged reviewed retained-leader WNOWAIT lifecycle and exclusive
+one-claim control. Fresh exact platform review covers compiler/cache writes.
 
-Preserve raw stdout and recognize only WP904's strict leading JVM os,container
-warning family before complete JSON. Reuse schema reference/cycle checks; preserve
-indices, config role/checksum, ordered argv/fixed environment, artifact/tree/path
-and depset identity. Full output can include non-Spawn fields and actual paramFiles;
-inspect their pinned emitter semantics before interpreting them. No generic salvage.
+Preparation cap60s, cleanup3s, each output16MiB, JVM2GiB; jobs2 bounds parallel
+compilers. This is a separate new compilation operation, not an increase to a
+spent query/source/test cap. The focused real producer build is required because
+analysis and miniature string fixtures cannot prove its source/tool/env/compiler
+and generated native-link outputs. It contains no test; user12s guideline is not
+a compilation hard deadline. Preserve timeout/nonzero/unknown cleanup without
+retrying or enlarging limits. Slug source AS/RSS/disk/string budgets unchanged.
 
-## Analysis, validation and boundaries
+## Evidence and validation
 
-Map each actual mnemonic/rule owner to demanded admitted/deferred family in the
-bootstrap matrix. Enumerate normal compiler, generated-input, tool/runfiles/support
-producers; retain extra rules_rust support closure outside Cargo CLI dependencies.
-Join outputs to consumer artifact IDs within this dump, preserving tree types,
-multiple producers and explicit absent producer cases. Source artifacts are not
-missing actions. Cross-dump comparisons use structural observed target/configuration/
-output paths and ordered compiler fields, never dump-local ID equality or ActionKey
-as semantic ownership. Do not infer generated content from a graph/virtual Args.
+After owned join/group-empty, inspect exact child output/exit and input/authority
+stability. A named successful library build is the compilation gate; preserve all
+cache/local environment limits. Verify actual normal compiler output is nonempty
+at its configured path and collect bounded regular generated flags/env/link files
+plus out_dir manifest/hash under the known configured producer paths. Preserve
+ordered bytes and exact producer/consumer membership; reject symlink/unbounded or
+unowned output reads. Do not equate these bytes with full root generated inputs,
+REAPI execution, hermetic system native-tool identity or whole-workload memory fit.
+On failure select its concrete normal producer gap; no adjacent annotations or
+code changes without evidence and a bounded reviewed contract.
 
-Independent final reviews cover producer/family mapping, evidence limits and actual
-join/group/input facts. Reuse prior lifecycle/source contracts, no new framework or
-unnecessary oracle fixture. Tracked allowlist: manifest/canonical/compact receipt,
-Stage10/readiness only reusable evidence; ignored operational files target/wp905.
-No production/lock/BUILD/toolchain edit yet. Run plan/diff checks and commit accepted
-accounting with next natural-owner gap selected. Windows minimal/deferred; allocation
-and string interning guidance in AGENTS.md remains mandatory for production edits.
+Independent final reviews cover real compiler/build-script output correspondence,
+lifecycle/input facts and scope. Reuse prior source/lifecycle contracts, no new
+framework or broad tests. Tracked allowlist: manifest/canonical/compact receipt,
+Stage10/readiness only reusable evidence. Operational target/wp906. No production,
+lock/BUILD/toolchain edit selected. Run plan/diff checks; commit actual outcome and
+next bounded owner. Allocation/interner discipline persists; Windows minimal.
 
 ## Immediate predecessor
 
-WP904 at8f2e8ea92 ran once, exit0/2.855s, natural join/groupempty and700 unchanged
-pins.581 Rustc/Run actions,36 local owners,38 local direct feature sets and353
-external normal direct feature sets accepted. All references resolve;1633 wrapper
-input bindings are owned,399 producers omitted by filter. See
-[configured receipt](wp904-configured-rustc-accounting-2026-10-06.json).
-WP900/901 declarations/planned units remain accepted; full generated/source/M7A
-stay open. Original memory REFUSED/source16/17/18 remain spent. No Slug source
-retry or runtime activation selected; all resource/permission limits persist.
+WP905 at55b32d048 ran once0/2.838s, naturaljoin/groupempty,702 unchanged pins and
+zero processes/actions.2164 records/16 families,all581 prior compiler/run records
+structurally equal,1633 wrapper files nowselectedproducer-bound. All graph refs
+resolve;6 identical Symlink pairs preserved. CLI artifact walk1385 records has
+no allocator C++ action. See
+[producer receipt](wp905-configured-producer-inventory-2026-10-06.json).
+Generated bytes/source/fullroot/M7A remain open; original memory REFUSED and
+source16/17/18 spent. No Slug source retry or runtime activation; all prior limits
+and user string-allocation guidance remain in force. Sibling directories reference.
