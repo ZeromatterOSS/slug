@@ -3607,7 +3607,7 @@ impl BuildCommandEvaluation {
         self.action_closure.owners().iter().map(Arc::as_ref)
     }
 
-    fn sole_requested_analysis(&self) -> Result<&ConfiguredNodeResult, &'static str> {
+    pub(crate) fn sole_requested_analysis(&self) -> Result<&ConfiguredNodeResult, &'static str> {
         let [target] = self.targets.as_ref() else {
             return Err("FileWrite aquery requires exactly one requested analysis");
         };
@@ -13960,5 +13960,9 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
 
     mod configured_action_conflicts_tests {
         include!("tests/configured_action_conflicts_tests.rs");
+    }
+
+    mod spawn_aquery_tests {
+        include!("tests/spawn_aquery_tests.rs");
     }
 }

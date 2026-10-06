@@ -2,9 +2,9 @@
 
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::ArtifactInputSource;
+#[cfg(test)]
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::FilesToRunProvider;
-use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::SpawnExecutable;
 use slug_build_api_v2::SpawnSpec;
@@ -194,68 +194,19 @@ pub(in crate::runtime) fn declared_artifacts(
         ));
     }
     let mut sources = SmallSet::new();
-    fn provider(
-        provider: &FilesToRunProvider,
-        sources: &mut SmallSet<AnalysisArtifact>,
-    ) -> Result<(), Arc<str>> {
-        let mut has_executable = provider.executable.is_none();
-        let mut has_tree = provider.support.is_none();
-        RetainedArtifactInputs::new(provider.files().clone())
-            .map_err(error)?
-            .visit(|artifact| {
-                has_executable |= provider.executable.as_ref() == Some(artifact);
-                has_tree |= provider
-                    .support
-                    .as_ref()
-                    .is_some_and(|support| &support.tree == artifact);
-                sources.insert(artifact.clone());
-            })
-            .map_err(error)?;
-        if !has_executable || !has_tree {
-            return Err(error(
-                "FilesToRun files omit its executable or runfiles tree",
-            ));
-        }
-        if provider.support.is_some() && provider.executable.is_none() {
-            return Err(error("FilesToRun runfiles support has no executable"));
-        }
-        Ok(())
-    }
-    fn inputs(
-        inputs: &ArtifactInputs,
-        sources: &mut SmallSet<AnalysisArtifact>,
-    ) -> Result<(), Arc<str>> {
-        for input in inputs.sources() {
-            if let ArtifactInputSource::FilesToRun(value) = input {
-                provider(value, sources)?;
-            }
-        }
-        inputs
-            .visit(|artifact| {
-                sources.insert(artifact.clone());
-            })
-            .map_err(error)
-    }
-    inputs(spawn.inputs(), &mut sources)?;
-    inputs(spawn.tools(), &mut sources)?;
-    match spawn.invocation() {
-        RetainedSpawnInvocation::Executable(SpawnExecutable::Artifact(artifact)) => {
+    crate::runtime::spawn_query_inputs::visit_declared_artifacts(spawn, |artifact| {
+        if !sources.contains(artifact) {
             sources.insert(artifact.clone());
         }
-        RetainedSpawnInvocation::Executable(SpawnExecutable::FilesToRun(value)) => {
-            provider(value, &mut sources)?;
-            if value.executable.is_none() {
-                return Err(error("source staging requires a declared executable"));
-            }
-        }
-        // The selected execution platform supplies the typed Shell executable.
-        // It is not a declared source artifact or a CAS input.
-        RetainedSpawnInvocation::Shell { .. } => {}
-        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(_)) => {
-            return Err(error(
-                "source staging requires an artifact-backed executable",
-            ));
-        }
+    })?;
+    // Keep the execution-only gate after declared membership validation.
+    if matches!(
+        spawn.invocation(),
+        RetainedSpawnInvocation::Executable(SpawnExecutable::Path(_))
+    ) {
+        return Err(error(
+            "source staging requires an artifact-backed executable",
+        ));
     }
     Ok(sources)
 }

@@ -71,7 +71,7 @@ pub fn format_file_write_aquery_text_output_for_scope(
     Ok(output)
 }
 
-fn aquery_label(label: &CanonicalLabel) -> String {
+pub(super) fn aquery_label(label: &CanonicalLabel) -> String {
     if label.package().repo().is_root() {
         format!("//{}:{}", label.package().package(), label.target())
     } else {

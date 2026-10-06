@@ -739,7 +739,7 @@ impl Daemon {
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
                 Ok(evaluation) => {
-                    match slug_core_v2::runtime::format_file_write_aquery_text_output_for_scope(
+                    match slug_core_v2::runtime::format_aquery_text_output_for_scope(
                         evaluation, scope,
                     ) {
                         Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),

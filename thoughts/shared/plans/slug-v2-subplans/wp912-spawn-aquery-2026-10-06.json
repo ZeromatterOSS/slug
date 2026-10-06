@@ -1,0 +1,330 @@
+{
+  "packet": "WP-7-211-m7a-spawn-action-query-projection-r1",
+  "operational_packet": "WP912",
+  "date": "2026-10-06",
+  "base": "7e6d5b069e0f42fc59a5e3aeadb7c77656cd0d8f",
+  "status": "accepted",
+  "outcome": "Owner-complete ordinary typed Spawn text aquery and mixed FileWrite/Spawn consumer over accepted configured closure; no execution or source activation.",
+  "compatibility": {
+    "exact": "Pinned Bazel9.2 Linux command quoting/Unicode escape/field framing and sorting, fixed environment, unspilled retained Args, default/custom label/output progress replacement and tool suffix in admitted Rust valid-Unicode domain. Existing FileWrite bytes/token retained.",
+    "slug_native": "Configuration display_token in both configuration fields, root/canonical labels in both platform fields, retained artifact/configuration/path identity and owner traversal order.",
+    "unsupported_deferred": [
+      "Spawn ActionKey omitted to M9 without substitute token",
+      "progress %{input}: original-primary-input producer prerequisite",
+      "Windows text stub",
+      "aspects and other action families",
+      "full production root aquery and M7A",
+      "authentic source execution and whole-workload memory fit"
+    ]
+  },
+  "ownership": {
+    "semantic": "ConfiguredAction/SpawnSpec immutable Args/invocation/environment/artifact recipes and owner context retained by validated BuildCommandEvaluation closure.",
+    "query": "Private-constructed borrowed Analysis Spawn view; semantic owner/action order and multiplicity, no execution representatives. Two allocation-free validation/render owner passes preserve FileWrite diagnostic precedence.",
+    "allocation": "Final stdout command-owned. Exact SmallSet artifact identity uses contains-before-clone per action; distinct Source labels own temporary string copies, Derived/WorkspaceStatus share existing storage. Path Cows borrow keys where possible; no display-path/hash-only identity shortcut. Input keys/paths released after input field before argv; argv and field scratch released per action. No new retained string pool/cache/interner/key/lock.",
+    "consumer": "Server existing accepted.project/publish; atomic unsupported command with no partial stdout; no host env/source reads/REAPI defaults.",
+    "execution_preservation": "Pure declared artifact callback reused with existing source-staging resource/unused-input gates and late Path rejection. Provider-first validation preserved; redundant provider revisit removed."
+  },
+  "reference": {
+    "bazel_tag": "9.2.0",
+    "bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "sources": {
+      "ActionGraphTextOutputFormatterCallback.java": "d7fece89d9921914961bd1a92227082f45b76bbd2f8011a17f23a58d96e45f17",
+      "SpawnAction.java": "64cbe2b26f16e51cd57f6cefbfb21c76c0b940c0bcd9b0b8109327aa5bf667c2",
+      "CommandLines.java": "3a04877252c0adc37c869515b211bd575fd1d8a9a8b5b94229387e2de12386e4",
+      "AbstractAction.java": "d264d41e0ca81466c143324e6eef318b4dbdea909e7150bd94242f9430358203",
+      "CommandFailureUtils.java": "0d63b5e8d9597dda476698fda92b9b2e34a5ff1c6d8aa20b4cfdde442811ba18",
+      "ScriptUtil.java": "35ea8e29b9da7522896adbc1559b3dc45baddb1d23d4cb14d0f7de62cb2bfe79",
+      "ShellEscaper.java": "d6f6051220e0c9fbb0153b31b4bfa287a9fc1800eedd4ffff9c4d8d2e3199564"
+    },
+    "method": "Independent pinned-source regression; no Bazel query/new source acquisition. Exact source anchors are in focused formatter docs; existing Starlark synthetic producer themes reused."
+  },
+  "source_sha256": {
+    "app/slug_analysis_v2/src/lib.rs": "832010374e4705a0b9456933bc6e9c267671de4f9ac1d31a63781e607f2fc89a",
+    "app/slug_analysis_v2/src/result.rs": "84abc8a5473803eee7561b63509c800837a8c8be4e5488699c3614fe40adfb9a",
+    "app/slug_analysis_v2/src/configured_spawn_action_view.rs": "342705266626b9833b8fc15b1adb801c0a7188ddee3febd7bc608c45c679b67f",
+    "app/slug_core_v2/src/runtime/aquery_text.rs": "d6d3b451efe38b891656a971015d175a55d6f4c18f868c3928eccab6c1d35a7a",
+    "app/slug_core_v2/src/runtime/spawn_query_inputs.rs": "082cc38c41e117b283806226cef9cddfff48fa06d1484263b04462780815742a",
+    "app/slug_core_v2/src/runtime/source_staging.rs": "11700b17d7389367df05bb2e8d52f0d7b1b8da270fcf1dbf2a7cbdb597750361",
+    "app/slug_core_v2/src/runtime/dice.rs": "2a39bebef6ac29ac366728b75cacbd0e5a46b92d62763c4587a51ee951978eac",
+    "app/slug_core_v2/src/runtime/mod.rs": "6f5532422eb0a02ade8be0ae44724f46470516d5f31308e4820923422b9afdd8",
+    "app/slug_core_v2/src/runtime/file_write_aquery_text.rs": "4492a334e23b8d6cf8f384bf99e87e12f387bb90416bf3aaa88489f84ae3b4e2",
+    "app/slug_core_v2/src/runtime/tests/spawn_aquery_tests.rs": "35f7ebddd1f503ad55cb9f5b65cc55dd48f3b04369100481b987cc397633b613",
+    "app/slug_core_v2/src/runtime/tests/configured_action_conflicts_tests.rs": "f885a21a73376f1fcb8097ef90ebd6e18bbac0537b98ca8b33b43ec779ef0b4e",
+    "app/slug_server_v2/src/lib.rs": "a553e03a0b811f473539185f0844c5b8907b53a2131bdd6818bd8dbae5ca17a8"
+  },
+  "validation": {
+    "toolchain": "nightly-2025-09-14 pinned rustup tool binaries",
+    "compile_attempts": {
+      "candidate-check": {
+        "exit_code": 0,
+        "elapsed_seconds": 19.542494008899666,
+        "receipt": "target/wp912/candidate-check.json"
+      },
+      "analysis-tests": {
+        "exit_code": 0,
+        "elapsed_seconds": 53.66222931398079,
+        "receipt": "target/wp912/analysis-tests.json"
+      },
+      "core-library": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.00524137902539,
+        "receipt": "target/wp912/core-library.json"
+      },
+      "core-tests": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.00448760599829,
+        "receipt": "target/wp912/core-tests.json"
+      },
+      "core-test-profile-library": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.004675806034356,
+        "receipt": "target/wp912/core-test-profile-library.json"
+      },
+      "core-unwind-library": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.0048667070223,
+        "receipt": "target/wp912/core-unwind-library.json"
+      },
+      "core-tests-after-unwind-prerequisite": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.00427348399535,
+        "receipt": "target/wp912/core-tests-after-unwind-prerequisite.json"
+      },
+      "core-owner-tests-with-prepared-libraries": {
+        "exit_code": 124,
+        "elapsed_seconds": 60.00480369699653,
+        "receipt": "target/wp912/core-owner-tests-with-prepared-libraries.json"
+      },
+      "core-tests-light": {
+        "exit_code": 101,
+        "elapsed_seconds": 24.60035797697492,
+        "receipt": "target/wp912/core-tests-light.json"
+      },
+      "core-tests-light-corrected": {
+        "exit_code": 0,
+        "elapsed_seconds": 30.44595800701063,
+        "receipt": "target/wp912/core-tests-light-corrected.json"
+      },
+      "core-tests-field-diagnostic": {
+        "exit_code": 0,
+        "elapsed_seconds": 7.768454078002833,
+        "receipt": "target/wp912/core-tests-field-diagnostic.json"
+      },
+      "core-tests-final": {
+        "exit_code": 0,
+        "elapsed_seconds": 6.346661536954343,
+        "receipt": "target/wp912/core-tests-final.json"
+      },
+      "final-cli-check": {
+        "exit_code": 0,
+        "elapsed_seconds": 6.936216210946441,
+        "receipt": "target/wp912/final-cli-check.json"
+      }
+    },
+    "compile_qualification": "Six default/profile preparation caps preserved, no larger cap. Final test preparation reuses WP899 opt-level0/debug0 for four local packages with jobs1; repository profiles/features/toolchain unchanged. Runtime semantics only, no performance claim.",
+    "current_preflight": {
+      "exit_code": 0,
+      "selected": 17,
+      "executable_sha256": "4e3c66e5af6b2e35309a98bff8c0deaab08228bcf2805d4561935d303a1bb018",
+      "receipt": "target/wp912/core-final-preflight.json"
+    },
+    "runtime": {
+      "tests": [
+        {
+          "name": "runtime::aquery_text::tests::declared_inputs_dedup_identity_before_equal_path_display",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003226674976758659,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::aquery_text::tests::fields_sort_after_unicode_escape_and_execution_info_keeps_raw_values",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0025126420659944415,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::aquery_text::tests::pinned_bazel_unicode_then_shell_bytes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0025207019643858075,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::build_only_observations_survive_the_narrow_source_certificate",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0027812529588118196,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::native_source_staging_tracks_sources_and_rejects_conflicting_roots",
+          "exit_code": 0,
+          "elapsed_seconds": 0.27078953804448247,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::resource_metadata_refuses_before_malformed_declared_inputs",
+          "exit_code": 0,
+          "elapsed_seconds": 0.00274451298173517,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::source_staging::tests::workspace_status_descriptors_reject_before_source_staging",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002667912980541587,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_command_tests::filewrite_aquery_text_keeps_root_order_and_excludes_dependency_actions",
+          "exit_code": 0,
+          "elapsed_seconds": 0.03425232297740877,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_command_tests::filewrite_aquery_text_matches_frozen_baseline",
+          "exit_code": 0,
+          "elapsed_seconds": 0.023185790050774813,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::configured_action_conflicts_tests::configured_action_conflicts_equal_filewrites_keep_owners_but_share_execution",
+          "exit_code": 0,
+          "elapsed_seconds": 0.017999714938923717,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_fields_restore_without_mutating_retained_results",
+          "exit_code": 0,
+          "elapsed_seconds": 0.10125617193989456,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_files_to_run_and_named_group_keep_declared_owners",
+          "exit_code": 0,
+          "elapsed_seconds": 0.020943338982760906,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_mixed_scope_order_and_unspilled_recipes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.021456410991959274,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::spawn_aquery_tests::spawn_aquery_preserves_filewrite_validation_before_render_priority",
+          "exit_code": 0,
+          "elapsed_seconds": 0.02317526109982282,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::file_write_aquery_text::tests::aquery_labels_use_bazel_root_and_canonical_external_spelling",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002358400961384177,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::file_write_aquery_text::tests::formatter_boundary_rejects_unadmitted_action_shapes",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0021152199478819966,
+          "passed_one": true
+        },
+        {
+          "name": "runtime::file_write_aquery_text::tests::output_path_validation_is_fail_closed_for_unescaped_text",
+          "exit_code": 0,
+          "elapsed_seconds": 0.002008498995564878,
+          "passed_one": true
+        }
+      ],
+      "selected": 17,
+      "passed": 17,
+      "elapsed_seconds": 0.5360208880156279,
+      "max_child_rss_kib": 78720
+    },
+    "runtime_rss_qualification": "max child RSS across small controls is an observation, not full-workload memory fit.",
+    "controls": "Exact escaping/sort; distinct Source identity/equal display path and repeat dedup; old FileWrite frozen output/order; mixed literal/deps/action order, forced/conditional unspilled Args/no virtual inputs, multiple outputs/tree marker/env/ExecutionInfo; Shell/Path/Artifact/FilesToRun/groups/platform; independent argv/env/input/output A/B/A, retained old text; two equal-writer semantic owners vs shared execution; priority guard-before-render; four source-staging controls.",
+    "corrections": [
+      "Imported ArtifactInputs only under cfg(test) after moving traversal.",
+      "Inherited equal-writer test expected root-relative spelling from full-path accessor: use root_relative_path and separately assert identical full paths plus two generic query records.",
+      "Test record helper stripped both final LFs; once-only diagnostic proved correct final ExecutionInfo field, helper now preserves its terminal LF. Initial15/17 and diagnostic/refusal outputs preserved under target/wp912."
+    ],
+    "checks": [
+      "pinned rustfmt changed Rust",
+      "git diff --check",
+      "v2_plan_status.py",
+      "v2_archive_status.sh"
+    ],
+    "final_compile_command": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "60s",
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "test",
+      "-p",
+      "slug_core_v2",
+      "--lib",
+      "--no-run",
+      "--config",
+      "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_bzlmod_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_loading_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_loading_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_core_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_core_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_analysis_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_analysis_v2.debug=0",
+      "--offline",
+      "--message-format=json"
+    ],
+    "final_compile_environment": {
+      "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "CARGO_BUILD_JOBS": "1"
+    },
+    "current_cli_check": [
+      "timeout",
+      "--signal=TERM",
+      "--kill-after=3s",
+      "60s",
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "check",
+      "-p",
+      "slug_cli_v2",
+      "--offline",
+      "--message-format=json"
+    ],
+    "explicit_compile_caps": {
+      "prepare_seconds": 60,
+      "kill_after_seconds": 3,
+      "capped_preparation_attempts": 6
+    }
+  },
+  "fixture_growth": {
+    "new_fixture_assets": 0,
+    "new_tracked_rust_test_sibling_lines": 389,
+    "qualification": "Focused Rust/BUILD epoch controls only, modest line-estimate overage reviewed; no copied source archives or generalized fixture framework."
+  },
+  "reviews": {
+    "final-source": {
+      "verdict": "FINAL ACCEPT",
+      "path": "target/wp912/final-source.md",
+      "sha256": "2322c5a972984fa16e647f1181708df2cd217931e3b6649ba4930c1da50dcdad"
+    },
+    "final-ownership": {
+      "verdict": "FINAL ACCEPT",
+      "path": "target/wp912/final-ownership.md",
+      "sha256": "7d79ee6404d81a2135930c13d30462fb24d4a1d2203f1227fa644945aa0d666f"
+    },
+    "final-fields": {
+      "verdict": "FINAL ACCEPT",
+      "path": "target/wp912/final-fields.md",
+      "sha256": "76b1480ca15d336e76c9075f08e931952a26ea4aa54cffd45187eb82f3b9a246"
+    }
+  },
+  "residual": "M7A graph comparison remains open. Current demand includes513 Rustc/67 CargoRun/379 ExtractCargoToml command-bearing records; not an exhaustive Spawn census. WP899 64KiB refusal, full source fit and source16/17/18 caps remain unchanged. Windows minimal."
+}

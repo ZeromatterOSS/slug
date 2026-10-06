@@ -396,6 +396,14 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   Configuration/path/order and the named FileWrite token exception remain
   explicitly Slug-native where recorded. Broader action/formats require their
   own admission; no formatter-owned action reconstruction is permitted.
+- [WP912 Spawn text aquery](wp912-spawn-aquery-2026-10-06.json) borrows ordinary
+  typed Spawn from the same validated configured closure and preserves mixed
+  FileWrite/Spawn semantic records. Unspilled retained Args, declared artifact
+  identity, fixed env, output/tree markers and Linux escaping are admitted with
+  native config/path domains; virtual execution params are not declared query
+  inputs. Spawn ActionKey and progress `%{input}` remain explicit prerequisites.
+  Scratch is action-local, output command-owned, and no retained pool/key is added.
+  Other action families/root comparison and M7A stay open.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command

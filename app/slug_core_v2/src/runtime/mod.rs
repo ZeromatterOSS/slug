@@ -18,6 +18,7 @@ pub use action_prerequisites::ActionPrerequisitePlan;
 pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;
 pub use action_prerequisites::RequestedActionPrerequisitePlan;
+mod aquery_text;
 mod configured_action_closure;
 mod configured_output;
 mod demands;
@@ -51,8 +52,10 @@ mod root_apparent_repository_source_path_input;
 mod root_bootstrap;
 mod scoped_cycle_detector;
 mod source_input;
+mod spawn_query_inputs;
 pub mod starlark;
 
+pub use aquery_text::format_aquery_text_output_for_scope;
 pub use configured_output::configured_output_root;
 pub use dice::ActionChainOutputTransport;
 pub use dice::ActionChainResult;

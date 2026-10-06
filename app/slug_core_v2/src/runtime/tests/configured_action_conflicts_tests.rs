@@ -95,7 +95,22 @@ async fn configured_action_conflicts_equal_filewrites_keep_owners_but_share_exec
     assert_eq!(semantic.len(), 2);
     assert_eq!(execution.len(), 1);
     assert_ne!(semantic[0].action().owner(), semantic[1].action().owner());
-    assert_eq!(semantic[0].action().output().path(), "shared.txt");
+    assert_eq!(
+        semantic[0].action().output().root_relative_path(),
+        "shared.txt"
+    );
+    assert_eq!(
+        semantic[0].action().output().path(),
+        semantic[1].action().output().path()
+    );
+    let text = crate::runtime::format_aquery_text_output_for_scope(
+        evaluation,
+        slug_query_v2::AqueryScope::Deps,
+    )
+    .unwrap();
+    assert_eq!(text.matches("action '").count(), 2);
+    assert!(text.contains("  Target: //:left\n"));
+    assert!(text.contains("  Target: //:right\n"));
 }
 
 #[tokio::test]

@@ -659,6 +659,38 @@ impl Deref for ConfiguredAction {
 pub struct ConfiguredActionView<'a>(&'a ConfiguredAction);
 
 impl<'a> ConfiguredActionView<'a> {
+    pub fn from_configured_action(action: &'a ConfiguredAction) -> Result<Self, &'static str> {
+        let spec: &ActionSpec = action;
+        if action.context.execution_platform().is_none() {
+            return Err("configured FileWrite action requires a selected execution platform");
+        }
+        if !matches!(spec.kind(), ActionKind::Write { .. }) {
+            return Err("configured action view supports only FileWrite actions");
+        }
+        if !matches!(spec.outputs(), [output] if output.kind() == ActionOutputKind::File) {
+            return Err("configured FileWrite action requires exactly one file output");
+        }
+        if spec
+            .outputs()
+            .iter()
+            .any(|output| output.metadata() != slug_build_api_v2::ActionOutputMetadata::Ordinary)
+        {
+            return Err("configured FileWrite action does not support constant metadata");
+        }
+        if !spec.argv().is_empty()
+            || !spec.inputs().is_empty()
+            || !spec.tools().is_empty()
+            || !spec.param_files().is_empty()
+            || !spec.env().is_empty()
+            || !spec.execution_requirements().is_empty()
+            || !spec.exec_properties().is_empty()
+            || spec.progress_message().is_some()
+        {
+            return Err("configured FileWrite action has unsupported execution fields");
+        }
+        Ok(Self(action))
+    }
+
     pub fn owner(&self) -> &'a ConfiguredTargetKey {
         self.0.context.owner()
     }
@@ -973,32 +1005,7 @@ impl ConfiguredNodeResult {
         &self,
     ) -> Result<impl ExactSizeIterator<Item = ConfiguredActionView<'_>>, &'static str> {
         for action in self.actions.iter() {
-            let spec: &ActionSpec = action;
-            if action.context.execution_platform().is_none() {
-                return Err("configured FileWrite action requires a selected execution platform");
-            }
-            if !matches!(spec.kind(), ActionKind::Write { .. }) {
-                return Err("configured action view supports only FileWrite actions");
-            }
-            if !matches!(spec.outputs(), [output] if output.kind() == ActionOutputKind::File) {
-                return Err("configured FileWrite action requires exactly one file output");
-            }
-            if spec.outputs().iter().any(|output| {
-                output.metadata() != slug_build_api_v2::ActionOutputMetadata::Ordinary
-            }) {
-                return Err("configured FileWrite action does not support constant metadata");
-            }
-            if !spec.argv().is_empty()
-                || !spec.inputs().is_empty()
-                || !spec.tools().is_empty()
-                || !spec.param_files().is_empty()
-                || !spec.env().is_empty()
-                || !spec.execution_requirements().is_empty()
-                || !spec.exec_properties().is_empty()
-                || spec.progress_message().is_some()
-            {
-                return Err("configured FileWrite action has unsupported execution fields");
-            }
+            ConfiguredActionView::from_configured_action(action)?;
         }
         Ok(self.actions.iter().map(ConfiguredActionView))
     }
