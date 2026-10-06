@@ -12,52 +12,55 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component transfers the sole owned compiler argument for
-builtin len()/type() after the unchanged exact positional shape guard. Optimizer
-ordering, helper folding/spans and fallback stay; three fixed Symbol buffers
-transfer per route. Generic IR spare capacity may survive the move.
-Next: select a proved redundant local copy or existing interner reuse through a
-bounded design checkpoint.
+The latest accepted component transfers owned arguments on successful compiler
+type-is inlining and one-value format optimization. All admission checks and
+optimizer order remain; rejected helpers preserve every argument and pointer.
+Three fixed Symbol buffers transfer per route; generic IR spare capacity may
+survive the move. Next: select a proved redundant local copy or existing interner
+reuse through a bounded design checkpoint.
 
 No network-dependent source observation, actual-source retry, cap growth,
 Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted builtin len/type argument ownership contract
+## Accepted terminal type-is/format argument ownership contract
 
-CallCompiled::call owns its arguments. Both existing len/type branches keep the
-exact one_pos guard, then consume the single pos_named expression instead of
-cloning and dropping its original. Optimizer order, unchanged len/typ folding,
-helper-generated spans/call_site and all later optimizers/fallback stay. The same
-IR/Symbol/frozen owner transfers; no helper, API, interner, cache, key, unsafe code,
-dependency, retained representation or donor import. Helper allocations remain.
+Private CallCompiled::try_type_is/try_format borrow the owned call arguments
+mutably and pop the sole expression only after every unchanged callee/shape/
+metadata/bound-string/method/parser check succeeds. Their Some immediately returns
+from call; every None leaves full args and original pointers intact. Existing
+one_pos checks, optimizer order, helper folding/spans, prefix/suffix frozen
+interning and all later enum/speculative/method/ordinary fallback stay. The same
+IR/Symbol/frozen owner transfers, with normal safe foreign owned_value references.
+No new helper, public API, interner, cache, key, unsafe code, dependency, retained
+representation or donor. Helper boxes/interner/final allocations remain.
 
-Three DESIGNs/FINALs accept whole-owner source proof and identical corrected
-305-line sibling tests. Initial baseline preserves a test error-wording mismatch;
-only that expected fragment was corrected, with original test hash reconstructed.
-Fresh corrected baseline has two semantic/lifecycle passes and one intended
-ownership failure (0/3 Symbol buffers per route); candidate passes 15/15 with
-3/3 transferred per route, 15,384 content bytes per constructed fixture. Exact IR/
-spans, twelve rejected argument shapes, ordinary-call fallback, constant folding,
-effects/count, seven byte-identical diagnostics, Unicode/list/dict lengths/type
-names, star/named runtime behavior, retained frozen functions after source/module/
-clone drop and explicit GC pass. Twelve protected source files, prior receiver/
-double-not tests, type-is/speculative/string-carrier controls and default Loading/
-Core/CLI alltargets checks pass. Fresh exact artifacts/preflights, serial pinned
-offline prep60s/tests30s and format/archive/plan/diff hygiene pass. No fixture
-assets or golden regeneration.
+Three DESIGNs/FINALs accept whole-owner source proof and identical 348-line sibling
+tests. Baseline has two semantic/lifecycle passes and one intended ownership
+failure (0/3 Symbol buffers per route); candidate passes 16/16 with 3/3 transferred
+per route, 15,384 content bytes per fixture. Exact helper-derived IR/spans/content,
+seventeen rejected helpers preserving args/pointers (twelve shape cases), full
+parser-rejection fallback and protected ordinary-call fallback pass. Foreign
+frozen metadata references and existing format prefix/suffix interner ownership,
+effects/count, named/star behavior, five byte-identical diagnostics, retained
+frozen functions after source/module/clone drop and explicit GC pass. Fifteen
+protected sources, prior builtin/receiver tests, type-is, format-speculative order,
+enum and string-carrier controls plus default Loading/Core/CLI alltargets checks
+pass. Fresh exact artifacts/preflights, serial pinned offline prep60s/tests30s and
+format/archive/plan/diff hygiene pass. No fixture assets or golden regeneration.
 
-Acceptance proves two removed scratch deep-clone sites and the fixed Symbol owner
+Acceptance proves two removed scratch deep-clone sites and fixed Symbol owner
 transfers. Generic IR Vec spare capacity may survive where clone discarded it.
 No unchanged capacity, reduced total retained/aggregate memory, allocation count,
-peak/RSS/speed or source-fit claim. Other optimizer copies and final bytecode/
-frozen ownership remain; full WP899/M7A stays open.
+peak/RSS/speed or source-fit claim. Other optimizer copies/final bytecode/frozen
+ownership remain; full WP899/M7A stays open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Terminal type-is/format optimizations transfer the sole owned expression only after every unchanged guard succeeds; every rejected helper preserves full args/pointers, optimizer order/spans/interner/foreign frozen owners stay. Three DESIGNs/FINALs; identical baseline two semantic passes/one ownership failure, candidate 16/16, three Symbol buffers transferred per route (15,384 content bytes each), seventeen rejection checks, five equal diagnostics and default dependents. Generic IR capacity caveat; no aggregate/RSS/speed claim | [Terminal call argument transfer](wp899-terminal-call-arg-move-2026-10-05.json) |
 | Compiler len/type sole arguments move under unchanged exact shape guards; optimizer order/helper folding/spans/fallback/frozen owners preserved. Three DESIGNs/FINALs; corrected same-test baseline two semantic passes/one ownership failure, candidate 15/15, three Symbol buffers transferred per route (15,384 content bytes each), twelve negative shapes, seven equal diagnostics and default dependents. Initial test message correction preserved; generic IR spare capacity caveat, no aggregate/RSS/speed claim | [Builtin argument transfer](wp899-builtin-arg-move-2026-10-05.json) |
 | Compiler double-not bool fold transfers already-owned inner IR instead of deep-cloning; exact guard/tree/spans/constant/fallback/frozen ownership preserved. Three DESIGNs/FINALs; identical baseline two semantic passes/one pointer failure, candidate 13/13, three Symbol buffers transferred (15,384 content bytes), two equal diagnostics and default dependents. Generic IR spare capacity caveat; no aggregate/RSS/speed claim | [Double-not ownership transfer](wp899-double-not-move-2026-10-05.json) |
 | Split/rsplit reuse complete input substrings by equal byte length at final list allocation; all splitting decisions, parameters/order, lists/scratch and partial owned strings preserved. Three DESIGNs/FINALs; same tests baseline two semantic passes/one sharing failure, candidate 14/14, 77,750 comparisons per variant, six equal errors, 42 sharing routes and default dependents. Two 128 KiB fixtures share with zero observed added arena accounting; fixture observations only | [Split/rsplit input reuse](wp899-split-input-reuse-2026-10-05.json) |

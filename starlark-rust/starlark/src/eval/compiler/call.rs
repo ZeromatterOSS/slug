@@ -129,11 +129,11 @@ impl CallCompiled {
     }
 
     /// Try to inline a function like `lambda x: type(x) == "y"`.
-    fn try_type_is(fun: &ExprCompiled, args: &ArgsCompiledValue) -> Option<ExprCompiled> {
+    fn try_type_is(fun: &ExprCompiled, args: &mut ArgsCompiledValue) -> Option<ExprCompiled> {
         let fun = fun.as_frozen_def()?;
-        let pos = args.one_pos()?;
+        args.one_pos()?;
         if let Some(InlineDefBody::ReturnTypeIs(t)) = &fun.def_info.inline_def_body {
-            Some(ExprCompiled::type_is(pos.clone(), *t))
+            Some(ExprCompiled::type_is(args.pos_named.pop().unwrap(), *t))
         } else {
             None
         }
@@ -251,7 +251,7 @@ impl CallCompiled {
     // Optimize `"aaa{}bbb".format(arg)`.
     fn try_format(
         fun: &IrSpanned<ExprCompiled>,
-        args: &ArgsCompiledValue,
+        args: &mut ArgsCompiledValue,
         ctx: &mut OptCtx,
     ) -> Option<ExprCompiled> {
         let fun = fun.as_frozen_bound_method()?;
@@ -259,23 +259,28 @@ impl CallCompiled {
         if fun.method.name != "format" {
             return None;
         }
-        let arg = args.one_pos()?;
+        args.one_pos()?;
 
         let (before, after) = parse_format_one(&format)?;
 
         let before = ctx.frozen_heap().alloc_str_intern(&before);
         let after = ctx.frozen_heap().alloc_str_intern(&after);
-        Some(ExprCompiled::format_one(before, arg.clone(), after, ctx))
+        Some(ExprCompiled::format_one(
+            before,
+            args.pos_named.pop().unwrap(),
+            after,
+            ctx,
+        ))
     }
 
     pub(crate) fn call(
         span: FrameSpan,
         call_site: FrameSpan,
         fun: IrSpanned<ExprCompiled>,
-        args: ArgsCompiledValue,
+        mut args: ArgsCompiledValue,
         ctx: &mut OptCtx,
     ) -> ExprCompiled {
-        if let Some(type_is) = CallCompiled::try_type_is(&fun, &args) {
+        if let Some(type_is) = CallCompiled::try_type_is(&fun, &mut args) {
             return type_is;
         }
 
@@ -303,7 +308,7 @@ impl CallCompiled {
             return r;
         }
 
-        if let Some(r) = CallCompiled::try_format(&fun, &args, ctx) {
+        if let Some(r) = CallCompiled::try_format(&fun, &mut args, ctx) {
             return r;
         }
 
@@ -342,3 +347,7 @@ mod receiver_memory_tests;
 #[cfg(test)]
 #[path = "call/builtin_arg_memory_tests.rs"]
 mod builtin_arg_memory_tests;
+
+#[cfg(test)]
+#[path = "call/terminal_arg_memory_tests.rs"]
+mod terminal_arg_memory_tests;

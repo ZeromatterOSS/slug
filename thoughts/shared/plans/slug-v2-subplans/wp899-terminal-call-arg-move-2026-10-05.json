@@ -1,0 +1,245 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "fef9f987b",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "starlark-rust/starlark/src/eval/compiler/call.rs": "bdb6cdd2378c1de24e9f9d2c24863fda0c4960809e548e33cc8369228fed986c",
+    "starlark-rust/starlark/src/eval/compiler/call/terminal_arg_memory_tests.rs": "3f2962973e671fc0f9716542b2766541bf3c07b32a795bd7b1f668d2ace136a0",
+    "starlark-rust/starlark/src/collections/symbol/symbol.rs": "8301dd1d265979baffdae5660ca89628e7ed4b4dd7c228fde7735c2f7d895453",
+    "starlark-rust/starlark/src/eval/compiler/span.rs": "17cb770ed46fb9c681fd44e614a8a1857e1bce1f028010b559d340a0b7bdae00",
+    "starlark-rust/starlark/src/eval/runtime/frame_span.rs": "d9e06ea2f1f667261387cec1786563db034bb3a8e33dea00dd5af6b64ff72264",
+    "starlark-rust/starlark/src/eval/compiler/expr.rs": "e054a466d40ce7098a3c008eda590f369860f0a2248c296e5dfaf0948f886b9f",
+    "starlark-rust/starlark/src/eval/compiler/args.rs": "d0a2e05c8fe7a815430ece5b6e23696bc6afa48d61a0e42963be4c9052df36c2",
+    "starlark-rust/starlark/src/eval/compiler/def_inline.rs": "50d9f4ce1f2dfab403e49e4ebe7fefb69324a039797d616ece92ee818295f944",
+    "starlark-rust/starlark/src/eval/compiler/call/receiver_memory_tests.rs": "5926167a27577f46616851d373c5bdb32691d0f32d0d9884b0bcf11f7fa33661",
+    "starlark-rust/starlark/src/eval/compiler/call/builtin_arg_memory_tests.rs": "7a7225d970d55b53ddf65ca41906056b8b4e8cbec6d24d891965996e35a2c4c4",
+    "starlark-rust/starlark/src/tests/opt.rs": "c9e2c5366fc541aaf3e2ced1c3c90b1634fca27afaeca675224560645994ab3e",
+    "starlark-rust/starlark/src/tests/opt/type_is.rs": "5c5131e0d01e80bebe90c261f76c7d1f1a31f6bc43668190c1a2438d4dbbe983",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257",
+    "starlark-rust/starlark/src/values/owned.rs": "edf16c1a7488868f332b1536bce5b78cdf0627f1d755ba39a8df870e7416ef2f",
+    "starlark-rust/starlark/src/values/types/string/dot_format.rs": "9e05ea2a9b1a2ec59fce64cabf4ed1939b08dd668cef45636cad706a1d253faa",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "a87db25e672275a89034ef6c6dc487e0944d79f5c5992be82486cb61e4e153f6",
+    "selectors": [
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_call_optimizations_transfer_symbols_and_preserve_ir_and_frozen_parts",
+      "eval::compiler::call::terminal_arg_memory_tests::rejected_terminal_checks_preserve_arguments_and_full_call_fallback",
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_calls_preserve_effects_errors_and_retained_frozen_functions",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_calls_transfer_sole_argument_symbol_buffers_and_preserve_ir",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_argument_shape_guards_folding_and_ordinary_calls_are_preserved",
+      "eval::compiler::call::builtin_arg_memory_tests::builtin_calls_preserve_effects_errors_and_retained_frozen_functions",
+      "eval::compiler::call::receiver_memory_tests::method_call_transfers_nested_symbol_buffers_and_preserves_ir_spans_arguments",
+      "eval::compiler::call::receiver_memory_tests::ordinary_call_keeps_function_arguments_and_span_ownership",
+      "eval::compiler::call::receiver_memory_tests::nested_method_execution_preserves_order_errors_and_frozen_ownership",
+      "tests::opt::test_type_is_inlined",
+      "tests::opt::type_is::returns_type_is",
+      "tests::opt::type_is::does_not_return_type_is",
+      "tests::opt::speculative_exec::test_format_speculatively_before_format_instr",
+      "tests::opt::speculative_exec::test_speculatively_inline_enum",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/call.rs": "bdb6cdd2378c1de24e9f9d2c24863fda0c4960809e548e33cc8369228fed986c",
+      "starlark-rust/starlark/src/eval/compiler/call/terminal_arg_memory_tests.rs": "3f2962973e671fc0f9716542b2766541bf3c07b32a795bd7b1f668d2ace136a0"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "a9104bceb73f3511688d337ba44e0abc3b52cb4040161c20b229fa5547468b98",
+    "selectors": [
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_call_optimizations_transfer_symbols_and_preserve_ir_and_frozen_parts",
+      "eval::compiler::call::terminal_arg_memory_tests::rejected_terminal_checks_preserve_arguments_and_full_call_fallback",
+      "eval::compiler::call::terminal_arg_memory_tests::terminal_calls_preserve_effects_errors_and_retained_frozen_functions"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/eval/compiler/call.rs": "e67a5af5bb4f20d862b54197894ba171d6a25a44a9109562d1a6fba8ad56eeee",
+      "starlark-rust/starlark/src/eval/compiler/call/terminal_arg_memory_tests.rs": "3f2962973e671fc0f9716542b2766541bf3c07b32a795bd7b1f668d2ace136a0"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/terminal-call-arg-move-baseline-compile.json",
+      "sha256": "1962805e21781da74b156f5d0da324cf5e89b847ef0a5cfcaa28b05c543522d6",
+      "exit_code": 0,
+      "elapsed_seconds": 6.142597358033527,
+      "log_sha256": "ebb6afa2be70e5abe0a92c29fe0a4d91fa8a453a121d60e84fe7fa1d2981ffd8"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/terminal-call-arg-move-baseline-preflight.json",
+      "sha256": "b9f51ae345c0c1ba546552f24e9747ae7140ac683694227c422ab347a4079d02",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02231882797786966,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/terminal-call-arg-move-baseline-controls.json",
+      "sha256": "d50d5e3db0fc7c726a78ff4fffde2736e328e8da8dd9086bdf3827de746d983f",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0062327299965545535,
+      "log_sha256": "530b7ce7e80d7a2d3fc146c527776788f08c88c2c88b28873adad188605c3bf2"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/terminal-call-arg-move-candidate-compile.json",
+      "sha256": "297f368e48968319b34d0e2bf76eca6cf582f2ebb69068829dd110e0cf7b5b13",
+      "exit_code": 0,
+      "elapsed_seconds": 4.795442253991496,
+      "log_sha256": "6b1ab4cc72ed6d5d8baec6949973735765fe7539da469f463b14c2a150138327"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/terminal-call-arg-move-candidate-preflight.json",
+      "sha256": "c7602c15d8ded57c83397648f51f902991bbca49d76e9efe9cec5023ebc15fa7",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019974927010480314,
+      "log_sha256": "6cdcdeb5b225066219e52ee7724ac246296e53935d42ceb4a772fb8122d77ffc"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/terminal-call-arg-move-candidate-controls.json",
+      "sha256": "ed9e15aa824ef56e0548d3ad8b3cf406d2b040423592f2636066f843b44dc6ab",
+      "exit_code": 0,
+      "elapsed_seconds": 0.010302979964762926,
+      "log_sha256": "c8c6fc90f03b9bd3c6d66485090e752564b803459ef15ff7f76dd8cbf2052861"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/terminal-call-arg-move-dependents-check.json",
+      "sha256": "d407250893c041be45b7adec2dd707c8d0b8a1619d8e5b973f88ee3c0aaecffd",
+      "exit_code": 0,
+      "elapsed_seconds": 7.580760623968672,
+      "log_sha256": "534762f7e4238cb0d14c438ec3a5f6e8650cf24b2e22658e2a67a422f7f4cf5b"
+    }
+  },
+  "proof": "Whole call.rs equals baseline plus sibling hook and exactly two private terminal-helper args references made mutable, exact one_pos guards retained, only final success expression clones replaced by sole owned pop. Owned call binding/references mutable only for these helpers. All None paths preserve args, successful Some immediately returns. All callee/metadata/bound-string/method/parser guards, prefix/suffix interning, optimizer ordering/constant/speculative/enum/method/fallback/spans unchanged; 15 protected source files baseline-identical, same tests. No new helper/API/interner/cache/key/unsafe/dependency/retained representation or donor.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "baseline_pointer_gate_failed": 1,
+    "candidate_new": 3,
+    "candidate_protected": 13,
+    "candidate_total": 16,
+    "negative_helper_checks_preserving_args": 17,
+    "shape_guard_negative_cases": 12,
+    "full_call_parser_rejection_fallback": 1,
+    "exact_equal_error_records": 5
+  },
+  "ownership_fixtures": {
+    "baseline": [
+      {
+        "route": "type_is",
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 0
+      },
+      {
+        "route": "format",
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 0
+      }
+    ],
+    "candidate": [
+      {
+        "route": "type_is",
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 3
+      },
+      {
+        "route": "format",
+        "symbols": 3,
+        "content_bytes": 15384,
+        "reused_buffers": 3
+      }
+    ]
+  },
+  "exact_errors": [
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      check([], struct())\nerror: Object of type `struct` has no attribute `outer`\n --> assert.bzl:8:20\n  |\n8 |     return is_list(seen(log, value).outer.inner)\n  |                    ^^^^^^^^^^^^^^^^^^^^^^\n  |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      render([], struct(outer=struct()))\nerror: Object of type `struct` has no attribute `inner`\n  --> assert.bzl:14:31\n   |\n14 |     return \"pre{}post\".format(seen(log, value).outer.inner)\n   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      star_check([], [])\n  * assert.bzl:12, in star_check\n      return is_list(*seen(log, values))\nerror: Missing parameter `x` for call to `assert.bzl.is_list`\n  --> assert.bzl:12:12\n   |\n12 |     return is_list(*seen(log, values))\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      star_check([], [[], {}])\n  * assert.bzl:12, in star_check\n      return is_list(*seen(log, values))\nerror: Found 1 extra positional argument(s) for call to assert.bzl.is_list\n  --> assert.bzl:12:12\n   |\n12 |     return is_list(*seen(log, values))\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n",
+    "Traceback (most recent call last):\n  * assert.bzl:1, in <module>\n      broken([], 1)\n  * assert.bzl:16, in broken\n      return \"{}{}\".format(seen(log, value))\nerror: Not enough parameters in format string\n  --> assert.bzl:16:12\n   |\n16 |     return \"{}{}\".format(seen(log, value))\n   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n   |\n"
+  ],
+  "limits": "Two compiler scratch deep-clone sites removed, three fixed Symbol buffers transfer per type-is/format fixture (15384 content bytes each). Generic IR Vec spare capacity may survive where clone discarded it; no unchanged-capacity, reduced total retained/aggregate memory, allocation-count, peak/RSS/speed/source-fit claim. Unchanged helper boxes/interner/final bytecode/frozen owners and other optimizer clones remain. Foreign metadata ownership uses unchanged safe owned_value frozen-heap references; prefix/suffix remain in existing interner.",
+  "growth": {
+    "test_sibling_lines": 348,
+    "estimate": "270-360 lines, three tests, no fixture assets",
+    "production": "Two private helper signatures/final argument transfers plus owned call binding/references and four-line cfg hook; cohesive existing owner."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline Starlark lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Loading/Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/terminal-call-arg-move-baseline-compile.json": "1962805e21781da74b156f5d0da324cf5e89b847ef0a5cfcaa28b05c543522d6",
+    "target/wp899/terminal-call-arg-move-baseline-compile.jsonl": "ebb6afa2be70e5abe0a92c29fe0a4d91fa8a453a121d60e84fe7fa1d2981ffd8",
+    "target/wp899/terminal-call-arg-move-baseline-controls.json": "d50d5e3db0fc7c726a78ff4fffde2736e328e8da8dd9086bdf3827de746d983f",
+    "target/wp899/terminal-call-arg-move-baseline-controls.jsonl": "530b7ce7e80d7a2d3fc146c527776788f08c88c2c88b28873adad188605c3bf2",
+    "target/wp899/terminal-call-arg-move-baseline-preflight.json": "b9f51ae345c0c1ba546552f24e9747ae7140ac683694227c422ab347a4079d02",
+    "target/wp899/terminal-call-arg-move-baseline-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/terminal-call-arg-move-baseline-selectors.json": "f07b7e643cad591ea2701316611f2eb466402c36ea783d23adfc27a3e2468d8c",
+    "target/wp899/terminal-call-arg-move-candidate-compile.json": "297f368e48968319b34d0e2bf76eca6cf582f2ebb69068829dd110e0cf7b5b13",
+    "target/wp899/terminal-call-arg-move-candidate-compile.jsonl": "6b1ab4cc72ed6d5d8baec6949973735765fe7539da469f463b14c2a150138327",
+    "target/wp899/terminal-call-arg-move-candidate-controls.json": "ed9e15aa824ef56e0548d3ad8b3cf406d2b040423592f2636066f843b44dc6ab",
+    "target/wp899/terminal-call-arg-move-candidate-controls.jsonl": "c8c6fc90f03b9bd3c6d66485090e752564b803459ef15ff7f76dd8cbf2052861",
+    "target/wp899/terminal-call-arg-move-candidate-preflight.json": "c7602c15d8ded57c83397648f51f902991bbca49d76e9efe9cec5023ebc15fa7",
+    "target/wp899/terminal-call-arg-move-candidate-preflight.jsonl": "6cdcdeb5b225066219e52ee7724ac246296e53935d42ceb4a772fb8122d77ffc",
+    "target/wp899/terminal-call-arg-move-candidate-selectors.json": "13754edb45c823936cef1b3ec3def50f1a031949c5b4df928b412ed0042dc4b0",
+    "target/wp899/terminal-call-arg-move-controls.py": "dd90515c1f4242c86828ff1d3171b36c7182b6b9a59b763e8115033555a46b76",
+    "target/wp899/terminal-call-arg-move-dependents-check.json": "d407250893c041be45b7adec2dd707c8d0b8a1619d8e5b973f88ee3c0aaecffd",
+    "target/wp899/terminal-call-arg-move-dependents-check.jsonl": "534762f7e4238cb0d14c438ec3a5f6e8650cf24b2e22658e2a67a422f7f4cf5b",
+    "target/wp899/terminal-call-arg-move-design-evidence.md": "ad7adfd62576127d4a6534c9be2d16f49f2b9cfa9593dedb132ca4213edac69f",
+    "target/wp899/terminal-call-arg-move-design-ownership.md": "7ad440c802ac2260f9be03b718d715c74a662620c176a9d1a4ceca2517813c14",
+    "target/wp899/terminal-call-arg-move-design-source.md": "8ab20794216406699c43c4cc0772cd994513b13023158d0be72614cac5e854d7",
+    "target/wp899/terminal-call-arg-move-design.md": "eaaf9c440cc701d801c808ade446a0e16e4512383b6107b38497fb9c8384e1ca",
+    "target/wp899/terminal-call-arg-move-record.py": "892fd7313f31930a718db11a2cbd5ed3b5ffb46b3bed4b400878d963644784c9",
+    "target/wp899/terminal-call-arg-move-start.json": "e029f8fc88ca817133448199ab13bd0b002c6be697caf086fae993a53bf16b23"
+  },
+  "start": {
+    "started_at": "2026-10-06T02:10:14.516034+00:00",
+    "baseline": "fef9f987bba10218c5deff602d68b1c6f4c57a80"
+  },
+  "timing": {
+    "compile_seconds": 18.518800235993695,
+    "test_seconds": 0.01653570996131748,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 441.373423
+  },
+  "validation_sha256": "336158946b3c2f33925fb415a1111ed57f0fffa0e59e2b959903d40b36a86482",
+  "final_reviews": {
+    "target/wp899/terminal-call-arg-move-final-source.md": "7fd1a49ee035faa56412576b068fcc9fd958179780ef7462db6c172c04e48e9f",
+    "target/wp899/terminal-call-arg-move-final-ownership.md": "bf385dd060980077521557e0de5c76a3de9d5abeff275de790ffab104431f094",
+    "target/wp899/terminal-call-arg-move-final-evidence.md": "2aba70ae0508d61583bcbd5cadb06b44aed40358c1698fbb79ac71f7d5967dea"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "532c084dd00476401621436e443486ea46ec4307a9f82137cc96abe57b2222c3",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "c05c2f361bdea9053040f3da7fbbc18bbb23c7cb24061cbbf80b1be9d32413ea",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "d31f05b2ac2ba2871f42749384dc81f6d7347e59a908da6718031350f1e7e0b9"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/terminal-call-arg-move-format-check.json",
+      "sha256": "00d8686d0fb6953d1a927461bda6494d6909933a373c8c21219bfaee2d875908",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/terminal-call-arg-move-archive-check.json",
+      "sha256": "cf9c46a9731b555913568583bb9820710741c522a9c0ba0ff157646d7cb6a228",
+      "exit_code": 0,
+      "log_sha256": "5661c1aecbaea2b1e486738d784c11b518a9967fa4eebf23b2712c017b0efc45"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/terminal-call-arg-move-plan-check.json",
+      "sha256": "9e25c9b818a87f8afe007a7a95746cda4eaa33aaba5ea33103e4f68cf0c669e0",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/terminal-call-arg-move-diff-check.json",
+      "sha256": "bba7a591e09dcde7d7a43ee6fe63741fac92df12cb879fc55aadacb18e4d3ca2",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

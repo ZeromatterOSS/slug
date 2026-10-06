@@ -39,11 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: compiler len/type calls move their sole owned argument
-under unchanged exact positional guards. Optimizer order/helper folding/spans,
-fallback/effects/errors/frozen ownership remain; 15 controls and default dependent
-checks pass. Three Symbol buffers transfer per route (15,384 content bytes each);
-generic IR spare capacity may survive, with no aggregate/RSS/speed claim.
+Latest accepted change: successful compiler type-is/format optimizations transfer
+their owned argument after unchanged admission checks. Rejected helpers preserve
+args/pointers; optimizer order/spans/interner/frozen ownership remain. Sixteen
+controls and default dependent checks pass. Three Symbol buffers transfer per
+route (15,384 content bytes each); generic IR spare capacity may survive, with no
+aggregate/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
