@@ -1,0 +1,114 @@
+{
+  "schema": 1,
+  "base": "adb8f4d4b1df7cb9fe312541842471f3b273c203",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "build",
+    "//app/slug_cli_v2:slug",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--jobs=2",
+    "--spawn_strategy=standalone",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 60,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "output_limit_scope": "Parent-saved bytes per log only; no child artifact RLIMIT_FSIZE",
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": true,
+  "tests_requested": false,
+  "compiler_census_before": [],
+  "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+  "downloads_requested": false,
+  "log_capture_eof": true,
+  "output_limit_exceeded": [],
+  "elapsed_seconds": 58.72105409298092,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "compiler_census_after": [],
+  "unexplained_compiler_processes_observed": false,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+    },
+    "stderr.log": {
+      "bytes": 82001,
+      "sha256": "4cfdac5231367345a9f6ffa571bea4649a42e17c1bbaadb0d522e61f0a5bb2b6"
+    }
+  },
+  "packet": "WP-7-209-m7a-cli-root-after-prerequisite-preparation-r1",
+  "disposition": "ACCEPTED_CURRENT_CLI_ROOT_COMPILATION",
+  "input_pin_count": 2829,
+  "reported_processes": {
+    "action_cache_hit": 1352,
+    "internal": 2,
+    "local": 30,
+    "total_actions": 32
+  },
+  "root_output": {
+    "path": "bazel-out/k8-fastbuild/bin/app/slug_cli_v2/slug",
+    "bytes": 151509312,
+    "sha256": "ceb64f03dd09b42787d7bc103b7d425ec6719b96c636b9dd90f6ef0627b5008b",
+    "identity": [
+      66308,
+      125995076,
+      33133,
+      151509312,
+      1791271759736485517,
+      1791271759936485828
+    ],
+    "schema": 1,
+    "artifact_id": 4321,
+    "producer_action_index": 0,
+    "execroot": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/execroot/_main",
+    "execroot_identity": [
+      66308,
+      125830534,
+      16877,
+      4096,
+      1791271759936485828,
+      1791271759936485828
+    ],
+    "scope": "Nonempty executable-mode current CLI output after successful ordinary root build. No Slug execution, full runfiles topology, hermetic tool freshness, source-memory fit or M7A admission."
+  },
+  "scope": "Current ordinary CLI root compilation/linking preparation and bounded executable-output observations only. No all-actions-fresh, complete runfiles, Slug runtime, source-memory fit or M7A claim.",
+  "next_decision": "Observe generated argument-file cfg bytes in the saved root-demanded compiler/producer closure using bounded local reads, without build, network or Slug source retry.",
+  "evidence_sha256": {
+    "target/wp910/build-observe.py": "4cf142c2e45e16c941c059e29d1dcbb0eb18c9d38381088558c491f620594676",
+    "target/wp910/claim.json": "8c4c27e7f54f29c3c8176c310a9e0b708ba35b030fb275e37412fec4492db82f",
+    "target/wp910/observation.json": "e924d01a03b6fbf4fe464381e34d4cd4055091057cacae928a9a4c232b5980e8",
+    "target/wp910/outputs.py": "dee35bca7f680f04d12c571ebe32d0a7ffb2160e0a901257222ea02409f2bb87",
+    "target/wp910/outputs.json": "6c33d88c16cab67981f5bfff11007cf977daa3144b1c39ed4b412974828ae2d4",
+    "target/wp910/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp910/stderr.log": "4cfdac5231367345a9f6ffa571bea4649a42e17c1bbaadb0d522e61f0a5bb2b6",
+    "target/wp910/final-source.md": "4ce865c87d0e695ca5cd40e9c0b7abd092b1faed71f3156ab901ed1924a6403d",
+    "target/wp910/final-evidence.md": "5cc22b59906bd80bcefd01b78241d94130dae1d8301933a6cbae54f015a73ac4",
+    "target/wp910/final-ownership.md": "7fad40273a14e0390ba8c1cff6abbe9b5b36b6f576b7b312d42bf14b42e4c21a"
+  },
+  "independent_final_reviews": {
+    "target/wp910/final-source.md": "4ce865c87d0e695ca5cd40e9c0b7abd092b1faed71f3156ab901ed1924a6403d",
+    "target/wp910/final-evidence.md": "5cc22b59906bd80bcefd01b78241d94130dae1d8301933a6cbae54f015a73ac4",
+    "target/wp910/final-ownership.md": "7fad40273a14e0390ba8c1cff6abbe9b5b36b6f576b7b312d42bf14b42e4c21a"
+  }
+}

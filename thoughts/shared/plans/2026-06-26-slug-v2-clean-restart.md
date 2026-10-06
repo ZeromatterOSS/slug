@@ -34,27 +34,26 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-209-m7a-cli-root-after-prerequisite-preparation-r1
-Status: Syntax and Starlark prerequisites accepted; current CLI compile selected
+Packet: WP-7-210-m7a-generated-argument-file-cfg-accounting-r1
+Status: Current CLI root compile accepted; generated argument-file bytes selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects the CLI root
-with materially completed syntax/Starlark prerequisites and corrected per-log
-capture. The [Starlark receipt](./slug-v2-subplans/wp909-starlark-prerequisite-build-2026-10-06.json)
-records8.136s success and its80.2MB library after fixing the inherited artifact
-file-limit mistake. Compile/cleanup/log caps remain unchanged. Root success stays
-open after WP907's cap; no identical failed invocation or Slug source retry.
-Source-memory/M7A remain open. Allocation/interner discipline, original memory
-REFUSED/source16/17/18 and source limits persist; Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects bounded local
+reads of generated compiler argument-file cfg bytes using the accepted root
+producer inventory. The [root receipt](./slug-v2-subplans/wp910-current-cli-root-build-2026-10-06.json)
+records58.721s ordinary CLI compilation success with unchanged inputs and clean
+completion. Compilation preparation now passes; authentic Slug source/runtime,
+whole-workload memory fit and M7A remain open. Allocation/interner discipline,
+original memory REFUSED/source16/17/18 and source caps persist; Windows minimal.
 
 ### Ready and blocked queue
 
-The current packet selects bounded compiler preparation under priority2; the remaining
+The current packet selects bounded generated-input accounting under priority1; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | configured 35/35 local path and local feature-attribute evidence accepted; separately review external features, configured actions and generated inputs |
-| 2 | Bazel root compilation and action coverage | select focused build/action evidence only after configured graph accounting; current packet cannot admit M7A behavior |
+| 1 | Configured production graph coverage | current36 local owners and353 external normal direct-feature owners accepted; generated argument bytes remain open |
+| 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
 | 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | select demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md); Stage 11 owns the library boundary |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
