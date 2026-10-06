@@ -1,0 +1,224 @@
+{
+  "schema": 1,
+  "base": "25b4efbc7d039bf596c8a5f67a78b18e4d03c321",
+  "root_unit_index": 394,
+  "root_package_id": "path+file:///run/media/system/Colossus/dev/slug/app/slug_cli_v2#0.1.0",
+  "root_features": [
+    "default"
+  ],
+  "host": "x86_64-unknown-linux-gnu",
+  "target": "x86_64-unknown-linux-gnu",
+  "planned_unit_count": 503,
+  "reachable_unit_count": 503,
+  "unreachable_unit_indices": [],
+  "local_package_count": 36,
+  "external_package_count": 315,
+  "metadata_selected_packages_without_units": [
+    "registry+https://github.com/rust-lang/crates.io-index#libm@0.2.16"
+  ],
+  "normal_external_unit_count": 351,
+  "normal_unit_comparisons": {
+    "equal": 329,
+    "narrower": 22
+  },
+  "comparison_by_platform": {
+    "None": {
+      "equal": 109,
+      "narrower": 17
+    },
+    "x86_64-unknown-linux-gnu": {
+      "equal": 220,
+      "narrower": 5
+    }
+  },
+  "planned_mode_counts": {
+    "build": 444,
+    "run-custom-build": 59
+  },
+  "interpretation": "Planned unit feature comparison with generated-lock declarations, not configured Bazel compiler/action flags, generated build-script output, executed actions or full M7A. Narrower root/host sets need consumer evidence before classifying a defect.",
+  "packet": "WP-7-200-m7a-current-production-inventory-r1",
+  "disposition": "ACCEPTED_CURRENT_PLANNED_UNIT_FEATURE_ACCOUNTING",
+  "source_gate_accepted": false,
+  "m7a_accepted": false,
+  "observation": {
+    "command": [
+      "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "build",
+      "-Z",
+      "unstable-options",
+      "--unit-graph",
+      "--locked",
+      "--offline",
+      "--manifest-path",
+      "app/slug_cli_v2/Cargo.toml",
+      "--bin",
+      "slug",
+      "--target",
+      "x86_64-unknown-linux-gnu"
+    ],
+    "exit_code": 0,
+    "elapsed_seconds": 0.1140567060210742,
+    "work_limit_seconds": 15,
+    "output_limit_bytes": 16777216,
+    "deadline_expired": false,
+    "kill_sent": false,
+    "joined": true,
+    "inputs_unchanged": true,
+    "tracked_state_unchanged": true,
+    "initial_tracked_status": " M thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n",
+    "output_bytes": 439916,
+    "stderr_bytes": 638
+  },
+  "target_narrower": [
+    {
+      "unit_index": 2,
+      "name": "ahash",
+      "version": "0.8.12",
+      "unit_features": [],
+      "declared_linux_lock_features": [
+        "default",
+        "getrandom",
+        "runtime-rng",
+        "std"
+      ],
+      "unit_only": [],
+      "lock_only": [
+        "default",
+        "getrandom",
+        "runtime-rng",
+        "std"
+      ]
+    },
+    {
+      "unit_index": 197,
+      "name": "lalrpop-util",
+      "version": "0.19.12",
+      "unit_features": [
+        "default",
+        "std"
+      ],
+      "declared_linux_lock_features": [
+        "default",
+        "lexer",
+        "regex",
+        "std"
+      ],
+      "unit_only": [],
+      "lock_only": [
+        "lexer",
+        "regex"
+      ]
+    },
+    {
+      "unit_index": 248,
+      "name": "num-traits",
+      "version": "0.2.19",
+      "unit_features": [
+        "default",
+        "i128",
+        "std"
+      ],
+      "declared_linux_lock_features": [
+        "default",
+        "i128",
+        "libm",
+        "std"
+      ],
+      "unit_only": [],
+      "lock_only": [
+        "libm"
+      ]
+    },
+    {
+      "unit_index": 335,
+      "name": "relative-path",
+      "version": "1.9.3",
+      "unit_features": [
+        "default"
+      ],
+      "declared_linux_lock_features": [
+        "default",
+        "serde"
+      ],
+      "unit_only": [],
+      "lock_only": [
+        "serde"
+      ]
+    },
+    {
+      "unit_index": 341,
+      "name": "rustix",
+      "version": "1.1.4",
+      "unit_features": [
+        "alloc",
+        "default",
+        "fs",
+        "std"
+      ],
+      "declared_linux_lock_features": [
+        "alloc",
+        "default",
+        "fs",
+        "std",
+        "termios"
+      ],
+      "unit_only": [],
+      "lock_only": [
+        "termios"
+      ]
+    }
+  ],
+  "tokio": [
+    {
+      "unit_index": 452,
+      "name": "tokio",
+      "version": "1.53.1",
+      "unit_features": [
+        "bytes",
+        "default",
+        "fs",
+        "full",
+        "io-std",
+        "io-util",
+        "libc",
+        "macros",
+        "mio",
+        "net",
+        "parking_lot",
+        "process",
+        "rt",
+        "rt-multi-thread",
+        "signal",
+        "signal-hook-registry",
+        "socket2",
+        "sync",
+        "test-util",
+        "time",
+        "tokio-macros",
+        "tracing"
+      ],
+      "comparison": "equal"
+    }
+  ],
+  "input_pin_count": 431,
+  "tool_pins": {
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo": "6d3e324c36d9e908a21584f2bbf76a560fa87778fa7bbabc8042b8fa16da031c",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc": "8d07143dd9a7558910b16eb445b4d4ed62cd4c4b365a451810e2ba0e1514995c",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc": "e4f884f304c22367efc04da40f39bf13bed6a3ef7e400ee1089d5a461f090c62"
+  },
+  "evidence_sha256": {
+    "target/wp901/unit-graph.json": "ce24c901996ebf1776789dad84e2922eb33374bee9ff87f41ef81e70c2265c80",
+    "target/wp901/observation.json": "1eda33ea5e7907f4d2ac2f925dc50966cfbc47d2298c7c0e971c217eba212d9e",
+    "target/wp901/analysis.json": "af9c44a69047d0f71e37fcb745d246f353b729473a2f393d3fcfcdd77af469b7",
+    "target/wp901/unit-observe.py": "320b010de97110b0dc684c6f53aa697edb154521bb095981bbe289bc1238206f",
+    "target/wp901/unit-analyze.py": "73174515b0cfb886dbd5f41254c9994c99baca479ccb029e688911648005fa40",
+    "target/wp901/rustc-version.txt": "4a7ca05b099f8095047128cf2514b25c1dc0f9cc630f26d49a93dacb295d74a1"
+  },
+  "independent_final_reviews": {
+    "target/wp901/final-source.md": "f60f58e728384268af9eda02d62f2e663cb7b8fb47e55d704a983f073af261bf",
+    "target/wp901/final-evidence.md": "a724fba287b6b3c838f2730bb0cfe921696654aec92a671371f20b0aba4da06b",
+    "target/wp901/final-ownership.md": "2972d4a836d01da7f5a7332a619935e5fc3d530269ec19a5dad980a3e3f5fd9c"
+  },
+  "historical_reuse": "Five narrower target names/versions/feature gaps match accepted Stage10 observations. Old raw target/wp714/wp719 artifacts are absent; authority locks changed since8f3ddef8b. Historical configured-action/bs.flags observations remain historical and are not substituted for current configured values.",
+  "next_decision": "Select bounded current configured Rustc action-graph evidence for the production CLI closure before deciding whether feature differences require any implementation. Keep full source admission/generated bytes/action/compilation/M7A gates open."
+}

@@ -1,7 +1,7 @@
 # Current Slug V2 Work Packet
 
 Packet: WP-7-200-m7a-current-production-inventory-r1
-Status: Offline inventory accepted; current Linux unit-feature reconciliation is next
+Status: Current unit-feature accounting accepted; configured Rustc action evidence is next
 
 ## Observable outcome and scope
 
@@ -17,7 +17,14 @@ The selected metadata observation is complete and spent; do not rerun it.
 external packages,977 edges, full static name/version membership and declared
 source/checksum/remote-revision correspondence. No missing static BUILD or lock
 owner was found. Next select a bounded Linux CLI unit-feature reconciliation
-before configured-action evidence; this packet does not yet invoke unit-graph.
+before configured-action evidence. Select one offline Cargo unit-graph observation
+of the actual slug binary for Linux, without compiling or executing build scripts.
+That observation is now complete and spent: all503 planned units are reachable;
+351 external normal units split329 equal/22 narrower, with no undeclared feature.
+[Accepted unit accounting](wp901-linux-unit-features-2026-10-06.json) preserves
+indices, profiles and host/target/build-script distinctions. No automatic rerun.
+Next select bounded current configured Rustc action evidence; this packet has
+not yet invoked Bazel. Historical configured/generated flags remain historical.
 
 Root owns selection, analysis, scheduling and commits. Read Stage10's accepted
 production inventory and live cache-core delta, and bootstrap-readiness's finite
@@ -29,11 +36,21 @@ reopen a historical failed invocation merely to improve its result.
 Pin clean base, all tracked Cargo.toml files, root Cargo.lock/Cargo.Bazel.lock,
 MODULE.bazel/MODULE.bazel.lock/.bazelversion/rust-toolchain and relevant BUILD
 files before observation. Resolve Cargo/rustc/rustdoc from nightly-2025-09-14.
-One locked/offline metadata command, rooted at app/slug_cli_v2/Cargo.toml, with
-format-version1 and filter-platform x86_64-unknown-linux-gnu, supplies the graph.
+The accepted metadata command is spent and reused. One new command is selected:
+`cargo build -Z unstable-options --unit-graph --locked --offline --manifest-path
+app/slug_cli_v2/Cargo.toml --bin slug --target x86_64-unknown-linux-gnu`. Cargo
+prints its planned unit graph without compilation or build-script execution.
 No compilation, build action, Bazel, network, daemon or backend invocation.
 Limit observation to15s with TERM/KILL3 and16MiB output; compile nothing.
-Keep Cargo commands serial. Preserve nonzero exit/resource refusal rather than
+Keep Cargo commands serial. Record the selected root unit, dependency closure,
+mode, host/target platform, features and build-script/proc-macro distinctions.
+Compare common plus Linux-select features from Cargo.Bazel.lock for each normal
+external library/proc-macro unit; separate build-script compile/run units. A
+narrower host/CLI set is not an implementation defect without a configured
+consumer discriminator. Preserve duplicate units by index, not package name.
+Keep planned units distinct from executed actions.
+
+Preserve nonzero exit/resource refusal rather than
 retrying automatically. Preparation/analysis is bounded local scratch, with no
 new runtime cache/interner/DICE owner or retained semantic data.
 
@@ -53,8 +70,8 @@ mapping, evidence limits and ownership/unchanged input claims. Run plan/archive
 status and git diff --check; commit compact accepted inventory evidence.
 
 Tracked allowlist: this manifest, canonical scheduling, compact terminal and
-inventory receipts, and Stage10/readiness only for a newly established reusable
-delta. Operational snapshots/scripts live ignored target/wp900. No production
+inventory/unit-feature receipts, and Stage10/readiness only for a newly established reusable
+delta. Operational snapshots/scripts live ignored target/wp900 and target/wp901. No production
 Rust, manifest/dependency/lock/BUILD/toolchain changes are selected yet.
 
 ## Immediate predecessor and preserved gates

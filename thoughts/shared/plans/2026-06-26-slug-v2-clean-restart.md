@@ -35,13 +35,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-200-m7a-current-production-inventory-r1
-Status: Offline inventory accepted; current Linux unit-feature reconciliation is next
+Status: Current unit-feature accounting accepted; configured Rustc action evidence is next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) selects current Linux
 normal/build CLI inventory reconciliation under canonical priority1, using one
 locked/offline metadata observation and static declared producers. The accepted view has36 local/316 external packages and977 edges, with complete
 static lock membership and declared source/pin correspondence. Next reconcile
-Linux CLI unit features before selecting configured-action evidence. See the
+Linux CLI unit features with one bounded offline unit-graph observation before
+selecting configured-action evidence. The observation is complete:503 reachable
+units and351 normal external units,329 equal/22 narrower with no undeclared
+feature. No compilation or build-script execution. Next select current Rustc
+action evidence; old configured/generated flag observations remain historical.
+See the [unit receipt](./slug-v2-subplans/wp901-linux-unit-features-2026-10-06.json) and the
 [inventory receipt](./slug-v2-subplans/wp900-production-inventory-2026-10-06.json).
 Metadata features are not unit/configured compiler flags; M7A remains partial.
 

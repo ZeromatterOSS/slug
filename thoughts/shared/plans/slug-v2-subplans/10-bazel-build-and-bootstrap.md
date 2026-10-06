@@ -124,6 +124,19 @@ content, configured reachability, unit features or compilation. Current Linux
 unit-feature and configured-action correspondence remain to be reconciled.
 Three independent FINALs accept the bounded inventory; full M7A stays open.
 
+The [current unit-feature receipt](wp901-linux-unit-features-2026-10-06.json)
+adds one0.114s locked/offline planned-unit graph at25b4efbc7; no compilation or
+build script ran. All503 units are root-reachable, with36 local/315 external
+package IDs and only metadata-selected libm lacking a compilation unit. Of351
+external library/proc-macro units,329 match generated Linux lock features and22
+are narrower (five Linux target/seventeen host). No unit has undeclared features;
+Tokio's22 Linux features exclude metadata-only windows-sys. Indexed duplicates,
+platform/mode/profile and custom-build compile/run units are preserved separately.
+The five target gaps match historical names/versions, but current configured
+compiler flags and generated flag bytes remain unproved. Historical raw graphs
+are absent and locks have changed since8f3ddef8b; do not promote old observations
+into current action evidence. Three FINALs accept planned-unit accounting only.
+
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 
 The historical 33-package receipt above is unchanged. The live Cargo root now
