@@ -75,25 +75,36 @@ Both representative parses fit the existing256MiB RSS envelope; module evaluatio
 normal source certificates and whole-workload fit remain open. Python guard records
 remain closed; no limits were raised or identical diagnostics retried.
 
-Proceed with [the normal command source prerequisite](../../../../target/wp937/successor-source.md),
-after freezing its smallest Core test adapter, offline scope, lower image/scratch
-budgets, exact source/effect ownership and independently reviewed operation contract.
-Use the unchanged public probe fixture, native host, explicit rules_rust override and
-nightly setting through existing prepare_build_request/normal singleton drive_command.
-Retain its first genuine typed error or accepted terminal and actual counters under
-existing process caps. No donated sources/providers, guessed transitive roots or repeated
-root commands. New native loads add :lto.bzl,:rustc_resource_set.bzl,:stamp.bzl and external
-action_names/cc_common prerequisites to the earlier held candidates; normal ownership
-should identify the next reached prerequisite before another diagnostic read loop.
-Full source/module/materialization/registration/provider/public Rustc/M7A remain open.
+[WP938](wp938-normal-offline-source-prerequisite-2026-10-06.json) then observes one
+ordinary native singleton //pkg:probe command using the unchanged fixture, native host,
+explicit rules_rust override and nightly setting. Coupled image/scratch and source-byte
+budgets remain16MiB; the offline scope excludes repository execution before Need progress.
+The first scope error is NetworkDisabled with1 registry attempt and0 admitted/transport/
+written bytes; the outer native error is observed_terminal. Its mismatch subtype and
+exact denied URL/module were not recorded, so do not infer either from counters.
+The0.211s observation peaks at63,960KiB including phase samples;3 protected tests and
+the native observer pass, corrected Core preparation9.340s/CLIcheck37.562s pass. Final
+source live buffers are0 and scope weak expiry passes; descriptor peak5,352B with final
+reported used/image/scratch0. This early refusal fits caps; no complete producer/graph
+or whole-workload fit follows. The first test-only namespace compile error is preserved.
+
+Next freeze [the bounded attribution seam](../../../../target/wp938/successor-source.md):
+borrowed request-row projection over the existing optional scoped recorder and exact
+ObservedTerminalMismatch subtype reporting. Prove its allocation/identity/retirement
+with small existing-owner controls. WP938 did not arm the recorder, so the blocked
+request cannot be recovered from this receipt. No blind module/cache guess, repeated
+root command, acquisition or source16–18/F3/fullroot retry is selected. Source/module/
+materialization/registration/provider/public Rustc/M7A remain open.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. Accepted WP937 allowlist: ignored target/wp937
-source/design/input/FDcontrol/operation/hash records and the existing Loading
-app/slug_loading_v2/src/bzl_source_memory_tests.rs for two Linuxignored profiles,
-and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture
+source/evidence review before dependent Rust work. WP938 accepted allowlist:
+ignored target/wp938 operations/reviews, the small Core
+runtime/tests/rules_rust_public_source_prerequisite_tests.rs and its Linux test-only
+include in runtime/dice.rs, plus canonical/current/bootstrap and one compact receipt.
+The next bounded attribution design must freeze its existing recorder owner and exact
+allowlist before editing; no runtime operation follows from the recommendation. Any minimal shared fixture
 adapter needs its exact existing owner/path and growth reason frozen before editing;
 prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.
 Fixture/expected files remain unchanged references. No new production API is justified

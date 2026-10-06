@@ -1,0 +1,447 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP938 normal offline public Rust source prerequisite",
+  "date": "2026-10-06",
+  "status": "accepted first typed prerequisite observation; producer remains unproved",
+  "baseline": "c779e43d5",
+  "contract": {
+    "path": "target/wp938/design.md",
+    "sha256": "4f266548fa099aada6e9cb5912d8650d4ed8b6067659da9d18209bbc053d4fbf"
+  },
+  "result": "One normal native singleton command reaches original scoped NetworkDisabled with one registry attempt and zero admitted/transport/written bytes; outer native observed_terminal stays distinct. Exact denied URL/module and mismatch subtype unrecorded.",
+  "source_pins": {
+    "target/wp938/inputs.json": "1d71c587afc16db793e26989d512496a2c9354a5956f49cd106341a9ae67dd33",
+    "target/wp938/supervise.py": "e03a39ae0066e36531eeed1a76ad38b2bf0ec4219c6d915afe76fab6df455d2f",
+    "app/slug_core_v2/src/runtime/tests/rules_rust_public_source_prerequisite_tests.rs": "1d7d79cc282907b3590467d15a13d9e6558d5b2485775fc6996234b116773a6b",
+    "app/slug_core_v2/src/runtime/dice.rs": "6c7889d431b4b0ec619ae11468a393e05b9453859f14d3672bcea71ed10ee827"
+  },
+  "inputs": {
+    "rules_rust_root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+    "workspace": "/run/media/system/Colossus/dev/slug/tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace",
+    "references": [
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/fixture.toml",
+        "bytes": 8220,
+        "sha256": "30e4225acfdf7d352b2b9972b778d47dd927ed2b885408e9151c41112facf9a8"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/expected/oracle.json",
+        "bytes": 196649,
+        "sha256": "63215a3bf415a4c93fcef815dfe7f36745952c9fa9700786a9e60e5da2860d42"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/MODULE.bazel",
+        "bytes": 426,
+        "sha256": "a357133030b94360b37061f380984caa374f7383841fabdc8c5d26bc114e3b10"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/BUILD.bazel",
+        "bytes": 292,
+        "sha256": "443b4798a3e113748cf14b22a9fdca51121a1d31b92d833a7006bedf1ea7fa4a"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/main.rs",
+        "bytes": 54,
+        "sha256": "7c1e6f2d79b79c74fe6442b1ad99fa1fe38c97feb6238b362c05dff20d6e977b"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/lib.rs",
+        "bytes": 59,
+        "sha256": "3850931daa5cb4e2a7fb77808c7ef9a481b8214fb118606e7cdb303f03f21ece"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/data.txt",
+        "bytes": 21,
+        "sha256": "e2fe7ce696d221cc9335e55806c0c51e3b356cad25954477591722edac6b7899"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/cquery_format.bzl",
+        "bytes": 877,
+        "sha256": "55a02be9e72fe3ce20739888ef7157db6f7d995463e5fee2d4456942390c0818"
+      }
+    ]
+  },
+  "executable": {
+    "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+    "sha256": "eac2ca49a5c44181eae5f2966aee34bc7d258a4b04f48f6239f889d54b91f477"
+  },
+  "validation": {
+    "executed_passes": 4,
+    "protected_tests": 3,
+    "native_observers": 1,
+    "operations": {
+      "list": {
+        "path": "target/wp938/list-operation.json",
+        "sha256": "e7fd14a2410a6873cc735911b7ad9eb11945875b6bc2f14b549972e50c580fd3"
+      },
+      "preflight": {
+        "path": "target/wp938/preflight-operation.json",
+        "sha256": "2778fa0405fa14e4a08294c87dd6fc1b16adc52f3be331c02de60ba35eb7d372"
+      },
+      "ordinary-0": {
+        "path": "target/wp938/ordinary-0-operation.json",
+        "sha256": "f91c8b46bb144f9b5502ed84b85b305c3f7d6d25dcbdf228f3779db3bc3f348d"
+      },
+      "ordinary-1": {
+        "path": "target/wp938/ordinary-1-operation.json",
+        "sha256": "cc292c1b06dc85e696281b26646ac6c91e66d95964269368a4f8fdedd8b290c7"
+      },
+      "ordinary-2": {
+        "path": "target/wp938/ordinary-2-operation.json",
+        "sha256": "fc608091e7f7d33c71e17f41c30e292a082005bdbc5b110cecb53bbd12699d62"
+      },
+      "native": {
+        "path": "target/wp938/native-operation.json",
+        "sha256": "a69f326259664c13597fd64b510eaa88609adad9825ed3f91d19be84e224083e"
+      }
+    },
+    "result": {
+      "path": "target/wp938/result.json",
+      "sha256": "63ac7e0cef03c653130dab0f2da9a2b6a8d69a8330f69bf65fe0c17ef8ee68bd"
+    },
+    "initial_compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 101,
+      "elapsed_seconds": 1.6899382179835811,
+      "artifacts": []
+    },
+    "corrected_compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 9.339627599925734,
+      "artifacts": [
+        "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e"
+      ],
+      "correction": "four test-only source_service paths use actual runtime::dice module namespace"
+    },
+    "direct_cli_check": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 37.56154940207489
+    },
+    "all_groups_empty_joined": true,
+    "notes": "Initial101/1.690s was four test-only module path errors corrected before runtime. Listing and preflight execute zero tests."
+  },
+  "allocation": {
+    "scope": "One normal singleton //pkg:probe build-driver invocation on the unchanged rules-rust-073 fixture, with the frozen local rules_rust override, nightly occurrence, native host, lockfile Off and scoped offline acquisition. Passing means the first actual terminal and retirement were recorded.",
+    "peak_rule": "max(monitored_rss_kib, child_rusage_peak_kib, all six native phase RSS samples)",
+    "basis": {
+      "result.json": "63ac7e0cef03c653130dab0f2da9a2b6a8d69a8330f69bf65fe0c17ef8ee68bd",
+      "native-operation.json": "a69f326259664c13597fd64b510eaa88609adad9825ed3f91d19be84e224083e",
+      "ordinary-0-operation.json": "f91c8b46bb144f9b5502ed84b85b305c3f7d6d25dcbdf228f3779db3bc3f348d",
+      "ordinary-1-operation.json": "cc292c1b06dc85e696281b26646ac6c91e66d95964269368a4f8fdedd8b290c7",
+      "ordinary-2-operation.json": "fc608091e7f7d33c71e17f41c30e292a082005bdbc5b110cecb53bbd12699d62",
+      "list-operation.json": "e7fd14a2410a6873cc735911b7ad9eb11945875b6bc2f14b549972e50c580fd3",
+      "preflight-operation.json": "2778fa0405fa14e4a08294c87dd6fc1b16adc52f3be331c02de60ba35eb7d372",
+      "compile.json": "55c71ccb1789667b649cf6ca6fabf4815fb44d76836dab0ec53fbcf46f2ad16b",
+      "compile-corrected.json": "16bc1696bafb1d3ef7c3aae16fb38427b3f31bca23d8d003bb9e6142d8280eaa",
+      "cli-check.json": "9cdd50c2c5c4b727860c2b2dee9cd98d9f323f5c731d19ead16ea341d02c330c"
+    },
+    "native": {
+      "selector": "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::normal_rules_rust_public_probe_offline_source_prerequisite",
+      "elapsed_seconds": 0.21086377592291683,
+      "selected_count": 1,
+      "pass_count": 1,
+      "monitored_rss_kib": 61956,
+      "child_rusage_peak_kib": 63728,
+      "phase_columns": [
+        "phase",
+        "rss_kib"
+      ],
+      "phase_rss": [
+        [
+          "baseline",
+          17628
+        ],
+        [
+          "after_runtime",
+          33252
+        ],
+        [
+          "after_command",
+          63960
+        ],
+        [
+          "after_terminal_drop",
+          63960
+        ],
+        [
+          "after_runtime_drop",
+          63960
+        ],
+        [
+          "after_scope_drop",
+          63960
+        ]
+      ],
+      "conservative_peak_rss_kib": 63960,
+      "outer_outcome": {
+        "stage": "native_refusal",
+        "kind": "observed_terminal",
+        "attempts": null,
+        "terminal_roots": null,
+        "analyses": null
+      },
+      "original_sticky_source_error": "Some(NetworkDisabled)",
+      "source_counters": {
+        "registry_attempts": 1,
+        "registry_admitted_bytes": 0,
+        "source_attempts": 0,
+        "transferred_bytes": 0,
+        "decoded_bytes": 0,
+        "written_bytes": 0,
+        "live_buffer_bytes_before_drop": 0,
+        "peak_buffer_bytes": 65536
+      },
+      "resource_columns": [
+        "stage",
+        "descriptor_used_bytes",
+        "descriptor_peak_reserved_bytes",
+        "image_logical_used_bytes",
+        "scratch_payload_used_bytes"
+      ],
+      "resources": [
+        [
+          "before_command",
+          0,
+          0,
+          0,
+          0
+        ],
+        [
+          "after_command",
+          0,
+          5352,
+          0,
+          0
+        ],
+        [
+          "after_runtime_drop",
+          0,
+          5352,
+          0,
+          0
+        ]
+      ],
+      "final_source_live_buffer_zero_asserted": true,
+      "final_scope_weak_expiry_asserted": true,
+      "joined_and_owned_group_empty": true,
+      "source_and_fixture_pins_unchanged": true,
+      "fits_frozen_single_observation_envelope": true
+    },
+    "supporting_gates": [
+      {
+        "selector": "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.19809949793852866,
+        "conservative_peak_rss_kib": 33832
+      },
+      {
+        "selector": "runtime::dice::source_service::tests::scoped_offline_http_refuses_registry_and_archive_before_parser",
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.1972926550079137,
+        "conservative_peak_rss_kib": 29972
+      },
+      {
+        "selector": "runtime::dice::tests::build_command_tests::neutral_identity_and_source_carrier_are_complete_only_and_exact",
+        "selected_count": 1,
+        "pass_count": 1,
+        "elapsed_seconds": 0.19742635497823358,
+        "conservative_peak_rss_kib": 33668
+      }
+    ],
+    "executed_test_count": 4,
+    "passed_test_count": 4,
+    "validation_without_test_execution": {
+      "operation_count": 2,
+      "ignored_listing": {
+        "exit_code": 0,
+        "listed_exact_new_case_count": 1,
+        "executed_tests": 0
+      },
+      "ordinary_preflight": {
+        "exit_code": 0,
+        "verified_exact_selector_count": 3,
+        "executed_tests": 0
+      }
+    },
+    "preparation": {
+      "initial_compile": {
+        "exit_code": 101,
+        "elapsed_seconds": 1.6899382179835811,
+        "attribution": "Four test-only source_service import/downcast paths named runtime rather than its actual runtime::dice owner; original failure preserved."
+      },
+      "corrected_compile": {
+        "exit_code": 0,
+        "elapsed_seconds": 9.339627599925734
+      },
+      "cli_check": {
+        "exit_code": 0,
+        "elapsed_seconds": 37.56154940207489
+      }
+    },
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304,
+      "file_bytes": 16777216,
+      "work_seconds": 5,
+      "cleanup_seconds": 8,
+      "source_credit_bytes": 16777216,
+      "source_live_buffer_bytes": 16777216,
+      "descriptor_bytes": 16777216,
+      "image_logical_bytes": 16777216,
+      "scratch_payload_bytes": 16777216
+    },
+    "terminal_qualification": "The outer observed_terminal refusal and retained scope NetworkDisabled are distinct observations. No accepted terminal, attempt count, terminal-root count or analyses count was returned. No registry MODULE URL or exact graph stage is inferred.",
+    "memory_qualification": "Budget counters measure their own charged domains, not total heap. Six-phase RSS is resident telemetry; unchanged RSS after drops neither disproves Weak retirement nor proves graph/AST deallocation. Runtime/terminal handles retire structurally; individual AST/graph allocations and live heap were not measured.",
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false,
+    "full_normal_graph_fit_proved": false,
+    "source_certificate_proved": false,
+    "compiler_or_action_execution": false,
+    "source16_F3_full_root_retry": false,
+    "summary_only_no_relaunch": true
+  },
+  "complexity": {
+    "new_test_lines": 309,
+    "include_lines": 5,
+    "reason": "Exhaustive borrowed outer enum categories plus constructor/preparation outcomes, six phases and scoped lifetime accounting; no new production API or representation."
+  },
+  "compatibility": {
+    "exact": "Unchanged8 fixture/reference hashes, actual normal singleton dispatch and explicit source policy.",
+    "slug_native": "Native host/configuration/source identity and bounded typed diagnostic.",
+    "deferred": "Denied registry request identity, complete sources/modules/generated registration/providers/public Rustc/full graph memory/M7A; Windows minimal."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp938/design-source.md",
+      "sha256": "df1f45c1ede0e9661d16bca26908a31ac80a6b5079e38dc3a4e458ca16f22140"
+    },
+    "design-evidence": {
+      "path": "target/wp938/design-evidence.md",
+      "sha256": "21dc800ad235333935b95d3a20edba1f362be635ea41edc68de621086069cc03"
+    },
+    "design-implementation": {
+      "path": "target/wp938/design-implementation.md",
+      "sha256": "930f1cc470e32ff564cafa7a3e7bb5b7089703e5d16a81ba36bbb9ece5f63c97"
+    },
+    "preflight-source": {
+      "path": "target/wp938/preflight-source.md",
+      "sha256": "88350b51c3dd17eee2a9f8aecf4f4d3c2943793d8ef04e3bd2c679bcb890f825"
+    },
+    "preflight-evidence": {
+      "path": "target/wp938/preflight-evidence.md",
+      "sha256": "4c4ba2049a219b975d2c4dd802fbee1200054c6ef05313b174389d1ee4063412"
+    },
+    "final-source": {
+      "path": "target/wp938/final-source.md",
+      "sha256": "2de0e5709761d9c3dd242538e52bec6ba2f9ac77adb502881b749085a5b46e19"
+    },
+    "final-evidence": {
+      "path": "target/wp938/final-evidence.md",
+      "sha256": "362f9023eaa751ee72ca1beae7b94e488229a243d4e4f61db7ba481a8362a8e6"
+    }
+  },
+  "next": {
+    "recommendation": {
+      "path": "target/wp938/successor-source.md",
+      "sha256": "af036fab139df0d8e7414dd9ac9c0807ac2226323c68559019e8ee82b482ada5"
+    },
+    "gate": "Freeze minimal borrowed existing scoped-registry recorder projection and exact mismatch subtype with small controls; no command retry or acquisition selected.",
+    "packet_continues": true,
+    "normal_producer_proved": false,
+    "whole_workload_fit_unproved": true
+  },
+  "packet_elapsed_seconds": 1280.3364460468292
+}

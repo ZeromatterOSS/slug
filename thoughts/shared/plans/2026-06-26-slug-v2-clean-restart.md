@@ -68,10 +68,15 @@ hash-only bodyguard left native imports/initialization unproved.
 two actual native parsers at23,932/44,236KiB peaks,12/0 native loads,3FD+3protected
 tests and separate Loading/Core preparation. Original source ownership retires;
 one required parser copy is counted. These representative parses fit the existing
-envelope. Next freeze one normal offline public-probe source-prerequisite command
-with lower image/scratch budgets, preserving its first typed result and actual
-source counters. No Python limitraise, wholeworkloadfit or publicproducer admission
-follows; transitive/module/generated prerequisites remain open.
+envelope. [WP938](./slug-v2-subplans/wp938-normal-offline-source-prerequisite-2026-10-06.json)
+observes one normal offline public-probe command at63,960KiB/0.211s under lower16MiB
+image/scratch budgets: first scope NetworkDisabled,1registryattempt/zero admitted
+bytes, outer observed_terminal error.3protected+1observer tests and Core/CLI
+preparation pass; scope retirement passes. Denied URL/module and mismatch subtype
+were not recorded. Next freeze borrowed existing-recorder attribution/subtype
+reporting with small controls; no repeated root or acquisition is selected. No
+wholeworkloadfit or publicproducer admission follows; transitive/module/generated
+prerequisites remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

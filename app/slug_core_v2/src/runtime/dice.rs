@@ -14062,4 +14062,9 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod file_write_external_aquery_tests {
         include!("tests/file_write_external_aquery_tests.rs");
     }
+
+    #[cfg(target_os = "linux")]
+    mod rules_rust_public_source_prerequisite_tests {
+        include!("tests/rules_rust_public_source_prerequisite_tests.rs");
+    }
 }
