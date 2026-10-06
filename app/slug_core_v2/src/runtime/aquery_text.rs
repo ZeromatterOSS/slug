@@ -11,6 +11,7 @@ use std::fmt::Write;
 use slug_analysis_v2::ConfigurationKind;
 use slug_analysis_v2::ConfiguredActionView;
 use slug_analysis_v2::ConfiguredBuildInfoActionView;
+use slug_analysis_v2::ConfiguredCppCompileActionView;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredRunfilesSupportActionView;
 use slug_analysis_v2::ConfiguredSolibActionView;
@@ -23,6 +24,7 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use starlark_map::small_set::SmallSet;
 
 use super::build_info_aquery_text::append_build_info;
+use super::cpp_compile_aquery_text::append_cpp_compile;
 use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
@@ -84,6 +86,8 @@ fn validate_owner(
             ConfiguredSolibActionView::from_configured_action(action)?;
         } else if action.build_info_transform_spec().is_some() {
             ConfiguredBuildInfoActionView::from_configured_action(action, workspace)?;
+        } else if action.cpp_compile_spec().is_some() {
+            ConfiguredCppCompileActionView::from_configured_action(action)?;
         } else {
             ConfiguredSpawnActionView::from_configured_action(action)?;
         }
@@ -123,6 +127,11 @@ fn append_owner(
                 output,
                 ConfiguredBuildInfoActionView::from_configured_action(action, workspace)?,
             )?;
+        } else if action.cpp_compile_spec().is_some() {
+            append_cpp_compile(
+                output,
+                ConfiguredCppCompileActionView::from_configured_action(action)?,
+            )?;
         } else {
             append_spawn(
                 output,
@@ -147,7 +156,7 @@ fn append_spawn(
         .configuration()
         .slug_configuration()
         .ok_or("Spawn aquery text rejects legacy configuration")?;
-    let projection = configuration.projection();
+    let configuration_token = configuration.projection().display_token();
     let target = aquery_label(owner.label());
     let platform = aquery_label(view.execution_platform().label());
 
@@ -200,7 +209,7 @@ fn append_spawn(
     if owner.configuration().kind() == ConfigurationKind::Exec {
         output.push_str(" [for tool]");
     }
-    writeln!(output, "'\n  Mnemonic: {}\n  Target: {target}\n  Configuration: {}\n  Execution platform: {platform}", spawn.mnemonic(), projection.display_token()).unwrap();
+    writeln!(output, "'\n  Mnemonic: {}\n  Target: {target}\n  Configuration: {}\n  Execution platform: {platform}", spawn.mnemonic(), configuration_token).unwrap();
     append_inputs(output, spawn)?;
     append_list(output, "Outputs", &outputs);
     drop(outputs);
@@ -209,9 +218,28 @@ fn append_spawn(
 
     // allArguments query expansion, not execution's spilled argv/virtual files.
     // Drop the complete rendered argv at the end of this action, not command.
+    {
+        let argv = spawn.render_argv();
+        append_command_line(
+            output,
+            &configuration_token,
+            &platform,
+            argv.iter().map(|argument| argument.as_str()),
+        );
+    }
+    append_execution_info(output, spawn.execution_requirements().iter());
+    output.push('\n');
+    Ok(())
+}
+
+pub(super) fn append_command_line<'a>(
+    output: &mut String,
+    configuration: &str,
+    platform: &str,
+    arguments: impl Iterator<Item = &'a str>,
+) {
     output.push_str("  Command Line: (exec ");
-    let argv = spawn.render_argv();
-    for (index, argument) in argv.iter().enumerate() {
+    for (index, argument) in arguments.enumerate() {
         if index != 0 {
             output.push_str(" \\\n    ");
         }
@@ -219,13 +247,9 @@ fn append_spawn(
     }
     writeln!(
         output,
-        ")\n# Configuration: {}\n# Execution platform: {platform}",
-        projection.display_token()
+        ")\n# Configuration: {configuration}\n# Execution platform: {platform}"
     )
     .unwrap();
-    append_execution_info(output, spawn.execution_requirements().iter());
-    output.push('\n');
-    Ok(())
 }
 
 pub(super) fn append_environment(

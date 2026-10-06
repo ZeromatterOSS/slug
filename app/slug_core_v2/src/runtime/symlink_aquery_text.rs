@@ -86,7 +86,7 @@ pub(super) fn progress_message<'a>(
     progress
 }
 
-fn primary_input_relative(input: &AnalysisArtifact) -> Cow<'_, str> {
+pub(super) fn primary_input_relative(input: &AnalysisArtifact) -> Cow<'_, str> {
     match input {
         // SourceArtifact.getRootRelativePath strips external/<repo> from the
         // admitted nonsibling execution path. Borrow the canonical fields.

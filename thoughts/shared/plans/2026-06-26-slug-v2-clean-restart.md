@@ -34,18 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-217-m7a-cpp-compile-query-projection-r1
-Status: Borrowed BuildInfo query accepted; regular CppCompile metadata query selected
+Packet: WP-7-218-m7a-executable-file-write-query-r1
+Status: Borrowed CppCompile query accepted; demanded executable FileWrite query selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects concrete CppCompile
-field/owner design and a guarded regular-file metadata projection.
-[WP917](./slug-v2-subplans/wp917-build-info-aquery-2026-10-06.json) accepts genuine
-TranslateBuildInfo fields/omissions, workspace identity sharing and callback-provenance
-preservation. All60 distinct controls pass by qualified55+4+1 union, defaultCLI compiles
-and three final reviews accept. Hermetic module census/per-demand fixture corrections
-are explicit; no failed gate is waived. No retained string pool is added. Full-root,
-authentic source/runtime, whole-workload memory fit and M7A remain open.
-Allocation/interner discipline, source16/17/18 and source caps persist; Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects executable scalar
+FileWrite query fields for five observed main-repository build-script owners.
+[WP918](./slug-v2-subplans/wp918-cpp-compile-aquery-2026-10-06.json) accepts guarded
+regular pre-discovery CppCompile query with borrowed tools/fixed env and action-local
+identity/path/options scratch. All64 distinct controls pass by qualified61+2+1 union,
+nine BuildAPI gates/defaultCLI pass and three final reviews accept. Normal immutable
+fixture source requests and expected literal corrections preserve exact assertions.
+No retained pool is added. Full-root, authentic source/runtime, whole-workload memory
+fit and M7A remain open; allocation/interner discipline/source16/17/18/caps persist.
+Windows minimal.
 
 ### Ready and blocked queue
 
@@ -56,7 +57,7 @@ priorities stay queued until their concrete prerequisites and owners are ready.
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects typed regular CppCompile query metadata; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects demanded executable FileWrite query fields; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

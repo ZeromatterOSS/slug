@@ -1,86 +1,89 @@
-# Current Slug V2 Work Packet
+# Slug V2 current work packet
 
-Packet: WP-7-217-m7a-cpp-compile-query-projection-r1
-Status: Borrowed BuildInfo query accepted; regular CppCompile metadata query selected
+Packet: WP-7-218-m7a-executable-file-write-query-r1
+Status: Borrowed CppCompile query accepted; demanded executable FileWrite query selected
 
-## Observable result and source prerequisites
+## Observable result and learned source
 
-Add text/aquery for the existing retained regular C/C++ CppCompileSpec through the
-ordinary validated configured closure. WP905 saved deps graph contains three
-CppCompile records; mnemonic counts alone do not prove those complete authentic
-owners reproduced. Pin Bazel9.2 tag8220c6198837d5c13d53fea211cf3282aa12408a concrete
-CppCompileAction/CompileCommandLine, AbstractAction, Artifact and text callback
-before implementation. A concrete DESIGN field table must settle constructor initial
-getInputs vs pruned/discovered inputs, primary input/output/progress/tool suffix,
-fixed-only query environment vs effective execution environment, command formatting,
-owner/compile ExecutionInfo merge precedence, outputs/order/markers and omissions.
-Reuse existing producer/source tests; missing retained facts become named unsupported
-or a bounded owner prerequisite before activation. No generic Spawn impersonation,
-header discovery, callback/action execution, source acquisition or full-root retry.
+Expose the retained executable bit of regular scalar FileWrite actions in text/aquery
+for main-repository owners through the same validated configured closure. WP905 saved
+production graph has five main FileWrites, all explicitly executable (actions373/416/
+444/474/892: starlark, starlark_map, slug_reapi_cache_v2, allocative, starlark_syntax
+build scripts);67of69 total FileWrites explicitly executable. This is query demand,
+not evidence those authentic owners have been reproduced in Slug. No standalone
+ArgsWrite demand is proven by virtual params or graph mnemonic counts.
 
-Compatibility: exact pinned concrete fields in a guarded pre-discovery regular-file,
-default-policy/no-paramfile Unix query slice after DESIGN acceptance; existing native
-configuration/path/label/order/full artifact identity. ActionKey remains M9 omission
-without native substitute. Windows minimal unsupported. Full-root/M7A, authentic
-source/runtime and whole-workload memory fit remain open; source16/17/18 spent/caps persist.
+Pin Bazel9.2 tag8220c6198837d5c13d53fea211cf3282aa12408a FileWriteAction,
+AbstractFileWriteAction, AbstractAction and text callback. Reconcile Writing script
+versus Writing file, output prettyPrint, tool suffix, IsExecutable and current class
+omissions against existing accepted scalar text. Concrete source design settles any
+existing header discrepancy before changing it. Contents flags and ActionKey are not
+selected. Keep external-owner query refusal separate (64savedexternalowners), default
+context/aspect/platform/output/root/path guards and full all-owner-before-render priority.
 
-## Owners, allocation and review
+Compatibility: exact pinned executable/class fields in the admitted guarded Unix scalar
+main-owner query slice; existing native configuration/path/label/action token domains.
+ActionKey without native substitute, external FileWrite query, broader families/contents
+flags and Windows breadth remain deferred. No execution, staging, cache, configuration
+identity or source gate is widened. Full-root/M7A/source/runtime/whole-memory-fit open;
+source16/17/18 spent/caps and allocation/interner discipline persist.
 
-Read orchestration skill/AGENTS, inherited Stage6 CppCompile construction/expansion
-and Stage8 query contracts, DICE docs for any borrowed cross-crate boundary and utility
-reuse skill/Stage9 matching adopted primitives. Recipe/context/configuration remain
-owned by existing configured action; reference-only Analysis view stores no cloned
-graph or evaluator state. Query compares full structural identities before display
-sorting. Derive source/inputs/outputs from producer-owned facts, retaining independent
-input owner/root configuration. Validate selected/raw/effective platform, absent
-aspects/default policy, regular output root and typed input kinds before command text.
-Preserve complete all-owner guard-before-render priority and semantic multiplicity.
+## Owners, scope and allocation
 
-Borrow or transfer retained strings and paths where lifetime fits; use existing scoped
-interning at semantic producers for repeated immutable data. No new global/query pool,
-key/cache/lock, retained lifetime widening or graph clone. Do not call input_sets() to
-clone four execution-preparation collections for query. Review smallest traversal and
-identity scratch over retained ArtifactInputs, pure no-paramfile argv expansion and
-fixed environment projection. If existing visitor loans cannot escape, retain only
-bounded necessary action-local shared handles; no string/path-byte cloning by default.
-Reuse current escaped field encoders and existing final command-owned String. Attribute
-expansion/escaping/identity-set scratch and actual release boundaries; no whole-fit or
-performance claim from focused RSS. Independently review source table + concrete
-ownership/memory contract before edits, then actual final diff + discriminating evidence.
+Read orchestration/AGENTS, Stage8 accepted query contract and Stage6 retained Write
+ownership. BuildAPI normal write constructor already owns content+boolean; borrowed
+ConfiguredActionView permits either bit and existing FileWriteSemanticIdentity encodes
+it. Core presentation currently rejects true and hardcodes file/false. Preserve original
+natural owners, structural equality/invalidation, root certificates and validation;
+no new DICE key/cache/interner/graph or semantic/execution view relaxation. DICE docs
+remain inherited; any actual DICE/identity change requires a named reviewed prerequisite.
 
-## Allowlist and validation
+Borrow retained scalar bit/content/paths and choose static header text; generate only
+independent final query String and existing action-local identity/display scratch.
+Intern repeated immutable strings at their existing semantic scope where appropriate;
+no global pool for static or temporary formatter strings, retained lifetime widening,
+extra owned content copy, or workload-memory/performance claim from focused tests.
 
-Candidates: new Analysis configured_cpp_compile_action_view.rs and lib export;
-new Core cpp_compile_aquery_text.rs plus aquery_text/mod dispatch/helper visibility;
-new runtime/tests/cpp_compile_aquery_tests.rs and dice include ONLY. Root must reconcile
-any demonstrated pure borrowed recipe getter/expansion prerequisite in
-app/slug_build_api_v2/src/actions/cpp_compile.rs or cpp_compile/expansion.rs before use;
-no input preparation/discovery/execution, producer equality/cache/key changes or other
-family. Production estimate<300/test<400; growth triggers responsibility review.
-Operational target/wp918; 3 DESIGN/FINAL reviews and root integration/commit.
+Allowlist: Core runtime/file_write_aquery_text.rs; new small sibling
+runtime/tests/file_write_executable_aquery_tests.rs and Dice INCLUDE only; existing
+spawn_aquery_tests.rs, runfiles_aquery_metadata_tests.rs, solib_aquery_tests.rs,
+build_info_aquery_tests.rs, cpp_compile_aquery_tests.rs only to reconcile executable
+writes previously used as early rendering-error fixtures. Preserve each priority
+assertion using another admitted structural shape with a real formatter refusal;
+never turn a priority test into two valid actions. Root checks actual existing negative
+consumers before activation. No changes to loading, provider publication, dense inputs,
+execution, path transport or shared semantic identity. Production estimate<60/newtests
+<220; review growth at natural responsibility boundaries. Existing large Dice receives
+an include only; no new algorithm there. Operational target/wp919. Source/design and
+final independent reviews precede consequential activation/acceptance; root owns
+integration/compile/commit, useful parallel readonly evidence/ownership review.
 
-Controls: genuine retained constructor/binder regular C/C++ query fields, literal/deps
-and tool owners; initial inputs/identity before equal path display, independently owned
-source/header configuration, output/progress/order; fixed vs inherited/feature execution
-environment discrimination and ExecutionInfo precedence; command formatting/expansion,
-held A/B/A/owned text after drops, unsupported kinds/policy/platform/paramfile and
-all-owner refusal priority. Reuse WP917 sixty protected controls and existing CppCompile
-pure expansion/initial-input/refusal tests; select smallest exact new guards after
-source design. No new oracle unless named source gap cannot use pinned proof; any
-external oracle60s/TERM3/JVM2GiB/log16MiB, no action/network acquisition. Compile separately
-pinned offline JSON<=60s/TERM3 Core jobs1 established four-packageopt0debug0 no-run;
-default directCLI check and any named BuildApi owner compile if changed. Fresh exact
-nonignored preflight, minimal serial10s/TERM3 runtimes, no concurrent Cargo/shared target
-or ancestor-sensitive fixture tests. Preserve unaffected passing evidence, correct
-attributed missing gates only. fmt/diff/archive/status/receipt, root commit.
+## Evidence and validation
+
+Reuse scalar FileWrite controls and existing genuine normal write constructor fixtures.
+New finite false/true query must discriminate full class block and bit-dependent header,
+owned text after owner drops, same content/output bit-dependent native identity, literal/
+deps and configured tool owners where source-admitted, source/configured A/B/A held
+results, mixed owners/order and all-owner validation priority. Qualify authored fixtures
+versus saved production demand; no compiler/build-script executes or dependencies acquire.
+Audit affected unsupported-executable expectations, retain independent external/path/
+platform/kind/group negatives and exact ordinary false output. If a guard cannot be
+constructed normally, source-qualify rather than inventing an admitted producer.
+
+Compile separately pinned rustup-resolved offlineJSON<=60sTERM3 defaultCLI and Core
+no-run/jobs1 established four-packageopt0debug0. Fresh exact nonignored selector preflight,
+minimal serial10sTERM3 runtime; reuse WP91864 controls plus smallest new FileWrite gates.
+No concurrent Cargo/sharedtarget or ancestor-sensitive fixtures. Correct only attributed
+missing evidence; preserve all failures/passing results/caps. No external oracle without
+named pinned-source evidence gap. fmt/diff/archive/status, compact receipt and rootcommit.
 
 ## Immediate predecessor
 
-[WP917](wp917-build-info-aquery-2026-10-06.json) accepts genuine retained stable/volatile
-TranslateBuildInfo metadata with fixed tool progress, concrete omissions and inherited
-owner info. Exact authoritative workspace shares one existing Arc path handle across
-all five successful evaluation constructors; no bytes copied/key/anchor change. Sixty
-distinct controls pass by qualified55+4+1 union and defaultCLI compiles. Genuine Builtin
-source route and complete local module fixtures preserve callback authentication; public
-fixture census and per-demand transport are reconciled explicitly. No new retained pool,
-execution, source retry, full-root/M7A or whole-memory-fit admission.
+[WP918](wp918-cpp-compile-aquery-2026-10-06.json) admits borrowed regular pre-discovery
+CppCompile fields via mandatory/cache/declared-header full identity union, independently
+owned roots/Constant inputs, fixed-only env, borrowed tool/options and recipe-last info.
+64distinct controls pass by qualified61+2+1 union, nine BuildAPI controls/defaultCLI pass;
+three final reviews accept. One genuine restricted constructor fixture borrows44original
+helper bodies and uses finite normal selected-registry/local materialization requests.
+Source identity copies remain necessary action-local scratch with current visitor loans.
+No discovery/execution, retained pool, source retry, full-root/M7A or whole-fit admission.

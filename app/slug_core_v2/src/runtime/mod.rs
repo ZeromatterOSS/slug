@@ -22,6 +22,7 @@ mod aquery_text;
 mod build_info_aquery_text;
 mod configured_action_closure;
 mod configured_output;
+mod cpp_compile_aquery_text;
 mod demands;
 pub mod dice;
 mod events;

@@ -166,6 +166,11 @@ impl RetainedArtifactInputs {
         }
     }
 
+    /// Retained producer order; does not flatten inputs or extend visitor loans.
+    pub fn order(&self) -> crate::DepsetOrder {
+        self.0.order()
+    }
+
     pub fn visit(
         &self,
         mut visitor: impl FnMut(&AnalysisArtifact),

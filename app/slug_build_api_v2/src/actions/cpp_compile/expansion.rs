@@ -10,18 +10,23 @@ impl CppCompileSpec {
     /// Expand the admitted no-paramfile, always-pass-filter command recipe.
     /// Does not discover inputs, authorize execution or mutate retained Variables.
     pub fn expand_command_line(&self) -> Result<Vec<CompactString>, CcFeatureError> {
+        let options = self.expand_command_line_options()?;
+        let mut arguments = Vec::with_capacity(options.len() + 1);
+        arguments.push(self.data().selected_tool.clone());
+        arguments.extend(options);
+        Ok(arguments)
+    }
+
+    /// Expand owned options while allowing query to borrow the retained tool.
+    /// Uses the same no-paramfile fresh overlay as the complete command.
+    pub fn expand_command_line_options(&self) -> Result<Vec<CompactString>, CcFeatureError> {
         let data = self.data();
         // CppCompileAction.getOverwrittenVariables returns an empty Variables
         // even without modules. CompileCommandLine consequently creates a fresh
         // child scope: direct bindings are inherited, dotted cache seeds are not.
         let mut variables = OwnedCcVariableAccess::fresh_overlay(&data.variables);
-        let options = data
-            .feature_configuration
-            .get_command_line(&data.action_name, &mut variables)?;
-        let mut arguments = Vec::with_capacity(options.len() + 1);
-        arguments.push(data.selected_tool.clone());
-        arguments.extend(options);
-        Ok(arguments)
+        data.feature_configuration
+            .get_command_line(&data.action_name, &mut variables)
     }
 
     /// Resolve effective environment key/value pairs using only explicit client

@@ -436,6 +436,16 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   focused gates pass by qualified55+4+1 union and defaultCLI compiles; fixture topology
   and current per-demand revocation corrections are explicit. No callback/status/template
   execution, retained pool, source retry, full-root/M7A or whole-memory-fit admission.
+- [WP918 CppCompile text query](wp918-cpp-compile-aquery-2026-10-06.json) borrows
+  regular pre-discovery C/C++ metadata with default Unix/no-paramfile policy. Inputs
+  union mandatory/cache/declared-header full identities before escaped sorting; input
+  roots belong to their own owners and Constant inputs remain distinct from ordinary
+  outputs. Query uses fixed configuration env, borrowed compiler tool and recipe-last
+  ExecutionInfo. Dense visitor loans require unique action-local Source identity copies;
+  paths/options/identity scratch release within each action. Qualified61+2+1 union proves
+  64 controls plus9 BuildAPI gates/defaultCLI; genuine restricted constructor/source
+  route corrections preserve assertions. No discovery/execution, ActionKey, source retry,
+  retained pool, full-root/M7A or whole-memory-fit admission.
 - Accepted POSIX FileWrite `run` builds through the resolved FileWrite REAPI
   view, then returns a request-local launch plan. Only the CLI launches the
   program, with local program arguments and inherited streams. Launch is command

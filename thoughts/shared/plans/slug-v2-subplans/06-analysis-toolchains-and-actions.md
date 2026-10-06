@@ -377,8 +377,12 @@ One publication alias bijection covers the full recipe and distinct mandatory,
 cache-only, declared-header, builtin and additional-prunable input roles. Existing
 configured-node DICE ownership supplies invalidation and cutoff; no discovery
 cache or new key is introduced. Structural identity and paths remain Slug-native.
-CppCompile generic command/aquery/ActionKey projection, header discovery and execution
-remain explicitly unsupported in BuildAPI/Core/REAPI. Inert constructor fixtures
+Generic CppCompile Spawn/ActionKey projection, header discovery and execution remain
+unsupported in BuildAPI/Core/REAPI. The [WP918 typed query](wp918-cpp-compile-aquery-2026-10-06.json)
+borrows regular pre-discovery C/C++ metadata under default Unix/no-paramfile guards.
+Mandatory-spawn, cache-key and declared-header identities supply text inputs; source
+and each input keep their own configured roots. Fixed query environment and borrowed
+tool/options differ from effective execution environment. Inert constructor fixtures
 do not establish allocator toolchain/argv or compiler execution parity.
 
 WP770 adds pure typed argv and effective-environment projections over these
