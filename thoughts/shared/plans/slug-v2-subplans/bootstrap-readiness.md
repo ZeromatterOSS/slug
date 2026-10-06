@@ -465,9 +465,17 @@ and shared finite callback/literal order, including all256-byte no-match roundtr
 installed template content from the actual validated configured closure, sharing the
 original immutable catalog owner and retaining full source frontier/certificate.
 Actual main/external Target/Exec selection, full configuration restoration, native
-current-source refresh/revocation and held-owner release pass. Status production,
-writer permissions, volatile execution/cache policy, module tools and full
-cc_toolchain remain unproved. The unrelated legacy bare frontier fixture requires an
+current-source refresh/revocation and held-owner release pass.
+[WP926](wp926-native-workspace-status-inputs-2026-10-06.json) captures genuine bounded
+native default status inputs once per request and produces sorted UTF8 bytes inside
+DICE. Both complete catalog-backed headers under different configurations share one
+producer. Current capture/source association, same-sample retry/new-request revocation,
+real DICE cancellation/abort recovery and held/final owner release pass. USER/kernel
+identity and fixed English UTC are qualified native domains; SOURCE_DATE_EPOCH presence
+and nondefault policies refuse. Twenty-three unique Core controls (18 preserved protected
+plus5 current), default CLI and three FINAL reviews accept this content prerequisite.
+Status writing/mtime, volatile execution/cache policy, module tools and full cc_toolchain
+remain unproved; local buffers/Arc sharing do not establish whole-workload fit. The unrelated legacy bare frontier fixture requires an
 uncached registry dependency and remains unproved offline; its guard was not changed.
 Execution and raw projection/materialization paths for these descriptors/transforms
 remain closed; pure rendering does not establish whole-workload memory fit.

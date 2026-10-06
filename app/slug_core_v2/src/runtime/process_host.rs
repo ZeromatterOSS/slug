@@ -42,6 +42,14 @@ enum Property {
 }
 
 trait ProcessHostSource: Send + Sync {
+    fn workspace_status_inputs(
+        &self,
+    ) -> Result<
+        super::workspace_status_inputs::RawWorkspaceStatusInputs,
+        super::workspace_status_inputs::StatusError,
+    > {
+        Err(super::workspace_status_inputs::StatusError::UnsupportedPlatform)
+    }
     fn property(&self, property: Property) -> PropertyRead;
     fn memory_bytes(&self) -> Result<i64, SourceError>;
     fn processors(&self) -> Result<i32, SourceError>;
@@ -79,6 +87,14 @@ impl ProcessHostSource for UnsupportedSource {
 struct NativeSource;
 
 impl ProcessHostSource for NativeSource {
+    fn workspace_status_inputs(
+        &self,
+    ) -> Result<
+        super::workspace_status_inputs::RawWorkspaceStatusInputs,
+        super::workspace_status_inputs::StatusError,
+    > {
+        super::workspace_status_inputs::observe_native()
+    }
     fn property(&self, property: Property) -> PropertyRead {
         match property {
             // There is no Rust-native equivalent of a caller-supplied
@@ -775,6 +791,14 @@ pub struct ProcessHostOwner {
 }
 
 impl ProcessHostOwner {
+    pub(super) fn workspace_status_inputs(
+        &self,
+    ) -> Result<
+        super::workspace_status_inputs::RawWorkspaceStatusInputs,
+        super::workspace_status_inputs::StatusError,
+    > {
+        self.source.workspace_status_inputs()
+    }
     /// Creates a fresh process-latched Rust-native Host owner for a production
     /// runtime. Each retained runtime gets its own latch set, matching the
     /// owner boundary rather than using mutable process-global configuration.

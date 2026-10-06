@@ -1011,6 +1011,7 @@ struct NativeDemandCommand<'a> {
     lease: NativeDemandLeaseToken,
     repository_session: super::repository_io::RepositorySessionToken,
     inputs: NativeDemandInputBundle,
+    workspace_status: Option<Arc<super::workspace_status_inputs::WorkspaceStatusCapture>>,
     effects: Arc<CommandEffectOwner>,
     prior: AcceptedNativeDemandSnapshot,
     reusable_requests:
@@ -1267,6 +1268,10 @@ trait NativeCommandRoot: Clone {
     }
 
     fn initializes_request_revision(&self) -> bool {
+        false
+    }
+
+    fn requires_workspace_status_inputs(&self) -> bool {
         false
     }
 
@@ -3179,6 +3184,13 @@ pub use runfiles_manifest::PreparedRunfilesManifests;
 #[allow(dead_code)]
 #[path = "build_info_template_inputs.rs"]
 mod build_info_template_inputs;
+
+#[allow(dead_code)]
+#[path = "build_info_native_inputs.rs"]
+mod build_info_native_inputs;
+#[allow(dead_code)]
+#[path = "workspace_status_content.rs"]
+mod workspace_status_content;
 
 #[path = "action_chain_staging.rs"]
 mod action_chain_staging;
@@ -6360,6 +6372,7 @@ impl WorkspaceRuntime {
                 lease,
                 repository_session,
                 inputs,
+                workspace_status: None,
                 effects: CommandEffectOwner::new(),
                 path_input_ledger: path_inputs::NativePathInputLedger::new(
                     &prior.path_observations,
@@ -6398,6 +6411,26 @@ impl WorkspaceRuntime {
         let preflight = self.begin_native_demand_command_with_inputs(request)?;
         finish_probe_phase!(preflight_phase);
         let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
+        if root.requires_workspace_status_inputs() {
+            let raw = match self.process_host.workspace_status_inputs() {
+                Ok(raw) => raw,
+                Err(error) => {
+                    return guard.abort(NativeDemandSessionError::Computation(anyhow::anyhow!(
+                        error
+                    )));
+                }
+            };
+            let workspace = NormalizedAbsolutePath::new(self.workspace.clone())
+                .expect("runtime workspace is normalized");
+            let request = guard.command().lease.0;
+            guard.command.as_mut().unwrap().workspace_status = Some(Arc::new(
+                super::workspace_status_inputs::WorkspaceStatusCapture {
+                    workspace,
+                    request,
+                    raw,
+                },
+            ));
+        }
         let allows_empty_terminal = root.allows_empty_terminal();
         let mut attempts = 0usize;
         let mut revision_retries = 0usize;
@@ -7662,6 +7695,9 @@ impl NativeDemandCommand<'_> {
             self.lease.0,
             self.execute_transcript.dupe(),
         ));
+        if let Some(capture) = &self.workspace_status {
+            super::workspace_status_inputs::install(&mut data, capture);
+        }
         Ok(data)
     }
 
@@ -7673,6 +7709,7 @@ impl NativeDemandCommand<'_> {
             updater,
             self.runtime,
             &self.inputs,
+            self.workspace_status.as_ref(),
             self.repository_results.clone(),
             self.path_observations.clone(),
             &self.path_input_ledger,
@@ -8018,6 +8055,7 @@ impl NativeDemandCommand<'_> {
                     &mut updater,
                     self.runtime,
                     &prior.inputs,
+                    None,
                     prior.repository_results,
                     prior.path_observations,
                     &self.path_input_ledger,
@@ -8777,6 +8815,7 @@ fn prepare_selected_native_demand_snapshot(
         &mut updater,
         command.runtime,
         &snapshot.inputs,
+        None,
         snapshot.repository_results.clone(),
         snapshot.path_observations.clone(),
         &command.path_input_ledger,
@@ -8885,6 +8924,7 @@ fn inject_native_demand_snapshot(
     updater: &mut DiceTransactionUpdater,
     runtime: &WorkspaceRuntime,
     inputs: &NativeDemandInputBundle,
+    workspace_status: Option<&Arc<super::workspace_status_inputs::WorkspaceStatusCapture>>,
     repository_results: RepositoryMaterializationResultEpoch,
     path_observations: PathObservationEpoch,
     path_input_ledger: &path_inputs::NativePathInputLedger,
@@ -8893,6 +8933,7 @@ fn inject_native_demand_snapshot(
 ) -> anyhow::Result<()> {
     let workspace = NormalizedAbsolutePath::new(runtime.workspace.clone())
         .context("normalizing native-demand workspace")?;
+    super::workspace_status_inputs::inject(updater, &workspace, workspace_status)?;
     inject_root_module_request_inputs(
         updater,
         &runtime.workspace,

@@ -505,9 +505,19 @@ observed catalog-content resolver and private native BuildInfo template preparat
 key. The actual validated installed action selects the tracked catalog route/value;
 original result/byte Arcs, full action identity and complete union frontier/certificate
 are retained. Native acceptance checks current observations, and held metadata keeps
-its evaluation graph alive. Actual status production/observation, writer permissions,
-arbitrary or Java callbacks, execution/cache policy, installed module tools and full
-cc_toolchain remain deferred.
+its evaluation graph alive. [WP926](wp926-native-workspace-status-inputs-2026-10-06.json)
+adds fresh native Unix request input capture and a workspace-global DICE status-content
+producer. Actual USER reported text, kernel full/short hostname, uid provenance,
+SOURCE_DATE_EPOCH presence and one clock sample participate in tracked raw equality;
+fixed English UTC and default policies are explicit native domains. Repeated consumers
+share the original capture/descriptor/status Arcs and independent sorted UTF8 buffers.
+Certified checked templates produce complete independent headers through the existing
+Latin1 consumer. Original-Arc/transaction/source validation precedes native acceptance;
+selected, ordinary and abort paths revoke capture while held historical bytes survive.
+Actual cancellation/drain and final owner release pass. Bounded text/direct buffers and
+local date scratch add no global interner/pool or whole map; held metadata still retains
+its graph. Nondefault status policies/epoch, file writing/mtime/volatile cache, arbitrary
+or Java callbacks, execution, installed module tools and full cc_toolchain stay deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is

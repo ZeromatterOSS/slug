@@ -1,0 +1,264 @@
+{
+  "packet": "WP-7-225-m7a-native-workspace-status-inputs-r1",
+  "operations": {
+    "path": "target/wp926",
+    "hash_index": "target/wp926/operational-hashes.json",
+    "hash_index_sha256": "36738d9799f80b0c2b86cbddf8970946edc39a612e4c5f213040101a728d5027",
+    "operational_files": 89,
+    "elapsed_seconds_from_recorded_start": 1829.4827580451965,
+    "compile_seconds": 149.24026122305077,
+    "review_time": "not separately measured; no speedup claim"
+  },
+  "status": "accepted",
+  "date": "2026-10-06",
+  "baseline": "9a200fc909a9bf25376fd92ddb13ef8a172cab92",
+  "result": "Genuine bounded native request capture, workspace-global tracked DICE status UTF8 content and certified checked template/header metadata; no file publication or execution admission.",
+  "contract": {
+    "path": "target/wp926/contract.md",
+    "sha256": "a65ef3245759a49521f3cfa00cf186bb0912d21422dc3bb73fcaa7a51ba84c12",
+    "design_accepted_before_production": true
+  },
+  "source_basis": {
+    "immutable_bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "anchors": "BazelWorkspaceStatusModule80-85/151-157/173-188/231-242; WorkspaceStatusAction71-96/120-134; WorkspaceStatusFunction38-49; WorkspaceStatusValue28-38/63-72",
+    "source_discovery_sha256": "7df901734576d25f3e2cc4eb16c8fca209dba93d9880470b0305efd1e7400194",
+    "predecessor_source": "target/wp925/successor-source.md"
+  },
+  "compatibility": {
+    "exact": "Selected default sorted UTF8 fields/key-space-value-LF, positive timestamp whole-second arithmetic and selected English UTC formatting; unchanged Latin1 consumer and checked header bytes.",
+    "slug_native": "Reported USER plus independent real/effective UID, kernel hostname first-dot projection, actual per-request wall clock, fixed English policy and structural request/capture/source identity. No HotSpot/defaultlocale/name-authentication parity.",
+    "unsupported": "Present SOURCE_DATE_EPOCH even empty, nondefault command/embed/locale, invalid/absent/nonUnicode/oversize/line identity, out-of-range/unrepresentable time/calendar/platform; Windows unsupported."
+  },
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/build_info_native_inputs.rs": "86c58197fc341cef795b87af48ab57591c1cbcc112150810bf0442f2f66bda5a",
+    "app/slug_core_v2/src/runtime/build_info_template_inputs.rs": "0b4b6da7dfd8bf60d149dc0561b8e2c13853af33af381ad853ac18ce2bb9f420",
+    "app/slug_core_v2/src/runtime/dice.rs": "8f1c93a17209c5c53fbbde70d6354139ed484e99c3344debf8f90aae6e14bf90",
+    "app/slug_core_v2/src/runtime/mod.rs": "cad47a8b43122146e0d276739e6c1fab32a697aaf7bffabea197ba5e78873974",
+    "app/slug_core_v2/src/runtime/process_host.rs": "a5892b4df687de28640634d5351a735cb4a34105bdc1e615a93285c429f5c3e1",
+    "app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs": "50f5e62e62ff812d0a3e25244dfa708188a9aa4d2d2e11a989a5b2513e5a97c6",
+    "app/slug_core_v2/src/runtime/tests/workspace_status_inputs_tests.rs": "c46553c1e7b28e2b4b1aba4f0db11f181387976b96628964245d667a3889b95c",
+    "app/slug_core_v2/src/runtime/workspace_status_content.rs": "8e607d31c2dc73e04e85238f37a26271bdd7d5fcf6c99c0dceda96cc4fbf5e4f",
+    "app/slug_core_v2/src/runtime/workspace_status_inputs.rs": "fb58b3252b58f3de7d346eae6ab8d2d5c2d57086415dd1cf00246ec765575c05"
+  },
+  "owners": {
+    "raw": "One original command Arc captures actual USER/kernelhostname/uid/epoch presence/one SystemTime sample after lease/abort guard before updater, reused across Need/source retries. Text retained<=4096bytes; explicit failure states.",
+    "semantic": "Workspace-only injected key Present/Unauthorized owns full structural raw/association equality. Producer depends on key and checks original userdata carrier; descriptor/capture Arcs shared; direct independent stable/volatile buffers.",
+    "consumer": "Original checked template/action/catalog frontier/certificate Arc plus same status Arc and independent header Vec. Existing callback byte renderer retained.",
+    "completion": "Original terminal capture must match command and terminal transaction key; real template certificate/current-equivalent/source finalizer required. Selected/ordinary/abort updates revoke. No uncertified standalone status root.",
+    "concurrency": "Native overlapping requests remain Busy; historical raw A/B transactions retain versioned captures. No lock across compute or detached sampler."
+  },
+  "allocation": {
+    "storage": "Borrow fixed keys/captured values into two independent Vecs; captured text/descriptor/template/graph shared through original Arcs. Date/native OsString/numeric buffers scoped scratch. Volatile capacity69 covers supported12digit timestamp+24byte date/fixedkeys/LF without ordinary geometric growth.",
+    "interning": "Existing canonical labels/configuration owners/interners unchanged. Unique clock/environment/date strings not globally interned; no new pool/cache/map/copied graph/catalog.",
+    "retention": "DICE semantic/history and held command metadata retain original capture/buffers and whole template evaluation graph. Actual pending-worker drain and bounded final Weak release proved for tested schedules. Native environment acquisition still has temporary owned allocation.",
+    "claim": "No measured allocator improvement, universal cleanup or whole-workload memory-fit admission."
+  },
+  "validation": {
+    "unique_core_passes": 23,
+    "current_owner_passes": 5,
+    "preserved_unaffected_protected_passes": 18,
+    "not_single_current23_batch": true,
+    "preservation_basis": "only test inspection bind and volatile capacity65->69 changed after first20/23; all affected5 new owner tests rerun; protected18 owners/tests unchanged",
+    "current_preflight": {
+      "exit_code": 0,
+      "output": "Verified 5 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21101660002022982,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "c95656cbacb2296744bee60df028d8b2da7aa0795262c71bb9f42334a7536152",
+      "selected": 5,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "current_runtime": {
+      "tests": [
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::status_raw_conversion_has_exact_utf8_sorted_buffers_dates_and_refusal_priority",
+          "exit_code": 0,
+          "elapsed_seconds": 0.003644245909526944,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::status_capture_raw_aba_and_overlapping_versions_keep_structural_request_ownership",
+          "exit_code": 0,
+          "elapsed_seconds": 0.004076797980815172,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::genuine_native_status_shares_capture_across_configurations_renders_complete_headers_and_releases",
+          "exit_code": 0,
+          "elapsed_seconds": 0.21264533698558807,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::native_status_retry_new_request_cancellation_and_foreign_capture_refuse_without_publication",
+          "exit_code": 0,
+          "elapsed_seconds": 0.26754084997810423,
+          "environment_override": {},
+          "passed_one": true
+        },
+        {
+          "name": "runtime::dice::tests::build_info_aquery_tests::template_inputs::workspace_status_inputs::genuine_native_present_empty_source_date_epoch_refuses_and_revokes_capture",
+          "exit_code": 0,
+          "elapsed_seconds": 0.1946159959770739,
+          "environment_override": {
+            "SOURCE_DATE_EPOCH": ""
+          },
+          "passed_one": true
+        }
+      ],
+      "selected": 5,
+      "passed": 5,
+      "elapsed_seconds": 0.6825467470334843,
+      "max_child_rss_kib": 81248
+    },
+    "preserved_preflight": "target/wp926/core-preflight-before-inspection-bind.json",
+    "preserved_results": "target/wp926/core-results-before-inspection-bind.json",
+    "cli_default_check": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.598899109987542,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "current_owner_no_run": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--jobs",
+        "1",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.627575875958428,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "analysis": "Reuse WP925 unchanged three installed Analysis controls explicitly; no new Analysis run.",
+    "checks": "target/wp926/checks.json and integration.json",
+    "environment": "Current fifth exact selector child override SOURCE_DATE_EPOCH empty; actual NativeSource observed present-empty and refused/revoked; ambient native gates observed absence; no global environment mutation.",
+    "semantic_evidence": "Actual native identity/interval/date and full buffers/headers/configuration sharing;31literal UTC vectors/alltables; raw field/refusal priority and A/B/A/heldversions; genuine source retry reuses capture; newrequest distinct even equal seconds; cached/copy/stale complete refused; Busy; actual pending DICE worker witness drain/abort/recovery and final Weak owners release."
+  },
+  "corrections": {
+    "syntax": "Initial extra closing bracket before successful defaultCLI, preserved cli-check-initial.*.",
+    "resource": "First no-run ineffective environment packageprofile flags reached unchanged60s cap/no compiler error; explicit predecessor --config opt0/debug0 corrected. All preparation/runtime caps unchanged; profile-timeout.* preserved.",
+    "inspection": "Initial20/23;3native helper failures due unbound deferred cycle proxy in existing_state inspection; required bind inserted without assertion changes. Corrected3passed, then all5owner gates refreshed after capacity correction.",
+    "cancellation": "Worker replaced local pending future test with actual DICE pending-key waiter and worker witness release.",
+    "capacity": "Only later production patch65->69 plus explanatorycomment, allotherproductionpins unchanged. CurrentCLI/5affectedgates refreshed.",
+    "records": "preparation-correction.json/inspection-bind-correction.json/buffer-capacity-correction.json and original raw logs retained."
+  },
+  "reviews": {
+    "design": [
+      {
+        "role": "source",
+        "path": "target/wp926/design-source.md",
+        "sha256": "07c16225fd4d6793dda1b0531ee32f056b2f154cf3b0e10aa715ec404436c377",
+        "verdict": "ACCEPT"
+      },
+      {
+        "role": "ownership",
+        "path": "target/wp926/design-ownership.md",
+        "sha256": "4d6824d2a8e7595e0de53139863611af3887b2d77208dc8c9da7101556f0d5ab",
+        "verdict": "ACCEPT"
+      },
+      {
+        "role": "evidence",
+        "path": "target/wp926/design-evidence.md",
+        "sha256": "e0481ca4bf2659ac49c6cf38442a53910258d275fc83f8350b3eb5cc5c318c23",
+        "verdict": "ACCEPT"
+      }
+    ],
+    "final": [
+      {
+        "role": "source",
+        "path": "target/wp926/final-source.md",
+        "sha256": "3c0a835e663dab64ffc5ec0d4a8838e7d2008c97c6c2a81417477138ac6a143f",
+        "verdict": "ACCEPT"
+      },
+      {
+        "role": "ownership",
+        "path": "target/wp926/final-ownership.md",
+        "sha256": "a45587e8da2e2254897d4c69db352407f14428cae9f0a0169f963d38f56acc88",
+        "verdict": "ACCEPT"
+      },
+      {
+        "role": "evidence",
+        "path": "target/wp926/final-evidence.md",
+        "sha256": "d28bd2451654e78ed21a0fc9bba5a4521f96f72d37a631534f0116328cd4e2a0",
+        "verdict": "ACCEPT"
+      }
+    ]
+  },
+  "growth": {
+    "production_sibling_lines": {
+      "app/slug_core_v2/src/runtime/build_info_native_inputs.rs": 164,
+      "app/slug_core_v2/src/runtime/workspace_status_content.rs": 173,
+      "app/slug_core_v2/src/runtime/workspace_status_inputs.rs": 185
+    },
+    "tests_lines": 951,
+    "disposition": "Estimate450 exceeded; allthree FINAL accepted five cohesive predicates, independent expectations/shared finite Local fixture/one aggregate native adapter+bounded actual DICE cancellation key. Original WP925 writer helper extraction equivalent; no corpus/registry copies/alternate driver/assertion removal. Large production files glue only."
+  },
+  "inherited_limits": {
+    "memory": "WP89964KiB postdropguard REFUSED remains; controlled131072string/profile bounds and accepted equalpayload/per-demand transport support bounded resume, not actual full-workload fit. Actual unique/history/whole-root fit remains unknown.",
+    "source": "Source16/17/18 spent; no retries/acquisition; prior operation caps unchanged.",
+    "legacy_fixture": "Old bare registry-dependent frontier control remains unproved/transport-blocked offline. No retry/pass/waiver or guard edit.",
+    "deferred": "Status files/mtime/volatile cache/complete inputtree/action-chain/Cpp/REAPI/authentic fullroot/M7A/wholememoryfit; minimal Windows."
+  },
+  "successor": {
+    "packet": "WP-7-226-m7a-native-workspace-status-publication-r1",
+    "operations": "WP927",
+    "source_discovery": "target/wp926/successor-source.md",
+    "sha256": "2e1bd7235349904ce91b407a985fc3e3679d9d90584019ca62675b2a9a127bb5",
+    "activation": "Root concrete publication/destination/staging/failure API + three DESIGN required; selected only."
+  }
+}

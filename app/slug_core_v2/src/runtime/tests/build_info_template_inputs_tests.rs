@@ -461,28 +461,7 @@ fn native_template_preparation_certifies_current_frontier_ignores_shadow_and_ref
     let parent = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wp925/template-fixtures");
     std::fs::create_dir_all(&parent).unwrap();
     let workspace = tempfile::tempdir_in(parent.canonicalize().unwrap()).unwrap();
-    for (demand, result) in template_epoch().observations() {
-        let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) = result.as_ref()
-        else {
-            continue;
-        };
-        let path = workspace
-            .path()
-            .join(demand.path().as_path().strip_prefix("/workspace").unwrap());
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, bytes).unwrap();
-    }
-    std::fs::create_dir_all(workspace.path().join("platforms/host")).unwrap();
-    std::fs::write(
-        workspace.path().join("platforms/host/BUILD.bazel"),
-        "exports_files(['constraints.bzl'])\nplatform(name='host')\n",
-    )
-    .unwrap();
-    std::fs::write(
-        workspace.path().join("platforms/host/constraints.bzl"),
-        "HOST_CONSTRAINTS = []\n",
-    )
-    .unwrap();
+    write_template_workspace(workspace.path());
     let shadow = workspace.path().join(
         "external/bazel_tools/tools/build_defs/build_info/templates/non_volatile_file.h.template",
     );
@@ -645,4 +624,32 @@ fn native_template_preparation_certifies_current_frontier_ignores_shadow_and_ref
             .bytes(),
         TEMPLATE_CASES[1].2
     );
+}
+
+fn write_template_workspace(root: &Path) {
+    for (demand, result) in template_epoch().observations() {
+        let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) = result.as_ref()
+        else {
+            continue;
+        };
+        let path = root.join(demand.path().as_path().strip_prefix("/workspace").unwrap());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, bytes).unwrap();
+    }
+    std::fs::create_dir_all(root.join("platforms/host")).unwrap();
+    std::fs::write(
+        root.join("platforms/host/BUILD.bazel"),
+        "exports_files(['constraints.bzl'])\nplatform(name='host')\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("platforms/host/constraints.bzl"),
+        "HOST_CONSTRAINTS = []\n",
+    )
+    .unwrap();
+}
+
+mod workspace_status_inputs {
+    use super::*;
+    include!("workspace_status_inputs_tests.rs");
 }

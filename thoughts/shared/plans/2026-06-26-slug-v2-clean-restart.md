@@ -34,34 +34,34 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-225-m7a-native-workspace-status-inputs-r1
-Status: Tracked installed template preparation accepted; native default status input ownership selected
+Packet: WP-7-226-m7a-native-workspace-status-publication-r1
+Status: Native default status inputs accepted; source-certified status publication selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects genuine native
-request input capture and a workspace-global default status-content producer inside
-DICE. Its native identity/time/revision contract needs a concrete DESIGN checkpoint;
-status writing, update/cache policy and execution remain separate.
-[WP925](./slug-v2-subplans/wp925-build-info-catalog-template-preparation-2026-10-06.json)
-prepares actual installed BuildInfo templates from the validated observed closure,
-sharing original catalog bytes/result and full evaluation/frontier/certificate owners.
-Thirteen Core controls, three installed Analysis controls, CLI check and three FINAL
-reviews pass, including full configuration restoration, native refresh/revocation and
-held-result release. The optional legacy bare frontier fixture is registry-dependent
-and unproved offline; no old guard changed. Held metadata retains its evaluation graph.
-Whole-workload memory fit, authentic source/full-root/runtime and M7A stay open;
-allocation/interner discipline, prior memory/resource caps, source16/17/18 limits and
-minimal Windows scope persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects workspace-global
+stable/volatile file publication through the existing current-source native finalizer.
+Root must freeze the bounded destination/staging/failure API and three DESIGN reviews
+before activation. Stable equal content preserves the file; volatile writes every time.
+[WP926](./slug-v2-subplans/wp926-native-workspace-status-inputs-2026-10-06.json) owns genuine
+per-request native identity/clock/epoch observations and computes sorted UTF8 status
+inside DICE. Original owners share across consumer configurations/retries; selected,
+ordinary and abort paths revoke. Certified checked templates produce complete independent
+headers, with real cancellation/association and held/final release proof. Twenty-three
+unique Core gates (18 preserved protected+5 current), default CLI and three FINAL reviews
+pass. Native USER/kernel/English UTC policy remains qualified; nondefault policies/epoch
+and Windows unsupported. File writing/cache/execution/full-root/M7A/whole-workload fit
+remain open. Allocation/interner discipline, prior memory/resource/source16/17/18 caps
+and the old unproved offline bare registry guard persist.
 
 ### Ready and blocked queue
 
-The current packet selects demanded native default workspace-status inputs under priority3; the remaining
+The current packet selects source-certified workspace-status publication under priority3; the remaining
 priorities stay queued until their concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects native default workspace-status inputs; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects source-certified workspace-status publication; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

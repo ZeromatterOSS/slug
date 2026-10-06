@@ -88,6 +88,10 @@ pub(super) fn checked_template_label<'a>(
 }
 
 impl BuildInfoTemplatePreparationKey {
+    pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.build.workspace
+    }
+
     pub(super) fn new(
         build: BuildCommandRootKey,
         owner: ConfiguredTargetKey,
