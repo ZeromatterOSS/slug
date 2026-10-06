@@ -15,6 +15,7 @@
 //! the small synchronous seam between them; it owns no graph lookup or DICE
 //! state, and every value here dies with the evaluator.
 
+use std::borrow::Cow;
 use std::fmt;
 use std::hash::Hash;
 use std::sync::Arc;
@@ -831,12 +832,17 @@ impl AnalysisArtifactValue {
         }
     }
 
-    fn path(&self) -> String {
-        self.artifact.path().into_owned()
+    fn path(&self) -> Cow<'_, str> {
+        self.artifact.path()
     }
 
-    fn basename(&self) -> String {
-        self.path().rsplit('/').next().unwrap().to_owned()
+    fn basename(&self) -> &str {
+        let path = match &self.artifact {
+            AnalysisArtifact::Source(label) => label.target().as_str(),
+            AnalysisArtifact::Derived { output, .. } => output.path(),
+            AnalysisArtifact::WorkspaceStatus(status) => status.path(),
+        };
+        path.rsplit('/').next().unwrap()
     }
 
     fn dirname(&self) -> String {
@@ -1512,6 +1518,10 @@ mod context_lifecycle_tests;
 #[cfg(test)]
 #[path = "subrule_invocation/workspace_status_tests.rs"]
 mod workspace_status_tests;
+
+#[cfg(test)]
+#[path = "subrule_invocation/file_path_memory_tests.rs"]
+mod file_path_memory_tests;
 
 #[cfg(test)]
 mod native_solib_token_tests {

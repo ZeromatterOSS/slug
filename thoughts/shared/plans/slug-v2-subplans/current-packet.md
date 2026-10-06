@@ -12,10 +12,10 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component copies module name/version metadata directly from
-existing recorder fields into the Starlark heap. Four temporary Rust String copies
-are omitted; lookup priority, bindings/type/bytes and heap/frozen owners remain.
-This is a source-proved scratch-copy removal, with no measured memory claim.
+The latest accepted component preserves File path borrows and reads basename
+slices directly from existing artifact owners. Formatting and heap allocation
+copy the same bytes; final string ownership, attributes and identity remain.
+Fixed private pointer checks prove borrowing; no measured memory claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -24,41 +24,41 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted module metadata direct heap contract
+## Accepted File path/basename borrowing contract
 
-The four private module_name/module_version getters in BUILD globals and native
-methods return StringValue from existing heap.alloc_str over the same borrowed
-PackageRecorder CompactString fields. The generated StringValue adapter passes
-through the final heap value, omitting the prior temporary to_owned String.
-Native recorder lookup, current source lookup and metadata error keep exact
-priority; BUILD recorder/metadata lookup remain. Generated argument binding,
-exposure tables and Starlark string type/bytes are unchanged. Recorder owners
-stay alive during synchronous copying; final strings own bytes independently.
-No producer/admission/route/invalidation/key/DICE/identity/unsafe/dependency/
-donor or new helper/API/cache/interner. alloc_str does not invoke interning.
-Slug-native scratch-copy bypass preserves inherited admitted behavior.
+AnalysisArtifactValue's private path preserves the existing AnalysisArtifact Cow,
+omitting forced String ownership for already borrowed paths. Packaged/external
+Source Owned formatting remains. Basename borrows the last segment directly from
+Source target, Derived output.path or static WorkspaceStatus path. Source path
+construction only prepends package/repository prefixes before the complete target,
+so suffix bytes stay exact including slash-containing targets. Display/get_attr
+consumers copy synchronously under the live receiver; final heap/frozen strings
+own their bytes. Directory/short_path/full-path extension/root/owner/kind flags,
+identity/hash/equality/output ownership and underlying path admission/layout stay.
+No public API/new interner/cache/key/DICE/unsafe/dependency/donor or retained owner.
+Slug-native scratch copying/formatting bypass preserves inherited admitted bytes.
 
-Three DESIGNs/FINALs accept identical 170-line tests and baseline/candidate 5/5.
-Five raw retained-field fixtures across BUILD/Bzl/Bzlmod return thirty values
-with exact empty/ASCII/Unicode/NUL/long bytes/type/hash; these copying fixtures
-admit no new producer names or versions. Recorder bytes remain; evaluator and
-recorder drop before freezing, and returned OwnedFrozenValue fields survive
-FrozenModule/source-case drops. Twenty-eight full diagnostics match for both
-fields, wrong positional/named args, missing package state, unsupported metadata,
-and missing native source plus metadata (source error first). Three existing
-synthetic in-memory EpochBuilder tests protect calling BUILD vs loaded macro,
-apparent/canonical/root fields, declared/empty versions, same-DICE A/B/A and
-wrong-context/unsupported-route boundaries. No actual source observation/network/
-Bazel/daemon activity. Default Core/CLI and pinned serial offline fresh build/
-exact nonignored preflight/format/archive/plan/diff pass. No assets/goldens.
+Three DESIGNs/FINALs and narrow qualification FINALs accept identical 171-line
+tests: corrected baseline five semantic/protected passes and one intended path
+pointer failure; candidate 6/6. Thirteen source/derived/status cases preserve
+helper/Display/property bytes, Unicode/long/slash/external coordinates and root
+.h vs prefixed .h extension. Source pointers change 0→9 for borrowed paths and
+0→13 for basenames. Seventy-eight returned fields retain exact type/hash/bytes
+after File roots clear, freezing and artifact/module drops. Six full immutable/
+noncallable/unknown-field diagnostics match. Four unchanged workspace-status
+identity/frozen/output-owner/kind and fully loaded source/generated/shared-solib
+root controls plus default Core/CLI and pinned offline exact checks pass.
 
-The first baseline preflight omitted the bzl_module namespace for three existing
-test selectors and ran no tests. Correct selectors from the current executable
-reuse the exact successful baseline build/artifact/source; no test, production
-or assertion changed. Failed invocation and original launcher are preserved.
+Derived File/Directory/Symlink have runtime fixtures. RunfilesTree uses the same
+kind-independent helpers and has source proof only, with no new runtime case.
+Original unqualified design/validation and the coverage correction are preserved;
+source/tests/commands/results are unchanged. The initial E0432 test import of
+FrozenHeap from environment is corrected to values before production changes;
+original snapshot/failure and exact correction retain every fixture/assertion.
+No assets/goldens or actual source observation/network/Bazel/daemon activation.
 
-Acceptance proves four temporary String construction-site bypasses only. Final
-heap copying remains; allocation-failure sequencing is excluded. No allocator/
+Acceptance proves temporary copy/format bypass and fixed private pointer matches.
+Final heap copying remains; allocation-failure sequencing is excluded. No allocator/
 count/quantified memory/aggregate/peak/RSS/speed/source-fit or wider parity claim.
 Windows minimal/deferred; full WP899/M7A and source integration remain open.
 
@@ -66,6 +66,7 @@ Windows minimal/deferred; full WP899/M7A and source integration remain open.
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| File path Cow and basename slices borrow existing artifact owners; bytes/Display/attributes/identity and independent heap/frozen strings stay. Three DESIGNs/FINALs plus coverage qualification; corrected baseline five passes/one intended pointer failure, candidate 6/6, path pointers 0→9/basename 0→13, 78 retained fields/six equal errors/four root/status controls/default Core/CLI. Import correction preserved; three Derived kinds exercised, RunfilesTree source proof only. Copy bypass/pointer observations only, no quantified memory/RSS/speed claim | [File path borrowing](wp899-file-path-borrow-2026-10-06.json) |
 | Module name/version BUILD/native getters copy existing recorder fields directly into heap; lookup priority, type/bindings/errors and independent heap/frozen owners stay. Three DESIGNs/FINALs; same baseline/candidate 5/5, thirty returned fields across three exposures, twenty-eight equal full diagnostics, existing synthetic calling-BUILD/A/B/A/context controls and default Core/CLI. Selector-only correction preserved. Four source temporary-copy sites only; no quantified memory/RSS/speed claim | [Module metadata direct heap](wp899-module-metadata-direct-2026-10-06.json) |
 | C++ compilation-mode getter allocates directly in existing heap, omitting temporary Rust String; current caller/projection order, method string type/arity/errors and final heap/frozen owners stay. Three DESIGNs/FINALs; same baseline/candidate 4/4, all three modes/nine equal complete errors/retained frozen results/default Core/CLI. Original module-level fixture failure/correction preserved. One tiny source-copy bypass only; no quantified memory/RSS/speed claim | [C++ mode direct heap](wp899-cpp-mode-direct-2026-10-06.json) |
 | Glob exclusions precede candidate String copies; include flags/error priority, original-byte matching, escaping/UTF16 sort/dedup and owned outputs stay. Three DESIGNs/FINALs; corrected baseline one semantic pass/one capacity failure, candidate 12/12, 432 results/180 equal errors, fixed empty Vec capacity 128→0/retained mixed outputs/default Query/Core/CLI. Fixture failures/corrections preserved. Vec storage may shrink; earlier matcher work/allocation failure-panic sequencing excluded, no aggregate/RSS/speed claim | [Glob exclusion before copying](wp899-glob-exclude-before-copy-2026-10-06.json) |

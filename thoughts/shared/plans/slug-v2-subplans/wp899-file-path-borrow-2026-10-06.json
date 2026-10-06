@@ -1,0 +1,309 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "8664a5651272e9d0b8498cb924573bfa75b6727b",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native temporary File path/basename copying/formatting bypass; inherited admitted bytes/type/layout/errors/owners remain; no widened parity/admission",
+  "source_sha256": {
+    "app/slug_loading_v2/src/subrule_invocation.rs": "8440e1c540551a1baefaa9a12c7285cb8d5c4b85ac0baffadf314e5a64eb2d9f",
+    "app/slug_loading_v2/src/subrule_invocation/file_path_memory_tests.rs": "9f0aa4c2d0cd38107916414c06562af4f0aa3ebe1a52bf5b47b75ef94b2c55d4",
+    "app/slug_loading_v2/src/subrule_invocation/workspace_status_tests.rs": "952862c9a2c7f8b824f05100fa251f77eeb2f3525e83ab40dfa10e9bc9a63c64",
+    "app/slug_loading_v2/src/artifact_root_helper_tests.rs": "2bac1656307a949cab4ac4ffa6be296533234c60dc6c1040d6a02510cce93447",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "app/slug_loading_v2/Cargo.toml": "5af8ae9fffd743c683605ca78d9b9b9c8c29ebd7af6ec40a7fc2da4f4a16d06c",
+    "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+    "app/slug_loading_v2/src/artifact_root.rs": "61459e892a9d8cfc343e53121969dd20819004c5fb5e7fc4c64cbe3657f0cb87",
+    "app/slug_loading_v2/src/host_package_load_tests.rs": "fd593c0d922856bf137f818048632d8570f33eafa34797ec4ae0867a2da76eaf",
+    "app/slug_build_api_v2/src/analysis_value.rs": "97ddd1a077e63a5e1138c97d739a7a9f84df15eae85c374e9fb3a108f3f719ee",
+    "app/slug_build_api_v2/src/actions/spec.rs": "9e6b981c3360ed41735eb907f1e934809a92b3c8173c7625e18c3ce0788f48f1",
+    "app/slug_build_api_v2/src/workspace_status.rs": "de11c2d126e32b65ebe70c21c07da39adac82a5342c0108d8c67a127e78ddaca",
+    "app/slug_build_api_v2/src/artifact_root.rs": "d30b122e9bda7e8f29cf92129141a541e89e634ab2f5cf8c7d7bd2ef84a361d2",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/environment/modules.rs": "2aa3a01e226649e78a0fa874b20dc97d9f2aa8aa2ac31084de34fdb0b0c64e45"
+  },
+  "baseline_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "b18a33ac42830f0e71acd895b948cfec8b2b9eac92fb99e852acf2d96b190e1e",
+        "selectors": [
+          "subrule_invocation::file_path_memory_tests::file_helpers_borrow_existing_path_and_basename_owners",
+          "subrule_invocation::file_path_memory_tests::file_properties_preserve_bytes_type_hash_errors_and_frozen_results",
+          "subrule_invocation::workspace_status_tests::workspace_status_file_fields_hash_and_depset_equality",
+          "subrule_invocation::workspace_status_tests::workspace_status_cannot_be_claimed_as_declared_rule_output",
+          "subrule_invocation::workspace_status_tests::file_is_symlink_reflects_declared_kind_not_source_or_regular_file",
+          "bzl_module::host_package_load_tests::artifact_root_helper_tests::unchanged_repo_relative_path_uses_genuine_source_generated_and_shared_solib_roots"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/subrule_invocation.rs": "69ef91813eca88d3b3ed0f1fff4af362470efa9e631375e3df5379d5303ef68c",
+      "app/slug_loading_v2/src/subrule_invocation/file_path_memory_tests.rs": "9f0aa4c2d0cd38107916414c06562af4f0aa3ebe1a52bf5b47b75ef94b2c55d4",
+      "app/slug_loading_v2/src/subrule_invocation/workspace_status_tests.rs": "952862c9a2c7f8b824f05100fa251f77eeb2f3525e83ab40dfa10e9bc9a63c64",
+      "app/slug_loading_v2/src/artifact_root_helper_tests.rs": "2bac1656307a949cab4ac4ffa6be296533234c60dc6c1040d6a02510cce93447"
+    }
+  },
+  "candidate_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "82b52cdacda14e49013e0c2ba388416b1b2c3dc9372901846f07dc602d1121e9",
+        "selectors": [
+          "subrule_invocation::file_path_memory_tests::file_helpers_borrow_existing_path_and_basename_owners",
+          "subrule_invocation::file_path_memory_tests::file_properties_preserve_bytes_type_hash_errors_and_frozen_results",
+          "subrule_invocation::workspace_status_tests::workspace_status_file_fields_hash_and_depset_equality",
+          "subrule_invocation::workspace_status_tests::workspace_status_cannot_be_claimed_as_declared_rule_output",
+          "subrule_invocation::workspace_status_tests::file_is_symlink_reflects_declared_kind_not_source_or_regular_file",
+          "bzl_module::host_package_load_tests::artifact_root_helper_tests::unchanged_repo_relative_path_uses_genuine_source_generated_and_shared_solib_roots"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/subrule_invocation.rs": "8440e1c540551a1baefaa9a12c7285cb8d5c4b85ac0baffadf314e5a64eb2d9f",
+      "app/slug_loading_v2/src/subrule_invocation/file_path_memory_tests.rs": "9f0aa4c2d0cd38107916414c06562af4f0aa3ebe1a52bf5b47b75ef94b2c55d4",
+      "app/slug_loading_v2/src/subrule_invocation/workspace_status_tests.rs": "952862c9a2c7f8b824f05100fa251f77eeb2f3525e83ab40dfa10e9bc9a63c64",
+      "app/slug_loading_v2/src/artifact_root_helper_tests.rs": "2bac1656307a949cab4ac4ffa6be296533234c60dc6c1040d6a02510cce93447"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "69ef91813eca88d3b3ed0f1fff4af362470efa9e631375e3df5379d5303ef68c",
+    "hook_after": "mod workspace_status_tests;\n",
+    "hook": "\n#[cfg(test)]\n#[path = \"subrule_invocation/file_path_memory_tests.rs\"]\nmod file_path_memory_tests;\n",
+    "exact_replacements": [
+      [
+        "use std::fmt;\n",
+        "use std::borrow::Cow;\nuse std::fmt;\n"
+      ],
+      [
+        "    fn path(&self) -> String {\n        self.artifact.path().into_owned()\n    }\n\n    fn basename(&self) -> String {\n        self.path().rsplit('/').next().unwrap().to_owned()\n    }\n",
+        "    fn path(&self) -> Cow<'_, str> {\n        self.artifact.path()\n    }\n\n    fn basename(&self) -> &str {\n        let path = match &self.artifact {\n            AnalysisArtifact::Source(label) => label.target().as_str(),\n            AnalysisArtifact::Derived { output, .. } => output.path(),\n            AnalysisArtifact::WorkspaceStatus(status) => status.path(),\n        };\n        path.rsplit('/').next().unwrap()\n    }\n"
+      ]
+    ],
+    "every_other_production_byte_unchanged": true
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/file-path-borrow-baseline-compile.json",
+      "sha256": "73db49fc9192acdd3249d6d2c59739319fd6ca5d06decabcdb0cddf7d9f04786",
+      "exit_code": 101,
+      "elapsed_seconds": 17.642779536021408,
+      "log_sha256": "76535c02b028cb6e7675de130e802b85867697240c3fe81c051906e63563742f"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/file-path-borrow-baseline-r2-compile.json",
+      "sha256": "ed423e1bf00b01193254e8bd31576a0ee4e3ba66852ab8ca3960d686e77b8f8f",
+      "exit_code": 0,
+      "elapsed_seconds": 13.401034640031867,
+      "log_sha256": "97f7598c4a06ed09e12f4d5013ee6fd7daca05757aaa385521acf132ad8c5ddd"
+    },
+    "baseline-r2-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-preflight.json",
+      "sha256": "05842bd65387603d92df0174a09ab55214359606a64bc8fc3ce50e18b6fd95e6",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022151536017190665,
+      "log_sha256": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e"
+    },
+    "baseline-r2-slug_loading_v2-controls": {
+      "receipt": "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-controls.json",
+      "sha256": "7e286ed46832523bedbd1811455d2ad8c46fd557e4a235d88597c3c4cf9f7df8",
+      "exit_code": 101,
+      "elapsed_seconds": 0.017448174010496587,
+      "log_sha256": "1b2e324d5d487badf1025bc4d3b875d934782d914fb6b62cbdb34ce1d0941b29"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/file-path-borrow-candidate-compile.json",
+      "sha256": "a130ea2b10bec85fcc2f054c85a39ca54d22b81a5b06f7d5b8a74004c78aaee9",
+      "exit_code": 0,
+      "elapsed_seconds": 12.838509442983195,
+      "log_sha256": "a6d15159d3acee4a4dd0a25ce052137bfa4c49c7915d52f150ae7e01c34dc8ac"
+    },
+    "candidate-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/file-path-borrow-candidate-slug_loading_v2-preflight.json",
+      "sha256": "5838dafc91627c1eb167389da16776b43538307b386e60dfbb5cb217055bace9",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02558472298551351,
+      "log_sha256": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e"
+    },
+    "candidate-slug_loading_v2-controls": {
+      "receipt": "target/wp899/file-path-borrow-candidate-slug_loading_v2-controls.json",
+      "sha256": "ece3e15bb81bab9ee89215b53f7c9e5ba1a3caf7d58deb9e7aa2fb6b0e96dc67",
+      "exit_code": 0,
+      "elapsed_seconds": 0.017501784022897482,
+      "log_sha256": "7900e1cac5f6cf21c21ae4f392195252b1c7af3b7d627f131ebceb5943f96125"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/file-path-borrow-dependents-check.json",
+      "sha256": "6666f5ca227c26ee10e8e4c33d1b1a8038d8ff173c694b6809ebbaa3fed091ca",
+      "exit_code": 0,
+      "elapsed_seconds": 4.913192275969777,
+      "log_sha256": "8af163b30638647ab7796c435cbc7d81319efb94e1f6f87488be9ab22671c03e"
+    },
+    "format-check": {
+      "receipt": "target/wp899/file-path-borrow-format-check.json",
+      "sha256": "955e1ea9cdae2732f072961c8870e0f21ce41c27acf74832cce417419e1d38d8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02702475996920839,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/file-path-borrow-archive-check.json",
+      "sha256": "ec0f8cb8298ddcc18730f1f82c6d65b75345e76bed4427eb4b63c0c0e518934d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03418520401464775,
+      "log_sha256": "0e6f0b30cc847bfc93529a227676063ab7e21c059a445a57678fefa0f74a0fc1"
+    }
+  },
+  "pass_counts": {
+    "original_baseline_compile_exit": 101,
+    "corrected_baseline_semantic_and_protected": 5,
+    "corrected_baseline_intended_path_pointer_failure": 1,
+    "candidate_total": 6,
+    "candidate_new": 2,
+    "candidate_protected": 4
+  },
+  "metrics": {
+    "baseline-r2": {
+      "borrowed_paths": 9,
+      "path_source_pointer_matches": 0,
+      "basename_source_pointer_matches": 0,
+      "artifact_cases": 13,
+      "retained_string_fields": 78
+    },
+    "candidate": {
+      "borrowed_paths": 9,
+      "path_source_pointer_matches": 9,
+      "basename_source_pointer_matches": 13,
+      "artifact_cases": 13,
+      "retained_string_fields": 78
+    }
+  },
+  "captured_errors": {
+    "count": 6,
+    "equal_full_bytes": true,
+    "sha256": "ccaa7c05966a22886a29ca69d7416e4758a91a5f23d5d0c76e81ce6bad88e1bf"
+  },
+  "invariant_to_evidence": {
+    "copy_bypass": "Private path preserves original Cow instead of forcing borrowed paths into String. Basename directly borrows source target/derived output/status suffix, omitting unneeded full source path formatting and temporary basename copy. Existing heap copying/Display consumers unchanged. Fixed pointer observations only.",
+    "semantics": "Thirteen root/nested/dot/packaged/external/Unicode/long Source, Derived File/Directory/Symlink/external coordinate (RunfilesTree source-proof only), stable/volatile Status cases compare helper/full Display/actual registered properties to original full path/suffix/dirname/short_path/full-path extension. Root .h and prefixed .h differ correctly. Each source_path only prepends prefix before same target; final segment unchanged.",
+    "owners": "Path borrows only prior Borrowed owners; packaged/external Source Owned formatting remains. All basename slices remain under receiver label/output/static owner. 78 actual strings with exact bytes/type/hash are checked after file binding clears and module freeze drops mutable heap, FrozenModule and original artifact values drop. Final result owns bytes.",
+    "identity": "No artifact/root/output owner/hash/equality changes. Four unchanged status declared-kind/frozen identity/output-owner and fully loaded source/generated/shared-solib root helper controls. Default Core/CLI compile checks.",
+    "errors": "Six equal complete noncallable path/basename/dirname, immutable path/basename and unknown-field diagnostics. Attribute dispatch and every neighboring property unchanged."
+  },
+  "fixture_correction": {
+    "record": "target/wp899/file-path-borrow-fixture-correction.json",
+    "original_test_sha256": "6bdb26fa050abe8bcb77cd59306db9c852a62ed5afd6279994d342398809b28b",
+    "reason": "Unchanged baseline compilation E0432: new test imported FrozenHeap from environment instead of values. Correct the import only, preserving every fixture/assertion and production bytes.",
+    "exact_replacement_before_format": [
+      "use starlark::environment::FrozenHeap;\n",
+      "use starlark::values::FrozenHeap;\n"
+    ],
+    "classification": "fixture import correction within accepted design"
+  },
+  "limits": "Source temporary ownership-conversion/basename formatting-copy bypass and fixed private pointer observations only. Original Owned source path projection/dirname/short_path/extension stay. Final Starlark heap strings still independent copies. Allocation-failure sequencing excluded; no allocator/count/quantified memory/aggregate/peak/RSS/speed/source-fit claim. No public API/new interner/cache/helper outside private replacements/key/DICE/identity/unsafe/dependency/donor/admission/layout changes or Windows expansion. Full WP899/M7A/source integration open/unwaived. RunfilesTree has kind-independent source proof only, no new runtime fixture.",
+  "growth": {
+    "test_lines": 171,
+    "estimate": "two tests <=230lines; no assets/goldens"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T05:02:40.228857+00:00",
+    "baseline": "8664a5651272e9d0b8498cb924573bfa75b6727b"
+  },
+  "timing": {
+    "compile_and_check_seconds": 48.79551589500625,
+    "test_seconds": 0.03494995803339407,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 516.643279
+  },
+  "evidence_sha256": {
+    "target/wp899/file-path-borrow-archive-check.json": "ec0f8cb8298ddcc18730f1f82c6d65b75345e76bed4427eb4b63c0c0e518934d",
+    "target/wp899/file-path-borrow-archive-check.jsonl": "0e6f0b30cc847bfc93529a227676063ab7e21c059a445a57678fefa0f74a0fc1",
+    "target/wp899/file-path-borrow-baseline-compile.json": "73db49fc9192acdd3249d6d2c59739319fd6ca5d06decabcdb0cddf7d9f04786",
+    "target/wp899/file-path-borrow-baseline-compile.jsonl": "76535c02b028cb6e7675de130e802b85867697240c3fe81c051906e63563742f",
+    "target/wp899/file-path-borrow-baseline-r2-compile.json": "ed423e1bf00b01193254e8bd31576a0ee4e3ba66852ab8ca3960d686e77b8f8f",
+    "target/wp899/file-path-borrow-baseline-r2-compile.jsonl": "97f7598c4a06ed09e12f4d5013ee6fd7daca05757aaa385521acf132ad8c5ddd",
+    "target/wp899/file-path-borrow-baseline-r2-selectors.json": "9263f1968e87440031ee3a896cbfa213f5a85af84ba9c78d728452f9e9dd17c5",
+    "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-controls.json": "7e286ed46832523bedbd1811455d2ad8c46fd557e4a235d88597c3c4cf9f7df8",
+    "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-controls.jsonl": "1b2e324d5d487badf1025bc4d3b875d934782d914fb6b62cbdb34ce1d0941b29",
+    "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-preflight.json": "05842bd65387603d92df0174a09ab55214359606a64bc8fc3ce50e18b6fd95e6",
+    "target/wp899/file-path-borrow-baseline-r2-slug_loading_v2-preflight.jsonl": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e",
+    "target/wp899/file-path-borrow-candidate-compile.json": "a130ea2b10bec85fcc2f054c85a39ca54d22b81a5b06f7d5b8a74004c78aaee9",
+    "target/wp899/file-path-borrow-candidate-compile.jsonl": "a6d15159d3acee4a4dd0a25ce052137bfa4c49c7915d52f150ae7e01c34dc8ac",
+    "target/wp899/file-path-borrow-candidate-selectors.json": "57d301b8f7eae932fad4c7ae01ffdcea57ffd4f6cf21d0bdbd832164fb70e9da",
+    "target/wp899/file-path-borrow-candidate-slug_loading_v2-controls.json": "ece3e15bb81bab9ee89215b53f7c9e5ba1a3caf7d58deb9e7aa2fb6b0e96dc67",
+    "target/wp899/file-path-borrow-candidate-slug_loading_v2-controls.jsonl": "7900e1cac5f6cf21c21ae4f392195252b1c7af3b7d627f131ebceb5943f96125",
+    "target/wp899/file-path-borrow-candidate-slug_loading_v2-preflight.json": "5838dafc91627c1eb167389da16776b43538307b386e60dfbb5cb217055bace9",
+    "target/wp899/file-path-borrow-candidate-slug_loading_v2-preflight.jsonl": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e",
+    "target/wp899/file-path-borrow-controls.py": "308b2da11f4be74effeddca4419b07dd62e34633a08a734f4dd662f8e71a2dff",
+    "target/wp899/file-path-borrow-dependents-check.json": "6666f5ca227c26ee10e8e4c33d1b1a8038d8ff173c694b6809ebbaa3fed091ca",
+    "target/wp899/file-path-borrow-dependents-check.jsonl": "8af163b30638647ab7796c435cbc7d81319efb94e1f6f87488be9ab22671c03e",
+    "target/wp899/file-path-borrow-design-evidence.md": "c87e134a52cb5f98169cdf7c505fae39afba41d112793c617687f134fdf27f9b",
+    "target/wp899/file-path-borrow-design-ownership.md": "761659e2086bab9c3b54258d4a52f07e6bd0550916a3659decfdb40a2a0d4991",
+    "target/wp899/file-path-borrow-design-source.md": "e944d4998bfc80f390ff16b4f0f0ccb55f36db27d8222c6f5b78197dbbefb01a",
+    "target/wp899/file-path-borrow-design.md": "3ac75d5e448f1868eebb4efdf9612701c1ca8537d5bdc92b24953fda6d77a645",
+    "target/wp899/file-path-borrow-fixture-correction.json": "266ae8a47860c552fa8a0b93863aa39360ba37013fed9390c3858c1fd27123df",
+    "target/wp899/file-path-borrow-format-check.json": "955e1ea9cdae2732f072961c8870e0f21ce41c27acf74832cce417419e1d38d8",
+    "target/wp899/file-path-borrow-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/file-path-borrow-original-test.rs": "6bdb26fa050abe8bcb77cd59306db9c852a62ed5afd6279994d342398809b28b",
+    "target/wp899/file-path-borrow-record.py": "ea03a71557d99b604376d6cc52dee029250f57b86dd8053cf6badb81ddcbbb8e",
+    "target/wp899/file-path-borrow-start.json": "b0eee4c874846a47885caa719a65796dbdcdcdf24ae5f0548a630c46b2fe4a43",
+    "target/wp899/file-path-borrow-coverage-qualification.json": "eb9d51a6a76ee9b44fb972db9acf9bb668cddfbf52b0eb1a908968e6b14d49af",
+    "target/wp899/file-path-borrow-original-design.md": "2e4db9d02a98f00a7ff36ea0f27f214a3bdef84014ac49745c070ad3d1ac7867",
+    "target/wp899/file-path-borrow-validation.json": "680b0a4884c5b89b229479d782596478939e0d38ec3b65b076ce855f6fc247da"
+  },
+  "coverage_qualification": {
+    "record": "target/wp899/file-path-borrow-coverage-qualification.json",
+    "original_validation_sha256": "680b0a4884c5b89b229479d782596478939e0d38ec3b65b076ce855f6fc247da",
+    "original_design_sha256": "2e4db9d02a98f00a7ff36ea0f27f214a3bdef84014ac49745c070ad3d1ac7867",
+    "reason": "Ownership review identified fourth ActionOutputKind RunfilesTree. Three derived kinds are exercised; path/basename transform has no kind-dependent branches, so RunfilesTree uses source proof only.",
+    "metadata_change": "Replace all Derived kinds test claim with explicit File/Directory/Symlink runtime cases plus RunfilesTree source-proof qualification.",
+    "source_tests_commands_unchanged": true,
+    "reassessment": "No implementation or fixture change; existing source-only contract remains sound. Original import correction and all results retained."
+  },
+  "initial_final_reviews": {
+    "target/wp899/file-path-borrow-final-source.md": "741d9457132e2b0b63970c68c81f951a309291c19f0c94a2054357a3a8b25722",
+    "target/wp899/file-path-borrow-final-ownership.md": "2f3172fc49279b5b788a77a2fc459766cd0f2301bb4c2376998d6b3bb77ef789",
+    "target/wp899/file-path-borrow-final-evidence.md": "3100f456c5b0a40623b3b2ba38df80165a6ac48a47cb7744245d28ce83051e10"
+  },
+  "validation_sha256": "ae39e7e1858a7078f678beb780f12c94d27d3939e0bf010131df82611c90e731",
+  "final_reviews": {
+    "target/wp899/file-path-borrow-final-r2-source.md": "bf149d57351897677926d9269e1f4d5d871256d6fa6cd1a6f8549c9701b19642",
+    "target/wp899/file-path-borrow-final-r2-ownership.md": "cb76000ff1d7155cbc90bd5827e0cf67c8007ac9187c2663bc588acb8ae57277",
+    "target/wp899/file-path-borrow-final-r2-evidence.md": "6d2ae36634a8a8d2c507708f6aa51d76c33430b047eee53856a8b075e8c3ad75"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "528de2ad7f36247776589224a92991fd9d076adc1eebb1c6a8a9d02f805084ee",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "391599a8609626cc5c2e5425737b2bc7d9a08a376f618042b232b9d3d8d55ada",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "c28f5e41a48c92b776d2fea7939fba874d869ca5e5a37abc472dc6b7b76eef91"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/file-path-borrow-format-check.json",
+      "sha256": "955e1ea9cdae2732f072961c8870e0f21ce41c27acf74832cce417419e1d38d8",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/file-path-borrow-archive-check.json",
+      "sha256": "ec0f8cb8298ddcc18730f1f82c6d65b75345e76bed4427eb4b63c0c0e518934d",
+      "exit_code": 0,
+      "log_sha256": "0e6f0b30cc847bfc93529a227676063ab7e21c059a445a57678fefa0f74a0fc1"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/file-path-borrow-plan-check.json",
+      "sha256": "1380ac42b73d40e4a509d718576b17936d86d21082346a390dbeba0f9e195275",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/file-path-borrow-diff-check.json",
+      "sha256": "8507cb6635e3ba7d867ab4da42faff06d19e659eedf598387242ace3c80a02dd",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}
