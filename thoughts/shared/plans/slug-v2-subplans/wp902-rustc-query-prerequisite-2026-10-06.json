@@ -1,0 +1,82 @@
+{
+  "schema": 1,
+  "base": "fb67f509b1c73cf5ba4eafc5defeffe44ab6f472",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "aquery",
+    "mnemonic(\"(Rustc|RustcTool|CargoBuildScriptRun)\", deps(\"//app/slug_cli_v2:slug\"))",
+    "--output=jsonproto",
+    "--include_commandline",
+    "--include_artifacts",
+    "--include_param_files",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "exit_code": 1,
+  "elapsed_seconds": 2.1703192020067945,
+  "work_limit_seconds": 15,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "initial_tracked_status": " M thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md\n M thoughts/shared/plans/slug-v2-subplans/current-packet.md\n",
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "outputs": {
+    "actions.json": {
+      "bytes": 401,
+      "sha256": "5024b1c9afa4e4d771cfef696f8e79c47c0561116857824f7482bf8e626d469b"
+    },
+    "stderr.log": {
+      "bytes": 1511,
+      "sha256": "25ec8d37b15749b73377f9d89a9e390bd5ccff64c1a3effd9ee88de9d8ca78c8"
+    }
+  },
+  "packet": "WP-7-201-m7a-current-rustc-action-accounting-r1",
+  "disposition": "ACCEPTED_PREREQUISITE_REFUSAL_NO_ACTION_GRAPH",
+  "valid_action_graph_obtained": false,
+  "configured_action_rows_obtained": null,
+  "action_processes_reported": 0,
+  "input_pin_count": 687,
+  "blocking_repository": "@@rules_rust++crate+slug_crates__xz2-0.1.7",
+  "stdout_format": "JVM cgroup warning text, not JSON or an empty ActionGraphContainer",
+  "cache_freshness_warnings": [
+    "rules_swift++non_module_deps+build_bazel_rules_swift_local_config",
+    "rules_shell++sh_configure+local_config_shell"
+  ],
+  "independent_final_reviews": {
+    "target/wp902/final-source.md": "aa13e0cc208e876419d8de233653b9da4d43ddba903cc0a317a494b1839b064c",
+    "target/wp902/final-evidence.md": "ea286065919809fa029c5000b33e5feb0b5f3611b87760b7264c902a5183a5cf",
+    "target/wp902/final-ownership.md": "3f285cb5aff34bf864848e8629dd732d40f7c18615016f602cfde119cad3bab6"
+  },
+  "evidence_sha256": {
+    "target/wp902/observation.json": "051667ff54230012b7b3114512554a7b5e1275d18c434c3712376f20e68daf28",
+    "target/wp902/claim.json": "925963bb228462e5ed071223427bac8c180d54427b004349c370c923a7af5dac",
+    "target/wp902/actions.json": "5024b1c9afa4e4d771cfef696f8e79c47c0561116857824f7482bf8e626d469b",
+    "target/wp902/stderr.log": "25ec8d37b15749b73377f9d89a9e390bd5ccff64c1a3effd9ee88de9d8ca78c8",
+    "target/wp902/action-observe.py": "634125257b5fdbb8a9b1b48bbe195198c785c69ab136d95a5b5ca402f29153a2",
+    "target/wp902/source-fields.md": "a0755f9b8a3c0cac119ddc57e20dcc515b5d643f2e3e8594d0dfce6bb789111c",
+    "target/wp902/design-ownership.md": "6593ad9edab884ceed60a4cca934b63e40fbb5e9d0560c76717aed4de8755c09",
+    "target/wp902/design-evidence.md": "f4f2153153aafe7fd68a9baed8beccc6fdb39cdd86bfbf5644192ba7a7c577b2",
+    "target/wp902/leader-retention-control.json": "1dbfe99ac4bc04975d2f874ac6cd5d51ff620825dcc708b0172c29ed049b3c09",
+    "target/wp902/absent-repo-directories.json": "43bead989af9c340cb18e5984a7b53d24194926e6e0e162a88ff2a06194897b2"
+  },
+  "scope": "External Bazel oracle, no Slug semantic activation. No source/runtime/M7A gate closes. Original source attempts16/17/18 and memory stability REFUSED remain unchanged.",
+  "next_decision": "Select bounded local preparation of checksum-pinned lzma-sys0.1.20, pkg-config0.3.34 and xz2 0.1.7 archives already present in Cargo cache, then materialize only those Bazel repositories with downloads disabled. No automatic aquery retry.",
+  "automatic_retry": false
+}

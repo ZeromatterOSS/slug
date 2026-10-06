@@ -34,30 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-200-m7a-current-production-inventory-r1
-Status: Current unit-feature accounting accepted; configured Rustc action evidence is next
+Packet: WP-7-202-m7a-local-archive-repository-preparation-r1
+Status: Three checksum-pinned local crate archives selected for Bazel preparation
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects current Linux
-normal/build CLI inventory reconciliation under canonical priority1, using one
-locked/offline metadata observation and static declared producers. The accepted view has36 local/316 external packages and977 edges, with complete
-static lock membership and declared source/pin correspondence. Next reconcile
-Linux CLI unit features with one bounded offline unit-graph observation before
-selecting configured-action evidence. The observation is complete:503 reachable
-units and351 normal external units,329 equal/22 narrower with no undeclared
-feature. No compilation or build-script execution. Next select current Rustc
-action evidence; old configured/generated flag observations remain historical.
-See the [unit receipt](./slug-v2-subplans/wp901-linux-unit-features-2026-10-06.json) and the
-[inventory receipt](./slug-v2-subplans/wp900-production-inventory-2026-10-06.json).
-Metadata features are not unit/configured compiler flags; M7A remains partial.
-
-Controlled64-round string lifecycle and lexer evidence permits bounded broader
-progress; allocation/interner discipline is retained in AGENTS.md. The original
-memory-stability REFUSED remains. Global18 stopped in a declared15s TLS handshake
-step during initial-owner resolution, with peak sampled RSS73146368B and no
-allocation-abort diagnostic. Three FINALs accept terminal evidence and cleanup;
-full source admission stays open. Global16/17/18 remain spent, with no automatic
-retry or cap increase. See [terminal receipt](./slug-v2-subplans/wp899-progress-profile-terminal-2026-10-06.json).
-Windows remains minimal/deferred. Full WP899/M7A integration remains unaccepted.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects local archive
+verification and one bounded download-disabled materialization of three missing
+crate repositories from existing Cargo cache. The once-only Rustc query stopped
+at xz2 under nofetch, before a configured graph; no build action ran. See the
+[prerequisite receipt](./slug-v2-subplans/wp902-rustc-query-prerequisite-2026-10-06.json).
+No aquery/source retry or Slug runtime activation is selected. Current declared
+inventory/unit-feature accounting remains accepted; configured/source/M7A gates
+stay open. Allocation/interner discipline and all Slug source caps remain, with
+original memory REFUSED/source16/17/18 preserved. Windows minimal/deferred.
 
 ### Ready and blocked queue
 
