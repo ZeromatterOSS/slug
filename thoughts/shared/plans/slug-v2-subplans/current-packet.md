@@ -12,10 +12,9 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component converts temporary DOT class labels through owned
-CompactString conversion only for tight buffers at or above the pinned minimum
-heap capacity. Short and spare buffers retain the original copying conversion.
-Exact DOT bytes, final capacities, graph owners and release boundaries remain.
+The latest accepted component borrows canonical and apparent repository owners
+when rendering attribute labels. It removes a temporary canonical deep clone and
+Arc construction, preserving exact spelling, final capacity and owned output.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -24,49 +23,39 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted DOT class-label conversion ownership contract
+## Accepted query attribute-label borrowing contract
 
-Private SelectedQueryGraph::class_label keeps every assembly operation, numeric
-temporary, byte threshold, first-member exemption, truncation marker/count and
-member order. Only its final owned String conversion changes: capacity==len AND
-len>=size_of::<String>()+size_of::<usize>() selects existing CompactString::from;
-all shorter/inline/below-floor/spare values keep original CompactString::new.
-Pinned compact_str 0.8.2's copying heap constructor clamps to that minimum; its
-owned constructor transfers ordinarily encodable buffers. The large-capacity
-32-bit fallback copies through the original heap constructor and is excluded
-from transfer claims. This preserves final capacity and natural ownership.
+QueryLabel output_label and output_attribute_label share one private formatter
+borrowing CanonicalLabel and optional ApparentRepoName. Attribute rendering keeps
+full canonical repository equality and the existing then/flatten apparent alias
+projection. Some apparent renders @repo//package:target; None root uses
+//package:target; None nonroot uses the unchanged CanonicalLabel Display, exactly
+equivalent to the prior QueryLabel default formatting. Public Display, parsing,
+mapping provenance, semantic Eq/Hash/Ord, Arc owners and graph/DICE state remain.
+Every branch retains CompactString::new and its final owned capacity. Borrowed
+inputs expire during synchronous formatting; no reference escapes in output.
 
-Class-label CompactStrings remain synchronous render-phase scratch released
-with stdout's local labels vector. Returned stdout remains independently owned;
-request-owned graph labels/structural identity, factoring, quotient-edge dedup,
-sorted/unsorted traversal and public formatting paths remain unchanged. No new
-helper/public API/interner/cache/key/unsafe/dependency/representation or donor.
+Three DESIGNs and FINALs accept the bounded helper and source transformation.
+Identical corrected 141-line tests pass baseline 2/2 and candidate 13/13: twenty
+actual attribute cases cover root/canonical/apparent aliases and same/foreign
+repositories, empty packages and Unicode, with independent spellings and original
+algorithm bytes/capacity references. Long fields retain three owned outputs after
+source/apparent/owner/clone drops. Eleven existing identity/attribute/DOT controls,
+sixteen protected sources, default Core/CLI alltargets and pinned offline fresh
+artifact/preflight/format/archive/plan/diff checks pass. Initial preparation before
+the explicit expected spelling correction is not a test gate; corrected baseline
+and candidate tests are identical. No assets or golden changes.
 
-The original three DESIGN REVISEs identified the 25-31-byte capacity-floor
-mismatch before production implementation. Revised guards/boundary controls
-received three DESIGN R2 ACCEPTs; three FINALs accept the actual diff and evidence.
-Identical 118-line tests pass baseline 2/2 and candidate 7/7. Fourteen actual class
-cases preserve bytes, capacity and inline/heap state, including 24/25/31/32,
-tight/spare, empty/Unicode, byte-threshold/one-over, oversized first-member and
-multi-digit remaining counts. Eight raw DOT outputs match baseline in factored/
-unfactored and sorted/unsorted modes over duplicate/cyclic/generated-file graphs;
-source/graph/clone drop retains output text. Five existing graph regressions,
-thirteen protected sources, three pinned dependency sources and default Core/CLI
-alltargets checks pass. Initial baseline preparation before added boundary cases
-is not a test gate; revised baseline/candidate fresh artifacts and exact preflights,
-serial pinned offline prep60s/tests30s and format/archive/plan/diff hygiene pass.
-No assets or golden changes.
-
-Acceptance is exact source/library proof of bypassing one qualifying conversion
-text-copy site, with no runtime pointer or allocator measurement. Assembly,
-numeric temporary, short/spare/encoding-fallback copies, metadata and final stdout
-remain. No all-buffer transfer, quantified memory/allocation count, aggregate/
-peak/RSS/speed/source-fit claim. Full WP899/M7A stays open.
+Acceptance removes one temporary CanonicalLabel deep-clone/Arc::new source site
+and optional apparent Arc handle clone. Formatting String and final compact copying
+remain. No runtime pointer or allocator measurement, quantified allocation count,
+payload, aggregate/peak/RSS/speed or source-fit claim. Full WP899/M7A stays open.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| Query attribute labels borrow canonical/apparent owners instead of temporary deep clone/Arc construction; full repo projection, exact spelling/final capacity/owned output/identity remain. Three DESIGNs/FINALs; identical baseline 2/2, candidate 13/13, twenty attribute cases and retained output after source drops, eleven existing graph/DOT controls and default dependents. Source clone-site proof only; formatting/final copying remain, no quantified memory/aggregate/RSS/speed claim | [Query attribute-label borrowing](wp899-query-attribute-label-borrow-2026-10-06.json) |
 | DOT class-label conversion consumes tight buffers only at/above the pinned compact heap floor; short/spare original copying, exact bytes/final capacities/graph identity/release remain. Three revised DESIGNs/FINALs; identical baseline 2/2 and candidate 7/7, fourteen byte/capacity cases, eight equal DOT outputs, five existing graph controls and default Core/CLI checks. Initial heap-floor proposal rejected before implementation; source/library copy-bypass proof only, large 32-bit fallback excluded and no quantified memory/aggregate/RSS/speed claim | [DOT class-label conversion](wp899-dot-class-label-move-2026-10-06.json) |
 | Compiler list addition folding transfers owned elements after both unchanged per-operand 1000 guards; ordered fallback/tree/spans/frozen constant conversion stay. Three DESIGNs/FINALs; same corrected baseline two semantic passes/one ownership failure, candidate 12/12, fifteen Symbol buffers transferred across four routes, four admitted boundary combinations/eight rejection checks/four equal diagnostics and default dependents. Independently baseline-proved five-span golden correction; output collection/capacity caveats remain, no aggregate/RSS/speed claim | [List addition element transfer](wp899-list-add-arg-move-2026-10-06.json) |
 | Compiler type equality folding transfers the owned type(x) argument after unchanged guards, in both operand orders; rejected operands/pointers, helper IR/spans/frozen type-name ownership and ordered fallback stay. Three DESIGNs/FINALs; identical baseline two semantic passes/one ownership failure, candidate 19/19, three Symbol buffers transferred per orientation (15,384 content bytes each), ten rejection cases, five equal diagnostics and default dependents. Generic IR capacity caveat; no aggregate/RSS/speed claim | [Type equality argument transfer](wp899-type-equality-arg-move-2026-10-05.json) |

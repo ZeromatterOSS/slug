@@ -233,26 +233,37 @@ impl QueryLabel {
     }
 
     pub(crate) fn output_label(&self) -> CompactString {
-        match &self.apparent_repo {
-            Some(repo) => CompactString::new(format!(
-                "@{}//{}:{}",
-                repo.as_str(),
-                self.package(),
-                self.target()
-            )),
-            None => CompactString::new(self.to_string()),
-        }
+        Self::output_label_for(&self.canonical, self.apparent_repo.as_deref())
     }
 
     pub(crate) fn output_attribute_label(&self, label: &CanonicalLabel) -> CompactString {
         let same_owner_repo = label.package().repo() == self.canonical.package().repo();
-        Self {
-            canonical: Arc::new(label.clone()),
-            apparent_repo: same_owner_repo
-                .then(|| self.apparent_repo.clone())
+        Self::output_label_for(
+            label,
+            same_owner_repo
+                .then(|| self.apparent_repo.as_deref())
                 .flatten(),
+        )
+    }
+
+    fn output_label_for(
+        label: &CanonicalLabel,
+        apparent_repo: Option<&ApparentRepoName>,
+    ) -> CompactString {
+        match apparent_repo {
+            Some(repo) => CompactString::new(format!(
+                "@{}//{}:{}",
+                repo.as_str(),
+                label.package().package(),
+                label.target()
+            )),
+            None if label.package().repo().is_root() => CompactString::new(format!(
+                "//{}:{}",
+                label.package().package(),
+                label.target()
+            )),
+            None => CompactString::new(label.to_string()),
         }
-        .output_label()
     }
 }
 
@@ -2618,6 +2629,10 @@ fn path_to_package(path: &Path) -> Result<CompactString, QueryError> {
 fn label_in_package(package: &str, target: &str) -> Result<QueryLabel, QueryError> {
     QueryLabel::parse_root(&format!("//{package}:{target}"))
 }
+
+#[cfg(test)]
+#[path = "graph/query_attribute_label_memory_tests.rs"]
+mod query_attribute_label_memory_tests;
 
 #[cfg(test)]
 mod graph_tests {

@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "7873b4de4",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "source_sha256": {
+    "app/slug_query_v2/src/graph.rs": "78edec100be062e915891493ac669683c83ce870c140698767cbd393f983b4a0",
+    "app/slug_query_v2/src/graph/query_attribute_label_memory_tests.rs": "426df8b5c9a728cfb3cf9d7b7dd82b01f68093253896a3c441c4c49315764115",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "app/slug_query_v2/Cargo.toml": "c45d3a393da6f22b6b0e3cbfbe401ad7a4b0986de662ae19ae4872b5c5b4561f",
+    "app/slug_query_v2/src/lib.rs": "a140c2b6971b5e8439c14124ed0f3dc30919f0f2dcecef87f8cb50aaecd0a672",
+    "app/slug_query_v2/src/output.rs": "230e3a101d937c65e2382f7623ae0713cf847a4bdea735e68990ddaee5d7dd93",
+    "app/slug_query_v2/src/output/dot_class_label_memory_tests.rs": "8923f1d4fc3e2ddcc115ccbaff55c572b0065ff7ea55bd609ad93c2f500fbb82",
+    "app/slug_query_v2/src/evaluator.rs": "8d9bd8ed0359bec36515040391e2df02e003d62f2cc18a97a0e5a33f7a436991",
+    "app/slug_query_v2/src/loading_environment.rs": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de",
+    "app/slug_query_v2/src/generic.rs": "7eb2ef573cace410b8415c90f2d3a5a7dd29497a45290d11524597a2d974ab8f",
+    "app/slug_query_v2/src/traversal.rs": "0d5a50a2041806546bd9471017486d53ac05d48b813964fabcdf350203ba6b6c",
+    "app/slug_loading_v2/src/attrs.rs": "48d3bfe82e8d5753fa73ebb5a66c46ef7615e85d01b11fdcf06d685d8f3aa57a",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/package.rs": "a715fc400f471241ebc77f78b6c18ffb8ef8766e2fec4cbfcb4e78b7f1d3ae6a",
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3"
+  },
+  "dependency_sha256": {
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/lib.rs": "794b1923d5b04e941998fc54ca00fcf0ea19460fec2db1db6de96810f6da5eec"
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+    "artifact_sha256": "c3d994ef23a9b860dc581bb039fbbe6b3166154c19092e96a984aa89b8451ae7",
+    "selectors": [
+      "graph::query_attribute_label_memory_tests::attribute_label_rendering_preserves_spelling_capacity_and_source_identity",
+      "graph::query_attribute_label_memory_tests::attribute_label_outputs_remain_owned_after_source_and_owner_drop",
+      "graph::graph_tests::external_label_identity_is_canonical_while_output_is_apparent",
+      "graph::graph_tests::external_starlark_projection_keeps_explicit_main_and_classifies_hidden_edges",
+      "graph::graph_tests::query_attribute_retains_the_typed_loading_candidate_without_a_string_cache",
+      "graph::graph_tests::explicit_public_visibility_projects_an_explicit_empty_attribute",
+      "output::dot_class_label_memory_tests::dot_class_labels_preserve_bytes_capacity_and_truncation_boundaries",
+      "output::dot_class_label_memory_tests::dot_outputs_preserve_modes_graph_owners_and_retained_text",
+      "output::graph_output_tests::full_factored_dot_matches_bazel_node_then_outgoing_edge_layout",
+      "output::graph_output_tests::unfactored_dot_keeps_equivalent_nodes_separate",
+      "output::graph_output_tests::callback_unfactored_dot_deduplicates_edges_and_orders_cycles_without_adjacency",
+      "output::graph_output_tests::factoring_requires_matching_predecessors_and_deduplicates_quotient_edges",
+      "output::graph_output_tests::factored_order_compares_member_label_sequences_not_joined_dot_labels"
+    ],
+    "source_sha256": {
+      "app/slug_query_v2/src/graph.rs": "78edec100be062e915891493ac669683c83ce870c140698767cbd393f983b4a0",
+      "app/slug_query_v2/src/graph/query_attribute_label_memory_tests.rs": "426df8b5c9a728cfb3cf9d7b7dd82b01f68093253896a3c441c4c49315764115"
+    }
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+    "artifact_sha256": "405ec735dcb3a0ec8ae34b435cb4b814c48667693a40d7517d63e632ca86b721",
+    "selectors": [
+      "graph::query_attribute_label_memory_tests::attribute_label_rendering_preserves_spelling_capacity_and_source_identity",
+      "graph::query_attribute_label_memory_tests::attribute_label_outputs_remain_owned_after_source_and_owner_drop"
+    ],
+    "source_sha256": {
+      "app/slug_query_v2/src/graph.rs": "1177d17e20704af9f773d872deabdc61909836f223d5cb41b9e6ba0f034f8337",
+      "app/slug_query_v2/src/graph/query_attribute_label_memory_tests.rs": "426df8b5c9a728cfb3cf9d7b7dd82b01f68093253896a3c441c4c49315764115"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/query-attribute-label-borrow-baseline-compile.json",
+      "sha256": "4f3242baf6347ab2151eba35b1582cb0624a09ecd4db4dff53ed83d664211911",
+      "exit_code": 0,
+      "elapsed_seconds": 1.8526086609927006,
+      "log_sha256": "0f294339220ee3ab905e68dc510ba2e0bf1a37ac8e43cc342d4c1d1f3bd7f571"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/query-attribute-label-borrow-baseline-r2-compile.json",
+      "sha256": "a74d433849563ee8a5b3858d37e686df8c1c59d40c857014f04b7bbbf5b19159",
+      "exit_code": 0,
+      "elapsed_seconds": 1.034991363005247,
+      "log_sha256": "3afd6815f902983953aacc6c5a724d3144f1457cd44cf01855bcaf045dc52497"
+    },
+    "baseline-r2-preflight": {
+      "receipt": "target/wp899/query-attribute-label-borrow-baseline-r2-preflight.json",
+      "sha256": "2cabe643bf59adfc6a7777f938e2a40d72d2a524ff6c550b910fe9a7b55270bd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02415533596649766,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-r2-controls": {
+      "receipt": "target/wp899/query-attribute-label-borrow-baseline-r2-controls.json",
+      "sha256": "fa895677111d58fd36897a1bead061cb273c06de8d20084d00a4b8213d3f125d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002280140994116664,
+      "log_sha256": "9e5c3f6308fe8d440b0ecb99e73b66f39040c674d4383cc2fc1bc6920deeab4c"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/query-attribute-label-borrow-candidate-compile.json",
+      "sha256": "91103fb69c4cf19213fdd3f02fc6f47623d5b6ef7ee7110d9bf68f7e6ea0ecd0",
+      "exit_code": 0,
+      "elapsed_seconds": 2.570886156987399,
+      "log_sha256": "b7a0c3b6898f263d6255d24a3756600151481773248e159cfc92c88896c367e9"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/query-attribute-label-borrow-candidate-preflight.json",
+      "sha256": "e1cd569ee6b6a1bb2448510a3c5c5c463674c269e284812df8965b63591705db",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022499538026750088,
+      "log_sha256": "3d8ce2649dba2567b177a129f9de3c75f79d98d271e4a628d1fc2aacc0a92f52"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/query-attribute-label-borrow-candidate-controls.json",
+      "sha256": "8324fe7e298be3d5e1730ab5c63c1c2632ad3a32c3b7ce0d1bcd2d6979bca506",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0024662319920025766,
+      "log_sha256": "5774bf358ad0f6e0ba7559b4fe222700d1b8ca189cf1bf0c3c3b065a8a1ba981"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/query-attribute-label-borrow-dependents-check.json",
+      "sha256": "411ba51a12627bc3303d203a889162db9b56c26c06c2868c1e1884429d424bd3",
+      "exit_code": 0,
+      "elapsed_seconds": 2.8075206910143606,
+      "log_sha256": "578b08c6e66457915ea7f65575a32c4a2cbedb701da988d0e315d8e8aa561988"
+    }
+  },
+  "proof": "Whole graph.rs equals baseline plus test sibling hook and only QueryLabel output_label/output_attribute_label methods plus one private borrowed output_label_for. Exact canonical repository comparison and then/flatten apparent projection preserved. Some apparent renders @as_str//package:target; None root renders //package:target, None nonroot CanonicalLabel Display byte-equivalent to old QueryLabel Display. Every final branch retains CompactString::new. QueryLabel identity/Hash/Eq/Ord/public Display/mapping provenance/Arc owners/parsing and every other graph operation unchanged. Sixteen protected files and identical corrected baseline/candidate tests. No new public API/interner/cache/key/unsafe/dependency/retained representation or donor.",
+  "pass_counts": {
+    "baseline_semantic": 2,
+    "candidate_new": 2,
+    "candidate_protected": 11,
+    "candidate_total": 13,
+    "attribute_cases": 20
+  },
+  "metrics": {
+    "attribute_cases": 20,
+    "retained_output_bytes": [
+      16900,
+      11789,
+      5130
+    ]
+  },
+  "limits": "Source-proved removal of one temporary CanonicalLabel deep-clone/Arc::new site and optional apparent Arc handle clone. Synchronous borrowed inputs end before independently owned CompactString escapes; formatting String and final copying constructor remain. Exact bytes/capacity, source identities and retained outputs preserved. No pointer/allocator measurement, quantified allocation count or payload, aggregate/peak/RSS/speed/source-fit claim.",
+  "test_correction": "Before baseline execution, explicit expected apparent spellings were corrected to as_str because ApparentRepoName Display already includes @. Original test hash/initial successful compile preserved; initial compile is preparation only. Identical corrected baseline/candidate tests pass.",
+  "growth": {
+    "test_sibling_lines": 141,
+    "estimate": "100-180lines; two tests/no assets.",
+    "production": "One private helper bounded to QueryLabel existing formatting family and two existing methods/cfg sibling hook. Existing graph.rs size trigger addressed by sibling tests and no new graph/key responsibilities."
+  },
+  "test_profile": "Resolved pinned nightly-2025-09-14; serial offline slug_query_v2 lib prep60s/tests30s; fresh CargoJSON artifact/exact preflight, CARGO_MANIFEST_DIR, no golden regeneration. Default Core/CLI alltargets checks.",
+  "scope": "Local strings/basic memory; Windows minimal/deferred. Full WP899/M7A/source integration unwaived/unaccepted.",
+  "full_wp899_accepted": false,
+  "evidence_sha256": {
+    "target/wp899/query-attribute-label-borrow-archive-check.json": "124714d3b9999920b6ba16def4e050a6d7baefd0e8249cb8741d611609b5ad82",
+    "target/wp899/query-attribute-label-borrow-archive-check.jsonl": "47253972dad7b817b93434c06cb06b735a784ed74c2e421d94cb03d6a22c1161",
+    "target/wp899/query-attribute-label-borrow-baseline-compile.json": "4f3242baf6347ab2151eba35b1582cb0624a09ecd4db4dff53ed83d664211911",
+    "target/wp899/query-attribute-label-borrow-baseline-compile.jsonl": "0f294339220ee3ab905e68dc510ba2e0bf1a37ac8e43cc342d4c1d1f3bd7f571",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-compile.json": "a74d433849563ee8a5b3858d37e686df8c1c59d40c857014f04b7bbbf5b19159",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-compile.jsonl": "3afd6815f902983953aacc6c5a724d3144f1457cd44cf01855bcaf045dc52497",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-controls.json": "fa895677111d58fd36897a1bead061cb273c06de8d20084d00a4b8213d3f125d",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-controls.jsonl": "9e5c3f6308fe8d440b0ecb99e73b66f39040c674d4383cc2fc1bc6920deeab4c",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-preflight.json": "2cabe643bf59adfc6a7777f938e2a40d72d2a524ff6c550b910fe9a7b55270bd",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-attribute-label-borrow-baseline-r2-selectors.json": "af4118bd2f8685ec0ee8e17c40fc45a5981fa516cbdff0897401657c5b20d6a5",
+    "target/wp899/query-attribute-label-borrow-candidate-compile.json": "91103fb69c4cf19213fdd3f02fc6f47623d5b6ef7ee7110d9bf68f7e6ea0ecd0",
+    "target/wp899/query-attribute-label-borrow-candidate-compile.jsonl": "b7a0c3b6898f263d6255d24a3756600151481773248e159cfc92c88896c367e9",
+    "target/wp899/query-attribute-label-borrow-candidate-controls.json": "8324fe7e298be3d5e1730ab5c63c1c2632ad3a32c3b7ce0d1bcd2d6979bca506",
+    "target/wp899/query-attribute-label-borrow-candidate-controls.jsonl": "5774bf358ad0f6e0ba7559b4fe222700d1b8ca189cf1bf0c3c3b065a8a1ba981",
+    "target/wp899/query-attribute-label-borrow-candidate-preflight.json": "e1cd569ee6b6a1bb2448510a3c5c5c463674c269e284812df8965b63591705db",
+    "target/wp899/query-attribute-label-borrow-candidate-preflight.jsonl": "3d8ce2649dba2567b177a129f9de3c75f79d98d271e4a628d1fc2aacc0a92f52",
+    "target/wp899/query-attribute-label-borrow-candidate-selectors.json": "fe4553f8ba60dd7e8e09833a8dfd5ae642c05e59f6154b4fd2aa7e9749f8d058",
+    "target/wp899/query-attribute-label-borrow-controls.py": "abf3ec5127b831faa3a9a6201abcd40cd4bbc2446db16743192454cf91050b28",
+    "target/wp899/query-attribute-label-borrow-dependents-check.json": "411ba51a12627bc3303d203a889162db9b56c26c06c2868c1e1884429d424bd3",
+    "target/wp899/query-attribute-label-borrow-dependents-check.jsonl": "578b08c6e66457915ea7f65575a32c4a2cbedb701da988d0e315d8e8aa561988",
+    "target/wp899/query-attribute-label-borrow-design-evidence.md": "db082abf816574b19ad558eab4a37147724f2d8e3c0d1796faea278eff2c79e2",
+    "target/wp899/query-attribute-label-borrow-design-ownership.md": "1a8c30272c41e0c52ddd81788e5e25e4fe6a94b3cb8bbc018801d87a07cd094e",
+    "target/wp899/query-attribute-label-borrow-design-source.md": "0f959e4c9e47a01787f2c50e08786a416b61ed2ac0eb0995732627ecf6b9657c",
+    "target/wp899/query-attribute-label-borrow-design.md": "53a7e5f29014c09e7f9ab867480147753bdca9d5a5bfd845a376ca1948399507",
+    "target/wp899/query-attribute-label-borrow-format-check.json": "ed2ed9e60ff8cdbac03afc803f223ffd7b645458116d6970ca20536380b0783b",
+    "target/wp899/query-attribute-label-borrow-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/query-attribute-label-borrow-original-methods.txt": "28a11b11d9c36fd645c5dbba286da596aa24e5c3cab791245e9657a2f23097d9",
+    "target/wp899/query-attribute-label-borrow-record.py": "00bf064d3083d874d5a3fe780217f7a86e802f9bf969d8d2c922aa890354c3bd",
+    "target/wp899/query-attribute-label-borrow-start.json": "7c6a7f0adf435400282b5986d46fb77bc07d9c42b6cf41f63292754c8330c244",
+    "target/wp899/query-attribute-label-borrow-test-expectation-correction.json": "d7c019043cfb959e389303f268e24a3ef214b6385b615bd07d5ff88528172902"
+  },
+  "start": {
+    "started_at": "2026-10-06T02:58:33.813235+00:00",
+    "baseline": "7873b4de473d593196dbf79b3a2ffbf4900d8c05"
+  },
+  "timing": {
+    "compile_seconds": 8.266006871999707,
+    "test_seconds": 0.0047463729861192405,
+    "review_time": "Not separately measured",
+    "elapsed_from_design_seconds": 523.017526
+  },
+  "validation_sha256": "f5c2edc0877fdd06cb776681b5385ad68e5a0d7f0e76fc2488d30e21178a9934",
+  "final_reviews": {
+    "target/wp899/query-attribute-label-borrow-final-source.md": "7c72499e6338d53343a368981b17bcac502b793d6b3ace03ef32bcd6916984a8",
+    "target/wp899/query-attribute-label-borrow-final-ownership.md": "c5925b70d756ae116ff424959fbb8ef4f4a8fd39e38e8fb883534cb9d222f874",
+    "target/wp899/query-attribute-label-borrow-final-evidence.md": "5714fc7a17504ce46a96dc8c505d3c16a251a07f31352751a77fdab293acc237"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "bbe9e91a820ac2c23b56fc120d041ec62885be92b9981b933071a2e8ad09dad9",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "c45f02e4b44642b29da49c3dccc5ae6acd48a19127635a7f01e3a168fbb7b6a4",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "3b6b1f702ba6939e9cf5ae2b58022057293f3b73096fcdcddedd377fa45f13be"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/query-attribute-label-borrow-format-check.json",
+      "sha256": "ed2ed9e60ff8cdbac03afc803f223ffd7b645458116d6970ca20536380b0783b",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/query-attribute-label-borrow-archive-check.json",
+      "sha256": "124714d3b9999920b6ba16def4e050a6d7baefd0e8249cb8741d611609b5ad82",
+      "exit_code": 0,
+      "log_sha256": "47253972dad7b817b93434c06cb06b735a784ed74c2e421d94cb03d6a22c1161"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/query-attribute-label-borrow-plan-check.json",
+      "sha256": "f87ba1c2f64e54c797f04c05cf61224d75a6aa6489c4b69ca40ac2f835b07c34",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/query-attribute-label-borrow-diff-check.json",
+      "sha256": "434eace425b821249e6132a2135d940e6c00bde1bfc8bc29a60155a16181d716",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

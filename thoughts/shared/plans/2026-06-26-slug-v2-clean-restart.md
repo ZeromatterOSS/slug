@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: temporary DOT class labels use owned compact conversion
-only for tight buffers at/above the pinned heap-capacity floor. Short/spare copying,
-exact bytes/final capacities, graph owners and render release remain. Seven
-controls, fourteen capacity cases, eight equal DOT outputs and default dependent
-checks pass. Source/library ownership proof removes one qualifying conversion
-copy; no quantified allocation/aggregate/RSS/speed claim.
+Latest accepted change: query attribute-label rendering borrows canonical and
+apparent repository owners, removing a temporary deep clone and Arc construction.
+Exact repository projection, spelling, final capacity, identity and owned output
+remain. Thirteen controls, twenty attribute cases and default dependent checks
+pass. Source ownership proof only; formatting and final compact copying remain,
+with no quantified allocation/aggregate/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
