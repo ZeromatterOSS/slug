@@ -1,0 +1,128 @@
+{
+  "packet": "WP-7-219-m7a-external-file-write-query-r1",
+  "operational_packet": "WP920",
+  "date": "2026-10-06",
+  "base": "8757da926076f6b9f96f1cb0e33fc0656c892224",
+  "status": "accepted",
+  "outcome": "External-owner scalar FileWrite text projection over genuine main-root validated dependency closures; remove only main-owner presentation refusal, preserve borrowed semantic owners and private query policy.",
+  "compatibility": {
+    "exact": "Pinned FileWrite class/header/field algorithms and Derived root-relative external prefix in admitted Default Unix scalar query slice, with both executable bits.",
+    "slug_native": "Existing canonical external label/display, configuration/path/order and FileWrite action identity token; no real ActionKey.",
+    "deferred": "Standalone external BuildCommandRootKey rule requests (exported-source-only), LabelPrinter display-policy breadth, contents flags, ActionKey, discovery/execution, Windows breadth, authentic source/runtime/full-root/M7A and whole-workload memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "basis": "Immutable Artifact/AbstractAction/Label/PackageIdentifier/RepositoryName/text callback blobs in design-source.md plus accepted WP919 class/Unicode/empty-info proof. Derived prettyPrint keeps external prefix; Source-only stripping is inapplicable. No oracle/network/source acquisition."
+  },
+  "ownership": {
+    "retained": "No new semantic data/key/cache/interner/pool/graph, equality/invalidation/locking, source dispatch, publication, shared view/API or execution change.",
+    "guards": "Remove only private main-repository rendering refusal and unused borrowed owner argument. Existing absent-aspect/Default/structural Unix and selected raw/effective platform/own-bin-root/consumer guards stay; normalized path, mnemonic, Write and scalar shape guards stay. All-owner structural-before-render unchanged.",
+    "scratch": "Existing action-local label/token/native binary identity (including content-byte copies), progress/Unicode Cow and final independent String. Borrow full external paths/context; no prefix reparsing, alias reconstruction, extra content/label clone or retention widening. No zero-copy or measured allocation reduction claim."
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/file_write_aquery_text.rs": "94821241308d2ef20fa1e2bc29ff1ec42a31b55e1dc6b66ad10b8b6b9015d1fc",
+    "app/slug_core_v2/src/runtime/dice.rs": "0eb6a43c55b6c7100211d2fc5b15772e29db869e05a1129097ecbd837dcff185",
+    "app/slug_core_v2/src/runtime/tests/file_write_external_aquery_tests.rs": "78a961c188e52a5c3ce7095b346fa3f7e62cd0e3eec219a67759305dcf7abb79"
+  },
+  "validation": {
+    "toolchain": "Rustup-resolved pinned nightly-2025-09-14, offline Cargo JSON <=60s TERM3; CLI jobs2, Core jobs1 four-package invocation-only opt0debug0. Exact nonignored preflight from successful Cargo artifact, hashed actual executable. Serial10s TERM3 runtimes, no concurrent Cargo or native ancestor-sensitive fixtures.",
+    "compiles": {
+      "cli-check": {
+        "exit": 0,
+        "seconds": 6.277107064030133,
+        "receipt": "target/wp920/cli-check.json"
+      },
+      "core-tests": {
+        "exit": 0,
+        "seconds": 9.813454469083808,
+        "receipt": "target/wp920/core-tests.json"
+      },
+      "core-tests-caller-corrected": {
+        "exit": 0,
+        "seconds": 8.774411044083536,
+        "receipt": "target/wp920/core-tests-caller-corrected.json"
+      }
+    },
+    "core_distinct_passed": 69,
+    "core_qualification": "68 initial protected/lifecycle passes plus1 caller-corrected fields pass, not final69rerun. Production unchanged; lifecycle function byte-identical to passing initial source.",
+    "core_receipts": [
+      {
+        "receipt": "core-results.json",
+        "selected": 69,
+        "passed": 68,
+        "elapsed_seconds": 2.9450598179828376,
+        "max_child_rss_kib": 118276
+      },
+      {
+        "receipt": "core-results-caller-corrected.json",
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.06373764190357178,
+        "max_child_rss_kib": 72444
+      }
+    ],
+    "final_core_preflight": {
+      "exit_code": 0,
+      "output": "Verified 69 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.21017217601183802,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "31f0eaad3e5e1e3ca1e92e1725576da8a859a46e2fe3282330d36bde262dc1d7",
+      "selected": 69,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "checks": "Pinned changed Rust rustfmt check, git diff --check, archive check exit0; plan status checker passes before/after rollover. BuildAPI/Analysis producer owners untouched; no broader suite or extra direct-dependent compile justified."
+  },
+  "correction": {
+    "failure": "Initial new fields invocation used standalone external-rule BuildCommandRootKey; existing source dispatch returns ExternalTargetKind before formatting. Original source/log preserved, initial68/69 passes included lifecycle.",
+    "decision": "Three bounded caller-correction DESIGN reviews accepted preserving typed/exact refusal and exercising Target/Exec via genuine root dependencies, direct borrowed external blocks and real familyDeps consumer. No source policy or fabricated outer evaluation.",
+    "attribution": "Only fields body changed; lifecycle byte-identical to initial passing snapshot. Fresh preparation/exact69preflight and missing fields1/1 pass. Qualification is68+1, not full final69rerun."
+  },
+  "provenance": "One authored finite two-Local-module fixture with exact declared-relative path versus materialized-absolute logical-root schema, same-package Bzl/public external BUILD owns four actual writes. It uses injected ordinary Local completion epochs; it is not physical materializer/source-certificate replay or authentic rules_rust reconstruction. Bare standalone exported-source-only request negative has no certificate. Genuine rootcaller Target and wrapper Exec owner/output roots and pointer loans, full direct four blocks/generic Literal root/generic+family Deps five, label/noinput placeholders and declaration order proved. Synthetic checked Directory metadata priority explicitly qualified. Actual external BUILD content/bit and MODULE alias edits A/B/A change/restore native identity and full text, held owner/spec immutable; release all outcomes/transactions/spec/identity/owner/engine before final text checks. No compiler/build-script executes.",
+  "reviews": {
+    "source": {
+      "receipt": "target/wp920/final-source.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "ddac796b22a8b515561fec6d1601046b87920425536442d1dfb1a0277fc266d5"
+    },
+    "ownership": {
+      "receipt": "target/wp920/final-ownership.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "0b5e4707c2063a56578cba5bbe2554996f35c9eef63fcf8aa728f88273af04c3"
+    },
+    "evidence": {
+      "receipt": "target/wp920/final-evidence.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "82e51440e95e5b5ec81bde91102956bbdd18d241d099b2b4e14372af343dc87b"
+    }
+  },
+  "growth": {
+    "production": "Seven added/14removed formatter lines mostly boundary argument cleanup; no new algorithm/allocation. Large Dice four-line include only.",
+    "tests": "524-line cohesive sibling vs300estimate, root/review responsibility reassessment: finite two-Local module/completion helper, exact scalar/class helper, fields/scopes/cross-owner priority and combined source/mapping lifecycle. Caller correction keeps strong full blocks and typed negative. No corpus/new source assets, copied graph or helper API."
+  },
+  "timing": {
+    "compile_seconds": 24.864972577197477,
+    "recorded_runtime_seconds": 3.0087974598864093,
+    "observed_since_recorded_start_seconds": 1687.4577265359694,
+    "start_qualification": "Start recorded after packet selection and initial discovery; not whole-packet walltime.",
+    "review_seconds": "not independently measured"
+  },
+  "successor": {
+    "packet": "WP-7-220-m7a-public-compile-query-correspondence-r1",
+    "basis": "No further proven mnemonic-family/query-guard gap in bounded savedgraph/source scan. Existing published public cc_common.compile command/ownership/source/configuration/fresh-overlay controls are separate from WP918 restricted constructor/query proof. Inspect actual Default/Unix policy and prove normal public producer-to-query correspondence without guessed callback/family activation.",
+    "source_note": "target/wp920/successor-source.md"
+  },
+  "remaining": "Original64KiBpostdrop memory refusal and bounded cache/transport qualification persist; unique/history/whole-workload fit unknown. Focused child maximum118276KiB is not whole-fit evidence. Source16/17/18 spent/caps unchanged; no full-root/source/runtime/M7A closure.",
+  "operational_evidence": {
+    "directory": "target/wp920",
+    "hash_index": "target/wp920/operational-hashes.json",
+    "index_sha256": "83f39f0a716e40f6060c392034a8fba208b282aeb669f3567c5c6d1d8f531516"
+  }
+}

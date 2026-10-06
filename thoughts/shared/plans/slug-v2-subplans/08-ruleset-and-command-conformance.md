@@ -409,6 +409,17 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   and existing content-byte identity copies are explicitly retained. External
   query owners, ActionKey, execution/source/full-root/M7A and whole-memory-fit
   admission remain open; no retained pool or graph is added.
+- [WP920 external FileWrite query](wp920-external-file-write-aquery-2026-10-06.json)
+  also admits external owners already published in the same validated dependency
+  closure. Derived headers preserve the full external canonical repository prefix;
+  native labels, configured roots and action identity remain unchanged. Normal root
+  callers supply external Target/Exec owners, with four direct borrowed class blocks,
+  complete five-record generic/family Deps, source/mapping A/B/A and held-text release.
+  Standalone external BuildCommandRootKey rule requests still return the exact
+  exported-source-only refusal. Qualified68+1 union proves69 Core controls and CLI
+  compiles; no source dispatch, shared view, identity, execution or retained storage
+  changes. Actual filesystem/source-certificate replay, full-root/M7A and whole-memory
+  fit remain separate obligations.
 - [WP912 Spawn text aquery](wp912-spawn-aquery-2026-10-06.json) borrows ordinary
   typed Spawn from the same validated configured closure and preserves mixed
   FileWrite/Spawn semantic records. Unspilled retained Args, declared artifact

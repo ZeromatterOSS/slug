@@ -14000,4 +14000,8 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod file_write_executable_aquery_tests {
         include!("tests/file_write_executable_aquery_tests.rs");
     }
+
+    mod file_write_external_aquery_tests {
+        include!("tests/file_write_external_aquery_tests.rs");
+    }
 }

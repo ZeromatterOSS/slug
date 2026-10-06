@@ -31,7 +31,6 @@ pub fn format_file_write_aquery_text(
     let owner = action.owner();
     let output = action.output().root_relative_path();
     let is_executable = validate_renderable_action(
-        owner.label(),
         action.spec().mnemonic(),
         action.spec().kind(),
         action.spec().exec_group(),
@@ -122,15 +121,11 @@ pub(super) fn validate_file_write_query_context(
 }
 
 fn validate_renderable_action(
-    owner: &CanonicalLabel,
     mnemonic: &str,
     kind: &ActionKind,
     exec_group: Option<&str>,
     output: &str,
 ) -> Result<bool, &'static str> {
-    if !owner.package().repo().is_root() {
-        return Err("FileWrite aquery text requires a main-repository owner");
-    }
     if mnemonic != "FileWrite" {
         return Err("FileWrite aquery text requires the FileWrite mnemonic");
     }
@@ -201,8 +196,6 @@ mod tests {
 
     #[test]
     fn formatter_boundary_rejects_unadmitted_action_shapes() {
-        let root = CanonicalLabel::parse("@@//:write").unwrap();
-        let external = CanonicalLabel::parse("@@repo//:write").unwrap();
         let ordinary = ActionKind::Write {
             content: "content".to_owned(),
             is_executable: false,
@@ -212,27 +205,27 @@ mod tests {
             is_executable: true,
         };
         assert_eq!(
-            validate_renderable_action(&root, "FileWrite", &ordinary, None, "write.txt"),
+            validate_renderable_action("FileWrite", &ordinary, None, "write.txt"),
             Ok(false)
         );
         assert_eq!(
-            validate_renderable_action(&external, "FileWrite", &ordinary, None, "write.txt"),
-            Err("FileWrite aquery text requires a main-repository owner")
+            validate_renderable_action("FileWrite", &ordinary, None, "external/repo/pkg/write.txt"),
+            Ok(false)
         );
         assert_eq!(
-            validate_renderable_action(&root, "Other", &ordinary, None, "write.txt"),
+            validate_renderable_action("Other", &ordinary, None, "write.txt"),
             Err("FileWrite aquery text requires the FileWrite mnemonic")
         );
         assert_eq!(
-            validate_renderable_action(&root, "FileWrite", &ActionKind::Run, None, "write.txt"),
+            validate_renderable_action("FileWrite", &ActionKind::Run, None, "write.txt"),
             Err("FileWrite aquery text requires a Write action")
         );
         assert_eq!(
-            validate_renderable_action(&root, "FileWrite", &executable, None, "write.txt"),
+            validate_renderable_action("FileWrite", &executable, None, "write.txt"),
             Ok(true)
         );
         assert_eq!(
-            validate_renderable_action(&root, "FileWrite", &ordinary, Some("named"), "write.txt"),
+            validate_renderable_action("FileWrite", &ordinary, Some("named"), "write.txt"),
             Err("FileWrite aquery text requires the default exec group")
         );
     }

@@ -1,86 +1,90 @@
 # Slug V2 current work packet
 
-Packet: WP-7-219-m7a-external-file-write-query-r1
-Status: Executable FileWrite query accepted; external-owner scalar query selected
+Packet: WP-7-220-m7a-public-compile-query-correspondence-r1
+Status: External FileWrite query accepted; public compile producer/query proof selected
 
 ## Observable result and learned source
 
-Admit external-owner scalar FileWrite text query through the existing validated
-configured action closure. Saved WP905 graph SHA256
-15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c
-contains64 external FileWrites across54 labels,62 explicitly executable. This is
-saved query demand, not authentic Slug reproduction, source acquisition or execution.
-The remaining main-owner-only formatter guard is a concrete blockage; do not infer
-standalone ArgsWrite or CppLink/Archive gaps from mnemonic counts.
+Prove correspondence from the existing normal public cc_common.compile producer to
+accepted typed CppCompile text query. WP918 has a genuine restricted constructor/query
+fixture; normal public compile command/owner controls exist separately in Analysis
+rustc_map_each/compile_context/command_expansion.rs. The three published command,
+source/configuration restoration and fresh-overlay selectors are the next concrete
+producer proof gap, not a reason to activate a guessed mnemonic family. Saved WP905 has
+three CppCompile rows; ArgsWrite/ParameterFileWrite/TemplateExpand and paramFiles rows
+are absent. CppArchive/CppLink/CopyFile can be ordinary Spawns. No new %input or Rustc
+resource callback demand was proved by the bounded current source scan.
 
-Pin Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a FileWriteAction,
-AbstractFileWriteAction, Artifact and AbstractAction/text callback; reuse WP919 class,
-progress, Unicode and empty-info source proof. Resolve external artifact root-relative
-prettyPrint and retained canonical owner-label presentation before activation.
-Compatibility: exact class/header/field algorithms in the admitted default Unix scalar
-query slice, with existing Slug-native canonical external label/configuration/path/action
-identity domains. Contents flags, ActionKey, Windows breadth and broader classes deferred.
+Reuse pinned Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a WP918 CppCompileAction
+class/input/env/options/info source proof and existing public producer contracts. First
+inspect actual published context, roles/root/configuration and selected-platform policy:
+prove they fit the admitted Default Unix/no-paramfile/no-discovery query slice. If they
+do not, name the concrete owner prerequisite before activation; never fabricate selected
+facts or relax query guards to fit a fixture. Exact class algorithms apply within that
+slice; canonical labels/configuration/paths/order/action identity stay Slug-native.
+ActionKey, discovery/execution, Windows breadth and authentic full-root comparison deferred.
 
 ## Owners, scope and allocation
 
-Normal BuildAPI Write owns content/boolean/output; immutable configured context owns
-canonical external owner and selected raw/effective platform. Existing private publication
-binds output bin root to configured consumer, and FileWriteSemanticIdentity already
-encodes external owner/config/path/content/bit facts. Borrow those owners; lift only
-main-owner presentation refusal after source/design review. Shared views, structural
-identity/equality/invalidation, root validation, REAPI and execution are unchanged.
-Read DICE docs before any actual key/ownership/lock change; such a change needs a named
-reviewed prerequisite rather than an incidental formatter repair.
+Retained public CppCompileSpec and configured action context own source/object/dotd,
+mandatory/cache/declared-header input roles, borrowed compiler tool, variables/features,
+recipe requirements and selected raw/effective platform. Existing options-only encoder,
+full input identity union and configured context view consume these owners. No copied
+query recipe, side registry, inferred root, new retained key/cache/interner/graph or API.
+Borrow paths/context, use existing scoped producer interning, transfer printable Source
+storage where current visitor permits; unique identity/option/display scratch stays
+within one action and final text owns its bytes. Existing mandatory visitor loans need
+some Source identity copies; preserve that cost qualification. No global pool, async
+scratch borrowing, zero-copy or workload-memory-fit claim. Shared identity/equality,
+publication, discovery, REAPI and execution remain unchanged. Read DICE documentation
+before any real ownership/key/locking change; a prerequisite needs reviewed scope.
 
-No retained data/key/cache/interner/graph, source copying or new pool. Borrow scalar paths
-and context, existing scoped interning remains producer-owned. Existing display/native
-identity encoding needs action-local label/token/binary scratch, including existing
-content-byte copies. Unicode/progress Cow owns only necessary escaped/replaced bytes;
-final query String is independent and scratch releases within each action. Unique temporary
-strings are not globally interned. Preserve bounded allocation qualification and original
-64KiB postdrop refusal; no whole-workload memory-fit/performance claim.
+Allowlist: existing Core runtime/tests/cpp_compile_aquery_tests.rs coherent producer/query
+fixture, or one small sibling cpp_compile_public_aquery_tests.rs plus Dice INCLUDE only
+if a responsibility split improves reuse. Choose the exact test-owner/helper boundary in
+the concrete contract before edit; reuse existing original source/helper bodies by
+reference, no copied corpus or duplicate registry/materialization fixture. Default
+production estimate0; no formatter/API/BuildAPI/Analysis changes without an observed,
+reviewed prerequisite. Tests estimate<250 new lines over reused helpers; larger growth
+is a responsibility review trigger. Root owns contract/activation/compile/integration/
+commit; useful parallel source/ownership/evidence DESIGN and FINAL reviews. Operational
+area target/wp921. No new external oracle without named existing source-evidence gap.
 
-Allowlist: Core runtime/file_write_aquery_text.rs main-owner guard and directly affected
-boundary test; small runtime/tests/file_write_external_aquery_tests.rs plus Dice INCLUDE
-only; existing normal repository/mapping/materialization fixture helpers by reuse. Any
-additional helper owner must be named and independently reviewed before edit. No loading,
-source policy, registry semantics, provider publication, path transport, execution, identity
-or arbitrary root reconstruction. Production estimate<20/new fixture<300lines; growth is
-reviewed at natural responsibility boundaries, no algorithm enters large Dice. Operational
-target/wp920. Root owns scheduling/integration/compiles/commit, three useful independent
-source/ownership/evidence workers, DESIGN before activation and FINAL actual diff/evidence.
+## Evidence and validation
 
-## Evidence, validation and decision boundaries
+Keep original published public compile assertions, normal source/registry/materialization
+provenance and existing Core query controls. Add the smallest normal public constructor
+callsite with nonvacuous typed C/C++/PIC actions, main/external configured owners where
+existing callers admit them, Target/Exec complete class blocks, original header/input-role
+union/object/dotd/command/fixed-env/recipe-last info, exact semantic owner/root/pointer
+checks and mixed declaration/literal/deps order where selected. Use source/configuration
+A/B/A on one DICE engine and hold original result/recipe; query fresh overlays must not
+mutate original dotted caches. Release outcomes/views/options/identity/spec snapshots and
+engine before checking final owned text. Preserve unsupported policy/path/kind/root and
+all-owner structural-before-render controls, with impossible states source-qualified.
+No compiler or build-script executes; source16/17/18 spent/caps and actual-source refusal
+remain. Existing single external BuildCommandRootKey requests accept exported sources,
+not rules; use admitted root dependencies or actual existing Analysis producer callers,
+never a fabricated external requested evaluation.
 
-Inspect normal external caller, request mapping and materialized source fixtures before
-selecting the smallest finite genuine Write producer. Establish real private external
-publication/root-consumer binding, false/true Target and Exec complete blocks, root label
-controls unchanged, literal/deps configured owner/action order and independent owned text.
-Use observed source/mapping A/B/A through the same DICE engine and hold old results. Retain
-existing kind/group/path/context/platform/all-owner-before-render priorities; construct only
-normal supported metadata or explicitly source-qualify inaccessible branches. No synthetic
-Ready/identity or parser normalization. No actual build-script/compiler action executes.
-Normal ASCII json.decode may produce genuine Unicode for constructor coverage; literal
-BazelInternal source bytes are not arbitrary Unicode scalars.
-
-Compile separately pinned rustup-resolved offlineJSON<=60sTERM3 defaultCLI and Core
-no-run/jobs1 established four-packageopt0debug0. Fresh exact nonignored preflight and
-minimal serial10sTERM3 runtimes; reuse WP91967 and add only discriminating new gates.
-No concurrent Cargo/shared target or ancestor-sensitive fixtures. Reuse source proof;
-no external oracle without a named evidence gap, no source16/17/18 retry. Correct only
-attributed missing gates, preserve failures/nonstale passes. fmt/diff/archive/status,
-compact acceptance receipt and root commit. REPLAN if lifting the presentation guard
-requires new external publication/identity/execution/source semantics. Full-root/M7A,
-authentic source/runtime and whole-workload memory fit remain open. Linux priority;
-Windows minimal unsupported functionality is sufficient.
+Resolve pinned rustup cargo/rustc/rustdoc/rustfmt; separate offlineJSON<=60sTERM3 no-run
+for each changed test owner/direct dependent. Core uses established jobs1 four-package
+opt0debug0 invocation; keep profile edits out of checkout. DefaultCLI compile only if
+production path changes; named Analysis direct producer gates when helper/publication
+is exercised. Fresh exact nonignored selector preflight, minimal serial10sTERM3 runtime,
+no concurrent Cargo/shared target or ancestor-sensitive native fixtures. Reuse nonstale
+passes and run only missing gates after attributed correction. fmt/diff/archive/status,
+compact receipt and local rootcommit. Full-root/M7A/source/runtime and whole-memory-fit
+remain open; Linux priority and Windows minimal unsupported policy persist.
 
 ## Immediate predecessor
 
-[WP919](wp919-executable-file-write-aquery-2026-10-06.json) accepts borrowed false/true
-main-owner scalar FileWrite fields, Writing script/file, sequential progress replacements,
-Exec suffix and Unicode Outputs with raw headers and concrete empty environment/info.
-Private query-only context guards preserve shared execution views. All67 distinct Core
-controls pass by qualified65+1+1 union, defaultCLI compiles and three FINAL reviews accept.
-Normal JSON-produced Unicode fixes fixture representation without relaxing parser/producer;
-complete FilesToRun eight-record deps replaces the prior executable refusal. No retained
-pool or execution/source/full-root/M7A/whole-memory-fit admission.
+[WP920](wp920-external-file-write-aquery-2026-10-06.json) lifts only the main-owner
+presentation refusal for scalar FileWrite in validated dependency closures. Existing
+borrowed owners retain full Derived external prefixes and native label/config/path/token
+facts. Genuine rootcaller/wrapper provide external Target/Exec, four direct borrowed
+blocks and complete five-record generic/family Deps, source/mapping A/B/A and held release.
+Standalone external rule requests retain the exact exported-source-only negative.
+Qualified68+1 union proves69 Core controls, CLI compiles and three FINAL reviews accept.
+No source dispatch/shared view/identity/execution or retained storage change; no
+filesystem/source-certificate/full-root/M7A/whole-memory-fit admission.
