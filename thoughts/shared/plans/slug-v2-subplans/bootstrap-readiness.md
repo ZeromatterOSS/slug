@@ -498,9 +498,26 @@ accept this private GNU/Linux domain. Capture-time IO/finite render-error propag
 is source-only; no executed-negative claim.8236 stack bytes and shared original
 owners add no status-body/catalog/whole-string copy or global pool; original metadata
 header retention and full-workload-fit limits remain explicit. Header output-file
-publication, generic action chains and cache/REAPI remain unproved.
-Execution and raw projection/materialization paths for these descriptors/transforms
-remain closed; pure rendering does not establish whole-workload memory fit.
+publication was not admitted by WP928.
+[WP929](wp929-native-build-info-header-publication-2026-10-06.json) now accepts the
+private genuine-current native Info/Version header write at the original configured
+output. Complete physical bytes/paths/Ordinary versus Constant metadata/0444,
+configuration/source A/B/A, original one-use phase grants, real retry/abort/13mutation
+faults including actual rename EACCES, held-cell six-FD retirement and final Weak
+release pass in one current55-test batch, with default CLI and three FINAL reviews.
+The result shares the actual consumed header, using existing original Arc/interner
+owners and borrowed body/path scratch. Checked2MiB admission covers the pinned
+ordered recipe's1,405,044-byte conservative bound; pure worst-marker output is
+1,400,909bytes. Original precomputed/renderer overlap and9,260-byte conservative
+stack scratch remain accounted, with no whole-workload memory-fit claim.
+Status/revision may already change before header failure; conditional Drop unlink
+can leave owned scratch under a readonly parent. Generic action chains/cache/REAPI,
+other IO faults, external writers and Windows remain qualified or deferred.
+Saved WP905 artifact edges give all four TranslateBuildInfo outputs zero consumers;
+this closes a declared capability, not a demonstrated default CLI dependency.
+Further header/C++ execution needs concrete requested-root demand.
+Generic execution and raw projection/materialization paths for these descriptors/transforms
+remain closed; bounded producer evidence does not establish whole-workload memory fit.
 Native filegroup forwarding supplies the nested configured srcs/FilesToRun
 prerequisite used by the four implicit tool dependencies, preserving real file,
 runfiles and output-group providers and selected target/exec ownership. It does

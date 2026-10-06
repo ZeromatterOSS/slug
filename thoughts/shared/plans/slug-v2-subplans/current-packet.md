@@ -1,121 +1,99 @@
 # Slug V2 current work packet
 
-Packet: WP-7-228-m7a-native-build-info-header-publication-r1
-Status: Physical status inputs accepted; actual checked header output publication selected
+Packet: WP-7-229-m7a-effective-compiler-argument-reconciliation-r1
+Status: Native header capability accepted; recorded compiler argument reconciliation selected
 
 ## Observable and source basis
 
-Publish the independently owned header from genuine current physical-status consumption
-into that same retained BuildInfo action's declared configured output. This closes the
-finite TranslateBuildInfo producer's missing observable write, without generic action
-planning/Cpp/cache/REAPI or CLI activation. Root freezes concrete output/permit/seal,
-resource and partial-failure protocol and exact allowlist with three DESIGN reviews
-before code (operations WP929).
+Return to priority1's recorded declared Rustc input closure. Reconcile the ordered
+child arguments of all513 recorded Rustc owners in the1385-action root0 artifact
+closure:511 native wrappers and two bootstrap shell wrappers, with216 argument-file
+consumers and297 direct-only owners. Preserve1167 ordered bindings to201 shared
+decoded vectors (2089 observed bytes,39 nonempty). Close only source-proved literal,
+order, cfg and provenance classifications;
+report runtime-context and nested-file dependencies explicitly. The WP905 graph and
+WP911 byte/parser receipts are historical pinned observations, not current source
+freshness, executed compiler argv, Cargo host-role equivalence or Slug runtime fit.
+No reread/acquisition/build/query is required to consume the saved token vectors.
 
-Immutable Bazel9.2 8220c6198837d5c13d53fea211cf3282aa12408a:
-BuildInfoFileWriteAction99–103/118–184 reads selected physical status, executes the
-ordered callback and expands retained template to actual primary output with
-makeExecutable(false); LocalTemplateExpansionStrategy48–59/75–85 supplies Latin1
-bytes/executable policy and ordered literal substitution. Actual builtin
-bazel_cc_build_info.bzl supplies Info/Version callbacks and retained output names.
-[target/wp928/successor-source.md](../../../../target/wp928/successor-source.md) pins
-file hashes, exact current owners and gaps. Exact admitted physical/header bytes,
-callback order and nonexecutable output; Slug-native structural configured paths,
-readonly0444 staging and native source/revision/filesystem sequencing. Windows
-Unsupported; no Bazel exact inode/mode/cache dirtiness or arbitrary callback parity.
+Use the pinned cached rules_rust process_wrapper options.rs/util.rs and WP911 source
+interpretation, with immutable source pins and source-derived regression controls.
+[The successor source note](../../../../target/wp929/successor-source.md), SHA256
+435f8e39554ed0671fff5e68e29370e80864b4b5096740efdac5e0be00f05196, pins the exact
+source/observation owners. Ordered literal substitution follows append preparation; RHS exactly ${pwd}/${output_base}/${exec_root}
+depends on runtime cwd/canonicalization. Never fill these from an invented checkout,
+path spelling, current host cwd or another action's configuration. A symbolic/path-domain
+classification is qualified metadata, never exact historical absolute bytes or a new
+semantic identity. Bootstrap shell semantics are separate: physical pwd and first
+occurrence replacement, not native replace-all. Generated script bytes remain qualified.
+Keep normal library/proc-macro/run-script/tool/root roles and
+isTool separate. Unsupported source/context cases stay unknown rather than guessed.
+Exact claims cover only source-defined transformations over pinned supplied tokens;
+Slug-native inventory/domain classifications carry explicit provenance and unknowns.
+Historical absolute runtime argv/environment, current freshness and production execution
+remain unsupported/deferred by this packet.
 
-## Owners and completion/publication protocol
+## Owner, scope and allocation
 
-Reuse NativeBuildInfoFileInputsRoot/ConsumedBuildInfo and original actual configured
-action/context/output/role/catalog/capture/full source frontier. No arbitrary held
-header/receipt constructor, fake output/generating action, path-derived configuration,
-Source/source-image authority or new DICE key/cache. Original immutable metadata/root
-witnesses must guard completion/effects and current produced header association. Held
-historical data or a replacement/copy of visible terminal metadata/result must never
-mint a current header write. Same one-use error-exhaustion contract across clones.
+This is a bounded source-supplied inventory/comparator step, with no Slug production,
+DICE key, execution grant, interner or runtime change. Reuse exact action/artifact IDs
+within the pinned saved graph and original decoded file vectors by shared index;
+preserve consumer occurrence/order instead of duplicating every generated path/body.
+Process temporary argument state per consumer and retire it before the next. Borrow
+existing decoded strings where possible; retain only compact classifications/provenance
+and explicit unknowns. Do not globally intern unique tokens, clocks or temporary paths.
 
-Use ConfiguredOutputOwner::stage_output_subset with the actual singleton output and
-reservation, preserving full structural configuration/projection ownership and
-Ordinary Info/Constant Version metadata. Scalar create_file owns the real output.
-Generic WorkspaceStatus/BuildInfoTransform/Constant planner guards remain closed;
-Version publication does not admit Constant action-cache dirtiness.
+Root first freezes the smallest operational parser/classifier against the source
+note and accepted WP911 helper. Exact allowlist: ignored target/wp930/analyze.py,
+controls.py, bounded operation/result/hash records; canonical/current/bootstrap and
+one compact acceptance receipt. No new tracked production API/helper is justified.
+New operational helper roughly200–350lines and controls100–200 are review triggers,
+not automatic stops. No Rust/Analysis/BuildAPI/loading/source acquisition,
+input image/planner/backend/cache/CLI, generated .expanded writes or corpus expansion.
+Any production prerequisite discovered is selected separately, not silently activated.
 
-Existing action_output_staging/linux.rs::seal_file unconditionally chmods0555, so a
-narrow private scalar nonexecutable seal policy is required. A pre-seal caller chmod
-is insufficient. Freeze typed private0444 scalar behavior while preserving existing
-generic/tree/runfiles defaults, exact output identity and protected staging tests.
-No public/general mode override or unrelated stager refactor.
-
-Preferred current protocol: selected physical consume and header stage/write/seal/
-publish occur within the same synchronous current-source finalization callback using
-original completion-issued grant. No postcommit DICE/await, second status sample,
-precomputed metadata.header as physical output or fresh input registry. Borrow the
-actual independently owned header Vec once to disk; retain that same Vec in the
-result. Freeze whether empty output resources/preflight are prepared before status
-writes, or sequential status-consume-header explicitly permits later partial failure.
-Current single stager preflight is not a cross-stage transaction. Require no accepted
-header result on any failure, unchanged accepted snapshot and explicit already-changed
-status/header/revision attribution; no rollback or external-writer exclusion claim.
-Source/version retry before the callback must retire provisional resources without
-any visible status/header publication.
-
-## Allocation and scope checkpoint
-
-Reuse existing original Arc/Dupe graph, normalized/configured paths, descriptors and
-canonical label/configuration string/interner owners. Header scratch/stages/receipts
-belong to native phase/result memory outside DICE history. Charge original precomputed
-header, actual header Vec, staged disk body and exact simultaneous FD/scratch peak.
-No extra header/status/catalog/map/whole decoded String copy or global unique temp/
-clock pool. Existing local temp strings retire with staging. Bound header growth from
-actual selected recipes/templates and ordered substitution, including markers introduced
-by earlier HOST/USER values; status+template length alone is not a valid bound. Freeze
-checked finite bound/refusal before additional publication resources; preserve exact
-replacement semantics rather than escape/reorder values. Small fixtures/FD counts do
-not establish aggregate heap/RSS fit. Prior memory refusal/profile/resource caps,
-source16/17/18 spent attempts and old unproved offline BCR fixture persist.
-
-Likely allowlist to freeze after inspection: new runtime/build_info_header_publication.rs;
-minimal private current physical root delegation/accessors; configured_output.rs only
-if needed for narrowly typed scalar staging; action_output_staging.rs and linux.rs for
-private nonexecutable sealing; dice.rs registration only; one new nested test sibling
-and include reusing WP925–928 finite Local/catalog/action fixtures; canonical/current/
-Stage6/bootstrap and compact receipt. No Analysis/BuildAPI/source acquisition/image/
-transport/backend/cache/generic planner/CLI changes. Inspect exact responsibilities and
-growth before code; estimates new private production350–600 plus<=100owner glue,
-focused tests500–800 are review triggers, not permission stops. If current owners cannot
-preserve original output/request/source semantics, resolve that precise prerequisite
-before DESIGN; routine invocation/compiler/fixture corrections stay in packet.
+Preserve explicit memory and operation caps. Offline inventory runtime10s TERM3,
+512MiB address space/256MiB RSS; each saved input<=16MiB and final compact report<=4MiB,
+checked before parsing/encoding, with incremental ordered output hashes and per-action
+scratch retirement. Record peak/retention for this actual saved workload. No silent
+cap increase, fresh source16/17/18 attempt or registry/BCR retry. A small parser control does not establish
+whole-workload fit. Current Linux priority and minimal Windows Unsupported remain.
 
 ## Discriminators and acceptance
 
-Both Info/Version complete physical-input-derived header files must use the actual
-retained configured paths, metadata and nonexecutable mode, with independent full
-expected bytes. Different configurations and source A/B/A, introduced-later-marker
-order/resource refusal, copied/stale/foreign/current result bindings and clones must
-retain provenance. Source/version retry grants no early file write. Output root/name/
-link/type substitution must refuse; later stage/write/rename failure retains typed
-partial qualification and previous accepted snapshot. Actual stage/held-clone FD
-retirement and final original/header owners release. Reuse protected current44
-physical/status/source/finalizer/staging controls, including genuine pending DICE
-cancellation; do not retry the uncached bare BCR guard.
+Test direct-plus-appended vector order, repeated/shared files, option/value context
+across boundaries, literal ordered substitutions and introduced-later markers,
+special RHS context dependencies, unchanged/self-valued mappings, malformed repeated
+and single flag shapes, empty/missing/unknown values, direct executable transformation,
+bootstrap first-versus-all replacement, optional unstable-feature insertion/suppression,
+nested @ demand and cfg/check-cfg syntax. Preserve full original cfg payloads
+and distinguish unresolved path tokens from active named features. Unknown substitutions
+cannot authorize a complete argv/feature-absence claim. Assert per-owner action/artifact
+provenance, configuration/role association and exact conserved bindings/counts; do not
+infer Cargo host semantics or current filesystem freshness from saved dump IDs.
+Recompute the source note's literal-only residual occurrences (output_base513/pwd556/
+exec_root513) by exact owner/token provenance, without treating counts as semantics.
+The466 env-file declarations establish no effective environment bytes/claim.
 
-Serial pinned offlineJSON prep<=60s TERM3 jobs1 with existing explicit heavy-owner
-profile overrides, default CLI compile dependent, exact current nonignored preflight
-and serial10s TERM3 gates with2s lifecycle cleanup. Fmt/diff/archive/plan checks,
-three FINAL reviews, compact evidence/local commit. No actual binary/oracle/network/
-JVM/platform growth without a demonstrated gap. Full-root/M7A/whole-workload fit stays
-open. No performance savings claim without representative measured acceptance.
+Use source-derived controls and one bounded recorded-workload reconciliation; independent
+source/evidence review of the concrete helper and claims, source/diff/archive/plan checks,
+compact receipt/local commit. No Cargo required without a Rust change. A parser/context
+failure is corrected within this owner; a missing runtime historical-context fact remains
+an explicit boundary or source-ready next decision, not permission for ambient inference.
+M7A/full-root/whole-workload fit and authentic Slug execution remain open.
 
 ## Immediate predecessor
 
-[WP928](wp928-native-workspace-status-file-inputs-2026-10-06.json) accepts private
-original-request physical status correspondence and actual checked header bytes. All44
-current Core controls (39protected+5new), default CLI and three FINAL reviews pass.
-Actual scratch/full-byte/independent both-header/configuration proof, immutable metadata/
-root/capture bindings, error-exhausted one-use clones, old/current receipts, nine physical
-mutations, real source retry/normal abort/partial/read refusal and four-FD/Weak final
-release are proved. Capture-time IO/finite render-error propagation is source-only.
-Four receipt FDs and8236 stack scratch add no status/catalog/global-string owner;
-original precomputed header/graph remain retained. Partial revision/filesystem mutation,
-unclaimed scratch on identity/keep/unlink IO and external filesystem races remain
-qualified. Header output publication/generic action-chain/cache/full-fit stay separate.
+[WP929](wp929-native-build-info-header-publication-2026-10-06.json) accepts actual
+current native physical-status-derived Info/Version header writes at original
+configured singleton outputs. All55 current controls, default CLI and three
+FINAL reviews pass. The accepted result shares the same consumed header, no additional
+body copy/interner.2MiB checked admission covers the1,405,044-byte conservative bound;
+actual source-derived pure worst case1,400,909bytes. Source-proved12FD peak and9,260byte
+lexical scratch remain qualified. Original precomputed/renderer bodies remain retained.
+Actual rename EACCES closes all6header-stageFDs even through held cells, but readonly
+parent unlink can leave owned scratch; revision/status may already change on later error.
+Saved WP905 has zero consumers of all four TranslateBuildInfo outputs and no demanded
+C++ execution gap from those mnemonic rows. Further header/C++ integration therefore
+requires explicit requested-root demand. Historical freshness/memory/source attempt
+limits and the old unproved offline bare BCR guard persist.

@@ -3189,6 +3189,9 @@ mod build_info_template_inputs;
 #[path = "build_info_file_inputs.rs"]
 mod build_info_file_inputs;
 #[allow(dead_code)]
+#[path = "build_info_header_publication.rs"]
+mod build_info_header_publication;
+#[allow(dead_code)]
 #[path = "build_info_native_inputs.rs"]
 mod build_info_native_inputs;
 #[allow(dead_code)]

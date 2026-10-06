@@ -22,6 +22,11 @@ pub(super) struct NativeBuildInfoFileInputsTerminal {
     permit: Option<Arc<Mutex<Option<ReadPermit>>>>,
     pub(super) consumed: Option<Arc<ConsumedBuildInfo>>,
 }
+impl NativeBuildInfoFileInputsTerminal {
+    pub(super) fn original(&self) -> &Arc<BuildInfoNativeInputs> {
+        &self.original
+    }
+}
 // The slot is shared by terminal clones; grants themselves cannot be cloned.
 enum ReadPermit {
     Prepared(Arc<BuildInfoNativeInputs>),
@@ -42,7 +47,10 @@ impl NativeBuildInfoFileInputsRoot {
             origin: Arc::new(WorkspaceStatusPublicationRoot(key)),
         }
     }
-    fn check_original(&self, terminal: &NativeBuildInfoFileInputsTerminal) -> io::Result<()> {
+    pub(super) fn check_original(
+        &self,
+        terminal: &NativeBuildInfoFileInputsTerminal,
+    ) -> io::Result<()> {
         if !Arc::ptr_eq(&self.origin, &terminal.origin)
             || !Arc::ptr_eq(&terminal.original, &terminal.publication.inputs)
         {

@@ -185,6 +185,46 @@ impl ActionOutputStaging {
             Err(unsupported())
         }
     }
+    /// Private singleton header policy; generic/tree/runfiles sealing stays executable.
+    pub(super) fn seal_nonexecutable(
+        &mut self,
+        workspace: &slug_workspace_v2::NormalizedAbsolutePath,
+        expected: &[u8],
+    ) -> io::Result<()> {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            self.inner
+                .seal_nonexecutable(&self.outputs, workspace, expected)
+        }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            let _ = (workspace, expected);
+            Err(unsupported())
+        }
+    }
+    pub(super) fn publish_nonexecutable(
+        &mut self,
+        expected: &[u8],
+    ) -> io::Result<PublishedActionOutputs> {
+        #[cfg(all(target_os = "linux", target_env = "gnu"))]
+        {
+            self.inner.check_scalar_bytes(&self.outputs, expected)?;
+            self.publish()
+        }
+        #[cfg(not(all(target_os = "linux", target_env = "gnu")))]
+        {
+            let _ = expected;
+            Err(unsupported())
+        }
+    }
+    #[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+    pub(super) fn scalar_raw_fds(&self) -> [i32; 6] {
+        self.inner.scalar_raw_fds()
+    }
+    #[cfg(all(test, target_os = "linux", target_env = "gnu"))]
+    pub(super) fn scalar_stage_name(&self) -> &str {
+        self.inner.scalar_stage_name()
+    }
     fn preflight(&self) -> io::Result<()> {
         #[cfg(all(target_os = "linux", target_env = "gnu"))]
         {

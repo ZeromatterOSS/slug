@@ -921,3 +921,9 @@ fn native_file_inputs_source_retry_aborts_partial_reads_and_publication_errors_g
     );
     revoked(&runtime);
 }
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+mod header_publication {
+    use super::*;
+    include!("build_info_header_publication_tests.rs");
+}

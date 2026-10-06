@@ -34,35 +34,39 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-228-m7a-native-build-info-header-publication-r1
-Status: Physical status inputs accepted; actual checked header output publication selected
+Packet: WP-7-229-m7a-effective-compiler-argument-reconciliation-r1
+Status: Native header capability accepted; recorded compiler argument reconciliation selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects native publication
-of the actual physical-input-derived header into its retained configured output.
-Root freezes nonexecutable scalar sealing, original current grant/output binding,
-ordered-substitution resource bounds and partial-failure sequencing with three DESIGN
-reviews before code. [WP928](./slug-v2-subplans/wp928-native-workspace-status-file-inputs-2026-10-06.json)
-accepts genuine readonly physical status consumption and independent checked headers.
-All44 current Core controls (39protected+5new), default CLI and three FINAL reviews
-pass; capture/render IO errors remain source-only propagation proof. Error-exhausted
-clones, historical/current receipt refusal, actual source retry/partial/read failure
-and four-FD/Weak release pass. Original owners/interner use and8236 stack scratch avoid
-new status/catalog/whole-string copies; original precomputed header/graph remain
-retained. Linux readonly regular/no-link sequencing, partial revision/filesystem mutation
-and IO orphan/race qualifications persist. Header-file publication, generic execution/
-cache/REAPI, full-root/M7A/whole-workload fit and prior memory/resource/source16/17/18
-limits remain open; old unproved offline bare guard persists.
+The [current manifest](./slug-v2-subplans/current-packet.md) returns to priority1's
+recorded Rustc closure. It selects bounded offline reconciliation of all513 compiler
+argument streams, with native versus bootstrap wrapper semantics,201 shared recorded
+vectors, ordered substitutions and explicit historical runtime-path/context boundaries.
+Saved declarations and bytes do not prove current source freshness, actual execution,
+effective environment, Cargo host-role equivalence or whole-workload fit. No acquisition,
+source16/17/18 or registry retry is selected.
+[WP929](./slug-v2-subplans/wp929-native-build-info-header-publication-2026-10-06.json)
+accepts genuine current physical-status-derived Info/Version header publication into
+original configured outputs. All55 current tests, default CLI and three FINAL reviews
+pass. Original one-use metadata/root grants, full bytes/metadata/0444, source/configuration
+A/B/A, real retry/abort/rename failure and six-FD/Weak release are covered. The result
+shares the actual header with no added body copy/interner; original precomputed/renderer
+retention,2MiB admission,12FD peak and9,260-byte conservative scratch remain explicit.
+Partial status/revision changes, IO orphans/races and Windows Unsupported remain qualified.
+The saved root graph consumes none of the four declared headers; more header/C++ execution
+requires concrete requested-root demand. M7A/full-root/whole-workload fit, generic
+execution/cache/REAPI, prior memory/source limits and the unproved bare guard stay open.
 
 ### Ready and blocked queue
 
-The current packet selects actual checked header output publication under priority3; the remaining
-priorities stay queued until their concrete prerequisites and owners are ready.
+The current packet selects the recorded compiler argument gap under priority1. Declared
+header/C++ capabilities do not select execution without requested-root demand; the
+remaining priorities stay queued until concrete prerequisites and owners are ready.
 
 | Order | Result | State / dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
+| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; current packet reconciles saved ordered compiler arguments; runtime context/current freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects actual checked header output publication; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | native header producer accepted with zero saved root consumers; demanded execution rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

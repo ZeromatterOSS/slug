@@ -543,9 +543,29 @@ owner or string interner. Original precomputed header/graph remain intentionally
 retained. All44 current Core controls (39 protected+5 new), default CLI and three
 FINAL reviews pass. Capture-phase IO and finite renderer errors are source-only
 propagation proof; actual source retry/abort, partial rename, physical mutations/read
-refusal and four-FD/Weak release pass. Header-file publication remains deferred.
+refusal and four-FD/Weak release pass. Header-file publication was separate from WP928.
+[WP929](wp929-native-build-info-header-publication-2026-10-06.json) completes that
+private native producer by publishing the actual physically rendered header into its
+original configured singleton File. Original metadata/physical-root issuance and
+completion-owned ConfiguredOutputOwner bind one-use grants; errors spend clones and
+retire staged descriptors even through held scratch cells. The result shares the same
+actual consumed header Arc. A private scalar policy compares complete borrowed bytes,
+staged/prior fingerprints and current roots/names, sealing new headers0444 while
+preserving generic0555/tree/alias/runfiles policy. Complete Info/Version bytes,
+Ordinary/Constant metadata, two configurations/source A/B/A, source retry/abort,
+13 filesystem faults including actual rename EACCES and six-FD/Weak release pass.
+All55 current controls, default CLI and three FINAL reviews accept this Linux slice.
+The genuine catalog's ordered marker expansion is conservatively bounded1,405,044bytes
+under2MiB; the pure complete1,400,909-byte worst case is separate from a current grant.
+No additional body copy/interner is added; original precomputed and renderer bodies
+remain, with12FD peak and9,260-byte conservative lexical scratch. Status/revision may
+already change before later failure; readonly-parent unlink may leave owned scratch,
+and other unexecuted IO branches remain source-only. Whole-workload fit stays open.
+The saved WP905 root graph has no consumer of these four declared headers, so this
+capability does not prove an executable bootstrap dependency or select more header
+integration work by itself.
 Nondefault status policies/epoch, volatile cache/invalidation, arbitrary or Java callbacks,
-BuildInfo/action-chain execution, installed module tools and full cc_toolchain stay deferred.
+Generic BuildInfo/action-chain execution, installed module tools and full cc_toolchain stay deferred.
 Source-target analysis now classifies builtin catalog Files through the tracked
 repository route and existing immutable source key, propagating catalog/type/hash
 errors. This is distinct from filesystem acquisition: no host path or metadata is

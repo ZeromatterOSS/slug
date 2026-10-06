@@ -37,6 +37,7 @@ use crate::runtime::native_output_file::identity;
 
 mod alias;
 mod runfiles;
+mod scalar;
 mod source_backing;
 pub(super) use runfiles::validate_runfiles;
 pub(super) use source_backing::SourceBacking;
@@ -140,6 +141,8 @@ impl Destination {
                 temp.keep();
                 break (file, name, owned);
             } else {
+                // Identity is the cleanup authority, including before keep().
+                builder.disable_cleanup(true);
                 let temp = builder.tempfile_in(fd_path(&parent))?;
                 let name = temp
                     .path()
@@ -148,13 +151,17 @@ impl Destination {
                     .to_str()
                     .unwrap()
                     .to_owned();
-                if reserved.contains(name.as_str()) {
-                    continue;
-                }
                 let owned = Entry {
                     identity: identity(temp.as_file())?,
                     kind: SFlag::S_IFREG,
                 };
+                if reserved.contains(name.as_str()) {
+                    if entry(&parent, &name)? != Some(owned) {
+                        return Err(io::Error::other("reserved output stage changed"));
+                    }
+                    unlinkat(&parent, name.as_str(), UnlinkatFlags::NoRemoveDir)?;
+                    continue;
+                }
                 let (file, _) = temp.keep().map_err(|error| error.error)?;
                 break (file, name, owned);
             }
@@ -206,6 +213,7 @@ pub(super) struct Staging {
     attempted: bool,
     runfiles: Option<runfiles::RunfilesTopology>,
     alias: Option<String>,
+    scalar: Option<scalar::SealedScalar>,
 }
 impl Staging {
     pub(super) fn new(
@@ -260,6 +268,7 @@ impl Staging {
             attempted: false,
             runfiles: None,
             alias: None,
+            scalar: None,
         })
     }
     fn destination(
@@ -391,6 +400,7 @@ impl Staging {
             ));
         }
         self.check_alias()?;
+        self.check_scalar(outputs)?;
         self.preflight(outputs)
     }
     pub(super) fn publish(&mut self, outputs: &[ActionOutput]) -> io::Result<()> {

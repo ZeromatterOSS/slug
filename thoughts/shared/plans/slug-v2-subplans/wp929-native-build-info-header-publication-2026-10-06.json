@@ -1,0 +1,278 @@
+{
+  "packet": "WP-7-228-m7a-native-build-info-header-publication-r1",
+  "date": "2026-10-06",
+  "status": "accepted",
+  "baseline": "98adb7bc7f91e2c206a2b1fa28b5b887a6f88e48",
+  "result": "Genuine current native physical-status consumption publishes complete Info/Version headers into the retained configured singleton File output, sharing the actual consumed header owner.",
+  "contract": {
+    "path": "target/wp929/design.md",
+    "sha256": "b1a9c79a00d6e0816e58654d806c2de91c06ab7c4f40bedcfa5968b58be147d7"
+  },
+  "accounting_correction": {
+    "path": "target/wp929/static-account.md",
+    "sha256": "156363374994339fa7c43f6d2b67de5d7e721714780a9a494878aab1676d6f39"
+  },
+  "source_basis": {
+    "bazel_commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "note": {
+      "path": "target/wp928/successor-source.md",
+      "sha256": "a49bca1130e71025fa5cd0aee250b2d2517b751e76842fad8379976e5002159a"
+    },
+    "anchors": "BuildInfoFileWriteAction99-103/118-184; LocalTemplateExpansionStrategy48-59/75-85; builtin bazel_cc_build_info.bzl"
+  },
+  "compatibility": {
+    "exact": "Complete admitted physical-input-derived Latin1 headers, ordered callbacks, actual output role and nonexecutable output.",
+    "slug_native": "Structural configured output paths, original current-source request/issuance protocol and GNU/Linux readable regular single-link no-symlink0444 scalar replacement.",
+    "deferred": "Generic planner/action chain/CLI/cache/REAPI/Cpp, Constant cache dirtiness, arbitrary filesystem races/inode/mode parity, Windows beyond Unsupported, full-root/M7A and whole-workload fit."
+  },
+  "ownership": {
+    "issuance": "Original compute-issued metadata/root/physical terminal guard every completion/phase effect; exact granted consumed/pending Arc binding and original full source frontier.",
+    "permit": "Shared one-use nonClone Prepared/Staged permit taken before root/binding/phase checks. StageLease destructively clears pending Option on Drop, recovering poison; held cells retain no stage descriptors. No mutex spans DICE/await.",
+    "output": "Actual ConfiguredOutputOwner from completion, actual typed action/output/configuration, one borrowed write from fresh consumed.header; accepted result shares SAME consumed Arc and actual descriptors.",
+    "scalar": "Fixed staged plus optional prior fingerprints; full borrowed-body positional equality/EOF; normalized workspace/parent/name correspondence. Private singleton0444 only; generic0555/tree/alias/runfiles unchanged.",
+    "failure": "No accepted header on error; status/revision may already change, no rollback/cross-stage atomicity. Actual nonroot rename EACCES closes6FDs; readonly-parent Drop unlink leaves owned hidden stage, explicitly restored/removed only by fixture. Initial identity/keep/unlink IO may leave unclaimed scratch."
+  },
+  "allocation": {
+    "strings": "Reuse original interned label/config/catalog/status/string owners and Arc/Dupe paths; borrowed SmallSet path components, existing owner-local stage names. No global temporary pool, body/map/catalog/decoded-String copy or new key/interner.",
+    "header": "Original precomputed and actual independent headers remain. Publishing adds no additional body Vec; earlier Latin1/String/Vec overlap remains qualified.",
+    "bound": {
+      "cap": 2097152,
+      "conservative_info_bytes": 1405044,
+      "pure_worst_marker_bytes": 1400909,
+      "template_bounds": {
+        "path": "target/wp929/template-bounds.json",
+        "sha256": "954f9aa1aaf1114d5f5588b8829e1e871b750cfdeb64dca573a91e282a6fae85"
+      },
+      "independent_calculation": {
+        "path": "target/wp929/bound-calculation.json",
+        "sha256": "47c5a8f4d0f1265bff96f8a0c59cc80a3d9489570c36b94d4d37da3c9c470f8f"
+      }
+    },
+    "resources": "12 conservatively simultaneous FDs;6header stageFDs retire atphaseexit, accepted result retains0headerFD+original4statusreceiptFD. Same-call stack scratch<=9260bytes, no compiler slot-reuse assumed.",
+    "qualified": "Finite fixture RSS and source bounds establish no aggregate savings/whole-fit. WP899 refusal/profiles/DICE release limits persist, source16/17/18 spent; no retry."
+  },
+  "source_hashes": {
+    "app/slug_core_v2/src/runtime/build_info_header_publication.rs": {
+      "sha256": "caac3076cf2f060c0d25dbd97ffee89c0fc35a9c1d59d7e9eecf91b698d34456",
+      "lines": 264
+    },
+    "app/slug_core_v2/src/runtime/build_info_file_inputs.rs": {
+      "sha256": "c06c701ead31422a74127e43f94c3f1588a60956c5cc60e90692a6c8cdce7a14",
+      "lines": 226
+    },
+    "app/slug_core_v2/src/runtime/action_output_staging.rs": {
+      "sha256": "ccd3ecd1b87c3649bfaee415114070e98fab36859958a58ae5a217c9a7675739",
+      "lines": 269
+    },
+    "app/slug_core_v2/src/runtime/action_output_staging/linux.rs": {
+      "sha256": "a20a4eef46821943d2be0a6d11731c617a673010c14cc619c549d5a037094147",
+      "lines": 543
+    },
+    "app/slug_core_v2/src/runtime/action_output_staging/linux/scalar.rs": {
+      "sha256": "4ee766d0b8d5cc7ee06c6c99d4377b0e69fe03649b1e9d51d1078e73bf8b620e",
+      "lines": 182
+    },
+    "app/slug_core_v2/src/runtime/dice.rs": {
+      "sha256": "08bae91a02013f421b084763dfec99cfd123e7300ec23bd0d071bd782021e5d1",
+      "lines": 14065
+    },
+    "app/slug_core_v2/src/runtime/tests/build_info_header_publication_tests.rs": {
+      "sha256": "558d0edbcc6190097837748329a1bdbd408ee29163a8e607ed58deb64b68c093",
+      "lines": 862
+    },
+    "app/slug_core_v2/src/runtime/tests/workspace_status_file_inputs_tests.rs": {
+      "sha256": "b9a7b6df767c46591de4f864e870c3fdc60527a3397b6cff200fa43eaea341ed",
+      "lines": 929
+    }
+  },
+  "validation": {
+    "unique_current_passes": 55,
+    "protected": 50,
+    "new": 5,
+    "current_batch": true,
+    "preflight": {
+      "exit_code": 0,
+      "output": "Verified 55 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.2130836909636855,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "3e50a3782a28d2d752002c1191f9d769c8c13c166986f3f6f1c226a73824872d",
+      "selected": 55,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "runtime_summary": {
+      "selected": 55,
+      "passed": 55,
+      "elapsed_seconds": 8.89283293695189,
+      "max_child_rss_kib": 87500
+    },
+    "results": {
+      "path": "target/wp929/core-results.json",
+      "sha256": "b014f3e515720d6c13f792184fe0ee4e7a6b2e3f8a04a709b573c0808b1823a7"
+    },
+    "selectors": {
+      "path": "target/wp929/core-selectors.json",
+      "sha256": "c1610fbf88ea6f9be719a751f5e08af57fe12b4cd67786d12c6c48a564ea3153"
+    },
+    "current_compile": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 39.35505637305323,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "cli_current": {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 16.390140190022066,
+      "environment": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1"
+      }
+    },
+    "checks": {
+      "path": "target/wp929/checks.json",
+      "sha256": "aa5088add39a7cc4184e07f661f819851c972a638f64e985078fdb96c64f085f"
+    },
+    "diagnostics": {
+      "path": "target/wp929/diagnostic-account.json",
+      "sha256": "3bc4a46af5e6cefa124c69dfc761bd6964e5164f883daae794bbf02bd26eae96"
+    },
+    "compile_attribution": "Initial CLI101/15.122s E0505 borrowed reservedSmallSet; explicit drop before moving originalinputs. Corrected CLI0/16.390s and Core0/39.355s.",
+    "discriminators": "Complete Info/Version actual paths/metadata/0444/two-config/sourceABA/shared fresh body/final Weaks;10copy/origin/result/phase/held-clone refusal cases;13real staged/status/destination/permission mutations plus6FD immediateEBADF; real source retry/abort/recovery; pure full-marker/cap/singleton guards. 44old status/source controls and6alias/runfiles controls preserved.",
+    "source_only": "Write/sync/chmod/capture/render/initial identity/keep fallible RAII branches unless explicitly recorded executed; no generic fault framework/executed-negative claim.",
+    "old_unproved": "Legacy bare BCR-dependent guard remains unproved offline; not retried/waived.",
+    "no_actual_binary_or_oracle": "Compiledependent CLI only; no actual binary/oracle/network/JVM/platform expansion.",
+    "closing_checks": {
+      "path": "target/wp929/checks-close.json",
+      "sha256": "34b0316c42bf4118c5b06c24219dcb0603a2d9f6a0649a02361699c4b73d49e0"
+    }
+  },
+  "growth": {
+    "new_production": 446,
+    "existing_production_added": 65,
+    "existing_production_removed": 4,
+    "new_tests": 862,
+    "include": 6,
+    "review_trigger": "862 exceeds800 estimate by62; single real phase adapter and five distinct behavior groups, no copied harness/catalog. Reviewed cohesive responsibility splits; dice only3registration lines."
+  },
+  "reviews": {
+    "design": {
+      "source": {
+        "path": "target/wp929/design-source.md",
+        "sha256": "2b028640b7d42183e8e568fc55ef5c6c495fe3ee366fcd60597e3e113b0184a8",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp929/design-ownership.md",
+        "sha256": "3fcff54c3d61c56a03e5508d67a65d7dc6ee3582697c8cf97f9c211e7d480f3f",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp929/design-evidence.md",
+        "sha256": "27ff5892455a5e7891654c3853d6d10bbd2efb3205a0f799ee0b45c68e6eeef7",
+        "verdict": "ACCEPT"
+      }
+    },
+    "final": {
+      "source": {
+        "path": "target/wp929/final-source.md",
+        "sha256": "ffc96b0b0cf78be92542754f46d2edf9f7fe0d6ef36cb927502c45022b7e8d8d",
+        "verdict": "ACCEPT"
+      },
+      "ownership": {
+        "path": "target/wp929/final-ownership.md",
+        "sha256": "be0bf2e7e47b472bf28a46f71e5359b71c318be8f8a79294f448d3eb9a5ad949",
+        "verdict": "ACCEPT"
+      },
+      "evidence": {
+        "path": "target/wp929/final-evidence.md",
+        "sha256": "a3b8a86afe78d687deb26471e5a3bb5768b8e396aaabb61cd412dc89a2172b3f",
+        "verdict": "ACCEPT"
+      }
+    }
+  },
+  "operations": {
+    "path": "target/wp929",
+    "elapsed_seconds_from_recorded_start": 2519.346680879593,
+    "compile_seconds": 70.86758770607412,
+    "review_time": "Not separately measured; no speedup claim",
+    "hash_index": {
+      "path": "target/wp929/operational-hashes.json",
+      "sha256": "4d1501b1f08560156f30a010353298a51e7887dd99c08666c95195b7cdb27085"
+    },
+    "operational_files": 89
+  },
+  "demand_qualification": {
+    "basis": {
+      "path": "target/wp905/family-source.json",
+      "sha256": "1615f27c7674a6604da8a70d7e8c09e69c1cd7fd8455ac1c9afcae4d43d8e377"
+    },
+    "saved_graph_sha256": "15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c",
+    "finding": "All four declared TranslateBuildInfo outputs have zero consumers in the saved WP905 graph. This packet closes a declared producer capability, not a proved CLI requested-output prerequisite. C++ mnemonic presence alone also establishes no demanded execution gap.",
+    "future": "More header/C++ integration requires explicit requested-root demand; next priority returns to effective compiler-argument provenance."
+  },
+  "source_hash_index": {
+    "path": "target/wp929/source-hashes.json",
+    "sha256": "aabc3c87dcbb97b90f3c216b49f4d1c15b50056ca363407538c9b6f6d0e32e7d"
+  },
+  "successor_source": {
+    "path": "target/wp929/successor-source.md",
+    "sha256": "435f8e39554ed0671fff5e68e29370e80864b4b5096740efdac5e0be00f05196"
+  },
+  "successor": {
+    "packet": "WP-7-229-m7a-effective-compiler-argument-reconciliation-r1",
+    "operations": "WP930",
+    "decision": "Bounded offline source-derived reconciliation of saved513Rustc child streams,511native/twobootstrap wrappers,201shared recorded file vectors. Preserve exact order/literal transformations and explicit runtime cwd/canonicalization/nested-file/effective-env boundaries. No production/execution/acquisition activation."
+  }
+}
