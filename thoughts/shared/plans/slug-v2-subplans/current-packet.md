@@ -96,15 +96,28 @@ Url/Local(empty/nonUTF8) domains, first-distinct order/repeats, flagged partial 
 poisoned-lock recovery and final credit/Weak release are asserted. No retained storage
 or URL/path heap dump is added; source/module/public producer or whole-fit is unproved.
 
-Next freeze [the new attribution hypothesis](../../../../target/wp939/successor-source.md):
-one newly instrumented offline prerequisite observation, arming the existing recorder
-before charges and staging its first row into bounded stack scratch before reporting
-outside the lock. Explicitly account its approximately 0.3 MiB recorder reservation under
-the same 16 MiB live allowance and preserve all prior caps. This recommendation selects
-no operation; independent DESIGN must freeze actual ownership/effects/inputs/guards
-before edits or launch. WP938's omitted URL/subtype cannot be recovered. No blind
-module/cache guess, acquisition, success retry or source16–18/F3/fullroot repeat is
-selected. Source/module/materialization/registration/provider/public Rustc/M7A remain open.
+[WP940](wp940-exact-offline-registry-prerequisite-2026-10-06.json) accepts one newly
+instrumented normal offline observation. The complete sole Url row is exactly
+`https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel` (60 bytes), with one
+admission and first scope NetworkDisabled; the separate outer subtype is
+observed_terminal_demand. No source/admitted/transport bytes were acquired. The
+0.218 s observation peaks at 65,860 KiB; thirteen ordinary controls pass (2.524 s),
+Core preparation (36.196 s), CLI check (7.357 s) and two FINAL reviews pass. Recorder
+credit is 279,143 bytes with source peak 344,679 bytes under unchanged caps. One 16 KiB
+stack reporter streams hex after releasing the visitor lock; recorder credit, recorder
+Weak and scope Weak retirement pass. This identifies the unique request present at
+refusal, without proving a wrapped causal chain, typed module/file kind or availability.
+WP938's omitted facts remain unknown; no producer or whole-workload fit follows.
+
+Next freeze [source-specific typed readiness](../../../../target/wp940/successor-source.md):
+use the tracked root's evaluated declaration and existing ModuleKey/forward URL constructor
+to compare complete bytes, with the same workspace/preparation key. Candidate correspondence
+is not historical caller or MVS proof. Select local module policy only with an exact,
+independently evidenced root and first MODULE/import allowlist; no guessed cache alias,
+URL reverse parsing or source certificate. Keep source availability and normal producer
+requirements together in that bounded contract. No normal command, acquisition, success
+retry or source16–18/F3/fullroot repeat is selected. Source/module/materialization/
+registration/provider/public Rustc/M7A remain open.
 
 ## Ownership, scope and allocation
 
@@ -112,10 +125,12 @@ Root first freezes the smallest source-readiness and proof design, with independ
 source/evidence review before dependent Rust work. WP939's accepted allowlist was the
 existing Linux test-only source_service/registry_association.rs and its tests, plus the
 Core public source-prerequisite test's scalar mismatch formatter/unit case; its compact
-receipt preserves source/design/artifact/gate bindings. The next instrumentation contract
-must freeze the smallest shared normal test body and bounded stack reporter, current
-pins and ordinary controls before selecting a new ignored observation. No normal command
-or source acquisition is currently selected. Any minimal shared fixture
+receipt preserves source/design/artifact/gate bindings. WP940's accepted allowlist was only the existing Core public source-prerequisite test:
+one shared normal body, fixed first-row stack reporter and one ordinary unit. The compact
+receipt pins the design, sources, exact artifact, thirteen prerequisite gates, launch reviews
+and once-only observation. The next source-specific contract must freeze its existing
+Bzlmod/root-declaration owner, typed correspondence and exact local root evidence before
+editing or selecting an operation. No normal command or acquisition is currently selected. Any minimal shared fixture
 adapter needs its exact existing owner/path and growth reason frozen before editing;
 prefer a bounded companion over changes to Loading's39k-line host_package_load_tests.
 Fixture/expected files remain unchanged references. No new production API is justified

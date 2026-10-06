@@ -1,0 +1,429 @@
+{
+  "checkpoint": "WP940",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "4ddc6c29a50968e80707084c554975c1c7d0f962",
+  "status": "accepted",
+  "observable": "Newly armed normal offline command records its sole request and exact terminal mismatch without duplicated heap identities.",
+  "hypothesis": "Existing scoped recorder can preserve exact first-distinct identity when normal terminal validator refuses; no producer-success retry.",
+  "compatibility": {
+    "request_byte_domains": "existing exact representation",
+    "diagnostic": "Slug-native",
+    "module_version_file_kind": "unproved",
+    "wrapped_error_causal_chain": "unproved"
+  },
+  "outcome": {
+    "stage": "native_refusal",
+    "kind": "observed_terminal_demand",
+    "attempts": null,
+    "terminal_roots": null,
+    "analyses": null
+  },
+  "source_error": "Some(NetworkDisabled)",
+  "attribution": {
+    "attempted": 1,
+    "admitted": 1,
+    "scope_admitted": 1,
+    "distinct": 1,
+    "repeated": 0,
+    "retained": 1,
+    "refused": 0,
+    "sticky": 0,
+    "charged": 279143,
+    "visited": 1,
+    "complete": true,
+    "qualified": true,
+    "capture": "captured",
+    "first_row": {
+      "ordinal": 1,
+      "admissions": 1,
+      "url_hex": "68747470733a2f2f6263722e62617a656c2e6275696c642f6d6f64756c65732f706c6174666f726d732f312e312e302f4d4f44554c452e62617a656c",
+      "local_path_hex": null,
+      "url_utf8": "https://bcr.bazel.build/modules/platforms/1.1.0/MODULE.bazel"
+    },
+    "meaning": "unique registry request present at offline refusal",
+    "module_version_file_kind_proved": false,
+    "wrapped_error_causal_chain_proved": false
+  },
+  "source_counters": {
+    "registry_attempts": 1,
+    "registry_admitted_bytes": 0,
+    "source_attempts": 0,
+    "transferred_bytes": 0,
+    "decoded_bytes": 0,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 279143,
+    "peak_buffer_bytes": 344679
+  },
+  "phases": [
+    {
+      "phase": "baseline",
+      "rss_kib": 17560
+    },
+    {
+      "phase": "after_runtime",
+      "rss_kib": 35256
+    },
+    {
+      "phase": "after_command",
+      "rss_kib": 65860
+    },
+    {
+      "phase": "after_terminal_drop",
+      "rss_kib": 65860
+    },
+    {
+      "phase": "after_runtime_drop",
+      "rss_kib": 65860
+    },
+    {
+      "phase": "after_scope_drop",
+      "rss_kib": 65600
+    }
+  ],
+  "retirement": [
+    "live_buffer_zero=true",
+    "scope_weak_expired=true",
+    "recorder_weak_expired=true"
+  ],
+  "allocation": {
+    "recorder_charged_bytes": 279143,
+    "first_row_stack_capacity_bytes": 16384,
+    "encoded_heap_string": false,
+    "other_rows": "scalar count only",
+    "release": "Native test drops Runtime then recorder before bank-zero/recorder Weak/scope Weak checks.",
+    "discipline": "Borrow or transfer existing storage; reuse scoped interners for repeated immutable strings when ownership and cleanup fit. No global pool for unique diagnostic identities."
+  },
+  "preparation": [
+    {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 36.196463759988546,
+      "stdout_sha256": "3a805fd6e68454e2a7ff27d2e1ca2a6285cae09c4a771393a39b4cfa126254c9",
+      "stderr_sha256": "601a5bb051d3c9da53151c7ab0c3fd7a078748b987b02753ce7f6e779d40ef84"
+    },
+    {
+      "command": [
+        "timeout",
+        "--signal=TERM",
+        "--kill-after=3s",
+        "60s",
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--message-format=json"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 7.357103046029806,
+      "stdout_sha256": "55a2cb649a1c0aa178e7dfb81bbad6d490305b8350a2aa55b2e6d458f6901481",
+      "stderr_sha256": "3970e44d9b142cd5aa0d6bc77565be7b2b64abc817469eea36541dadf2c2cab4"
+    }
+  ],
+  "bindings": {
+    "target/wp940/supervise.py": "44348341eaec27fe6372734f830c34aff4c9f9dee798a5c3137bb13e4c3b3c3e",
+    "target/wp940/attribution_protocol.py": "76679880aafb18fc1f9b8b0084bbb9f76c2ccccae7c40da0fbda53a4b35a11e3",
+    "target/wp940/design.md": "da4e966b584c6359c922bd91ece0e498f376892a31ccc0fa48817c028ba3fb66",
+    "target/wp940/inputs.json": "1d71c587afc16db793e26989d512496a2c9354a5956f49cd106341a9ae67dd33",
+    "app/slug_core_v2/src/runtime/tests/rules_rust_public_source_prerequisite_tests.rs": "9ab6b2b39324322b6a49f58317ca29fba93c9e1749079f62ff46390c5bf42236",
+    "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e": "855c08756427fc00044f53bea3c8b6c12c732b3bb6b5a37348a78af5a673ba5a"
+  },
+  "references": [
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/fixture.toml",
+      "bytes": 8220,
+      "sha256": "30e4225acfdf7d352b2b9972b778d47dd927ed2b885408e9151c41112facf9a8"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/expected/oracle.json",
+      "bytes": 196649,
+      "sha256": "63215a3bf415a4c93fcef815dfe7f36745952c9fa9700786a9e60e5da2860d42"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/MODULE.bazel",
+      "bytes": 426,
+      "sha256": "a357133030b94360b37061f380984caa374f7383841fabdc8c5d26bc114e3b10"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/BUILD.bazel",
+      "bytes": 292,
+      "sha256": "443b4798a3e113748cf14b22a9fdca51121a1d31b92d833a7006bedf1ea7fa4a"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/main.rs",
+      "bytes": 54,
+      "sha256": "7c1e6f2d79b79c74fe6442b1ad99fa1fe38c97feb6238b362c05dff20d6e977b"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/lib.rs",
+      "bytes": 59,
+      "sha256": "3850931daa5cb4e2a7fb77808c7ef9a481b8214fb118606e7cdb303f03f21ece"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/data.txt",
+      "bytes": 21,
+      "sha256": "e2fe7ce696d221cc9335e55806c0c51e3b356cad25954477591722edac6b7899"
+    },
+    {
+      "path": "tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/cquery_format.bzl",
+      "bytes": 877,
+      "sha256": "55a02be9e72fe3ce20739888ef7157db6f7d995463e5fee2d4456942390c0818"
+    }
+  ],
+  "native_operation_sha256": "2567ba5ff7931456ba7744062ed48b9d51ccb1713690dc31cabaccc8a523b03f",
+  "native_result_sha256": "b7b74424ed1b903bea16f2e281cab7471f31782872be5a4608dbb1266e04d5bd",
+  "native_stdout_sha256": "d385528d7ab6e3694cf6731891e23461387fad0c91903473c31813cad18bd180",
+  "native_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "changes": {
+    "rust_added_lines": 383,
+    "rust_removed_lines": 9,
+    "fixture_growth": 0,
+    "reason": "One shared normal body, bounded byte staging/hex reporting and independent qualification matrix; formatted333 reporter/control lines plus lifecycle factoring. No production storage, source policy or semantic identity changes."
+  },
+  "corrections": [
+    "Design distinguishes Starlark value nightly from compiler nightly-2025-09-14.",
+    "Before execution, helper review fixed u64 call/refusal counter bounds, ARM-error/stage consistency, held-credit crosschecks and SIGKILL exit race.",
+    "Actual decoder aligned unavailable row for missing/bounds-refused capture before listing/runtime; all old reviews preserved."
+  ],
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "open": [
+    "Typed normal key/module/policy association for the recorded raw request",
+    "Exact current local transitive/module/generated repository and toolchain provider readiness",
+    "Normal retained public Rustc action, full graph memory fit and M7A"
+  ],
+  "packet_elapsed_seconds": 1344.6374690532684,
+  "reviews": [
+    {
+      "path": "target/wp940/final-source.md",
+      "verdict": "ACCEPT",
+      "sha256": "db4c9f0e0441e48156b5dc402bfaf6512cd43d988c88fc72b2a19c06881fc799"
+    },
+    {
+      "path": "target/wp940/final-evidence.md",
+      "verdict": "ACCEPT",
+      "sha256": "726d72792a8425db1bdf1b4cc987d6f3155d2ad342393d17b81e66de6730b1bf"
+    }
+  ],
+  "replan_reason": null,
+  "gate_advanced": "Normal offline command now preserves its sole request bytes and exact Demand mismatch separately from scoped NetworkDisabled.",
+  "memory": {
+    "native": {
+      "elapsed_seconds": 0.21828514290973544,
+      "monitored_rss_kib": 63240,
+      "child_rusage_peak_kib": 65280,
+      "conservative_peak_rss_kib": 65860,
+      "fixed_first_row_stack_bytes": 16384,
+      "final_source_live_buffer_zero_asserted": true,
+      "final_scope_weak_expiry_asserted": true,
+      "final_recorder_weak_expiry_asserted": true
+    },
+    "ordinary_totals": {
+      "selected_count": 13,
+      "pass_count": 13,
+      "elapsed_seconds_sum": 2.52400777884759,
+      "conservative_peak_rss_kib": 36716
+    },
+    "executed_test_count": 14,
+    "passed_test_count": 14,
+    "summary_sha256": "2593097388c44d66f0d57273a2738321680b3b339078dd1c43ef5b9f90cd0bd5"
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "validation_without_execution": {
+    "operation_count": 2,
+    "ordinary_preflight": {
+      "exit_code": 0,
+      "verified_exact_selector_count": 13,
+      "executed_tests": 0
+    },
+    "ignored_listing": {
+      "exit_code": 0,
+      "listed_exact_new_case_count": 1,
+      "executed_tests": 0
+    }
+  },
+  "tests": [
+    {
+      "operation": "ordinary-0-operation.json",
+      "name": "exact_registry_routes_repeats_supplied_non_utf8_paths_and_unarmed_controls",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19084107701200992,
+      "conservative_peak_rss_kib": 33760
+    },
+    {
+      "operation": "ordinary-1-operation.json",
+      "name": "registry_admission_128_then_129_repeat_or_new_has_no_source_open_or_bytes",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19846443191636354,
+      "conservative_peak_rss_kib": 35292
+    },
+    {
+      "operation": "ordinary-2-operation.json",
+      "name": "actual_root_256_distinct_then_257_refuses_before_io_and_preserves_origin",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.191718481015414,
+      "conservative_peak_rss_kib": 36716
+    },
+    {
+      "operation": "ordinary-3-operation.json",
+      "name": "concurrent_registry_charge_creator_and_sticky_caller_preserve_exact_order",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.1945408439496532,
+      "conservative_peak_rss_kib": 29760
+    },
+    {
+      "operation": "ordinary-4-operation.json",
+      "name": "registry_identity_bounds_gaps_and_scalar_overflow_never_certify_partial_history",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19431442290078849,
+      "conservative_peak_rss_kib": 27340
+    },
+    {
+      "operation": "ordinary-5-operation.json",
+      "name": "registry_association_credit_pressure_weak_attachment_and_clone_last_drop",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19126648898236454,
+      "conservative_peak_rss_kib": 30380
+    },
+    {
+      "operation": "ordinary-6-operation.json",
+      "name": "borrowed_registry_rows_preserve_distinct_order_domains_and_credit_lifecycle",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19677833502646536,
+      "conservative_peak_rss_kib": 27588
+    },
+    {
+      "operation": "ordinary-7-operation.json",
+      "name": "borrowed_registry_rows_preserve_partial_history_after_callback_panic",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19469027500599623,
+      "conservative_peak_rss_kib": 30312
+    },
+    {
+      "operation": "ordinary-8-operation.json",
+      "name": "terminal_mismatch_subtypes_preserve_original_scope_refusal",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19138706906232983,
+      "conservative_peak_rss_kib": 24652
+    },
+    {
+      "operation": "ordinary-9-operation.json",
+      "name": "scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19372040999587625,
+      "conservative_peak_rss_kib": 33592
+    },
+    {
+      "operation": "ordinary-10-operation.json",
+      "name": "scoped_offline_http_refuses_registry_and_archive_before_parser",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19312742701731622,
+      "conservative_peak_rss_kib": 30132
+    },
+    {
+      "operation": "ordinary-11-operation.json",
+      "name": "neutral_identity_and_source_carrier_are_complete_only_and_exact",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19850206200499088,
+      "conservative_peak_rss_kib": 33748
+    },
+    {
+      "operation": "ordinary-12-operation.json",
+      "name": "registry_first_row_reporter_preserves_raw_domains_bounds_and_offline_qualification",
+      "selected_count": 1,
+      "pass_count": 1,
+      "elapsed_seconds": 0.19465645495802164,
+      "conservative_peak_rss_kib": 25748
+    }
+  ],
+  "operation_receipts": {
+    "list-operation.json": "79d2eba9e8b92360e9cc39853d2520ceee44adfdaa7a274a0e97de2fd4d8617a",
+    "native-operation.json": "2567ba5ff7931456ba7744062ed48b9d51ccb1713690dc31cabaccc8a523b03f",
+    "ordinary-0-operation.json": "fddf31b2a71210ce9fb504a8ba809f0a536285676ea83d4a4418ed02445cbbb8",
+    "ordinary-1-operation.json": "160140812f8e865b58c1c2b582ab64fb762c5a247f7cb04163f3e2e68a7b32c3",
+    "ordinary-10-operation.json": "4fadf0361f9a38d6c874f70492fed2da44992f047f618f9ed909bff6330086b4",
+    "ordinary-11-operation.json": "55e21666d210012e5c4c11ede39f4d1c361e64e46fab06f2e5f3b6cf88370880",
+    "ordinary-12-operation.json": "e7a03c9095188aa19463c76158f8b29f7393ef7ee202ac0c5ee06b89f873b93a",
+    "ordinary-2-operation.json": "8a6a92ff28ee0900202da9a3c8c068f0f984295d14a51b19f00b42120c4a994f",
+    "ordinary-3-operation.json": "6892a3ce287295f6dec1cc263dc52e33da49c4c71e1dd4b120cf4134e0ad070e",
+    "ordinary-4-operation.json": "333a7b3bcb7a8dacaedc18fc1fe618f4669550f32e7c70cbb9739f96a8d15990",
+    "ordinary-5-operation.json": "0f11128fa5a1e1f2ea296e9cdd8fd6bb82c1b0a9dad0aa0955f8280bfa6050ee",
+    "ordinary-6-operation.json": "77f6c964dda1099a2e1c94a01bb07d434442830d4627da1880b24c3b9aad2df4",
+    "ordinary-7-operation.json": "bb6fec1c8057674d20eae106709ae50669619162759452d3a629d175cc28069f",
+    "ordinary-8-operation.json": "0c59e1634c26f2e16443af41f66d608c2a8c871a4ff5f87915a87b01bddd1748",
+    "ordinary-9-operation.json": "db344e58d0850ad6fb3a8019a4b9ae98b84f085c363fafeb629d6b2c95cbec0a",
+    "preflight-operation.json": "c8d73516809f7759a0cc545306ac204de63db05d2d3c709832b922c4b2094d07"
+  },
+  "successor": {
+    "recommendation": "target/wp940/successor-source.md",
+    "sha256": "5708c74ab74a07dc5fd00811f39034bec4bd8f4e024c73d9e8be0fe39aa3e23e",
+    "typed_owners": "target/wp940/typed-source-owners.md",
+    "typed_owners_sha256": "dbf3963c2c4bad9ebce41e8e5efe8530a04009d4979eb330613a12feed0971ce",
+    "next": "Freeze source-specific typed root declaration/key/request correspondence with existing constructors, and exact independently evidenced local-root/first-file readiness. Candidate matching is not historical caller or MVS proof. No further normal command or acquisition selected."
+  }
+}

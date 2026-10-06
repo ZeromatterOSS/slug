@@ -43,45 +43,27 @@ probe fixture and existing Spawn view/query APIs. First prove exact offline sour
 generated mapping and provider readiness, then normal configured action ownership.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
-[WP932](./slug-v2-subplans/wp932-offline-source-guard-2026-10-06.json)
-accepts scoped offline HTTP policy with8 focused gates/current CLIcheck.
-[WP933](./slug-v2-subplans/wp933-finite-source-availability-2026-10-06.json)
-verifies8 unchanged reference files (206,598B), while5 upstream candidates stop at
-the rules_rust+ directory symlink with zero external bodies read.11 controls pass;
-18,968KiB observed child peak establishes only finite-reader fit. The next concrete
-prerequisite is explicit local source/import/generated-tool and normal producer proof.
-[WP934](./slug-v2-subplans/wp934-explicit-root-alias-2026-10-06.json)
-accepts4 controls and one anchored187B absolute alias spelling with zero target/body
-reads,17,984KiB process peak. WP935 now selects that exact absolute target and the
-unchanged13 source/reference rows via the accepted stream/fact reader and11 reused
-controls. Existing module overrides retain explicit local provenance; metadata is
-not a source certificate.
-[WP935](./slug-v2-subplans/wp935-explicit-local-source-2026-10-06.json)
-observes all13 finite rows325,671B,including119,073B of five current upstream sources.
-Three old hashes match;11 current controls reused.0.092s/22,848KiB process peak and
-4,300,734B trace peak through perfile retirement establish finite-reader fit only.
-[WP936](./slug-v2-subplans/wp936-direct-local-imports-2026-10-06.json)
-observes all16 directlocal files/5,092,301B at31,180KiB peakRSS,11reusedcontrols.
-14partial fact tables remain; rustc’s postparse nodeguard and4.75MBknown_shas
-hash-only bodyguard left native imports/initialization unproved.
-[WP937](./slug-v2-subplans/wp937-native-source-memory-2026-10-06.json) accepts the
-two actual native parsers at23,932/44,236KiB peaks,12/0 native loads,3FD+3protected
-tests and separate Loading/Core preparation. Original source ownership retires;
-one required parser copy is counted. These representative parses fit the existing
-envelope. [WP938](./slug-v2-subplans/wp938-normal-offline-source-prerequisite-2026-10-06.json)
-observes one normal offline public-probe command at63,960KiB/0.211s under lower16MiB
-image/scratch budgets: first scope NetworkDisabled,1registryattempt/zero admitted
-bytes, outer observed_terminal error.3protected+1observer tests and Core/CLI
-preparation pass; scope retirement passes. Denied URL/module and mismatch subtype
-were not recorded. [WP939](./slug-v2-subplans/wp939-borrowed-registry-attribution-2026-10-06.json)
-accepts borrowed exact rows from the existing scoped credited slab and six mismatch
-labels, with nine ordinary passes (1.748 s; 37,320 KiB peak), Core preparation (36.746 s),
-CLI check (7.373 s) and two FINAL
-reviews. No retained strings/storage are added; pointer/domain/order/partial-history,
-panic recovery and final credit/Weak retirement pass. Next freeze one new instrumented
-offline attribution hypothesis under unchanged caps, before edits/launch; no command,
-acquisition or success retry is selected. Wholeworkloadfit/publicproducer admission and
-transitive/module/generated prerequisites remain open.
+Accepted source prerequisites are indexed in the current manifest: the scoped
+[offline guard](./slug-v2-subplans/wp932-offline-source-guard-2026-10-06.json),
+[explicit alias](./slug-v2-subplans/wp934-explicit-root-alias-2026-10-06.json),
+[finite source reads](./slug-v2-subplans/wp935-explicit-local-source-2026-10-06.json),
+[direct imports](./slug-v2-subplans/wp936-direct-local-imports-2026-10-06.json),
+[native parser ownership](./slug-v2-subplans/wp937-native-source-memory-2026-10-06.json),
+[initial offline command](./slug-v2-subplans/wp938-normal-offline-source-prerequisite-2026-10-06.json)
+and [borrowed attribution](./slug-v2-subplans/wp939-borrowed-registry-attribution-2026-10-06.json).
+Detailed chronology remains in those receipts and this plan at commit4ddc6c29a;
+representative parsing fits the memory envelope, while module/provider/full graph
+readiness remains unproved and all spent refusals remain closed.
+[WP940](./slug-v2-subplans/wp940-exact-offline-registry-prerequisite-2026-10-06.json)
+records one newly armed offline observation: sole exact BCR request ending in
+`modules/platforms/1.1.0/MODULE.bazel`, first NetworkDisabled and separate Demand
+mismatch. Fourteen executed tests pass; native 0.218 s/65,860 KiB, recorder credit
+279,143 bytes and source peak 344,679 bytes under unchanged caps. Fixed 16 KiB scratch,
+credit and recorder/scope Weak retirement are proved; no source bytes acquired. Next
+freeze typed declaration/key/forward-request correspondence and independently evidenced
+local-source readiness. Raw URL is not module/caller/MVS or availability proof. No command,
+acquisition or success retry is selected; whole-fit/public producer and transitive/module/
+generated prerequisites remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
