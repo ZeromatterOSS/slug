@@ -23,6 +23,7 @@ use starlark::values::FrozenValue;
 use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
+use starlark::values::StringValue;
 use starlark::values::Value;
 use starlark::values::list::AllocImmutableList;
 use starlark::values::starlark_value;
@@ -263,12 +264,14 @@ fn cpp_fragment_methods(builder: &mut MethodsBuilder) {
             }))
     }
 
-    fn compilation_mode(
+    fn compilation_mode<'v>(
         this: &CppFragmentValue,
-        eval: &mut Evaluator<'_, '_, '_>,
-    ) -> anyhow::Result<String> {
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<StringValue<'v>> {
         this.check(eval)?;
-        Ok(this.retained.projection().compilation_mode()?.to_owned())
+        Ok(eval
+            .heap()
+            .alloc_str(this.retained.projection().compilation_mode()?))
     }
 
     fn propeller_optimize_absolute_cc_profile<'v>(

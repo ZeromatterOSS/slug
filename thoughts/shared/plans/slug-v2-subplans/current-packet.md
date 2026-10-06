@@ -12,10 +12,10 @@ interners without changing semantic identity, source authority or natural owners
 Windows work remains minimal stubs/deferred until it can be tested effectively.
 Other checkout directories are reference material.
 
-The latest accepted component filters glob exclusions before copying candidate
-paths into owned results. Include flags, validation priority, unescaped matching,
-UTF16 sorting/dedup and final owned strings remain. Final Vec capacity can shrink;
-earlier matcher allocation work and failure sequencing have explicit limits.
+The latest accepted component allocates the C++ compilation-mode name directly
+in the existing Starlark heap, bypassing a temporary Rust String. Caller/projection
+checks, method type/arity, final bytes and natural heap/frozen owners remain.
+This is a tiny source-proved copy-site removal, with no measured memory claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint.
 
@@ -24,56 +24,47 @@ Bazel invocation, linked CLI/runtime activation or broader integration is
 selected during this scope. Source-admission and integration gates remain
 unwaived; memory controls cannot substitute for them.
 
-## Accepted glob exclusion-before-copy contract
+## Accepted C++ compilation-mode direct heap contract
 
-expand_glob applies its existing exclusion predicate to original candidate bytes
-before copying retained paths, removing the final retain pass. Every include
-pattern still runs and records its match flag independently of exclusion.
-check_include_matches, validate_excludes and check_final_matches keep exact
-priority. Leading-@ escaping, UTF16 sorting/dedup, regular/directory selection,
-listing/spec owners and final independent String outputs remain. No helper/API/
-interner/cache/key/DICE/identity/unsafe/dependency/donor, observed-host traversal
-or matcher algorithm changes. Slug-native copy scheduling/storage optimization
-preserves inherited admitted glob results, with no widened parity.
+The private compilation_mode getter returns StringValue from existing
+heap.alloc_str over the same retained enum member, naming the evaluator heap
+lifetime. The previous to_owned String was immediately copied by the generated
+String allocation adapter. The existing StringValue adapter passes through the
+heap value. Current-caller check stays first, projection error next; generated
+method parameter binding, Starlark string type and arity/error priority remain.
+The projection owns source bytes during synchronous copying; final heap/frozen
+strings own their bytes independently. No new public API/helper/interner/cache/
+key/DICE/identity/unsafe/dependency/donor or adjacent method changes. alloc_str
+does not invoke alloc_str_intern. Slug-native scratch copy bypass preserves
+inherited admitted behavior without widening parity.
 
-Exclusion variants are immutable pure boolean matchers (Invalid=>false), with
-total boolean/error semantics conditional on normal allocation. Earlier matching
-can add temporary work on routes that later report include/exclude errors.
-Allocation-machinery failure/panic sequencing, including earlier matcher Vec<char>
-capacity overflow on huge inputs/later-error routes, is excluded beyond OOM.
-No arbitrary-size/platform allocation-order or universal lower-work claim.
-Final Vec backing storage/capacity may shrink; exact prior capacity is not preserved.
+Three DESIGNs/FINALs accept identical baseline/candidate four focused tests.
+The single 86-line test calls all fastbuild/dbg/opt modes through actual .bzl
+functions, checks exact type/value, and captures nine equal complete diagnostics
+for denied caller/positional/named argument errors. cpp/read bindings are cleared;
+evaluator/context drop before freezing and OwnedFrozenValue results survive
+FrozenModule drops. Existing retained-fragment identity/current-caller, facade
+method boundaries and independent target/exec projection controls remain.
+Default Core/CLI, pinned serial offline builds/exact nonignored preflights and
+format/archive/plan/diff pass. No assets/goldens.
 
-Three DESIGNs/FINALs accept identical corrected 217-line tests: baseline one
-semantic pass/one intended capacity failure; candidate 12/12 including eight
-existing glob boundaries and two actual synchronous BUILD/native-glob controls.
-432 full Result comparisons match the original collect/validate/retain algorithm;
-180 complete diagnostics match exactly. Missing include→invalid exclude→all-excluded
-priority, literal/headtail/complex/invalid rules, empty includes, hidden/parenthesis/
-question/recursive/Unicode/NUL paths, directories, projected duplicates, original
-byte exclusions and UTF16 ordering are discriminated. Fixed 128 long excluded
-paths return an empty Vec with public capacity 128→0; source bytes/capacities/
-pointers stay. Mixed owned outputs [6,4,3077] bytes survive source/listing/spec/clone
-drops. Default Query/Core/CLI, pinned serial offline fresh artifacts/exact preflights
-and format/archive/plan/diff pass. No assets/goldens.
+The initial unchanged baseline fixture called the getter at module level,
+triggering the existing function-caller requirement before its denied-caller
+assertion. Exact same calls are wrapped in read functions, with read cleared
+before freeze; all value/type/error/retained-result assertions remain. Original
+snapshot, failure and narrow correction are preserved; production stayed
+unchanged until the corrected baseline passed. Only one fixture correction.
 
-Initial unchanged baseline E0433 was a fixture-only undeclared serde_json call;
-standard Debug output captures the same raw errors without adding a dependency.
-Baseline-r2 fixture miscounted é🙂 as seven UTF8 bytes instead of six. Only the
-expected length changes 3589→3077; exact full string/source/ownership assertions
-remain. Original/r2 snapshots and failed receipts reconstruct; corrected fresh
-baseline/candidate tests are identical. Second correction reassessment preserves
-the original design. The source review's allocation qualification is recorded.
-
-Acceptance proves rejected-path String-copy bypass and this fixed final vector-
-capacity observation only. No string allocator/count/quantified payload/aggregate/
-peak/RSS/speed/source-fit claim. Windows minimal/deferred; full WP899/M7A and source
-integration remain open/unwaived.
+Acceptance proves one tiny temporary String-copy site bypass. Final heap copy
+remains; allocation failure/OOM sequencing is excluded. No allocator/count/
+quantified memory/aggregate/peak/RSS/speed/source-fit claim. Windows minimal/
+deferred; full WP899/M7A and source integration remain open/unwaived.
 
 ## Accepted local memory boundaries
 
 | Owner / narrow accepted result | Receipt |
 |---|---|
+| C++ compilation-mode getter allocates directly in existing heap, omitting temporary Rust String; current caller/projection order, method string type/arity/errors and final heap/frozen owners stay. Three DESIGNs/FINALs; same baseline/candidate 4/4, all three modes/nine equal complete errors/retained frozen results/default Core/CLI. Original module-level fixture failure/correction preserved. One tiny source-copy bypass only; no quantified memory/RSS/speed claim | [C++ mode direct heap](wp899-cpp-mode-direct-2026-10-06.json) |
 | Glob exclusions precede candidate String copies; include flags/error priority, original-byte matching, escaping/UTF16 sort/dedup and owned outputs stay. Three DESIGNs/FINALs; corrected baseline one semantic pass/one capacity failure, candidate 12/12, 432 results/180 equal errors, fixed empty Vec capacity 128→0/retained mixed outputs/default Query/Core/CLI. Fixture failures/corrections preserved. Vec storage may shrink; earlier matcher work/allocation failure-panic sequencing excluded, no aggregate/RSS/speed claim | [Glob exclusion before copying](wp899-glob-exclude-before-copy-2026-10-06.json) |
 | String repetition by two copies directly into existing final heap concat, omitting temporary String; unpack/arithmetic/capacity priority, other counts, bytes/type/hash, mul/rmul/folding and GC/frozen owners stay. Three DESIGNs/FINALs; same baseline 2/2, candidate 8/8, 5,460 comparisons/fourteen equal full errors/four large owned outputs/default Loading/Core/CLI. Source scratch-bypass proof only, no quantified memory/RSS/speed claim; OOM sequencing excluded | [Direct repetition by two](wp899-string-repeat-two-direct-2026-10-06.json) |
 | Query tests() tag filtering scratch borrows immutable suite-owned names/suffixes; hash/dedup/order, manual/prefix/tag/size filtering, caller awaits/strict policy/edges and final owners remain. Three DESIGNs/FINALs; same baseline one semantic pass/one pointer failure + three integrations, candidate 5/5, 123 source pointers and 6,669 filters, twenty-one existing oracle rows/default Core/CLI. Async lifetime is source/type proof. Three alternative scratch copy sites only; set storage may change, no quantified memory/RSS/speed claim | [Query suite-tag borrowing](wp899-query-suite-tag-borrow-2026-10-06.json) |

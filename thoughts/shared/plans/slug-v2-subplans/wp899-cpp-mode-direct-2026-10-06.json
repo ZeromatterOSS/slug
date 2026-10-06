@@ -1,0 +1,351 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "16c8d268bb414f89ad761bf882e77a32265fd804",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native temporary String-copy bypass; inherited admitted mode bytes/method behavior remain; no widened parity",
+  "source_sha256": {
+    "app/slug_loading_v2/src/analysis_fragments.rs": "c8fb4b0d8395e9243a3bc0e95ce4dfeed754c776b80c25b781a5a98aeeb79554",
+    "app/slug_loading_v2/src/analysis_fragments/cc_feature_tests.rs": "006f4d83e895c6620f408e5a88a6a941028212be46ebc710c7543178c07ae37c",
+    "app/slug_configuration_v2/src/native/cpp_fragment.rs": "e6a4922863390479c832496d864fdf88fdc60d134eebbfcf173634ce15bd04fb",
+    "app/slug_configuration_v2/src/native/tests.rs": "917990d720bfbb1ef1e227585b1f728eba91c2e2414979e10db885014eaa42c6",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "app/slug_loading_v2/Cargo.toml": "5af8ae9fffd743c683605ca78d9b9b9c8c29ebd7af6ec40a7fc2da4f4a16d06c",
+    "app/slug_loading_v2/src/lib.rs": "85b15b8a36fcc2eea1b9908056d64060b92cc704ac4f5b194d0fc897fc249406",
+    "app/slug_loading_v2/src/builtin_restriction.rs": "3a27ada3826d2ac10027124dee9905d5f09e5a2f8ddb412cbdb0aee201889a0d",
+    "app/slug_build_api_v2/src/lib.rs": "4314803300105f05c55e1668be701f6f08b1d34915e7816aca1fb78e31262b32",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/layout/typed.rs": "fe43834be8a24c30852c4f0672a791dbd587e2efa3b08d6541b63e5ec5cb98cf",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark_derive/src/module/render/fun.rs": "cb0319548e69e323e8cca0e12d172ea1af6cb207ecbd11808c097f2d3f856a03"
+  },
+  "baseline_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "7ec88af2c3a6dd5ffb9e47d2ce5c07291a86562816afce10e6a89fce99f70af1",
+        "selectors": [
+          "analysis_fragments::cc_feature_tests::cpp_compilation_mode_preserves_strings_errors_and_frozen_ownership",
+          "analysis_fragments::cc_feature_tests::retained_cpp_fragment_preserves_identity_and_uses_current_caller",
+          "analysis_fragments::cc_feature_tests::cpp_feature_facade_preserves_public_attributes_and_restricted_methods"
+        ],
+        "fresh": false
+      },
+      "slug_configuration_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_configuration_v2-3d893d9a29bdb6ca",
+        "artifact_sha256": "3c5b5e101db140d87558d22f631cbe6607098cd1fb38bc19119cb33aaf40299e",
+        "selectors": [
+          "native::tests::cpp_fragment_projection_distinguishes_target_and_exec_compilation_modes"
+        ],
+        "fresh": true
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/analysis_fragments.rs": "7050209fd9c57aa0e285dea06fd6fa7ddad024a04aa1063bf2f8879424a7b0d9",
+      "app/slug_loading_v2/src/analysis_fragments/cc_feature_tests.rs": "006f4d83e895c6620f408e5a88a6a941028212be46ebc710c7543178c07ae37c",
+      "app/slug_configuration_v2/src/native/cpp_fragment.rs": "e6a4922863390479c832496d864fdf88fdc60d134eebbfcf173634ce15bd04fb",
+      "app/slug_configuration_v2/src/native/tests.rs": "917990d720bfbb1ef1e227585b1f728eba91c2e2414979e10db885014eaa42c6"
+    }
+  },
+  "candidate_selection": {
+    "targets": {
+      "slug_loading_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-91b0a2591f2fe671",
+        "artifact_sha256": "7d861bd9eae02e832dafaaeed94f7d952eb31fe5fa61e9834531f80f7eab7c0e",
+        "selectors": [
+          "analysis_fragments::cc_feature_tests::cpp_compilation_mode_preserves_strings_errors_and_frozen_ownership",
+          "analysis_fragments::cc_feature_tests::retained_cpp_fragment_preserves_identity_and_uses_current_caller",
+          "analysis_fragments::cc_feature_tests::cpp_feature_facade_preserves_public_attributes_and_restricted_methods"
+        ],
+        "fresh": false
+      },
+      "slug_configuration_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_configuration_v2-3d893d9a29bdb6ca",
+        "artifact_sha256": "3c5b5e101db140d87558d22f631cbe6607098cd1fb38bc19119cb33aaf40299e",
+        "selectors": [
+          "native::tests::cpp_fragment_projection_distinguishes_target_and_exec_compilation_modes"
+        ],
+        "fresh": true
+      }
+    },
+    "source_sha256": {
+      "app/slug_loading_v2/src/analysis_fragments.rs": "c8fb4b0d8395e9243a3bc0e95ce4dfeed754c776b80c25b781a5a98aeeb79554",
+      "app/slug_loading_v2/src/analysis_fragments/cc_feature_tests.rs": "006f4d83e895c6620f408e5a88a6a941028212be46ebc710c7543178c07ae37c",
+      "app/slug_configuration_v2/src/native/cpp_fragment.rs": "e6a4922863390479c832496d864fdf88fdc60d134eebbfcf173634ce15bd04fb",
+      "app/slug_configuration_v2/src/native/tests.rs": "917990d720bfbb1ef1e227585b1f728eba91c2e2414979e10db885014eaa42c6"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_sha256": "7050209fd9c57aa0e285dea06fd6fa7ddad024a04aa1063bf2f8879424a7b0d9",
+    "exact_replacements": [
+      [
+        "use starlark::values::StarlarkValue;\n",
+        "use starlark::values::StarlarkValue;\nuse starlark::values::StringValue;\n"
+      ],
+      [
+        "    fn compilation_mode(\n        this: &CppFragmentValue,\n        eval: &mut Evaluator<'_, '_, '_>,\n    ) -> anyhow::Result<String> {\n        this.check(eval)?;\n        Ok(this.retained.projection().compilation_mode()?.to_owned())\n    }\n",
+        "    fn compilation_mode<'v>(\n        this: &CppFragmentValue,\n        eval: &mut Evaluator<'v, '_, '_>,\n    ) -> anyhow::Result<StringValue<'v>> {\n        this.check(eval)?;\n        Ok(eval\n            .heap()\n            .alloc_str(this.retained.projection().compilation_mode()?))\n    }\n"
+      ]
+    ],
+    "every_other_production_byte_unchanged": true,
+    "existing_test_bytes_unchanged": true
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-compile.json",
+      "sha256": "f8f8ab231a2f8c01249e5cefac4cbed11987b19ae3bbda52d2a645ca57cc5c6d",
+      "exit_code": 0,
+      "elapsed_seconds": 10.528255719982553,
+      "log_sha256": "61f0754e7172766ad24e0d2c7ee503679ae5f71326a0be82cf5de69fd834e1b4"
+    },
+    "baseline-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-preflight.json",
+      "sha256": "cb2c6f208139b134902be75ec898bbe55717ac1296fb7b9fdd509186eaa16810",
+      "exit_code": 0,
+      "elapsed_seconds": 0.04315179702825844,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-slug_loading_v2-controls": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-controls.json",
+      "sha256": "279086dfeeaf1defdcffb6cbf8a6d49973c29d960372b657d6f467d478455cec",
+      "exit_code": 101,
+      "elapsed_seconds": 0.0119788579759188,
+      "log_sha256": "e43f9f7b2012addf28b1d2d8c0fb3495fd199fb4aee69f487a20e745b4cff24a"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-r2-compile.json",
+      "sha256": "ab4d16d4a437001fceecc75fda95cd2222af5b5a4fea841667d21535931d7292",
+      "exit_code": 0,
+      "elapsed_seconds": 8.239372409007046,
+      "log_sha256": "77fe6cca6ec84420ed85dcf4ec7e071c81a2b868ee3cde5e41c3d765df0755f4"
+    },
+    "baseline-r2-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-preflight.json",
+      "sha256": "e4af485c33174375f5f2e8b97eac7336f036b6a6f8a5c4cb7d4ad88b713a6f51",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0241278350003995,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "baseline-r2-slug_loading_v2-controls": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-controls.json",
+      "sha256": "0c68f1a561dd6b532efb93fc7934906e434432f2370ec77c1b3edc545b232505",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01370123599190265,
+      "log_sha256": "cfae44247257001b8a80b3b304cf1cc33ea25a9d2b5b37eb97f428d0ab33860a"
+    },
+    "baseline-r2-slug_configuration_v2-preflight": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-preflight.json",
+      "sha256": "f6fe0fc4de4875a4de2fb7db3c9d393a238a2c509b65a5968bedefbbc045b912",
+      "exit_code": 0,
+      "elapsed_seconds": 0.019941725011449307,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "baseline-r2-slug_configuration_v2-controls": {
+      "receipt": "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-controls.json",
+      "sha256": "e381982544c57a959efaf17f6b6cf8cb565106879451c971ce0acbe273da606c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.004713243048172444,
+      "log_sha256": "6a6d88bcfa35c652074a781f4f1fb25c0d25cd575a334e6ec6ffc8f414aa0cc8"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/cpp-mode-direct-candidate-compile.json",
+      "sha256": "c8695cc270ce89ea3279ef1363d5fc67e8c00b6b73a0fbbee56bb6d32c7ed08b",
+      "exit_code": 0,
+      "elapsed_seconds": 10.331427356984932,
+      "log_sha256": "4e166c54b2d3a98ffa07bd599f4fb8ee6dba0b393606d8b558085b8362cd3cf9"
+    },
+    "candidate-slug_loading_v2-preflight": {
+      "receipt": "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-preflight.json",
+      "sha256": "568f4a85932c49351dc63394b614e7e8682f7e0ac8cf56e517ba31a28298ad20",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024118884990457445,
+      "log_sha256": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27"
+    },
+    "candidate-slug_loading_v2-controls": {
+      "receipt": "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-controls.json",
+      "sha256": "64a965d1ac4900e8589eb0631d8fac2951f144a641f2b09aa31b2ea5e4ca4b05",
+      "exit_code": 0,
+      "elapsed_seconds": 0.013645986036863178,
+      "log_sha256": "cfae44247257001b8a80b3b304cf1cc33ea25a9d2b5b37eb97f428d0ab33860a"
+    },
+    "candidate-slug_configuration_v2-preflight": {
+      "receipt": "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-preflight.json",
+      "sha256": "d32056ad34216fb34b16fe6e9dece2c0eca95f93a29ce4f56966027ddcb48de8",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01978901500115171,
+      "log_sha256": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365"
+    },
+    "candidate-slug_configuration_v2-controls": {
+      "receipt": "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-controls.json",
+      "sha256": "64ebbc62eb2189a682c157a9e672ca3f01660b59ea36d09dd0b5b5c9c58a58fb",
+      "exit_code": 0,
+      "elapsed_seconds": 0.004690752015449107,
+      "log_sha256": "6a6d88bcfa35c652074a781f4f1fb25c0d25cd575a334e6ec6ffc8f414aa0cc8"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/cpp-mode-direct-dependents-check.json",
+      "sha256": "d8a918e4f3845261b7a8cd827fdaaa7160fb8d2168660a3047373f7c14286dfc",
+      "exit_code": 0,
+      "elapsed_seconds": 5.009160928020719,
+      "log_sha256": "61d0eac23a08d1c483dd06619b5917c85ae726c07524265509ef9bb7d41bdb90"
+    },
+    "format-check": {
+      "receipt": "target/wp899/cpp-mode-direct-format-check.json",
+      "sha256": "886203f4dfe1aa0d94ed317d66de847d1d6039b0d2d8431f9eebe9c9f36e1b9d",
+      "exit_code": 0,
+      "elapsed_seconds": 0.01645304902922362,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/cpp-mode-direct-archive-check.json",
+      "sha256": "3bf06476288c33951fb1849829609405bea00e96641080ede7ca00ad34aa548b",
+      "exit_code": 0,
+      "elapsed_seconds": 0.034953567024786025,
+      "log_sha256": "d82c983f806a6dfe10b44657b8ae70dc0747deb453c6a7ff1ece6be8448992a2"
+    }
+  },
+  "pass_counts": {
+    "original_baseline_protected": 2,
+    "original_baseline_fixture_failure": 1,
+    "corrected_baseline": 4,
+    "candidate": 4
+  },
+  "captured_errors": {
+    "count": 9,
+    "unique": 3,
+    "equal_full_bytes": true,
+    "sha256": "e137b2f6dbe466d4f7fb63dde9c597eac0f7503f8087fba4e0558636f1ff4197"
+  },
+  "invariant_to_evidence": {
+    "source_copy_bypass": "Same projection name previously to_owned then native String adapter heap.alloc_str; new existing StringValue adapter returns the existing heap value. Only temporary Rust String construction omitted. alloc_str does not invoke interner.",
+    "semantics": "Actual allowed .bzl function caller getter produces fastbuild/dbg/opt with string type; same full denied/positional/keyword errors. this.check remains first, projection ? next, identical macro parameter binding. Invalid configuration states rejected in unchanged projection constructor.",
+    "ownership": "Borrow remains under live retained receiver during synchronous heap copy. Test clears cpp/read roots; evaluator/context drop before freeze, result OwnedFrozenValue held after FrozenModule drop. Exact three modes/string type survive. Final heap/frozen ownership unchanged.",
+    "protected": "Unchanged retained fragment identity/current caller and feature facade controls; independent target/exec configuration projection; default Core/CLI checks."
+  },
+  "fixture_correction": {
+    "record": "target/wp899/cpp-mode-direct-fixture-correction.json",
+    "original_test_sha256": "e6780592bc659b0b17a05e29ade0eb01d6dcd2a1dd952780a0b3819706be85f9",
+    "reason": "Unchanged baseline requires .bzl function caller; module-level fixture call triggered earlier caller-shape error. Wrap exact same getter calls in read() and clear read with cpp before freezing. Existing denied diagnostic/type/value/arity/frozen ownership assertions retained.",
+    "exact_replacements_before_format": [
+      [
+        "(\"RESULT=cpp.compilation_mode()\", false),",
+        "(\"def read(): return cpp.compilation_mode()\\nRESULT=read()\", false),"
+      ],
+      [
+        "(\"RESULT=cpp.compilation_mode(1)\", true),",
+        "(\"def read(): return cpp.compilation_mode(1)\\nRESULT=read()\", true),"
+      ],
+      [
+        "(\"RESULT=cpp.compilation_mode(unexpected=1)\", true),",
+        "(\"def read(): return cpp.compilation_mode(unexpected=1)\\nRESULT=read()\", true),"
+      ],
+      [
+        "\"RESULT=cpp.compilation_mode()\\nTYPE=type(RESULT)\\ncpp=None\"",
+        "\"def read(): return cpp.compilation_mode()\\nRESULT=read()\\nTYPE=type(RESULT)\\ncpp=None\\nread=None\""
+      ]
+    ],
+    "original_failure": "baseline Loading controls: 2 protected passed, new fixture failed on denied error assertion; exit101. Production untouched.",
+    "classification": "fixture invocation correction within accepted design"
+  },
+  "limits": "One tiny source-proved temporary String-copy bypass. Final heap copy remains; alloc_str is not alloc_str_intern. Allocation failure/OOM sequencing excluded. No allocator/count/quantified memory/aggregate/peak/RSS/speed/source-fit claim. No public API/new helper/interner/cache/DICE/key/identity/unsafe/dependency/donor or Windows expansion. Full WP899/M7A/source integration open/unwaived.",
+  "growth": {
+    "new_test_lines": 86,
+    "estimate": "one test <=100lines; no assets/goldens"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T04:47:40.173148+00:00",
+    "baseline": "16c8d268bb414f89ad761bf882e77a32265fd804"
+  },
+  "timing": {
+    "compile_and_check_seconds": 34.10821641399525,
+    "test_seconds": 0.04873007506830618,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 294.664358
+  },
+  "evidence_sha256": {
+    "target/wp899/cpp-mode-direct-archive-check.json": "3bf06476288c33951fb1849829609405bea00e96641080ede7ca00ad34aa548b",
+    "target/wp899/cpp-mode-direct-archive-check.jsonl": "d82c983f806a6dfe10b44657b8ae70dc0747deb453c6a7ff1ece6be8448992a2",
+    "target/wp899/cpp-mode-direct-baseline-compile.json": "f8f8ab231a2f8c01249e5cefac4cbed11987b19ae3bbda52d2a645ca57cc5c6d",
+    "target/wp899/cpp-mode-direct-baseline-compile.jsonl": "61f0754e7172766ad24e0d2c7ee503679ae5f71326a0be82cf5de69fd834e1b4",
+    "target/wp899/cpp-mode-direct-baseline-r2-compile.json": "ab4d16d4a437001fceecc75fda95cd2222af5b5a4fea841667d21535931d7292",
+    "target/wp899/cpp-mode-direct-baseline-r2-compile.jsonl": "77fe6cca6ec84420ed85dcf4ec7e071c81a2b868ee3cde5e41c3d765df0755f4",
+    "target/wp899/cpp-mode-direct-baseline-r2-selectors.json": "e5aa93f3c9bd3c8321f22f4474b5c833faca8009dc6373444770305c0fcbcdca",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-controls.json": "e381982544c57a959efaf17f6b6cf8cb565106879451c971ce0acbe273da606c",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-controls.jsonl": "6a6d88bcfa35c652074a781f4f1fb25c0d25cd575a334e6ec6ffc8f414aa0cc8",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-preflight.json": "f6fe0fc4de4875a4de2fb7db3c9d393a238a2c509b65a5968bedefbbc045b912",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_configuration_v2-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-controls.json": "0c68f1a561dd6b532efb93fc7934906e434432f2370ec77c1b3edc545b232505",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-controls.jsonl": "cfae44247257001b8a80b3b304cf1cc33ea25a9d2b5b37eb97f428d0ab33860a",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-preflight.json": "e4af485c33174375f5f2e8b97eac7336f036b6a6f8a5c4cb7d4ad88b713a6f51",
+    "target/wp899/cpp-mode-direct-baseline-r2-slug_loading_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/cpp-mode-direct-baseline-selectors.json": "13a41f2258f3aac519323574744dd213c1c3c8190b97e35af52cd448ae7e8ede",
+    "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-controls.json": "279086dfeeaf1defdcffb6cbf8a6d49973c29d960372b657d6f467d478455cec",
+    "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-controls.jsonl": "e43f9f7b2012addf28b1d2d8c0fb3495fd199fb4aee69f487a20e745b4cff24a",
+    "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-preflight.json": "cb2c6f208139b134902be75ec898bbe55717ac1296fb7b9fdd509186eaa16810",
+    "target/wp899/cpp-mode-direct-baseline-slug_loading_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/cpp-mode-direct-candidate-compile.json": "c8695cc270ce89ea3279ef1363d5fc67e8c00b6b73a0fbbee56bb6d32c7ed08b",
+    "target/wp899/cpp-mode-direct-candidate-compile.jsonl": "4e166c54b2d3a98ffa07bd599f4fb8ee6dba0b393606d8b558085b8362cd3cf9",
+    "target/wp899/cpp-mode-direct-candidate-selectors.json": "aeb108e0ac978ad969d1fb9d9411564836a7389eec9903a5aa4455be5f8f7985",
+    "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-controls.json": "64ebbc62eb2189a682c157a9e672ca3f01660b59ea36d09dd0b5b5c9c58a58fb",
+    "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-controls.jsonl": "6a6d88bcfa35c652074a781f4f1fb25c0d25cd575a334e6ec6ffc8f414aa0cc8",
+    "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-preflight.json": "d32056ad34216fb34b16fe6e9dece2c0eca95f93a29ce4f56966027ddcb48de8",
+    "target/wp899/cpp-mode-direct-candidate-slug_configuration_v2-preflight.jsonl": "9a2751015ee328644fe5c464be9d6e453b1e245e8ec8b26a31062c742b2dd365",
+    "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-controls.json": "64a965d1ac4900e8589eb0631d8fac2951f144a641f2b09aa31b2ea5e4ca4b05",
+    "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-controls.jsonl": "cfae44247257001b8a80b3b304cf1cc33ea25a9d2b5b37eb97f428d0ab33860a",
+    "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-preflight.json": "568f4a85932c49351dc63394b614e7e8682f7e0ac8cf56e517ba31a28298ad20",
+    "target/wp899/cpp-mode-direct-candidate-slug_loading_v2-preflight.jsonl": "b3e64e1e161e40cd579d568c80ce6163b9e5ecd1e17df3b050ab35e65f3d5a27",
+    "target/wp899/cpp-mode-direct-controls.py": "ab8109ef56dc37a6e4cea35a4607147ec90b7a483e3b9c8148b82b1f61305c2b",
+    "target/wp899/cpp-mode-direct-dependents-check.json": "d8a918e4f3845261b7a8cd827fdaaa7160fb8d2168660a3047373f7c14286dfc",
+    "target/wp899/cpp-mode-direct-dependents-check.jsonl": "61d0eac23a08d1c483dd06619b5917c85ae726c07524265509ef9bb7d41bdb90",
+    "target/wp899/cpp-mode-direct-design-evidence.md": "ab3062782a58d1a307479bfad21388a875364a15fc018b2e9b1003a3effcdf31",
+    "target/wp899/cpp-mode-direct-design-ownership.md": "a177884c847a06854756aed8387c7615c28a52af18e568c011a8aa8c6a808847",
+    "target/wp899/cpp-mode-direct-design-source.md": "36ca6dd9df795ccf289f5e08817c10fc38b1a543b8e71c6fc7e657ede8cca7b5",
+    "target/wp899/cpp-mode-direct-design.md": "978988e4bf25bec48f82581cbb0885d2875a1eba240bec0f8ea9559a677e63a6",
+    "target/wp899/cpp-mode-direct-fixture-correction.json": "8377c5571d45ffeb8735b38a0f0b7539806daf8aa4d4183091a0e22888d5b856",
+    "target/wp899/cpp-mode-direct-format-check.json": "886203f4dfe1aa0d94ed317d66de847d1d6039b0d2d8431f9eebe9c9f36e1b9d",
+    "target/wp899/cpp-mode-direct-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/cpp-mode-direct-original-test.rs": "e6780592bc659b0b17a05e29ade0eb01d6dcd2a1dd952780a0b3819706be85f9",
+    "target/wp899/cpp-mode-direct-record.py": "343dfab39d8d80a0a8b613630c0f7816a47f54116fe51b4a2c40a102abecc4a5",
+    "target/wp899/cpp-mode-direct-start.json": "3e151ec1d88696c5a35a2bcca30aae31b17f6c1c830d7b65e93fcef0d81c264b"
+  },
+  "validation_sha256": "a559b0b4f67e20b84dbfa1847cee9b07680e0c36a91b0464f48737426d9146c9",
+  "final_reviews": {
+    "target/wp899/cpp-mode-direct-final-source.md": "3537b54e11c601173971932fbb46947e0b7cfe730f2897e64a1818a697b97937",
+    "target/wp899/cpp-mode-direct-final-ownership.md": "1fc3de72537db73e5a66b7c27d53f6dc8dafc60220a776d76bd0b882a1e42d76",
+    "target/wp899/cpp-mode-direct-final-evidence.md": "e26d29befea9c92db98af2c8496a67d346ae4af0a58645a0e266ca4f6fe11c74"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "2c38e37e4e2e6b7822601492b22f0b67dd954db318838219d054c27169ec49c0",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "281c4ba803e44096313f179c2bc47b7c333911fd7c9ff2d95f7e5e4f6c250e02",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "980b0b4a7b9cdc43811efc13cdc7defde38dc637540f0fd26c27298a4de423fb"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/cpp-mode-direct-format-check.json",
+      "sha256": "886203f4dfe1aa0d94ed317d66de847d1d6039b0d2d8431f9eebe9c9f36e1b9d",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/cpp-mode-direct-archive-check.json",
+      "sha256": "3bf06476288c33951fb1849829609405bea00e96641080ede7ca00ad34aa548b",
+      "exit_code": 0,
+      "log_sha256": "d82c983f806a6dfe10b44657b8ae70dc0747deb453c6a7ff1ece6be8448992a2"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/cpp-mode-direct-plan-check.json",
+      "sha256": "ef5a12b2bfabdc4af9498c33594d00e74b79c924583f041f98e4988eb16df990",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/cpp-mode-direct-diff-check.json",
+      "sha256": "246c0ec753830daef9924290a9aa4b1ef8e079b653958859f13732b485fc12c0",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

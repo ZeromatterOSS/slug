@@ -24,6 +24,92 @@ use crate::provider::BzlEvaluationContext;
 const FILENAME: &str = "cpp_features.bzl";
 
 #[test]
+fn cpp_compilation_mode_preserves_strings_errors_and_frozen_ownership() {
+    let mut held = Vec::new();
+    let mut errors = Vec::new();
+    for mode in ["fastbuild", "dbg", "opt"] {
+        let mapping = RepositoryMapping::new(RepositoryMappingId::new("cpp-mode").unwrap());
+        let configuration = configuration(false)
+            .with_command_configuration_context(
+                configuration(false).starlark_options().clone(),
+                &CommandConfigurationOverlay::from(vec![CommandConfigurationOccurrence::native(
+                    NativeCommandOption::CompilationMode,
+                    Some(mode),
+                    false,
+                )]),
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap();
+        for (source, allowed) in [
+            (
+                "def read(): return cpp.compilation_mode()\nRESULT=read()",
+                false,
+            ),
+            (
+                "def read(): return cpp.compilation_mode(1)\nRESULT=read()",
+                true,
+            ),
+            (
+                "def read(): return cpp.compilation_mode(unexpected=1)\nRESULT=read()",
+                true,
+            ),
+        ] {
+            let error = evaluate_configuration(source, configuration.clone(), allowed)
+                .unwrap_err()
+                .to_string();
+            if !allowed {
+                assert!(error.contains("cannot use private API"), "{error}");
+            }
+            errors.push(error);
+        }
+        let identity = BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@rules_cc+//cc/private:cpp_features.bzl").unwrap(),
+            workspace_path: PathBuf::from(FILENAME),
+            repository_mapping: Arc::from([]),
+        };
+        let context = BzlEvaluationContext::macro_runtime_context(
+            identity.clone(),
+            Arc::from([(
+                CompactString::new(FILENAME),
+                BzlModuleSourceProvenance::new(identity, [0; 32]),
+            )]),
+        );
+        let module = Module::new();
+        module.set(
+            "cpp",
+            module.heap().alloc_simple(CppFragmentValue::new(
+                CppFragmentProjection::new(configuration).unwrap(),
+            )),
+        );
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        evaluator
+            .eval_module(
+                AstModule::parse(
+                    FILENAME,
+                    "def read(): return cpp.compilation_mode()\nRESULT=read()\nTYPE=type(RESULT)\ncpp=None\nread=None".to_owned(),
+                    &Dialect::Bazel,
+                )
+                .unwrap(),
+                &Globals::standard(),
+            )
+            .unwrap();
+        assert_eq!(module.get("TYPE").unwrap().unpack_str(), Some("string"));
+        assert_eq!(module.get("RESULT").unwrap().unpack_str(), Some(mode));
+        drop(evaluator);
+        drop(context);
+        let frozen = module.freeze().unwrap();
+        held.push(frozen.get("RESULT").unwrap());
+        drop(frozen);
+    }
+    for (value, mode) in held.iter().zip(["fastbuild", "dbg", "opt"]) {
+        assert_eq!(value.value().unpack_str(), Some(mode));
+        assert_eq!(value.value().get_type(), "string");
+    }
+    println!("CPP_MODE_ERRORS={errors:?}");
+}
+
+#[test]
 fn retained_cpp_fragment_preserves_identity_and_uses_current_caller() {
     let retained =
         RetainedCppFragment::new(CppFragmentProjection::new(configuration(true)).unwrap());

@@ -39,12 +39,12 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: glob exclusions run before candidate path copying.
-Include flags/error priority, unescaped matching, ordering and owned output remain.
-Twelve controls, 432 result comparisons, 180 equal diagnostics, fixed empty Vec
-capacity 128→0, retained strings and Query/Core/CLI checks pass. Vec storage may
-shrink; earlier matcher allocation-work/failure sequencing has explicit limits.
-No aggregate/RSS/speed claim.
+Latest accepted change: the C++ compilation-mode getter copies the retained mode
+name directly into the existing Starlark heap, omitting its temporary Rust String.
+Caller/projection order, string type/arity/errors and final ownership remain.
+Four focused controls, all three modes, nine identical diagnostics, retained frozen
+results and Core/CLI checks pass. One tiny source-copy bypass only; no quantified
+memory/RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,
 cap growth or runtime activation is selected.
