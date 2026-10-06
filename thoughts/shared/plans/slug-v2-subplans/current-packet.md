@@ -42,56 +42,34 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Selected offline prerequisite checkpoint
+## Current finite source-availability checkpoint
 
-WP932 accepted the offline prerequisite after read-only discovery found no selective
-offline scoped transport policy: empty
-registry inputs cannot prohibit extension/archive HTTP, while closing the whole scope
-also refuses local path/source progress. The reviewed contract is
-[target/wp932/design.md](../../../../target/wp932/design.md). Implement an immutable
-allow_network scalar in existing SourceServiceLimits, default true, with a common
-scoped HTTP check before parser allocation/DNS/connect. False selects sticky typed
-NetworkDisabled with new inline code12; existing codes1–11 and Native services retain
-behavior. This operational guard is Slug-native and changes no DICE semantic key.
-No fixture/root/source observation is selected at this checkpoint.
+[WP933](wp933-finite-source-availability-2026-10-06.json) accepted one closed
+finite observation:11 controls pass;8 unchanged reference files match their pins
+(206,598B). All5 external candidates refuse directory_symlink rules_rust+ before
+body reads.13 completed decisions are not13 source admissions. Observed child peak
+18,968KiB and trace peak1,586,993B/retained1,484,476B cover eight reference reads and
+zero external AST bodies; trace excludes encoding, process RSS includes it. Normal
+source/public producer/full-workload memory fit remain unproved. No identical retry.
 
-Correction allowlist: Core runtime/source_service/{scope.rs,http.rs,failure.rs,
-failure/tests.rs,tests.rs}; runtime/source_preparation/genuine_root.rs exhaustive
-scalar attribution arm only; Bzlmod registry_dice/{refusal.rs,refusal_tests.rs}; prior
-scheduling/receipt and ignored target/wp932 records. No second corpus/cache/interner
-or owned source clone. Local426-byte MODULE read controls prove only ordinary local
-transport and retained Arc lifetime. Direct common-leaf registry/archive refusal
-controls establish zero parser reservation and counters at that boundary; upstream
-registry parsing/attempt bookkeeping may precede it. Default profiles, first refusal,
-cleanup/retirement and stable code/projection gates protect behavior.
-
-Unit runtime10s TERM3/512MiBAS/256MiBRSS/1MiBlog, expected below1s per named case;
-compile/check offline separately60s using pinned nightly and prior owner profile.
-Independent DESIGN before edits and FINAL actual diff/evidence, exact selectors and
-normal checks required. These unit resource observations do not establish complete
-source or workload fit. Before any dependent public-root proof, freeze exact native
-module override/file-registry provenance and generated-tool requests under the
-original availability contract; no implicit Bazel-cache fallback is supported.
-
-[Accepted WP932 receipt](wp932-offline-source-guard-2026-10-06.json):7 Core/1 Bzlmod
-named unit gates and current CLI check pass;33,136KiB conservative Core process peak,
-all runtime groups joined. Initial mixed preparation124/60s is preserved; separate
-Bzlmod40.156s/Core32.033s/CLI25.752s preparation gates pass with unchanged60s bounds.
-No source availability observation was consumed. Continue this packet with the
-[first-file recommendation](../../../../target/wp932/successor-source.md), SHA256
-d9e6dd58b580c99c99a4bb68109872f6ff0f4102c46b71d64b846c4310bf4ac8:
-freeze only exact MODULE/defs/extensions/repository import files at the named existing
-local root, descriptor-anchored streamed hashes and small source facts,16MiB aggregate
-including fixture/reference inputs,64KiB reusable scratch and original10s/512MiBAS/
-256MiBRSS/4MiBreport caps. No entire archive/tree/binary or implicit cache certificate.
-Derive the exact additional module/import allowlist from current observed MODULE;
-missing/unparsed imports remain typed prerequisites. Source readiness still precedes
-any dependent public producer proof, which needs a separately frozen Core contract.
+Next use [the source recommendation](../../../../target/wp933/successor-source.md),
+SHA2568deff2a0aa665ef3861c9b30b04668f5e6a34b646f05c0ff52fdf6b5520bd7b9,
+to observe metadata for the one refused rules_rust+ alias. Anchor the exact absolute
+parent chain with DIRECTORY/NOFOLLOW, bracket each FD/named identity, lstat/readlink
+that single leaf twice and verify exact unchanged link identity/target. No source
+body/target follow-through, canonicalize fallback, directory census or acquisition.
+Retain only compact identity/target metadata;10s TERM3/512MiBAS/256MiBRSS/1MiBlog/4MiB
+report caps remain. Freeze the metadata design and temporary controls before one
+actual observation. Then separately select the observed absolute lexical target as
+an explicit local module root through existing CommandModuleOverrides; no new API or
+implicit Bazel cache certificate. Unknown/relative/mutated aliases stay typed until
+the exact path derivation and source-read allowlist are frozen. This continuation
+preserves WP933's refusal and all source16–18/F3/BCR/full-root limits.
 
 ## Ownership, scope and allocation
 
 Root first freezes the smallest source-readiness and proof design, with independent
-source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp932
+source/evidence review before dependent Rust work. Initial allowlist: ignored target/wp933
 source/availability/design/input/operation/hash records, a focused Core sibling
 runtime/tests/rustc_producer_aquery_tests.rs, its test-only include in runtime/dice.rs,
 and canonical/current/bootstrap plus one compact receipt. Any minimal shared fixture

@@ -1,0 +1,113 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "checkpoint": "WP933 finite local source availability",
+  "date": "2026-10-06",
+  "status": "accepted observation only",
+  "baseline": "f201f876229cd2c4726dc8acf473d1b54933e78e",
+  "contract": {
+    "path": "target/wp933/design.md",
+    "sha256": "1abbac83ac7ceec8cd08908fcc0a905e3818d38bed2ff42d89220b00e16594a1"
+  },
+  "result": "8 exact reference files verified,206598B; all5 external candidates refuse directory_symlink rules_rust+ before body read.13 completed row decisions are not13 source passes.",
+  "compatibility": {
+    "exact": "Unchanged fixture/reference pins verified; no new compatibility admission.",
+    "slug_native": "Bounded local diagnostic observations and literal facts only.",
+    "deferred": "Alias target/current external source/module-import/materialization/registration/provider/public Rustc owner/full workload fit/M7A; Windows minimal."
+  },
+  "source_pins": {
+    "target/wp933/read.py": "b1449695dce5f24f7fa34db8131b4ad4dd8cf67776c36753d57d365d0c943b13",
+    "target/wp933/facts.py": "19ce415b75d77e667c846807650cfbe41120cbed7f80e48c2e978236b6f1e429",
+    "target/wp933/reader_controls.py": "a74b6762ad0ef2a9182b62b2724ead97e23a94c437f5e35f4bb601699cc82ddd",
+    "target/wp933/fact_controls.py": "4ac9568502600f73facae5a7618c049db5150d3d2bf87e782cd994af9e3328e3",
+    "target/wp933/bounded.py": "fd49ad59bfa727e6a0bae7548436c65f6aeefbda13080e56f298b5d840cb2aa2",
+    "target/wp933/inputs.json": "361f7ae08a6117a9e1588c9339d8b348dafd53907080d5286193ca5a67ba7462",
+    "target/wp933/design.md": "1abbac83ac7ceec8cd08908fcc0a905e3818d38bed2ff42d89220b00e16594a1"
+  },
+  "validation": {
+    "controls": {
+      "selected": 11,
+      "passed": 11,
+      "elapsed_seconds": 0.07164581399410963,
+      "operation": {
+        "path": "target/wp933/controls-operation.json",
+        "sha256": "7fa9fba9b5d51be74c8b7604987f35629aaef219e0092912e0584186ddfe4d84"
+      },
+      "raw": {
+        "path": "target/wp933/controls.stderr",
+        "sha256": "001f12f6483ae91eba640ac615b115e3966e82ca798d74c3d964cfedc2082ddc"
+      }
+    },
+    "observation": {
+      "selected": 13,
+      "completed": 13,
+      "source_passes": 0,
+      "external_body_bytes": 0,
+      "reference_bytes": 206598,
+      "elapsed_seconds": 0.04124393593519926,
+      "operation": {
+        "path": "target/wp933/availability-operation.json",
+        "sha256": "f28a878f59dfb3bc461498d69fc28e422ad998817e554282be5e1418a7b64284"
+      },
+      "report": {
+        "path": "target/wp933/result.json",
+        "sha256": "720164f9b7274023d6b81903c5721c8fa530cecb37e5a85fed1146ae1dd9e612"
+      }
+    },
+    "all_groups_empty_joined": true
+  },
+  "allocation": {
+    "strategy": "One64KiB streaming scratch,one256KiB facts body; body/text/AST retired perfile. Compact facts/identities/helpers only; no global source/string pool.",
+    "trace_loaded_bytes": 1513610,
+    "trace_retained_bytes": 1484476,
+    "trace_peak_bytes": 1586993,
+    "report_bytes": 27316,
+    "observation_rss_kib": 18968,
+    "controls_rss_kib": 29572,
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304
+    },
+    "qualification": "Trace excludes interpreter/read-module compilation/initial tracemalloc import and report encoding; RSS includes encoding. Eight reference reads,zero upstream AST bodies; no Slug savings or whole workload fit."
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp933/design-source.md",
+      "sha256": "2934e327bc61d0c5e1a0db049fcd19ffe9829d62721709f019698bfc99a8e16e"
+    },
+    "design-evidence": {
+      "path": "target/wp933/design-evidence.md",
+      "sha256": "fbd4e64bd275849f953294165847c89e3620d5bcb2289ae3b897d52ec2a69141"
+    },
+    "preflight-source": {
+      "path": "target/wp933/preflight-source.md",
+      "sha256": "c6ca012c642a3ced6f5ba1025261ec38e784a54a0106e2190364ddc9834d3266"
+    },
+    "preflight-evidence": {
+      "path": "target/wp933/preflight-evidence.md",
+      "sha256": "f8f9d184f0bf46c2aaf06650e58d06ec2ccc2c1a9efddaa315118b9b43f73c86"
+    },
+    "final-source": {
+      "path": "target/wp933/final-source.md",
+      "sha256": "74eeaa3d521b624ceb1233149616e4486db8b53cb46017a2c0efc586b0b40759"
+    },
+    "final-evidence": {
+      "path": "target/wp933/final-evidence.md",
+      "sha256": "b176135cbe9060c8c0487bc984c3b47fccf8d8e62a250ea5fdcbfa7f8700fab1"
+    }
+  },
+  "next": {
+    "packet_continues": true,
+    "gate": "Explicit anchored metadata observation of the single refused rules_rust+ alias; freeze actual target as an explicit local root before later source reads. No follow-through,guessed target,certificate,root/census/acquisition/source16\u201318/F3/BCR retry.",
+    "public_producer_unproved": true,
+    "whole_memory_fit_unproved": true,
+    "recommendation": {
+      "path": "target/wp933/successor-source.md",
+      "sha256": "8deff2a0aa665ef3861c9b30b04668f5e6a34b646f05c0ff52fdf6b5520bd7b9"
+    }
+  },
+  "packet_elapsed_seconds": 1054.1571390628815
+}

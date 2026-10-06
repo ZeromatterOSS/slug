@@ -44,13 +44,14 @@ generated mapping and provider readiness, then normal configured action ownershi
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 [WP932](./slug-v2-subplans/wp932-offline-source-guard-2026-10-06.json)
-adds an immutable local-only scoped HTTP policy and typed code12 while preserving
-local reads and retained Arc byte lifetime. Eight focused gates and CLI check pass;
-Core unit process peak33,136KiB remains below256MiB. The initial mixed compilation
-hit60s; completed dependencies were reused in separate bounded preparations. This
-is an operational prerequisite only. The unchanged public fixture's exact local
-module/import/generated-tool availability and normal producer remain next under
-WP-7-231; no source/root attempt or whole-workload fit is claimed.
+accepts scoped offline HTTP policy with8 focused gates/current CLIcheck.
+[WP933](./slug-v2-subplans/wp933-finite-source-availability-2026-10-06.json)
+verifies8 unchanged reference files (206,598B), while5 upstream candidates stop at
+the rules_rust+ directory symlink with zero external bodies read.11 controls pass;
+18,968KiB observed child peak establishes only finite-reader fit. The next concrete
+prerequisite is exact alias metadata and explicit local root selection via existing
+module overrides, then source/import/generated-tool and normal producer proof.
+No full-workload memory fit or source/root retry is admitted.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
