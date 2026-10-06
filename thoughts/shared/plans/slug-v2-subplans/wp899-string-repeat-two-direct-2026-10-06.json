@@ -1,0 +1,268 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "0f9bae4002f0bc2df6825bba2b1ecb2c79a7238c",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native local string scratch optimization; inherited Rust mul/rmul/count/bytes/type/hash/errors preserved; local Bazel context adds no Java/UTF16/size parity",
+  "source_sha256": {
+    "starlark-rust/starlark/src/values/types/string/str_type.rs": "c00bc6d0acefcfdaf2021c8964f7b654a9527fe37bb62cf0a3a95912400e0c7d",
+    "starlark-rust/starlark/src/values/types/string/repeat_two_memory_tests.rs": "b9bd12ad1a6eadc776303c37290fca1b6110c738207e691a2a7dc596a1fbe168",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "starlark-rust/starlark/Cargo.toml": "1aee590006684fde395f91a74df4f4ace2db2c6ecc3f0f7afe564a76eabac660",
+    "starlark-rust/starlark/src/values/types/string/methods.rs": "6444a195114471738ae2bb0f3aa84c1d2c99b5be9a00d84f4c49e007797a572c",
+    "starlark-rust/starlark/src/values/types/string/alloc_unpack.rs": "ba1a29c78621d552552b22cc377fea449173ab3d110c6feafe353281eb586bb9",
+    "starlark-rust/starlark/src/values/layout/avalues/str_.rs": "8f08110a3d77772b8b8645cb95f1820ed75e1fce77ea7bebb766c13ea06b2930",
+    "starlark-rust/starlark/src/values/layout/static_string.rs": "5d2c46207beea38de7958f4aa8d8076789ad99ce331f87b278c09948e275df0d",
+    "starlark-rust/starlark/src/values/layout/heap/arena.rs": "bb5ad2d31c2e25eb7c1bd83a74bdea34069d26ebfaf3c7319c6e7b886b0974ca",
+    "starlark-rust/starlark/src/values/layout/heap/heap_type.rs": "704c26dee697ca2c453b0a10314d5b071d8274b4303c75b0f04ab80ba2e110c5",
+    "starlark-rust/starlark/src/values/types/string/intern/interner.rs": "3ff51091cc553cb89c450cd94fbad974cc3b257a2ea62f44b49c3d9914be2c9f",
+    "starlark-rust/starlark/src/tests/opt/speculative_exec.rs": "b2153cd273a8b5319d7f8cc12b07e26d338203a95d8bfc7e0a955cd3cf0b6af2",
+    "starlark-rust/starlark/src/tests/bazel_internal_string.rs": "5188f0ed4d55f4e4986a24911485b59c9e60c8b5f0450d1176e282ffbe9f8257"
+  },
+  "reference_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/net/starlark/java/eval/EvalUtils.java": "bb6d9cfd440023c0974da4979aa19e4dd6c5f304377df4eba4139712007ba9f9",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/raw_vec/mod.rs": "5c51411a79a9c48ce17940080603d7129a7426dec86ae43d1d8924f7bfa8198a",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/string.rs": "bde5c14b3071610c7a0658276b56efb5d6d60de9e5fcaef1779b9c6d9724f17a"
+  },
+  "baseline_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "1996037b1bb496ee461ef9e84b9ac8eec51647c75d97470121785cdcad623662",
+    "fresh": false,
+    "selectors": [
+      "values::types::string::str_type::repeat_two_memory_tests::multiplication_directions_preserve_bytes_hashes_counts_and_raw_errors",
+      "values::types::string::str_type::repeat_two_memory_tests::repeated_outputs_and_functions_survive_gc_freeze_and_source_drop"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/str_type.rs": "9e68a2c9616fcc64d6d50eb6a71f780c41dd7094f2ec95434938d76f829d89bb",
+      "starlark-rust/starlark/src/values/types/string/repeat_two_memory_tests.rs": "b9bd12ad1a6eadc776303c37290fca1b6110c738207e691a2a7dc596a1fbe168"
+    }
+  },
+  "candidate_selection": {
+    "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-afbbf94a6213211c",
+    "artifact_sha256": "d6f461af3e771a5269bb1d0e92b18b2408fa31e5f686ba1429788c6ada728a20",
+    "fresh": false,
+    "selectors": [
+      "values::types::string::str_type::repeat_two_memory_tests::multiplication_directions_preserve_bytes_hashes_counts_and_raw_errors",
+      "values::types::string::str_type::repeat_two_memory_tests::repeated_outputs_and_functions_survive_gc_freeze_and_source_drop",
+      "values::types::string::str_type::tests::test_arithmetic_on_string",
+      "values::types::string::intern::interner::tests::test_intern",
+      "values::types::string::intern::interner::tests::test_string_value_intern",
+      "tests::opt::speculative_exec::test_methods_invoked_speculatively",
+      "tests::bazel_internal_string::test_standard_string_encoding_is_unchanged",
+      "tests::bazel_internal_string::test_bazel_internal_separate_parse_and_freeze_pass_through"
+    ],
+    "source_sha256": {
+      "starlark-rust/starlark/src/values/types/string/str_type.rs": "c00bc6d0acefcfdaf2021c8964f7b654a9527fe37bb62cf0a3a95912400e0c7d",
+      "starlark-rust/starlark/src/values/types/string/repeat_two_memory_tests.rs": "b9bd12ad1a6eadc776303c37290fca1b6110c738207e691a2a7dc596a1fbe168"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/string-repeat-two-direct-baseline-compile.json",
+      "sha256": "22d6fccc2192922f88a910106c697443d70e3618c0049e9574f47f6a1f4864e1",
+      "exit_code": 0,
+      "elapsed_seconds": 6.733283809036948,
+      "log_sha256": "ed7a988a2eb7baeadc826fad171a80fe715329e2db1bbef28e102ef46bcaf4e7"
+    },
+    "baseline-preflight": {
+      "receipt": "target/wp899/string-repeat-two-direct-baseline-preflight.json",
+      "sha256": "6fc5f0aaed0c37c1669da4305df7ea36beb74234530dad5cabd5b3f3fcd04955",
+      "exit_code": 0,
+      "elapsed_seconds": 0.022351638006512076,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-controls": {
+      "receipt": "target/wp899/string-repeat-two-direct-baseline-controls.json",
+      "sha256": "69b6303d6ffca28d380e737f86356c4822dd6ac5dcedc452226d7615758eda56",
+      "exit_code": 0,
+      "elapsed_seconds": 0.008309128985274583,
+      "log_sha256": "4d4f07730f0c9e667e534af6c8e5f96f6cafc7380e7aeb7ecdbe997f1e05a4fc"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/string-repeat-two-direct-candidate-compile.json",
+      "sha256": "c5c676f3c8654aa5714a3b9b648ee78cb8f96a69e63d377d1cdea84094116da6",
+      "exit_code": 0,
+      "elapsed_seconds": 3.9235934889875352,
+      "log_sha256": "d395b9d6b34defbf4d51f280efb9176a460404d320d1ec46434ea3b4c3c984b7"
+    },
+    "candidate-preflight": {
+      "receipt": "target/wp899/string-repeat-two-direct-candidate-preflight.json",
+      "sha256": "3e9749a74e69751f32d0e8900458dc953fc521ca0198b8ff2a2f37275b762dd4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024082046002149582,
+      "log_sha256": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565"
+    },
+    "candidate-controls": {
+      "receipt": "target/wp899/string-repeat-two-direct-candidate-controls.json",
+      "sha256": "67ef2f228dbd42150d694b5b7d440dbdfbd360dde42ada3e7b50cf4cab663206",
+      "exit_code": 0,
+      "elapsed_seconds": 0.009509184979833663,
+      "log_sha256": "ccadefcb9d4cbb8722ed3f53e81c9463f09c0e233886cc11c2e4b83836cc4a35"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-dependents-check.json",
+      "sha256": "346e45b6e79046610d3d728e673eda103a5fb460fd6feeb1a0f299f3b597d07a",
+      "exit_code": 0,
+      "elapsed_seconds": 7.595482774020638,
+      "log_sha256": "c829991cf0d064e0072e482d6e33e761600267e38fff9bc1eaae9114e7724923"
+    },
+    "format-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-format-check.json",
+      "sha256": "8071a0aa0ca8fd473f2cc80f82efd818ffc784b9c2f50b0d46754c7cd471a1d6",
+      "exit_code": 0,
+      "elapsed_seconds": 0.010706942004617304,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-archive-check.json",
+      "sha256": "c3db1c5854972f63c44c5115765f5ffbadb5985c432e2aa357781f7b1933180e",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03313763998448849,
+      "log_sha256": "c2a6913635db8788a0a28c40c0e48f54635f58fdf537b3f2b0e607202d96decf"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "9e68a2c9616fcc64d6d50eb6a71f780c41dd7094f2ec95434938d76f829d89bb",
+    "exact_replacements": [
+      [
+        "        let mut result = String::with_capacity(self.len() * cmp::max(0, l) as usize);",
+        "        let capacity = self.len() * cmp::max(0, l) as usize;\n        if l == 2 && capacity <= isize::MAX as usize {\n            return Some(Ok(heap.alloc_str_concat(self, self).to_value()));\n        }\n        let mut result = String::with_capacity(capacity);"
+      ]
+    ],
+    "every_other_byte_unchanged": true
+  },
+  "test_profile": "Resolved pinned nightly2025-09-14 fourtools; serial offline starlark lib CargoJSON no-run prep60s/exact nonignored preflight/tests30s; manifest directory/no golden regeneration; defaultLoadingCoreCLI alltargets/format/archive/plan/diff",
+  "pass_counts": {
+    "baseline_new": 2,
+    "candidate_new": 2,
+    "candidate_protected": 6,
+    "candidate_total": 8
+  },
+  "metrics": {
+    "comparisons": 5460,
+    "raw_errors": [
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `NoneType`\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `NoneType` and `string`\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `bool`\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `bool` and `string`\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `float`\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `float` and `string`\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `string`\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `string`\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `string` and `list`\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Operation `*` not supported for types `list` and `string`\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Integer value is too big to fit in i32: 2147483648\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Integer value is too big to fit in i32: 2147483648\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Integer value is too big to fit in i32: -2147483649\n --> assert.bzl:2:24\n  |\n2 | def left(s, n): return s * n\n  |                        ^^^^^\n  |\n",
+      "Traceback (most recent call last):\n  File <builtin>, in <module>\nerror: Integer value is too big to fit in i32: -2147483649\n --> assert.bzl:3:25\n  |\n3 | def right(s, n): return n * s\n  |                         ^^^^^\n  |\n"
+    ],
+    "raw_errors_sha256": "e42e501b80b8dfa738ed9704f707c18f4c971757ecbbebe9a59775b7ea668551",
+    "large_owned_output_bytes": [
+      196608,
+      196608,
+      229376,
+      229376
+    ],
+    "retained_bytes": [
+      57344,
+      57344,
+      16384,
+      16384
+    ]
+  },
+  "invariant_to_evidence": {
+    "guard_order": "i32 unpack results unchanged; exact original capacity expression evaluates before l==2/<=isizeMAX guard. Original capacity constructor handles oversized capacity, unchanged other-count loop/finalallocation",
+    "bytes_type_hash": "5460 actual compiled left/right calls vs Rust repeat,341 ASCII/Unicode/NUL/empty strings andi32min/-2/-1/0/1/2/3/5counts; four large owned count2outputs, exactbytes/type/lazyhash/inputbuffers",
+    "errors": "14complete rawerrors exactly equal baseline/candidate: bothdirections None/bool/float/string/list/positiveandnegativeout-of-i32 operands",
+    "representation": "Existing String adapter\u2192alloc_str and concat use same emptyconstants/nonemptyUNINIT_HASH/bytecount/u32lengthcheck; natural outputcopies still owned; no inputsharing",
+    "lifecycle": "Fresh mutable inputvariables cleared then explicitGC; foldedconstants and retained frozenoutputs/functions after source/module/clone drop, exact bytes and subsequent callsfromnewmodule",
+    "normal_callers": "Six existing arithmetic/mutableandfrozeninterner/speculation/standardandinternalstringcarriers plus defaultLoadingCoreCLI",
+    "scratch_bypass": "Wholeownerexacttransform + existingconcat source prove applicable l==2temporaryString construction/copy bypass; finalheapcopiesremain"
+  },
+  "limits": "Source-proof scratch bypass only. No pointer/arena/allocator/count/quantified payload/aggregate/peak/RSS/speed/source-fit optimization claim. Final owned output still copies full bytes. Allocation/OOM failure sequencing excluded; deterministic arithmetic/capacityoverflow preserved by source guard, no huge allocating/unsafe fake-length fixture. No new helper/API/interner/cache/key/DICE/identity/unsafe/dependency/donor or retained representation. Windows minimal/deferred; fullWP899/M7A/sourceintegration open/unwaived.",
+  "growth": {
+    "test_lines": 180,
+    "estimate": "170\u2013280lines;two tests/noassets/goldens",
+    "production": "Name originalcapacity/addguard only plus cfg siblinghook"
+  },
+  "fixture_corrections": [],
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T04:27:33.428912+00:00",
+    "baseline": "0f9bae4002f0bc2df6825bba2b1ecb2c79a7238c"
+  },
+  "timing": {
+    "compile_and_check_seconds": 18.25236007204512,
+    "test_seconds": 0.017818313965108246,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 309.888677
+  },
+  "evidence_sha256": {
+    "target/wp899/string-repeat-two-direct-archive-check.json": "c3db1c5854972f63c44c5115765f5ffbadb5985c432e2aa357781f7b1933180e",
+    "target/wp899/string-repeat-two-direct-archive-check.jsonl": "c2a6913635db8788a0a28c40c0e48f54635f58fdf537b3f2b0e607202d96decf",
+    "target/wp899/string-repeat-two-direct-baseline-compile.json": "22d6fccc2192922f88a910106c697443d70e3618c0049e9574f47f6a1f4864e1",
+    "target/wp899/string-repeat-two-direct-baseline-compile.jsonl": "ed7a988a2eb7baeadc826fad171a80fe715329e2db1bbef28e102ef46bcaf4e7",
+    "target/wp899/string-repeat-two-direct-baseline-controls.json": "69b6303d6ffca28d380e737f86356c4822dd6ac5dcedc452226d7615758eda56",
+    "target/wp899/string-repeat-two-direct-baseline-controls.jsonl": "4d4f07730f0c9e667e534af6c8e5f96f6cafc7380e7aeb7ecdbe997f1e05a4fc",
+    "target/wp899/string-repeat-two-direct-baseline-preflight.json": "6fc5f0aaed0c37c1669da4305df7ea36beb74234530dad5cabd5b3f3fcd04955",
+    "target/wp899/string-repeat-two-direct-baseline-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/string-repeat-two-direct-baseline-selectors.json": "203e64cb017ee267fcde69e8a212113480062add3096b7e428fdb6f81fca805a",
+    "target/wp899/string-repeat-two-direct-candidate-compile.json": "c5c676f3c8654aa5714a3b9b648ee78cb8f96a69e63d377d1cdea84094116da6",
+    "target/wp899/string-repeat-two-direct-candidate-compile.jsonl": "d395b9d6b34defbf4d51f280efb9176a460404d320d1ec46434ea3b4c3c984b7",
+    "target/wp899/string-repeat-two-direct-candidate-controls.json": "67ef2f228dbd42150d694b5b7d440dbdfbd360dde42ada3e7b50cf4cab663206",
+    "target/wp899/string-repeat-two-direct-candidate-controls.jsonl": "ccadefcb9d4cbb8722ed3f53e81c9463f09c0e233886cc11c2e4b83836cc4a35",
+    "target/wp899/string-repeat-two-direct-candidate-preflight.json": "3e9749a74e69751f32d0e8900458dc953fc521ca0198b8ff2a2f37275b762dd4",
+    "target/wp899/string-repeat-two-direct-candidate-preflight.jsonl": "56f5d53677c6332120d94989f063fde5c55cf37c8cb1622854f4d8f88aa6d565",
+    "target/wp899/string-repeat-two-direct-candidate-selectors.json": "2af7b7edcaba0a0107f962092a402376849d61e127a6bf5013e0a628f437d5c3",
+    "target/wp899/string-repeat-two-direct-controls.py": "47295b958ed050cb39774181d762df98189917fa5fc910deb3991ad59372ee44",
+    "target/wp899/string-repeat-two-direct-dependents-check.json": "346e45b6e79046610d3d728e673eda103a5fb460fd6feeb1a0f299f3b597d07a",
+    "target/wp899/string-repeat-two-direct-dependents-check.jsonl": "c829991cf0d064e0072e482d6e33e761600267e38fff9bc1eaae9114e7724923",
+    "target/wp899/string-repeat-two-direct-design-evidence.md": "1ebb054477e0d3bcf2e19882d774ed10d7e6a48c4dc2dbeef753158893c025d3",
+    "target/wp899/string-repeat-two-direct-design-ownership.md": "5dd5928c683d005a662d1b56ed20f994dec22f215a352972ed6a24866b33b703",
+    "target/wp899/string-repeat-two-direct-design-source.md": "7f59d4d6f9df2c3900af6ca8a3af2b295b84e45753bb73352a0b152d8843e79f",
+    "target/wp899/string-repeat-two-direct-design.md": "0cae7c200606b8c9995ea08527f62d8683d9e35c64e537e6b8f0b2744ed0471a",
+    "target/wp899/string-repeat-two-direct-format-check.json": "8071a0aa0ca8fd473f2cc80f82efd818ffc784b9c2f50b0d46754c7cd471a1d6",
+    "target/wp899/string-repeat-two-direct-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/string-repeat-two-direct-record.py": "d1d52dfa8fc7fb4394a07785d8ad686ffd7b4b623d79f12e1ef6572b9a61d055",
+    "target/wp899/string-repeat-two-direct-start.json": "1510fb7a4fd880a6bcb588f967d3f1a6a47f47e398a9e3c294d50d07eba97b19"
+  },
+  "validation_sha256": "332b88adb99c136ed1ce0d4056abe02d8bed53e1053e5e25b397ea59cffd601b",
+  "final_reviews": {
+    "target/wp899/string-repeat-two-direct-final-source.md": "ab8240008fa667789762a6aa03d10c226f662371399e65cf3c8b28bb289e5439",
+    "target/wp899/string-repeat-two-direct-final-ownership.md": "d38d3af4f16474b5ae1b6fc3814d34ab12809c8fa1abd45ed1c821012ebda1c0",
+    "target/wp899/string-repeat-two-direct-final-evidence.md": "9dc71fede1151a83c05c5e3b50288ea57d07591d3d57a305412b830e00e207cf"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "6976252b93b7e8a1301c49440764bdf61031b48c632982fe2d7020f6f20cc525",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "9d5278c619913bc8c1c7c29edd70ccfc2bc9465b002465753ec26645d2dc9a08",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "afc0c8d287adba481e04be2416ba6b4126845ef7c812c134f69a37e27f3815e8"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-format-check.json",
+      "sha256": "8071a0aa0ca8fd473f2cc80f82efd818ffc784b9c2f50b0d46754c7cd471a1d6",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-archive-check.json",
+      "sha256": "c3db1c5854972f63c44c5115765f5ffbadb5985c432e2aa357781f7b1933180e",
+      "exit_code": 0,
+      "log_sha256": "c2a6913635db8788a0a28c40c0e48f54635f58fdf537b3f2b0e607202d96decf"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-plan-check.json",
+      "sha256": "bdd85af6401d704ec83d6831390d596a07ebc11077c471430a5cee80187b62de",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/string-repeat-two-direct-diff-check.json",
+      "sha256": "874cb28c0be8319387c41837fb2c81bff5a35716a78887038233a7658ef5f155",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

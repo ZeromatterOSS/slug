@@ -39,11 +39,11 @@ Status: Local string ownership and memory optimization; source integration defer
 
 The [current manifest](./slug-v2-subplans/current-packet.md) owns the local,
 offline memory contract, accepted component index and unwaived full WP899 gates.
-Latest accepted change: query tests() filtering borrows immutable suite tag names
-instead of copying them into scratch sets. Prefix/manual/hash/order/filtering,
-caller awaits and final ownership remain. Five controls, 123 shared source keys,
-6,669 comparisons, twenty-one existing oracle rows and Core/CLI checks pass.
-Async lifetime is source/type proof; set storage may change. No quantified memory/
+Latest accepted change: string repetition by two writes directly into final heap
+storage, omitting temporary String construction/copying. Unpack/capacity priority,
+other counts, bytes/hash and natural ownership remain. Eight controls, 5,460 byte/
+hash comparisons, fourteen equal diagnostics, retained GC/frozen outputs and
+dependent checks pass. Source scratch-bypass proof only; no quantified memory/
 RSS/speed claim.
 Next: select a proved redundant local copy or existing interner reuse through a
 bounded design checkpoint. No source observation, network-dependent retry,

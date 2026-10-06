@@ -423,7 +423,11 @@ impl<'v> StarlarkValue<'v> for StarlarkStr {
             Ok(None) => return None,
             Err(e) => return Some(Err(e)),
         };
-        let mut result = String::with_capacity(self.len() * cmp::max(0, l) as usize);
+        let capacity = self.len() * cmp::max(0, l) as usize;
+        if l == 2 && capacity <= isize::MAX as usize {
+            return Some(Ok(heap.alloc_str_concat(self, self).to_value()));
+        }
+        let mut result = String::with_capacity(capacity);
         for _i in 0..l {
             result.push_str(self)
         }
@@ -647,3 +651,7 @@ len("😿") == 1
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "repeat_two_memory_tests.rs"]
+mod repeat_two_memory_tests;
