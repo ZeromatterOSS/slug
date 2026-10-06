@@ -41,17 +41,45 @@ const RULES_SHA: [u8; 32] = [
     0x25, 0xe3, 0xb0, 0x77, 0x12, 0x86, 0x12, 0x75, 0x4c, 0x4a, 0xdd, 0x1b, 0x4c, 0x90, 0xd2, 0x0a,
     0x6b, 0xe0, 0x65, 0x66, 0xb6, 0x23, 0xde, 0xe6, 0xe3, 0x20, 0x38, 0xd0, 0xe8, 0xf9, 0x30, 0x62,
 ];
-fn features_bytes(bytes: &[u8]) -> bool {
-    bytes.len() == 346 && sha2::Sha256::digest(bytes).as_slice() == FEATURES_SHA
+const SKYLIB_SHA: [u8; 32] = [
+    0x69, 0xad, 0x69, 0x27, 0x09, 0x83, 0x16, 0x84, 0x8b, 0x34, 0xa9, 0x14, 0x2b, 0xcc, 0x97, 0x5e,
+    0x01, 0x8b, 0xa2, 0x7f, 0x08, 0xc4, 0xff, 0x40, 0x3f, 0x50, 0xc1, 0xb6, 0xe6, 0x46, 0xca, 0x67,
+];
+const ADDITIONAL_IDENTITIES: [(&str, &str); 2] = [
+    ("bazel_features", "bazel_features+"),
+    ("bazel_skylib", "bazel_skylib+"),
+];
+fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
+    let (size, hash) = match slot {
+        0 => (346, FEATURES_SHA),
+        1 => (389, SKYLIB_SHA),
+        _ => unreachable!(),
+    };
+    bytes.len() == size && sha2::Sha256::digest(bytes).as_slice() == hash
 }
-struct FourthModule {
+#[derive(Clone, Copy)]
+enum ModuleMode {
+    Three,
+    Four,
+    Five,
+}
+impl ModuleMode {
+    fn additional_count(self) -> usize {
+        match self {
+            Self::Three => 0,
+            Self::Four => 1,
+            Self::Five => 2,
+        }
+    }
+}
+struct AdditionalModule {
     root: NormalizedAbsolutePath,
     file: NormalizedAbsolutePath,
 }
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
-    fourth: Option<FourthModule>,
+    additional: [Option<AdditionalModule>; 2],
 }
 #[derive(Debug)]
 struct Denied {
@@ -66,23 +94,38 @@ impl Bodies {
         Self {
             roots,
             files,
-            fourth: None,
+            additional: [None, None],
         }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
-        self.fourth = Some(FourthModule { root, file });
+        self.additional[0] = Some(AdditionalModule { root, file });
+        self
+    }
+    fn with_fifth(mut self, root: NormalizedAbsolutePath) -> Self {
+        assert!(
+            self.additional[0].is_some(),
+            "fifth binding requires fourth"
+        );
+        let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
+        self.additional[1] = Some(AdditionalModule { root, file });
         self
     }
     fn roots(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
-        self.roots
-            .iter()
-            .chain(self.fourth.iter().map(|binding| &binding.root))
+        self.roots.iter().chain(
+            self.additional
+                .iter()
+                .flatten()
+                .map(|binding| &binding.root),
+        )
     }
     fn files(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
-        self.files
-            .iter()
-            .chain(self.fourth.iter().map(|binding| &binding.file))
+        self.files.iter().chain(
+            self.additional
+                .iter()
+                .flatten()
+                .map(|binding| &binding.file),
+        )
     }
     fn bindings(
         &self,
@@ -93,9 +136,18 @@ impl Bodies {
         ]
         .into_iter()
         .chain(
-            self.fourth
+            self.additional
                 .iter()
-                .map(|binding| ("bazel_features", "bazel_features+", &binding.root)),
+                .enumerate()
+                .filter_map(|(slot, binding)| {
+                    binding.as_ref().map(|binding| {
+                        (
+                            ADDITIONAL_IDENTITIES[slot].0,
+                            ADDITIONAL_IDENTITIES[slot].1,
+                            &binding.root,
+                        )
+                    })
+                }),
         )
     }
     fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
@@ -182,8 +234,8 @@ struct Milestones {
     preparations: u64,
     effective_empty: bool,
     source: Option<Weak<[u8]>>,
-    features_source: Option<Weak<[u8]>>,
-    features_bytes: Option<(usize, bool)>,
+    additional_source: [Option<Weak<[u8]>>; 2],
+    additional_bytes: [Option<(usize, bool)>; 2],
     selected_reported: bool,
     bytes: usize,
     hash_match: bool,
@@ -344,20 +396,21 @@ impl NativeCommandRoot for ModuleRoot {
             }
             SourcePreparationOutcome::Complete(Ok(mapping)) => mapping,
         };
-        if let Some(binding) = &self.bodies.fourth {
-            if let Some(bytes) = observed_bytes(mapping.observations(), &binding.file) {
+        for (slot, binding) in self.bodies.additional.iter().enumerate() {
+            if let Some(bytes) = binding
+                .as_ref()
+                .and_then(|binding| observed_bytes(mapping.observations(), &binding.file))
+            {
                 let mut state = self.milestones.lock().unwrap();
-                state
-                    .features_source
-                    .get_or_insert_with(|| Arc::downgrade(bytes));
-                state.features_bytes = Some((bytes.len(), features_bytes(bytes)));
+                state.additional_source[slot].get_or_insert_with(|| Arc::downgrade(bytes));
+                state.additional_bytes[slot] = Some((bytes.len(), additional_bytes(slot, bytes)));
             }
         }
         if let Err(error) = mapping.result().as_ref() {
             let mut state = self.milestones.lock().unwrap();
             state.mapping = Some("semantic_refusal");
             state.refusal = Some(error.selected_source_refusal());
-            if self.bodies.fourth.is_some() {
+            if self.bodies.additional[0].is_some() {
                 state.selected_reported = true;
                 drop(state);
                 report_selected(error.selected_module_registry_file());
@@ -375,16 +428,25 @@ impl NativeCommandRoot for ModuleRoot {
                 && demand.operation() == PathObservationOperation::FileBytes
                 && matches!(value.as_ref(), PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) if root_bytes(bytes) && Arc::ptr_eq(bytes, &source))
         });
-        let fourth_covered = self.bodies.fourth.as_ref().is_none_or(|binding| {
-            observed_bytes(mapping.observations(), &binding.file)
-                .is_some_and(|bytes| features_bytes(bytes))
-                && observed_bytes(mapping.observations(), &self.bodies.files[1]).is_some_and(
-                    |bytes| {
-                        bytes.len() == 4481 && sha2::Sha256::digest(bytes).as_slice() == RULES_SHA
-                    },
-                )
-        });
-        if !covered || !root_covered || !fourth_covered {
+        let additional_covered =
+            self.bodies
+                .additional
+                .iter()
+                .enumerate()
+                .all(|(slot, binding)| {
+                    binding.as_ref().is_none_or(|binding| {
+                        observed_bytes(mapping.observations(), &binding.file)
+                            .is_some_and(|bytes| additional_bytes(slot, bytes))
+                    })
+                })
+                && (self.bodies.additional[0].is_none()
+                    || observed_bytes(mapping.observations(), &self.bodies.files[1]).is_some_and(
+                        |bytes| {
+                            bytes.len() == 4481
+                                && sha2::Sha256::digest(bytes).as_slice() == RULES_SHA
+                        },
+                    ));
+        if !covered || !root_covered || !additional_covered {
             self.milestones.lock().unwrap().mapping = Some("coverage_refusal");
             return Err(refusal());
         }
@@ -732,18 +794,150 @@ fn fourth_module_need_admission_is_opt_in_and_exact() {
 }
 
 #[test]
+fn fifth_module_need_admission_is_opt_in_and_exact() {
+    let normalized = |path: &str| NormalizedAbsolutePath::new(Path::new(path)).unwrap();
+    let base = || {
+        Bodies::new([
+            normalized("/fixture"),
+            normalized("/rules"),
+            normalized("/platforms"),
+        ])
+    };
+    let need = |path: &str, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            normalized(path),
+            operation,
+        )))
+    };
+    let body = need("/skylib/MODULE.bazel", PathObservationOperation::FileBytes);
+    let local =
+        (*local_native_request(&normalized("/fixture"), "bazel_skylib+", "/skylib")).clone();
+    for bodies in [base(), base().with_fourth(normalized("/features"))] {
+        assert!(bodies.admit(&body).is_err());
+        assert!(
+            bodies
+                .admit(&SourcePreparationNeeds::repository(local.clone()))
+                .is_err()
+        );
+    }
+    assert!(std::panic::catch_unwind(|| base().with_fifth(normalized("/skylib"))).is_err());
+    let bodies = base()
+        .with_fourth(normalized("/features"))
+        .with_fifth(normalized("/skylib"));
+    assert!(bodies.admit(&body).is_ok());
+    assert!(
+        bodies
+            .admit(&need(
+                "/skylib/MODULE.bazel",
+                PathObservationOperation::FileDigest
+            ))
+            .is_ok()
+    );
+    for path in [
+        "/",
+        "/skylib",
+        "/skylib/MODULE.bazel",
+        "/skylib/BUILD",
+        "/skylib/BUILD.bazel",
+        "/skylib/.bazelignore",
+    ] {
+        assert!(
+            bodies
+                .admit(&need(path, PathObservationOperation::Lstat))
+                .is_ok()
+        );
+    }
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(local.clone()))
+            .is_ok()
+    );
+    let original = need("/fixture/MODULE.bazel", PathObservationOperation::FileBytes);
+    for excluded in [
+        need(
+            "/skylib_extra/MODULE.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        need("/skylib/BUILD.bazel", PathObservationOperation::FileBytes),
+        need("/skylib/REPO.bazel", PathObservationOperation::Lstat),
+        need("/skylib/MODULE.bazel", PathObservationOperation::ReadLink),
+    ] {
+        assert!(
+            bodies
+                .admit(&original.try_union(&excluded).unwrap())
+                .is_err()
+        );
+    }
+    for case in 0..10 {
+        let mut wrong = local.clone();
+        match case {
+            0 => {
+                wrong.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("bazel_skylib").unwrap()
+            }
+            1 => wrong.id.workspace = normalized("/other"),
+            2 => wrong.kind = RepositoryMaterializationKind::Immutable,
+            3 | 8 => {
+                let path = if case == 3 { "/other" } else { "/features" };
+                wrong.kind = RepositoryMaterializationKind::Local {
+                    logical_root: normalized(path),
+                };
+                Arc::make_mut(&mut wrong.repo_spec.attributes)
+                    .insert("path".into(), OverrideAttributeValue::String(path.into()));
+            }
+            4 => wrong.repo_spec.rule_id.rule_name = "http_archive".into(),
+            5 => {
+                Arc::make_mut(&mut wrong.repo_spec.attributes).insert(
+                    "path".into(),
+                    OverrideAttributeValue::String("/other".into()),
+                );
+            }
+            6 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other//tools/build_defs/repo:local.bzl").unwrap()
+            }
+            7 => {
+                wrong.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap()
+            }
+            9 => {
+                Arc::make_mut(&mut wrong.repo_spec.attributes)
+                    .insert("extra".into(), OverrideAttributeValue::String("x".into()));
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            bodies
+                .admit(
+                    &original
+                        .try_union(&SourcePreparationNeeds::repository(wrong))
+                        .unwrap()
+                )
+                .is_err()
+        );
+    }
+}
+
+#[test]
 #[ignore = "frozen scoped native MODULE preparation observation"]
 fn native_root_module_and_normal_mapping_prerequisite() {
-    observe_native_modules(false);
+    observe_native_modules(ModuleMode::Three);
 }
 
 #[test]
 #[ignore = "frozen scoped four-root native MODULE readiness observation"]
 fn native_four_root_local_module_and_mapping_prerequisite() {
-    observe_native_modules(true);
+    observe_native_modules(ModuleMode::Four);
 }
 
-fn observe_native_modules(with_features: bool) {
+#[test]
+#[ignore = "frozen scoped five-root native MODULE readiness observation"]
+fn native_five_root_local_module_and_mapping_prerequisite() {
+    observe_native_modules(ModuleMode::Five);
+}
+
+fn observe_native_modules(mode: ModuleMode) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -762,11 +956,28 @@ fn observe_native_modules(with_features: bool) {
         root("SLUG_NATIVE_RULES_RUST_ROOT"),
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
     ]);
-    if with_features {
+    if mode.additional_count() >= 1 {
         bodies = bodies.with_fourth(root("SLUG_NATIVE_BAZEL_FEATURES_ROOT"));
         println!(
             "WP945_REQUEST bazel_features_root={}",
-            bodies.fourth.as_ref().unwrap().root.as_path().display()
+            bodies.additional[0]
+                .as_ref()
+                .unwrap()
+                .root
+                .as_path()
+                .display()
+        );
+    }
+    if mode.additional_count() == 2 {
+        bodies = bodies.with_fifth(root("SLUG_NATIVE_BAZEL_SKYLIB_ROOT"));
+        println!(
+            "WP946_REQUEST bazel_skylib_root={}",
+            bodies.additional[1]
+                .as_ref()
+                .unwrap()
+                .root
+                .as_path()
+                .display()
         );
     }
     let bodies = Arc::new(bodies);
@@ -844,10 +1055,12 @@ fn observe_native_modules(with_features: bool) {
                 bodies.roots[1].as_path().display()
             )),
             Some(format!("platforms={}", bodies.roots[2].as_path().display())),
-            bodies
-                .fourth
+            bodies.additional[0]
                 .as_ref()
                 .map(|binding| format!("bazel_features={}", binding.root.as_path().display())),
+            bodies.additional[1]
+                .as_ref()
+                .map(|binding| format!("bazel_skylib={}", binding.root.as_path().display())),
         ];
         match BzlmodCommandPolicyKey::from_flags_with_module_overrides(
             None,
@@ -898,20 +1111,24 @@ fn observe_native_modules(with_features: bool) {
         ),
         None => println!("WP942_NATIVE kind=unavailable attempts=unavailable roots=unavailable"),
     }
-    let (source_weak, features_weak) = {
+    let (source_weak, additional_weak) = {
         let state = milestones.lock().unwrap();
-        if with_features {
-            match state.features_bytes {
+        for (slot, prefix) in ["WP945", "WP946"]
+            .into_iter()
+            .take(mode.additional_count())
+            .enumerate()
+        {
+            match state.additional_bytes[slot] {
                 Some((bytes, hash_match)) => {
-                    println!("WP945_SOURCE seen=true bytes={bytes} hash_match={hash_match}")
+                    println!("{prefix}_SOURCE seen=true bytes={bytes} hash_match={hash_match}")
                 }
                 None => {
-                    println!("WP945_SOURCE seen=false bytes=unavailable hash_match=unavailable")
+                    println!("{prefix}_SOURCE seen=false bytes=unavailable hash_match=unavailable")
                 }
             }
-            if !state.selected_reported {
-                report_selected(None);
-            }
+        }
+        if mode.additional_count() >= 1 && !state.selected_reported {
+            report_selected(None);
         }
         println!(
             "WP942_ROOT_SOURCE seen={} calls={} policy_checked={} bytes={} hash_match={} anchor={} outer_variant={:?}",
@@ -964,7 +1181,7 @@ fn observe_native_modules(with_features: bool) {
                 "missing"
             }
         );
-        (state.source.clone(), state.features_source.clone())
+        (state.source.clone(), state.additional_source.clone())
     };
     let counters = scope.snapshot();
     println!(
@@ -1004,9 +1221,10 @@ fn observe_native_modules(with_features: bool) {
         || source_weak
             .as_ref()
             .is_some_and(|weak| weak.upgrade().is_some())
-        || features_weak
-            .as_ref()
-            .is_some_and(|weak| weak.upgrade().is_some())
+        || additional_weak
+            .iter()
+            .flatten()
+            .any(|weak| weak.upgrade().is_some())
         || recorder_weak
             .as_ref()
             .is_some_and(|weak| weak.upgrade().is_some()))
@@ -1026,9 +1244,10 @@ fn observe_native_modules(with_features: bool) {
             .is_none_or(|weak| weak.upgrade().is_none())
     );
     assert!(
-        features_weak
-            .as_ref()
-            .is_none_or(|weak| weak.upgrade().is_none())
+        additional_weak
+            .iter()
+            .flatten()
+            .all(|weak| weak.upgrade().is_none())
     );
     if let Some((image, scratch)) = &budgets {
         assert_eq!(image.descriptor_budget().used_bytes(), 0);
@@ -1045,10 +1264,14 @@ fn observe_native_modules(with_features: bool) {
         "WP942_RETIREMENT source_weak_seen={} source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
         source_weak.is_some()
     );
-    if with_features {
+    for (slot, prefix) in ["WP945", "WP946"]
+        .into_iter()
+        .take(mode.additional_count())
+        .enumerate()
+    {
         println!(
-            "WP945_RETIREMENT source_weak_seen={} source_weak_expired=true",
-            features_weak.is_some()
+            "{prefix}_RETIREMENT source_weak_seen={} source_weak_expired=true",
+            additional_weak[slot].is_some()
         );
     }
 }

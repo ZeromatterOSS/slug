@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: normal native root ready; actual bazel_skylib1.8.2 request preserved
+Status: bounded native memory/lifecycle gates pass; actual rules_cc0.2.4 prerequisite
 
 ## Observable and source basis
 
@@ -142,10 +142,36 @@ to ground this precise request against independent saved declarations and exact 
 source availability, then continue ordinary native loading. All earlier spent-source,
 acquisition, full-root and memory limits remain unchanged; no new operation is selected.
 
+## Accepted WP946 continuation
+
+[WP946](wp946-native-skylib-source-readiness-2026-10-06.json) observes the grounded bazel_skylib+ metadata target187B
+and exact MODULE389B/fullSHA69ad6927… at0.031s/17,356KiB and0.042s/18,748KiB.
+Partial literal facts match bazel_skylib1.8.2/compatibility_level1; one expression remains
+unknown. Separate current FD/name/ancestor brackets establish physical availability,
+with15 reused controls/zero reruns, not native evaluation or graph/BCR/MVS provenance.
+
+The existing companion now shares closed Three/Four/Five modes and two fixed optional
+bindings. Seven ordinary controls pass1.396s/56,656KiB; separate Core preparation37.015s
+and direct Core/CLI check7.265s pass. One five-root native observer passes0.240s at
+conservative67,360KiB RSS under256MiB, with64 current pins and five parent MODULE
+brackets6058B. Original root426B/hash/Weak and scope/recorder/credit retirement succeed.
+Both added sources remain unseen in the returned epoch: bytes/hash/evaluation unavailable.
+The original semantic mapping error supplies the borrowed rules_cc0.2.4/outer59B MODULE
+request; this retained discovery request does not establish completed MVS or provenance.
+No mapping certificate, generated provider/public Rustc or whole-workload fit is admitted.
+
+Next use [the source recommendation](../../../../target/wp946/successor-source.md) to
+freeze the precise rules_cc prerequisite from independent saved declarations and immutable
+normal name/join policy. One conditional metadata address is grounded; current availability
+remains unknown. Only its witnessed target can ground a subsequent exact MODULE observation
+and reviewed normal binding extension. Existing memory limits and source exclusions remain.
+These representative operations fit their caps, allowing source-specific implementation
+of the broader producer plan to continue; retain allocation discipline at every step.
+
 ## Ownership, scope and allocation
 
-The latest checkpoint adds an optional fourth binding, borrowed diagnostic reporting and
-a focused whole-Need control in the existing test companion; no production change.
+The latest checkpoint shares two fixed optional bindings, borrowed diagnostic reporting and
+focused whole-Need controls in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
 error; version.normalized() exposes its already parsed canonical spelling, not an authored
@@ -155,14 +181,14 @@ detail is opaque. Representation, equality/invalidation/Need policies and existi
 interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
 
 WP942's actual native root anchor and mapping share one normal scoped DICE request;
-whole-Need admission permits only three exact MODULE bodies and finite metadata/Local
-roles. Successful certification would require the original covered mapping epoch, exact
-root/platforms sources and root Arc identity. That branch remains source-reviewed,
+whole-Need admission preserves the three-root default and opt-in exact fourth/fifth
+MODULE bodies with finite metadata/Local roles. Successful certification would require
+the original covered mapping epoch, exact root/platforms sources and root Arc identity. That branch remains source-reviewed,
 unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
 
 Root owns bounded wrappers, integration and compact receipts. The next contract must
-freeze the independently grounded source-specific correction for the actual bazel_skylib
+freeze the independently grounded source-specific correction for the actual rules_cc
 request before another source/native operation. Consequential ownership/representation/operation changes
 receive independent design and final review. Prefer existing natural owners and bounded
 companions to copied large harnesses; record any concrete shared-boundary growth reason.

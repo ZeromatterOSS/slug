@@ -95,6 +95,14 @@ cover5669B; sibling refusal precedes bazel_features native source/evaluation. Se
 Core preparation16.238s/CoreCLI check7.334s pass, no production/fixture changes. Next ground
 that actual request's local source and continue normal loading. Mapping/provider/public
 Rustc/M7A/full-workload gates remain open; no new source/acquisition/retry selected.
+[WP946](./slug-v2-subplans/wp946-native-skylib-source-readiness-2026-10-06.json)
+accepts exact skylib MODULE389B availability and shared opt-in five-root observer.
+Seven controls1.396s/56,656KiB and native0.240s/67,360KiB pass; five parent bindings6058B,
+root426B/hash/Weak and zero final credits succeed. Both added native sources remain unseen;
+actual borrowed semantic prerequisite is rules_cc0.2.4/outer59B MODULE request. Separate
+Core37.015s/CoreCLI7.265s pass. Representative runtime memory fits unchanged caps; continue
+source-specific normal loading toward public Rustc with borrowing/scoped interning discipline.
+Mapping/provider/public producer/MVS/provenance/whole-workload gates remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
