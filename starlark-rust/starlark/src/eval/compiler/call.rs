@@ -307,16 +307,8 @@ impl CallCompiled {
             return r;
         }
 
-        if let ExprCompiled::Builtin1(Builtin1::Dot(field), this) = &fun.node {
-            return CallCompiled::new_method(
-                span,
-                call_site,
-                (**this).clone(),
-                field,
-                fun.span,
-                args,
-                ctx,
-            );
+        if let ExprCompiled::Builtin1(Builtin1::Dot(field), this) = fun.node {
+            return CallCompiled::new_method(span, call_site, *this, &field, fun.span, args, ctx);
         }
 
         ExprCompiled::Call(Box::new(IrSpanned {
@@ -342,3 +334,7 @@ impl IrSpanned<CallCompiled> {
         CallCompiled::call(self.span, *call_site, expr, args, ctx)
     }
 }
+
+#[cfg(test)]
+#[path = "call/receiver_memory_tests.rs"]
+mod receiver_memory_tests;
