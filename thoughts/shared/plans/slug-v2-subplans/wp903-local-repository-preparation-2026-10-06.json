@@ -1,0 +1,141 @@
+{
+  "schema": 1,
+  "base": "c854a9f785acf27b36048dbf11e29ab77c348b4b",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "fetch",
+    "--repo=@@rules_rust++crate+slug_crates__lzma-sys-0.1.20",
+    "--repo=@@rules_rust++crate+slug_crates__pkg-config-0.3.34",
+    "--repo=@@rules_rust++crate+slug_crates__xz2-0.1.7",
+    "--distdir=/run/media/system/Colossus/dev/slug/target/wp903/distdirs-mvxt7nq2/5fda04ab3764e6cde78b9974eec4f779acaba7c4e84b36eca3cf77c581b85d27",
+    "--distdir=/run/media/system/Colossus/dev/slug/target/wp903/distdirs-mvxt7nq2/f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548",
+    "--distdir=/run/media/system/Colossus/dev/slug/target/wp903/distdirs-mvxt7nq2/388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 15,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": false,
+  "downloads_requested": false,
+  "elapsed_seconds": 0.9597404539817944,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "packet": "WP-7-202-m7a-local-archive-repository-preparation-r1",
+  "disposition": "ACCEPTED_LOCAL_REPOSITORY_PREPARATION",
+  "input_pin_count": 697,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+    },
+    "stderr.log": {
+      "bytes": 192,
+      "sha256": "8afc465857fdc486dec50fbf151daffe99dfc9e36beb0985bb51c36ee4e73708"
+    }
+  },
+  "compressed_archive_bytes": 805307,
+  "regular_archive_files_equal": 448,
+  "expanded_archive_bytes": 2932174,
+  "materialized_repositories": [
+    {
+      "name": "lzma-sys",
+      "version": "0.1.20",
+      "archive_sha256": "5fda04ab3764e6cde78b9974eec4f779acaba7c4e84b36eca3cf77c581b85d27",
+      "build_file_content_sha256": "faac73424763c9f8c7d8b62a7954e7a79f053a2b127e694ef9a87424b01e56b5",
+      "marker_sha256": "9a9ec9c55be1899bcbc410ff9d1945b51eeed6a94c982726887858166b88c583",
+      "archive_regular_files_equal": 415,
+      "archive_expanded_bytes": 2763685,
+      "source_unchanged": true,
+      "selected_repo_spec_unchanged": true
+    },
+    {
+      "name": "pkg-config",
+      "version": "0.3.34",
+      "archive_sha256": "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548",
+      "build_file_content_sha256": "c0c32606c3e7ec575f2f00d910ccf6687f1fd302ec1aa5a2390099bbc4f53ffe",
+      "marker_sha256": "ad8fdbe1e56800b54d7258f8dd172e0732e7cd0274ab7f460ce9d28fe996901a",
+      "archive_regular_files_equal": 16,
+      "archive_expanded_bytes": 77051,
+      "source_unchanged": true,
+      "selected_repo_spec_unchanged": true
+    },
+    {
+      "name": "xz2",
+      "version": "0.1.7",
+      "archive_sha256": "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2",
+      "build_file_content_sha256": "068958e600ecf333fbcbe5f8e1ec63524ecc6830c8573fe28d57643775e99ba4",
+      "marker_sha256": "2c5c7398c66d9b6b357f15b6387b270cbbc80d14dc21d0dabf5442171a7e6688",
+      "archive_regular_files_equal": 17,
+      "archive_expanded_bytes": 91438,
+      "source_unchanged": true,
+      "selected_repo_spec_unchanged": true
+    }
+  ],
+  "cleanup": {
+    "parent": "/run/media/system/Colossus/dev/slug/target/wp903/distdirs-mvxt7nq2",
+    "recorded_parent_identity": [
+      66308,
+      160433881,
+      16832,
+      4096,
+      1791268220764911619,
+      1791268220764911619
+    ],
+    "exact_owned_parent_removed": true,
+    "three_owned_files_removed": true,
+    "original_archives_unchanged": true,
+    "shared_cache_removed": false
+  },
+  "scope": "Normal three-repository local source preparation only; configured/action/generated/compiler/full-source gates unproved.",
+  "cache_lock_unchanged": true,
+  "initial_verifier_correction": "External-marker assumption corrected to normal cache sibling recorded_inputs; prior receipt preserved. Local verification strengthened and rerun; fetch not repeated.",
+  "next_decision": "Select one current CLI configured Rustc action accounting query with the three local preparation prerequisites changed. Full source/M7A remains open.",
+  "evidence_sha256": {
+    "target/wp903/stage.py": "68d0a46bc1b56237330441801ae4c8cc71045be0321437d616ada9d4607a9ba3",
+    "target/wp903/stage.json": "a0d0a4df9d73db5816528102b60b33c9bac94fdf1525a546f41fad146c5b3a27",
+    "target/wp903/fetch-observe.py": "8df034cf8866d7621d5de4335f2229570e2880aa484ed7f87f8daafa0b214ec0",
+    "target/wp903/claim.json": "bbf8e6385dbefa4f116803c30c95144a0b17f9ecd3422d4d6feff5ffef11d33b",
+    "target/wp903/observation.json": "26b611466fe332b3f81f190a6b6c576b5f633cf8bfd1e699134c79c5347ab8c1",
+    "target/wp903/materialization-initial.json": "53b0d0349f4bf4bd20c11bbab6cf9719e3f5a29b699ddc0b2bf967a2a97357b4",
+    "target/wp903/materialization.json": "0085a95940229ef09e589e3db8b78740c1f6743176e7446e02bef5afb617af75",
+    "target/wp903/verify.py": "ebf58459fc5f7d7f3d38b2d69cdc4e0b9d54d729fd66b241c78a75139be8cf2b",
+    "target/wp903/cleanup.py": "c5c04b9a6707a65d7a18b41abd79a0bc3bbe1299ffd13fe9e1a2d66c82514ac1",
+    "target/wp903/cleanup.json": "aca1eee85a948a1d45853ed76eb58f6cdd0196a0cf4f75224ac05c709e746a1a",
+    "target/wp903/lifecycle-reuse.json": "e129ab56663b4cecfe2003dc67400facd44b2a30db1850ed1e61aead607df753",
+    "target/wp903/marker-source.md": "561662a2b0d706b009dc45d0bd6db72446da5cc900775c11bc92c58c1512889b",
+    "target/wp903/design-source.md": "7ce0980737137754de3875742a838a4d30ff4980a890321edb5afeceec143a80",
+    "target/wp903/design-evidence.md": "ba8c33e80958b8b67a5e12ab0af4cc34d07cefe6a269b9e4e3b5df88b0bd84d1",
+    "target/wp903/design-ownership.md": "60e84f52e4a5d6328dfbd962b48765568ccd73b8ed67910016e36950f31f934e",
+    "target/wp903/final-source.md": "bf1b2f707c1d534493c4fdf8a8efcfbd614573f74b0980c758bdccfa67c32098",
+    "target/wp903/final-evidence.md": "9cd76410eb7f08d31bbc6f60031b8b7bdd7d9ef2e5cda710b44dd6c2a7512a6f",
+    "target/wp903/final-ownership.md": "14722340bee857c7c596b9a62d9137da86ff8c142932728ec11292e4eb68166c",
+    "target/wp903/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp903/stderr.log": "8afc465857fdc486dec50fbf151daffe99dfc9e36beb0985bb51c36ee4e73708"
+  },
+  "independent_final_reviews": {
+    "target/wp903/final-source.md": "bf1b2f707c1d534493c4fdf8a8efcfbd614573f74b0980c758bdccfa67c32098",
+    "target/wp903/final-evidence.md": "9cd76410eb7f08d31bbc6f60031b8b7bdd7d9ef2e5cda710b44dd6c2a7512a6f",
+    "target/wp903/final-ownership.md": "14722340bee857c7c596b9a62d9137da86ff8c142932728ec11292e4eb68166c"
+  }
+}

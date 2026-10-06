@@ -1,68 +1,74 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-202-m7a-local-archive-repository-preparation-r1
-Status: Three checksum-pinned local crate archives selected for Bazel preparation
+Packet: WP-7-203-m7a-prepared-rustc-action-accounting-r1
+Status: Local prerequisite prepared; one current configured CLI action query selected
 
-## Observable outcome
+## Observable outcome and compatibility
 
-The current CLI Rustc query cannot analyze because the Bazel xz2 repository is
-absent under nofetch. Select local source preparation for exactly lzma-sys0.1.20,
-pkg-config0.3.34 and xz2 0.1.7, the three current Cargo-selected external package
-directories absent from the existing cache. This directory inventory does not
-prove complete configured closure or repository freshness. Their Cargo archives
-already exist locally; checksum and current Cargo/Bazel declarations must agree.
-Compatibility: Slug-native preparation evidence; no semantic/feature edit.
-Root owns selection, staging, invocation, cleanup and commits.
+Continue canonical priority1 with current Linux CLI configured Rustc action
+accounting after accepted three-repository preparation. The previous nofetch
+query had no graph because xz2 was absent; that prerequisite has changed.
+Select one current query, then compare current direct configured compiler feature,
+source/package and input/parameter ownership against accepted Cargo inventory
+and Linux unit evidence. Classify a demanded missing producer before semantic
+implementation. Compatibility: Slug-native accounting; no runtime activation,
+compiler/build success, complete freshness or M7A claim. Root owns invocation,
+analysis, scheduling and commits.
 
-## Source and ownership
+## Inputs and bounded operation
 
-Bazel9.2 tag8220c619's DownloadManager validates checksum cache/distdir hits
-before disableDownload refusal. The selected URLs end in download; http_archive
-uses tar.gz, so distdir candidates are download/download.tar.gz. Ordinary
-repository materialization requires fetching enabled; downloader remains disabled.
-See WP902's final source review/hash in the [query receipt](wp902-rustc-query-prerequisite-2026-10-06.json).
-Read and pin the three exact generated cached http_archive declarations and
-build-file inputs before the new operation; reject mismatching names, digests,
-URLs, strip prefixes or unexpected process/patch hooks. No synthetic override.
+Reuse WP902 pinned Bazel9.2.0/schema/rules_rust compiler-wrapper source and reviewed
+WNOWAIT retained-leader lifecycle. Pin current tracked Cargo/BUILD/bzl authority,
+locks/MODULE/toolchain, exact Bazel binary, cached selected RepoSpecs and prepared
+BUILD/source-marker inputs. Check process overlap before launch. One batch aquery
+selects mnemonic("(Rustc|RustcTool|CargoBuildScriptRun)",
+deps("//app/slug_cli_v2:slug")), with jsonproto/commandline/artifact/param-file
+output, nofetch, repository_disable_download, lockfile_mode=error, ignored RC,
+explicit nightly channel and loading threads2. No build/test/action or network
+download is selected. JVM2GiB, operation15s, cleanup3s, output16MiB each. Fresh
+platform cache-write review applies to this exact operation. Preserve failures,
+no automatic retry/cap growth. These caps do not alter Slug source/memory limits.
 
-Stage verified regular source archives into a fresh private target/wp903 parent,
-using bounded64KiB copies and NOFOLLOW source identity/size/stability checks.
-Each archive <=1MiB and total <=2MiB. Exact current Cargo.lock checksum equals
-Cargo.Bazel.lock and staged bytes. Three SHA-named distdirs each supply download.
-Keep originals unchanged; no hard links or foreign cache cleanup.
+Raw stdout may start with the two already observed JVM os,container warning
+lines. Preserve raw bytes and warning evidence; a strict bounded parser may
+recognize only that exact warning family before a JSON object, then require a
+complete valid ActionGraphContainer. No generic substring salvage or empty-graph
+claim. A missing graph/refusal remains missing evidence.
 
-Select one pinned Bazel9.2 batch fetch for exactly these canonical repositories,
-explicit private distdirs, repository_disable_download, lockfile_mode=error,
-ignore RC and explicit nightly channel. Source inputs/binary/staged archives and
-known scheduling edits are pre-pinned; no build/test/compiler/backend action or
-network download is selected. JVM2GiB, loading threads2, operation15s, cleanup3s,
-output16MiB. Reuse reviewed WNOWAIT leader/group cleanup from WP902 unchanged.
-These operation caps do not alter Slug source/memory/permission limits.
+## Analysis and validation
 
-Fresh platform cache-write approval applies to the exact operation. Persistent
-user authorization to implement the broader plan covers local prerequisite
-preparation; the old nofetch query scope does not authorize an automatic query
-retry. No new aquery or Slug source observation is selected here. Preserve
-nonzero/resource/unknown cleanup rather than retrying or increasing caps.
+Reuse WP902 source-fields.md for actual Bazel9.2 schema: preserve action array
+indices, target/configuration/artifact/pathfragment/depset references, ordered
+arguments, fixed environment and exact ParameterFileWrite-backed paramFiles.
+Missing/cyclic/unresolved references refuse affected claims. Configuration isTool
+is not equivalent to Cargo host role. Process-wrapper --arg-file build-script
+output is a generated input, distinct from virtual param-file arguments; current
+generated bytes remain unproved without their natural producer evidence.
 
-## Validation and boundaries
+Map exact external canonical crate repository names to current lock name/version
+and configured target role; compare named feature cfgs and target triples with
+current common/Linux declarations and accepted planned units without equating
+workspace-unified, planned or configured feature scopes. Preserve duplicate
+configured actions, proc-macro/build-script/tool distinctions and unselected
+packages. Account local targets separately; do not diagnose narrower planned
+features as a defect without a configured consumer. Source pins/cache warnings
+qualify freshness; no whole closure/source memory claim follows.
 
-Independent review checks archive/declaration identity, local downloader protocol,
-operation join/group/input facts and actual materialization evidence. Repository
-creation is source preparation, not configured action, generated bytes or build
-success. Preserve stale repository warnings and unproved fresh source ownership.
-After the joined operation, verify selected repository markers/files using normal
-writer evidence; remove only the owned private distdir after terminal review and
-fresh identity proof, retaining compact hashes/receipt. No shared-cache removal.
-Allowlist: manifest/canonical, compact prerequisite/preparation receipts and
-Stage10/readiness only for reusable evidence. Operational files target/wp902/903;
-no production code, lock, Cargo/BUILD or toolchain edit. Run plan/diff checks.
+Independent final review checks source mapping, evidence conclusions and actual
+join/group/input facts; lifecycle design and field contracts are inherited, not
+reopened. Tracked allowlist: manifest/canonical and compact receipts; Stage10 or
+readiness only for reusable evidence. Operational snapshots/scripts target/wp904.
+No production/lock/BUILD/toolchain edit. Run plan status and diff checks; commit
+accepted evidence and select the next finite owner gap. Windows stays minimal.
 
 ## Immediate predecessor
 
-WP902 atfb67f509b ran once, exit1/2.170s: missing xz2 repo, zero build processes,
-no action graph (stdout was JVM warning text). Child/group cleanup and687 pinned
-inputs passed; three FINALs accept prerequisite evidence only. WP900/901 current
-inventory/unit evidence remains accepted. Full actual-source admission/M7A are
-open, original memory REFUSED and source16/17/18 remain spent. Allocation/interner
-discipline persists in AGENTS.md; Windows minimal/deferred, siblings reference.
+WP903 atc854a9f78 fetched exactly three selected local repositories once,
+exit0/0.960s with natural join/group-empty and697 unchanged pins. Three FINALs
+accept normal source preparation:805307 compressed bytes,448 regular archive
+files/2932174 expanded bytes equal, exact inline BUILDs and normal cache markers.
+Private stage removed; originals/shared cache retained. See
+[preparation receipt](wp903-local-repository-preparation-2026-10-06.json).
+Current WP900/901 inventory/planned units stay accepted. Full actual-source/M7A
+remain open; original memory REFUSED/source16/17/18 stay spent. Allocation/interner
+discipline in AGENTS.md and all source caps persist; sibling directories reference.

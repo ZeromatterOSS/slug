@@ -34,18 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-202-m7a-local-archive-repository-preparation-r1
-Status: Three checksum-pinned local crate archives selected for Bazel preparation
+Packet: WP-7-203-m7a-prepared-rustc-action-accounting-r1
+Status: Local prerequisite prepared; one current configured CLI action query selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects local archive
-verification and one bounded download-disabled materialization of three missing
-crate repositories from existing Cargo cache. The once-only Rustc query stopped
-at xz2 under nofetch, before a configured graph; no build action ran. See the
-[prerequisite receipt](./slug-v2-subplans/wp902-rustc-query-prerequisite-2026-10-06.json).
-No aquery/source retry or Slug runtime activation is selected. Current declared
-inventory/unit-feature accounting remains accepted; configured/source/M7A gates
-stay open. Allocation/interner discipline and all Slug source caps remain, with
-original memory REFUSED/source16/17/18 preserved. Windows minimal/deferred.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects current
+configured Rustc action accounting after the three missing repositories were
+prepared from checksum-verified local Cargo archives. The single preparation
+succeeded with complete regular-member and inline BUILD equality, natural join
+and private staging cleanup; see the
+[preparation receipt](./slug-v2-subplans/wp903-local-repository-preparation-2026-10-06.json).
+Current inventory/unit-feature accounting remains accepted. Configured/generated
+source and M7A gates stay open; no Slug source retry or runtime activation.
+Allocation/interner discipline and Slug source caps persist, with original memory
+REFUSED/source16/17/18 preserved. Windows minimal/deferred.
 
 ### Ready and blocked queue
 
