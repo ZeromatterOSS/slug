@@ -1,63 +1,61 @@
 # Current Slug V2 Work Packet
 
-Packet: WP-7-208-m7a-starlark-library-prerequisite-preparation-r1
-Status: Syntax prerequisite accepted; isolated Starlark library compile selected
+Packet: WP-7-209-m7a-cli-root-after-prerequisite-preparation-r1
+Status: Syntax and Starlark prerequisites accepted; current CLI compile selected
 
 ## Observable outcome and source basis
 
-Prepare the ordinary //starlark-rust/starlark:starlark library under the inherited
-bounded compiler operation. WP908 accepted its syntax dependency, including the
-nonempty generated grammar. WP905 Rustc action235 owns artifact4099,
-bazel-out/k8-fastbuild/bin/starlark-rust/starlark/libstarlark-1881180005.rlib;
-Core/analysis/Starlark/bzlmod/loading compiler actions157/179/212/216/220 consume
-it through normal --extern/input edges. This is a required prerequisite, not a
-cause attribution for the capped root build. Compatibility: Slug-native external
-Bazel preparation only. Root owns invocation, output observations and integration.
+Build the literal //app/slug_cli_v2:slug root with the now-prepared syntax and
+Starlark libraries and corrected per-log capture. WP905 Rustc action0 owns
+non-tree artifact4321 bazel-out/k8-fastbuild/bin/app/slug_cli_v2/slug. The normal
+BUILD/Cargo dependency owners and current configured/direct feature/producer
+inventory remain accepted. This is materially changed preparation after WP907's
+unattributed root cap, not an identical failed invocation or cap enlargement.
+Compatibility: Slug-native external Bazel compilation only; root owns invocation,
+input/output observations and integration. No Slug semantic activation or M7A close.
 
-Literal BUILD selects src/**/*.rs, the ordinary build_script and declared deps/
-proc macros. build.rs observes the selected RUSTC --version and emits rust_nightly
-when appropriate. Build-script run329 owns tree3922 build_script.out_dir and five
-metadata files6494/6495/6004/25/7794; host compile533 owns script7791. Use normal
-producer outputs; no substitute generation, BUILD/source/feature/toolchain edit.
-Reuse WP905 graph/schema and WP908 accepted controller/input/output reviews.
+## One operation and inherited contracts
 
-## One operation and boundaries
+Select one pinned batch Bazel root build: noRC/nofetch/downloader disabled/lockfile
+error/nightly/loading2/jobs2/standalone. Retain60s compile/3s cleanup/JVM2GiB and
+16MiB saved bytes per log. Reuse WP909 r2 parent-owned nonblocking dual-pipe capture
+(max64KiB read per ready stream/pump), overflow cancellation, bounded EOF drain,
+retained-leader WNOWAIT group retirement and compiler snapshots. No inherited
+artifact RLIMIT_FSIZE. The actual file-size limiter defect and small controls are
+reviewed; no global string pool or new production memory owner. Fresh exact
+platform review covers ordinary compiler/cache writes. Serialize Cargo/native
+builds; no tests/backend/network acquisition/Slug source request or automatic retry.
 
-Select one pinned batch Bazel build of the literal library target: noRC, nofetch,
-downloader disabled, lockfile error, nightly, loading2/jobs2, standalone. Retain
-compilation60s/cleanup3s/output16MiB per log/JVM2GiB. jobs2 bounds declared action
-dispatch, not nested subprocesses. A fresh exact platform review covers the cache
-writes. Reuse the retained-leader WNOWAIT group controller and named process census;
-no overlapping Cargo/native build. No test, acquisition, backend, Slug source
-request or automatic root retry. Preserve failure and cleanup evidence; no cap growth.
+Pin inherited tracked Rust/Cargo/BUILD/bzl/lalrpop authority, locks/MODULE/toolchain,
+binary, cached compiler/runner sources and prepared repositories. Require clean
+tracked state and exact enumerated pre/post pins. On successful joined/group-empty
+completion with empty observed compiler snapshots, complete EOF and no overflow,
+observe the exact nonempty executable-mode root file with the reused anchored
+NOFOLLOW/NONBLOCK regular reader. Preselect256MiB file observation cap and64KiB
+streaming reads; an older79.7MB root metadata observation is sizing only, never
+current build proof. Do not execute the binary or inspect unrelated cache artifacts.
 
-Pin the inherited tracked Rust/Cargo/BUILD/bzl/lalrpop authority, locks/MODULE/
-toolchain, pinned binary, cached compiler/runner sources and prepared repositories.
-Require clean scheduling state and unchanged enumerated pins. After successful
-join/group emptiness and empty observed compiler snapshots, use the reused anchored
-NOFOLLOW/NONBLOCK bounded reader to observe the nonempty regular rlib, five regular
-metadata files (empty is allowed), and out_dir. An empty out_dir is valid for this
-compiler-version script. Natural cached outputs are allowed; do not claim every
-action executed afresh or every ambient/transitive system input is authenticated.
+## Acceptance and boundaries
 
-## Acceptance and scope
-
-Named library success and exact producer-output observations advance focused
-compiler preparation. Full CLI linking, source-memory fit, Slug execution and M7A
-remain open. On failure name the actual diagnostic or preserve unattributed cap;
-choose its concrete owner before any production change. Independent finals cover
-source correspondence, evidence and lifecycle deltas using accepted scaffolding;
-no new framework or broad suites. Tracked allowlist: manifest/canonical, compact
-receipt and Stage10 reusable gate evidence; operational target/wp909. Run plan/diff
-checks and commit the accepted actual outcome. Allocation/interner discipline and
-all Slug source AS/RSS/disk/string caps persist; Windows minimal/deferred.
+Actual named root build success and regular output receipt advance current
+compilation/linking preparation. Cache reuse is valid; no all-actions-fresh,
+full-runfiles/default-output topology, all-tools hermeticity, Slug runtime, source
+memory-fit or full M7A claim. Failure preserves its concrete diagnostic/owner or
+unattributed cap before selecting a smaller owner; never automatically repeat or
+grow the cap. Independent finals reuse source/evidence/ownership scaffolding.
+Tracked allowlist: manifest/canonical, compact receipts and Stage10 reusable gate
+updates; operational target/wp910. No production/lock/BUILD/toolchain edit selected.
+Run plan/diff checks and commit the accepted result. Source AS/RSS/disk/string caps,
+AGENTS allocation/interner discipline and original memory REFUSED/source16/17/18
+remain intact. Windows minimal/deferred; sibling repositories reference.
 
 ## Immediate predecessor
 
-WP908 at e35117e0e succeeded in12.023s:28 reported actions (1 internal/27 local)
-and790 cache hits,2827 enumerated pins unchanged, natural join/groupempty and no
-observed compiler leftovers. The8,259,098B syntax rlib and618,176B grammar source
-match their normal producers; three FINALs accept focused preparation only. See
-[syntax receipt](wp908-syntax-prerequisite-build-2026-10-06.json). WP907 root cap
-remains without cause attribution; original memory REFUSED/source16/17/18 remain
-spent. No Slug source retry or M7A activation; siblings are reference.
+WP909 at f5a6943c5 initially failed1/11.640s with clean unchanged inputs and no Rust
+diagnostic. Its controller incorrectly capped all regular compiler files at16MiB.
+The reviewed correction restricts only parent-saved logs. One corrected build
+succeeded0/8.136s with2829 unchanged pins, clean completion/EOF and no log overflow;
+2 actions/927 cache hits and80,189,590B Starlark rlib. Normal script flags contain
+--cfg=rust_nightly; its.empty output directory is valid. Three FINALs accept
+focused preparation; exact original signal remains unproved. See
+[Starlark receipt](wp909-starlark-prerequisite-build-2026-10-06.json).

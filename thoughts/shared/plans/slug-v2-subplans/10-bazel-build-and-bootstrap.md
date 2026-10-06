@@ -185,8 +185,15 @@ root compilation stays open. The subsequent
 in12.023s with28 actions and790 cache hits,2827 unchanged pins and clean completion.
 The8,259,098B rlib and included618,176B grammar source match their normal producers;
 five script metadata files are naturally empty. Three FINALs accept this focused
-preparation without fresh-generation or root-success claims. Select the ordinary
-Starlark library consumer next under the same caps.
+preparation without fresh-generation or root-success claims. The ordinary
+[Starlark consumer](wp909-starlark-prerequisite-build-2026-10-06.json) then succeeded
+in8.136s with2 actions/927 cache hits and80,189,590B rlib. Its initial failed
+invocation exposed a controller bug: inherited RLIMIT_FSIZE capped compiler
+artifacts as well as logs. Reviewed parent-side bounded pipe capture now enforces
+only16MiB saved bytes per log; compile/cleanup/source-memory caps are unchanged.
+Three fast capture controls and actual EOF/no-overflow completion support the
+correction. Three FINALs accept focused preparation; original Rustc signal is
+unrecorded. Select the materially prepared current CLI root next.
 
 #### Live WP-7-13 cache-core inventory delta (2026-09-16)
 

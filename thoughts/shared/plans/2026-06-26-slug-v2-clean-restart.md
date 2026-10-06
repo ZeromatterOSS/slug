@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-208-m7a-starlark-library-prerequisite-preparation-r1
-Status: Syntax prerequisite accepted; isolated Starlark library compile selected
+Packet: WP-7-209-m7a-cli-root-after-prerequisite-preparation-r1
+Status: Syntax and Starlark prerequisites accepted; current CLI compile selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects the ordinary
-Starlark library after its syntax prerequisite succeeded in12.023s with unchanged
-enumerated inputs and clean completion. See the
-[syntax receipt](./slug-v2-subplans/wp908-syntax-prerequisite-build-2026-10-06.json).
-Root linking remains open after its60s cap; the isolated required prerequisite is
-not a timeout-cause attribution or identical root retry. Source-memory/M7A remain
-open. Allocation/interner discipline, original memory REFUSED/source16/17/18 and
-source limits persist; Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects the CLI root
+with materially completed syntax/Starlark prerequisites and corrected per-log
+capture. The [Starlark receipt](./slug-v2-subplans/wp909-starlark-prerequisite-build-2026-10-06.json)
+records8.136s success and its80.2MB library after fixing the inherited artifact
+file-limit mistake. Compile/cleanup/log caps remain unchanged. Root success stays
+open after WP907's cap; no identical failed invocation or Slug source retry.
+Source-memory/M7A remain open. Allocation/interner discipline, original memory
+REFUSED/source16/17/18 and source limits persist; Windows minimal.
 
 ### Ready and blocked queue
 

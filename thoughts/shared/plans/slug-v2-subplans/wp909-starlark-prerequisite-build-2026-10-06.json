@@ -1,0 +1,338 @@
+{
+  "schema": 1,
+  "base": "f5a6943c54518e69ca350d7a7fb4ddc07bd76926",
+  "cwd": "/run/media/system/Colossus/dev/slug",
+  "command": [
+    "/run/media/system/Colossus/dev-home/.cache/bazelisk/downloads/sha256/7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694/bin/bazel",
+    "--batch",
+    "--ignore_all_rc_files",
+    "--host_jvm_args=-Xmx2g",
+    "build",
+    "//starlark-rust/starlark:starlark",
+    "--nofetch",
+    "--repository_disable_download",
+    "--lockfile_mode=error",
+    "--@rules_rust//rust/toolchain/channel=nightly",
+    "--loading_phase_threads=2",
+    "--jobs=2",
+    "--spawn_strategy=standalone",
+    "--color=no",
+    "--curses=no",
+    "--noshow_progress"
+  ],
+  "work_limit_seconds": 60,
+  "cleanup_limit_seconds": 3,
+  "output_limit_bytes": 16777216,
+  "output_limit_scope": "Parent-saved bytes per log only; no child artifact RLIMIT_FSIZE",
+  "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+  "initial_tracked_status": "",
+  "deadline_expired": false,
+  "term_sent": false,
+  "kill_sent": false,
+  "joined": true,
+  "owned_group_empty": true,
+  "error": null,
+  "exit_code": 0,
+  "automatic_retry": false,
+  "actions_requested": true,
+  "tests_requested": false,
+  "compiler_census_before": [],
+  "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+  "downloads_requested": false,
+  "log_capture_eof": true,
+  "output_limit_exceeded": [],
+  "elapsed_seconds": 8.135769205051474,
+  "signal_observed": false,
+  "inputs_unchanged": true,
+  "tracked_state_unchanged": true,
+  "compiler_census_after": [],
+  "unexplained_compiler_processes_observed": false,
+  "outputs": {
+    "stdout.log": {
+      "bytes": 401,
+      "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+    },
+    "stderr.log": {
+      "bytes": 957,
+      "sha256": "a5a0e2813494debca9be54a490087f28a47dce31b5625ead2c697412031dc814"
+    }
+  },
+  "packet": "WP-7-208-m7a-starlark-library-prerequisite-preparation-r1",
+  "disposition": "ACCEPTED_BOUNDED_STARLARK_PREREQUISITE_AFTER_LOG_LIMIT_CORRECTION",
+  "input_pin_count": 2829,
+  "reported_processes": {
+    "action_cache_hit": 927,
+    "internal": 1,
+    "local": 1,
+    "total_actions": 2
+  },
+  "producer_outputs": {
+    "schema": 1,
+    "execroot": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/343a846ed75d86315cf38594423501b5/execroot/_main",
+    "execroot_identity": [
+      66308,
+      125830534,
+      16877,
+      4096,
+      1791271504850089192,
+      1791271504850089192
+    ],
+    "regular_outputs": [
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/libstarlark-1881180005.rlib",
+        "bytes": 80189590,
+        "sha256": "be490d7900a4219dbcadb3776110fbaa672c4053c9873ac390412a41a62af5c0",
+        "identity": [
+          66308,
+          127140689,
+          33133,
+          80189590,
+          1791271504812089133,
+          1791271504851089193
+        ],
+        "artifact_id": 4099,
+        "producer_action_index": 235
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.env",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125850316,
+          33133,
+          0,
+          1791270488219506440,
+          1791270488220747802
+        ],
+        "utf8_content": "",
+        "artifact_id": 6494,
+        "producer_action_index": 329
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.flags",
+        "bytes": 18,
+        "sha256": "6fbf101abc8821a87c7d32b418d5a330c1aa4ba1512f8db9d2dd0d925bb89c72",
+        "identity": [
+          66308,
+          125863059,
+          33133,
+          18,
+          1791270488219506440,
+          1791270488220747802
+        ],
+        "utf8_content": "--cfg=rust_nightly",
+        "artifact_id": 6495,
+        "producer_action_index": 329
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.linkflags",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863060,
+          33133,
+          0,
+          1791270488219506440,
+          1791270488220747802
+        ],
+        "utf8_content": "",
+        "artifact_id": 6004,
+        "producer_action_index": 329
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.linksearchpaths",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863061,
+          33133,
+          0,
+          1791270488219506440,
+          1791270488220747802
+        ],
+        "utf8_content": "",
+        "artifact_id": 25,
+        "producer_action_index": 329
+      },
+      {
+        "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.depenv",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "identity": [
+          66308,
+          125863058,
+          33133,
+          0,
+          1791270488219506440,
+          1791270488220747802
+        ],
+        "utf8_content": "",
+        "artifact_id": 7794,
+        "producer_action_index": 329
+      }
+    ],
+    "regular_output_bytes": 80189608,
+    "out_dir": {
+      "path": "bazel-out/k8-fastbuild/bin/starlark-rust/starlark/build_script.out_dir",
+      "artifact_id": 3922,
+      "producer_action_index": 329,
+      "identity": [
+        66308,
+        127140900,
+        16749,
+        4096,
+        1791270488220458460,
+        1791270488220747802
+      ],
+      "entries": [
+        {
+          "path": ".empty",
+          "type": "regular",
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "identity": [
+            66308,
+            127140911,
+            33133,
+            0,
+            1791270488220458460,
+            1791270488220747802
+          ]
+        }
+      ],
+      "entry_count": 1,
+      "regular_bytes": 0
+    },
+    "scope": "One ordinary Bazel library success and bounded producer output bytes. No final executable native-link, hermetic tools, full root, Slug execution or memory/source fit proof."
+  },
+  "initial_invocation": {
+    "schema": 1,
+    "base": "f5a6943c54518e69ca350d7a7fb4ddc07bd76926",
+    "cwd": "/run/media/system/Colossus/dev/slug",
+    "work_limit_seconds": 60,
+    "cleanup_limit_seconds": 3,
+    "output_limit_bytes": 16777216,
+    "binary_sha256": "7668a95db1250f12c40407251e4e203b4ec8bf39bc495d2f485b2d8c99048694",
+    "initial_tracked_status": "",
+    "deadline_expired": false,
+    "term_sent": false,
+    "kill_sent": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "error": null,
+    "exit_code": 1,
+    "automatic_retry": false,
+    "actions_requested": true,
+    "tests_requested": false,
+    "compiler_census_before": [],
+    "compiler_census_scope": "Observed named process snapshot only; jobs2 bounds action dispatch, not nested subprocess count; no escaped-descendant retirement guarantee",
+    "downloads_requested": false,
+    "elapsed_seconds": 11.64023737993557,
+    "signal_observed": false,
+    "inputs_unchanged": true,
+    "tracked_state_unchanged": true,
+    "compiler_census_after": [],
+    "unexplained_compiler_processes_observed": false,
+    "outputs": {
+      "stdout.log": {
+        "bytes": 401,
+        "sha256": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e"
+      },
+      "stderr.log": {
+        "bytes": 1403,
+        "sha256": "a72ee94b5952fbdf3307cdab896806cca9560887a4f190bf0863f206269debd8"
+      }
+    },
+    "input_pin_count": 2827,
+    "output_promoted": false,
+    "contract_defect": "Inherited RLIMIT_FSIZE limited all descendant regular files, contrary to per-log intent.",
+    "cause_qualification": "Exact16MiB temporary archive and corrected80MiB success support the diagnosis; original rustc signal/EFBIG not recorded, so exact causality is qualified."
+  },
+  "log_limit_correction": {
+    "saved_bytes_per_stream": 16777216,
+    "scratch_read_bytes_per_stream": 65536,
+    "child_artifact_rlimit_set": false,
+    "overflow_cancels_owned_group": true,
+    "eof_required_for_output_acceptance": true,
+    "compile_and_cleanup_caps_unchanged": true,
+    "controls": {
+      "schema": 1,
+      "controls": [
+        {
+          "name": "ordinary",
+          "exit_code": 0,
+          "elapsed_seconds": 0.0067203110083937645,
+          "counts": {
+            "stdout.log": 10,
+            "stderr.log": 10
+          },
+          "exceeded": [],
+          "eof": true
+        },
+        {
+          "name": "artifact_above_log_cap",
+          "exit_code": 0,
+          "elapsed_seconds": 0.018341547111049294,
+          "counts": {
+            "stdout.log": 17,
+            "stderr.log": 0
+          },
+          "exceeded": [],
+          "eof": true,
+          "artifact_bytes": 17825792
+        },
+        {
+          "name": "independent_log_overflow",
+          "exit_code": 0,
+          "elapsed_seconds": 0.006620021071285009,
+          "counts": {
+            "stdout.log": 4096,
+            "stderr.log": 4096
+          },
+          "exceeded": [
+            "stdout.log",
+            "stderr.log"
+          ],
+          "eof": true
+        }
+      ],
+      "private_directory_removed": true
+    },
+    "design_wrapper_sha256": "79f01764e355434559ffe768b7228b316a195c43aeecd9f42179eb47b0f5a85b",
+    "executed_wrapper_sha256": "281f6b9ee9b1c59db9101936203e507c6265f0a78662131a17924e838a8c2f86",
+    "post_design_delta": "Only two additional process-wrapper Rust source pins; Capture/control/lifecycle unchanged. Actual2829-pin wrapper accepted by final ownership review."
+  },
+  "evidence_sha256": {
+    "target/wp909/build-observe.py": "c84df9c9dd4cacdac24dbb3f69837766bd02da2b09cb4b09718e1912e9bc59d2",
+    "target/wp909/claim.json": "b3f0b419f7f371a9fcf15c048a381675a00952adda7244db94e9cdf92235e329",
+    "target/wp909/observation.json": "30075d57ecdbe4fa3658fe485662ccfe0dde88f13812a821f0e0a21b2326fa95",
+    "target/wp909/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp909/stderr.log": "a72ee94b5952fbdf3307cdab896806cca9560887a4f190bf0863f206269debd8",
+    "target/wp909/final-source.md": "51eaf0ebe2117f470544d13fb988a0a8a8e6bfb01a0d02a12590a2d51f018e75",
+    "target/wp909/final-evidence.md": "18201eb1436f773e0c559c8c2befee9fc47cd293c8fda29aa6d573139fdbbb03",
+    "target/wp909/final-ownership.md": "016aad3859d8fefadd9d1e75986b0bad7c45cff1d36952aec075377851f5c0b6",
+    "target/wp909/r2/build-observe.py": "281f6b9ee9b1c59db9101936203e507c6265f0a78662131a17924e838a8c2f86",
+    "target/wp909/r2/claim.json": "b3f0b419f7f371a9fcf15c048a381675a00952adda7244db94e9cdf92235e329",
+    "target/wp909/r2/observation.json": "6b43c6ee30d9b29a9bf0011678a54e203ce63af7be3f8443a1fdbb44e8d34fab",
+    "target/wp909/r2/outputs.py": "d2e8a0f7cd3d60afdff5a8b5da2fb0fc4661d311059028ff20b5bfb660297779",
+    "target/wp909/r2/outputs.json": "d8617d7035010580d08e9733dbe1f01db7518dd63fd1b1cf3e3ce63c3544d13c",
+    "target/wp909/r2/stdout.log": "518872c7a6f91053abf57a6dac766f016c864565a1c79db84aac17a7767dba2e",
+    "target/wp909/r2/stderr.log": "a5a0e2813494debca9be54a490087f28a47dce31b5625ead2c697412031dc814",
+    "target/wp909/r2/capture-controls.py": "c567a1547b9cd1aa8477dbab7199a614802232098cc3b7079587fd50673067a5",
+    "target/wp909/r2/capture-controls.json": "d446cbc13f35be40d6a70943c97a3aba55bbac7f240e985b92458b80a74a45d0",
+    "target/wp909/r2/correction-contract.md": "d8d9f231c9fac581128e7f34b7a1f40581b01efb7bf7fb02382a5bd96869ca7d",
+    "target/wp909/r2/design-ownership.md": "2e4387aba67dddf95f9a069bea7b9f934ea51e8139e6429664fad24a971c75e8",
+    "target/wp909/r2/final-source.md": "53c56ee28bb6e5825a99f48f9920080d4eca88b87cae03ec0dab482bc4a16119",
+    "target/wp909/r2/final-evidence.md": "4234ab6d5f8f792a6560f505f8a42558c04d0502f434636997822fc6648ef65b",
+    "target/wp909/r2/final-ownership.md": "45de1c9ac0a89e856d54097cbcaeb721bc2390e90992f5081fa11335935e05a8"
+  },
+  "independent_final_reviews": {
+    "target/wp909/r2/final-source.md": "53c56ee28bb6e5825a99f48f9920080d4eca88b87cae03ec0dab482bc4a16119",
+    "target/wp909/r2/final-evidence.md": "4234ab6d5f8f792a6560f505f8a42558c04d0502f434636997822fc6648ef65b",
+    "target/wp909/r2/final-ownership.md": "45de1c9ac0a89e856d54097cbcaeb721bc2390e90992f5081fa11335935e05a8"
+  },
+  "scope": "Focused ordinary Starlark library success with natural cached inputs and bounded outputs; no full-root, Slug source fit/runtime, all-tools freshness or M7A claim."
+}
