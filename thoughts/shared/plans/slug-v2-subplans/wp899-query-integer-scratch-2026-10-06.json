@@ -1,0 +1,359 @@
+{
+  "schema": 1,
+  "packet": "WP-7-199-m7a-request-selected-source-profile-r1",
+  "baseline": "e635f81bf",
+  "disposition": "ACCEPTED_COMPONENT_FULL_WP899_OPEN",
+  "compatibility": "Slug-native memory implementation; inherited signed-integer slots and Rust string parsing unchanged, no widened Java/Bazel parity",
+  "source_sha256": {
+    "app/slug_query_v2/src/expr.rs": "7d5cb8341b21de5e37992341872684635e3fe4b42e32b738fa71eada4f9060f0",
+    "app/slug_query_v2/src/expr/query_integer_memory_tests.rs": "c6003c07c55cf668fe12e71182fa36c56e0e6f72e1a7bc5157c759e227b291a1",
+    "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960",
+    "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+    "Cargo.lock": "ee3ecfd672786ce09d9dc641280bf97ce55c86a67f615e20eb218007cd3ba314",
+    "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+    "app/slug_query_v2/Cargo.toml": "c45d3a393da6f22b6b0e3cbfbe401ad7a4b0986de662ae19ae4872b5c5b4561f",
+    "app/slug_query_v2/src/lib.rs": "a140c2b6971b5e8439c14124ed0f3dc30919f0f2dcecef87f8cb50aaecd0a672",
+    "app/slug_query_v2/src/parser.rs": "35224a853b80140053d6f8cec1936c2ed1bf2e4ada02c4d7c543f2946729bd9f",
+    "app/slug_query_v2/src/graph.rs": "78edec100be062e915891493ac669683c83ce870c140698767cbd393f983b4a0",
+    "app/slug_query_v2/src/evaluator.rs": "8d9bd8ed0359bec36515040391e2df02e003d62f2cc18a97a0e5a33f7a436991",
+    "app/slug_query_v2/src/loading_environment.rs": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de",
+    "app/slug_query_v2/src/generic.rs": "7eb2ef573cace410b8415c90f2d3a5a7dd29497a45290d11524597a2d974ab8f",
+    "app/slug_query_v2/src/traversal.rs": "0d5a50a2041806546bd9471017486d53ac05d48b813964fabcdf350203ba6b6c",
+    "app/slug_identity_v2/src/label.rs": "3fb6e177f2ae3fe33bbc3972f9d063b3027f2b09e30d99f0e4a2e6c2a03290ea",
+    "app/slug_identity_v2/src/repo.rs": "25517e3ac2ab60a03252b89fea207fc4900fd1e9c4cb6ff6e9305945e4fcd65e",
+    "app/slug_core_v2/src/lib.rs": "f56760059219ee57a5fd97ea05cd1420565d2668cb12fff6216d4e288130768d",
+    "app/slug_cli_v2/src/commands/query.rs": "c70111e1a9f4a30519ad399da612aef5328fc0534ed4ca552864b9e2a8b032f3"
+  },
+  "reference_sha256": {
+    "/run/media/system/Colossus/dev/bazel/src/main/java/com/google/devtools/build/lib/query2/engine/QueryParser.java": "336cdc96d2202acdcc37b221c22f40e973341fbab70d37d32c6b925eddf5174d",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/convert/num.rs": "2c5ae5de6317835420415f88f3d0c631f4e0921a1032031532a7066658d9f6b5",
+    "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/num/mod.rs": "20d408cf147e588522078ff6944f7aae0f22b6219dd45d6cbe6ebd8e421e294b",
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/lib.rs": "794b1923d5b04e941998fc54ca00fcf0ea19460fec2db1db6de96810f6da5eec",
+    "/run/media/system/Colossus/dev-home/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/compact_str-0.8.2/src/repr/mod.rs": "f13dd831c63141051499a84248dac0c8b0e04832240b7da0d27cbaecae32ee2c"
+  },
+  "baseline_selection": {
+    "targets": {
+      "slug_query_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+        "artifact_sha256": "abad016f4d60d4f86481abfbd32bb8acc752261b546c6b53c292714a3d7674aa",
+        "selectors": [
+          "expr::query_integer_memory_tests::integer_slots_preserve_ranges_raw_errors_capacity_and_ast_owners",
+          "expr::query_integer_memory_tests::integer_slot_public_validators_preserve_diagnostics_spans_and_signed_semantics"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_query_v2/src/expr.rs": "6a0e1031047a83a476b527e4e2e51c35eb98943096c00cbf000ea5df261bb1a1",
+      "app/slug_query_v2/src/expr/query_integer_memory_tests.rs": "c6003c07c55cf668fe12e71182fa36c56e0e6f72e1a7bc5157c759e227b291a1",
+      "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960"
+    }
+  },
+  "candidate_selection": {
+    "targets": {
+      "slug_query_v2": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_query_v2-17ec0c7465c33e93",
+        "artifact_sha256": "9812fb8469e2d3f29ab461a2426afb36616b421224973b6dd7525d0f6677618a",
+        "selectors": [
+          "expr::query_integer_memory_tests::integer_slots_preserve_ranges_raw_errors_capacity_and_ast_owners",
+          "expr::query_integer_memory_tests::integer_slot_public_validators_preserve_diagnostics_spans_and_signed_semantics",
+          "generic::tests::cquery_deps_dispatches_the_single_literal_and_nonnegative_depth",
+          "generic::tests::cquery_rdeps_passes_the_seed_without_resolving_it",
+          "generic::tests::cquery_deps_evaluation_rejects_non_top_level_or_invalid_forms_independently",
+          "generic::tests::cquery_some_reuses_the_shared_count_and_recursive_fold"
+        ],
+        "fresh": false
+      },
+      "query": {
+        "artifact": "/run/media/system/Colossus/dev/slug/target/debug/deps/query-1eec5767cc6ec170",
+        "artifact_sha256": "78e965a3b58a3650c64f5de597da39e8b48c1303173dabf4f2f2542e85a2ad73",
+        "selectors": [
+          "signed_java_integer_slots_validate_without_narrowing_expression_integers",
+          "cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_siblings_visible_loading_files_executables_and_kind"
+        ],
+        "fresh": false
+      }
+    },
+    "source_sha256": {
+      "app/slug_query_v2/src/expr.rs": "7d5cb8341b21de5e37992341872684635e3fe4b42e32b738fa71eada4f9060f0",
+      "app/slug_query_v2/src/expr/query_integer_memory_tests.rs": "c6003c07c55cf668fe12e71182fa36c56e0e6f72e1a7bc5157c759e227b291a1",
+      "app/slug_query_v2/tests/query.rs": "17375ebfdc1e2902941f3bc3c721e01d941f808029bddb82ebb9fbdd03611960"
+    }
+  },
+  "validation": {
+    "baseline-compile": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-compile.json",
+      "sha256": "a7760be7c569047954655be491c1e7fa5c74ac0ebb13c92a133969e0b723b835",
+      "exit_code": 0,
+      "elapsed_seconds": 1.5497975570033304,
+      "log_sha256": "5205d9edeb94c847b68893451c5ab33e3293094e8c7a8fa69850c83ce7764172"
+    },
+    "baseline-slug_query_v2-preflight": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-slug_query_v2-preflight.json",
+      "sha256": "985fc187a2721d64469d9c0d4c48b5cb9b1c804997f90cbdee8cf7d39e643135",
+      "exit_code": 0,
+      "elapsed_seconds": 0.02384343498852104,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-slug_query_v2-controls": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-slug_query_v2-controls.json",
+      "sha256": "c58ce533da42863a779ee05156e1efb0b25a1ddc6af7e20bf9542cb0fd78c82c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.002171159954741597,
+      "log_sha256": "fa5eb480349ed21f3ce035305a0b5da225c7c0f08348c5b2975ab0a0864ca52c"
+    },
+    "baseline-r2-compile": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-r2-compile.json",
+      "sha256": "b82e8015b667ca5c877b664e74a42b3ef4863609b28d24094ab011815aaddbf7",
+      "exit_code": 0,
+      "elapsed_seconds": 1.137838753988035,
+      "log_sha256": "4d133163b8c01d07e51a13bf41bec801b2a5404572f2041968e631136445d869"
+    },
+    "baseline-r2-slug_query_v2-preflight": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-preflight.json",
+      "sha256": "b5673e6af9c88357e17b76dda37db4c47eda8ed764a93bccc37ee64d276f7c28",
+      "exit_code": 0,
+      "elapsed_seconds": 0.021591814002022147,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "baseline-r2-slug_query_v2-controls": {
+      "receipt": "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-controls.json",
+      "sha256": "1993847f1ada15db8b7e6aa12f066ce8e3c3a215135022731d50249895bf33db",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0020845799590460956,
+      "log_sha256": "fa5eb480349ed21f3ce035305a0b5da225c7c0f08348c5b2975ab0a0864ca52c"
+    },
+    "candidate-compile": {
+      "receipt": "target/wp899/query-integer-scratch-candidate-compile.json",
+      "sha256": "e0909c222ab14834484bd59d484d7b2a61d92498ca79ba92b974ced030cd141c",
+      "exit_code": 0,
+      "elapsed_seconds": 1.416566404979676,
+      "log_sha256": "f97e651e960199b7e13d4612388529cf80e1be4c5b73bf73335e37de50fe35fd"
+    },
+    "candidate-slug_query_v2-preflight": {
+      "receipt": "target/wp899/query-integer-scratch-candidate-slug_query_v2-preflight.json",
+      "sha256": "8a558f2753e7f4ca346dcf11052d506db58ce77fb1302adeb5592180de1de84a",
+      "exit_code": 0,
+      "elapsed_seconds": 0.024483906978275627,
+      "log_sha256": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e"
+    },
+    "candidate-slug_query_v2-controls": {
+      "receipt": "target/wp899/query-integer-scratch-candidate-slug_query_v2-controls.json",
+      "sha256": "2af2c3ab7da48fe5fea2fb5d17fa1f9a6cc73d428523fac33a47b74d105f0a86",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0026267030043527484,
+      "log_sha256": "7d174fd0701eabd38c510f7d3ddbcf88d05bdac7a1c4fd1be4421e6e32810941"
+    },
+    "candidate-query-preflight": {
+      "receipt": "target/wp899/query-integer-scratch-candidate-query-preflight.json",
+      "sha256": "5492524cdc758715d6d1213e633747b140d6a5e6b81de3715ff62adc8bde9466",
+      "exit_code": 0,
+      "elapsed_seconds": 0.020092905964702368,
+      "log_sha256": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936"
+    },
+    "candidate-query-controls": {
+      "receipt": "target/wp899/query-integer-scratch-candidate-query-controls.json",
+      "sha256": "7a3639e888c1bdd2522385895a1a994abf8cdc4e7eab111b2b3b9091e91c40bd",
+      "exit_code": 0,
+      "elapsed_seconds": 0.0016691479831933975,
+      "log_sha256": "e6c0a67fd00fb9ee11efbb4f128b85f508dad6a5a4b1b622021c920215b24d37"
+    },
+    "dependents-check": {
+      "receipt": "target/wp899/query-integer-scratch-dependents-check.json",
+      "sha256": "76b66823840f9ab09c4afa1f7dc4e8dfa5c4464f4fb3211e14a081060105a8d6",
+      "exit_code": 0,
+      "elapsed_seconds": 7.064655413036235,
+      "log_sha256": "4651b71a2f6d104b57b9c8f3002393b2df5c3c2bf6b7b7c86737960a70fe6bdc"
+    },
+    "format-check": {
+      "receipt": "target/wp899/query-integer-scratch-format-check.json",
+      "sha256": "c861eb8230e0cbfd880ea7b7a055bf96913f0334f1b4c0679a3856d9eca80f5c",
+      "exit_code": 0,
+      "elapsed_seconds": 0.013613176008220762,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/query-integer-scratch-archive-check.json",
+      "sha256": "44f7c22949d94b06a349d4e9c38d26b97ecae733bc35baace89ddad23dff08d4",
+      "exit_code": 0,
+      "elapsed_seconds": 0.03330671996809542,
+      "log_sha256": "c8eedf3301478df5b388bfc5c2824acfa845a753b39c0e16f5f9b9456b65160c"
+    }
+  },
+  "whole_owner_proof": {
+    "baseline_with_hook_sha256": "6a0e1031047a83a476b527e4e2e51c35eb98943096c00cbf000ea5df261bb1a1",
+    "original_method_body": "        let raw = match &self.kind {\n            QueryExpressionKind::Integer(value) => CompactString::from(value.to_string()),\n            QueryExpressionKind::TargetLiteral(value) => value.clone(),\n            _ => CompactString::from(self.to_string()),\n        };\n        raw.parse::<i32>().map_err(|_| raw)",
+    "candidate_method_body": "        match &self.kind {\n            QueryExpressionKind::Integer(value) => {\n                i32::try_from(*value).map_err(|_| CompactString::from(value.to_string()))\n            }\n            QueryExpressionKind::TargetLiteral(value) => {\n                value.as_str().parse::<i32>().map_err(|_| value.clone())\n            }\n            _ => {\n                let raw = CompactString::from(self.to_string());\n                raw.parse::<i32>().map_err(|_| raw)\n            }\n        }",
+    "every_other_byte_unchanged": true
+  },
+  "test_profile": "Resolved pinned nightly2025-09-14 four tools; serial offline lib+query integration CargoJSON no-run prep60s/exact preflight/tests30s, CARGO_MANIFEST_DIR/no golden regeneration; default Core/CLI alltargets/format/archive/plan/diff checks",
+  "pass_counts": {
+    "baseline_new": 2,
+    "candidate_new": 2,
+    "candidate_protected": 6,
+    "candidate_total": 8
+  },
+  "metrics": {
+    "raw_errors": [
+      "2147483648",
+      "-2147483649",
+      "18446744073709551615",
+      "",
+      "+",
+      "-",
+      " 1",
+      "1 ",
+      "1_000",
+      "0x10",
+      "\u0661",
+      "\uff11\uff12",
+      "1\u0000",
+      "1\u00e9\ud83d\ude42",
+      "\n1",
+      "deps(//:x)",
+      "let x = //:x in $x",
+      "set(//:x //:y)",
+      "a union b"
+    ],
+    "raw_errors_sha256": "0def375da8230bafcfbc1d6048e453920d8b4a578301f6b2c97f22144aaf6e03",
+    "public_errors": [
+      "expected an integer literal: '2147483648' at bytes 11..21",
+      "expected an integer literal: '2147483648' at bytes 11..21",
+      "expected an integer literal: '18446744073709551615' at bytes 11..31",
+      "expected an integer literal: '18446744073709551615' at bytes 11..31",
+      "expected an integer literal: '-2147483649' at bytes 11..24",
+      "expected an integer literal: '-2147483649' at bytes 11..24",
+      "expected an integer literal: ' 1' at bytes 11..15",
+      "expected an integer literal: ' 1' at bytes 11..15",
+      "expected an integer literal: '1_000' at bytes 11..18",
+      "expected an integer literal: '1_000' at bytes 11..18",
+      "expected an integer literal: '\u0661' at bytes 11..15",
+      "expected an integer literal: '\u0661' at bytes 11..15",
+      "expected an integer literal: '1\u0000' at bytes 11..15",
+      "expected an integer literal: '1\u0000' at bytes 11..15",
+      "expected an integer literal: 'deps(//:x)' at bytes 11..21",
+      "expected an integer literal: 'deps(//:x)' at bytes 11..21",
+      "cquery deps() depth must be nonnegative at bytes 11..15"
+    ],
+    "public_errors_sha256": "47d2dea5d5df713f379f76e2e95a0a9aa68829a8eb2d38f2a87e2ca0d21c47c6",
+    "numeric_cases": 2054,
+    "target_cases": 21,
+    "fallback_cases": 4,
+    "fallback_display_cases": 2,
+    "retained_errors_bytes_and_capacity": [
+      [
+        47104,
+        47104
+      ],
+      [
+        47104,
+        47104
+      ]
+    ]
+  },
+  "invariant_to_evidence": {
+    "numeric_conversion": "2054 u64 boundary/sample cases compared to original decimal i32 parse; exact error bytes/capacity and unchanged AST/span",
+    "target_parse": "21 sign/zero-padding/limits/empty/Unicode/whitespace/NUL/underscore/range cases through exact unchanged parser; source pointer/capacity/full debug remain",
+    "fallback": "Four normal fallback AST displays retain raw errors/capacity; empty BinaryOpSequence display succeeds123/rejectsu64max proving parsing retained",
+    "public_diagnostics": "17 complete loading/configured errors with exact argument byte spans, negative-depth priority, signed/quoted successes and admitted large integer expression",
+    "ownership": "Two tight/spare long target inputs produce 47104-byte/capacity owned errors/clones after AST/source/original-error drop; original failure Clone policy retained",
+    "normal_callers": "Six existing generic depth/reverse/count/order/invalid and signed-integer/validator integration controls plus Core/CLI defaults",
+    "scratch_removal": "Exact whole-owner proof: successful Integer formatting and successful TargetLiteral clone skipped; original failure constructors and fallback retained"
+  },
+  "test_extension": "Before production edit, added empty-sequence formatted-numeric success/failure after DESIGN review. Original191-line baseline2/2 hash/pass preserved; extended200-line baseline/candidate freshly compiled and identical. No assertions removed or failures.",
+  "limits": "Source-proof only two successful conversion scratch sites bypassed. Invalid/fallback raw strings, final diagnostics and AST owners stay; no pointer/allocator witness, quantified allocation/payload/count, aggregate/peak/RSS/speed/source-fit claim. No helper/API/interner/cache/key/DICE/identity/unsafe/dependency/retained representation/donor import. Windows minimal/deferred; full WP899/M7A/source integration open/unwaived.",
+  "growth": {
+    "test_lines": 200,
+    "estimate": "140-230lines, two tests/no assets/goldens",
+    "production": "Existing private method only plus cfg sibling hook; no additional responsibilities"
+  },
+  "full_wp899_accepted": false,
+  "start": {
+    "started_at": "2026-10-06T03:48:52.072302+00:00",
+    "baseline": "e635f81bfc4eeadbe6f74d73c0a6a59af6452640"
+  },
+  "timing": {
+    "compile_and_check_seconds": 11.168858129007276,
+    "test_seconds": 0.008551590901333839,
+    "review_time": "not separately measured",
+    "elapsed_from_design_seconds": 379.361819
+  },
+  "evidence_sha256": {
+    "target/wp899/query-integer-scratch-archive-check.json": "44f7c22949d94b06a349d4e9c38d26b97ecae733bc35baace89ddad23dff08d4",
+    "target/wp899/query-integer-scratch-archive-check.jsonl": "c8eedf3301478df5b388bfc5c2824acfa845a753b39c0e16f5f9b9456b65160c",
+    "target/wp899/query-integer-scratch-baseline-compile.json": "a7760be7c569047954655be491c1e7fa5c74ac0ebb13c92a133969e0b723b835",
+    "target/wp899/query-integer-scratch-baseline-compile.jsonl": "5205d9edeb94c847b68893451c5ab33e3293094e8c7a8fa69850c83ce7764172",
+    "target/wp899/query-integer-scratch-baseline-r2-compile.json": "b82e8015b667ca5c877b664e74a42b3ef4863609b28d24094ab011815aaddbf7",
+    "target/wp899/query-integer-scratch-baseline-r2-compile.jsonl": "4d133163b8c01d07e51a13bf41bec801b2a5404572f2041968e631136445d869",
+    "target/wp899/query-integer-scratch-baseline-r2-selectors.json": "fe56bb52c111c7efc240d0d74c1072dc3a182bc64505415b0c73c6becff17e24",
+    "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-controls.json": "1993847f1ada15db8b7e6aa12f066ce8e3c3a215135022731d50249895bf33db",
+    "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-controls.jsonl": "fa5eb480349ed21f3ce035305a0b5da225c7c0f08348c5b2975ab0a0864ca52c",
+    "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-preflight.json": "b5673e6af9c88357e17b76dda37db4c47eda8ed764a93bccc37ee64d276f7c28",
+    "target/wp899/query-integer-scratch-baseline-r2-slug_query_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-integer-scratch-baseline-selectors.json": "38e997479939db657d55802dcc403697cf7ff42b43aa98a7f157e1549eafef77",
+    "target/wp899/query-integer-scratch-baseline-slug_query_v2-controls.json": "c58ce533da42863a779ee05156e1efb0b25a1ddc6af7e20bf9542cb0fd78c82c",
+    "target/wp899/query-integer-scratch-baseline-slug_query_v2-controls.jsonl": "fa5eb480349ed21f3ce035305a0b5da225c7c0f08348c5b2975ab0a0864ca52c",
+    "target/wp899/query-integer-scratch-baseline-slug_query_v2-preflight.json": "985fc187a2721d64469d9c0d4c48b5cb9b1c804997f90cbdee8cf7d39e643135",
+    "target/wp899/query-integer-scratch-baseline-slug_query_v2-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-integer-scratch-candidate-compile.json": "e0909c222ab14834484bd59d484d7b2a61d92498ca79ba92b974ced030cd141c",
+    "target/wp899/query-integer-scratch-candidate-compile.jsonl": "f97e651e960199b7e13d4612388529cf80e1be4c5b73bf73335e37de50fe35fd",
+    "target/wp899/query-integer-scratch-candidate-query-controls.json": "7a3639e888c1bdd2522385895a1a994abf8cdc4e7eab111b2b3b9091e91c40bd",
+    "target/wp899/query-integer-scratch-candidate-query-controls.jsonl": "e6c0a67fd00fb9ee11efbb4f128b85f508dad6a5a4b1b622021c920215b24d37",
+    "target/wp899/query-integer-scratch-candidate-query-preflight.json": "5492524cdc758715d6d1213e633747b140d6a5e6b81de3715ff62adc8bde9466",
+    "target/wp899/query-integer-scratch-candidate-query-preflight.jsonl": "b0cd46209bd9f85a75bd96df751a0da42e97aad39d1140d6995a9041c9e57936",
+    "target/wp899/query-integer-scratch-candidate-selectors.json": "bdb61d994a564a1b76fd9fb7d0be3a708eff73ee011a61ba7aa8aedd659f9f77",
+    "target/wp899/query-integer-scratch-candidate-slug_query_v2-controls.json": "2af2c3ab7da48fe5fea2fb5d17fa1f9a6cc73d428523fac33a47b74d105f0a86",
+    "target/wp899/query-integer-scratch-candidate-slug_query_v2-controls.jsonl": "7d174fd0701eabd38c510f7d3ddbcf88d05bdac7a1c4fd1be4421e6e32810941",
+    "target/wp899/query-integer-scratch-candidate-slug_query_v2-preflight.json": "8a558f2753e7f4ca346dcf11052d506db58ce77fb1302adeb5592180de1de84a",
+    "target/wp899/query-integer-scratch-candidate-slug_query_v2-preflight.jsonl": "c59b4930109b01e60614193b0c8501c486b91e19a601974eb3a180a30cd9236e",
+    "target/wp899/query-integer-scratch-controls.py": "57e42107f448d039b8e6d25237a6641b34cd2d3d42ffcc535775a6f585785a6f",
+    "target/wp899/query-integer-scratch-dependents-check.json": "76b66823840f9ab09c4afa1f7dc4e8dfa5c4464f4fb3211e14a081060105a8d6",
+    "target/wp899/query-integer-scratch-dependents-check.jsonl": "4651b71a2f6d104b57b9c8f3002393b2df5c3c2bf6b7b7c86737960a70fe6bdc",
+    "target/wp899/query-integer-scratch-design-evidence.md": "611e5e39b9026c316d29393928c41391b12eb181a3e0afa8274858c14477dc97",
+    "target/wp899/query-integer-scratch-design-ownership.md": "eb33eee2bbbc7c7ddbce17251709b94136a65eab79ae41ecc3a3c093603aa06b",
+    "target/wp899/query-integer-scratch-design-source.md": "6dcb411f3b607bbf2d5c90927fdce91cf065ba114d1468be1eee0dcfcc5913b3",
+    "target/wp899/query-integer-scratch-design.md": "47a1a0b5dd7e13763c2f40c042946ad03c0304e275f918642d03b27ad470ad57",
+    "target/wp899/query-integer-scratch-format-check.json": "c861eb8230e0cbfd880ea7b7a055bf96913f0334f1b4c0679a3856d9eca80f5c",
+    "target/wp899/query-integer-scratch-format-check.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp899/query-integer-scratch-record.py": "806779d3651acfd9fa5c811e1421efc84689e87a87230636e871cb02459607fa",
+    "target/wp899/query-integer-scratch-start.json": "5341c76d1d3f8fc36b4e2db505a13c257b473c4a25775ff040df965d83a0da34",
+    "target/wp899/query-integer-scratch-test-extension.json": "8f96e5844f54974bc9ac10605b45aeeb49c5487a4c20853057ddac8c7c8088c7"
+  },
+  "validation_sha256": "a35dcc54b859253079047e91b5904a4c88a537599c28f0949b0d933ebe6cc3b9",
+  "final_reviews": {
+    "target/wp899/query-integer-scratch-final-source.md": "cc4264be283c79bb5e58a5b10a22f62a4e2c6e5d7418e31fc1a0cf3db74f36d9",
+    "target/wp899/query-integer-scratch-final-ownership.md": "7c1ff87043983753a5a6b353c7cfea20e201f5654ebffb357452588a7b99baf7",
+    "target/wp899/query-integer-scratch-final-evidence.md": "e53cee4d392297419e286078020fe20bbf731c8e3e163b3011be967f935ebb99"
+  },
+  "scheduling_sha256": {
+    "thoughts/shared/plans/slug-v2-subplans/current-packet.md": "3e0d914cd876b9ab93b4774c0275b28a1e817584717a81c967bd9abc8177ff69",
+    "thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md": "3682b06403067872f16eef0c4bb6e384493568aa4ede736033e344f74aa4ef98",
+    "thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md": "7f4d77ca92bbf3c02766f62b03426dcfa2e59a02ec03d0c1bd01853ee1f495c0"
+  },
+  "hygiene": {
+    "format-check": {
+      "receipt": "target/wp899/query-integer-scratch-format-check.json",
+      "sha256": "c861eb8230e0cbfd880ea7b7a055bf96913f0334f1b4c0679a3856d9eca80f5c",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "archive-check": {
+      "receipt": "target/wp899/query-integer-scratch-archive-check.json",
+      "sha256": "44f7c22949d94b06a349d4e9c38d26b97ecae733bc35baace89ddad23dff08d4",
+      "exit_code": 0,
+      "log_sha256": "c8eedf3301478df5b388bfc5c2824acfa845a753b39c0e16f5f9b9456b65160c"
+    },
+    "plan-check": {
+      "receipt": "target/wp899/query-integer-scratch-plan-check.json",
+      "sha256": "5f822ca44b4625db9d130418004c16e1586311138a2c0704848a087122e30899",
+      "exit_code": 0,
+      "log_sha256": "d01f864754ea9983e6168690bcc359b274b430aa8138e14e938c72b58b2c934a"
+    },
+    "diff-check": {
+      "receipt": "target/wp899/query-integer-scratch-diff-check.json",
+      "sha256": "64db13945c4e354125193d40f9d3ec513e6643319610443d71e931b4622492eb",
+      "exit_code": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

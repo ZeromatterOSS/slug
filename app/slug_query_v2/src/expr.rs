@@ -560,12 +560,18 @@ impl QueryExpression {
     }
 
     pub(crate) fn java_integer_literal(&self) -> Result<i32, CompactString> {
-        let raw = match &self.kind {
-            QueryExpressionKind::Integer(value) => CompactString::from(value.to_string()),
-            QueryExpressionKind::TargetLiteral(value) => value.clone(),
-            _ => CompactString::from(self.to_string()),
-        };
-        raw.parse::<i32>().map_err(|_| raw)
+        match &self.kind {
+            QueryExpressionKind::Integer(value) => {
+                i32::try_from(*value).map_err(|_| CompactString::from(value.to_string()))
+            }
+            QueryExpressionKind::TargetLiteral(value) => {
+                value.as_str().parse::<i32>().map_err(|_| value.clone())
+            }
+            _ => {
+                let raw = CompactString::from(self.to_string());
+                raw.parse::<i32>().map_err(|_| raw)
+            }
+        }
     }
 
     /// Returns the admitted top-level configured `deps()` invocation after it
@@ -1020,3 +1026,7 @@ impl fmt::Display for QueryExpression {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "expr/query_integer_memory_tests.rs"]
+mod query_integer_memory_tests;
