@@ -1,0 +1,158 @@
+{
+  "packet": "WP-7-218-m7a-executable-file-write-query-r1",
+  "operational_packet": "WP919",
+  "date": "2026-10-06",
+  "base": "ebb4e9d7ccca8b42e010beaf584dbcdb13a240dd",
+  "status": "accepted",
+  "outcome": "Borrowed executable-aware main-owner scalar FileWrite text query through the same validated configured closure; correct class progress/tool suffix and Unicode Outputs without execution or shared view changes.",
+  "compatibility": {
+    "exact": "Pinned Writing script/file, sequential progress replacements, tool suffix, IsExecutable, escaped Unicode Outputs and concrete empty environment/info in admitted default Unix scalar query slice. Ordinary false Target block unchanged.",
+    "slug_native": "Existing canonical labels/configuration/path/order and FileWrite action display identity; not Bazel ActionKey.",
+    "deferred": "External-owner query, contents flags, ActionKey, Windows breadth, broader classes, authentic source/runtime/full-root/M7A and whole-workload memory fit."
+  },
+  "reference": {
+    "tag": "9.2.0",
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "basis": "Six immutable source blobs/anchors in target/wp919/design-source.md plus callback/StringEncoding Unicode amendment; no external oracle or source acquisition.",
+    "source_qualification": "Rust valid-Unicode retained path domain is native. Unicode producer uses normal ASCII json.decode source through existing serde_json to avoid BazelInternal source byte lifting. Not arbitrary internal byte/Java invalid-surrogate parity."
+  },
+  "ownership": {
+    "retained": "No new keys, retained data/cache/interner/pool/graph, equality/invalidation/locking or private publication change. Same existing Write recipe/content/bit and configured owner/output/context.",
+    "guards": "Private borrowed query-only absent-aspect/default-context/structural Unix guard in direct formatter and all-owner metadata pass; shared execution views unchanged. Existing private publication binds output root to configured consumer and paired raw/effective selected platform. Existing main-owner/mnemonic/path/regular-output/kind/shape guards retained.",
+    "scratch": "Read bit by value, borrow paths/context, static prefix/suffix and existing progress/Unicode Cow helpers; existing label/token and native binary identity scratch remains including content-byte copies. Final query String independent; scratch releases per action, no zero-copy or workload-fit claim."
+  },
+  "source_sha256": {
+    "app/slug_core_v2/src/runtime/aquery_text.rs": "b526d6944bdbeb0fc7c08e2ba7a5698d51382a4d6f98bbee902bfcc69d5d71ba",
+    "app/slug_core_v2/src/runtime/dice.rs": "a7c02a939d71fcf7f4167a127d2a9533c03656abce36fb8a3ff77c1a8b92939a",
+    "app/slug_core_v2/src/runtime/file_write_aquery_text.rs": "f512592a6e27e4bbcc1745e0ce52daf6ed3d0256f352b31b9a9c29bf8a9f44b9",
+    "app/slug_core_v2/src/runtime/tests/build_info_aquery_tests.rs": "9fcb495c2e30ff7b4a5f351cc5f8a885a7ed0d1189e785a1c8b7286ed3389b6e",
+    "app/slug_core_v2/src/runtime/tests/cpp_compile_aquery_tests.rs": "8234de56f5e1bc5e7f59eb4a401ad2941c27f12a223eb485affc713347594625",
+    "app/slug_core_v2/src/runtime/tests/runfiles_aquery_metadata_tests.rs": "cd1e496cb3da62ab511e72f165b98ed5e835f029254251af830c0e3975a37b48",
+    "app/slug_core_v2/src/runtime/tests/solib_aquery_tests.rs": "fbb66595697ea7dbd3518d27e0e88cc7171835307a25cacdbd1f940f544bb1a1",
+    "app/slug_core_v2/src/runtime/tests/spawn_aquery_tests.rs": "5dc6ed066ab9e9c5453d7035786361e0da6d0d961f5321c39ef273f905963ba1",
+    "app/slug_core_v2/src/runtime/tests/file_write_executable_aquery_tests.rs": "d96c1afe85ce9b6164283e2a9766c8df3475b6c2f26f05e2dccbdf99d981549e"
+  },
+  "validation": {
+    "toolchain": "rustup-resolved nightly-2025-09-14; offline Cargo JSON <=60s TERM3, CLI jobs2 and Core jobs1 four-package invocation-only opt0debug0. Fresh exact nonignored preflight, serial10s TERM3 runtimes, no concurrent Cargo/nativefixtures.",
+    "compiles": {
+      "cli-check-unicode-corrected": {
+        "exit": 0,
+        "seconds": 6.30861585191451,
+        "receipt": "target/wp919/cli-check-unicode-corrected.json"
+      },
+      "cli-check": {
+        "exit": 0,
+        "seconds": 6.337942932033911,
+        "receipt": "target/wp919/cli-check.json"
+      },
+      "core-tests-fixture-corrected": {
+        "exit": 0,
+        "seconds": 4.470000552013516,
+        "receipt": "target/wp919/core-tests-fixture-corrected.json"
+      },
+      "core-tests-json-corrected": {
+        "exit": 0,
+        "seconds": 4.41227870201692,
+        "receipt": "target/wp919/core-tests-json-corrected.json"
+      },
+      "core-tests-utf8-corrected": {
+        "exit": 0,
+        "seconds": 4.426254807971418,
+        "receipt": "target/wp919/core-tests-utf8-corrected.json"
+      },
+      "core-tests": {
+        "exit": 0,
+        "seconds": 9.745040131965652,
+        "receipt": "target/wp919/core-tests.json"
+      }
+    },
+    "core_distinct_passed": 67,
+    "core_qualification": "65 unaffected initial protected +1 corrected lifecycle +1 JSON-corrected fields, not a fresh full67 rerun. Final fixture value affects only Unicode field target; production unchanged through fixture corrections.",
+    "core_receipts": [
+      {
+        "selected": 67,
+        "passed": 65,
+        "elapsed_seconds": 2.8032066259765998,
+        "max_child_rss_kib": 117940,
+        "receipt": "core-results.json"
+      },
+      {
+        "selected": 2,
+        "passed": 1,
+        "elapsed_seconds": 0.07151767902541906,
+        "max_child_rss_kib": 74740,
+        "receipt": "core-results-utf8-corrected.json"
+      },
+      {
+        "selected": 1,
+        "passed": 1,
+        "elapsed_seconds": 0.062142024049535394,
+        "max_child_rss_kib": 72548,
+        "receipt": "core-results-json-corrected.json"
+      }
+    ],
+    "final_core_preflight": {
+      "exit_code": 0,
+      "output": "Verified 67 exact nonignored test(s); no tests executed.\n",
+      "elapsed_seconds": 0.2101159270387143,
+      "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-79e22cce559a218e",
+      "executable_sha256": "e4a9a987eeedd52d365f18cb2137a370ab716c77bf3e9c1021e31b4aeb4a16f1",
+      "selected": 67,
+      "artifact_profile": {
+        "opt_level": "0",
+        "debuginfo": 0,
+        "debug_assertions": true,
+        "overflow_checks": true,
+        "test": true
+      },
+      "fresh": false
+    },
+    "checks": "Pinned changed Rust rustfmt check, git diff --check and archive checks exit0. Scheduling checker passes before/after rollover. No full suite or BuildAPI rerun because shared producer/helper owners unchanged."
+  },
+  "corrections": {
+    "BUILD": "Initial two new tests stopped at unsupported Unicode escape syntax in BUILD.",
+    "BZL": "Moving the same escapes to .bzl repeated the parser failure; assumption explicitly reassessed, no parser relaxation.",
+    "literal_UTF8": "Literal UTF8 reached ordinary constructor with BazelInternal byte lifting; exact path assertion correctly failed fields, lifecycle passed.",
+    "JSON": "Existing normal JSON builtin decodes ASCII escapes into retained Unicode scalars. Only fixture value changed; same genuine path, raw header and escaped Outputs assertions pass. Only missing fields gate rerun; all source snapshots/logs preserved."
+  },
+  "provenance": "One authored tiny normal ctx.actions.write fixture, DefaultInfo only, selected platform nonempty props; false/true Target/Exec complete blocks, ordered writes/deps, introduced placeholders, real Unicode scalar output. Same-owner/content/output/config isolated executable bit changes exactly one identity byte 0->1; held DICE source A/B/A restores text. Explicitly drop snapshots/views/identities/outcomes/transactions/DICE before independent text checks. Existing synthetic priority metadata tests remain qualified; no compiler/build-script executes.",
+  "reviews": {
+    "source": {
+      "receipt": "target/wp919/final-source.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "150c4d4b54bccb892b20850afac41135c4cfff5ad839857c1373bf44ccf182fa"
+    },
+    "ownership": {
+      "receipt": "target/wp919/final-ownership.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "9a98a0e91e022f23083a314fc2be9f536ac67816238113275cc9260d78fafd95"
+    },
+    "evidence": {
+      "receipt": "target/wp919/final-evidence.md",
+      "verdict": "FINAL ACCEPT",
+      "sha256": "b70ec9bc336b80acda64d05363cb78e3401c874be01be524d80ebc49ed389489"
+    }
+  },
+  "growth": {
+    "production": "50added/11removed formatter lines plus4added/1removed all-owner glue; one private query presentation policy, existing helpers reused. Large Dice exactly four-line include.",
+    "tests": "One361-line sibling with2cohesive fields/scopes and lifecycle controls vs220estimate, explicitly reviewed growth; five prior early-error fixtures preserve real independent apostrophe rendering refusal. Existing FilesToRun adds ~106 lines complete8-record closure:3Spawn+1real executablewriter+4supportfamilies. No new source corpus/assets/graph clones."
+  },
+  "timing": {
+    "compile_seconds": 35.70013297791593,
+    "recorded_runtime_seconds": 2.954651703010313,
+    "observed_since_recorded_start_seconds": 2003.4881319550332,
+    "start_qualification": "Recorded after activation/source research, not whole-packet walltime.",
+    "review_seconds": "not independently measured"
+  },
+  "successor": {
+    "packet": "WP-7-219-m7a-external-file-write-query-r1",
+    "basis": "Saved WP905 graphSHA15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c:64externalFileWrites across54labels,62explicit executable; remaining main-owner-only query guard. Existing native owner/output identity is present; require external path/label/private publication and normal producer proof before lifting only presentation guard.",
+    "source_note": "target/wp919/successor-source.md"
+  },
+  "remaining": "Original64KiBpostdrop refusal and bounded cache/transport memory qualification persist; unique/history/whole-workload fit unknown. No source16/17/18 retry or full-root/source/runtime/M7A closure.",
+  "operational_evidence": {
+    "directory": "target/wp919",
+    "hash_index": "target/wp919/operational-hashes.json",
+    "index_sha256": "c24a91fa67fcb5658abad946e4bd8118ed2826a1ef48e995db4e515f872f7fe2"
+  }
+}

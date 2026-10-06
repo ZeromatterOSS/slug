@@ -29,6 +29,7 @@ use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_aquery_text::aquery_label;
 use super::file_write_aquery_text::format_file_write_aquery_text;
+use super::file_write_aquery_text::validate_file_write_query_context;
 use super::runfiles_support_aquery_text::append_runfiles_support;
 use super::solib_aquery_text::append_solib;
 use super::spawn_query_inputs::visit_declared_artifacts;
@@ -77,7 +78,9 @@ fn validate_owner(
 ) -> Result<(), &'static str> {
     for action in owner.actions() {
         if matches!(action.kind(), ActionKind::Write { .. }) {
-            ConfiguredActionView::from_configured_action(action)?;
+            validate_file_write_query_context(&ConfiguredActionView::from_configured_action(
+                action,
+            )?)?;
         } else if action.symlink_spec().is_some() {
             ConfiguredSymlinkActionView::from_configured_action(action)?;
         } else if action.runfiles_support_spec().is_some() {

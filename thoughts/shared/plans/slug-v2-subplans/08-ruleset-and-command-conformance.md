@@ -396,6 +396,19 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
   Configuration/path/order and the named FileWrite token exception remain
   explicitly Slug-native where recorded. Broader action/formats require their
   own admission; no formatter-owned action reconstruction is permitted.
+- [WP919 executable FileWrite query](wp919-executable-file-write-aquery-2026-10-06.json)
+  admits either retained bit for scalar main-owner writes. Class fields use Writing
+  script/file, sequential progress replacement, Exec suffix and escaped Unicode
+  Outputs with raw headers; concrete environment/info remain empty. Private
+  query-only default-context/Unix guards preserve shared execution views and
+  all-owner validation priority. Qualified65+1+1 union proves67 Core controls,
+  including full eight-record FilesToRun deps and bit-isolated held A/B/A; CLI
+  compiles. Unicode constructor coverage uses ordinary ASCII JSON decoding rather
+  than treating BazelInternal source bytes as arbitrary Unicode scalars. Paths
+  and context are borrowed, presentation/identity scratch stays action-local,
+  and existing content-byte identity copies are explicitly retained. External
+  query owners, ActionKey, execution/source/full-root/M7A and whole-memory-fit
+  admission remain open; no retained pool or graph is added.
 - [WP912 Spawn text aquery](wp912-spawn-aquery-2026-10-06.json) borrows ordinary
   typed Spawn from the same validated configured closure and preserves mixed
   FileWrite/Spawn semantic records. Unspilled retained Args, declared artifact

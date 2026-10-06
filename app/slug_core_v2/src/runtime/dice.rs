@@ -13996,4 +13996,8 @@ root(name = "root", deps = [":parent_a", ":parent_b"])
     mod cpp_compile_aquery_tests {
         include!("tests/cpp_compile_aquery_tests.rs");
     }
+
+    mod file_write_executable_aquery_tests {
+        include!("tests/file_write_executable_aquery_tests.rs");
+    }
 }

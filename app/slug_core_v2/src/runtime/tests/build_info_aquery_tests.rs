@@ -593,7 +593,7 @@ async fn build_info_aquery_metadata_guards_info_identity_and_priority() {
         "FileWrite",
         vec![ActionOutput::new(
             spec.output().root().clone(),
-            "early",
+            "early'quoted",
             ActionOutputKind::File,
         )],
     );
@@ -604,6 +604,14 @@ async fn build_info_aquery_metadata_guards_info_identity_and_priority() {
             make(AnalysisArtifact::WorkspaceStatus(spec.status().clone())),
         ],
         true,
+    );
+    let early_view = ResolvedFileWriteSemanticView::from_configured_action(
+        slug_analysis_v2::ConfiguredActionView::from_configured_action(&rejected.actions()[0])
+            .unwrap(),
+    );
+    assert_eq!(
+        crate::runtime::format_file_write_aquery_text(&early_view),
+        Err("FileWrite aquery text requires a normalized relative output")
     );
     let replaced = build_info_replaced(evaluation, rejected);
     for scope in [AqueryScope::Literal, AqueryScope::Deps] {

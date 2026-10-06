@@ -34,19 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-218-m7a-executable-file-write-query-r1
-Status: Borrowed CppCompile query accepted; demanded executable FileWrite query selected
+Packet: WP-7-219-m7a-external-file-write-query-r1
+Status: Executable FileWrite query accepted; external-owner scalar query selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) selects executable scalar
-FileWrite query fields for five observed main-repository build-script owners.
-[WP918](./slug-v2-subplans/wp918-cpp-compile-aquery-2026-10-06.json) accepts guarded
-regular pre-discovery CppCompile query with borrowed tools/fixed env and action-local
-identity/path/options scratch. All64 distinct controls pass by qualified61+2+1 union,
-nine BuildAPI gates/defaultCLI pass and three final reviews accept. Normal immutable
-fixture source requests and expected literal corrections preserve exact assertions.
-No retained pool is added. Full-root, authentic source/runtime, whole-workload memory
-fit and M7A remain open; allocation/interner discipline/source16/17/18/caps persist.
-Windows minimal.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects external-owner
+scalar FileWrite query for64 saved external actions across54 labels.
+[WP919](./slug-v2-subplans/wp919-executable-file-write-aquery-2026-10-06.json) accepts
+both executable bits for main-owner scalar query, corrected progress/tool suffix and
+Unicode Outputs. All67 distinct Core controls pass by qualified65+1+1 union,
+defaultCLI compiles and three FINAL reviews accept. Genuine Unicode uses ordinary
+ASCII JSON decoding, with prior parser/byte-lifting failures preserved. Complete
+FilesToRun deps retains all eight records. Private query guards preserve shared views;
+paths are borrowed and scratch stays action-local, including existing native identity
+content-byte copies. No retained pool is added. Full-root, authentic source/runtime,
+whole-workload memory fit and M7A remain open; allocation/interner discipline,
+source16/17/18/caps and minimal Windows scope persist.
 
 ### Ready and blocked queue
 
@@ -57,7 +59,7 @@ priorities stay queued until their concrete prerequisites and owners are ready.
 |---|---|---|
 | 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; effective argv/source freshness remain qualified |
 | 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects demanded executable FileWrite query fields; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
+| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | current packet selects demanded external-owner FileWrite query; other demanded rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
 | 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |

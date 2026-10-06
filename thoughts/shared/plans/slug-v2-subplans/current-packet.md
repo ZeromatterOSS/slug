@@ -1,89 +1,86 @@
 # Slug V2 current work packet
 
-Packet: WP-7-218-m7a-executable-file-write-query-r1
-Status: Borrowed CppCompile query accepted; demanded executable FileWrite query selected
+Packet: WP-7-219-m7a-external-file-write-query-r1
+Status: Executable FileWrite query accepted; external-owner scalar query selected
 
 ## Observable result and learned source
 
-Expose the retained executable bit of regular scalar FileWrite actions in text/aquery
-for main-repository owners through the same validated configured closure. WP905 saved
-production graph has five main FileWrites, all explicitly executable (actions373/416/
-444/474/892: starlark, starlark_map, slug_reapi_cache_v2, allocative, starlark_syntax
-build scripts);67of69 total FileWrites explicitly executable. This is query demand,
-not evidence those authentic owners have been reproduced in Slug. No standalone
-ArgsWrite demand is proven by virtual params or graph mnemonic counts.
+Admit external-owner scalar FileWrite text query through the existing validated
+configured action closure. Saved WP905 graph SHA256
+15ab5b4c9902e8338d3258397d7c08fffcf43910218bdb001f2cb9126c62180c
+contains64 external FileWrites across54 labels,62 explicitly executable. This is
+saved query demand, not authentic Slug reproduction, source acquisition or execution.
+The remaining main-owner-only formatter guard is a concrete blockage; do not infer
+standalone ArgsWrite or CppLink/Archive gaps from mnemonic counts.
 
-Pin Bazel9.2 tag8220c6198837d5c13d53fea211cf3282aa12408a FileWriteAction,
-AbstractFileWriteAction, AbstractAction and text callback. Reconcile Writing script
-versus Writing file, output prettyPrint, tool suffix, IsExecutable and current class
-omissions against existing accepted scalar text. Concrete source design settles any
-existing header discrepancy before changing it. Contents flags and ActionKey are not
-selected. Keep external-owner query refusal separate (64savedexternalowners), default
-context/aspect/platform/output/root/path guards and full all-owner-before-render priority.
-
-Compatibility: exact pinned executable/class fields in the admitted guarded Unix scalar
-main-owner query slice; existing native configuration/path/label/action token domains.
-ActionKey without native substitute, external FileWrite query, broader families/contents
-flags and Windows breadth remain deferred. No execution, staging, cache, configuration
-identity or source gate is widened. Full-root/M7A/source/runtime/whole-memory-fit open;
-source16/17/18 spent/caps and allocation/interner discipline persist.
+Pin Bazel9.2 commit8220c6198837d5c13d53fea211cf3282aa12408a FileWriteAction,
+AbstractFileWriteAction, Artifact and AbstractAction/text callback; reuse WP919 class,
+progress, Unicode and empty-info source proof. Resolve external artifact root-relative
+prettyPrint and retained canonical owner-label presentation before activation.
+Compatibility: exact class/header/field algorithms in the admitted default Unix scalar
+query slice, with existing Slug-native canonical external label/configuration/path/action
+identity domains. Contents flags, ActionKey, Windows breadth and broader classes deferred.
 
 ## Owners, scope and allocation
 
-Read orchestration/AGENTS, Stage8 accepted query contract and Stage6 retained Write
-ownership. BuildAPI normal write constructor already owns content+boolean; borrowed
-ConfiguredActionView permits either bit and existing FileWriteSemanticIdentity encodes
-it. Core presentation currently rejects true and hardcodes file/false. Preserve original
-natural owners, structural equality/invalidation, root certificates and validation;
-no new DICE key/cache/interner/graph or semantic/execution view relaxation. DICE docs
-remain inherited; any actual DICE/identity change requires a named reviewed prerequisite.
+Normal BuildAPI Write owns content/boolean/output; immutable configured context owns
+canonical external owner and selected raw/effective platform. Existing private publication
+binds output bin root to configured consumer, and FileWriteSemanticIdentity already
+encodes external owner/config/path/content/bit facts. Borrow those owners; lift only
+main-owner presentation refusal after source/design review. Shared views, structural
+identity/equality/invalidation, root validation, REAPI and execution are unchanged.
+Read DICE docs before any actual key/ownership/lock change; such a change needs a named
+reviewed prerequisite rather than an incidental formatter repair.
 
-Borrow retained scalar bit/content/paths and choose static header text; generate only
-independent final query String and existing action-local identity/display scratch.
-Intern repeated immutable strings at their existing semantic scope where appropriate;
-no global pool for static or temporary formatter strings, retained lifetime widening,
-extra owned content copy, or workload-memory/performance claim from focused tests.
+No retained data/key/cache/interner/graph, source copying or new pool. Borrow scalar paths
+and context, existing scoped interning remains producer-owned. Existing display/native
+identity encoding needs action-local label/token/binary scratch, including existing
+content-byte copies. Unicode/progress Cow owns only necessary escaped/replaced bytes;
+final query String is independent and scratch releases within each action. Unique temporary
+strings are not globally interned. Preserve bounded allocation qualification and original
+64KiB postdrop refusal; no whole-workload memory-fit/performance claim.
 
-Allowlist: Core runtime/file_write_aquery_text.rs; new small sibling
-runtime/tests/file_write_executable_aquery_tests.rs and Dice INCLUDE only; existing
-spawn_aquery_tests.rs, runfiles_aquery_metadata_tests.rs, solib_aquery_tests.rs,
-build_info_aquery_tests.rs, cpp_compile_aquery_tests.rs only to reconcile executable
-writes previously used as early rendering-error fixtures. Preserve each priority
-assertion using another admitted structural shape with a real formatter refusal;
-never turn a priority test into two valid actions. Root checks actual existing negative
-consumers before activation. No changes to loading, provider publication, dense inputs,
-execution, path transport or shared semantic identity. Production estimate<60/newtests
-<220; review growth at natural responsibility boundaries. Existing large Dice receives
-an include only; no new algorithm there. Operational target/wp919. Source/design and
-final independent reviews precede consequential activation/acceptance; root owns
-integration/compile/commit, useful parallel readonly evidence/ownership review.
+Allowlist: Core runtime/file_write_aquery_text.rs main-owner guard and directly affected
+boundary test; small runtime/tests/file_write_external_aquery_tests.rs plus Dice INCLUDE
+only; existing normal repository/mapping/materialization fixture helpers by reuse. Any
+additional helper owner must be named and independently reviewed before edit. No loading,
+source policy, registry semantics, provider publication, path transport, execution, identity
+or arbitrary root reconstruction. Production estimate<20/new fixture<300lines; growth is
+reviewed at natural responsibility boundaries, no algorithm enters large Dice. Operational
+target/wp920. Root owns scheduling/integration/compiles/commit, three useful independent
+source/ownership/evidence workers, DESIGN before activation and FINAL actual diff/evidence.
 
-## Evidence and validation
+## Evidence, validation and decision boundaries
 
-Reuse scalar FileWrite controls and existing genuine normal write constructor fixtures.
-New finite false/true query must discriminate full class block and bit-dependent header,
-owned text after owner drops, same content/output bit-dependent native identity, literal/
-deps and configured tool owners where source-admitted, source/configured A/B/A held
-results, mixed owners/order and all-owner validation priority. Qualify authored fixtures
-versus saved production demand; no compiler/build-script executes or dependencies acquire.
-Audit affected unsupported-executable expectations, retain independent external/path/
-platform/kind/group negatives and exact ordinary false output. If a guard cannot be
-constructed normally, source-qualify rather than inventing an admitted producer.
+Inspect normal external caller, request mapping and materialized source fixtures before
+selecting the smallest finite genuine Write producer. Establish real private external
+publication/root-consumer binding, false/true Target and Exec complete blocks, root label
+controls unchanged, literal/deps configured owner/action order and independent owned text.
+Use observed source/mapping A/B/A through the same DICE engine and hold old results. Retain
+existing kind/group/path/context/platform/all-owner-before-render priorities; construct only
+normal supported metadata or explicitly source-qualify inaccessible branches. No synthetic
+Ready/identity or parser normalization. No actual build-script/compiler action executes.
+Normal ASCII json.decode may produce genuine Unicode for constructor coverage; literal
+BazelInternal source bytes are not arbitrary Unicode scalars.
 
 Compile separately pinned rustup-resolved offlineJSON<=60sTERM3 defaultCLI and Core
-no-run/jobs1 established four-packageopt0debug0. Fresh exact nonignored selector preflight,
-minimal serial10sTERM3 runtime; reuse WP91864 controls plus smallest new FileWrite gates.
-No concurrent Cargo/sharedtarget or ancestor-sensitive fixtures. Correct only attributed
-missing evidence; preserve all failures/passing results/caps. No external oracle without
-named pinned-source evidence gap. fmt/diff/archive/status, compact receipt and rootcommit.
+no-run/jobs1 established four-packageopt0debug0. Fresh exact nonignored preflight and
+minimal serial10sTERM3 runtimes; reuse WP91967 and add only discriminating new gates.
+No concurrent Cargo/shared target or ancestor-sensitive fixtures. Reuse source proof;
+no external oracle without a named evidence gap, no source16/17/18 retry. Correct only
+attributed missing gates, preserve failures/nonstale passes. fmt/diff/archive/status,
+compact acceptance receipt and root commit. REPLAN if lifting the presentation guard
+requires new external publication/identity/execution/source semantics. Full-root/M7A,
+authentic source/runtime and whole-workload memory fit remain open. Linux priority;
+Windows minimal unsupported functionality is sufficient.
 
 ## Immediate predecessor
 
-[WP918](wp918-cpp-compile-aquery-2026-10-06.json) admits borrowed regular pre-discovery
-CppCompile fields via mandatory/cache/declared-header full identity union, independently
-owned roots/Constant inputs, fixed-only env, borrowed tool/options and recipe-last info.
-64distinct controls pass by qualified61+2+1 union, nine BuildAPI controls/defaultCLI pass;
-three final reviews accept. One genuine restricted constructor fixture borrows44original
-helper bodies and uses finite normal selected-registry/local materialization requests.
-Source identity copies remain necessary action-local scratch with current visitor loans.
-No discovery/execution, retained pool, source retry, full-root/M7A or whole-fit admission.
+[WP919](wp919-executable-file-write-aquery-2026-10-06.json) accepts borrowed false/true
+main-owner scalar FileWrite fields, Writing script/file, sequential progress replacements,
+Exec suffix and Unicode Outputs with raw headers and concrete empty environment/info.
+Private query-only context guards preserve shared execution views. All67 distinct Core
+controls pass by qualified65+1+1 union, defaultCLI compiles and three FINAL reviews accept.
+Normal JSON-produced Unicode fixes fixture representation without relaxing parser/producer;
+complete FilesToRun eight-record deps replaces the prior executable refusal. No retained
+pool or execution/source/full-root/M7A/whole-memory-fit admission.

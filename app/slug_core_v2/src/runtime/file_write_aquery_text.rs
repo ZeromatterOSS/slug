@@ -8,21 +8,29 @@
  * above-listed licenses.
  */
 
+use slug_analysis_v2::ConfigurationKind;
+use slug_analysis_v2::ConfiguredActionAspectProvenance;
+use slug_analysis_v2::ConfiguredActionView;
+use slug_analysis_v2::ConfiguredExecGroup;
 use slug_build_api_v2::ActionKind;
+use slug_configuration_v2::HostPathFlavor;
 use slug_identity_v2::CanonicalLabel;
 use slug_query_v2::AqueryScope;
 
+use super::aquery_text::escaped_unicode;
 use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_identity::FileWriteSemanticIdentity;
+use super::symlink_aquery_text::progress_message;
 
 pub fn format_file_write_aquery_text(
     view: &ResolvedFileWriteSemanticView<'_>,
 ) -> Result<String, &'static str> {
     let action = view.action();
+    validate_file_write_query_context(action)?;
     let owner = action.owner();
     let output = action.output().root_relative_path();
-    validate_renderable_action(
+    let is_executable = validate_renderable_action(
         owner.label(),
         action.spec().mnemonic(),
         action.spec().kind(),
@@ -35,14 +43,21 @@ pub fn format_file_write_aquery_text(
         .ok_or("FileWrite aquery text rejects legacy configuration")?;
     let projection = configuration.projection();
     let identity = FileWriteSemanticIdentity::from_resolved(view)?;
+    let target = aquery_label(owner.label());
+    let progress = progress_message(Some(output), "FileWrite", &target, output, None);
+    let writing = if is_executable { "script" } else { "file" };
+    let tool_suffix = if owner.configuration().kind() == ConfigurationKind::Exec {
+        " [for tool]"
+    } else {
+        ""
+    };
 
     Ok(format!(
-        "action 'Writing file {output}'\n  Mnemonic: FileWrite\n  Target: {target}\n  Configuration: {configuration}\n  Execution platform: {platform}\n  SlugActionToken: {action_token}\n  Inputs: []\n  Outputs: [{exec_path}]\n  IsExecutable: false",
-        target = aquery_label(owner.label()),
+        "action 'Writing {writing} {progress}{tool_suffix}'\n  Mnemonic: FileWrite\n  Target: {target}\n  Configuration: {configuration}\n  Execution platform: {platform}\n  SlugActionToken: {action_token}\n  Inputs: []\n  Outputs: [{exec_path}]\n  IsExecutable: {is_executable}",
         configuration = projection.display_token(),
         platform = aquery_label(action.execution_platform().label()),
         action_token = identity.aquery_display_token(),
-        exec_path = action.output().path(),
+        exec_path = escaped_unicode(action.output().path()),
     ))
 }
 
@@ -79,13 +94,40 @@ pub(super) fn aquery_label(label: &CanonicalLabel) -> String {
     }
 }
 
+// Query-only policy: shared FileWrite semantics and execution keep their own gates.
+// Called during all-owner structural validation and by the direct formatter.
+pub(super) fn validate_file_write_query_context(
+    action: &ConfiguredActionView<'_>,
+) -> Result<(), &'static str> {
+    if action.context().aspect() != ConfiguredActionAspectProvenance::Absent {
+        return Err("configured FileWrite query does not support aspect provenance");
+    }
+    if action.exec_group() != &ConfiguredExecGroup::Default || action.spec().exec_group().is_some()
+    {
+        return Err("configured FileWrite query requires the default exec group");
+    }
+    let configuration = action
+        .owner()
+        .configuration()
+        .slug_configuration()
+        .ok_or("FileWrite aquery text rejects legacy configuration")?;
+    if configuration
+        .configured_action_path_flavor()
+        .map_err(|_| "configured FileWrite query requires retained Host path facts")?
+        != HostPathFlavor::Unix
+    {
+        return Err("configured FileWrite query does not support Windows");
+    }
+    Ok(())
+}
+
 fn validate_renderable_action(
     owner: &CanonicalLabel,
     mnemonic: &str,
     kind: &ActionKind,
     exec_group: Option<&str>,
     output: &str,
-) -> Result<(), &'static str> {
+) -> Result<bool, &'static str> {
     if !owner.package().repo().is_root() {
         return Err("FileWrite aquery text requires a main-repository owner");
     }
@@ -95,16 +137,13 @@ fn validate_renderable_action(
     let ActionKind::Write { is_executable, .. } = kind else {
         return Err("FileWrite aquery text requires a Write action");
     };
-    if *is_executable {
-        return Err("FileWrite aquery text does not support executable writes");
-    }
     if exec_group.is_some() {
         return Err("FileWrite aquery text requires the default exec group");
     }
     if !is_admitted_output_path(output) {
         return Err("FileWrite aquery text requires a normalized relative output");
     }
-    Ok(())
+    Ok(*is_executable)
 }
 
 fn is_admitted_output_path(path: &str) -> bool {
@@ -174,7 +213,7 @@ mod tests {
         };
         assert_eq!(
             validate_renderable_action(&root, "FileWrite", &ordinary, None, "write.txt"),
-            Ok(())
+            Ok(false)
         );
         assert_eq!(
             validate_renderable_action(&external, "FileWrite", &ordinary, None, "write.txt"),
@@ -190,7 +229,7 @@ mod tests {
         );
         assert_eq!(
             validate_renderable_action(&root, "FileWrite", &executable, None, "write.txt"),
-            Err("FileWrite aquery text does not support executable writes")
+            Ok(true)
         );
         assert_eq!(
             validate_renderable_action(&root, "FileWrite", &ordinary, Some("named"), "write.txt"),

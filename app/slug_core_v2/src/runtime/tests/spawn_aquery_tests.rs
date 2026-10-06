@@ -295,10 +295,116 @@ async fn spawn_aquery_files_to_run_and_named_group_keep_declared_owners() {
         assert!(block.contains("  Target: //:subject\n"));
         assert!(block.contains("  Execution platform: //:platform\n"));
     }
-    assert!(
-        crate::runtime::format_aquery_text_output_for_scope(evaluation, AqueryScope::Deps).is_err(),
-        "unadmitted executable FileWrite/runfiles actions must not disappear"
+    // The complete FilesToRun closure now includes the real executable writer
+    // and all four support families; none may disappear from dependency query.
+    assert_eq!(
+        tool.actions()
+            .iter()
+            .map(|action| action.mnemonic())
+            .collect::<Vec<_>>(),
+        [
+            "FileWrite",
+            "RepoMappingManifest",
+            "SourceSymlinkManifest",
+            "SymlinkTree",
+            "RunfilesTree"
+        ]
     );
+    let support = provider.support.as_ref().unwrap();
+    let configuration = tool
+        .configured_target_key()
+        .unwrap()
+        .configuration()
+        .slug_configuration()
+        .unwrap()
+        .projection()
+        .display_token();
+    let write = ResolvedFileWriteSemanticView::from_configured_action(
+        slug_analysis_v2::ConfiguredActionView::from_configured_action(&tool.actions()[0]).unwrap(),
+    );
+    let native_token =
+        crate::runtime::file_write_identity::FileWriteSemanticIdentity::from_resolved(&write)
+            .unwrap()
+            .aquery_display_token();
+    let mut expected_tool = format!(
+        "action 'Writing script tool [for tool]'\n  Mnemonic: FileWrite\n  Target: //:tool\n  Configuration: {configuration}\n  Execution platform: //:platform\n  SlugActionToken: {native_token}\n  Inputs: []\n  Outputs: [{executable}]\n  IsExecutable: true\n\n"
+    );
+    let manifest = support.manifest.as_ref().unwrap().path().into_owned();
+    let mapping = support
+        .repo_mapping_manifest
+        .as_ref()
+        .unwrap()
+        .path()
+        .into_owned();
+    let mut tree_inputs = vec![executable.clone(), manifest.clone(), mapping];
+    tree_inputs.sort();
+    for (index, header, inputs, tail) in [
+        (
+            1,
+            "action 'Writing repo mapping manifest for //:tool [for tool]'".to_owned(),
+            String::new(),
+            "  IsExecutable: false\n",
+        ),
+        (
+            2,
+            "action 'Creating source manifest for //:tool [for tool]'".to_owned(),
+            String::new(),
+            "  IsExecutable: false\n",
+        ),
+        (
+            3,
+            format!(
+                "action 'Creating runfiles tree {} [for tool]'",
+                manifest.rsplit_once('/').unwrap().0
+            ),
+            support.input_manifest.path().into_owned(),
+            "  Environment: [PATH=/bin:/usr/bin:/usr/local/bin]\n",
+        ),
+        (
+            4,
+            "runfiles for //:tool".to_owned(),
+            tree_inputs.join(", "),
+            "",
+        ),
+    ] {
+        let action = &tool.actions()[index];
+        let view =
+            slug_analysis_v2::ConfiguredRunfilesSupportActionView::from_configured_action(action)
+                .unwrap();
+        assert!(std::ptr::eq(
+            view.spec(),
+            action.runfiles_support_spec().unwrap()
+        ));
+        assert!(Arc::ptr_eq(view.spec().support(), support));
+        expected_tool.push_str(&format!(
+            "{header}\n  Mnemonic: {}\n  Target: //:tool\n  Configuration: {configuration}\n  Execution platform: //:platform\n  Inputs: [{inputs}]\n  Outputs: [{}]\n{tail}\n",
+            action.mnemonic(), view.output().path()));
+    }
+    let expected_deps = evaluation
+        .action_closure
+        .owners()
+        .iter()
+        .map(|owner| {
+            if owner.actions().is_empty() {
+                return String::new();
+            }
+            match owner
+                .configured_target_key()
+                .unwrap()
+                .label()
+                .to_string()
+                .as_str()
+            {
+                "@@//:subject" => text.clone(),
+                "@@//:tool" => expected_tool.clone(),
+                unexpected => panic!("unexpected action owner: {unexpected}"),
+            }
+        })
+        .collect::<String>();
+    let deps = query_text(evaluation, AqueryScope::Deps);
+    assert_eq!(deps, expected_deps);
+    assert_eq!(records(&deps).len(), 8);
+    assert!(deps.contains(&expected_tool));
     drop(transaction);
     drop(outcome);
     drop(dice);
@@ -333,7 +439,11 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
                             is_executable: true,
                         },
                         "FileWrite",
-                        original_action.outputs().to_vec(),
+                        vec![ActionOutput::new(
+                            original_action.outputs()[0].root().clone(),
+                            "early'quoted",
+                            ActionOutputKind::File,
+                        )],
                     ),
                     ActionSpec::new(
                         ActionKind::Write {
@@ -351,6 +461,14 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
                 vec![original_action.context().clone()],
             )
             .unwrap(),
+    );
+    let early_view = ResolvedFileWriteSemanticView::from_configured_action(
+        slug_analysis_v2::ConfiguredActionView::from_configured_action(&malformed.actions()[0])
+            .unwrap(),
+    );
+    assert_eq!(
+        crate::runtime::format_file_write_aquery_text(&early_view),
+        Err("FileWrite aquery text requires a normalized relative output")
     );
     let mut targets = evaluation.targets.to_vec();
     targets[0].analysis = Some(malformed.clone());

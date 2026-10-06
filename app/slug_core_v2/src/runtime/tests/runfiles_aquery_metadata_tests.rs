@@ -305,12 +305,24 @@ async fn runfiles_aquery_metadata_guards_identity_environment_and_priority() {
                     is_executable: true,
                 },
                 "FileWrite",
-                vec![owner.actions()[0].outputs()[0].clone()],
+                vec![ActionOutput::new(
+                    owner.actions()[0].outputs()[0].root().clone(),
+                    "early'quoted",
+                    ActionOutputKind::File,
+                )],
             ),
             ActionSpec::runfiles_support(invalid),
         ],
         context,
     ));
+    let early_view = ResolvedFileWriteSemanticView::from_configured_action(
+        slug_analysis_v2::ConfiguredActionView::from_configured_action(&malformed.actions()[0])
+            .unwrap(),
+    );
+    assert_eq!(
+        crate::runtime::format_file_write_aquery_text(&early_view),
+        Err("FileWrite aquery text requires a normalized relative output")
+    );
     let mut targets = evaluation.targets.to_vec();
     targets[0].analysis = Some(malformed.clone());
     let altered = BuildCommandEvaluation {

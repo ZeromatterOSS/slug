@@ -963,7 +963,7 @@ async fn cpp_compile_aquery_metadata_guards_environment_identity_and_priority() 
         "FileWrite",
         vec![ActionOutput::new(
             root.clone(),
-            "early",
+            "early'quoted",
             ActionOutputKind::File,
         )],
     );
@@ -971,6 +971,18 @@ async fn cpp_compile_aquery_metadata_guards_environment_identity_and_priority() 
         let mut bad = data.clone();
         bad.construction.mandatory_spawn_inputs = direct(vec![]);
         let rejected = cpp_node(original, vec![earlier, cpp_spec(bad)], true);
+        if matches!(rejected.actions()[0].kind(), ActionKind::Write { .. }) {
+            let early_view = ResolvedFileWriteSemanticView::from_configured_action(
+                slug_analysis_v2::ConfiguredActionView::from_configured_action(
+                    &rejected.actions()[0],
+                )
+                .unwrap(),
+            );
+            assert_eq!(
+                crate::runtime::format_file_write_aquery_text(&early_view),
+                Err("FileWrite aquery text requires a normalized relative output")
+            );
+        }
         let expected =
             ConfiguredCppCompileActionView::from_configured_action(&rejected.actions()[1])
                 .unwrap_err();
