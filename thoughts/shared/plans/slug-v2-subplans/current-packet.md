@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bounded native memory/lifecycle gates pass; actual rules_shell0.6.1 prerequisite
+Status: bounded native memory/lifecycle gates pass; actual apple_support1.24.1 prerequisite
 
 ## Observable and source basis
 
@@ -44,189 +44,54 @@ REAPI and M7A/full-root remain open.
 
 ## Current source-readiness checkpoint
 
-[WP942](wp942-native-local-module-readiness-2026-10-06.json) accepts genuine native
-root MODULE loading/evaluation through public RootModuleLoadingAnchorObservationKey,
-then preserves the normal HostRootRepositoryMappingObservationKey registry transport
-prerequisite. The original426B Host source matches its full hash; its first Weak and
-all recorder/scope credits retire. Five focused ordinary tests and one supervised native
-observer pass, Core preparation9.537s and direct CLI check7.358s pass. The native case
-runs0.226s at conservative66,816KiB RSS under the unchanged256MiB cap. Parent held-FD
-brackets verify all three pinned MODULE files; only the root native milestone succeeds.
+[WP949](wp949-native-shell-source-readiness-2026-10-06.json) observes rules_shell+ target187B and exact MODULE485B/fullSHA72e76b0e…,
+literal rules_shell0.6.1 with3unknown directives. Metadata0.031s/17,504KiB and module0.042s/18,652KiB
+are separate held FD/name/ancestor/fullhash/EOF witnesses, not an atomic alias/sourcecertificate,
+normal evaluation or graph/BCR authenticity. The explicit normal Local binding uses existing
+empty-effective-key/name-check semantics; priorcc0.2.4 versus Local0.2.17 mismatch remains.
 
-Mapping ends in the typed RegistryFileTransport classification chain with first scope
-NetworkDisabled. The first retained diagnostic URL is the complete66B
-`https://bcr.bazel.build/modules/bazel_features/1.50.0/MODULE.bazel`; recorder sole-offline
-qualification is false. It does not identify the selected typed leaf, current MVS or
-registry provenance. Scope transfer/decode/write and source-attempt counters are zero,
-separate from the actual native Host root read. No mapping certificate, normal platforms
-evaluation, generated provider/toolchain or public Rustc action is admitted. Full-workload
-fit remains open; representative parser and native source operations fit their caps.
+The sole shared companion now has fixed5extras/closedEight, four-prior constructor and
+all-prior paired negatives (Eight8, earlier2/4/6 preserved). Net50formattedlines; borrowed
+static names/error tuple and fixed7 once-per-request override strings preserve ownership.
+Ten ordinary tests pass1.963s/55,208KiB. Separate Core compile
+9.628s and direct Core/CLI check7.331s pass;
+compiler memory remains separate from runtime fit. One eight-root native observer passes
+0.240s at conservative66,184KiB RSS (sampled/rusage/all six phases) under256MiB,
+with77currentpins and8parent MODULE brackets8477B. Genuine original root426B/hash/
+anchor/firstWeak and tracked credit/recorder/scope retirement are checked.
 
-Next ground the precise typed request origin or exact local-source availability using
-existing source owners and the independently recorded rules_rust declaration. The
-[source recommendation](../../../../target/wp942/successor-source.md) identifies the
-already-retained typed error association and the missing borrowed public projection.
-Freeze that concrete contract before implementation or another source operation. No
-new root replay, locator/alias guess, acquisition or spent-source retry is selected.
-[WP941](wp941-platforms-local-module-readiness-2026-10-06.json) remains the preceding
-root-declaration/forward-request and individually bracketed platforms416B source basis;
-its partial facts do not certify normal evaluation or registry/MVS provenance.
+Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous.
+The held original semantic error reports apple_support1.24.1/outer65B MODULE request. This borrowed discovery association proves no completed MVS/BCR provenance.
+Scope registry attempts1/admittedbytes0
+and recorder8attempts/1admitted/7refused/qualified=False
+stay separate; adapter calls are not source attempts. Parent hashes do not fabricate native
+source epochs. Eleven fresh Rust checks=10Coreordinary+1native;2physical decisions are
+observations.15availability/3FD/1version controls reused0runs. Logical credit/Weak release
+proves no RSS-page reclaim or whole-workload fit. Mapping/providers/publicRustc/fullfit limits
+remain explicit in the actual receipt. Continue [the actual source owner recommendation](../../../../target/wp949/native/successor-source.md) under unchanged memory/caps and borrowed/
+scoped-interned allocation discipline.
 
-Reusable source/memory evidence: [WP934 alias](wp934-explicit-root-alias-2026-10-06.json),
-[WP935 finite reads](wp935-explicit-local-source-2026-10-06.json),
-[WP936 direct imports](wp936-direct-local-imports-2026-10-06.json),
-[WP937 native parser ownership](wp937-native-source-memory-2026-10-06.json),
-[WP938 offline command](wp938-normal-offline-source-prerequisite-2026-10-06.json),
-[WP939 borrowed attribution](wp939-borrowed-registry-attribution-2026-10-06.json) and
-[WP940 exact request](wp940-exact-offline-registry-prerequisite-2026-10-06.json).
-Detailed source history remains in those receipts and this manifest at8ea23765d.
-Representative native parses peak23,932/44,236KiB; WP940 normal offline refusal peaks
-65,860KiB with279,143B recorder credit/source peak344,679B and final credit/Weak release.
-These operations fit unchanged memory caps; full source/module/whole-workload fit is open.
-All earlier refused guards/replays remain closed.
+## Reusable evidence and predecessor
 
-[WP943](wp943-borrowed-module-registry-association-2026-10-06.json) accepts
-HostRootRepositoryMappingError::selected_module_registry_file: a borrowed tuple of the
-actual retained discovery Module name, existing canonical version and outer RegistryFileUrl.
-The fixed typed chain distinguishes root/compute/policy/invalid/sibling errors; no new
-string storage, Arc increment, parsing, interner, DICE behavior or private-key export.
-Three new association/pointer/lifetime controls and three protected classifier gates pass
-in0.727s at30,940KiB conservative ordinary peak. Offline owner preparation5.636s and
-serial direct Core/CLI check8.203s pass. Preparation memory is separate from the ordinary
-runtime caps. No native/source operation was executed and the accessor does not upgrade
-WP942's diagnostic row into a current selected identity or completed MVS/provenance proof.
-Next ground one exact current local source locator or observe the retained typed request
-under a separately frozen instrumentation contract, then advance normal source readiness.
-
-[WP944](wp944-bazel-features-local-source-2026-10-06.json) observes the one
-source-grounded bazel_features+ link (187B raw absolute target,0.031s/17,652KiB), then
-exactly its first MODULE346B/fullSHA
-`2083ef9c7a469f520890483ccf8e0189d6e71e2117e7752e15e6554433d5ae3e`
-(0.042s/18,776KiB). Literal facts declare bazel_features1.50.0, bazel_skylib1.6.1 and
-protobuf33.6 with dev_dependency=true; two directives remain unparsed. Each operation
-has independent current FD/name/ancestor brackets and stable source/result/raw pins,
-joined empty process group and unchanged caps. Fifteen old controls are reused with
-current exact pins/raw outcomes; zero new tests or Rust/fixture changes. Body/parse
-trace peaks1,822,501B through retirement, retaining1,685,969B compact facts/helpers;
-encoding is excluded from tracing and these are Python observations, not Slug savings.
-
-This establishes individually bracketed physical candidate/version correspondence,
-not current selected native identity, shared output-base graph/BCR/MVS provenance,
-normal evaluation, mapping certification or producer/full-workload fit. Next use the
-[source owner recommendation](../../../../target/wp944/successor-owner.md) to freeze
-ordinary native Host loading and the actual Local materializer with four exact roots/
-MODULEs, plus borrowed semantic-error reporting. Only original observed source/epoch/
-Weak milestones qualify native readiness; a sibling error may occur before this new
-module is read. No new native/import/acquisition/spent-source operation is selected.
-
-[WP945](wp945-native-borrowed-dependency-readiness-2026-10-06.json) accepts the
-opt-in four-root native observer under the normal Host/Local/request-policy owners.
-The existing three-root default is preserved in one shared test body. Six ordinary
-controls pass in1.191s/55,480KiB; separate Core preparation16.238s and direct Core/CLI
-check7.334s pass. The once-only native observation passes in0.241s at conservative
-67,312KiB RSS, with53 current pins and four held-FD parent MODULE brackets totaling
-5669B. Genuine native root426B/fullhash/firstWeak succeeds; all scope/recorder/source
-credits and original observed owners retire. Preparation memory remains separately
-reported; these finite runtime results do not establish full-workload fit.
-
-Normal mapping returns the actual semantic RegistryFileTransport prerequisite. While
-its original error is held, the borrowed tuple records bazel_skylib1.8.2 and its outer
-63B MODULE request; this is a retained discovery request, not completed MVS/BCR proof.
-The separate diagnostic recorder row remains unqualified. NetworkDisabled admits no
-transferred/decoded/written registry bytes. A sibling error arrives before the new
-bazel_features source enters the returned native epoch: its source/bytes/hash/evaluation
-remain unavailable. No mapping certificate/generated provider/public Rustc is admitted.
-
-Next use [the source owner recommendation](../../../../target/wp945/successor-source.md)
-to ground this precise request against independent saved declarations and exact local
-source availability, then continue ordinary native loading. All earlier spent-source,
-acquisition, full-root and memory limits remain unchanged; no new operation is selected.
-
-## Accepted WP946 continuation
-
-[WP946](wp946-native-skylib-source-readiness-2026-10-06.json) observes the grounded bazel_skylib+ metadata target187B
-and exact MODULE389B/fullSHA69ad6927… at0.031s/17,356KiB and0.042s/18,748KiB.
-Partial literal facts match bazel_skylib1.8.2/compatibility_level1; one expression remains
-unknown. Separate current FD/name/ancestor brackets establish physical availability,
-with15 reused controls/zero reruns, not native evaluation or graph/BCR/MVS provenance.
-
-The existing companion now shares closed Three/Four/Five modes and two fixed optional
-bindings. Seven ordinary controls pass1.396s/56,656KiB; separate Core preparation37.015s
-and direct Core/CLI check7.265s pass. One five-root native observer passes0.240s at
-conservative67,360KiB RSS under256MiB, with64 current pins and five parent MODULE
-brackets6058B. Original root426B/hash/Weak and scope/recorder/credit retirement succeed.
-Both added sources remain unseen in the returned epoch: bytes/hash/evaluation unavailable.
-The original semantic mapping error supplies the borrowed rules_cc0.2.4/outer59B MODULE
-request; this retained discovery request does not establish completed MVS or provenance.
-No mapping certificate, generated provider/public Rustc or whole-workload fit is admitted.
-
-Next use [the source recommendation](../../../../target/wp946/successor-source.md) to
-freeze the precise rules_cc prerequisite from independent saved declarations and immutable
-normal name/join policy. One conditional metadata address is grounded; current availability
-remains unknown. Only its witnessed target can ground a subsequent exact MODULE observation
-and reviewed normal binding extension. Existing memory limits and source exclusions remain.
-These representative operations fit their caps, allowing source-specific implementation
-of the broader producer plan to continue; retain allocation discipline at every step.
-
-## Accepted WP947 continuation
-
-[WP947](wp947-native-local-version-readiness-2026-10-06.json) observes one exact rules_cc+ target187B and
-MODULE1181B/fullSHA1849602c… at0.031s/17,280KiB and0.052s/18,600KiB. The body declares
-rules_cc0.2.17/compatibility1 with6unsupported directives, so original requested0.2.4
-correspondence fails. A separately reviewed explicit Local replan uses its actual bytes:
-normal nonregistry effective version is empty, name must match, declared version stays
-0.2.17. Immutable Bazel source and existing Slug owners agree; the existing discriminating
-empty/nonempty expected-key test passes0.122s/24,932KiB. No registry0.2.4 equivalence or
-shared graph/BCR/MVS provenance is inferred.
-
-The shared companion adds a third fixed optional binding and closed Six mode, reusing
-request/source/cleanup loops and the Five/Six control matrix (net80lines; production0).
-Eight Core controls pass1.602s/56,112KiB; separate Core compile10.095s and direct Core/CLI
-check7.324s pass. One six-root native observer passes0.241s at conservative64,864KiB RSS,
-with72current pins and6parent MODULE brackets7239B. Original root426B/hash/Weak and all
-tracked scope/recorder/credit retirement succeed. All three added sources remain unseen
-in the returned epoch: source/hash/evaluation unavailable, extra Weak expiry vacuous.
-
-The actual held semantic mapping error now reports rules_license1.0.0/outer64B MODULE
-request. It remains a retained discovery association, not completed selection/provenance.
-Scope1registryattempt/0bytes and recorder11attempts/1admitted/10refused/unqualified remain
-separate. Ten Rust checks comprise9ordinary (8Core+1version) and1native;2physical decisions
-are observations.15availability and3FD controls are reused with0reruns. Representative
-runtime operations fit unchanged caps; mapping/providers/public Rustc/full fit stay open.
-Next follow [the source recommendation](../../../../target/wp947/native/successor-source.md)
-to ground the actual rules_license prerequisite before its separately frozen source step.
-
-## Accepted WP948 continuation
-
-[WP948](wp948-native-license-source-readiness-2026-10-06.json) observes the grounded rules_license+ target187B
-and exact MODULE753B/fullSHAa7fda60e… at0.031s/17,532KiB and0.042s/18,596KiB.
-Supported literal facts declare rules_license1.0.0/compatibility1 and4dev dependencies,
-with0unsupported directives. Name/version correspondence supports the physical candidate;
-it proves no evaluation or BCR/MVS provenance. The concrete normal Local binding uses
-existing empty-effective-key/name-check semantics; prior version test16pins/raw is reused
-with0newruns, and earlier rules_cc0.2.4 versus Local0.2.17 mismatch remains explicit.
-
-The shared companion adds fixed4extras/closedSeven and all-prior paired crossing checks:
-Fifth2/Sixth4cases preserved, Seventh6pairs cover every earlier root/canonical. Net58lines,
-no production/dependency/fixture growth or new string/source cache. Nine Core tests pass
-1.774s/53,924KiB; separate Core compile9.705s and direct Core/CLI check7.309s pass.
-One seven-root native observer passes0.242s at conservative67,012KiB RSS under256MiB,
-with75current pins and7parent MODULE brackets7992B. Original root426B/hash/Weak and
-all tracked credit/recorder/scope retirement succeed. All4extras remain unseen in the
-returned epoch; source/hash/evaluation unavailable and their Weak expiry vacuous.
-
-The actual held semantic mapping error now reports rules_shell0.6.1/outer62B MODULE
-request, a retained discovery association rather than completed selection/provenance.
-Scope1registryattempt/0bytes and unqualified recorder9attempts/1admitted/8refused stay
-separate. Ten fresh Rust checks=9Coreordinary+1native;2physical decisions are observations.
-15availability/3FD/1version controls are reused with0reruns. Runtime memory fits unchanged
-caps, while mapping/providers/public Rustc/full-workload fit remain open. Follow
-[the source recommendation](../../../../target/wp948/native/successor-source.md) for
-one separately frozen source-specific correction to the actual rules_shell prerequisite.
+[WP948](wp948-native-license-source-readiness-2026-10-06.json) is the immediate predecessor:
+Seven observer0.242s/67,012KiB, root426B/Weak/credits checked, four extrasunseen,
+actual rules_shell0.6.1 prerequisite. Its version control was reused; publicproducer/fullfit open.
+Detailed completed chronology is pinned at6c45dd2fc:
+`thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
+Reusable topic index: [alias](wp934-explicit-root-alias-2026-10-06.json),
+[finite reads](wp935-explicit-local-source-2026-10-06.json), [direct imports](wp936-direct-local-imports-2026-10-06.json),
+[native parser ownership](wp937-native-source-memory-2026-10-06.json), [offline owner](wp938-normal-offline-source-prerequisite-2026-10-06.json),
+[borrowed attribution](wp939-borrowed-registry-attribution-2026-10-06.json), [exact request](wp940-exact-offline-registry-prerequisite-2026-10-06.json),
+[platforms](wp941-platforms-local-module-readiness-2026-10-06.json), [root epoch](wp942-native-local-module-readiness-2026-10-06.json),
+[borrowed semantic association](wp943-borrowed-module-registry-association-2026-10-06.json),
+[features](wp944-bazel-features-local-source-2026-10-06.json), [Four](wp945-native-borrowed-dependency-readiness-2026-10-06.json),
+[skylib/Five](wp946-native-skylib-source-readiness-2026-10-06.json), [Local version/Six](wp947-native-local-version-readiness-2026-10-06.json).
+Representative parser/source operations fit their existing caps; full-source/whole-workload fit
+remains open. Every earlier refused source/replay/guard boundary remains closed.
 
 ## Ownership, scope and allocation
 
-The latest checkpoint shares four fixed optional bindings, borrowed diagnostic reporting and
+The latest checkpoint shares five fixed optional bindings, borrowed diagnostic reporting and
 focused whole-Need controls in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
@@ -237,15 +102,16 @@ detail is opaque. Representation, equality/invalidation/Need policies and existi
 interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
 
 WP942's actual native root anchor and mapping share one normal scoped DICE request;
-whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth/seventh
+whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth/seventh/eighth
 MODULE bodies with finite metadata/Local roles. Successful certification would require
-the original covered mapping epoch, exact root/platforms sources and root Arc identity. That branch remains source-reviewed,
-unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
+the original nonempty mapping epoch covering all eight MODULE full hashes, original root
+Arc identity and actual platforms/rules_rust requirements. That branch remains source-reviewed
+and unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
 
 Root owns bounded wrappers, integration and compact receipts. The next contract must
-freeze the independently grounded source-specific correction for the actual rules_shell
-request before another source/native operation. Consequential ownership/representation/operation changes
+freeze the independently grounded source-specific correction for the actual observed
+prerequisite before another source/native operation. Consequential ownership/representation/operation changes
 receive independent design and final review. Prefer existing natural owners and bounded
 companions to copied large harnesses; record any concrete shared-boundary growth reason.
 
@@ -290,7 +156,7 @@ plan checks, compact receipt and local commit. No broad suite/new Bazel oracle i
 without an evidence gap. No 513-owner graph or fullM7A/whole-fit completion follows from
 this finite prerequisite.
 
-## Immediate predecessor
+## Generated compiler context
 
 [WP931](wp931-generated-compiler-env-files-2026-10-06.json) accepts individually
 bracketed current reads of all446 generated env files (190,700B) linked to466 ordered

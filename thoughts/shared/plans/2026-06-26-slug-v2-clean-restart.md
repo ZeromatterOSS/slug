@@ -119,6 +119,12 @@ Separate Core9.705s/CoreCLI7.309s pass; prior version evidence is reused0newruns
 Actual next typed request is rules_shell0.6.1/outer62B MODULE. Continue its source-specific
 normal owner under existing memory/borrowing/interning limits; no mapping/providers/public
 Rustc/MVS/provenance/full-workload fit admission.
+[WP949](./slug-v2-subplans/wp949-native-shell-source-readiness-2026-10-06.json) accepts exact shell485B/literal0.6.1 availability
+and sharedEight/all-prior crossing guards.10ordinary1.963s/55,208KiB and
+native0.240s/66,184KiB pass;8parentbindings8477B/originalroot/Weak/credits checked.
+Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual apple_support1.24.1 prerequisite.
+Continue its actual normal owner under borrowing/scoped interning and unchanged caps;
+public Rustc/provenance/whole-workload fit remains open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

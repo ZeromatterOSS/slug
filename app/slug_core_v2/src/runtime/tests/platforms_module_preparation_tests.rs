@@ -54,23 +54,30 @@ const LICENSE_SHA: [u8; 32] = [
     0xa7, 0xfd, 0xa6, 0x0e, 0xef, 0xdf, 0x3d, 0x8c, 0x82, 0x72, 0x62, 0xba, 0x49, 0x99, 0x57, 0xe4,
     0xdf, 0x06, 0xf6, 0x59, 0x33, 0x0b, 0xbe, 0x6c, 0xdb, 0xdb, 0x97, 0x5b, 0x76, 0x8b, 0xb6, 0x5c,
 ];
-const ADDITIONAL_IDENTITIES: [(&str, &str); 4] = [
+const SHELL_SHA: [u8; 32] = [
+    0x72, 0xe7, 0x6b, 0x0e, 0xea, 0x4e, 0x81, 0x61, 0x1e, 0xf5, 0x45, 0x2a, 0xa8, 0x2b, 0x3d, 0xa3,
+    0x4c, 0xac, 0xa0, 0xc8, 0xb7, 0xb5, 0xc0, 0xc9, 0x58, 0x43, 0x38, 0xaa, 0x93, 0xba, 0xe2, 0x6b,
+];
+const ADDITIONAL_IDENTITIES: [(&str, &str); 5] = [
     ("bazel_features", "bazel_features+"),
     ("bazel_skylib", "bazel_skylib+"),
     ("rules_cc", "rules_cc+"),
     ("rules_license", "rules_license+"),
+    ("rules_shell", "rules_shell+"),
 ];
-const ADDITIONAL_ENV: [&str; 4] = [
+const ADDITIONAL_ENV: [&str; 5] = [
     "SLUG_NATIVE_BAZEL_FEATURES_ROOT",
     "SLUG_NATIVE_BAZEL_SKYLIB_ROOT",
     "SLUG_NATIVE_RULES_CC_ROOT",
     "SLUG_NATIVE_RULES_LICENSE_ROOT",
+    "SLUG_NATIVE_RULES_SHELL_ROOT",
 ];
-const ADDITIONAL_MARKERS: [(&str, &str); 4] = [
+const ADDITIONAL_MARKERS: [(&str, &str); 5] = [
     ("WP945", "bazel_features_root"),
     ("WP946", "bazel_skylib_root"),
     ("WP947", "rules_cc_root"),
     ("WP948", "rules_license_root"),
+    ("WP949", "rules_shell_root"),
 ];
 fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
     let (size, hash) = match slot {
@@ -78,6 +85,7 @@ fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
         1 => (389, SKYLIB_SHA),
         2 => (1181, CC_SHA),
         3 => (753, LICENSE_SHA),
+        4 => (485, SHELL_SHA),
         _ => unreachable!(),
     };
     bytes.len() == size && sha2::Sha256::digest(bytes).as_slice() == hash
@@ -89,6 +97,7 @@ enum ModuleMode {
     Five,
     Six,
     Seven,
+    Eight,
 }
 impl ModuleMode {
     fn additional_count(self) -> usize {
@@ -98,6 +107,7 @@ impl ModuleMode {
             Self::Five => 2,
             Self::Six => 3,
             Self::Seven => 4,
+            Self::Eight => 5,
         }
     }
 }
@@ -108,7 +118,7 @@ struct AdditionalModule {
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
-    additional: [Option<AdditionalModule>; 4],
+    additional: [Option<AdditionalModule>; 5],
 }
 #[derive(Debug)]
 struct Denied {
@@ -123,7 +133,7 @@ impl Bodies {
         Self {
             roots,
             files,
-            additional: [None, None, None, None],
+            additional: [None, None, None, None, None],
         }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
@@ -156,6 +166,15 @@ impl Bodies {
         );
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
         self.additional[3] = Some(AdditionalModule { root, file });
+        self
+    }
+    fn with_eighth(mut self, root: NormalizedAbsolutePath) -> Self {
+        assert!(
+            self.additional[..4].iter().all(Option::is_some),
+            "eighth binding requires fourth through seventh"
+        );
+        let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
+        self.additional[4] = Some(AdditionalModule { root, file });
         self
     }
     fn roots(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
@@ -281,8 +300,8 @@ struct Milestones {
     preparations: u64,
     effective_empty: bool,
     source: Option<Weak<[u8]>>,
-    additional_source: [Option<Weak<[u8]>>; 4],
-    additional_bytes: [Option<(usize, bool)>; 4],
+    additional_source: [Option<Weak<[u8]>>; 5],
+    additional_bytes: [Option<(usize, bool)>; 5],
     selected_reported: bool,
     bytes: usize,
     hash_match: bool,
@@ -855,14 +874,20 @@ fn seventh_module_need_admission_is_opt_in_and_exact() {
     additional_module_need_admission(ModuleMode::Seven);
 }
 
+#[test]
+fn eighth_module_need_admission_is_opt_in_and_exact() {
+    additional_module_need_admission(ModuleMode::Eight);
+}
+
 fn additional_module_need_admission(mode: ModuleMode) {
     let slot = match mode {
         ModuleMode::Five => 1,
         ModuleMode::Six => 2,
         ModuleMode::Seven => 3,
+        ModuleMode::Eight => 4,
         _ => unreachable!(),
     };
-    let roots = ["/features", "/skylib", "/cc", "/license"];
+    let roots = ["/features", "/skylib", "/cc", "/license", "/shell"];
     let paths = match mode {
         ModuleMode::Five => [
             "/",
@@ -888,6 +913,14 @@ fn additional_module_need_admission(mode: ModuleMode) {
             "/license/BUILD.bazel",
             "/license/.bazelignore",
         ],
+        ModuleMode::Eight => [
+            "/",
+            "/shell",
+            "/shell/MODULE.bazel",
+            "/shell/BUILD",
+            "/shell/BUILD.bazel",
+            "/shell/.bazelignore",
+        ],
         _ => unreachable!(),
     };
     let excluded_paths = match mode {
@@ -908,6 +941,12 @@ fn additional_module_need_admission(mode: ModuleMode) {
             "/license/BUILD.bazel",
             "/license/REPO.bazel",
             "/license/MODULE.bazel",
+        ],
+        ModuleMode::Eight => [
+            "/shell_extra/MODULE.bazel",
+            "/shell/BUILD.bazel",
+            "/shell/REPO.bazel",
+            "/shell/MODULE.bazel",
         ],
         _ => unreachable!(),
     };
@@ -941,6 +980,9 @@ fn additional_module_need_admission(mode: ModuleMode) {
         if count >= 4 {
             bodies = bodies.with_seventh(normalized(roots[3]));
         }
+        if count >= 5 {
+            bodies = bodies.with_eighth(normalized(roots[4]));
+        }
         bodies
     };
     let body = need(paths[2], PathObservationOperation::FileBytes);
@@ -960,6 +1002,7 @@ fn additional_module_need_admission(mode: ModuleMode) {
                 ModuleMode::Five => configured(count).with_fifth(normalized(roots[slot])),
                 ModuleMode::Six => configured(count).with_sixth(normalized(roots[slot])),
                 ModuleMode::Seven => configured(count).with_seventh(normalized(roots[slot])),
+                ModuleMode::Eight => configured(count).with_eighth(normalized(roots[slot])),
                 _ => unreachable!(),
             })
             .is_err()
@@ -1088,6 +1131,12 @@ fn native_seven_root_local_module_and_mapping_prerequisite() {
     observe_native_modules(ModuleMode::Seven);
 }
 
+#[test]
+#[ignore = "frozen scoped eight-root normal Local MODULE readiness observation"]
+fn native_eight_root_local_module_and_mapping_prerequisite() {
+    observe_native_modules(ModuleMode::Eight);
+}
+
 fn observe_native_modules(mode: ModuleMode) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
@@ -1114,6 +1163,7 @@ fn observe_native_modules(mode: ModuleMode) {
             1 => bodies.with_fifth(extra_root),
             2 => bodies.with_sixth(extra_root),
             3 => bodies.with_seventh(extra_root),
+            4 => bodies.with_eighth(extra_root),
             _ => unreachable!(),
         };
         let (prefix, field) = ADDITIONAL_MARKERS[slot];
@@ -1196,7 +1246,7 @@ fn observe_native_modules(mode: ModuleMode) {
     let mut policy_error = false;
     let mut outcome = None;
     if let Some(runtime) = &runtime {
-        let mut overrides: [Option<String>; 6] = Default::default();
+        let mut overrides: [Option<String>; 7] = Default::default();
         for (slot, (name, _, root)) in bodies.bindings().enumerate() {
             overrides[slot] = Some(format!("{name}={}", root.as_path().display()));
         }

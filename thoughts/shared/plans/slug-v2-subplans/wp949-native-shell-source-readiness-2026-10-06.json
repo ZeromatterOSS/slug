@@ -1,0 +1,524 @@
+{
+  "checkpoint": "WP949 normal local rules_shell source readiness",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "6c45dd2fc6272bc3b32f51916619b08797a56aee",
+  "previous_goal_turn": "progress",
+  "outcome": "progress: exact shell availability and closed Eight normal owner observation",
+  "compatibility": {
+    "exact": "observed bytes/fullhash and unchanged admitted Local empty-effective-key/name-check semantics",
+    "slug_native": "bounded instrumentation and explicit local provenance",
+    "deferred": "current graph/BCR/MVS provenance, mapping/providers/generatedtoolchains/public Rustc/whole-workload fit"
+  },
+  "availability": {
+    "metadata": {
+      "record": {
+        "path": "target/wp949/metadata/operation.json",
+        "sha256": "be7d8b74439057fc833ef971e20126bda478df1bdab5a8114a9cf552940e584e"
+      },
+      "elapsed_seconds": 0.03138463792856783,
+      "selected": 1,
+      "passed": null,
+      "conservative_rss_kib": 17504,
+      "current_pin_count": 34,
+      "exit_no_stop_joined_empty": true,
+      "result": {
+        "path": "target/wp949/metadata/result.json",
+        "sha256": "71bece1271bdea4dc11c266b4e917c2f3fb7ad9459c2c5b8250cd36be57e80f2"
+      },
+      "stdout": {
+        "path": "target/wp949/metadata/stdout",
+        "sha256": "73b041f26ec9f7941cddcf25eaae55d99e7323cac2d44aa6404b913ce79917f9"
+      },
+      "stderr": {
+        "path": "target/wp949/metadata/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "target_bytes": 187,
+      "target_followed": false,
+      "source_body_bytes": 0
+    },
+    "module": {
+      "record": {
+        "path": "target/wp949/module/operation.json",
+        "sha256": "ada2389dfbf41b6bc09ce162c66ec49282f428fea9cd207e1018d25e60298b5c"
+      },
+      "elapsed_seconds": 0.04164608707651496,
+      "selected": 1,
+      "passed": null,
+      "conservative_rss_kib": 18652,
+      "current_pin_count": 42,
+      "exit_no_stop_joined_empty": true,
+      "result": {
+        "path": "target/wp949/module/result.json",
+        "sha256": "8de380afa870af1915ffd749b6de5704ffd5159ba9b2a91d7394eb93ccd014cf"
+      },
+      "stdout": {
+        "path": "target/wp949/module/stdout",
+        "sha256": "c82a066c5d118177c43db7a4e61ea917b62c25201aca6585cf56676ec01f1b59"
+      },
+      "stderr": {
+        "path": "target/wp949/module/stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "bytes": 485,
+      "sha256": "72e76b0eea4e81611ef5452aa82b3da34caca0c8b7b5c0c9584338aa93bae26b",
+      "declared_name": "rules_shell",
+      "declared_version": "0.6.1",
+      "partial": true,
+      "unknown_directives": 3,
+      "retained_trace_bytes": 1686950,
+      "peak_trace_bytes": 1836477
+    },
+    "qualification": "Two separate NOFOLLOW FD/name/ancestor witnesses/fullhash/EOF; non-atomic alias/source correspondence, not evaluation/authenticity/MVS. Python trace excludes encoding, no Slug savings claim."
+  },
+  "local_consistency": {
+    "requested_version": "0.6.1",
+    "declared_version": "0.6.1",
+    "normal_effective_version": "empty",
+    "matching_name_required": true,
+    "registry_authenticity_proved": false,
+    "basis": {
+      "path": "target/wp947/successor-source.md",
+      "sha256": "fcfdec9c74e9dbf641a77bf90f9c0c4a290d76a307eed1f86b69109a4863bfad"
+    },
+    "prior_version_control": {
+      "record": {
+        "path": "target/wp947/native/ordinary-version.json",
+        "sha256": "7741720457832370d90f42dad22a7a4529422dfc2628049cbafc004b293de902"
+      },
+      "elapsed_seconds": 0.1215200440492481,
+      "selected": 1,
+      "passed": 1,
+      "conservative_rss_kib": 24932,
+      "current_pin_count": 16,
+      "exit_no_stop_joined_empty": true
+    },
+    "new_version_control_runs": 0,
+    "prior_cc_registry0.2.4_vs_local0.2.17_correspondence": false
+  },
+  "contracts": [
+    {
+      "path": "target/wp949/design.md",
+      "sha256": "dfc9251bba8ba44f2753a97db0dc967cd25a553bf9e62b9f3b05d61e7975ef21"
+    },
+    {
+      "path": "target/wp949/module/design.md",
+      "sha256": "cc08cb40f0eee02d8a65eeb1b3d566e44d6403b284b616d6c0ee0ef90ac2f12b"
+    },
+    {
+      "path": "target/wp949/native-basis.md",
+      "sha256": "2c18c782d680630ec79a31319cde840609fe02ccebe67b6f917e9965e133563b"
+    },
+    {
+      "path": "target/wp949/native/design.md",
+      "sha256": "5855ca88ca57682a3fee53f4e5de95285fc618b8cc0662084abfd95456cb4765"
+    },
+    {
+      "path": "target/wp949/native/inputs.json",
+      "sha256": "986b4ed674b5239072e66a6500de8205810cc24d9027dd2fcb6ac4fd9e304906"
+    },
+    {
+      "path": "target/wp949/native/toolchain.json",
+      "sha256": "de89f89618ad39c1c2e38b4a76dfdf5c19d8da71966c29c915152e21850758a9"
+    }
+  ],
+  "implementation": {
+    "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+    "sha256": "6f73013de2c2b7eb8ece8f3fea09b29147cc9ee5c9237c8fe6febd0cef20bb4b",
+    "insertions": 59,
+    "deletions": 9,
+    "net_lines": 50,
+    "lines": 1465,
+    "production_files_changed": 0,
+    "dependency_files_changed": 0,
+    "fixture_files_changed": 0,
+    "reason_below_estimate": "Existing all-prior matrix/loops need no refactor; only one fixed-slot/mode/path row and wrappers added."
+  },
+  "allocation": "Borrowed static identity/env/marker tables and actual error tuple; fixed seven unique override Strings once/request, first original Weak/scalars. Existing scoped interners/shared owners remain; no body/diagnostic copy or new cache/global pool.",
+  "scripts": [
+    {
+      "path": "target/wp949/observe.py",
+      "sha256": "cbf49810ae74503c651181be920d75b93933dc0e606b82d388dced23ed4fda71"
+    },
+    {
+      "path": "target/wp949/run.py",
+      "sha256": "0a719bd91425170b94cde3632d430cd0aa8b9f50b46ad275a9937cf4bc9843d1"
+    },
+    {
+      "path": "target/wp949/native/prepare.py",
+      "sha256": "55fadacc974d0540cd93f58ae5efa67fa8a6c85e6997842b231dcd1108d56d7c"
+    },
+    {
+      "path": "target/wp949/native/supervise.py",
+      "sha256": "ba89bbc66dd598130b01dee5d1624527f3771c5fbd4b9673db7578ee9510229c"
+    },
+    {
+      "path": "target/wp949/native/protocol.py",
+      "sha256": "4b32975a12e9b77d9bcd5c20d4fdd32df7fda5369a019060ecd621f69253f65c"
+    }
+  ],
+  "reviews": [
+    {
+      "path": "target/wp949/launch-metadata-source.md",
+      "sha256": "55ceb98a40fa5c6bca1b5c04f2fe93035ad37641909f5be4248cf33aff876800"
+    },
+    {
+      "path": "target/wp949/launch-metadata-evidence.md",
+      "sha256": "df5aec8d487dd90bd4c33ab5820801b6c47b7ea16566422e14f27a1e393c645b"
+    },
+    {
+      "path": "target/wp949/launch-module-source.md",
+      "sha256": "45a146a1959ced4744cb7478975e2e0789db12da8860881193ad268e3bc862c3"
+    },
+    {
+      "path": "target/wp949/launch-module-evidence.md",
+      "sha256": "b6ae4edb60010424901ba74674ca08b61f5602850daa58c0edae9d199a67953a"
+    },
+    {
+      "path": "target/wp949/native/design-source.md",
+      "sha256": "86e0b8f98652b1f78cabf7ab95c67912f9b76bbf81f89b3c0e38a70a7f92ec2a"
+    },
+    {
+      "path": "target/wp949/native/design-evidence.md",
+      "sha256": "9ee004a715688537f437eb73a4e060e095e8ee96ec23f3e7a66fb6476a90df5a"
+    },
+    {
+      "path": "target/wp949/native/scripts-source.md",
+      "sha256": "15e24118f4371dd7299e7b2a7f8ffd59e21e76e2ec7419b9cd56b1316de4a073"
+    },
+    {
+      "path": "target/wp949/native/scripts-evidence.md",
+      "sha256": "52e43804e9718fb97fcdc00b8d41fea99a5ca4aaf6a7708748fcb8de2908c848"
+    },
+    {
+      "path": "target/wp949/native/code-source.md",
+      "sha256": "e1b55d43656b45f2cdcd77d08eb353747f3d354dcfbb02c387637fec75fce768"
+    },
+    {
+      "path": "target/wp949/native/code-evidence.md",
+      "sha256": "b6464b567c6dece4e8e1c044a8483451af8ecc0483ef61062a3d96c736e325cd"
+    },
+    {
+      "path": "target/wp949/native/preflight-source.md",
+      "sha256": "81e087a63bd30599a3bd71c2db93bbf6a35d30bb4c4deb73542263e70766793a"
+    },
+    {
+      "path": "target/wp949/native/preflight-evidence.md",
+      "sha256": "1843d14a335069593ec3b64252b0671001518d3ea9c0f000da2f2df0ae4bc1e3"
+    },
+    {
+      "path": "target/wp949/native/final-source.md",
+      "sha256": "76cc6eef9e38dd2cb7911b8e068444e3a3ec09381ee993ee147008f1c0d4e2ee"
+    },
+    {
+      "path": "target/wp949/native/final-evidence.md",
+      "sha256": "3b408b2d39021da3efa05199b05afa24ea3dbfb5e88e84cff3a950f28f1ca71a"
+    }
+  ],
+  "preparation": {
+    "core_compile": {
+      "record": {
+        "path": "target/wp949/native/compile.json",
+        "sha256": "322acf041a2eeed8bb5e5fc0522fa8f4c290c9fccf96848611c71ea837a35d01"
+      },
+      "elapsed_seconds": 9.628291953005828,
+      "selected": 0,
+      "passed": 0,
+      "conservative_rss_kib": 1905852,
+      "current_pin_count": 15,
+      "exit_no_stop_joined_empty": true
+    },
+    "direct_core_cli_check": {
+      "record": {
+        "path": "target/wp949/native/check.json",
+        "sha256": "4caef78978ab6028731b387a189e17802d3649fb8735a5e9f92ae171e9ba5085"
+      },
+      "elapsed_seconds": 7.331382200005464,
+      "selected": 0,
+      "passed": 0,
+      "conservative_rss_kib": 640876,
+      "current_pin_count": 15,
+      "exit_no_stop_joined_empty": true
+    },
+    "qualification": "Serial offline jobs1/opt0/debug0 owner preparation separately capped60s; compiler RSS does not establish runtime fit"
+  },
+  "ordinary": {
+    "operations": [
+      {
+        "path": "target/wp949/native/ordinary-0-operation.json",
+        "sha256": "2212534f933e5dba05325419a4cc6fcec51869a8cb943a97d73337a97126c37d"
+      },
+      {
+        "path": "target/wp949/native/ordinary-1-operation.json",
+        "sha256": "12e8b4ff76e17374e8a819c18c0656919c9e49cd9682485c3ec57bf9514c360d"
+      },
+      {
+        "path": "target/wp949/native/ordinary-2-operation.json",
+        "sha256": "c1b021756a5c5cd47ca7062c362f54630abaa847e67c3b9664793dc0190028ce"
+      },
+      {
+        "path": "target/wp949/native/ordinary-3-operation.json",
+        "sha256": "f0b049fa6c2ba7455fa386e0bdd89bc545c7bb0c3c7593d33167f1b759ff77c7"
+      },
+      {
+        "path": "target/wp949/native/ordinary-4-operation.json",
+        "sha256": "2b5b3d0fffaa99055ee6ab8d4088098410cb9a489251b0776dc9f7a08f19a411"
+      },
+      {
+        "path": "target/wp949/native/ordinary-5-operation.json",
+        "sha256": "eb0fb6022e06becb6681532dcb548e602a570537b8b70e315b9eaceda23fedd9"
+      },
+      {
+        "path": "target/wp949/native/ordinary-6-operation.json",
+        "sha256": "ffc3fcc7bda6f7138b2261394c48a268917f04eb5dc36aeaf14e20d3678bfd5d"
+      },
+      {
+        "path": "target/wp949/native/ordinary-7-operation.json",
+        "sha256": "2d953e067fe7786383168750f235a2ee760708eaa661415d516816720b1c6fea"
+      },
+      {
+        "path": "target/wp949/native/ordinary-8-operation.json",
+        "sha256": "2eafee50488b6c56106409433268b10674a1b62e792171058e513f4c8538112b"
+      },
+      {
+        "path": "target/wp949/native/ordinary-9-operation.json",
+        "sha256": "7e2f564cdf2cb84ff432540c66156900069d58d239592c0e153bb31797d6b28d"
+      }
+    ],
+    "selectors": [
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::eighth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::seventh_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::sixth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fifth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fourth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::complete_need_admission_refuses_mixed_and_wrong_operation_before_progress",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::registry_first_row_reporter_preserves_raw_domains_bounds_and_offline_qualification",
+      "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+      "runtime::dice::tests::source_input_tests::native_source_digest_is_revalidated_before_acceptance",
+      "runtime::request_revision::tests::native_epoch_certificate_preserves_equal_and_replaces_only_changed_arcs"
+    ],
+    "selected": 10,
+    "passed": 10,
+    "elapsed_seconds": 1.9633452537236735,
+    "conservative_rss_kib": 55208,
+    "raw_and_current_pins_verified": true
+  },
+  "preflight": [
+    {
+      "path": "target/wp949/native/list-operation.json",
+      "sha256": "59d33b1d30095bab455a794d0d9545239ee5e70fef0df1074ae17833cd020671"
+    },
+    {
+      "path": "target/wp949/native/preflight-operation.json",
+      "sha256": "f2467e2ea02a59f5fe61b813b4762d5c76228693225160f87faa7e95ceb11671"
+    }
+  ],
+  "native": {
+    "record": {
+      "path": "target/wp949/native/native-operation.json",
+      "sha256": "870203e54cd5949d054b4875859c1e1ba2bf4789d9c5558c3b09ac514c29ae37"
+    },
+    "elapsed_seconds": 0.2403090299339965,
+    "selected": 1,
+    "passed": 1,
+    "conservative_rss_kib": 66184,
+    "current_pin_count": 77,
+    "exit_no_stop_joined_empty": true,
+    "result": {
+      "path": "target/wp949/native/result.json",
+      "sha256": "b226213758a9a46977eb82d5c2d871059d964547b63a0ab087270b9764a26c1f"
+    },
+    "stdout": {
+      "path": "target/wp949/native/native.stdout",
+      "sha256": "c20417a7d9053fe9643663dee5df25625d761b5b37af7c7fae4ad1ce2354c2c0"
+    },
+    "stderr": {
+      "path": "target/wp949/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "parent_sources": 8,
+    "parent_source_bytes": 8477,
+    "root": {
+      "seen": true,
+      "calls": 28,
+      "policy_checked": true,
+      "bytes": 426,
+      "hash_match": true,
+      "anchor": "complete",
+      "outer_variant": "None"
+    },
+    "mapping": {
+      "state": "semantic_refusal",
+      "codes": [
+        "RootMappingPredecessor",
+        "ExtensionMappingsRoutes",
+        "RoutesGraph",
+        "GraphDiscoveryLeaf",
+        "DiscoverySourcePreparation",
+        "ModuleSourceRegistryFile",
+        "RegistryFileTransport"
+      ],
+      "termination": "Classified",
+      "native_detail": true
+    },
+    "actual_semantic_request": {
+      "capture": "captured",
+      "name_len": 13,
+      "name_hex": "6170706c655f737570706f7274",
+      "version_len": 6,
+      "version_hex": "312e32342e31",
+      "url_len": 65,
+      "url_hex": "68747470733a2f2f6263722e62617a656c2e6275696c642f6d6f64756c65732f6170706c655f737570706f72742f312e32342e312f4d4f44554c452e62617a656c",
+      "decoded": {
+        "name": "apple_support",
+        "version": "1.24.1",
+        "url": "https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel"
+      },
+      "meaning": "actual retained selected discovery request borrowed from semantic mapping error",
+      "completed_mvs_provenance_proved": false
+    },
+    "extra_sources": {
+      "bazel_features_source": {
+        "seen": false,
+        "bytes": null,
+        "hash_match": null
+      },
+      "bazel_skylib_source": {
+        "seen": false,
+        "bytes": null,
+        "hash_match": null
+      },
+      "rules_cc_source": {
+        "seen": false,
+        "bytes": null,
+        "hash_match": null
+      },
+      "rules_license_source": {
+        "seen": false,
+        "bytes": null,
+        "hash_match": null
+      },
+      "rules_shell_source": {
+        "seen": false,
+        "bytes": null,
+        "hash_match": null
+      }
+    },
+    "source_counters": {
+      "registry_attempts": 1,
+      "registry_admitted_bytes": 0,
+      "source_attempts": 0,
+      "transferred_bytes": 0,
+      "decoded_bytes": 0,
+      "written_bytes": 0,
+      "live_buffer_bytes_before_drop": 279143,
+      "peak_buffer_bytes": 344679
+    },
+    "source_error": "Some(NetworkDisabled)",
+    "resources": [
+      {
+        "phase": "before_command",
+        "descriptor_used": 0,
+        "descriptor_peak": 0,
+        "logical_used": 0,
+        "scratch_used": 0
+      },
+      {
+        "phase": "after_command",
+        "descriptor_used": 0,
+        "descriptor_peak": 12488,
+        "logical_used": 0,
+        "scratch_used": 0
+      },
+      {
+        "phase": "after_runtime_drop",
+        "descriptor_used": 0,
+        "descriptor_peak": 12488,
+        "logical_used": 0,
+        "scratch_used": 0
+      }
+    ],
+    "extra_source_retirement": {
+      "fourth_source_retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true
+      },
+      "fifth_source_retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true
+      },
+      "sixth_source_retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true
+      },
+      "seventh_source_retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true
+      },
+      "eighth_source_retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true
+      }
+    },
+    "recorder": {
+      "attempted": 8,
+      "admitted": 1,
+      "refused": 7,
+      "distinct": 1,
+      "retained": 1,
+      "charged": 279143,
+      "qualified": false
+    },
+    "retirement": {
+      "source_weak_seen": true,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "qualification": "Parent-only FD/fullhash/EOF/name/ancestor brackets across joined child are not native response injection or atomic collection. Genuine root/epoch authority only; unseen extras have unavailable bytes/hash and vacuous Weak expiry. Adapter calls, source-service attempts and unqualified recorder rows stay distinct. Credit/Weak release does not prove RSS-page reclaim or mapping/provider/public-producer success."
+  },
+  "counts": {
+    "fresh_rust_checks": 11,
+    "fresh_core_ordinary": 10,
+    "fresh_native": 1,
+    "physical_observations": 2,
+    "reused_availability_controls": 15,
+    "reused_fd_controls": 3,
+    "reused_version_controls": 1,
+    "new_reused_control_runs": 0
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "source_policy": "Unchanged offline registry1MiB/all source-image-scratch16MiB/attempts16/threads2/work5s/cleanup8s",
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": {
+    "actual_request": {
+      "name": "apple_support",
+      "version": "1.24.1",
+      "url": "https://bcr.bazel.build/modules/apple_support/1.24.1/MODULE.bazel"
+    },
+    "recommendation": {
+      "path": "target/wp949/native/successor-source.md",
+      "sha256": "bcdb4275adfd7be6d7462ecd4ecceb3a7528732206006877304cd391f7d32296"
+    },
+    "scope": "Separately grounded source-specific normal owner continuation; no identical retry or unreviewed ninth binding"
+  },
+  "checks": {
+    "rustfmt": "passed",
+    "diff": "passed",
+    "plan_status": "passed",
+    "archive": "passed",
+    "current_operation_and_receipt_hashes": "passed"
+  },
+  "recorded_utc": "2026-10-07T00:21:40.253238+00:00",
+  "packet_elapsed_seconds": 948.099347
+}
