@@ -598,7 +598,7 @@ impl fmt::Display for GeneratedPlanDiagnostic<'_> {
     }
 }
 type GeneratedFileSignature = (&'static str, usize, bool, [u8; 32]);
-const GENERATED_FEATURES_FILES: [GeneratedFileSignature; 2] = [
+static GENERATED_FEATURES_FILES: [GeneratedFileSignature; 2] = [
     (
         "BUILD.bazel",
         266,
@@ -617,6 +617,28 @@ const GENERATED_FEATURES_FILES: [GeneratedFileSignature; 2] = [
             0xe3, 0xd6, 0x78, 0x0b, 0xb1, 0xa8, 0x69, 0xff, 0x03, 0x2e, 0x2c, 0x2b, 0x88, 0x2b,
             0xa3, 0xea, 0xc6, 0x01, 0xb0, 0xd2, 0x12, 0x80, 0x50, 0x55, 0x59, 0xe7, 0x7a, 0xe2,
             0x77, 0x3e, 0x4a, 0x6f,
+        ],
+    ),
+];
+static GENERATED_FEATURES_VERSION_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "BUILD.bazel",
+        196,
+        true,
+        [
+            0xc2, 0xb2, 0xa6, 0x61, 0x25, 0x5d, 0x1b, 0xa6, 0xa3, 0x78, 0x5f, 0x0f, 0xc6, 0x57,
+            0x0d, 0x48, 0x76, 0x0d, 0xaf, 0x24, 0x97, 0x28, 0x55, 0x00, 0x19, 0x97, 0x47, 0x6f,
+            0xe9, 0xb1, 0xec, 0xc9,
+        ],
+    ),
+    (
+        "version.bzl",
+        17,
+        true,
+        [
+            0x1a, 0x77, 0x53, 0xdd, 0x36, 0x88, 0x96, 0xd0, 0xcb, 0xc7, 0xce, 0xbc, 0x84, 0xd1,
+            0x95, 0x02, 0xb9, 0x95, 0x20, 0x85, 0xc2, 0x56, 0x30, 0xaf, 0x57, 0x95, 0x06, 0xdf,
+            0x10, 0x9b, 0xaa, 0x86,
         ],
     ),
 ];
@@ -658,31 +680,48 @@ impl Bodies {
         &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
         &'static str,
     )> {
-        self.first_denied_materialization_with_plan_matcher(needs, &|plan| {
-            generated_features_plan_matches(plan, &GENERATED_FEATURES_FILES)
-        })
+        self.first_denied_materialization_with_plan_matcher(needs, &generated_features_plan_matches)
     }
-    fn generated_features_owner_is_admitted(
+    fn generated_features_owner_signatures(
         &self,
         request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
-    ) -> bool {
+    ) -> Option<&'static [GeneratedFileSignature; 2]> {
         let label = &request.repo_spec.rule_id.bzl_file;
-        self.generated_features_file_effects
-            && self.bazel_features_import_sources
-            && self.additional[0].is_some()
-            && request.id.workspace == self.roots[0]
-            && request.id.canonical_repo.as_str()
-                == "bazel_features++version_extension+bazel_features_globals"
-            && label.package().repo().as_str() == "bazel_features+"
-            && label.package().package().as_str() == "private"
-            && label.target().as_str() == "globals_repo.bzl"
-            && label.mapping_id().is_none()
-            && request.repo_spec.rule_id.rule_name == "globals_repo"
+        if !self.generated_features_file_effects
+            || !self.bazel_features_import_sources
+            || self.additional[0].is_none()
+            || request.id.workspace != self.roots[0]
+            || label.package().repo().as_str() != "bazel_features+"
+            || label.package().package().as_str() != "private"
+            || label.mapping_id().is_some()
+        {
+            return None;
+        }
+        match (
+            request.id.canonical_repo.as_str(),
+            label.target().as_str(),
+            request.repo_spec.rule_id.rule_name.as_str(),
+        ) {
+            (
+                "bazel_features++version_extension+bazel_features_globals",
+                "globals_repo.bzl",
+                "globals_repo",
+            ) => Some(&GENERATED_FEATURES_FILES),
+            (
+                "bazel_features++version_extension+bazel_features_version",
+                "version_repo.bzl",
+                "version_repo",
+            ) => Some(&GENERATED_FEATURES_VERSION_FILES),
+            _ => None,
+        }
     }
     fn first_denied_materialization_with_plan_matcher<'a>(
         &self,
         needs: &'a SourcePreparationNeeds,
-        plan_matches: &impl Fn(&slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan) -> bool,
+        plan_matches: &impl Fn(
+            &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+            &[GeneratedFileSignature; 2],
+        ) -> bool,
     ) -> Option<(
         &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
         &'static str,
@@ -694,7 +733,10 @@ impl Bodies {
                     return Some((request, "immutable_kind"));
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
-                    if self.generated_features_owner_is_admitted(request) && plan_matches(plan) {
+                    if self
+                        .generated_features_owner_signatures(request)
+                        .is_some_and(|expected| plan_matches(plan, expected))
+                    {
                         continue;
                     }
                     return Some((request, "generated_kind"));
@@ -1145,14 +1187,15 @@ impl Bodies {
         )
     }
     fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
-        self.admit_with_plan_matcher(needs, &|plan| {
-            generated_features_plan_matches(plan, &GENERATED_FEATURES_FILES)
-        })
+        self.admit_with_plan_matcher(needs, &generated_features_plan_matches)
     }
     fn admit_with_plan_matcher(
         &self,
         needs: &SourcePreparationNeeds,
-        plan_matches: &impl Fn(&slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan) -> bool,
+        plan_matches: &impl Fn(
+            &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+            &[GeneratedFileSignature; 2],
+        ) -> bool,
     ) -> Result<(), Denied> {
         let refusal = |family| Denied {
             family,

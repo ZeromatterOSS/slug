@@ -688,172 +688,295 @@ fn small_generated_plan(
 fn generated_features_materialization_is_opt_in_and_exact() {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
-    let expected: [GeneratedFileSignature; 2] = [
-        ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
-        ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+    let expected = [
+        [
+            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+            ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+        ],
+        [
+            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+            ("version.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+        ],
     ];
-    let rows: &[(&str, &[u8], bool)] = &[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", true)];
-    let matches = |plan: &_| generated_features_plan_matches(plan, &expected);
-    let bodies = make()
-        .with_fourth(path("/features"))
-        .with_bazel_features_import_sources(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        )
-        .with_generated_features_file_effects(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        );
-    let needs = SourcePreparationNeeds::repository(generated_globals_request(
-        &bodies,
-        small_generated_plan(rows),
-    ));
-    assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_ok());
-    assert!(bodies.admit(&needs).is_err()); // The native fixed signature is never the synthetic signature.
-    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
-        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
-            let configured = make()
-                .with_fourth(path("/features"))
-                .with_bazel_features_import_sources(registry, command)
-                .with_generated_features_file_effects(registry, command);
-            assert_eq!(
-                configured.admit_with_plan_matcher(&needs, &matches).is_ok(),
-                matches!(registry, RegistryChoice::PreparedFile)
-                    && matches!(command, CommandChoice::PublicProbe)
-            );
-        }
-    }
-    for closed in [
-        make(),
-        make().with_fourth(path("/features")),
-        make().with_generated_features_file_effects(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        ),
-        make()
+    let matches = |plan: &_, selected: &[GeneratedFileSignature; 2]| {
+        let index = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
+            0
+        } else {
+            assert!(std::ptr::eq(selected, &GENERATED_FEATURES_VERSION_FILES));
+            1
+        };
+        generated_features_plan_matches(plan, &expected[index])
+    };
+    for version in [false, true] {
+        let second = if version {
+            "version.bzl"
+        } else {
+            "globals.bzl"
+        };
+        let rows: &[(&str, &[u8], bool)] = &[("BUILD.bazel", b"a", true), (second, b"b", true)];
+        let request_for_plan = |bodies: &Bodies, plan| {
+            let mut request = generated_globals_request(bodies, plan);
+            if version {
+                request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    "bazel_features++version_extension+bazel_features_version",
+                )
+                .unwrap();
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_features+//private:version_repo.bzl").unwrap();
+                request.repo_spec.rule_id.rule_name = "version_repo".into();
+            }
+            request
+        };
+        let bodies = make()
             .with_fourth(path("/features"))
             .with_bazel_features_import_sources(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
-            ),
-        make()
-            .with_fourth(path("/features"))
+            )
             .with_generated_features_file_effects(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
-            ),
-    ] {
-        assert!(closed.admit_with_plan_matcher(&needs, &|_| true).is_err());
-    }
-    let mut wrong_slot = make()
-        .with_fourth(path("/other"))
-        .with_fifth(path("/features"))
-        .with_bazel_features_import_sources(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        )
-        .with_generated_features_file_effects(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        );
-    wrong_slot.additional[0] = None;
-    assert!(
-        wrong_slot
-            .admit_with_plan_matcher(&needs, &|_| true)
-            .is_err()
-    );
-    // A permissive shape closure cannot bypass any typed owner field or mapping provenance.
-    for index in 0..7 {
-        let mut request = generated_globals_request(&bodies, small_generated_plan(rows));
-        match index {
-            0 => request.id.workspace = path("/other"),
-            1 => {
-                request.id.canonical_repo =
-                    slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
-            }
-            2 => {
-                request.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@other//private:globals_repo.bzl").unwrap()
-            }
-            3 => {
-                request.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@bazel_features+//other:globals_repo.bzl").unwrap()
-            }
-            4 => {
-                request.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@bazel_features+//private:other.bzl").unwrap()
-            }
-            5 => request.repo_spec.rule_id.rule_name = "other".into(),
-            6 => {
-                let mut mapping = slug_identity_v2::RepositoryMapping::new(
-                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
-                );
-                mapping.insert(
-                    slug_identity_v2::ApparentRepoName::new("features").unwrap(),
-                    slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap(),
-                );
-                request.repo_spec.rule_id.bzl_file =
-                    slug_identity_v2::ApparentLabel::parse("@features//private:globals_repo.bzl")
-                        .unwrap()
-                        .resolve(&mapping);
-            }
-            _ => unreachable!(),
-        }
-        assert!(
-            bodies
-                .admit_with_plan_matcher(&SourcePreparationNeeds::repository(request), &|_| true)
-                .is_err()
-        );
-    }
-    let invalid: &[&[(&str, &[u8], bool)]] = &[
-        &[],
-        &[("BUILD.bazel", b"a", true)],
-        &[
-            ("BUILD.bazel", b"a", true),
-            ("globals.bzl", b"b", true),
-            ("extra", b"", false),
-        ],
-        &[("globals.bzl", b"b", true), ("BUILD.bazel", b"a", true)],
-        &[("BUILD", b"a", true), ("globals.bzl", b"b", true)],
-        &[("BUILD.bazel", b"aa", true), ("globals.bzl", b"b", true)],
-        &[("BUILD.bazel", b"c", true), ("globals.bzl", b"b", true)],
-        &[("BUILD.bazel", b"a", false), ("globals.bzl", b"b", true)],
-        &[("BUILD.bazel", b"a", true), ("globals.bzl", b"c", true)],
-        &[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", false)],
-    ];
-    for rows in invalid {
-        let needs = SourcePreparationNeeds::repository(generated_globals_request(
+            );
+        let needs = SourcePreparationNeeds::repository(request_for_plan(
             &bodies,
             small_generated_plan(rows),
         ));
-        assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_err());
-    }
-    for symlink in [false, true] {
-        let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
-        if symlink {
-            builder
-                .push_symlink(
-                    compact_str::CompactString::new("LINK"),
-                    slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
-                        path("/source"),
-                        PathObservationNamespace::Host,
-                    )
-                    .unwrap(),
-                    Arc::from(&b"opaque"[..]),
-                )
-                .unwrap();
-        } else {
-            builder
-                .push_archive(
-                    Arc::from([compact_str::CompactString::new(
-                        "https://mirror.example/dist/rustc.tar.xz",
-                    )]),
-                    [0; 32],
-                    compact_str::CompactString::new("prefix"),
-                )
-                .unwrap();
+        assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_ok());
+        assert!(bodies.admit(&needs).is_err()); // The native fixed signature is never the synthetic signature.
+        for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+            for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+                let configured = make()
+                    .with_fourth(path("/features"))
+                    .with_bazel_features_import_sources(registry, command)
+                    .with_generated_features_file_effects(registry, command);
+                assert_eq!(
+                    configured.admit_with_plan_matcher(&needs, &matches).is_ok(),
+                    matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe)
+                );
+            }
         }
-        assert!(!matches(&builder.finish()));
+        for closed in [
+            make(),
+            make().with_fourth(path("/features")),
+            make().with_generated_features_file_effects(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
+            make()
+                .with_fourth(path("/features"))
+                .with_bazel_features_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                ),
+            make()
+                .with_fourth(path("/features"))
+                .with_generated_features_file_effects(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                ),
+        ] {
+            assert!(
+                closed
+                    .admit_with_plan_matcher(&needs, &|_, _| true)
+                    .is_err()
+            );
+        }
+        let mut wrong_slot = make()
+            .with_fourth(path("/other"))
+            .with_fifth(path("/features"))
+            .with_bazel_features_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
+            .with_generated_features_file_effects(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            );
+        wrong_slot.additional[0] = None;
+        assert!(
+            wrong_slot
+                .admit_with_plan_matcher(&needs, &|_, _| true)
+                .is_err()
+        );
+        // A permissive shape closure cannot bypass any typed owner field or mapping provenance.
+        for index in 0..7 {
+            let mut request = request_for_plan(&bodies, small_generated_plan(rows));
+            match index {
+                0 => request.id.workspace = path("/other"),
+                1 => {
+                    request.id.canonical_repo =
+                        slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
+                }
+                2 => {
+                    request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if version {
+                        "@@other//private:version_repo.bzl"
+                    } else {
+                        "@@other//private:globals_repo.bzl"
+                    })
+                    .unwrap()
+                }
+                3 => {
+                    request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if version {
+                        "@@bazel_features+//other:version_repo.bzl"
+                    } else {
+                        "@@bazel_features+//other:globals_repo.bzl"
+                    })
+                    .unwrap()
+                }
+                4 => {
+                    request.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@bazel_features+//private:other.bzl").unwrap()
+                }
+                5 => request.repo_spec.rule_id.rule_name = "other".into(),
+                6 => {
+                    let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                        slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                    );
+                    mapping.insert(
+                        slug_identity_v2::ApparentRepoName::new("features").unwrap(),
+                        slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap(),
+                    );
+                    request.repo_spec.rule_id.bzl_file =
+                        slug_identity_v2::ApparentLabel::parse(if version {
+                            "@features//private:version_repo.bzl"
+                        } else {
+                            "@features//private:globals_repo.bzl"
+                        })
+                        .unwrap()
+                        .resolve(&mapping);
+                }
+                _ => unreachable!(),
+            }
+            assert!(
+                bodies
+                    .admit_with_plan_matcher(
+                        &SourcePreparationNeeds::repository(request),
+                        &|_, _| true
+                    )
+                    .is_err()
+            );
+        }
+        // Atomic owner selection cannot be assembled from sibling components.
+        for field in 0..3 {
+            let mut crossed = request_for_plan(&bodies, small_generated_plan(rows));
+            match field {
+                0 => {
+                    crossed.id.canonical_repo =
+                        slug_identity_v2::CanonicalRepoName::new(if version {
+                            "bazel_features++version_extension+bazel_features_globals"
+                        } else {
+                            "bazel_features++version_extension+bazel_features_version"
+                        })
+                        .unwrap()
+                }
+                1 => {
+                    crossed.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if version {
+                        "@@bazel_features+//private:globals_repo.bzl"
+                    } else {
+                        "@@bazel_features+//private:version_repo.bzl"
+                    })
+                    .unwrap()
+                }
+                2 => {
+                    crossed.repo_spec.rule_id.rule_name = if version {
+                        "globals_repo"
+                    } else {
+                        "version_repo"
+                    }
+                    .into()
+                }
+                _ => unreachable!(),
+            }
+            assert!(
+                bodies
+                    .admit_with_plan_matcher(
+                        &SourcePreparationNeeds::repository(crossed),
+                        &|_, _| true
+                    )
+                    .is_err()
+            );
+        }
+        let crossed_shape = request_for_plan(
+            &bodies,
+            small_generated_plan(&[
+                ("BUILD.bazel", b"a", true),
+                (
+                    if version {
+                        "globals.bzl"
+                    } else {
+                        "version.bzl"
+                    },
+                    b"b",
+                    true,
+                ),
+            ]),
+        );
+        assert!(
+            bodies
+                .admit_with_plan_matcher(
+                    &SourcePreparationNeeds::repository(crossed_shape),
+                    &matches
+                )
+                .is_err()
+        );
+        let invalid: &[&[(&str, &[u8], bool)]] = &[
+            &[],
+            &[("BUILD.bazel", b"a", true)],
+            &[
+                ("BUILD.bazel", b"a", true),
+                (second, b"b", true),
+                ("extra", b"", false),
+            ],
+            &[(second, b"b", true), ("BUILD.bazel", b"a", true)],
+            &[("BUILD", b"a", true), (second, b"b", true)],
+            &[("BUILD.bazel", b"aa", true), (second, b"b", true)],
+            &[("BUILD.bazel", b"x", true), (second, b"b", true)],
+            &[("BUILD.bazel", b"a", false), (second, b"b", true)],
+            &[("BUILD.bazel", b"a", true), (second, b"x", true)],
+            &[("BUILD.bazel", b"a", true), (second, b"b", false)],
+        ];
+        for rows in invalid {
+            let needs = SourcePreparationNeeds::repository(request_for_plan(
+                &bodies,
+                small_generated_plan(rows),
+            ));
+            assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_err());
+        }
+        for symlink in [false, true] {
+            let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+            if symlink {
+                builder
+                    .push_symlink(
+                        compact_str::CompactString::new("LINK"),
+                        slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                            path("/source"),
+                            PathObservationNamespace::Host,
+                        )
+                        .unwrap(),
+                        Arc::from(&b"opaque"[..]),
+                    )
+                    .unwrap();
+            } else {
+                builder
+                    .push_archive(
+                        Arc::from([compact_str::CompactString::new(
+                            "https://mirror.example/dist/rustc.tar.xz",
+                        )]),
+                        [0; 32],
+                        compact_str::CompactString::new("prefix"),
+                    )
+                    .unwrap();
+            }
+            assert!(!matches(
+                &builder.finish(),
+                if version {
+                    &GENERATED_FEATURES_VERSION_FILES
+                } else {
+                    &GENERATED_FEATURES_FILES
+                }
+            ));
+        }
     }
 }
 #[test]
@@ -869,11 +992,36 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         );
-    let expected: [GeneratedFileSignature; 2] = [
-        ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
-        ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+    let expected = [
+        [
+            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+            ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+        ],
+        [
+            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+            ("version.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+        ],
     ];
-    let matches = |plan: &_| generated_features_plan_matches(plan, &expected);
+    let matches = |plan: &_, selected: &[GeneratedFileSignature; 2]| {
+        let index = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
+            0
+        } else {
+            assert!(std::ptr::eq(selected, &GENERATED_FEATURES_VERSION_FILES));
+            1
+        };
+        generated_features_plan_matches(plan, &expected[index])
+    };
+    let version_request = |plan| {
+        let mut request = generated_globals_request(&bodies, plan);
+        request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+            "bazel_features++version_extension+bazel_features_version",
+        )
+        .unwrap();
+        request.repo_spec.rule_id.bzl_file =
+            CanonicalLabel::parse("@@bazel_features+//private:version_repo.bzl").unwrap();
+        request.repo_spec.rule_id.rule_name = "version_repo".into();
+        request
+    };
     let valid = SourcePreparationNeeds::repository(generated_globals_request(
         &bodies,
         small_generated_plan(&[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", true)]),
@@ -896,12 +1044,40 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             .unwrap()
             .as_ref()
     ));
+    let version = SourcePreparationNeeds::repository(version_request(small_generated_plan(&[
+        ("BUILD.bazel", b"a", true),
+        ("version.bzl", b"b", true),
+    ])));
+    let version_original = version
+        .repository_materializations()
+        .values()
+        .next()
+        .unwrap();
+    let version_weak = Arc::downgrade(version_original);
+    let version_count = Arc::strong_count(version_original);
+    for cohort in [
+        valid.try_union(&version).unwrap(),
+        version.try_union(&valid).unwrap(),
+    ] {
+        assert!(bodies.admit_with_plan_matcher(&cohort, &matches).is_ok());
+        for held in [original, version_original] {
+            let present = cohort
+                .repository_materializations()
+                .values()
+                .find(|r| std::ptr::eq(r.as_ref(), held.as_ref()))
+                .unwrap();
+            assert!(Arc::ptr_eq(present, held));
+        }
+    }
+    assert_eq!(Arc::strong_count(original), count);
+    assert_eq!(Arc::strong_count(version_original), version_count);
+    let cohort = valid.try_union(&version).unwrap();
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone(),
     );
     assert!(
         bodies
-            .admit_with_plan_matcher(&valid.try_union(&local).unwrap(), &matches)
+            .admit_with_plan_matcher(&cohort.try_union(&local).unwrap(), &matches)
             .is_ok()
     );
     let mut unknown = generated_globals_request(&bodies, small_generated_plan(&[]));
@@ -938,8 +1114,8 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         ),
     ] {
         for mixed in [
-            valid.try_union(&excluded).unwrap(),
-            excluded.try_union(&valid).unwrap(),
+            cohort.try_union(&excluded).unwrap(),
+            excluded.try_union(&cohort).unwrap(),
         ] {
             let mut progress = 0;
             if bodies.admit_with_plan_matcher(&mixed, &matches).is_ok() {
@@ -972,20 +1148,50 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         &bodies,
         small_generated_plan(&[("BUILD.bazel", b"c", true), ("globals.bzl", b"b", true)]),
     ));
-    for mixed in [
-        local.try_union(&changed).unwrap(),
-        changed.try_union(&local).unwrap(),
-    ] {
-        assert_eq!(
-            bodies
-                .admit_with_plan_matcher(&mixed, &matches)
-                .unwrap_err()
-                .family,
-            "materialization"
-        );
+    let changed_version =
+        SourcePreparationNeeds::repository(version_request(small_generated_plan(&[
+            ("BUILD.bazel", b"a", true),
+            ("version.bzl", b"x", true),
+        ])));
+    for changed in [changed, changed_version] {
+        let accepted_sibling = if changed
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .id
+            .canonical_repo
+            .as_str()
+            == "bazel_features++version_extension+bazel_features_globals"
+        {
+            &version
+        } else {
+            &valid
+        };
+        let with_local = accepted_sibling.try_union(&local).unwrap();
+        for mixed in [
+            with_local.try_union(&changed).unwrap(),
+            changed.try_union(&with_local).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit_with_plan_matcher(&mixed, &matches).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(
+                bodies
+                    .admit_with_plan_matcher(&mixed, &matches)
+                    .unwrap_err()
+                    .family,
+                "materialization"
+            );
+        }
     }
+    drop(cohort);
+    drop(version);
     drop(valid);
     assert!(weak.upgrade().is_none());
+    assert!(version_weak.upgrade().is_none());
 }
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
@@ -1030,10 +1236,12 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             );
-        // Presentation eligibility never widens the existing Globals-only typed admission.
+        // A permissive phase shape still selects only the two exact typed owners; native uses fixed signatures.
         assert_eq!(
-            enabled.admit_with_plan_matcher(&needs, &|_| true).is_ok(),
-            !version
+            enabled
+                .admit_with_plan_matcher(&needs, &|_, _| true)
+                .is_ok(),
+            true
         );
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);

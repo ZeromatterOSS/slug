@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated Features cohort materialization readiness
+Status: Materialization namespace owner readiness
 
 ## Observable and source basis
 
@@ -44,67 +44,64 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP985](wp985-generated-features-version-plan-2026-10-07.json) accepts original
-Version plan presentation on baselinee39dad56809b8b87db51374611106a01bee27115.
-Only the existing borrowed diagnostic's exact owner tuple adds Version alongside
-Globals; native Globals permission/defaults/first-offender/production storage stay
-unchanged. The same bounded facade preserves9visits/8rows,512/2048path,
-1MiB/4MiBcontent,1024mapping+4096owner and16KiB LF-inclusive encoded bounds.
-No retained fields, heap strings/report, requestArc/plan/spec/content copies or
-interner. Independent growth review accepts118net/666changed cfgtest lines
-(parent13tuple plus105test growth; changed volume largely old harness indentation).
-Both existing formatter selectors cover both owners, crossed tuples, pointers,
-mapping/order/bounds and enabled-policy Version refusal. The decoder binds the
-original exact owner before parsing and scopes Globals's admission contradiction to
-Globals; Version content similarity grants nothing. All inherited raw/accounting/
-closed-error/role coherence and caps stay intact.
+[WP986](wp986-generated-features-sibling-permission-2026-10-07.json) accepts finite
+original Globals+Version permission on baselinebf6dc57637609a0050949f4cf9975a8973b78925.
+Each full typed owner/context/mappingNone tuple selects its OWN borrowed static
+ordered two-file signatures before the fixed matcher. Same default-false flag,
+PreparedFile+PublicProbe/Features role/additional[0]/actual projection; whole Need
+still validates every sibling before progress. No new retained field/flag/heap String/
+Arc/spec/plan/content copies/interner/writer. Added compile-static64digest/22path bytes
+are distinct from runtime heap. Independent growth review accepts251net/629changed
+(parent43selector/static/seam plus208paired guard/cohort tests with old loop reindent).
+Both existing guard selectors cover owners/context/crossed tuple/crossed shape/per-file
+mutants and positive two-owner cohort/mixed zero-progress/original Arc/Weak.
+Decoder contradictions bind each original owner to OWN signatures;1851/213/2064 remain
+expected comparisons, not a16MiB bank replacement or output attribution.
 
 42 fresh Core tests +4 controls +1 normal observer =47 fresh named passes, including
 five existing materializer lifecycle gates.42 unchanged owner/callback and11 reader
-checks are qualified reuse0fresh. Current48 successful operations/559union pins
-include557native pins. Compile9.966s/check7.298s execute0tests; compiler memory is
-separate from runtime fit. Ordinary8.018s/synthetics0.298s; native1.799s peaks94,708KiB
+checks are qualified reuse0fresh. Current48 successful operations/563union pins
+include561native pins. Compile10.316s/check7.318s execute0tests; compiler memory is
+separate from runtime fit. Ordinary8.058s/synthetics0.298s; native1.896s peaks94,224KiB
 under256MiB. Credits clear/scope and recorder Weak expire; bodyWeak unseen/vacuous.
 CurrentBodies192bytes is not an allocation/layout delta. Native plan/body/materializer/
-registryArc/DICE/pages/wholefit remain unproved. Original237ordered leases remain
-918,928physical/1,837,856hash bytes, original188+combined49/two64KiB128KiB,
-non-atomic/noncertifying. Source64/646,987decoded/reg105/235,521/ErrorNone/Written0
+registryArc/DICE/pages/freshness/wholefit remain unproved. Original237ordered leases
+remain918,928physical/1,837,856hash bytes, original188+combined49/two64KiB128KiB,
+non-atomic/noncertifying. Source64/646,987decoded/reg105/235,521/ErrorNone/Transfer0
 remain unchanged; numeric exhaustion is not quota evidence or cap authority.
 
-The actual600-byte LF report captures original exact Version owner:
-bazel_features++version_extension+bazel_features_version,
-@@bazel_features+//private:version_repo.bzl / version_repo. Two ordered purefiles:
-BUILD.bazel196B/SHA c2b2a661255d1ba6a3785f0fc6570d48760daf24972855001997476fe9b1ecc9,
-version.bzl17B/SHA1a7753dd368896d0cbc7cebc84d19502b9952085c25630af579506df109baa86,
-both executabletrue;213content/22path bytes, mappingNone/attribute_count0.
-This is borrowed plan metadata, not fullSpec/attribute semantics/output rehash or
-materialization evidence. Whole combined Need still refuses BEFORE progress/writes;
-public preparation/dispatch/policy complete, certificate/observations/analyses/
-actions/Rustc unavailable.
+Normal scoped materializer now accounts WrittenBytes2064 and has no remaining
+materialization/plan refusal. That matches expected1851+213 work; charging before IO
+is not independent completed files/digests/modes/epoch/public certificate proof.
+Actual next refusal is namespace/Lstat at exact normalized '/'(one byte/hex2f).
+The marker captures no namespace tag/operational instance or canonical repository
+owner. Slash and write totals identify neither owner nor physical root. Public
+preparation/dispatch/policy complete; computation refusal, certificate/observations/
+analyses/actions/Rustc unavailable.
 
 ## Active continuation contract
 
-Continue WP231 using the [grounded successor](../../../../target/wp985/native/successor-source.md),
-SHA25633abb1e72a616517f266b9793e52a3554dd4305de77460234032858dc43c3d14.
-Review a consequential finite original Globals+Version pure-file sibling permission.
-Reuse the same default-false PreparedFile+PublicProbe flag and actual policy_checked,
-Features role/additional[0]. Bind each atomic workspace/canonical/rule tuple and
-mappingNone to its OWN exact two ordered File paths/lengths/digests/modes plus EOF.
-Validate both shapes before borrowed SHA; Globals1851+Version213=2064 expected cohort
-content/hash work, not a replacement WrittenBytes bank or entire-Need assumption.
-No additional diagnostics/acquisition/body reads needed for these already-owned plans.
+Continue WP231 using the [grounded successor](../../../../target/wp986/native/successor-source.md),
+SHA256482c48930a3c83f00f3050dac353ef372aa81310d6c8ea43233eb19ed383bff0.
+Borrow the shared first offending nonHost demand's original namespace tag/operational
+instance, operation/path and association to the SAME current command's injected
+RepositoryMaterializationResultEpoch/original request at the natural owner. Namespace
+is Host or Materialization(instance), not canonical identity. Genuine Immutable success
+owns observation_instance/generation_root and epoch entry owns original request/plan;
+check_need currently lacks that context and entries/get are private. Freeze a minimal
+borrowed natural-owner accessor/facade/context if needed; bound identity/scan/encoding,
+retain unavailable/nonunique/bounds states and emit outside milestones Mutex.
+No epoch map/spec/plan/path/TempDir copies, retained association mirror, physical-root
+output/reconstruction, historical result replay or private-export workaround.
 
-Keep shared whole-Need admission and all other Generated/Immutable/Local/path/family
-precedence: unknown/mixed requests refuse before progress. Extend existing tiny-byte
-matcher tests for both owners/crossed shape/second-file mutation/context/mapping and
-mixed no-progress; reuse existing lifecycle gates without copying output plaintext.
-Pass SAME original request/RepoSpec/plan through normal Generated route, scoped
-RepositoryMaterializer/write_counted/session/tempdir/epoch/preflight. Preserve full
-structural equality/conflicts/generation, byte credits, cancellation, retirement and
-final revalidation; do not interpret opaque attrs or reconstruct outputs/Local roots/
-providers/certificates/generic permissions. Accounted writes are distinct from actual
-completed output/epoch proof. Relevant gates must be fresh for changed observation;
-no unchanged native retry or cap raise without actual quota and reviewed decision.
+Preserve fullNeed refusal pending actual association. Do not infer Features from
+2064 or slash, or grant generic Materialization/root-prefix/recursive permissions.
+After actual original request/success-instance association is captured and reviewed,
+a consequential finite namespace/op/path permission may use existing genuine retained
+root authorization and normal observation owner. Preserve structural equality,
+generation/session/cancel/preflight/epoch/final revalidation and allocation discipline;
+no constructed provider/root/certificate/output. Relevant gates fresh for changed
+observation; no unchanged native retry or cap raise without actual quota and review.
 
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
@@ -116,6 +113,10 @@ same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
 
+[WP985](wp985-generated-features-version-plan-2026-10-07.json), accepted at
+bf6dc57637609a0050949f4cf9975a8973b78925, captures original Version BUILD.bazel196B
+then version.bzl17B, both executabletrue,213content/22path/mappingNone/attrs0.
+Borrowed plan projection preserves Globals-only permission; signatures ground WP986.
 [WP984](wp984-generated-features-globals-permission-2026-10-07.json), accepted at
 e39dad56809b8b87db51374611106a01bee27115, grants only the exact original Globals
 ordered file signatures and moves first refusal to Version. Whole-Need refuses before
