@@ -3401,7 +3401,11 @@ fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
         (RegistryChoice::DefaultBcr, CommandChoice::Modules, 16),
         (RegistryChoice::DefaultBcr, CommandChoice::PublicProbe, 16),
         (RegistryChoice::PreparedFile, CommandChoice::Modules, 16),
-        (RegistryChoice::PreparedFile, CommandChoice::PublicProbe, 64),
+        (
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+            128,
+        ),
     ] {
         let bodies = make().with_rules_rust_defs_import_sources(registry, command);
         let limits = bodies.source_limits(registry);

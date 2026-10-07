@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated-source attempt capacity readiness
+Status: Generated-proxy source and materialization readiness
 
 ## Observable and source basis
 
@@ -44,75 +44,80 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint
 
-[WP990](wp990-current-source-attempt-context-2026-10-07.json) associates the original
-first-created SourceAttempts refusal with its actual phase and current command-owned
-repository epoch. Stack-only cfgtest/Linux callbacks reuse the original observer cores,
-operate after Scope/session lock release and before IO/postcheck, and borrow the existing
-workspace/epoch/demand. The shared bounded materialization formatter is extracted without
-changing its byte grammar. No retained strings, paths, requests, plans, epochs, cache,
-index or interner is added; Windows retains its Unsupported stub.
+[WP991](wp991-finite-source-attempt-readiness-2026-10-07.json) clears the observed
+SourceAttempts64 barrier with finite cfgtest/Linux ceiling and existing opted-in profile128.
+Production/default64 and default probe16 remain unchanged. Four Rust files/25 net lines
+add no retained strings, paths, cache, index or new source permission. The complete role
+matrix, inclusive charge/first poison and unchanged byte-bank controls pass.
 
-Independent design/implementation/correction/prelaunch/final reviews accept919 net Rust
-lines across12 files: shared formatter/context, four thin caller hooks and four focused
-controls. All63 ordinary Rust plus4 strict controls and1 changed native observer pass:
-68 fresh named passes and69 successful operations. Five unchanged Bzlmod outcomes remain
-qualified prior0fresh. Core compile42.234s and Loading/Core/CLI check12.198s execute0tests.
-The earlier19.715s E0433 preparation is preserved0credit; its sole test-only bridge
-module path correction is independently reviewed and all fresh gates pass.
+All63 Rust tests and4 corrected strict decoder controls pass. Compile9.744s and direct
+Loading/Core/CLI check7.585s execute0tests. The control correction fixes unintended helper
+class discovery and stale65-over64 assertion; its failed attempt remains0credit. Exactly67
+unchanged passing operations retain their original raw/maps and five preserved helper
+artifacts under an independently accepted qualification ledger; corrected controls/native
+require all current bytes. No Rust/executable/selector/profile/cap/command change or rerun.
 
-The changed normal probe takes2.228s, peaks95,432KiB under256MiB, and reports original
-Materialization1/FileBytes plus adjacent need_paths/command/unique/descendant context.
-The original current request is generated bazel_features_globals, owned by
-@@bazel_features+//private:globals_repo.bzl and globals_repo. This grounds ordinary demand
-acquisition, rather than certificate/preflight revalidation, at SourceAttempts64. It
-proves no completed read, output, permission or cap increase. Source64/646,987 decoded,
-registry105/235,521 and Written2064 remain unchanged; no Need is denied. Preparation
-remains complete/singleton/policy checked; certificate/analysis/actions/Rustc unavailable.
-Descriptor/logical/scratch/live-buffer credits clear; Scope/recorder Weak expire. Native
-body/plan/materializer/registry Arc/DICE/page/output/freshness/full-fit remain unproved.
-Parent/supervisor/aggregate RSS and compiler memory remain separate.
+The single changed public probe takes2.380s and peaks97,900KiB under256MiB. Actual selected128
+uses66 attempts/648,589 decoded bytes with SourceErrorNone; registry105/235,521 and
+Written2064 remain unchanged. Original materialization refusal now identifies
+@@rules_cc+//cc:extensions.bzl::_compatibility_proxy_repo_rule, canonical
+rules_cc++compatibility_proxy+cc_compatibility_proxy, reason generated_kind. Its208 bounded
+identity bytes do not capture original plan/mapping/output/attrs. No quota/context marker
+or generated-plan header is present. Public preparation is complete/singleton/policy
+checked; certificate/observations/analyses/actions/Rustc unavailable. Descriptor/logical/
+scratch/live-buffer credits clear and Scope/recorder Weak expire. Native body/plan/
+materializer/registry Arc/DICE/page/output/freshness and whole-workload fit remain open.
+237 ordered parent leases/918,928 physical/1,837,856 hash bytes retain two64KiB buffers;
+parent noninherited/non-atomic brackets do not certify native sources.
 
 ## Active continuation contract
 
-Use the actual [source surface](../../../../target/wp990/native/successor-source.md),
-[policy recommendation](../../../../target/wp990/native/successor-policy.md), WP990 receipt
-and WP989's accepted natural callflow. Review and implement a finite test/Linux
-SourceAttempts validator ceiling128 and the EXISTING PreparedFile/PublicProbe defs-import
-opt-in source profile128. Keep SourceServiceLimits Default and non-test ceiling64,
-actual-root profile64, default fixture and other roles16, object1MiB, each16MiB byte bank,
-registry128/default16 and all runtime/memory caps.128 is bounded headroom beyond the
-observed first refused attempt beyond64, not a measured total closure requirement. Use
-existing policy/ceiling/inclusive-first-poison controls; no new instrumentation, retained
-read cache, source grant or freshness exemption. Preflight and certificate revalidation
-remain mandatory; matching physical path bytes never equate namespace/instance/operation.
+Continue the broader normal producer plan through a cohesive source-grounded compatibility-
+proxy materialization change. Use WP991's [source recommendation](../../../../target/wp991/native/successor-source.md),
+[policy constraints](../../../../target/wp991/native/successor-policy.md) and
+[evidence constraints](../../../../target/wp991/native/successor-evidence.md).
+The existing canonical Generated constructor already carries the original full RepoSpec
+and evaluated GeneratedRepositoryFileEffectPlan. Reuse those owners and existing scoped
+writer, observed inputs, preflight and final certificate validation. Do not add a request/
+plan cache, mirrored strings, guessed proxy output or new diagnostic layer.
 
-Rust surface: source_service/scope.rs validator, source_service/tests.rs existing finite
-ceiling controls, platforms_module_preparation_tests.rs existing source profile and
-public_probe_preparation_tests.rs existing complete role-policy matrix. Freeze the exact
-predicate and independent design before edits. Reuse current63 selectors; fresh affected
-owner/direct-dependent checks and strict current128 policy/raw controls precede one
-changed capped observer. Validate original128 transcript fields; no128→64 normalization
-or copied/fabricated results. The evidence owner may reuse a bounded current public
-policy function and the existing explicit delegate installation in a fresh isolated
-current helper graph; historical source files and saved observations stay read-only.
-Name exact current function owners and bindings, obtain actual helper review before
-activation, and preserve the counted-write Host delegate and all closed field domains.
+First freeze one bounded local reference inspection of the already accepted cc/extensions.bzl
+row:7631B/SHA a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872,
+from WP991 inputs/WP978 availability. This is existing local definition inspection, with
+no acquisition. Preserve exact FD/name/size/hash correspondence and explicit caps; classify
+it as source evidence, not a test, native output, registry/MVS proof or full-plan witness.
+Read exact rule output paths/content/default executable/branches/attributes and mapping
+semantics before choosing signatures. The saved partial facts alone prove none of those.
+No actual native probe or semantic admission is selected before the consequential design
+checkpoint. No identical WP991 retry.
 
-Original237 ordered parent leases remain918,928 physical/1,837,856 hash bytes, original
-188+combined49/two64KiB128KiB scratch, non-inherited/non-atomic/noncertifying. Preparation
-is pinned/offline/jobs1 <=60s; runtime10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
-FSIZE16MiB. No identical WP990 probe retry. Borrow/transfer/share existing strings and
-use scoped interners for repeated retained immutable strings where lifetime/cleanup fit;
-avoid pools for transient unique paths. Linux bootstrap remains the focus. Local0.2.17/
-requested0.2.4 and caller alias/defining self remain distinct. Full public Rustc/support/
-data/providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/M7A/MVS/
+After reference grounding, root freezes the exact functional predicate/allowlist and
+independent design within this packet before edits: existing Core native test grant owner
+and focused public-probe controls, plus minimum current decoder helpers. Admit only the
+actual typed proxy owner and source-derived pure-file plan shape, preserving complete
+owner/workspace/canonical/rule identity and own namespace/path/operation matching. Other
+requests, archive/symlink/malformed/foreign/mixed demands fail before progress. All
+materialization uses the original normal pipeline and actual plan; mandatory preflight
+and certificate revalidation remain. If a precise branch/attribute/mapping fact is still
+unavailable, use the existing borrowed projection as a named prerequisite; do not guess.
+
+Selected128/default probe16/serviceDefault and production64, registry128/default16,
+object1MiB/each16MiB byte bank and all caps remain. Preparation pinned/offline/jobs1<=60s;
+runtime10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB. Keep original237
+ordered188+49 parent leases/two64KiB128KiB scratch unless a separately grounded source row
+requires an explicit bounded delta. Borrow/transfer/share storage; use scoped interners
+for repeated retained immutable strings when lifetime/cleanup fits, avoiding pools for
+transient unique paths. Linux focus and Windows minimal stubs remain. Local0.2.17/requested
+0.2.4 and caller alias/defining self remain distinct. Full public Rustc/support/data/
+providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/M7A/MVS/
 provenance/whole-fit remain required; the full goal stays active.
 
 ## Immediate predecessor
 
-[WP989](wp989-source-attempt-demand-origin-2026-10-07.json), accepted at3562aeb2a, captures
-the original first-created regular FileBytes charge before IO, without an owner or phase.
-Its ordinary two-caller atomic-origin, reader/kernel parity, lock-release, pointer/opaque
-bounds and lifecycle controls remain in the fresh selector prefix. The original
-EAGAIN/thread barrier failure and superseded results remain preserved0currentcredit.
-Earlier source/owner/plan decisions are Git-reachable through its predecessor manifest.
+[WP990](wp990-current-source-attempt-context-2026-10-07.json), accepted at91482a5df,
+associated the original first-created Materialization1 FileBytes refusal with the current
+borrowed command-owned generated Globals request during NeedPaths. Stack-only callbacks
+and shared bounded formatter add no retained strings/cache; all63+4+1 gates pass and once
+native2.228s/95,432KiB refused at64. Its earlier compiler correction and all prior spent
+operations remain preserved. WP991 makes the reviewed finite functional quota change;
+earlier owner and source contracts remain Git-reachable through that predecessor.

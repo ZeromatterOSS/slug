@@ -28,11 +28,13 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
     let defaults = SourceServiceLimits::default();
     assert!(defaults.allow_network);
     assert_eq!(defaults.registry_attempts, 128);
+    assert_eq!(defaults.source_attempts, 64);
     assert_eq!(defaults.live_buffer_bytes, 16 << 20);
     assert_eq!(defaults.blocking_threads, None);
     let profile = SourceServiceLimits::actual_root();
     assert!(profile.allow_network);
     assert_eq!(profile.registry_attempts, 256);
+    assert_eq!(profile.source_attempts, 64);
     assert_eq!(profile.live_buffer_bytes, 40 << 20);
     assert_eq!(profile.blocking_threads, Some(2));
     assert_eq!(
@@ -58,6 +60,18 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
         );
         assert_eq!(owner.snapshot().registry_attempts, limit);
     }
+    for limit in [1, 64, 65, 128] {
+        let owner = scope(SourceServiceLimits {
+            source_attempts: limit,
+            ..defaults
+        });
+        owner.charge(SourceCounter::SourceAttempts, limit).unwrap();
+        let refused = Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+        assert_eq!(owner.charge(SourceCounter::SourceAttempts, 1), refused);
+        assert_eq!(owner.charge(SourceCounter::RegistryAttempts, 1), refused);
+        assert_eq!(owner.snapshot().source_attempts, limit);
+        assert_eq!(owner.snapshot().registry_attempts, 0);
+    }
     type Setter = fn(&mut SourceServiceLimits, u64);
     let ceilings: [(u64, Setter); 7] = [
         (defaults.registry_object_bytes, |l, n| {
@@ -67,7 +81,9 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
         (defaults.registry_admitted_bytes, |l, n| {
             l.registry_admitted_bytes = n
         }),
-        (defaults.source_attempts, |l, n| l.source_attempts = n),
+        (SourceServiceLimits::MAX_SOURCE_ATTEMPTS, |l, n| {
+            l.source_attempts = n
+        }),
         (defaults.transferred_bytes, |l, n| l.transferred_bytes = n),
         (defaults.decoded_bytes, |l, n| l.decoded_bytes = n),
         (defaults.written_bytes, |l, n| l.written_bytes = n),

@@ -71,6 +71,11 @@ impl Default for SourceServiceLimits {
 impl SourceServiceLimits {
     pub(super) const MAX_REGISTRY_ATTEMPTS: u64 = 256;
 
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) const MAX_SOURCE_ATTEMPTS: u64 = 128;
+    #[cfg(not(all(test, target_os = "linux")))]
+    pub(super) const MAX_SOURCE_ATTEMPTS: u64 = 64;
+
     // The explicit actual-root diagnostic admits one existing 32 MiB payload
     // plus charged recorder/scratch. Production keeps the original 16 MiB cap.
     #[cfg(all(test, target_os = "linux"))]
@@ -98,7 +103,7 @@ impl SourceServiceLimits {
             (self.registry_object_bytes, max.registry_object_bytes),
             (self.registry_attempts, Self::MAX_REGISTRY_ATTEMPTS),
             (self.registry_admitted_bytes, max.registry_admitted_bytes),
-            (self.source_attempts, max.source_attempts),
+            (self.source_attempts, Self::MAX_SOURCE_ATTEMPTS),
             (self.transferred_bytes, max.transferred_bytes),
             (self.decoded_bytes, max.decoded_bytes),
             (self.written_bytes, max.written_bytes),

@@ -35,25 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated-source attempt capacity readiness
+Status: Generated-proxy source and materialization readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-WP990 now associates the original first-refused Materialization1 FileBytes demand with
-ordinary need_paths and its current command-owned generated Globals request/root, using
-borrowed bounded cfgtest/Linux context outside locks. The changed probe takes2.228s and
-peaks95,432KiB under256MiB;68 fresh named checks/69 current operations pass. The source
-service still refuses at64 attempts; no read, output, certificate or public Rustc is
-proved. Next review and implement finite test/Linux validator/profile128 headroom while
-production/default64, default fixture16, byte/RSS/runtime budgets and mandatory source
-revalidation remain intact. Current helper delegates must parse actual128 fields without
-raw normalization; no new read cache, string/path mirror, grant or diagnostic layer.
+[WP991](./slug-v2-subplans/wp991-finite-source-attempt-readiness-2026-10-07.json)
+clears the SourceAttempts64 barrier with a finite test/Linux opted-in profile128 while
+production/default64, default fixture16 and all byte/runtime/memory limits remain.
+All63 Rust+4 strict controls+1 changed native pass. The once public probe uses66 attempts
+with no source error, takes2.380s and peaks97,900KiB under256MiB; next original generated_kind
+refusal is the rules_cc compatibility-proxy repository. Its plan/output/mapping remain
+unobserved. A bounded inspection of the accepted7631B local rule definition is next, then
+reviewed source-derived original-owner materialization support through the normal pipeline.
+No cache, string/path mirrors, new diagnostic layer or automatic quota increase is selected.
 Representative parsing/read-prefix allocation fits the cap, permitting broader readiness
-work; complete public producer and whole-workload fit remain open. Allocation discipline
-and existing scoped interners govern future retained strings. See the manifest and
-[WP990 receipt](./slug-v2-subplans/wp990-current-source-attempt-context-2026-10-07.json).
+work; complete public producer and whole-workload fit remain open. Borrow/share storage and
+use existing scoped interners where repeated retained strings and cleanup fit.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

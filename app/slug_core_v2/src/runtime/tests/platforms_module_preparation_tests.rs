@@ -964,7 +964,7 @@ impl Bodies {
             registry_attempts: registry.registry_attempts(),
             registry_admitted_bytes: 16 << 20,
             source_attempts: if self.rules_rust_defs_import_sources {
-                64
+                128
             } else {
                 16
             },
