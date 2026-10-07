@@ -270,10 +270,11 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 3] = [
     "rules/common_settings.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
-const RULES_CC_IMPORTS: [&str; 3] = [
+const RULES_CC_IMPORTS: [&str; 4] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
+    "cc/extensions.bzl",
 ];
 const RULES_CC_IMPORT_METADATA: [&str; 2] = ["cc", "cc/common"];
 struct Bodies {

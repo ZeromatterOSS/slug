@@ -1661,7 +1661,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 8);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 10);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -1672,6 +1672,28 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     for (excluded, operation) in [
         ("/cc/cc", PathObservationOperation::FileBytes),
         ("/cc/cc/common", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/extensions.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/extensions.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/cc/cc/Extensions.bzl", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/extensions_extra.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/extensions.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/rules/cc/extensions.bzl", PathObservationOperation::Lstat),
+        (
+            "/skylib/cc/extensions.bzl",
+            PathObservationOperation::FileBytes,
+        ),
         (
             "/cc/cc/find_cc_toolchain.bzl/child",
             PathObservationOperation::Lstat,

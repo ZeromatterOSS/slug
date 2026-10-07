@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: RulesCC Local extension source readiness design
+Status: RulesCC private toolchain source readiness design
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,36 +149,32 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP977](./slug-v2-subplans/wp977-command-local-extension-readiness-2026-10-07.json) accepts normal CommandAbsolute Local selected-extension inputs and
-checked external routes on baseline d559d55f7a27673b5a2e67c4a60d429facf42836.
-Borrowed classifier inspection and one shared mapping Arc preserve the original
-selected definition, structural identity, observations and Local materialization.
-All three Loading consumers reject invalid nonRoot routes; RootBuild retains its
-graph-owned canonical Local fallback. Caller aliases may differ from defining self names.
-Measured retained increments are route826B/capability323B/request328B;64 retained route
-Arcs share backing and release their final Weak. Seven production/six test owners add
-181/954 net lines; the54-line test estimate excess is reviewed cohesive coverage.
-72 ordinary Rust+4 Python+1 changed native checks pass. Genuine callback modes preserve
-all original assertions and pass at13.953s/193856KiB and12.916s/157712KiB under20s/256MiB;
-combined10/20s stops remain resource-only. Other ordinary/native gates retain10s.
-Four pinned offline preparations pass separately; compiler memory is not runtime-fit proof.
-Once native1.154s/87620KiB surpasses the previous Unsupported Local route and reaches
-an exact205B HostLstat Need: current rules_cc_root + /cc/extensions.bzl. Native_refusal,
-prepcomplete/singleton/policytrue, null terminal/certificate/observations/analyses/actions/
-Rustc; no body availability or evaluation is inferred. Source48/513510Decoded and
-registry105/235521 admitted; source64/default16 remain,16 spare is numeric only.
-82 accepted operations/486 union pins versus484 native pins; captures0 and223 parent
-leases792677physical/1585354hash bytes in the same128KiB scratch. Non-atomic parent
-brackets do not certify native source identity. Actual scope/recorder Weak and credits
-retire; unseen private body Weak expiry is vacuous, allDICE/page/whole-fit remain open.
-Next freeze one strict bounded source capture for this exact path, followed conditionally
-by same-role exact-leaf Lstat/FileBytes admission. Imports await usable partial facts;
-no recursive grant, synthetic proxy/provider, source read or automatic native retry is
-activated by checkpoint acceptance. Preserve Local declared0.2.17/requested0.2.4 distinction.
-Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/restoration/
-fullCLI/M7A/MVS/provenance remain open; borrowing/scoped interning and Windowsminimum persist.
-Immediate predecessor [WP976](./slug-v2-subplans/wp976-rules-cc-declared-import-readiness-2026-10-07.json)
-retains the prior finite rules_cc import role and Unsupported-route observation.
+[WP978](./slug-v2-subplans/wp978-local-extension-source-readiness-2026-10-07.json) accepts exact cc/extensions.bzl source readiness on
+baseline53b58b455d39966aa889f85a3689c7740b3df171. One strictcapture7631B/.042s/18900KiB/
+33pins with one64KiB scratch, body/text/AST retirement and3partialloads/8unknown top-level
+nodes; one availability observation is not a test/certificate. Existing CCtable3→4 and
+wholeNeed8→10/sevenmixednegativecases add23netcfgtest lines in two owners,16B static
+descriptor/17B literal/zero guardheap/newflags/production. All previous cases remain.
+32freshCore+4Python+1normalobserver=37fresh namedpasses; Bzlmod11/Loading29 andreader11
+qualified unchanged-owner reuse0fresh. Two serial pinnedpreps5.222s/7.409s execute0;
+compiler memory separate. Callbackmodes13.938s/193440KiB and12.922s/157516KiB retain20s,
+otherordinary/native10s. Historical combined callback stops remain resource-only.
+Once native1.083s/88268KiB now reaches exact198B rules_cc_root/cc/private HostLstat.
+Native_refusal/prepcomplete/singletonpolicytrue/nullterminal/cert/obs/analyses/actions/
+Rustc; sourceNone/packagecausenone. Source51/528367Decoded (+3/+14857 aggregateonly),
+registry105/235521 unchanged.38currentoperations/474unionpins versus472runtimepins,
+224orderedparentleases800308physical/1600616hash bytes, same two64KiBcontexts128KiB.
+Non-atomic/noninherited brackets are not nativeSourcecertificates/freshness. Scope/recorder
+Weak and credits retire; private bodyWeak unseen/vacuous/allDICEpage/wholefit open.
+Next freeze one strict cc/private/toolchain/cc_configure.bzl capture from actualcc/private
+Need plus captured same-repo literal load line18, then conditional existingCC5/metadata4.
+Metadata cc/private and cc/private/toolchain remains Lstat-only; no unknown/foreignimport
+grant or automaticnative retry. Source64/default16 leaves13numericattempts only, no
+closure/sufficiency. Localdeclared0.2.17/requested0.2.4, borrowing/scopedinterning,
+Windowsminimal and fullpublicproducer/support/data/providers/toolchains/actions/runfiles/
+oracle/restoration/fullCLI/M7A/MVS/provenance/wholefit requirements persist.
+Immediate predecessor [WP977](./slug-v2-subplans/wp977-command-local-extension-readiness-2026-10-07.json)
+retains accepted shared Local routing/allocation/77freshchecks at53b58b455d39966aa889f85a3689c7740b3df171.
 [WP972](./slug-v2-subplans/wp972-rules-rust-import-frontier-readiness-2026-10-07.json)
 captures seven exact local imports122679B once at0.093s/22,976KiB/35pins with the
 unchanged strict FD/facts owner;11reader checks qualifiedreuse0fresh, seven observations
