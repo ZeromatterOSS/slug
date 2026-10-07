@@ -1609,7 +1609,7 @@ fn bazel_features_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 7);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 17);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -1694,6 +1694,43 @@ fn bazel_features_import_sources_need_is_opt_in_exact_table_only() {
         );
         assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
     }
+    // Each newly captured leaf remains exact in a mixed whole-Need batch.
+    for relative in &BAZEL_FEATURES_IMPORTS[3..] {
+        let selected = Path::new("/features").join(relative);
+        for (excluded, operation) in [
+            (selected.join("child"), PathObservationOperation::Lstat),
+            (
+                Path::new("/features").join(format!("{relative}-extra")),
+                PathObservationOperation::FileBytes,
+            ),
+            (
+                Path::new("/features").join(relative.to_ascii_uppercase()),
+                PathObservationOperation::FileBytes,
+            ),
+            (
+                Path::new("/features").join(format!("{relative}.sibling")),
+                PathObservationOperation::Lstat,
+            ),
+            (
+                Path::new("/skylib").join(relative),
+                PathObservationOperation::FileBytes,
+            ),
+            (selected, PathObservationOperation::FileDigest),
+        ] {
+            let mixed = all.try_union(&need(&excluded, operation.dupe())).unwrap();
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(
+                (denied.family, denied.operation),
+                ("path", path_operation_code(&operation))
+            );
+            assert_eq!(denied.path.unwrap().as_path(), excluded.as_path());
+        }
+    }
     for sparse in [
         make(),
         make()
@@ -1768,7 +1805,7 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 8);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 10);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -1829,6 +1866,40 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             ("path", path_operation_code(&operation))
         );
         assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+    let selected = Path::new("/skylib/lib/modules.bzl");
+    for (excluded, operation) in [
+        (selected.join("child"), PathObservationOperation::Lstat),
+        (
+            Path::new("/skylib/lib/modules.bzl-extra").to_path_buf(),
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            Path::new("/skylib/lib/Modules.bzl").to_path_buf(),
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            Path::new("/skylib/lib/modules.sibling.bzl").to_path_buf(),
+            PathObservationOperation::Lstat,
+        ),
+        (
+            Path::new("/features/lib/modules.bzl").to_path_buf(),
+            PathObservationOperation::FileBytes,
+        ),
+        (selected.to_path_buf(), PathObservationOperation::FileDigest),
+    ] {
+        let mixed = all.try_union(&need(&excluded, operation.dupe())).unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(
+            (denied.family, denied.operation),
+            ("path", path_operation_code(&operation))
+        );
+        assert_eq!(denied.path.unwrap().as_path(), excluded.as_path());
     }
     for sparse in [make(), make().with_fourth(path("/skylib"))] {
         let sparse = sparse.with_bazel_skylib_import_sources(

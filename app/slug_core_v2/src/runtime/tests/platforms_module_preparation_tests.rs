@@ -264,12 +264,22 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 28] = [
     "rust/private/stamp.bzl",
 ];
 const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
-const BAZEL_FEATURES_IMPORTS: [&str; 3] = ["features.bzl", "private/util.bzl", "private/parse.bzl"];
+const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
+    "features.bzl",
+    "private/util.bzl",
+    "private/parse.bzl",
+    "private/extensions.bzl",
+    "private/repos.bzl",
+    "private/globals.bzl",
+    "private/globals_repo.bzl",
+    "private/version_repo.bzl",
+];
 const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
-const BAZEL_SKYLIB_IMPORTS: [&str; 3] = [
+const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "lib/paths.bzl",
     "lib/structs.bzl",
     "rules/common_settings.bzl",
+    "lib/modules.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
 const RULES_CC_IMPORTS: [&str; 8] = [

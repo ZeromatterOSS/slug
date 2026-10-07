@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Features private extension source readiness
+Status: Typed materialization demand readiness
 
 ## Observable and source basis
 
@@ -44,50 +44,55 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP980](wp980-bazel-features-import-readiness-2026-10-07.json) accepts the finite
-Features source role on baseline4edecf56514696b73e9818a3284f49161cd32a03.
-Two strict captures observed three bodies totaling16,976 bytes, single64KiB scratch
-and per-row body/text/AST retirement. Defaultfalse PreparedFile/PublicProbe uses
-borrowed additional[0], three body leaves HostLstat/FileBytes and private Lstat only.
-Seven whole Needs and shared root/mode/namespace/operation/refusal tests preserve
-all old roles. Two cfgtest owners add281 lines,64B static descriptors/52 literal bytes,
-one inline bool; no separate heap allocation or owned strings. Current Bodies192B
-is measured; old layout/payload delta remains unproved. Growth was independently
-reviewed; wrong-slot fixture prefixes were corrected before compilation.
+[WP981](wp981-features-extension-import-readiness-2026-10-07.json) accepts the finite
+Features3→8/wholeNeed7→17 and Skylib3→4/wholeNeed8→10 cohort on baseline
+09d0cf38e876375648fb35d58f31dd84e8232e13. Four strict captures observed six bodies
+with10,125 bytes, one64KiB scratch and per-row body/text/AST retirement. Two cfgtest
+owners add81net lines (85insert/4delete),96B static descriptors/121literal bytes;
+no new fields, flags, separate guard heap or guard-owned strings. Defaultfalse
+PreparedFile/PublicProbe borrowed slots0/1, metadata, namespace/root/operation,
+projection and mixed-no-progress contracts remain exact. Current Bodies192B is
+measured; historic layout/per-allocation/total-retention delta remains unproved.
 
 31 fresh Core tests +4 synthetic controls +1 normal observer =36 fresh named passes;
 42 unchanged owner/callback checks and11 reader controls are qualified reuse0fresh.
-Pinned serial preparations10.401s/7.312s execute no tests; compiler memory is separate.
-Ordinary runtime totals5.990s, synthetics0.187s. Normal1.243s peaks89,700KiB under256MiB;
+Pinned serial preparations9.243s/7.305s execute no tests; compiler memory is separate.
+Ordinary runtime totals5.971s, synthetics0.228s. Normal1.787s peaks93,732KiB under256MiB;
 scope/recorder cleanup and final credits retire. BodyWeak remains unseen/vacuous;
 all DICE/allocator pages and whole-workload fit remain open. Current37 operations/
-501 union pins include499 native pins. Ordered231 parent leases bracket908,803 physical
-bytes/1,817,606 hash bytes using two64KiB contexts128KiB, non-atomic and noncertifying.
+525 union pins include523 native pins. Original231 ordered parent rows are preserved
+as an exact prefix, with six appended within original188+combined49=237 leases.
+Physical918,928 bytes/1,837,856 hash bytes use two64KiB contexts128KiB, non-atomic
+and noncertifying.
 
-Actual source52/542,839 decoded is aggregate+1/+14,472 relative to WP979, without
-per-file consumption attribution; registry105/235,521 unchanged. Public preparation
-is complete/policychecked, while terminal/certificate/observations/analyses/actions/
-Rustc remain unavailable. The next exact210B Host Lstat is selected Features root/
-private/extensions.bzl. Source64 leaves12 numeric attempts, not files or closure.
+Actual source64/646,987 decoded is aggregate+12/+104,148 relative to WP980, without
+per-file consumption attribution; registry105/235,521 unchanged. SourceErrorNone at
+limit64 is not a quota error or authority to raise caps. Public preparation is complete/
+policychecked, while terminal/certificate/observations/analyses/actions/Rustc remain
+unavailable. The actual next refused family is materialization; kind/request identity/
+repo spec/failed predicate and path are unobserved. No source or generated alias guess.
 
 ## Active continuation contract
 
 Continue WP231 toward the genuine normal producer using the
-[grounded successor](../../../../target/wp980/native/successor-source.md), SHA256
-cab6c8a7540fc3f342b5f7a7fe32216ac66d1e31cd82f8f77f9fafb4dc492deb.
-Freeze the next baseline/design/inputs and independently review unchanged strict
-reader bindings before one exact private/extensions.bzl capture (two components).
-Body size/hash/import facts remain unknown. Require both actual eligibility FINALs
-before any finite source-role change. Further same-root literal imports require
-separate bounded eligibility; foreign generated globals/version remain closed.
+[grounded successor](../../../../target/wp981/native/successor-source.md), SHA256
+2dc8ca1aafa93db2cb405377ec3ac3fda9bec2581abe4084b46e59b463f5017e.
+Freeze and independently review a bounded typed diagnostic before one changed normal
+observation. Share the existing materialization predicate/first-offender order between
+Bodies::admit and GuardedSingleton::check_need. Report the original borrowed request
+immediately before refusal/progress and outside the milestone mutex, without cloning
+request/spec/attributes/plan/name/path, Debug rendering, extra Arc retention or new
+semantic identity. Admission/default modes, precedence, epochs and certificates stay
+unchanged. Kind and static failed-check tags plus bounded borrowed canonical/rule ID
+fields and scalar checks select the natural owner; per-field/aggregate bounds and
+unavailable/bounds-refused states must be explicit. Do not render arbitrary attributes
+or generated plans. The first refused request is not a complete inventory.
 
-If usable, append only that leaf to Features3→4, union7→9, preserving borrowed
-additional[0]/defaultfalse mode/namespace/operation/mixed-no-progress/projection tests.
-No new flag/heap/owned strings/sourcebank/cache/production identity changes. Natural
-checked Local definition/credited ExternalBzl/Need/epoch/certificate owners stay intact.
-Original231 parent prefix may append only eligible rows using the same two64KiB
-contexts128KiB. Freeze actual scope/growth/current validation before implementation;
-no recursive import, generated alias/proxy/provider or broader prefix fallback.
+Fresh controls discriminate all three kinds/every Local predicate, old admission and
+mixed batch zero progress, bounded identity/no retention, exact marker/unknown domains
+and untouched old raw lines. Reuse original237 ordered leases and two64KiB contexts.
+Only actual typed evidence selects subsequent materialization implementation; no
+materialization/effect/provider grant or identical retry accompanies diagnostics.
 
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
@@ -101,14 +106,12 @@ same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
 
+[WP980](wp980-bazel-features-import-readiness-2026-10-07.json), accepted at
+09d0cf38e876375648fb35d58f31dd84e8232e13, owns the initial finite Features3 role,
+private metadata and the exact extensions.bzl Need.
 [WP979](wp979-private-cc-import-readiness-2026-10-07.json), accepted at
-4edecf56514696b73e9818a3284f49161cd32a03, owns finite CC8/meta4
-and the prior Features/features.bzl Need. Earlier source chronology is Git-reachable.
-
-[WP978](wp978-local-extension-source-readiness-2026-10-07.json), accepted at
-26d4e1daa0649106e778851aecf8b1b37accc1fa, admits the independently observed exact
-cc/extensions.bzl and establishes the earlier198-byte cc/private Host Lstat.
+4edecf56514696b73e9818a3284f49161cd32a03, owns finite CC8/meta4.
 [WP977](wp977-command-local-extension-readiness-2026-10-07.json), accepted at
 53b58b455d39966aa889f85a3689c7740b3df171, owns checked CommandAbsolute Local extension
-routes, shared mappings and source lifecycle. Its production identity/alias/RootBuild/
+routes, shared mappings and source lifecycle. Production identity/alias/RootBuild/
 classifier/retention contracts remain accepted. Earlier chronology is Git-reachable.

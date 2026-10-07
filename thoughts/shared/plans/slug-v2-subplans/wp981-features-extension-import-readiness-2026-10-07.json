@@ -1,0 +1,268 @@
+{
+  "checkpoint": "WP981",
+  "baseline": "09d0cf38e876375648fb35d58f31dd84e8232e13",
+  "started_at": "2026-10-07T14:51:53.401481+00:00",
+  "accepted_at": "2026-10-07T15:28:12.724616+00:00",
+  "elapsed_wall_seconds": 2179.323135,
+  "implementation": {
+    "production_files": 0,
+    "cfgtest_files": 2,
+    "insertions": 85,
+    "deletions": 4,
+    "net_lines": 81,
+    "changed_lines": 89,
+    "estimate_max_net_lines": 130,
+    "static_descriptor_bytes": 96,
+    "static_literal_bytes": 121,
+    "new_fields": 0,
+    "new_flags": 0,
+    "new_separate_guard_heap_allocations": 0,
+    "new_guard_owned_strings": 0,
+    "test_path_format_case_scratch": "Scoped transient builders for exact refusal tests, no global interning.",
+    "current_bodies_size": 192,
+    "layout_delta_proved": false,
+    "contract": "Finite captured Features3\u21928/wholeNeed7\u219217 and Skylib3\u21924/8\u219210. Preserve metadata/defaultfalse mode/namespace/root/projection/oldcases and add36 mixed exact-leaf negatives, no production/representation change."
+  },
+  "counts": {
+    "current_operations": 37,
+    "material_pins": 525,
+    "fresh_core_ordinary": 31,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "reused_owner_ordinary": 42,
+    "reused_owner_fresh_runs": 0,
+    "preparation_operations": 2,
+    "compiler_memory_is_runtime_fit": false,
+    "source_leases": 237,
+    "fresh_capture_operations_in_separate_stage": 4,
+    "capture_decisions": 6,
+    "total_fresh_named_passes": 36,
+    "reused_reader_controls": 11,
+    "reused_reader_fresh_runs": 0
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp981/native/compile.json",
+        "sha256": "09164acaebc0011bd60d41b1016641f14a7d08e47b694e2f1d9baedd6eef7777"
+      },
+      "elapsed_seconds": 9.243047375930473,
+      "executed_tests": 0,
+      "compiler_memory_separate": true
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp981/native/check.json",
+        "sha256": "5c2970ed956c1cfbe0bbe8937d9109dbc642b9bd40e0f361f26dec71b4181a28"
+      },
+      "elapsed_seconds": 7.304731443990022,
+      "executed_tests": 0,
+      "compiler_memory_separate": true
+    }
+  },
+  "runtime_seconds": {
+    "ordinary_31_sum": 5.971146221854724,
+    "synthetic_4": 0.22751398605760187,
+    "normal_once": 1.7869682259624824
+  },
+  "captures": [
+    {
+      "scope": "capture",
+      "operation": {
+        "path": "target/wp981/capture/availability-operation.json",
+        "sha256": "4c5672d1667f456618ee6bf4262d196ffaaf6d3b24f704d9b24283bf340a934a"
+      },
+      "result": {
+        "path": "target/wp981/capture/result.json",
+        "sha256": "96140e2ee688445e676f58bb86da284e3f45b11e5eb5331bf8e8cffdee63702a"
+      },
+      "source_review": {
+        "path": "target/wp981/capture/final-source.md",
+        "sha256": "629f38b8f690b45d97b49f8b8bea8f0f5f1cf56f35bfedd962a0da148109fd5e"
+      },
+      "evidence_review": {
+        "path": "target/wp981/capture/final-evidence.md",
+        "sha256": "a46666ccd98a244e371f284932c78edad32eae756c19e8e666a55dd9dfdf545c"
+      },
+      "observed_count": 1,
+      "test_passes": 0,
+      "total_bytes": 201,
+      "elapsed_seconds": 0.04242218693252653,
+      "conservative_peak_kib": 18684,
+      "artifact_pins": 27
+    },
+    {
+      "scope": "features",
+      "operation": {
+        "path": "target/wp981/features/availability-operation.json",
+        "sha256": "9a7d5d639acde467d53535db05b5858f75f7ef01060ea30e48f2a5b7078ec0b0"
+      },
+      "result": {
+        "path": "target/wp981/features/result.json",
+        "sha256": "106a5bbeb7b8dcee5bc35bbd6fa8c5329745edf3a4682a6e64bfbaa6422e4c6a"
+      },
+      "source_review": {
+        "path": "target/wp981/features/final-source.md",
+        "sha256": "757a6159563cd8c60b3ee55c9ed8243cc3c2cfb970d4840155403d3a7814b9af"
+      },
+      "evidence_review": {
+        "path": "target/wp981/features/final-evidence.md",
+        "sha256": "89f2bd60bd95529210d5ef0064a25da62e6686cbc58f8010478448292768b8b9"
+      },
+      "observed_count": 1,
+      "test_passes": 0,
+      "total_bytes": 476,
+      "elapsed_seconds": 0.04233521700371057,
+      "conservative_peak_kib": 18616,
+      "artifact_pins": 38
+    },
+    {
+      "scope": "skylib",
+      "operation": {
+        "path": "target/wp981/skylib/availability-operation.json",
+        "sha256": "41d8d708d5c7459518b363bf402a55af2bca392ac3e2020aba7517cdc07cc6a0"
+      },
+      "result": {
+        "path": "target/wp981/skylib/result.json",
+        "sha256": "7e4200aa4c5b425d1dc145e87b1a3b65d947bc9f82e98abbd9029d3b86d4005b"
+      },
+      "source_review": {
+        "path": "target/wp981/skylib/final-source.md",
+        "sha256": "7cf6d51a537b1a88e7f5c4bf62691bfd458b89bc1af9b51be1ae231823092fba"
+      },
+      "evidence_review": {
+        "path": "target/wp981/skylib/final-evidence.md",
+        "sha256": "e95328820e3710b43387a3614f2a1f62d0c68a9ac25fb6a3e8c270e87167204b"
+      },
+      "observed_count": 1,
+      "test_passes": 0,
+      "total_bytes": 4981,
+      "elapsed_seconds": 0.04219295596703887,
+      "conservative_peak_kib": 18912,
+      "artifact_pins": 38
+    },
+    {
+      "scope": "siblings",
+      "operation": {
+        "path": "target/wp981/siblings/availability-operation.json",
+        "sha256": "abc3114466c7c2de2688b0abbf2310cf6f9b510e1eb54c94b62912e4c27875a6"
+      },
+      "result": {
+        "path": "target/wp981/siblings/result.json",
+        "sha256": "0495a7c0a63d0b6e257ea9412e8e677c20ffba0f08fa1f7648e67b67b1b6d257"
+      },
+      "source_review": {
+        "path": "target/wp981/siblings/final-source.md",
+        "sha256": "1887eb9b69fadf601fe504506a9084a6df2ab867b49ec78c76522b8e3a52984f"
+      },
+      "evidence_review": {
+        "path": "target/wp981/siblings/final-evidence.md",
+        "sha256": "a15eb1dc099167360c5a696e31a241b6f6b95eea87b174e77f805468071b5adf"
+      },
+      "observed_count": 3,
+      "test_passes": 0,
+      "total_bytes": 4467,
+      "elapsed_seconds": 0.04217246698681265,
+      "conservative_peak_kib": 19192,
+      "artifact_pins": 36
+    }
+  ],
+  "operational_summary": {
+    "path": "target/wp981/native/operational-summary.json",
+    "sha256": "0cfb489f3d082e14110e9056be47afc1627ba7d54f463c9a28c48a498b88c101"
+  },
+  "memory_summary": {
+    "path": "target/wp981/native/memory-summary.json",
+    "sha256": "b317e0f2e4397958b2a90b24180cb56734f533c219f3d86fd58c23338be6cf84"
+  },
+  "reviews": {
+    "implementation-source": {
+      "path": "target/wp981/native/implementation-source.md",
+      "sha256": "566fd0c2a2517b3b3822ced7fb47800a38734e9c912b168741f1326444c09466"
+    },
+    "implementation-evidence": {
+      "path": "target/wp981/native/implementation-evidence.md",
+      "sha256": "a47dc62b34c38a631e1501c75ba827972f32979bea2b2ca178ea337584c3668e"
+    },
+    "preflight-source": {
+      "path": "target/wp981/native/preflight-source.md",
+      "sha256": "13c83343d2894d8652cba4007f98c670823610bad747b3eb64d0cb63ada7c5e3"
+    },
+    "preflight-evidence": {
+      "path": "target/wp981/native/preflight-evidence.md",
+      "sha256": "d9d96c6e3a002da54a2ba0bdf7e06a1b731356d922b606014fa7d288c74fd9a4"
+    },
+    "final-source": {
+      "path": "target/wp981/native/final-source.md",
+      "sha256": "ff335e37e3c4c84a51f416616f035d2ca8166792467c2a7f3bb3f723890d12f1"
+    },
+    "final-evidence": {
+      "path": "target/wp981/native/final-evidence.md",
+      "sha256": "50034f3b2c6a5dceda4bdab6595290a4873d59ffe06b0ce670f977d034ede091"
+    },
+    "final-root": {
+      "path": "target/wp981/native/final-root.md",
+      "sha256": "f944e4b2a61b2b520124b98781779f0378a61c52261c89945b9f42dce518f4e8"
+    }
+  },
+  "implementation_source_is_author_handoff": true,
+  "successor_source": {
+    "path": "target/wp981/native/successor-source.md",
+    "sha256": "2dc8ca1aafa93db2cb405377ec3ac3fda9bec2581abe4084b46e59b463f5017e"
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp981/native/native-operation.json",
+      "sha256": "be705aa0f3c8a0cd6e76bc98e137e29c337b84cef696e4b127f89c11fd4507ca"
+    },
+    "result": {
+      "path": "target/wp981/native/result.json",
+      "sha256": "d2dba24941aee766ea46258bb5779b8461e831c90573151242a18feddbbaed5b"
+    },
+    "stdout": {
+      "path": "target/wp981/native/native.stdout",
+      "sha256": "7e7f7c0ba05a130ca597eef720269544b16f931a3b687e46d372054967165a9d"
+    },
+    "stderr": {
+      "path": "target/wp981/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 1.7869682259624824,
+    "conservative_peak_kib": 93732,
+    "runtime_pins": 523,
+    "source_leases": 237,
+    "physical_bytes": 918928,
+    "before_after_hash_bytes": 1837856,
+    "parent_scratch_bytes": 131072,
+    "accepted_231_row_prefix_preserved": true
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 64,
+    "transferred_bytes": 0,
+    "decoded_bytes": 646987,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 2114151,
+    "peak_buffer_bytes": 3259456
+  },
+  "retirement": {
+    "source_weak_seen": false,
+    "source_weak_expired": true,
+    "live_buffer_zero": true,
+    "scope_weak_expired": true,
+    "recorder_weak_expired": true
+  },
+  "next_prerequisite": {
+    "family": "materialization",
+    "request_capture": "missing",
+    "operation": "none",
+    "path_capture": "missing",
+    "remaining_source_attempts_numeric": 0,
+    "quota_error_observed": false,
+    "basis": "Actual non-path family refusal; shared borrowed first-offender classifier and immediate bounded typed marker before admission/progress, outside milestone mutex; no identity/kind/predicate guessed."
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "qualification": "Source +12/+104148 vs WP980 is aggregate only. SourceErrorNone at limit64 does not establish a quotaerror or justify cap increase. Materialization request/kind/id/spec/predicate unavailable until bounded typed diagnostic. Fields/guard storage unchanged/currentBodies192; historicallayout/perallocation/totalretention delta unproved. Preparation complete/policychecked but terminal/cert/analysis/actions/Rustc absent. Parent231prefix+6 order/FD brackets non-atomic/noncertifying, bodyWeak unseen/vacuous; genuine scope/recorder cleanup and finalcredits observed. Fixed10s/RSS256MiB/AS512MiB/source64-default16/registry128-default16/object1MiB/all16MiB. Borrow/share/transfer storage and use existing scoped interners where owner cleanup fits; Windows minimal. Fullpublic support/data/provider/toolchain/action/runfiles/oracle/sameDICErestoration/fullCLI/M7A/MVS/provenance/wholefit required."
+}
