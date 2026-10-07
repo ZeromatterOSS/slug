@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bounded native memory/lifecycle gates pass; actual buildozer 8.5.1 prerequisite
+Status: bounded native memory/lifecycle gates pass; actual zlib 1.3.1.bcr.5 prerequisite
 
 ## Observable and source basis
 
@@ -44,60 +44,60 @@ REAPI and M7A/full-root remain open.
 
 ## Current source-readiness checkpoint
 
-[WP951](wp951-native-package-metadata-readiness-2026-10-07.json) observes package_metadata+ target187B and exact MODULE235B/fullSHA77890552…,
-declaring package_metadata0.0.3 with syntax partial=false and no dependency/load/unknown facts.
-Metadata0.042s/17,496KiB and module0.042s/18,876KiB are separate held NOFOLLOW
+[WP952](wp952-native-buildozer-source-readiness-2026-10-07.json) observes buildozer+ target187B and exact MODULE1122B/fullSHAa35d9561…,
+declaring buildozer8.5.1/>=6.2.0 with three dependency/three unknown partial facts and no loads.
+Metadata0.032s/17,788KiB and module0.052s/18,604KiB are separate held NOFOLLOW
 FD/name/ancestor/fullhash/EOF witnesses, not an atomic source certificate or native evaluation.
 Name/version physically match the actual request; explicit normal Local uses the existing
 empty-effective-key/name-check semantics without registry authenticity or graph/MVS equivalence.
 Prior cc0.2.4 versus Local0.2.17 and apple1.24.1 versus Local1.24.2 mismatches remain;
 apple's apparent repo_name build_bazel_apple_support is distinct from canonical apple_support+.
+Prior package_metadata235B/declared0.0.3 remains physical correspondence only.
 
-The sole shared companion has fixed7 extras/closedTen, six-prior constructor and
-all-prior paired negatives (Ten12, earlier2/4/6/8/10 preserved), net51 formatted lines.
-Borrowed static names/error
-tuple and fixed9 once-per-request override strings preserve ownership. Twelve ordinary
-tests pass in 2.367s/55,840KiB. Separate Core compile
-9.686s and direct Core/CLI check
-7.354s pass; compiler memory is separate from runtime fit.
-One ten-root native observer passes in 0.245s at conservative
-66,644KiB RSS under256MiB, with 81 current pins and ten parent MODULE
-brackets9,816B. Genuine original root426B/hash/anchor/firstWeak and tracked credit/recorder/
+The sole shared companion has fixed8 extras/closedEleven, seven-prior constructor and
+all-prior paired negatives (Eleven14, earlier2/4/6/8/10/12 preserved), net51 formatted lines. Borrowed static names/error
+tuple and fixed10 once-per-request override strings preserve ownership. Thirteen ordinary
+tests pass in 2.552s/55,640KiB. Separate Core compile
+9.665s and direct Core/CLI check
+7.293s pass; compiler memory is separate from runtime fit.
+One eleven-root native observer passes in 0.239s at conservative
+67,448KiB RSS under256MiB, with 83 current pins and eleven parent MODULE
+brackets10,938B. Genuine original root426B/hash/anchor/firstWeak and tracked credit/recorder/
 scope retirement are checked.
 
-Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support, package_metadata. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous.
-The held original semantic error reports buildozer 8.5.1 and the original 60B MODULE request. This borrowed discovery association proves no completed MVS/BCR provenance.
+Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support, package_metadata, buildozer. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous.
+The held original semantic error reports zlib 1.3.1.bcr.5 and the original 61B MODULE request. This borrowed discovery association proves no completed MVS/BCR provenance.
 Scope registry attempts1/admittedbytes0
-and recorder5attempts/1admitted/4refused/qualified=False
+and recorder4attempts/1admitted/3refused/qualified=False
 stay separate; adapter calls are not source attempts. Parent hashes do not fabricate native
-epochs. Thirteen fresh Rust checks=12Coreordinary+1native; two physical decisions are
+epochs. Fourteen fresh Rust checks=13Coreordinary+1native; two physical decisions are
 observations.15availability/3FD/1version controls reused0runs. Logical credit/Weak release
 proves no RSS-page reclaim or whole-workload fit. Mapping/providers/publicRustc/fullfit limits
-remain explicit in the actual receipt. Continue [the actual source owner recommendation](../../../../target/wp951/native/successor-source.md)
+remain explicit in the actual receipt. Continue [the actual source owner recommendation](../../../../target/wp952/native/successor-source.md)
 under unchanged memory/caps and borrowed/scoped-interned allocation discipline.
 
 ## Reusable evidence and predecessor
 
-[WP950](wp950-native-apple-local-readiness-2026-10-06.json) is the immediate predecessor:
-Nine observer0.243s/67,560KiB, root426B/Weak/credits checked, six extras unseen,
-actual package_metadata0.0.3 prerequisite. Its Local version control was reused;
+[WP951](wp951-native-package-metadata-readiness-2026-10-07.json) is the immediate predecessor:
+Ten observer0.245s/66,644KiB, root426B/Weak/credits checked, seven extras unseen,
+actual buildozer8.5.1 prerequisite. Its Local version control was reused;
 public producer/whole-workload fit remain open. Detailed completed chronology is pinned
-at56b0519e9: `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
+at605f2f3af: `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
 Reusable topic index: [alias](wp934-explicit-root-alias-2026-10-06.json),
 [finite reads](wp935-explicit-local-source-2026-10-06.json), [direct imports](wp936-direct-local-imports-2026-10-06.json),
 [native parser ownership](wp937-native-source-memory-2026-10-06.json), [offline owner](wp938-normal-offline-source-prerequisite-2026-10-06.json),
 [borrowed attribution](wp939-borrowed-registry-attribution-2026-10-06.json), [exact request](wp940-exact-offline-registry-prerequisite-2026-10-06.json),
 [platforms](wp941-platforms-local-module-readiness-2026-10-06.json), [root epoch](wp942-native-local-module-readiness-2026-10-06.json),
 [borrowed semantic association](wp943-borrowed-module-registry-association-2026-10-06.json),
-[features](wp944-bazel-features-local-source-2026-10-06.json), [Four controls](wp945-native-borrowed-dependency-readiness-2026-10-06.json),
+[features/Four](wp944-bazel-features-local-source-2026-10-06.json), [Four controls](wp945-native-borrowed-dependency-readiness-2026-10-06.json),
 [skylib/Five](wp946-native-skylib-source-readiness-2026-10-06.json), [Local version/Six](wp947-native-local-version-readiness-2026-10-06.json),
-[license/Seven](wp948-native-license-source-readiness-2026-10-06.json), [shell/Eight](wp949-native-shell-source-readiness-2026-10-06.json).
+[license/Seven](wp948-native-license-source-readiness-2026-10-06.json), [shell/Eight](wp949-native-shell-source-readiness-2026-10-06.json), [apple/Nine](wp950-native-apple-local-readiness-2026-10-06.json).
 Representative parser/source operations fit existing caps; full-source/whole-workload fit
 remains open. Every earlier refused source/replay/guard boundary remains closed.
 
 ## Ownership, scope and allocation
 
-The latest checkpoint shares seven fixed optional bindings, borrowed diagnostic reporting and
+The latest checkpoint shares eight fixed optional bindings, borrowed diagnostic reporting and
 focused whole-Need controls in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
@@ -108,9 +108,9 @@ detail is opaque. Representation, equality/invalidation/Need policies and existi
 interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
 
 WP942's actual native root anchor and mapping share one normal scoped DICE request;
-whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth/seventh/eighth/ninth/tenth
+whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth/seventh/eighth/ninth/tenth/eleventh
 MODULE bodies with finite metadata/Local roles. Successful certification would require
-the original nonempty mapping epoch covering all ten MODULE full hashes, original root
+the original nonempty mapping epoch covering all eleven MODULE full hashes, original root
 Arc identity and actual platforms/rules_rust requirements. That branch remains source-reviewed
 and unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
