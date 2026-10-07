@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: CC private symbol source readiness
+Status: Capturing finite CC direct import cohort
 
 ## Observable and source basis
 
@@ -44,85 +44,78 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint
 
-[WP992](wp992-original-proxy-materialization-2026-10-07.json) adds finite compatibility-
-proxy admission through the original authenticated RepoSpec/evaluated plan and scoped
-materializer. The reviewed atomic owner borrows static signatures for the exact modern
-three-file plan, preserves both Features cohorts and uses the same current-epoch namespace
-selector. No retained strings, containers, flags or production/Windows behavior changed.
-The3,164B literal fixture and focused extensions keep all63 test selectors unchanged.
+[WP993](wp993-cc-private-symbol-source-readiness-2026-10-07.json) admits six observed
+CC private symbol sources through the existing exact cfgtest/Linux role. Its static
+body table8→14 and metadata4→5 preserve all defaults, scopes, whole-Need controls and
+production behavior; no retained strings/containers/flags changed. Capture observed
+75,965B in0.073s/21,792KiB and retired per-row bodies/text/AST with one64KiB scratch.
+The14-row decoder validates every row before its explicit legacy8 interface projection.
 
-Pinned Core preparation10.675s and Loading/Core/CLI check7.368s pass with zero test credit;
-63 Rust tests and4 strict decoder controls pass. The corrected native observation takes
-2.871s and peaks98,060KiB under256MiB. SourceErrorNone,67 attempts/649,343 decoded bytes,
-registry105/235,521 and counted Written5228 reach the next original HostLstat demand:
-selected rules_cc root cc/private/cc_common.bzl, captured212B. Materialization/namespace/
-quota refusals are absent. Counted writes are an expected comparison, not completed-output
-or full Spec/certificate proof. Public preparation/singleton/policy checked are complete;
-certificate/analyses/actions/Rustc remain unavailable. Scope/recorder Weak and descriptor/
-logical/scratch/live-buffer credits retire; complete native body/plan/registry/DICE/page/
-freshness/whole-fit remain open. Original237 leases/two64KiB buffers remain unchanged.
-
-One root outer16s launcher timeout interrupted an earlier child start during parent
-verification/startup. Its exact partial raw is retained with zero terminal/pass/RSS/
-postcheck/retirement credit. Direct supervised invocation corrected the missing gate;
-inner10s/3s/caps/source/helpers remained unchanged. This checkpoint explicitly records two
-child starts and one credited terminal observation. Independent combined design, actual
-implementation, prelaunch and final review accepted the change; no redundant role review
-is claimed. Source reference inspection and its corrections are coupled in the receipt.
+Fresh pinned compile5.487s and Loading/Core/CLI check7.419s pass with zero tests.
+All63 Rust tests and4 decoder themes pass. One native3.104s peaks98,420KiB under256MiB,
+SourceErrorNone,source72/719,599 decoded bytes,registry105/235,521 and counted Written5228.
+Actual next original HostLstat220B is selected CC cc/common/cc_helper_internal.bzl.
+All243 ordered parent leases994,893B/1,989,786 bracket bytes match, same two64KiB buffers.
+Scopes/recorder Weak and ending descriptor/logical/scratch/live credits retire;
+body/registry Arc/DICE/page/freshness/fullSpec/output/whole-fit remain open. Public
+preparation/singleton/policychecked complete; certificate/actions/Rustc unavailable.
+Independent combined design/static/prelaunch/final review accepted the change. Corrected
+root census70 current operations means69 native gate records+one fresh six-source capture;
+qualified prior proxy reference is separate and receives zero fresh credit.
 
 ## Active continuation contract
 
-Continue the broader normal producer plan with one source-grounded CC private symbol
-family, using the actual first demand and the six ordered loads in the accepted modern
-symbols.bzl literal. [Source recommendation](../../../../target/wp992/native/successor-source.md)
-and [evidence constraints](../../../../target/wp992/native/successor-evidence.md) define:
+Continue normal producer readiness with one cohesive21 direct-import CC cohort from
+[saved source declarations](../../../../target/wp993/native/successor-source.md) and
+[actual evidence constraints](../../../../target/wp993/native/successor-evidence.md).
+Actual first helper matches the first captured cc_common literal. Saved six callers have
+29 occurrences/24 distinct labels; three are already admitted,21 same-root leaves remain
+unobserved. Freeze the complete first-appearance list in target/wp994/capture/inputs.json.
+No inferred directory/prefix recursion or foreign grant is selected.
 
-- cc/private/cc_common.bzl
-- cc/private/cc_info.bzl
-- cc/private/cc_shared_library_info.bzl
-- cc/private/debug_package_info.bzl
-- cc/private/objc_info.bzl
-- cc/private/toolchain_config/cc_toolchain_config_info.bzl
+Use one once-only source capture through unchanged WP933 regular descriptor reader and
+facts owner: all-ancestor anchors/NOFOLLOW/regular/name/EOF/full SHA/pre-post identity,
+1MiB/object and16MiB aggregate, one64KiB scratch, bounded256KiB fact body and per-row
+body/text/AST retirement. Sizes/hashes/eligibility remain unknown. Missing/oversize/UTF8/
+mutation/timeout remain explicit unavailable results, with no retry or cap increase.
+Exactly two capture helpers plus root configs/reviews may change under target/wp994.
+One combined independent capture design/helper/prelaunch delta review suffices for the
+unchanged read owner; root transparent role qualifications never claim another reviewer.
+Activate only its explicit reviewed switch and preserve exact inverse, then direct capped
+supervision. Parent artifact verification precedes the separate native child clock.
+Qualified prior11 reader controls stay0fresh; capture observations have pass_countNone.
 
-Freeze exactly these six selected-root candidates, component counts3/3/3/3/3/4, for one
-bounded regular NOFOLLOW/all-ancestor FD availability capture before any grant. Their
-sizes/hashes/UTF-8/body/facts/import closure remain unknown until actual reviewed capture.
-Use accepted reader/facts owners, per-object1MiB/aggregate16MiB/64KiB scratch and existing
-10s/3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/file16MiB bounds. Missing/oversize/error
-cannot be silently replaced. Preserve native canonical mapping/source epoch/certificate
-ownership; reference availability is no test, native output, selected-version or MVS proof.
-No network acquisition, source recursion, directory scan or proxy rules_impl expansion.
+After all21 eligible rows and actual source final review, freeze the consequential
+functional contract before Rust edits. Conditional existing CC14→35 body table and
+metadata5→8 adds only compile/link/rules_impl directories with HostLstat. Preserve current
+prefix/roles/defaultfalse/additional[2], all scopes/op/namespace/root/case/suffix/child/
+mixed controls; expected finite union78. Two existing cfgtest Rust owners and minimum
+nine current ignored native helpers only; no new flags/retained strings/maps/cache/plan/
+DICE/production/Windows representation. New descendants remain unselected. Complete35
+current validation must precede the accepted legacy interface projection, original raw/
+artifacts/flags/limits/counters unchanged, with current35/8 denial contradictions checked.
+Append eligible21 after original243 in the SAME second context264 (188+76), same two64KiB
+buffers; actual byte totals and native readiness remain unproved until observation.
 
-After actual source FINAL eligibility, root freezes/reviews the conditional functional
-predicate before edits. The existing default-false PreparedFile/PublicProbe CC role and
-additional[2] remain owners. Extend only the exact8-body prefix to14 for HostLstat/FileBytes
-and metadata4→5 with cc/private/toolchain_config HostLstat only. Preserve all cross-root/
-namespace/mode/operation/suffix/child/case/default/mixed whole-Need controls; replace a
-newly admitted old negative with an equally discriminating excluded leaf. Only the two
-existing Core cfgtest owners and minimum current ignored decoder/preparation helpers may
-change. No new flag, retained strings/map/cache/plan, diagnostic family, provider or source
-fallback is selected. All63 named controls and4 strict decoder themes remain required.
-Append only six actually eligible rows after original237, same two64KiB contexts; exact
-byte totals and243-row readiness must be established rather than guessed. Preparation
-and parent evidence verification have distinct clocks from the native10s operation.
-
-Retain pinned serial offline/jobs1 preparation<=60s, actual CargoJSON artifact authority,
-current selection and focused tests, independent actual diff/prelaunch/final review, one
-changed native observer, compact coupled receipt and accepted local commit. Preserve
-passing gates unless relevant inputs change; no identical terminal replay or automatic
-quota increase. Selected source128/default probe16/production64, registry128/default16,
-object1MiB/each16MiB bank and all caps stay fixed. Borrow/transfer/share storage and use
-existing scoped interners for repeated retained immutable strings when lifetime/cleanup
-fits; avoid pooling transient unique paths. Linux focus and minimal Windows stubs remain.
-Local0.2.17/requested0.2.4 and caller alias/defining self remain distinct. Full public Rustc/
-support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/
-M7A/MVS/provenance/whole-workload fit remain required; the full goal stays active.
+Reuse pinned toolchain via rustupwhich; serial offline/jobs1 Core no-run and direct
+Loading/Core/CLI check<=60s with actual CargoJSON executable authority. Existing63 Rust
+selectors and4 strict decoder themes, one current preflight/list, combined actual delta
+review/prelaunch then one changed native; preserve passed gates unless relevant inputs
+change. Native10s/absoluteTERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB;
+source128/defaultprobe16/production64,registry128/default16,object1MiB/every16MiB bank stay
+fixed. No artificial outer deadline or automatic quota increase. Record actual Need,
+bytes/memory/retirement/publicproducer; finalreview/coupled receipt/planstatus/archive/
+diffcheck/acceptedlocalcommit. Borrow/transfer/share storage; use existing scoped interners
+for repeated retained immutable strings when lifetime/cleanup fit, avoid pooling unique
+transient paths. PublicRustc/support/data/providers/toolchains/actions/runfiles/oracle/
+same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/whole-workload fit remain required;
+full goal active. Linux focus, Windows minimal stubs remain.
 
 ## Immediate predecessor
 
-[WP991](wp991-finite-source-attempt-readiness-2026-10-07.json), accepted at2655fad31,
-cleared SourceAttempts64 using finite cfgtest/Linux selected128 while default/production64
-and probe16 stayed fixed. Its63+4+1 gates passed; native2.380s/97,900KiB used66 attempts with
-SourceErrorNone and first exposed the genuine compatibility-proxy materialization demand.
-Its67 qualified prior operation maps and failed decoder correction remain reachable in
-that receipt. WP992 uses fresh current gates and no historical helper-snapshot exception.
+[WP992](wp992-original-proxy-materialization-2026-10-07.json), accepted4507beff3,
+admitted the original modern three-file compatibility proxy plan through borrowed static
+signatures and scoped materializer/current-epoch namespace.63+4+1 passes reached the
+private cc_common source at2.871s/98,060KiB. Its preserved root outer-timeout partial raw
+has zero terminal credit; corrected direct invocation kept all inner limits. Source
+reference and prior guard lifetime/ownership evidence remain reachable in its receipt.

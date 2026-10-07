@@ -1,0 +1,309 @@
+{
+  "checkpoint": "WP993",
+  "baseline": "4507beff3173f6bb49594243b984c2c95931617a",
+  "compatibility": "Exact captured local bytes and guard discriminators; Slug-native cfgtest/Linux readiness; production/Windows unchanged.",
+  "implementation": {
+    "rust_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "d52a1756414bc48ba1535b2bc9cb369600c8086cec83c0d1fb82370a395671cb"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "87710fea8928334b98b99065426f32d7640565655a6eb204c1f6a08aae9bd4d7"
+      }
+    ],
+    "growth": {
+      "insertions": 47,
+      "deletions": 4,
+      "changed": 51,
+      "net": 43
+    },
+    "natural_owner": "Existing exact PreparedFile/PublicProbe CC role/additional[2], loading source observations and materializer; no guard owner change.",
+    "body_rows_before": 8,
+    "body_rows_after": 14,
+    "metadata_before": 4,
+    "metadata_after": 5,
+    "coupled_demand_matrix": 33,
+    "memory": {
+      "new_retained_strings": 0,
+      "new_retained_containers": 0,
+      "new_flags": 0,
+      "static_file_append": 6,
+      "static_metadata_append": 1,
+      "allocation_policy": "Borrow/transfer/share storage; existing scoped interners for repeated retained immutable strings when lifetime and cleanup fit; no global pool for unique temporary paths."
+    },
+    "decoder": "Validate all14 exact rows before explicit legacy8 interface projection; original artifacts/raw/flags/limits/counters unchanged; current14/5 contradiction checks remain."
+  },
+  "counts": {
+    "current_all_phase_operations": 70,
+    "current_native_gate_operations": 69,
+    "fresh_capture_operations": 1,
+    "fresh_capture_observations": 6,
+    "capture_test_passes": 0,
+    "fresh_core_ordinary": 63,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "fresh_named_passes": 68,
+    "qualified_prior_reference_operations": 1,
+    "qualified_prior_reference_observations": 1,
+    "qualified_prior_reader_controls": 11,
+    "qualified_prior_bzlmod_passes": 5,
+    "prior_fresh_credit": 0,
+    "current_material_pin_union": 541,
+    "native_runtime_pins": 528,
+    "native_child_starts": 1,
+    "credited_native_terminal_observations": 1,
+    "census_qualification": "Frozen audit current_operations70 computes native69+qualified prior reference1; corrected root current70 computes native69+fresh capture1. Prior reference gets zero fresh credit; no duplicate operation/test."
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp993/native/compile.json",
+        "sha256": "853b0fea80de2567f7f4b22c1d20e2d9c9632a794cbd756f9b20a38910857db1"
+      },
+      "seconds": 5.487165974103846,
+      "test_passes": 0
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp993/native/check.json",
+        "sha256": "13ab758c483200094ee37c586198995e82d731e65ce2298f6c5794999605ee9b"
+      },
+      "seconds": 7.418899090960622,
+      "test_passes": 0
+    }
+  },
+  "tests": {
+    "ordinary_seconds": 12.224144259351306,
+    "ordinary_peak_kib": 58304,
+    "control_seconds": 0.6476716740289703,
+    "control_peak_kib": 21504,
+    "selectors": {
+      "path": "target/wp993/native/selectors.json",
+      "sha256": "fa2dd6ff42c10a21e941f26269a172d76a6a0dbbdc6ea0d68ba1560f9b4dfeca"
+    },
+    "actual_cargo_artifact": {
+      "path": "target/wp993/native/executable.json",
+      "sha256": "985ae4caf3d4aa8aa63d25a1c0f1c8f030162e22c5b6b8fd0ae1dac8612da0db"
+    },
+    "compiler_memory_is_runtime_fit": false
+  },
+  "capture": {
+    "operation": {
+      "path": "target/wp993/capture/availability-operation.json",
+      "sha256": "0d45f0ef9ad8ebb614acf3572667cda369f2547c64414dbe712f719846333e5f"
+    },
+    "result": {
+      "path": "target/wp993/capture/result.json",
+      "sha256": "d00180aba4ac0ec7708a49c035aa0d0887d6fef020c3f2a7c9507135af9299b2"
+    },
+    "observed_rows": [
+      {
+        "path": "cc/private/cc_common.bzl",
+        "bytes": 33860,
+        "sha256": "5e6ab737945b487759c9f039c77a066dc65bbe15cf590b566fe86029cc610762"
+      },
+      {
+        "path": "cc/private/cc_info.bzl",
+        "bytes": 29389,
+        "sha256": "4424bb876c3f8234d7cfce20652e7ab1a7b2fc34cc2c637b1cb4313590d9f1bc"
+      },
+      {
+        "path": "cc/private/cc_shared_library_info.bzl",
+        "bytes": 1304,
+        "sha256": "5b7dcd1f20611891bbe14d77c81fb47bf564f982e238d0ed2bc78d316efdb2f1"
+      },
+      {
+        "path": "cc/private/debug_package_info.bzl",
+        "bytes": 1281,
+        "sha256": "b22666c62cafcb12b3e1cc01d5d3ecfcd48f530cf5b915fbdcfea4abcf8d19f8"
+      },
+      {
+        "path": "cc/private/objc_info.bzl",
+        "bytes": 4422,
+        "sha256": "675fffb06e4731d2f0f4b7c9f2d38596fff042321dec5e581f73b5e44f8fde8a"
+      },
+      {
+        "path": "cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+        "bytes": 5709,
+        "sha256": "8c522773214e202b426ae43589f59a8bdbf3af19d2e595ba8ec7ac125fef5d39"
+      }
+    ],
+    "bytes": 75965,
+    "seconds": 0.07262503204401582,
+    "peak_kib": 21792,
+    "sequential_fd_opens": 109,
+    "literal_load_occurrences": 29,
+    "new_edges_unselected": true,
+    "collection_atomic": false,
+    "native_certificate": false,
+    "body_text_ast_retired_per_row": true,
+    "scratch_bytes": 65536
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp993/native/native-operation.json",
+      "sha256": "0ec32d398c5318e168919a1dfacb329a591cd8f5d55c35ecfc218b5ec4cc839a"
+    },
+    "result": {
+      "path": "target/wp993/native/result.json",
+      "sha256": "a2177e7e3984e200a0e1d6c24bc43df8cf5c5969e55064afb2b18b7ba8201874"
+    },
+    "stdout": {
+      "path": "target/wp993/native/native.stdout",
+      "sha256": "691c285080955a226e9ad15c77b451a007e9ba4b4109551ed2b3edde8c4a2f5e"
+    },
+    "stderr": {
+      "path": "target/wp993/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 3.103780044009909,
+    "conservative_peak_kib": 98420,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 72,
+      "transferred_bytes": 0,
+      "decoded_bytes": 719599,
+      "written_bytes": 5228,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "next_need": {
+      "family": "path",
+      "path_len": 220,
+      "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f623637396330323038313365623864363538393230343438613165383231383830633632643239336435366435363435323463386332353465323065343835662f64306534656261612d376666612d346133642d613735352d6335643239653964633738632f63632f636f6d6d6f6e2f63635f68656c7065725f696e7465726e616c2e627a6c",
+      "selected_relative": "cc/common/cc_helper_internal.bzl",
+      "operation": "lstat"
+    },
+    "public_probe": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "ending_resource_credits": {
+      "phase": "after_runtime_drop",
+      "descriptor_used": 0,
+      "descriptor_peak": 101464,
+      "logical_used": 0,
+      "scratch_used": 0
+    },
+    "qualification": "Native prefix fits256MiB; body Weak Seenfalse is not a body lifetime witness; complete Arc/DICE/page/output/freshness/fullSpec/whole-fit unproved. Written5228 is counted accounting comparison only, not completed output."
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "source_bindings": {
+    "ordered_leases": 243,
+    "prefix": 188,
+    "additional": 55,
+    "physical_bytes": 994893,
+    "before_after_hash_bytes": 1989786,
+    "parent_buffers": 2,
+    "parent_buffer_bytes_each": 65536,
+    "combined_parent_scratch_bytes": 131072,
+    "noninherited": true,
+    "collection_atomic": false,
+    "native_certificate": false
+  },
+  "artifacts": {
+    "design": {
+      "path": "target/wp993/native/design.md",
+      "sha256": "a40417559be364e8f53c40ceb7416d8711a6ccac043d75f45429ef2e541c3784"
+    },
+    "design-review": {
+      "path": "target/wp993/native/design-review.md",
+      "sha256": "f2af02e439a87e88b81273878594eaa538e1b1ef3be9298c84a0a6f00b2eec23"
+    },
+    "implementation-source": {
+      "path": "target/wp993/native/implementation-source.md",
+      "sha256": "f9476c7ecfeec3984c4332144797b645d9d1c26a9cd563e9e67227d604d1e7eb"
+    },
+    "implementation-evidence": {
+      "path": "target/wp993/native/implementation-evidence.md",
+      "sha256": "3f3c9422f499b6f6cc728818f794f312495103eaa464285547f69a2cf3acf69e"
+    },
+    "preflight-source": {
+      "path": "target/wp993/native/preflight-source.md",
+      "sha256": "0fc7bde68e991ed3ef3406970e0427ac84388c4660af6afbba6a8dfc53bade51"
+    },
+    "preflight-evidence": {
+      "path": "target/wp993/native/preflight-evidence.md",
+      "sha256": "32cb60258ccf3e8ef7a5114317cb4a66c790d6333024990d52af4e89933380bc"
+    },
+    "final-source": {
+      "path": "target/wp993/native/final-source.md",
+      "sha256": "392dc3da811de517e2faffaa574bb81e4c484aeb3cd5a3a5444477a0c27605f6"
+    },
+    "final-evidence": {
+      "path": "target/wp993/native/final-evidence.md",
+      "sha256": "9fe28701f02b2f0279ea3a5919e2ead6caddf416b92511adcac4274d72b094ae"
+    },
+    "successor-source": {
+      "path": "target/wp993/native/successor-source.md",
+      "sha256": "5f0c5caf2c754b79772057b5c88204f899372cef0016a9bf14fe2cebaff096b2"
+    },
+    "successor-evidence": {
+      "path": "target/wp993/native/successor-evidence.md",
+      "sha256": "2228cedce6fd2a7a0a9a63dab2be36363bb7b7f4e35ed09f0ece193d538337dc"
+    }
+  },
+  "capture_reviews": {
+    "design": {
+      "path": "target/wp993/capture/design.md",
+      "sha256": "a093476536797953cab9fc608ffe3f7c1e9c2ae14ceb779bac1551a6ad1904d4"
+    },
+    "design-review": {
+      "path": "target/wp993/capture/design-review.md",
+      "sha256": "d509281c0f7a959e4dab8f4161e702cff3bc7205dd12778a585abb93a75c54bf"
+    },
+    "preflight-source": {
+      "path": "target/wp993/capture/preflight-source.md",
+      "sha256": "fc677e26076e5c06b6c4d1c9ec379608c672256b10c4ad7b97b8b669f131a886"
+    },
+    "preflight-evidence": {
+      "path": "target/wp993/capture/preflight-evidence.md",
+      "sha256": "c91ff8cca8d416ec3c7624c9566abd637b3bc5a084ef7db02aaa1304142f3097"
+    },
+    "final-source": {
+      "path": "target/wp993/capture/final-source.md",
+      "sha256": "cf0fbe77beca17e1c0af336d29d468d349df039adc1bf5d5c40d2dec51901c71"
+    },
+    "final-evidence": {
+      "path": "target/wp993/capture/final-evidence.md",
+      "sha256": "bc123bb1a4938685f151901c7db771e193030b674251c8395e0555dce7add84d"
+    }
+  },
+  "continuation": "One bounded21 same-root direct-literal cohort capture after actual first Need; conditional exact table35/metadata8 only after all eligible observed rows/independent reviewed contract. Further edges remain unselected.",
+  "normal_public_rustc_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "full_goal_active": true,
+  "accepted_at": "2026-10-07T23:07:30.763145+00:00",
+  "residuals": [
+    "Normal publicRustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024\u21922021\u21922024/fullCLI/M7A/MVS/provenance/whole-workload fit remain required.",
+    "Runtime prefix fit does not include aggregate parent/compiler memory or complete graph fit.",
+    "Windows remains minimal stubs/unsupported."
+  ]
+}

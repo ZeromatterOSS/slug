@@ -4445,7 +4445,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 20);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 33);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -4454,6 +4454,38 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/cc_common.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/cc_common.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/Cc_common.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/cc_common_sibling.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/private/cc_info.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain_config",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain_config",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/cc/cc/private/toolchain_config/cc_toolchain_config_info.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
         ("/cc/cc", PathObservationOperation::FileBytes),
         ("/cc/cc/common", PathObservationOperation::FileBytes),
         ("/cc/cc/private", PathObservationOperation::FileBytes),

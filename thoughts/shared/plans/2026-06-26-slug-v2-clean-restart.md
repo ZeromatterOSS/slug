@@ -35,26 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: CC private symbol source readiness
+Status: Capturing finite CC direct import cohort
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP992](./slug-v2-subplans/wp992-original-proxy-materialization-2026-10-07.json)
-admits the exact modern compatibility-proxy file plan through the original typed owner,
-borrowed static signatures, normal materializer and current-epoch namespace. No retained
-strings/containers/flags or production/Windows changes. All63 Rust+4 strict controls pass;
-the corrected native takes2.871s/98,060KiB under256MiB, source67/649,343 with no source error
-and counted Written5228. Next original demand is selected CC cc/private/cc_common.bzl
-HostLstat. Counted writes do not certify output; public Rustc/full graph fit remain open.
-A root outer-timeout invocation has preserved partial raw and zero terminal credit;
-corrected direct supervision keeps all inner caps. Next freeze one bounded six-source
-private-symbol cohort from the actual demand and saved literal loads, then review its
-conditional existing-role grant. No source recursion, cache or diagnostic layer is selected.
+[WP993](./slug-v2-subplans/wp993-cc-private-symbol-source-readiness-2026-10-07.json)
+admits six exact CC private symbol rows through the existing borrowed static role;
+no retained strings/containers/flags or production/Windows behavior changed.63 Rust+4
+strict controls pass, fresh compile/check pass; one native3.104s peaks98,420KiB under256MiB
+with source72/719,599/None and counted Written5228. Original243 parent leases match and
+scope/recorder/credits retire; public certificate/actions/Rustc/fullSpec/output/whole-fit
+remain open. Actual next HostLstat220B is selected CC cc/common/cc_helper_internal.bzl.
+Continue one cohesive21 direct-literal same-root capture using unchanged capped reader,
+then conditional reviewed35/8 static grant; no recursive prefix or foreign acquisition.
 Representative parsing/read-prefix allocation fits the cap, permitting broader readiness
-work. Borrow/share storage and use existing scoped interners where repeated retained
-strings and cleanup fit; complete public producer and whole-workload fit remain required.
+work. Borrow/share storage and use existing scoped interners for repeated retained strings
+when lifetime/cleanup fit; complete public producer and whole-workload fit remain required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
