@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches analyzer toolchain import source prerequisite
+Status: Normal public probe reaches platform import source prerequisite
 
 ## Observable and source basis
 
@@ -44,72 +44,65 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP970](wp970-rules-rust-defs-direct-import-readiness-2026-10-07.json) accepts one
-private borrowed table for eleven saved defs direct imports (314975B) and exact
-rust/private HostLstat metadata. Leaves admit Host Lstat/FileBytes only, PreparedFile+
-PublicProbe/defaultfalse; MODULE/digest/readlink/ancestor/other-root/unknown/transitive
-roles remain unchanged. Actual observer uses the same Bodies-owned limit factory as
-policy controls: SourceAttempts64 only for the new table mode,16 for other modes, with
-all byte/memory/RSS/time/registry caps unchanged. One176B static descriptor table plus
-fixed literals allocates no heap strings/map/cache/interner/source copy.262net lines in
-the two existing private test owners (45parent/217child) add zero production/DICE/reader
-change; shared role/mixed23Need/policy/actualboundary tests preserve the prior24 controls.
-28Coreordinary+4synthetic+1native pass, currentCore no-run/CoreCLIcheck pass. The bounded
-149-line public/Host decoder-function fork validates original selected64/default16 raw
-marker/counter policy without normalization; historical helpers remain unchanged.
-Unchanged Loading23/Bzlmod3 are qualifiedreuse0fresh; replaced old Core is historical.
+[WP971](wp971-rules-rust-toolchain-import-readiness-2026-10-07.json) captures all four
+source-grounded toolchain siblings (929B) once with the unchanged strict FD/facts owner:
+0.042s/18,952KiB,27 current material pins, one64KiB scratch, per-row body/text/AST
+retirement. Partial literal facts and physical hashes are diagnostic observations,
+not native exports/source certificates or complete imports. Eleven reader/fact checks
+are qualified reuse0fresh; four row decisions are observations, not test passes.
+Two static deadline/cleanup corrections preceded the only capture; no failed source
+operation or hidden retry is accepted.
 
-Actual once0.654s/conservative81,456KiB/325nativepins versus338union current materials
-advances to the selected rules_rust `rust/rust_analyzer_toolchain.bzl` HostLstat Need,
-exact220B captured path. Preparationcomplete/singleton/policytrue/native_refusal/computation
-remains; certificate/observations/analyses/actions/Rustc unavailable, packagecause none/
-unavailable. Actual selectedlimits64/Hosthistory64 agree with the original report. Source
-None105registry235521B unchanged,17Host20052Decoded is aggregate+1/1023 againstWP969;
-it proves no per-file native hash/body-Arc/exports/freshness. Full33named passes are29Rust
-plus4Python;34current operation/raw records cover338materials. All200 original-order
-parent leases verify605945B/1211890B beforeafter hashes, two64KiB scratch buffers128KiB,
-noninherited/individually bracketed/non-atomic and separate from child semantic bytes.
-Scope/recorder/finalcredits retire, without all-DICE Arc/page proof. Private MODULE/body
-Weak/hash/freshness remain unobserved/vacuous. Public compiler producer/fullfit stay open.
+The existing defaultfalse PreparedFile+PublicProbe table preserves its eleven-entry
+prefix and appends four exact Host Lstat/FileBytes leaves: fifteen finite defs/toolchain
+dependency imports, not fifteen direct defs loads or full closure. Five net cfgtest Rust
+lines add64descriptor/111literal bytes and zero heap strings, flags, maps, interners,
+cache, body copies, production/reader/DICE changes. Existing role loops cover15 leaves
+and31 positive Needs; mixed unknown/digest/directory-body Needs refuse before progress.
+Selected64/default16, object1MiB and all16MiB cumulative/live/image/scratch, registry/
+network/concurrency/RSS/time limits stay unchanged. Existing scope/default/flag controls
+remain meaningful. Fresh28Coreordinary+4synthetic+1native pass, with current Core no-run
+and CoreCLIcheck; unchanged Loading23/Bzlmod3 qualified reuse0fresh. Public/Host decoder
+functions reuse the accepted16/64 policy and original raw without normalization.
 
-Continue the actual toolchain leaf prerequisite from
-[target/wp970/native/successor-source.md](../../../../target/wp970/native/successor-source.md).
-Saved literal toolchain loads ground one four-sibling cohort: rust_analyzer_toolchain.bzl,
-rust_stdlib_filegroup.bzl, rust_toolchain.bzl and rustfmt_toolchain.bzl. Capture these
-exact local bodies together under existing bounds, then couple metadata/body roles
-if usable; their sizes, hashes and availability remain unobserved. Existing observed direct-table
-rows do not authenticate an unobserved toolchain body or full closure. Freeze any new
-bounded local availability capture and original-owner admission before another operation;
-no speculative transitive grant, raw rewrite, automatic repeat or further limit expansion.
-Selected64 has17 attempts observed, not proof that remaining imports fit. Preserve every
-byte/object/cumulative/live/image/scratch/RSS/time cap and borrowed/scoped interner
-ownership. Original public fixture/support/data/oracle/same-DICE restoration/fullCLI/
-M7A/provenance/whole-workload fit remain required; Windows may stay minimal Unsupported.
+Once native0.704s/conservative84,164KiB,355 runtime pins versus386 union materials in35
+operation/raw records including the capture, reaches exact201B selected rules_rust
+rust/platform HostLstat Need. SourceNone105registry235521B unchanged;27Host334004Decoded
+is aggregate+10/+313952 versusWP970, not per-file body/Arc/hash/evaluation/freshness.
+Public preparationcomplete/singleton/policytrue/native_refusal/computation retains null
+certificate/observations/analyses/actions/Rustc and packagecause none/unavailable.
+All204 ordered parent leases verify606874B/1213748B hashes in the same two64KiB scratch
+contexts128KiB, noninherited/individually bracketed/non-atomic and separate from child
+semantic bytes. Scope/recorder/final credits retire; private body/MODULE Weak witnesses
+remain uninstrumented/unseen/vacuous, not complete DICE/page or per-Arc retirement.
+Compiler memory is separate and fit applies only to the reached prefix.
 
-Immediate [WP969](wp969-rules-rust-defs-source-readiness-2026-10-07.json), at
-5c50389f6d70309d49112717a2d0de330e429f7d, admitted exact defs.bzl HostLstat/FileBytes
-under the private selected root/flag,94net private/test lines/zero production storage;
-24ordinary+4synthetic+1native/currentCoreCLI preparation pass,0.580s/82,760KiB reached
-rust/private. Its16/19029 source history was exhausted numerically, with no source-budget
-error; current64 is the explicit reviewed scalar continuation. Static test correction
-before compilation and one excluded unbracketed6092B integration-review read remain
-qualified predecessor records, no extra native/test/corpus/certificate credit. Current
-reviews use exact two-key reference hashes and never open body-binding targets. Older
-RootBuild command-Local route ownership/readiness are reachable through its immutable
-[WP968](wp968-root-build-command-local-readiness-2026-10-07.json) predecessor; original
-reader/kernel/bridge remain owned by
-[WP960](wp960-bounded-host-file-readiness-2026-10-07.json).
+Continue the actual platform prerequisite from
+[target/wp971/native/successor-source.md](../../../../target/wp971/native/successor-source.md),
+using a cohesive grounded metadata/body cohort before another changed observer.
+[target/wp971/native/known-import-frontier.json](../../../../target/wp971/native/known-import-frontier.json)
+records59 literal edges from16 current admitted callers,23 local candidates and4 foreign
+labels. It selects no new role or operation and proves no current availability/full
+closure; rustc's saved node-limit leaves imports unknown. Root freezes the next exact
+source-specific contract from actual outcome plus independently checked literal edges.
+No metadata-only checkpoint, speculative transitive prefix, raw rewrite, identical
+repeat or further cap increase. Selected64 has27 observed uses, not closure sufficiency.
+Borrow/transfer/share storage and use existing scoped interners for repeated retained
+strings when cleanup fits; do not intern unique temporary scratch. Genuine public
+Rustc/support/data/providers/toolchain/runfiles/executable/oracle/same-DICE edition
+restoration/fullCLI/M7A/MVS/provenance/whole-workload fit remain open; Windows minimal.
 
-Reuse authentic177-file/273940B corpus from
-[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11source rows
-10938B without extraction/availability retry.152available MODULEs do not prove selected
-closure or sufficiency. Borrow/transfer string storage and use existing scoped interners
-for repeated retained strings when their cleanup fits; do not intern temporary unique
-scratch. Selected SourceAttempts64 has17 observed uses, not source-closure sufficiency; cumulative history is not per-Arc live
-credit; private MODULE/body Weak witnesses remain unobserved/vacuous. Public Rustc/support/
-data/toolchain/provider/executable/config/runfiles/oracle/same-engine2024→2021→2024,
-MVS/BCR provenance, fullCLI/M7A and whole-workload fit remain required. Windows may stay
-minimal Unsupported. Preserve every source/allocation/runtime cap below.
+Immediate [WP970](wp970-rules-rust-defs-direct-import-readiness-2026-10-07.json), at
+cee749034fad670d185ce8163447ec2877a72330, admitted the original11 direct defs imports
+and exact private metadata, explicitly selected64/default16 while preserving byte caps.
+Its33 named checks and once81,456KiB observer reached analyzer-toolchain HostLstat,
+17Host20052Decoded aggregate;200 parent leases605945B and source-body attribution
+remained unproved. Earlier WP969 correction/excluded review read and original reader/
+bridge/module source/provenance histories remain immutable through its predecessor.
+Current reviews hash exact two-key artifact references, never underlying body bindings.
+Reuse authentic177-file/273940B registry corpus and11MODULE rows10938B from
+[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) without extraction
+or source retry;152available MODULEs do not prove selected closure or sufficient inputs.
 
 ## Reusable evidence and predecessor
 

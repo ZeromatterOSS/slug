@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches analyzer toolchain import source prerequisite
+Status: Normal public probe reaches platform import source prerequisite
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,28 +149,27 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
+[WP971](./slug-v2-subplans/wp971-rules-rust-toolchain-import-readiness-2026-10-07.json)
+observes four exact toolchain siblings929B once at0.042s/18,952KiB with the unchanged
+strict FD/facts owner;11reader checks reused0fresh, four observations not tests.
+Five net cfgtest lines append four static literals to the existing15-leaf finite
+import dependency table, original11prefix/defaultfalse/zeroheap/newflag/storage/DICE
+change; selected64/default16 and allbyte/runtime limits unchanged.28Coreordinary+
+4synthetic+1native/currentCoreCLI preparation pass. Once0.704s/84,164KiB reaches exact
+201B rust/platform HostLstat: SourceNone105registry235521B unchanged,27Host334004Decoded
+aggregate+10/+313952, not per-file body/hash/Arc/evaluation proof.355runtimepins versus
+386union materials/35operations include capture1.204parent leases606874B/1213748hash
+bytes share the original two64KiB contexts128KiB, non-atomic/noninherited/not native
+certificates; credit/Weak retirement does not prove allDICE/page/body freshness.
+Publicnative_refusal/prepcomplete/singletonpolicytrue/nullproducer/certificate counts
+remain. Continue cohesive source-grounded platform metadata/body prerequisites from
+target/wp971/native/successor-source.md; saved59-edge frontier selects no new role,
+unknown rustc imports/foreign labels remain closed, no speculative grant/cap raise.
+PublicRustc/support/data/provider/toolchain/runfiles/oracle/restoration/fullCLI/M7A/
+MVS/provenance/wholefit remainopen. Immediate
 [WP970](./slug-v2-subplans/wp970-rules-rust-defs-direct-import-readiness-2026-10-07.json)
-accepts the finite11 direct-import borrowed table plus exactprivateHostLstat, coupledleaf
-Lstat/FileBytes and defaultfalse PreparedFilePublicProbe. PrivateBodieslimitfactory uses
-explicitselected64/default16 sourceattempt scalar; all byte/memory/RSS/timecaps unchanged.
-262net private/test/zero production/DICE/reader changes,176Bstaticdescriptors/fixedliterals/
-zeroheapstrings/cache/interner/sourcecopy.28Coreordinary+4synthetic+1native pass with
-currentCoreCLI preparation;149line public/Hostdecoder functionfork validates unaltered
-raw16/64 while historicalhelpers stayunchanged. Loading23/Bzlmod3qualifiedreuse0fresh.
-Once0.654s/81,456KiB/325runtimepins/338unionmaterials/200leases605945B1211890brackets
-reaches exact220B rust/rust_analyzer_toolchain.bzl HostLstatNeed. SourceNone105registry
-235521B unchanged,17Host20052Decoded aggregate+1/1023; actualselectedlimits64/Host64.
-Publicnative_refusal/computation/prepcomplete/singletonpolicytrue/nullcertificatecounts/
-packagecause none; privatebodyhash/Weak/freshnessunobserved/vacuous, finalcreditsnotallDICE
-Arc/page release. Parent128KiB/non-atomic/noninherited brackets notnativecertificates.
-Next cohesive four-sibling local toolchain availability/admission from
-target/wp970/native/successor-source.md requires frozen reviewed contract beforeoperation;
-known directtable isnotfullclosure/unknownbodyauthenticity, no speculativegrant orlimit
-increase. OriginalpublicRustc/support/data/provider/toolchain/runfiles/oracle/restoration/
-MVS/provenance/fullCLI/M7A/wholefit remainopen. Immediate
-[WP969](./slug-v2-subplans/wp969-rules-rust-defs-source-readiness-2026-10-07.json), at
-5c50389f6d70309d49112717a2d0de330e429f7d, reachedprivateLstat at82,760KiB; its static
-correction and excluded6092B review-onlyread/history remainqualified predecessor evidence.
+atcee749034fad670d185ce8163447ec2877a72330 preserves earlier complete source histories,
+including its once81,456KiB analyzer-toolchain prerequisite and explicit64 policy.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

@@ -1068,7 +1068,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 23);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 31);
     assert!(bodies.admit(&all).is_ok());
     for (excluded, operation) in [
         (
