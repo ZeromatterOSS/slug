@@ -1,0 +1,634 @@
+{
+  "checkpoint": "WP954 bounded authentic metadata preparation and normal file registry",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "220c4711d725cda13349b03f99799a899103a2b2",
+  "previous_goal_turn": "progress",
+  "outcome": "progress: actual metadata source read and all eight extra Local modules observed; registry attempt limit is next owned boundary",
+  "compatibility": {
+    "exact": "unchanged full source bytes and authentic metadata verifier invariants",
+    "slug_native": "physical offline preparation and scoped normal native source observation",
+    "deferred": "mutable local registry freshness, complete mapping/providers/public Rustc and whole-workload fit"
+  },
+  "corpus": {
+    "operation": {
+      "path": "target/wp954/corpus/operation.json",
+      "sha256": "326782a5736b7ad84a2dbe6904227f3361b0b8ee1a8839e60f818c3e60a17346"
+    },
+    "result": {
+      "path": "target/wp954/corpus/result.json",
+      "sha256": "ee373fef2f89203c1650c79ce3918a5905476fd83af4d7ee5e7a77cd030a3962"
+    },
+    "stdout": {
+      "path": "target/wp954/corpus/stdout",
+      "sha256": "dfead5431d80e9eac9a14fdb598308a3396e2a4df796d38d0d7c5d1efec43714"
+    },
+    "stderr": {
+      "path": "target/wp954/corpus/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "status": "prepared",
+    "entry_count": 177,
+    "member_bytes": 273940,
+    "input_bytes": 464102,
+    "aggregate_actual_read_bytes": 1202144,
+    "elapsed_seconds": 0.7901362160919234,
+    "conservative_rss_kib": 27768,
+    "current_pin_count": 54,
+    "memory": {
+      "loaded_current": 4963895,
+      "loaded_peak": 4963895,
+      "retained_compact_helpers_and_rows": 5096363,
+      "peak_through_retirement": 22854062,
+      "tracing_excludes_encoding": true,
+      "source_bodies_retained": false
+    },
+    "qualification": "177 individually bracketed outputs and three held fullhash/EOF source inputs, not an atomic snapshot, BCR response authenticity or Host certificate. No plaintext bodies retained. Python trace excludes encoding and is not Slug allocation savings."
+  },
+  "implementation": {
+    "production_changes": 0,
+    "dependency_changes": 0,
+    "fixture_changes": 0,
+    "rust_file": {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "sha256": "5585143c59b559d92039d4ba2f80e1505202734b1dea65d071168855c27521ca"
+    },
+    "formatted_lines": 1750,
+    "net_lines": 125,
+    "scope": "Closed opt-in PreparedFile registry choice on existing Eleven companion; default BCR wrappers, whole Need and all11 Host-success certificate guards unchanged. Constructs URI once through existing normalizer; subsequent Arc-backed RegistryUrls copies use Dupe. Borrowed diagnostics; no new interner or source cache, no zero-copy claim."
+  },
+  "preparation": {
+    "compile": {
+      "path": "target/wp954/native/compile.json",
+      "sha256": "3ccfbe2d8f6988692d1da683eb58009543d62994f01837dd49dabb0ff1fd0b7f"
+    },
+    "check": {
+      "path": "target/wp954/native/check.json",
+      "sha256": "ed56b9780b5caf92705b164d8a5e32574937d3df99cc89115d436f725afe19ec"
+    },
+    "compile_seconds": 38.6203548850026,
+    "direct_check_seconds": 7.310160750057548,
+    "executable": {
+      "path": "target/wp954/native/executable.json",
+      "sha256": "e1770e656f6d3b09b8d934aa8411d451604c4ee5e44c41e223b9c0d0b7120d77"
+    },
+    "qualification": "Separate compiler preparation within60s; compiler memory is not runtime-fit evidence."
+  },
+  "ordinary": {
+    "selected": 14,
+    "passed": 14,
+    "elapsed_seconds": 2.748029005015269,
+    "conservative_rss_kib": 53116,
+    "exact_preflight": {
+      "path": "target/wp954/native/preflight-operation.json",
+      "sha256": "bd95c41eb14c13f97ee89b5b3131fe2a0cda0858c704be2cf3952c28aa8bb939"
+    },
+    "ignored_list": {
+      "path": "target/wp954/native/list-operation.json",
+      "sha256": "331e67d88d9238161f7e2137277b67208e7d8049ec46a1627ed8fb2012fb0aff"
+    },
+    "operations": [
+      {
+        "path": "target/wp954/native/ordinary-0-operation.json",
+        "sha256": "4564268aa94b4b1ade38d8bd438bf21c9ec689f03afc8d0c347196ff5b663f72"
+      },
+      {
+        "path": "target/wp954/native/ordinary-1-operation.json",
+        "sha256": "307fe982957930ec09a5878ec5553468ba91f88feabdd852cf2538040699e6f3"
+      },
+      {
+        "path": "target/wp954/native/ordinary-2-operation.json",
+        "sha256": "47113473b265ca4f043045b815d8bac2de5fd876d6438537fedd2ea9b38c6bdf"
+      },
+      {
+        "path": "target/wp954/native/ordinary-3-operation.json",
+        "sha256": "6c12b6598c26a293a081bb64e5eef41d64c53ca0a20a6c02448a595c3168b389"
+      },
+      {
+        "path": "target/wp954/native/ordinary-4-operation.json",
+        "sha256": "1fad844c8e437ec4d2b1cf03b1a6cc79d07046aad0188be8664d3cd0f226c3ee"
+      },
+      {
+        "path": "target/wp954/native/ordinary-5-operation.json",
+        "sha256": "689cc6d41b5fd014ac9b7976c67f32f59ec8cf6ab650e43714c7547fa480b01c"
+      },
+      {
+        "path": "target/wp954/native/ordinary-6-operation.json",
+        "sha256": "172f7dc2462ff51cbb086ed1b9e72e16e4867b14fb5810ea738a5778cb6c77a6"
+      },
+      {
+        "path": "target/wp954/native/ordinary-7-operation.json",
+        "sha256": "bfdb8c1795b2326f92f7ad198c681272ff5b83a6f8688b94db58795f8cef7fbc"
+      },
+      {
+        "path": "target/wp954/native/ordinary-8-operation.json",
+        "sha256": "5a197afdb8650598f1fbbb4e3fcefcd7239987ee47add9d2f66bc922a1db884b"
+      },
+      {
+        "path": "target/wp954/native/ordinary-9-operation.json",
+        "sha256": "ee2b7ca5e346f7bc222f1e7ca099f0895024a63a4a391478acf6692cd909549f"
+      },
+      {
+        "path": "target/wp954/native/ordinary-10-operation.json",
+        "sha256": "1b672c41f955439ef96eb8463d56ef723cf2c75508428359f3d2842de52d88b4"
+      },
+      {
+        "path": "target/wp954/native/ordinary-11-operation.json",
+        "sha256": "e53186bc717110ad422a287bf111ddc58820f1002da4030b5e1a506605b17ab4"
+      },
+      {
+        "path": "target/wp954/native/ordinary-12-operation.json",
+        "sha256": "947d8d7208676a872ef4d3cbf6071d6c17ba4c6b7a275f952cc0f69c3e7078a5"
+      },
+      {
+        "path": "target/wp954/native/ordinary-13-operation.json",
+        "sha256": "05b0600df466e38beb44017093430e1613566991fae3e37a360eea2889d8bc80"
+      }
+    ]
+  },
+  "controls": {
+    "corpus_operation": {
+      "path": "target/wp954/controls/operation.json",
+      "sha256": "657aaed48ccaee3bb1c1c3a064dbcb5d90b0951267f301148f2fa0955b5a8079"
+    },
+    "corpus_selected": 5,
+    "corpus_passed": 5,
+    "corpus_seconds": 0.1224413700401783,
+    "corpus_peak_kib": 28400,
+    "decoder_operation": {
+      "path": "target/wp954/native/protocol-controls/operation.json",
+      "sha256": "90db7ad76546d871427aa129ffc9e94374bad30b428e2914e30c9e0d47bd646c"
+    },
+    "decoder_selected": 2,
+    "decoder_passed": 2,
+    "decoder_seconds": 0.034731881925836205,
+    "decoder_peak_kib": 16232,
+    "decoder_synthetic_only": true,
+    "reused_fd": 3,
+    "reused_availability": 15,
+    "reused_version": 1,
+    "reused_runs": 0
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp954/native/native-operation.json",
+      "sha256": "c4f30d8d6a03b727bfd34c05c79aabed340f81a7164c5e6a61405ba9ce95e1a1"
+    },
+    "result": {
+      "path": "target/wp954/native/result.json",
+      "sha256": "bbf92d742621e1af488b49f16863e33b693f6d6955152a1498cce904537a8fe7"
+    },
+    "stdout": {
+      "path": "target/wp954/native/native.stdout",
+      "sha256": "1e10d7539134270fbd5f796f7e50034aad9ae6c8d5438e81aa45d83481214aff"
+    },
+    "stderr": {
+      "path": "target/wp954/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "exit_code": 0,
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 0.29252312099561095,
+    "sampled_rss_kib": 68328,
+    "child_rusage_rss_kib": 69140,
+    "conservative_rss_kib": 69544,
+    "current_pin_count": 95,
+    "physical_source_files": 188,
+    "physical_source_bytes": 284878,
+    "before_after_hash_read_bytes": 569756,
+    "source_brackets_observed": true,
+    "current_pins_raw_verified": true,
+    "stop_reason": null,
+    "joined": true,
+    "owned_group_empty": true,
+    "profile": {
+      "outcome": {
+        "stage": "native_refusal",
+        "kind": "computation",
+        "attempts": null,
+        "terminal_roots": null
+      },
+      "phases": [
+        {
+          "phase": "baseline",
+          "rss_kib": 17756
+        },
+        {
+          "phase": "after_runtime",
+          "rss_kib": 39104
+        },
+        {
+          "phase": "after_command",
+          "rss_kib": 69440
+        },
+        {
+          "phase": "after_terminal_drop",
+          "rss_kib": 69544
+        },
+        {
+          "phase": "after_runtime_drop",
+          "rss_kib": 69544
+        },
+        {
+          "phase": "after_scope_drop",
+          "rss_kib": 69476
+        }
+      ],
+      "resources": [
+        {
+          "phase": "before_command",
+          "descriptor_used": 0,
+          "descriptor_peak": 0,
+          "logical_used": 0,
+          "scratch_used": 0
+        },
+        {
+          "phase": "after_command",
+          "descriptor_used": 0,
+          "descriptor_peak": 47048,
+          "logical_used": 0,
+          "scratch_used": 0
+        },
+        {
+          "phase": "after_runtime_drop",
+          "descriptor_used": 0,
+          "descriptor_peak": 47048,
+          "logical_used": 0,
+          "scratch_used": 0
+        }
+      ],
+      "source_error": "Some(Limit(RegistryAttempts))",
+      "source_counters": {
+        "registry_attempts": 16,
+        "registry_admitted_bytes": 96781,
+        "source_attempts": 0,
+        "transferred_bytes": 0,
+        "decoded_bytes": 0,
+        "written_bytes": 0,
+        "live_buffer_bytes_before_drop": 279143,
+        "peak_buffer_bytes": 1424448
+      },
+      "root_source": {
+        "seen": true,
+        "calls": 33,
+        "policy_checked": true,
+        "bytes": 426,
+        "hash_match": true,
+        "anchor": "complete",
+        "outer_variant": "None"
+      },
+      "mapping": {
+        "state": "semantic_refusal",
+        "codes": [
+          "RootMappingPredecessor",
+          "ExtensionMappingsRoutes",
+          "RoutesGraph",
+          "GraphDiscoveryLeaf",
+          "DiscoverySourcePreparation",
+          "ModuleSourceRegistryFile",
+          "RegistryFileLocalRead"
+        ],
+        "termination": "Classified",
+        "native_detail": true
+      },
+      "denied": {
+        "family": "none",
+        "path_len": null,
+        "path_hex": "none",
+        "capture": "missing"
+      },
+      "retirement": {
+        "source_weak_seen": true,
+        "source_weak_expired": true,
+        "live_buffer_zero": true,
+        "scope_weak_expired": true,
+        "recorder_weak_expired": true
+      },
+      "normal_producer_proved": false,
+      "whole_workload_fit_proved": false,
+      "attribution": {
+        "attempted": 19,
+        "admitted": 16,
+        "scope_admitted": 16,
+        "distinct": 16,
+        "repeated": 0,
+        "retained": 16,
+        "refused": 3,
+        "sticky": 2,
+        "charged": 279143,
+        "visited": 16,
+        "complete": true,
+        "qualified": false,
+        "capture": "captured",
+        "first_row": {
+          "ordinal": 1,
+          "admissions": 1,
+          "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f72656769737472792f6d6f64756c65732f7a6c69622f312e332e312e6263722e352f4d4f44554c452e62617a656c",
+          "local_path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f72656769737472792f6d6f64756c65732f7a6c69622f312e332e312e6263722e352f4d4f44554c452e62617a656c",
+          "url_utf8": "file:///run/media/system/Colossus/dev/slug/target/wp954/registry/modules/zlib/1.3.1.bcr.5/MODULE.bazel"
+        },
+        "meaning": "first distinct partial diagnostic identity only",
+        "module_version_file_kind_proved": false,
+        "wrapped_error_causal_chain_proved": false
+      },
+      "registry_choice": {
+        "choice": "file",
+        "url_len": "64",
+        "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f7265676973747279",
+        "policy_checked": true
+      },
+      "registry_body_weak": "unobserved",
+      "additional_sources": [
+        {
+          "owner": "bazel_features_root",
+          "source": {
+            "seen": true,
+            "bytes": 346,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "bazel_skylib_root",
+          "source": {
+            "seen": true,
+            "bytes": 389,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "rules_cc_root",
+          "source": {
+            "seen": true,
+            "bytes": 1181,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "rules_license_root",
+          "source": {
+            "seen": true,
+            "bytes": 753,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "rules_shell_root",
+          "source": {
+            "seen": true,
+            "bytes": 485,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "apple_support_root",
+          "source": {
+            "seen": true,
+            "bytes": 1104,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "package_metadata_root",
+          "source": {
+            "seen": true,
+            "bytes": 235,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        },
+        {
+          "owner": "buildozer_root",
+          "source": {
+            "seen": true,
+            "bytes": 1122,
+            "hash_match": true
+          },
+          "retirement": {
+            "source_weak_seen": true,
+            "source_weak_expired": true
+          }
+        }
+      ],
+      "selected_semantic_request": {
+        "capture": "captured",
+        "name_len": 10,
+        "name_hex": "61627365696c2d637070",
+        "version_len": 10,
+        "version_hex": "32303235303831342e31",
+        "url_len": 107,
+        "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f72656769737472792f6d6f64756c65732f61627365696c2d6370702f32303235303831342e312f4d4f44554c452e62617a656c",
+        "decoded": {
+          "name": "abseil-cpp",
+          "version": "20250814.1",
+          "url": "file:///run/media/system/Colossus/dev/slug/target/wp954/registry/modules/abseil-cpp/20250814.1/MODULE.bazel"
+        },
+        "completed_mvs_provenance_proved": false
+      }
+    },
+    "qualification": "Passing bounded observer reports actual computation/semantic refusal at registry attempt16; this is not mapping/provider/producer success. All8 extra Local sources actually seen/fullhash true/original Weak expired. Parent full hashes are physical only; all11 native Host-success certificate unexecuted. Registry body Weak unobserved; livecredit0 proves no original registry Arc or RSS-page reclaim."
+  },
+  "contracts": [
+    {
+      "path": "target/wp954/design.md",
+      "sha256": "2ce0ada16b929e1cc1bdeb560e81c2922a210e43c65e6ff8a69565700cb6ae6c"
+    },
+    {
+      "path": "target/wp954/inputs.json",
+      "sha256": "8c0e705ff3e28acafa40d827ce652e3ba04d2851dfe6644e01c9972ae5dfdb9a"
+    },
+    {
+      "path": "target/wp954/corpus.py",
+      "sha256": "639adeab7478d44a8770fa601646ec8812e1f72438117a32fd166004eeedc1ce"
+    },
+    {
+      "path": "target/wp954/controls.py",
+      "sha256": "615a6659ee2b9a72e905645789438601bcb2a9d6d7afc9412dc11b5a938a72a0"
+    },
+    {
+      "path": "target/wp954/run.py",
+      "sha256": "6f280c7f5bcd5d41422c11a4cac24d1506f504594f9202f88368798af91c3aaf"
+    },
+    {
+      "path": "target/wp954/native/design.md",
+      "sha256": "dd6ad77f97f3cc5590622da06ce876bb25691cafce5614e05af87ab796bb9a6f"
+    },
+    {
+      "path": "target/wp954/native/inputs.json",
+      "sha256": "15cc2a3d906933efcdc4787b2af37913945aa22313c4721cceac432ab10204fb"
+    },
+    {
+      "path": "target/wp954/native/protocol.py",
+      "sha256": "96a8500e54160cafba54293e369fcc28b5e1b89602abfa4ecbf46c87c4f79eeb"
+    },
+    {
+      "path": "target/wp954/native/supervise.py",
+      "sha256": "3f05ff6b80157d00bf92a5af2a36b9cadb571775b923e398b28377385d10470d"
+    },
+    {
+      "path": "target/wp954/native/prepare.py",
+      "sha256": "8765740dbf1a24c393d00bbcaaba99cfebe9f74d2b1377a2cc68bdb91dacdd9f"
+    },
+    {
+      "path": "target/wp954/native/protocol_controls.py",
+      "sha256": "9d0d2ad633d59559abf7cf16155708b9ea0a5465f189853b3e04b82062ac4c84"
+    },
+    {
+      "path": "target/wp954/native/protocol_control_run.py",
+      "sha256": "5951191546e8b676645c6421376d771918835a6c829426ac9ba4e9ca6b1cce68"
+    }
+  ],
+  "reviews": [
+    {
+      "path": "target/wp954/design-source.md",
+      "sha256": "403ed5bec73f5692113c800e43c0c0a3ae964a28d4427da54d66e3e85cea435f"
+    },
+    {
+      "path": "target/wp954/design-evidence.md",
+      "sha256": "c38617807aa23c59c77cdd4d8809c9f43273c05ea6888a5907b9e7217d9ad114"
+    },
+    {
+      "path": "target/wp954/launch-controls-source.md",
+      "sha256": "b72b2c1c63f2b6873bf9355acebbd84ad8a6512d22f63f02c5d72d2383718eb8"
+    },
+    {
+      "path": "target/wp954/launch-controls-evidence.md",
+      "sha256": "94e310b034992c9b69df55692c692c3011b491cd785bc7c2df8ad501ec682591"
+    },
+    {
+      "path": "target/wp954/launch-corpus-source.md",
+      "sha256": "34f7735c6b96c3a1fa34b4bd322d531c4e41ebdc6b2a335f032a3393665b0cf5"
+    },
+    {
+      "path": "target/wp954/launch-corpus-evidence.md",
+      "sha256": "598cf2042d8d0d5e48a05b1b954009290b6ea28e70d5119eaa77c8c958f4c672"
+    },
+    {
+      "path": "target/wp954/final-corpus-source.md",
+      "sha256": "a5c04dcedc1f13047d7bc00db28ca779bb9e9a137be96f8c816227aabfe1f1d4"
+    },
+    {
+      "path": "target/wp954/final-corpus-evidence.md",
+      "sha256": "940f359a2a356dea42df0078fa74b6bf7bbb7e7f3d34db8c74a5c32116742c9f"
+    },
+    {
+      "path": "target/wp954/native/design-source.md",
+      "sha256": "920600cab3e0b3e65575638344b98cbe134175a93c07c1c701fd72cb65d5609a"
+    },
+    {
+      "path": "target/wp954/native/design-evidence.md",
+      "sha256": "e9fc2ffab94664191de194df177b77dcb4214f37d9a879b2786bf4ce9d89b13f"
+    },
+    {
+      "path": "target/wp954/native/code-source.md",
+      "sha256": "e70cdbe0e5cd6acf7334ed14a39c4d1b63fe2ea6dc2bcf4a67fb0b99c72b5620"
+    },
+    {
+      "path": "target/wp954/native/code-evidence.md",
+      "sha256": "8cd10ca73ca0659930100c0334816cf7a24ca57c2b3cd689f2d0709e87b5b1d1"
+    },
+    {
+      "path": "target/wp954/native/preflight-source.md",
+      "sha256": "b5407cd531ec07cd16f6696b171744b9bd73d31241fa142fe97ff61a75c3e07d"
+    },
+    {
+      "path": "target/wp954/native/preflight-evidence.md",
+      "sha256": "ba4dca921382af21ab3daba4ec4b4585028cb20f8bf3b31200940a33e8ae8ed9"
+    },
+    {
+      "path": "target/wp954/native/final-source.md",
+      "sha256": "c301bc5a4b438e51240f5293ceb1aef867601780c01b5d4ef58d2746aefd8467"
+    },
+    {
+      "path": "target/wp954/native/final-evidence.md",
+      "sha256": "83de9a6f787c7bd5958503a4d8b2099f7729141a678224951126c8106b86323d"
+    }
+  ],
+  "counts": {
+    "fresh_rust_tests": 15,
+    "fresh_python_controls": 7,
+    "physical_corpus_observations": 1
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": {
+    "actual_request": {
+      "name": "abseil-cpp",
+      "version": "20250814.1",
+      "url": "file:///run/media/system/Colossus/dev/slug/target/wp954/registry/modules/abseil-cpp/20250814.1/MODULE.bazel"
+    },
+    "actual_boundary": "Some(Limit(RegistryAttempts))",
+    "decision": "Independently design PreparedFile-only32 registry attempts and matching decoder bounds using the existing naturally scaled diagnostic recorder. Preserve default BCR16 and all object/byte/RSS/time/sourceAttempt limits. This selects review, not another operation or cap activation.",
+    "recommendation": {
+      "path": "target/wp954/native/successor-source.md",
+      "sha256": "86406e09cee56abe943c3786c218aef7d78ebe32e539f142032a2eb314f988b0"
+    },
+    "prepared_abseil_member": {
+      "path": "/run/media/system/Colossus/dev/slug/target/wp954/registry/modules/abseil-cpp/20250814.1/MODULE.bazel",
+      "bytes": 1376,
+      "sha256": "51f2312901470cdab0dbdf3b88c40cd21c62a7ed58a3de45b365ddc5b11bcab2",
+      "identity": [
+        66308,
+        160958391,
+        33188,
+        1791337778545784617,
+        1791337778545784617,
+        1376
+      ],
+      "individually_bracketed": true,
+      "relative_path": "modules/abseil-cpp/20250814.1/MODULE.bazel",
+      "source_url": "https://bcr.bazel.build/modules/abseil-cpp/20250814.1/MODULE.bazel"
+    },
+    "recorder_rows_and_bytes": {
+      "current_rows": 16,
+      "current_reserved_bytes": 279143,
+      "proposed_rows": 32,
+      "proposed_reserved_bytes": 541287,
+      "increment_bytes": 262144,
+      "max_supported_rows": 256,
+      "scope_byte_limit": 16777216
+    }
+  },
+  "checks": {
+    "plan_status": "passed",
+    "archive": "passed",
+    "diff": "passed"
+  },
+  "recorded_utc": "2026-10-07T02:11:30.441916+00:00",
+  "packet_elapsed_seconds": 2068.506716
+}

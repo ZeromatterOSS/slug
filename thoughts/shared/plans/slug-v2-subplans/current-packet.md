@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: zlib conditional lookup unavailable; owned offline registry metadata continuation
+Status: owned file registry advances all eight Local sources; reviewed attempt-capacity continuation
 
 ## Observable and source basis
 
@@ -42,86 +42,66 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Selected continuation
+## Current checkpoint and selected continuation
 
-[WP953](wp953-zlib-alias-unavailable-2026-10-07.json) closes the sole conditional external/zlib+ lookup as
-unavailable FileNotFoundError/errno2:0.032s/17,504KiB,38stable current pins,
-one completed observation/passnull/zero bodies. The missing component and global absence
-are unproved.15named availability controls reused0runs; no MODULE/Twelfth/Rust/native
-activation, alternate alias/output base/census or identical retry.
+[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) prepares the authentic
+owned177 metadata files/273940B from three pinned inputs464102B. Five controls and the
+once preparation pass in0.790s/conservative27768KiB; source bodies retire after exact
+verification/write/readback, with compact provenance only. Traced22854062B peak and
+5096363B retained helpers/rows exclude encoding and do not measure Slug savings.
 
-Positive repository-owned source: configured-cli-authentic registry-metadata.json
-explicitly indexes modules/zlib/1.3.1.bcr.5/MODULE.bazel,237B/fullSHAeec517b5…;
-fixture manifest pins177metadata entries/409600B tar/fullSHA60b023fc… and273940
-advertised member bytes. Archive/member bytes have not been read or verified here.
-Continue [the source-owner decision](../../../../target/wp953/successor-decision.md)
-with separately reviewed bounded owned-metadata corpus preparation and existing normal
-file-registry ownership. Reuse exact fixture inventory/verifier invariants and retire
-per-file scratch; no new source strings/global pool or copied whole fixture harness.
-The six direct metadata objects and absent registry policy JSON are explicit gaps to
-freeze if actually required. Inventory membership is not current runtime demand.
+The existing Eleven companion now has one closed opt-in PreparedFile registry choice,
+with normal RegistryUrls/request and actual RootModuleRegistryUrlsKey equality before
+anchor computation. DefaultBCR wrappers/markers and the whole-Need/all11 Host-success
+certificate guards stay intact. Arc-backed RegistryUrls Dupe and borrowed diagnostics
+avoid repeated URL/body ownership; no interner/global pool or second semantic cache.
+Fourteen ordinary Rust tests pass in2.748s/53116KiB; two synthetic decoder controls pass.
+Separate Core compile38.620s and direct Core/CLI check7.310s pass.
 
-No full fixture assemble/prove/F3, payload archive, network/acquisition or spent-source
-retry follows. Freeze exact inputs/counts/aggregate budget, normal request projection,
-DICE source/equality/freshness/retention and lifetime/certificate coverage before native.
-Keep registry1MiB/source-image-scratch16MiB/attempt16/threads2/work5cleanup8 and runtime
-caps; any attempt-policy change needs an explicit independent design with its user-limit
-basis, never a silent increase. Preserve all eleven prior Local source rows/versions/
-repo_name facts and first semantic-error precedence. Full public Rustc and whole-fit
-remain the intended outcome; source metadata preparation alone cannot close them.
+One new normal file-registry observer passes in0.293s/conservative69544KiB with95stable
+runtime pins and188 held original regular source/output leases284878B (569756B fullhash
+before/after reads). Root426B/anchor/fullhash and all eight extra Local module sources
+are actually observed/fullhash-true; their original Weak handles expire along with scope
+and recorder, and final tracked credits/image/scratch resources are zero. Successful
+all11 native Host-certificate coverage remains unexecuted. Registry-body Weak retirement
+is unobserved, and zero live credits do not prove DICE Arc or RSS-page release.
 
-## Current source-readiness checkpoint
+The actual terminal is computation/semantic refusal, RegistryFileLocalRead, with sticky
+Some(Limit(RegistryAttempts)):16 admitted attempts/96781 admitted bytes, peak live buffer
+1424448B. The original borrowed selected tuple names abseil-cpp20250814.1 and its107B
+file-registry MODULE URL. The first diagnostic zlib row is distinct and unqualified.
+No whole-Need denial occurred. The attempt stop establishes no missing object, completed
+mapping/MVS/provider/public Rustc or whole-workload fit. No retry or cap increase follows.
 
-[WP952](wp952-native-buildozer-source-readiness-2026-10-07.json) observes buildozer+ target187B and exact MODULE1122B/fullSHAa35d9561…,
-declaring buildozer8.5.1/>=6.2.0 with three dependency/three unknown partial facts and no loads.
-Metadata0.032s/17,788KiB and module0.052s/18,604KiB are separate held NOFOLLOW
-FD/name/ancestor/fullhash/EOF witnesses, not an atomic source certificate or native evaluation.
-Name/version physically match the actual request; explicit normal Local uses the existing
-empty-effective-key/name-check semantics without registry authenticity or graph/MVS equivalence.
-Prior cc0.2.4 versus Local0.2.17 and apple1.24.1 versus Local1.24.2 mismatches remain;
-apple's apparent repo_name build_bazel_apple_support is distinct from canonical apple_support+.
-Prior package_metadata235B/declared0.0.3 remains physical correspondence only.
-
-The sole shared companion has fixed8 extras/closedEleven, seven-prior constructor and
-all-prior paired negatives (Eleven14, earlier2/4/6/8/10/12 preserved), net51 formatted lines. Borrowed static names/error
-tuple and fixed10 once-per-request override strings preserve ownership. Thirteen ordinary
-tests pass in 2.552s/55,640KiB. Separate Core compile
-9.665s and direct Core/CLI check
-7.293s pass; compiler memory is separate from runtime fit.
-One eleven-root native observer passes in 0.239s at conservative
-67,448KiB RSS under256MiB, with 83 current pins and eleven parent MODULE
-brackets10,938B. Genuine original root426B/hash/anchor/firstWeak and tracked credit/recorder/
-scope retirement are checked.
-
-Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support, package_metadata, buildozer. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous.
-The held original semantic error reports zlib 1.3.1.bcr.5 and the original 61B MODULE request. This borrowed discovery association proves no completed MVS/BCR provenance.
-Scope registry attempts1/admittedbytes0
-and recorder4attempts/1admitted/3refused/qualified=False
-stay separate; adapter calls are not source attempts. Parent hashes do not fabricate native
-epochs. Fourteen fresh Rust checks=13Coreordinary+1native; two physical decisions are
-observations.15availability/3FD/1version controls reused0runs. Logical credit/Weak release
-proves no RSS-page reclaim or whole-workload fit. Mapping/providers/publicRustc/fullfit limits
-remain explicit in the actual receipt. Continue [the actual source owner recommendation](../../../../target/wp952/native/successor-source.md)
-under unchanged memory/caps and borrowed/scoped-interned allocation discipline.
+Next independently review PreparedFile-only32 registry attempts and matching decoder
+bounds using the existing naturally scaled diagnostic recorder:541287B reserved at32,
++262144B versus16, below unchanged16MiB source/live caps. Default BCR stays16; all
+object/byte/RSS/time/sourceAttempt limits remain. The actual selected abseil MODULE is
+already prepared1376B/fullSHA; absence is not the issue. The current source recommendation
+lives at target/wp954/native/successor-source.md. No operation or cap change is activated
+until this concrete policy's independent design and focused validation pass. Existing object/byte/image/scratch/RSS/time caps and all prior spent-source
+refusals remain. A changed packet attempt estimate requires measured justification and
+independent design; never grow a fixed module mode per dependency or silently raise limits.
+Mutable same-URL local registry invalidation remains separately owned: successful local
+RegistryFileFound currently has no generation dependency or Host body certificate row.
+This fresh immutable corpus and held physical brackets qualify one runtime only.
 
 ## Reusable evidence and predecessor
 
-[WP951](wp951-native-package-metadata-readiness-2026-10-07.json) is the immediate predecessor:
-Ten observer0.245s/66,644KiB, root426B/Weak/credits checked, seven extras unseen,
-actual buildozer8.5.1 prerequisite. Its Local version control was reused;
-public producer/whole-workload fit remain open. Detailed completed chronology is pinned
-at605f2f3af: `thoughts/shared/plans/slug-v2-subplans/current-packet.md`.
-Reusable topic index: [alias](wp934-explicit-root-alias-2026-10-06.json),
-[finite reads](wp935-explicit-local-source-2026-10-06.json), [direct imports](wp936-direct-local-imports-2026-10-06.json),
-[native parser ownership](wp937-native-source-memory-2026-10-06.json), [offline owner](wp938-normal-offline-source-prerequisite-2026-10-06.json),
-[borrowed attribution](wp939-borrowed-registry-attribution-2026-10-06.json), [exact request](wp940-exact-offline-registry-prerequisite-2026-10-06.json),
-[platforms](wp941-platforms-local-module-readiness-2026-10-06.json), [root epoch](wp942-native-local-module-readiness-2026-10-06.json),
-[borrowed semantic association](wp943-borrowed-module-registry-association-2026-10-06.json),
-[features/Four](wp944-bazel-features-local-source-2026-10-06.json), [Four controls](wp945-native-borrowed-dependency-readiness-2026-10-06.json),
-[skylib/Five](wp946-native-skylib-source-readiness-2026-10-06.json), [Local version/Six](wp947-native-local-version-readiness-2026-10-06.json),
-[license/Seven](wp948-native-license-source-readiness-2026-10-06.json), [shell/Eight](wp949-native-shell-source-readiness-2026-10-06.json), [apple/Nine](wp950-native-apple-local-readiness-2026-10-06.json).
-Representative parser/source operations fit existing caps; full-source/whole-workload fit
-remains open. Every earlier refused source/replay/guard boundary remains closed.
+[WP953](wp953-zlib-alias-unavailable-2026-10-07.json) closed one conditional zlib alias
+lookup unavailable at0.032s/17504KiB with zero body bytes; global absence was not proved.
+The independent authentic owned177 metadata corpus provided the positive alternative.
+[WP952](wp952-native-buildozer-source-readiness-2026-10-07.json) preserves eleven Local
+MODULE rows10938B and the prior native observation; detailed chronology and unchanged
+contracts remain reachable at220c4711d: current-packet.md. Explicit Local empty-effective-key
+semantics do not authenticate registry versions: cc requested0.2.4 versus Local0.2.17,
+apple requested1.24.1 versus Local1.24.2, and apple repo_name build_bazel_apple_support
+versus canonical apple_support+ stay distinct. Six direct metadata objects and absent
+bazel_registry.json are outside the177 corpus; do not invent policy/mirrors or payloads.
+Reuse the prior3FD/15availability/1version outcomes with current source/raw/hash checks,
+zero reruns. Earlier alias/read/import/parser/root-epoch/borrowing checkpoints are indexed
+in WP954's predecessor and earlier immutable receipts. Representative source operations
+fit the existing caps; complete graph/whole-workload fit remains open.
 
 ## Ownership, scope and allocation
 

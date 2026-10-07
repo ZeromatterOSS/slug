@@ -9,6 +9,8 @@ use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepositoryMaterializationKind;
 use slug_bzlmod_v2::RootModuleCommandPolicyKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
+use slug_bzlmod_v2::RootModuleRegistryUrls;
+use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::SelectedSourceRefusal;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -141,6 +143,75 @@ impl ModuleMode {
             Self::Eleven => 8,
         }
     }
+}
+#[derive(Clone, Copy)]
+enum RegistryChoice {
+    DefaultBcr,
+    PreparedFile,
+}
+impl RegistryChoice {
+    fn urls(self, prepared: impl FnOnce() -> RegistryUrls) -> RegistryUrls {
+        match self {
+            Self::DefaultBcr => RegistryUrls::new(["https://bcr.bazel.build/"]),
+            Self::PreparedFile => prepared(),
+        }
+    }
+}
+fn prepared_file_registry(spelling: &str, expected: &Path) -> Result<RegistryUrls, ()> {
+    if spelling.len() > 1024
+        || !spelling
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"/._-".contains(&b))
+    {
+        return Err(());
+    }
+    let root = NormalizedAbsolutePath::new(Path::new(spelling)).map_err(|_| ())?;
+    if root.as_path().as_os_str() != Path::new(spelling).as_os_str() || root.as_path() != expected {
+        return Err(());
+    }
+    RegistryUrls::from_request(expected, &[format!("file://{spelling}")]).map_err(|_| ())
+}
+fn registry_policy_matches(actual: &RootModuleRegistryUrls, expected: &RegistryUrls) -> bool {
+    actual == &RootModuleRegistryUrls::from(expected.dupe())
+}
+#[test]
+fn prepared_file_registry_policy_is_opt_in_and_exact() {
+    let expected = Path::new("/task/registry");
+    let file = prepared_file_registry("/task/registry", expected).unwrap();
+    assert_eq!(file.as_slice().len(), 1);
+    assert_eq!(file.as_slice()[0].as_str(), "file:///task/registry");
+    let bcr = RegistryChoice::DefaultBcr.urls(|| panic!("default must not obtain prepared root"));
+    assert_eq!(bcr.as_slice().len(), 1);
+    assert_eq!(bcr.as_slice()[0].as_str(), "https://bcr.bazel.build");
+    assert!(registry_policy_matches(
+        &RootModuleRegistryUrls::from(file.dupe()),
+        &file
+    ));
+    for wrong in [
+        RegistryUrls::new(["file:///other/registry"]),
+        bcr,
+        RegistryUrls::new(["file:///task/registry", "file:///other/registry"]),
+        RegistryUrls::new(std::iter::empty::<&str>()),
+    ] {
+        assert!(!registry_policy_matches(
+            &RootModuleRegistryUrls::from(wrong),
+            &file
+        ));
+    }
+    for spelling in [
+        "task/registry",
+        "/task/../task/registry",
+        "/task/registry/",
+        "/task/other",
+        "/task/reg istry",
+        "/task/registry?",
+        "/task/registry#",
+        "/task/%workspace%",
+        "",
+    ] {
+        assert!(prepared_file_registry(spelling, expected).is_err());
+    }
+    assert!(prepared_file_registry(&"a".repeat(1025), expected).is_err());
 }
 struct AdditionalModule {
     root: NormalizedAbsolutePath,
@@ -361,6 +432,7 @@ struct Milestones {
     additional_source: [Option<Weak<[u8]>>; 8],
     additional_bytes: [Option<(usize, bool)>; 8],
     selected_reported: bool,
+    registry_policy_checked: bool,
     bytes: usize,
     hash_match: bool,
     anchor: Option<&'static str>,
@@ -372,6 +444,7 @@ struct Milestones {
 #[derive(Clone)]
 struct ModuleRoot {
     bodies: Arc<Bodies>,
+    expected_registry: Option<RegistryUrls>,
     milestones: Arc<Mutex<Milestones>>,
 }
 #[derive(Clone)]
@@ -443,6 +516,18 @@ impl NativeCommandRoot for ModuleRoot {
             .map_err(|_| refusal())?;
         if !exact || mode != slug_bzlmod_v2::RootModuleLockfileMode::from(LockfileMode::Off) {
             return Err(refusal());
+        }
+        if let Some(expected) = &self.expected_registry {
+            let actual = tx
+                .compute(&RootModuleRegistryUrlsKey {
+                    workspace: self.bodies.roots[0].as_path().to_owned(),
+                })
+                .await
+                .map_err(|_| refusal())?;
+            if !registry_policy_matches(&actual, expected) {
+                return Err(refusal());
+            }
+            self.milestones.lock().unwrap().registry_policy_checked = true;
         }
         self.milestones.lock().unwrap().effective_empty = true;
         self.milestones.lock().unwrap().anchor = Some("need");
@@ -1294,13 +1379,36 @@ fn native_eleven_root_local_module_and_mapping_prerequisite() {
     observe_native_modules(ModuleMode::Eleven);
 }
 
+#[test]
+#[ignore = "frozen scoped eleven-root prepared file-registry readiness observation"]
+fn native_eleven_root_prepared_file_registry_and_mapping_prerequisite() {
+    observe_native_modules_with_registry(ModuleMode::Eleven, RegistryChoice::PreparedFile);
+}
 fn observe_native_modules(mode: ModuleMode) {
+    observe_native_modules_with_registry(mode, RegistryChoice::DefaultBcr);
+}
+fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: RegistryChoice) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace"),
     )
     .unwrap();
+    let registry_urls = registry_choice.urls(|| {
+        let expected = NormalizedAbsolutePath::new(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/wp954/registry"),
+        )
+        .unwrap();
+        prepared_file_registry(
+            &std::env::var("SLUG_NATIVE_FILE_REGISTRY_ROOT").expect("frozen registry root"),
+            expected.as_path(),
+        )
+        .expect("exact prepared file registry")
+    });
+    let request_registry = match registry_choice {
+        RegistryChoice::DefaultBcr => "https://bcr.bazel.build/",
+        RegistryChoice::PreparedFile => registry_urls.as_slice()[0].as_str(),
+    };
     let root = |name| {
         let spelling = std::env::var(name).expect("frozen supervisor root");
         assert!(spelling.len() <= 1024 && !spelling.chars().any(char::is_whitespace));
@@ -1339,10 +1447,11 @@ fn observe_native_modules(mode: ModuleMode) {
     }
     let bodies = Arc::new(bodies);
     println!(
-        "WP942_REQUEST workspace={} rules_root={} platforms_root={} registry=https://bcr.bazel.build/ lockfile=off local_overrides=true",
+        "WP942_REQUEST workspace={} rules_root={} platforms_root={} registry={} lockfile=off local_overrides=true",
         workspace.as_path().display(),
         bodies.roots[1].as_path().display(),
-        bodies.roots[2].as_path().display()
+        bodies.roots[2].as_path().display(),
+        request_registry
     );
     let start = Instant::now();
     let scope = SourceServiceScope::new_for_test(
@@ -1421,14 +1530,21 @@ fn observe_native_modules(mode: ModuleMode) {
                 let mut request = NativeDemandRequestInputBundle::normalized_initial();
                 request.command_policy = policy;
                 request.lockfile_mode = LockfileMode::Off;
-                request.registry_urls = RegistryUrls::new(["https://bcr.bazel.build/"]);
-                outcome = Some(runtime.drive_command(
-                    request,
-                    ModuleRoot {
-                        bodies,
-                        milestones: milestones.clone(),
-                    },
-                ));
+                request.registry_urls = registry_urls.dupe();
+                outcome = Some(
+                    runtime.drive_command(
+                        request,
+                        ModuleRoot {
+                            bodies,
+                            expected_registry: matches!(
+                                registry_choice,
+                                RegistryChoice::PreparedFile
+                            )
+                            .then(|| registry_urls.dupe()),
+                            milestones: milestones.clone(),
+                        },
+                    ),
+                );
             }
         }
     }
@@ -1461,6 +1577,15 @@ fn observe_native_modules(mode: ModuleMode) {
     }
     let (source_weak, additional_weak) = {
         let state = milestones.lock().unwrap();
+        if matches!(registry_choice, RegistryChoice::PreparedFile) {
+            let url = registry_urls.as_slice()[0].as_str().as_bytes();
+            println!(
+                "WP954_REGISTRY choice=file url_len={} url_hex={} policy_checked={}",
+                url.len(),
+                RegistryHex((url.len() <= REGISTRY_IDENTITY_BYTES).then_some(url)),
+                state.registry_policy_checked
+            );
+        }
         for (slot, (prefix, _)) in ADDITIONAL_MARKERS
             .into_iter()
             .take(mode.additional_count())

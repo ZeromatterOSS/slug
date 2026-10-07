@@ -146,8 +146,15 @@ public Rustc/provenance/whole-workload fit remains open.
 [WP953](./slug-v2-subplans/wp953-zlib-alias-unavailable-2026-10-07.json) closes the one conditional zlib lookup unavailable
 in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global absence
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
-fixture bundle. Next separately review bounded offline corpus preparation through normal
-file-registry owners, preserving source/memory caps and genuine provider/public Rustc gates.
+fixture bundle independently grounds the completed bounded corpus below; source/memory
+caps and genuine provider/public Rustc gates stay intact.
+[WP954](./slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json)
+prepares177 authentic metadata files/273940B at27MiBRSS, then advances the existing
+normal file-registry observer at68MiBRSS: all8 extra Local sources now observed/fullhash
+checked/original Weak retired.14 ordinary+2decoder+5writer+1native gates pass; the actual
+next boundary is registry attempt16 while selecting abseil-cpp20250814.1. Review the
+normal attempt/diagnostic-capacity policy before another run; mapping/public Rustc,
+mutable registry freshness/original registry Arc retirement and wholefit remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
