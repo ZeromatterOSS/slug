@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Cohesive local import frontier accepted; continue remaining declared imports
+Status: Local toolchain import pair accepted; continue grounded rustc imports
 
 ## Observable and source basis
 
@@ -43,6 +43,44 @@ Current fullCLI compiler closure/execution, inherited environment/historical cwd
 REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
+
+[WP973](wp973-rules-rust-local-toolchain-import-readiness-2026-10-07.json), baseline
+54cbc04a5279484d3d090536eb3bd1fcbc56e2a6, captures exact lto4417B once in0.042s/
+18,944KiB with35 stable pins and unchanged strict FD/facts/64KiB scratch/per-row body/
+text/AST retirement. One observation is not a test pass;11 original reader/fact controls
+are qualified reuse0fresh. Historical semver1916B plus the usable lto row append to the
+original24-prefix body table26, while all3 exact HostLstat metadata paths/defaultfalse
+PreparedFile+PublicProbe flag/projection and source64/default16/allcaps remain. Two net
+cfgtest Rust lines add32 static descriptor/43 literal bytes and zero guard heap strings;
+no production/newflag/reader/parser/DICE/cache/interner/fixture change. Existing28 tests
+cover26 leaves/3dirs/55 positive Needs and unchanged mixed unknown/directory-body/child/
+digest/namespace/default/wholeNeed-before-progress controls. Current pinned Core no-run
+5.251s and CoreCLIcheck7.449s pass;28ordinary8.336s/57,356KiB+4synthetic0.086s/18,220KiB
+pass, unchanged Loading23/Bzlmod3 qualified reuse0fresh. Compiler memory stays separate.
+
+Once normal native0.708s/conservative84,180KiB reaches exact223B selected-root
+rust/private/rustc_resource_set.bzl HostLstat: SourceNone105registry235521B/27Host334004
+Decoded unchanged fromWP972. WholeNeed refusal precedes additional body progress; no
+newly admitted body/hash/evaluation/freshness is inferred.393 runtime pins versus430
+union materials across35 operation/raw records include capture1. All215 ordered parent
+leases verify760385 physical/1520770 beforeafter hash bytes with the same two64KiB
+contexts128KiB, individually bracketed/non-atomic/noninherited/not native certificates.
+Public preparationcomplete/singleton/policytrue still returns native_refusal/computation
+and null certificate/observations/analyses/actions/Rustc, packagecause none/unavailable.
+Final credits/scope/recorder retire; unseen/vacuous body/MODULE Weak does not prove all
+DICE/page/per-Arc release. Prefix fit stays below unchanged caps, whole workload unproved.
+
+[target/wp973/native/successor-source.md](../../../../target/wp973/native/successor-source.md)
+reuses qualified historical WP937 native parser AstLoads12 from exact145040B rustc/fullSHA,
+independently matched to original saved operation/raw. Native begin/end spans ground
+resource_set and sibling stamp as a cohesive two-unknown-body capture/conditional pair;
+no fresh rustc/header observation or parser/reporting API is required. The81-edge Python
+subset/27callers/26local candidates stays incomplete after rustc node-limit; native parser
+provenance is syntactic, not current evaluation, repository resolution or certificate.
+All unknown/foreign (@skylib/@rules_cc/@bazel_tools)/new transitives stay closed until a
+frozen grounded contract. Genuine public Rustc/support/data/providers/toolchains/runfiles/
+oracle/sameDICE restoration/fullCLI/M7A/MVS/provenance/whole-fit remain open. Keep borrowing/
+transfer/scoped interning with fitting cleanup and minimal Windows Unsupported.
 
 [WP972](wp972-rules-rust-import-frontier-readiness-2026-10-07.json), baseline
 b5f0155aa5d68de877e2bf8933d73a2f9c25192d, captures seven exact declared local imports
