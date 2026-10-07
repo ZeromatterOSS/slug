@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches platform import source prerequisite
+Status: Cohesive local import frontier accepted; continue remaining declared imports
 
 ## Observable and source basis
 
@@ -43,6 +43,50 @@ Current fullCLI compiler closure/execution, inherited environment/historical cwd
 REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
+
+[WP972](wp972-rules-rust-import-frontier-readiness-2026-10-07.json), baseline
+b5f0155aa5d68de877e2bf8933d73a2f9c25192d, captures seven exact declared local imports
+once: 122,679B in0.093s/22,976KiB with35 stable pins, one64KiB scratch and per-row
+body/text/AST retirement. Seven decisions are diagnostic observations, not tests,
+semantic exports, native source certificates or complete closure. Eleven original
+reader/fact controls are qualified reuse0fresh. Saved platform mappings/triple plus
+these seven rows extend the existing body table15→24 and exact HostLstat metadata
+paths private/platform/settings. The original15 prefix/defaultfalse PreparedFile+
+PublicProbe flag and all source64/default16, object1MiB, cumulative/live/image/scratch
+16MiB and runtime limits remain. Guard paths use borrowed static literals:144 body
+plus48 metadata descriptor bytes,254 body plus26 new metadata literal bytes, zero
+heap allocation. Actual57 net cfgtest lines (13 guard/table,44 controls) exceed the
+20–40 estimate through formatted directory spelling tuples and discriminating mixed
+Needs, with no new abstraction, production owner, flag, map, interner, cache, reader,
+DICE or fixture. Existing28 controls cover24 leaves/3 directories/51 positive Needs;
+unknown/digest/each-directory body or child Needs refuse before progress. The old
+providers negative now uses excludedunknown.bzl rather than weakening the test.
+
+Fresh28 Core ordinary tests pass in8.321s/57,936KiB, four synthetic decoder tests in
+0.086s/18,140KiB; current pinned Core no-run10.164s and CoreCLIcheck7.432s pass.
+Compiler memory stays separate. Unchanged Loading23/Bzlmod3 are qualified reuse0fresh.
+One changed normal native observer passes in0.706s/conservative84,352KiB,374 runtime
+pins versus411 union materials across35 operation/raw records including capture1.
+Its exact208B selected-root rust/private/lto.bzl HostLstat Need is grounded by captured
+private/toolchain.bzl:11. SourceNone105registry235521B/27Host334004Decoded are unchanged
+fromWP971: whole-Need refusal precedes new body progress, so newly admitted source
+bodies/evaluation are not inferred. Public preparationcomplete/singleton/policytrue
+still returns native_refusal/computation with null certificate/observations/analyses/
+actions/Rustc and packagecause none/unavailable. All213 ordered parent leases verify
+754052 physical/1508104 beforeafter hash bytes through the same two64KiB contexts
+128KiB, noninherited/individually bracketed/non-atomic and separate from child bytes.
+Scope/recorder/final credits retire; uninstrumented body/MODULE Weak expiry remains
+unseen/vacuous, not complete DICE/page/per-Arc release. Prefix fit stays below caps;
+genuine public Rustc/support/data/provider/toolchain/runfiles/oracle/restoration/fullCLI/
+M7A/MVS/provenance/whole-workload fit remain open.
+
+Continue the cohesive remaining source-grounded local import family from
+[target/wp972/native/successor-source.md](../../../../target/wp972/native/successor-source.md).
+Actual lto plus the same caller's semver literal are unadmitted prerequisites; saved
+partial facts/known frontier select no automatic child, recursive or foreign grant.
+Freeze the next design before a new operation, preserve all caps and genuine producer
+goal, and keep borrowing/scoped interning aligned with retained owners. Windows remains
+minimally unsupported. Earlier checkpoint evidence follows unchanged.
 
 [WP971](wp971-rules-rust-toolchain-import-readiness-2026-10-07.json) captures all four
 source-grounded toolchain siblings (929B) once with the unchanged strict FD/facts owner:

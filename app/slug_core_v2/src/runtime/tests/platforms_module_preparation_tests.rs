@@ -232,8 +232,8 @@ struct AdditionalModule {
     root: NormalizedAbsolutePath,
     file: NormalizedAbsolutePath,
 }
-// Finite imports declared by defs.bzl and its toolchain.bzl dependency.
-const RULES_RUST_DEFS_IMPORTS: [&str; 15] = [
+// Finite imports declared by the observed defs/toolchain dependency family.
+const RULES_RUST_DEFS_IMPORTS: [&str; 24] = [
     "rust/toolchain.bzl",
     "rust/private/clippy.bzl",
     "rust/private/common.bzl",
@@ -249,7 +249,17 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 15] = [
     "rust/rust_stdlib_filegroup.bzl",
     "rust/rust_toolchain.bzl",
     "rust/rustfmt_toolchain.bzl",
+    "rust/platform/triple_mappings.bzl",
+    "rust/platform/triple.bzl",
+    "rust/private/lint_test.bzl",
+    "rust/private/providers.bzl",
+    "rust/private/utils.bzl",
+    "rust/settings/incompatible.bzl",
+    "rust/private/rust_allocator_libraries.bzl",
+    "rust/private/pic_utils.bzl",
+    "rust/private/toolchain.bzl",
 ];
+const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -421,7 +431,10 @@ impl Bodies {
             && path
                 .strip_prefix(self.roots[1].as_path())
                 .is_ok_and(|relative| {
-                    (metadata && relative == Path::new("rust/private"))
+                    (metadata
+                        && RULES_RUST_IMPORT_METADATA
+                            .iter()
+                            .any(|directory| relative == Path::new(directory)))
                         || RULES_RUST_DEFS_IMPORTS
                             .iter()
                             .any(|file| relative == Path::new(file))

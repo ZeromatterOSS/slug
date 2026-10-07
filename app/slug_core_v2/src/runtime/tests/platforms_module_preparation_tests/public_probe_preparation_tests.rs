@@ -1031,20 +1031,48 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             Some("/rules"),
         );
     }
-    assert_exact_root_file_role(
-        "rust/private",
-        &[PathObservationOperation::Lstat],
-        Bodies::with_rules_rust_defs_import_sources,
-        |b| b.rules_rust_defs_import_sources,
-        &[
-            "/rules/rust/private/child",
-            "/rules/RUST/private",
-            "/rules/rust/private-extra",
-            "/rules-other/rust/private",
-        ],
-        "/rules/rust/private",
-        Some("/rules"),
-    );
+    for (relative, selected, spellings) in [
+        (
+            "rust/private",
+            "/rules/rust/private",
+            [
+                "/rules/rust/private/child",
+                "/rules/RUST/private",
+                "/rules/rust/private-extra",
+                "/rules-other/rust/private",
+            ],
+        ),
+        (
+            "rust/platform",
+            "/rules/rust/platform",
+            [
+                "/rules/rust/platform/child",
+                "/rules/RUST/platform",
+                "/rules/rust/platform-extra",
+                "/rules-other/rust/platform",
+            ],
+        ),
+        (
+            "rust/settings",
+            "/rules/rust/settings",
+            [
+                "/rules/rust/settings/child",
+                "/rules/RUST/settings",
+                "/rules/rust/settings-extra",
+                "/rules-other/rust/settings",
+            ],
+        ),
+    ] {
+        assert_exact_root_file_role(
+            relative,
+            &[PathObservationOperation::Lstat],
+            Bodies::with_rules_rust_defs_import_sources,
+            |b| b.rules_rust_defs_import_sources,
+            &spellings,
+            selected,
+            Some("/rules"),
+        );
+    }
     let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
     let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_rules_rust_defs_import_sources(
@@ -1062,17 +1090,23 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
         Path::new("/rules/rust/private"),
         PathObservationOperation::Lstat,
     );
+    for relative in &RULES_RUST_IMPORT_METADATA[1..] {
+        let selected = Path::new("/rules").join(relative);
+        all = all
+            .try_union(&need(&selected, PathObservationOperation::Lstat))
+            .unwrap();
+    }
     for relative in RULES_RUST_DEFS_IMPORTS {
         let selected = Path::new("/rules").join(relative);
         for operation in &operations {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 31);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 51);
     assert!(bodies.admit(&all).is_ok());
     for (excluded, operation) in [
         (
-            "/rules/rust/private/providers.bzl",
+            "/rules/rust/private/unknown.bzl",
             PathObservationOperation::Lstat,
         ),
         (
@@ -1096,6 +1130,16 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileDigest,
         ),
         ("/rules/rust/private", PathObservationOperation::FileBytes),
+        ("/rules/rust/platform", PathObservationOperation::FileBytes),
+        ("/rules/rust/settings", PathObservationOperation::FileBytes),
+        (
+            "/rules/rust/platform/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/settings/child",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/rules/rust/private/BUILD.bazel",
             PathObservationOperation::Lstat,

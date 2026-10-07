@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches platform import source prerequisite
+Status: Cohesive local import frontier accepted; continue remaining declared imports
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,6 +149,24 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
+[WP972](./slug-v2-subplans/wp972-rules-rust-import-frontier-readiness-2026-10-07.json)
+captures seven exact local imports122679B once at0.093s/22,976KiB/35pins with the
+unchanged strict FD/facts owner;11reader checks qualifiedreuse0fresh, seven observations
+not tests. Saved platform2 plus captured7 extend the original15-prefix table to24 bodies
+and3 exact metadata Lstats, defaultfalse and zero guard heap strings/newflag/cache/DICE/
+production changes.57net cfgtest lines (13guard/44controls) exceed20–40 estimate through
+formatted borrowed-directory tuples and meaningful whole-Need controls;51positive Needs
+and excludedunknown replacement preserve strength. Selected64/default16 and allcaps stay.
+28ordinary+4synthetic+1native/currentCoreCLIpreparation pass. Once0.706s/84,352KiB reaches
+exact208B rust/private/lto.bzl HostLstat, SourceNone105registry235521B/27Host334004Decoded
+unchanged: wholeNeed-before-progress, no newlyadmitted body/hash/evaluation inferred.
+374runtimepins versus411union/35opsinclcapture1;213parentleases754052B/1508104hashbytes
+share the same two64KiB contexts128KiB, non-atomic/noninherited/not sourcecertificates.
+Publicnative_refusal/prepcomplete/singletonpolicytrue/nullproducer remains; finalcredits/
+unseen-vacuousWeak do not prove allDICE/page/body freshness. Continue cohesive grounded
+remaining local dependencies from target/wp972/native/successor-source.md, with no
+unknown/foreign/recursive grant or cap raise. PublicRustc/support/data/providers/runfiles/
+oracle/restoration/fullCLI/M7A/MVS/provenance/wholefit remain open. Immediate predecessor
 [WP971](./slug-v2-subplans/wp971-rules-rust-toolchain-import-readiness-2026-10-07.json)
 observes four exact toolchain siblings929B once at0.042s/18,952KiB with the unchanged
 strict FD/facts owner;11reader checks reused0fresh, four observations not tests.
