@@ -30,6 +30,8 @@ mod file_write_aquery_text;
 mod file_write_identity;
 mod generated_repository_definition;
 mod input_image;
+#[cfg(all(test, target_os = "linux"))]
+mod materialization_diagnostic;
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod native_output_file;
 mod path_observation;
@@ -57,6 +59,8 @@ mod root_bootstrap;
 mod runfiles_support_aquery_text;
 mod scoped_cycle_detector;
 mod solib_aquery_text;
+#[cfg(all(test, target_os = "linux"))]
+mod source_attempt_context;
 mod source_input;
 mod spawn_query_inputs;
 pub mod starlark;

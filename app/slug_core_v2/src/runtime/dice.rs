@@ -1231,11 +1231,24 @@ impl NativeCommandCompletionContext<'_, '_> {
                 certificate,
                 &self.command.path_observations,
                 |demands| {
+                    #[cfg(all(test, target_os = "linux"))]
+                    {
+                        let materializer = &self.command.runtime.repository_materializer;
+                        let context = super::source_attempt_context::SourceAttemptContext::certificate_precheck(
+                            materializer.workspace(), Some(self.selected_repository_results),
+                        );
+                        materializer.observe_native_with_charge_origin(
+                            self.command.repository_session, demands, &mut |demand| context.report(demand),
+                        ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+                    }
+                    #[cfg(not(all(test, target_os = "linux")))]
+                    {
                     self.command
                         .runtime
                         .repository_materializer
                         .observe_native(self.command.repository_session, demands)
                         .map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+                    }
                 },
             )
             .await
@@ -6574,6 +6587,17 @@ impl WorkspaceRuntime {
                                     selected_updater,
                                     &full_epoch,
                                     |demands| {
+                                        #[cfg(all(test, target_os = "linux"))]
+                                        {
+                                            let context = super::source_attempt_context::SourceAttemptContext::certificate_finalize(
+                                                self.repository_materializer.workspace(), Some(&prepared.snapshot.repository_results),
+                                            );
+                                            self.repository_materializer.observe_native_with_charge_origin(
+                                                repository_session, demands, &mut |demand| context.report(demand),
+                                            ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+                                        }
+                                        #[cfg(not(all(test, target_os = "linux")))]
+                                        {
                                         self.repository_materializer
                                             .observe_native(repository_session, demands)
                                             .map_err(|error| {
@@ -6581,6 +6605,7 @@ impl WorkspaceRuntime {
                                                     "{error:?}"
                                                 ))
                                             })
+                                        }
                                     },
                                     || attempt_root.publish(&mut terminal),
                                 )

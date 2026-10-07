@@ -370,6 +370,22 @@ pub(in crate::runtime::dice) fn observe_image_rows(
         }
     }
     if !legacy.is_empty() {
+        #[cfg(all(test, target_os = "linux"))]
+        let observed = {
+            let materializer = &command.runtime.repository_materializer;
+            let context = crate::runtime::source_attempt_context::SourceAttemptContext::need_paths(
+                materializer.workspace(),
+                Some(&command.repository_results),
+            );
+            materializer
+                .observe_native_with_charge_origin(
+                    command.repository_session,
+                    legacy,
+                    &mut |demand| context.report(demand),
+                )
+                .map_err(NativeDemandSessionError::Repository)?
+        };
+        #[cfg(not(all(test, target_os = "linux")))]
         let observed = command
             .runtime
             .repository_materializer

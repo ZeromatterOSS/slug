@@ -18,6 +18,11 @@ use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::ObservedPathFrontierError;
 
 use super::*;
+use crate::runtime::materialization_diagnostic::MATERIALIZATION_AGGREGATE_BYTES;
+use crate::runtime::materialization_diagnostic::MATERIALIZATION_FIELD_BYTES;
+use crate::runtime::materialization_diagnostic::MATERIALIZATION_MARKER_BYTES;
+use crate::runtime::materialization_diagnostic::MaterializationDiagnostic;
+use crate::runtime::materialization_diagnostic::MaterializationWriter;
 
 mod public_probe_preparation_tests {
     include!("platforms_module_preparation_tests/public_probe_preparation_tests.rs");
@@ -329,120 +334,6 @@ fn path_operation_code(operation: &PathObservationOperation) -> &'static str {
         PathObservationOperation::DirectoryEntries => "directory_entries",
         PathObservationOperation::WindowsLongPath => "windows_long_path",
         PathObservationOperation::WindowsOptionPathLongName => "windows_option_path_long_name",
-    }
-}
-const MATERIALIZATION_FIELD_BYTES: usize = 1024;
-const MATERIALIZATION_AGGREGATE_BYTES: usize = 4096;
-const MATERIALIZATION_MARKER_BYTES: usize = 10240;
-struct MaterializationDiagnostic<'a> {
-    kind: &'static str,
-    reason: &'static str,
-    fields: [Option<&'a [u8]>; 7],
-}
-impl<'a> MaterializationDiagnostic<'a> {
-    fn new(
-        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
-        reason: &'static str,
-    ) -> Self {
-        let (kind, logical_root) = match &request.kind {
-            RepositoryMaterializationKind::Local { logical_root } => {
-                ("local", Some(logical_root.as_path().as_os_str().as_bytes()))
-            }
-            RepositoryMaterializationKind::Immutable => ("immutable", None),
-            RepositoryMaterializationKind::GeneratedFileEffects(_) => {
-                ("generated_file_effects", None)
-            }
-        };
-        let label = &request.repo_spec.rule_id.bzl_file;
-        Self {
-            kind,
-            reason,
-            fields: [
-                Some(request.id.workspace.as_path().as_os_str().as_bytes()),
-                Some(request.id.canonical_repo.as_str().as_bytes()),
-                Some(label.package().repo().as_str().as_bytes()),
-                Some(label.package().package().as_str().as_bytes()),
-                Some(label.target().as_str().as_bytes()),
-                Some(request.repo_spec.rule_id.rule_name.as_bytes()),
-                logical_root,
-            ],
-        }
-    }
-    fn captured(&self) -> bool {
-        self.fields
-            .iter()
-            .flatten()
-            .try_fold(0usize, |sum, bytes| {
-                (bytes.len() <= MATERIALIZATION_FIELD_BYTES).then_some(())?;
-                sum.checked_add(bytes.len())
-                    .filter(|sum| *sum <= MATERIALIZATION_AGGREGATE_BYTES)
-            })
-            .is_some()
-    }
-}
-struct MaterializationWriter<'a, W> {
-    writer: &'a mut W,
-    bytes: usize,
-    limit: usize,
-}
-impl<W: fmt::Write> fmt::Write for MaterializationWriter<'_, W> {
-    fn write_str(&mut self, text: &str) -> fmt::Result {
-        self.bytes = self
-            .bytes
-            .checked_add(text.len())
-            .filter(|n| *n < self.limit)
-            .ok_or(fmt::Error)?;
-        self.writer.write_str(text)
-    }
-}
-impl MaterializationDiagnostic<'_> {
-    fn write_marker(&self, formatter: &mut fmt::Formatter<'_>, marker: &str) -> fmt::Result {
-        use fmt::Write;
-        let captured = self.captured();
-        let mut writer = MaterializationWriter {
-            writer: formatter,
-            bytes: 0,
-            limit: MATERIALIZATION_MARKER_BYTES,
-        };
-        write!(
-            writer,
-            "{marker} capture={} kind={} reason={}",
-            if captured {
-                "captured"
-            } else {
-                "bounds_refused"
-            },
-            self.kind,
-            self.reason
-        )?;
-        for (name, bytes) in [
-            "workspace",
-            "canonical",
-            "rule_repo",
-            "rule_package",
-            "rule_target",
-            "rule_name",
-            "logical_root",
-        ]
-        .into_iter()
-        .zip(self.fields)
-        {
-            match bytes {
-                Some(bytes) => write!(
-                    writer,
-                    " {name}_len={} {name}_hex={}",
-                    bytes.len(),
-                    RegistryHex(captured.then_some(bytes))
-                )?,
-                None => write!(writer, " {name}_len=none {name}_hex=none")?,
-            }
-        }
-        Ok(())
-    }
-}
-impl fmt::Display for MaterializationDiagnostic<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.write_marker(formatter, "WP982_MATERIALIZATION")
     }
 }
 const GENERATED_PLAN_ROWS: usize = 8;

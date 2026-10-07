@@ -103,12 +103,46 @@ pub(super) fn observe_native_scoped<T>(
     let retained = RetainedMaterializationRoots::new(owner, roots)?;
     #[cfg(unix)]
     {
-        observe_with_scoped(&retained, demands, &mut UnixPathObservationAdapter, scope)
+        #[cfg(all(test, target_os = "linux"))]
+        {
+            observe_with_scoped(
+                &retained,
+                demands,
+                &mut UnixPathObservationAdapter,
+                scope,
+                &mut |_| {},
+            )
+        }
+        #[cfg(not(all(test, target_os = "linux")))]
+        {
+            observe_with_scoped(&retained, demands, &mut UnixPathObservationAdapter, scope)
+        }
     }
     #[cfg(windows)]
     {
         windows_native::observe_windows_scoped(&retained, demands, scope)
     }
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn observe_native_scoped_with_charge_origin<T>(
+    owner: &T,
+    roots: impl IntoIterator<Item = (PathObservationInstanceId, NormalizedAbsolutePath)>,
+    demands: impl IntoIterator<Item = PathObservationDemand>,
+    scope: Option<&Arc<SourceServiceScope>>,
+    on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
+) -> Result<PathObservationEpoch, PathObservationKernelError> {
+    if scope.is_none() {
+        return observe_native(owner, roots, demands);
+    }
+    let retained = RetainedMaterializationRoots::new(owner, roots)?;
+    observe_with_scoped(
+        &retained,
+        demands,
+        &mut UnixPathObservationAdapter,
+        scope,
+        on_first_refusal,
+    )
 }
 
 impl<'owner> RetainedMaterializationRoots<'owner> {
@@ -182,7 +216,14 @@ fn observe_with(
     demands: impl IntoIterator<Item = PathObservationDemand>,
     operations: &mut impl ObservationOperations,
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
-    observe_with_scoped(retained, demands, operations, None)
+    #[cfg(all(test, target_os = "linux"))]
+    {
+        observe_with_scoped(retained, demands, operations, None, &mut |_| {})
+    }
+    #[cfg(not(all(test, target_os = "linux")))]
+    {
+        observe_with_scoped(retained, demands, operations, None)
+    }
 }
 
 fn observe_with_scoped(
@@ -190,6 +231,7 @@ fn observe_with_scoped(
     demands: impl IntoIterator<Item = PathObservationDemand>,
     operations: &mut impl ObservationOperations,
     scope: Option<&Arc<SourceServiceScope>>,
+    #[cfg(all(test, target_os = "linux"))] on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
     let mut demands = demands.into_iter().collect::<Vec<_>>();
     demands.sort_unstable();
@@ -243,7 +285,16 @@ fn observe_with_scoped(
         check_scope(scope)?;
         let result = if demand.operation() == PathObservationOperation::FileBytes {
             match scope {
-                Some(scope) => scoped_file_bytes(&demand, operations, scope)?,
+                Some(scope) => {
+                    #[cfg(all(test, target_os = "linux"))]
+                    {
+                        scoped_file_bytes(&demand, operations, scope, on_first_refusal)?
+                    }
+                    #[cfg(not(all(test, target_os = "linux")))]
+                    {
+                        scoped_file_bytes(&demand, operations, scope)?
+                    }
+                }
                 None => observe_one(&demand, operations),
             }
         } else {
@@ -267,6 +318,7 @@ fn scoped_file_bytes(
     demand: &PathObservationDemand,
     operations: &mut impl ObservationOperations,
     scope: &Arc<SourceServiceScope>,
+    #[cfg(test)] on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
 ) -> Result<PathObservationResult, PathObservationKernelError> {
     use super::dice::source_service::RegularFileError;
     #[cfg(not(test))]
@@ -277,7 +329,10 @@ fn scoped_file_bytes(
     let read = super::dice::source_service::read_host_file_with_charge_origin(
         scope,
         path.as_path(),
-        || source_attempt_diagnostic::report(demand),
+        || {
+            source_attempt_diagnostic::report(demand);
+            on_first_refusal(demand);
+        },
     );
     #[cfg(not(test))]
     let read = read_host_file(scope, path.as_path());

@@ -31,6 +31,100 @@ fn scope(
 }
 
 #[test]
+#[cfg(target_os = "linux")]
+fn scoped_native_origin_callback_runs_outside_session_lock_before_postcheck() {
+    use std::os::unix::ffi::OsStrExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(directory.path().to_owned()).unwrap();
+    let own = scope(&workspace, SourceServiceLimits::default());
+    let materializer = RepositoryMaterializer::new_scoped(workspace, own.clone()).unwrap();
+    let token = begin_empty(&materializer);
+    let file = directory.path().join("body");
+    std::fs::write(&file, b"abc").unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(file).unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let calls = Cell::new(0);
+    let observed = materializer
+        .observe_native_with_charge_origin(token, [demand.clone()], &mut |_| {
+            calls.set(calls.get() + 1)
+        })
+        .unwrap();
+    assert!(matches!(observed.get(&demand).unwrap().as_ref(),
+        PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == b"abc"));
+    assert_eq!(calls.get(), 0);
+    assert_eq!(own.snapshot().decoded_bytes, 3);
+    own.charge(SourceCounter::SourceAttempts, 63).unwrap();
+    let absent = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(directory.path().join("absent")).unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let original_path = absent.path().as_path().as_os_str().as_bytes().as_ptr();
+    let counters = |s: crate::runtime::dice::source_service::SourceServiceCounters| {
+        (
+            s.registry_attempts,
+            s.registry_admitted_bytes,
+            s.source_attempts,
+            s.transferred_bytes,
+            s.decoded_bytes,
+            s.written_bytes,
+            s.live_buffer_bytes,
+            s.peak_buffer_bytes,
+        )
+    };
+    let before = counters(own.snapshot());
+    let error = RepositorySessionError::SourceService(SourceServiceError::Limit(
+        SourceCounter::SourceAttempts,
+    ));
+    assert_eq!(
+        materializer.observe_native_with_charge_origin(token, [absent.clone()], &mut |original| {
+            calls.set(calls.get() + 1);
+            assert_eq!(original, &absent);
+            assert_eq!(
+                original.path().as_path().as_os_str().as_bytes().as_ptr(),
+                original_path
+            );
+            // Both reentries would deadlock if either observer lock survived.
+            assert!(materializer.session_is_active(token));
+            assert_eq!(counters(own.snapshot()), before);
+            assert_eq!(
+                own.check(),
+                Err(SourceServiceError::Limit(SourceCounter::SourceAttempts))
+            );
+            assert!(!original.path().as_path().exists());
+        },),
+        Err(error)
+    );
+    assert_eq!(calls.get(), 1);
+    assert_eq!(counters(own.snapshot()), before);
+    assert!(matches!(
+        materializer.observe_native_with_charge_origin(token, [absent.clone()], &mut |_| calls
+            .set(calls.get() + 1),),
+        Err(RepositorySessionError::SourceService(
+            SourceServiceError::Limit(SourceCounter::SourceAttempts)
+        ))
+    ));
+    assert_eq!(calls.get(), 1);
+    materializer.discard(token).unwrap();
+
+    let fresh = scope(materializer.workspace(), SourceServiceLimits::default());
+    let inactive =
+        RepositoryMaterializer::new_scoped(materializer.workspace().clone(), fresh.clone())
+            .unwrap();
+    let stale = begin_empty(&inactive);
+    inactive.discard(stale).unwrap();
+    assert!(inactive.observe_native_with_charge_origin(
+        stale, [absent], &mut |_| calls.set(calls.get() + 1),
+    ).is_err());
+    assert_eq!(calls.get(), 1);
+    assert_eq!(fresh.snapshot().source_attempts, 0);
+}
+
+#[test]
 fn scoped_materializer_foreign_missing_and_poisoned_cached_requests_do_not_call_source() {
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
     let own = scope(&workspace, SourceServiceLimits::default());

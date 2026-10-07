@@ -125,3 +125,105 @@ fn scoped_file_epoch_validates_whole_demand_set_and_aborts_operational_failures(
     assert_eq!(owner.snapshot().decoded_bytes, 0);
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 }
+
+#[test]
+fn source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal() {
+    use std::cell::Cell;
+    use std::os::unix::ffi::OsStrExt;
+
+    let directory = tempfile::tempdir().unwrap();
+    let root = NormalizedAbsolutePath::new(directory.path().to_path_buf()).unwrap();
+    let absent = bytes_demand(&directory.path().join("absent"));
+    let original_path = absent.path().as_path().as_os_str().as_bytes().as_ptr();
+    let calls = Cell::new(0);
+    let owner = scope(&root);
+    owner.charge(SourceCounter::SourceAttempts, 64).unwrap();
+    let unknown = PathObservationDemand::new(
+        PathObservationNamespace::Materialization(PathObservationInstanceId::new(9)),
+        root.clone(),
+        PathObservationOperation::Lstat,
+    );
+    // Validation of the entire set precedes any charge or callback.
+    assert_eq!(
+        observe_native_scoped_with_charge_origin(
+            &directory,
+            [],
+            [absent.clone(), unknown.clone()],
+            Some(&owner),
+            &mut |_| calls.set(calls.get() + 1),
+        ),
+        Err(PathObservationKernelError::UnknownDemandInstance(unknown))
+    );
+    assert_eq!(calls.get(), 0);
+    assert_eq!(owner.snapshot().source_attempts, 64);
+    owner.check().unwrap();
+
+    let refused = PathObservationKernelError::SourceService(SourceServiceError::Limit(
+        SourceCounter::SourceAttempts,
+    ));
+    assert_eq!(
+        observe_native_scoped_with_charge_origin(
+            &directory,
+            [],
+            [absent.clone()],
+            Some(&owner),
+            &mut |demand| {
+                calls.set(calls.get() + 1);
+                assert_eq!(demand, &absent);
+                assert_eq!(
+                    demand.path().as_path().as_os_str().as_bytes().as_ptr(),
+                    original_path
+                );
+                assert_eq!(owner.snapshot().source_attempts, 64);
+                assert_eq!(owner.snapshot().decoded_bytes, 0);
+                assert!(!absent.path().as_path().exists());
+            },
+        ),
+        Err(refused)
+    );
+    assert_eq!(calls.get(), 1);
+    assert!(matches!(
+        observe_native_scoped_with_charge_origin(
+            &directory,
+            [],
+            [absent.clone()],
+            Some(&owner),
+            &mut |_| calls.set(calls.get() + 1),
+        ),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Limit(SourceCounter::SourceAttempts)
+        ))
+    ));
+    assert_eq!(calls.get(), 1);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+
+    let healthy = scope(&root);
+    let observed = observe_native_scoped_with_charge_origin(
+        &directory,
+        [],
+        [absent.clone()],
+        Some(&healthy),
+        &mut |_| calls.set(calls.get() + 1),
+    )
+    .unwrap();
+    assert_eq!(
+        observed.get(&absent).unwrap().as_ref(),
+        &PathObservationResult::FileBytes(PathOperationResult::Missing)
+    );
+    assert_eq!(calls.get(), 1);
+    assert_eq!(healthy.snapshot().source_attempts, 1);
+    healthy.cancel();
+    assert_eq!(
+        observe_native_scoped_with_charge_origin(
+            &directory,
+            [],
+            [absent],
+            Some(&healthy),
+            &mut |_| calls.set(calls.get() + 1),
+        ),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Cancelled
+        ))
+    );
+    assert_eq!(calls.get(), 1);
+}

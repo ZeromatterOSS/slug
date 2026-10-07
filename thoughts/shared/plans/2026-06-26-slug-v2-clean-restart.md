@@ -35,24 +35,25 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated-source observation phase readiness
+Status: Generated-source attempt capacity readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-WP989 now captures the original Materialization1 FileBytes demand whose regular-file
-charge first refuses at SourceAttempts64, using only borrowed bounded cfgtest/Linux
-projection outside locks. The sole changed probe passes in2.242s/94,204KiB under256MiB;
-64 fresh named checks and65 current operations pass. A focused eight-thread fixture's
-EAGAIN/barrier stop is preserved; two synchronized callers retain the concurrency
-assertion and pass after fresh gates without raising caps. The failed demand's current
-request owner and observe phase remain unproved. Normal exact-demand filtering already
-exists, while preflight/certificate revalidation performs legitimate reads before reuse.
-Next associate the original failed demand with the current epoch/phase using existing
-borrowed ownership before a separately reviewed quota or reuse decision. No cap increase
-or global read cache is activated. Completed outputs, public Rustc and full workload fit
-remain open; allocation discipline holds. See the current manifest for compact evidence.
+WP990 now associates the original first-refused Materialization1 FileBytes demand with
+ordinary need_paths and its current command-owned generated Globals request/root, using
+borrowed bounded cfgtest/Linux context outside locks. The changed probe takes2.228s and
+peaks95,432KiB under256MiB;68 fresh named checks/69 current operations pass. The source
+service still refuses at64 attempts; no read, output, certificate or public Rustc is
+proved. Next review and implement finite test/Linux validator/profile128 headroom while
+production/default64, default fixture16, byte/RSS/runtime budgets and mandatory source
+revalidation remain intact. Current helper delegates must parse actual128 fields without
+raw normalization; no new read cache, string/path mirror, grant or diagnostic layer.
+Representative parsing/read-prefix allocation fits the cap, permitting broader readiness
+work; complete public producer and whole-workload fit remain open. Allocation discipline
+and existing scoped interners govern future retained strings. See the manifest and
+[WP990 receipt](./slug-v2-subplans/wp990-current-source-attempt-context-2026-10-07.json).
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

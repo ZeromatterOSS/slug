@@ -1,5 +1,9 @@
 use super::*;
 
+mod source_attempt_context_tests {
+    include!("public_probe_preparation_tests/source_attempt_context_tests.rs");
+}
+
 #[derive(Clone, Copy)]
 pub(super) enum CommandChoice {
     Modules,
