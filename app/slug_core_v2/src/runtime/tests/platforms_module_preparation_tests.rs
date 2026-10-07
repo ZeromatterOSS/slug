@@ -270,13 +270,18 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 3] = [
     "rules/common_settings.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
-const RULES_CC_IMPORTS: [&str; 4] = [
+const RULES_CC_IMPORTS: [&str; 8] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
     "cc/extensions.bzl",
+    "cc/private/toolchain/cc_configure.bzl",
+    "cc/private/toolchain/lib_cc_configure.bzl",
+    "cc/private/toolchain/unix_cc_configure.bzl",
+    "cc/private/toolchain/windows_cc_configure.bzl",
 ];
-const RULES_CC_IMPORT_METADATA: [&str; 2] = ["cc", "cc/common"];
+const RULES_CC_IMPORT_METADATA: [&str; 4] =
+    ["cc", "cc/common", "cc/private", "cc/private/toolchain"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],

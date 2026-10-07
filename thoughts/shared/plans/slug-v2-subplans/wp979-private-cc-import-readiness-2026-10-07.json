@@ -1,0 +1,193 @@
+{
+  "checkpoint": "WP979",
+  "baseline": "26d4e1daa0649106e778851aecf8b1b37accc1fa",
+  "started_at": "2026-10-07T13:39:16.072106+00:00",
+  "accepted_at": "2026-10-07T14:12:10.568443+00:00",
+  "elapsed_wall_seconds": 1974.496337,
+  "implementation": {
+    "production_files": 0,
+    "cfgtest_files": 2,
+    "insertions": 56,
+    "deletions": 3,
+    "net_lines": 53,
+    "static_descriptor_bytes": 96,
+    "static_literal_bytes": 195,
+    "new_guard_heap_bytes": 0,
+    "new_flags": 0,
+    "contract": "Append four independently observed private CC bodies to existing table4\u21928; metadata2\u21924 remains Lstat-only. Whole Need10\u219220, preserve old cases and add12mixed negatives; same borrowed exact predicate/selected slot/defaultfalse policy."
+  },
+  "counts": {
+    "current_operations": 36,
+    "material_pins": 499,
+    "fresh_core_ordinary": 30,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "reused_owner_ordinary": 42,
+    "reused_owner_fresh_runs": 0,
+    "preparation_operations": 2,
+    "compiler_memory_is_runtime_fit": false,
+    "source_leases": 228,
+    "fresh_capture_operations_in_separate_stage": 2,
+    "capture_decisions": 4,
+    "total_fresh_named_passes": 35,
+    "reused_reader_controls": 11,
+    "reused_reader_fresh_runs": 0
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp979/native/compile.json",
+        "sha256": "40668c6e3936e049c61914eac0703c23094ebafe75aab04117a6a858266f7ce9"
+      },
+      "elapsed_seconds": 5.249606239958666,
+      "executed_tests": 0,
+      "compiler_memory_separate": true
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp979/native/check.json",
+        "sha256": "3f698deab330ab70a44134d00b11b902ea480f01a7f3763211e77b8ff38c353e"
+      },
+      "elapsed_seconds": 7.296032498939894,
+      "executed_tests": 0,
+      "compiler_memory_separate": true
+    }
+  },
+  "runtime_seconds": {
+    "ordinary_30_sum": 5.710230993456207,
+    "synthetic_4": 0.14806230901740491,
+    "normal_once": 1.099271118058823
+  },
+  "captures": [
+    {
+      "operation": {
+        "path": "target/wp979/capture/availability-operation.json",
+        "sha256": "faff2781e33e5d15892121308a447fa40d749a55d76a49c2b2a42d1e8ac923da"
+      },
+      "result": {
+        "path": "target/wp979/capture/result.json",
+        "sha256": "3c36aa0527cfbe3d2923e1b4ba375bc38d4930c9d3df3180e996a0e488d2fa9f"
+      },
+      "source_review": {
+        "path": "target/wp979/capture/final-source.md",
+        "sha256": "03abc048178a5104276422017c17293217fe9c2b97ab5744aa71281ffbba7a17"
+      },
+      "evidence_review": {
+        "path": "target/wp979/capture/final-evidence.md",
+        "sha256": "f657102e2589b246c96f7676f3c1de53d989f96063b87e9f4393993b3c9191c6"
+      },
+      "observed_count": 1,
+      "test_passes": 0,
+      "elapsed_seconds": 0.042235876084305346,
+      "conservative_peak_kib": 19244,
+      "artifact_pins": 37,
+      "total_bytes": 6123
+    },
+    {
+      "operation": {
+        "path": "target/wp979/siblings/availability-operation.json",
+        "sha256": "8470ae283c321c4266d16059ca5e1b0fc4cd5723e378580d9e13c25ce5c118af"
+      },
+      "result": {
+        "path": "target/wp979/siblings/result.json",
+        "sha256": "2f144a3fa6f0e73a9a790d6061f94b4d2f89111ad302cd7c755d3149a0e34b39"
+      },
+      "source_review": {
+        "path": "target/wp979/siblings/final-source.md",
+        "sha256": "b0157985a136084b84b79b82409ab86e5b5630b58f84bb23f8d917a857a0c22f"
+      },
+      "evidence_review": {
+        "path": "target/wp979/siblings/final-evidence.md",
+        "sha256": "96426ad4b23bca6c8664e9d293d529a8458692697b18abef3e84a4a7fd549a76"
+      },
+      "observed_count": 3,
+      "test_passes": 0,
+      "elapsed_seconds": 0.08319939102511853,
+      "conservative_peak_kib": 24404,
+      "artifact_pins": 50,
+      "total_bytes": 85396
+    }
+  ],
+  "operational_summary": {
+    "path": "target/wp979/native/operational-summary.json",
+    "sha256": "3c555c095e17595c3a3ba331ef448a54c2a7d3c56c04da38175dde371cae74af"
+  },
+  "reviews": {
+    "implementation-source": {
+      "path": "target/wp979/native/implementation-source.md",
+      "sha256": "6b4a932073028c59769c6e2c19e6c5a4863d3622eaa644a8e1901b7c0bfdb542"
+    },
+    "implementation-evidence": {
+      "path": "target/wp979/native/implementation-evidence.md",
+      "sha256": "46736229694db052d35d8c8d5145971d56fcaf6df74faee482e1585ede8db800"
+    },
+    "preflight-source": {
+      "path": "target/wp979/native/preflight-source.md",
+      "sha256": "89c4a1a456c03ff96c7820899382aa199c84996bfc4b641cd5603261a939fe92"
+    },
+    "preflight-evidence": {
+      "path": "target/wp979/native/preflight-evidence.md",
+      "sha256": "5cfb827bff2e6f769f300be7ac6b7ec6a5da77c593f0bf1c2edab64e351910e5"
+    },
+    "final-source": {
+      "path": "target/wp979/native/final-source.md",
+      "sha256": "ba6c7772691f5aacb30bbc25d45881d2da21c172f6bbb796e87111b972e26f89"
+    },
+    "final-evidence": {
+      "path": "target/wp979/native/final-evidence.md",
+      "sha256": "e66029a6c1587b48ff9700dc20fb8e317459f1aa9160dec451b4a47d267c8d6d"
+    },
+    "final-root": {
+      "path": "target/wp979/native/final-root.md",
+      "sha256": "ddd83d9e1e741376346afaa8e3049fcdaf517aa0238ed38c96f3b8067ea7dd0c"
+    }
+  },
+  "successor_source": {
+    "path": "target/wp979/native/successor-source.md",
+    "sha256": "303e0cba361a5e3f73f684786b4e4b73e96cafca35d7c0ee637af1dc7fc4c20b"
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp979/native/native-operation.json",
+      "sha256": "06f4af390fa16f9edb1518bba0d8a6414f373b6cc156a7e0e28a693ecfc59e0c"
+    },
+    "result": {
+      "path": "target/wp979/native/result.json",
+      "sha256": "74180d11bf72ff667ad7677a973c372c91f70ed502f4101773c62751de2285c9"
+    },
+    "conservative_peak_kib": 88936,
+    "runtime_pins": 497,
+    "source_leases": 228,
+    "physical_bytes": 891827,
+    "before_after_hash_bytes": 1783654,
+    "parent_scratch_bytes": 131072
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 51,
+    "transferred_bytes": 0,
+    "decoded_bytes": 528367,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 2114151,
+    "peak_buffer_bytes": 3259456
+  },
+  "retirement": {
+    "source_weak_seen": false,
+    "source_weak_expired": true,
+    "live_buffer_zero": true,
+    "scope_weak_expired": true,
+    "recorder_weak_expired": true
+  },
+  "next_prerequisite": {
+    "owner": "bazel_features_root",
+    "relative_path": "features.bzl",
+    "operation": "HostLstat",
+    "path_len": 200,
+    "basis": "Actual current Need plus captured cc/extensions.bzl partial literals at16/17, features.bzl and private/util.bzl; neither next body availability is inferred.",
+    "remaining_source_attempts_numeric": 13
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "qualification": "Native stopped at whole-Need source admission; source51/528367 and registry105/235521 unchanged, no new private body consumption attribution. Preparation complete/policychecked but certificate/observations/analyses/actions/Rustc null. Strict captures and noninherited non-atomic parent brackets prove physical correspondence only. BodyWeak unseen/vacuous; actual scope/recorder cleanup and final credits observed.35fresh passes/42qualified prior owner checks0fresh; capture observations and preparations are not passes. Runtime10s/RSS256MiB/AS512MiB/source64-default16/registry128-default16/object1MiB/all16MiB byte caps fixed. Borrow/share/transfer storage and use existing scoped interners where owner cleanup fits; Windows declarations only. Full public support/data/provider/toolchain/action/runfiles/oracle/same-DICE restoration/fullCLI/M7A/MVS/provenance/wholefit remain required. Pre-execution helper uniqueness and no-op negative fixture corrections caused no failed operation."
+}

@@ -1655,13 +1655,19 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::Lstat,
         ))
         .unwrap();
+    for relative in &RULES_CC_IMPORT_METADATA[2..] {
+        let selected = Path::new("/cc").join(relative);
+        all = all
+            .try_union(&need(&selected, PathObservationOperation::Lstat))
+            .unwrap();
+    }
     for relative in RULES_CC_IMPORTS {
         let selected = Path::new("/cc").join(relative);
         for operation in &operations {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 10);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 20);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -1672,6 +1678,48 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     for (excluded, operation) in [
         ("/cc/cc", PathObservationOperation::FileBytes),
         ("/cc/cc/common", PathObservationOperation::FileBytes),
+        ("/cc/cc/private", PathObservationOperation::FileBytes),
+        ("/cc/cc/private", PathObservationOperation::FileDigest),
+        (
+            "/cc/cc/private/toolchain",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/cc/cc/private/toolchain/cc_configure.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/cc_configure.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/Cc_configure.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/unknown_cc_configure.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/unix_cc_configure.bzl/child",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/windows_cc_configure.bzl-extra",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/Lib_cc_configure.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/cc/private/toolchain/cc_configure.bzl",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/cc/cc/extensions.bzl/child",
             PathObservationOperation::Lstat,
