@@ -1,0 +1,322 @@
+{
+  "checkpoint": "WP995",
+  "baseline": "2ff694de133f8bf65351a45acf3ae445db8a94dd",
+  "compatibility": "Exact captured local bytes and guard discriminators; Slug-native cfgtest/Linux readiness; production/Windows unchanged.",
+  "implementation": {
+    "rust_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "a017bcd8d40443fd1144beb90449e2e1d43d3c7a7e2ac84cedb9644057b3d31b"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "e77aa608ce355ae2e3460245fcced62b9d5dc2e27fed5781fbf37cebccadfa9a"
+      }
+    ],
+    "growth": {
+      "insertions": 42,
+      "deletions": 2,
+      "changed": 44,
+      "net": 40
+    },
+    "natural_owner": "Existing exact PreparedFile/PublicProbe CC role/additional[2], loading source observations and materializer; no guard owner change.",
+    "body_rows_before": 35,
+    "body_rows_after": 43,
+    "metadata_before": 8,
+    "metadata_after": 8,
+    "coupled_demand_matrix": 94,
+    "memory": {
+      "new_retained_strings": 0,
+      "new_retained_containers": 0,
+      "new_flags": 0,
+      "static_file_append": 8,
+      "static_metadata_append": 0,
+      "allocation_policy": "Borrow/transfer/share storage; existing scoped interners for repeated retained immutable strings when lifetime and cleanup fit; no global pool for unique temporary paths."
+    },
+    "decoder": "Complete43 exact rows validated FIRST before accepted legacy8 interface projection; current43/8 denial contradictions checked; original input/raw/flags/limits/counters unchanged."
+  },
+  "counts": {
+    "current_all_phase_operations": 70,
+    "current_native_gate_operations": 69,
+    "fresh_capture_operations": 1,
+    "fresh_capture_observations": 8,
+    "capture_test_passes": 0,
+    "fresh_core_ordinary": 63,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "fresh_named_passes": 68,
+    "qualified_prior_reference_operations": 1,
+    "qualified_prior_reference_observations": 1,
+    "qualified_prior_reader_controls": 11,
+    "qualified_prior_bzlmod_passes": 5,
+    "prior_fresh_credit": 0,
+    "current_material_pin_union": 589,
+    "native_runtime_pins": 556,
+    "native_child_starts": 1,
+    "credited_native_terminal_observations": 1,
+    "census_qualification": "Current70 operations=69 current native gates+one current8-row capture; qualified prior reference1 and captures6/33 observations separate with zero fresh credit.",
+    "qualified_prior_capture_operations": 6,
+    "qualified_prior_capture_observations": 33
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp995/native/compile.json",
+        "sha256": "be05e92122de23003ea214ad9b5ba7aacb0372f0de12dbd77f490a694844e2e8"
+      },
+      "seconds": 5.467428539996035,
+      "test_passes": 0
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp995/native/check.json",
+        "sha256": "148017526311ac95e02a6e1ac8241a49708293ddc86aad27fa5841ace7af6b90"
+      },
+      "seconds": 7.322293741046451,
+      "test_passes": 0
+    }
+  },
+  "tests": {
+    "ordinary_seconds": 12.390074885683134,
+    "ordinary_peak_kib": 57964,
+    "control_seconds": 0.930191959021613,
+    "control_peak_kib": 21852,
+    "selectors": {
+      "path": "target/wp995/native/selectors.json",
+      "sha256": "fa2dd6ff42c10a21e941f26269a172d76a6a0dbbdc6ea0d68ba1560f9b4dfeca"
+    },
+    "actual_cargo_artifact": {
+      "path": "target/wp995/native/executable.json",
+      "sha256": "0c00b05898eb599a5a4d85fe5af2f528ce16eb689fc093f96057c6d65e85162e"
+    },
+    "compiler_memory_is_runtime_fit": false
+  },
+  "capture": {
+    "operation": {
+      "path": "target/wp995/capture/availability-operation.json",
+      "sha256": "50fe646b826c2ed3af7acce54b97db50e674a1756de9de73146885696fc63587"
+    },
+    "result": {
+      "path": "target/wp995/capture/result.json",
+      "sha256": "c1d56ac1efab236ad431945c54d4c193e9b58bca115fc920d60e19f4ea052dfc"
+    },
+    "observed_rows": [
+      {
+        "path": "cc/private/paths.bzl",
+        "bytes": 1293,
+        "sha256": "c982ac685f0bfbd32602d82d1c37f3bf50a2714ca6a13bfd3c08d4e5cc8b8872"
+      },
+      {
+        "path": "cc/action_names.bzl",
+        "bytes": 8322,
+        "sha256": "e52d16474bd3ad3a0e0a4cd0cb1ad60b968ac5b0b2bcb0b1cffe85aedf80ed9d"
+      },
+      {
+        "path": "cc/common/semantics.bzl",
+        "bytes": 7634,
+        "sha256": "029254fd58eb8b3bf32a0f772e479b991a51ce21a6f6cc8a5739aadbce3900da"
+      },
+      {
+        "path": "cc/private/compile/cc_compilation_helper.bzl",
+        "bytes": 29387,
+        "sha256": "2c484cade81f0d70efd203612b5492e5578871b2b3e9be7987de42de9c57863f"
+      },
+      {
+        "path": "cc/private/compile/compile_action_templates.bzl",
+        "bytes": 10604,
+        "sha256": "10a43c512a85458f45a0223a7ddc7c1b56f8072872b765b1744d336ff91ec794"
+      },
+      {
+        "path": "cc/private/link/cc_linking_helper.bzl",
+        "bytes": 30696,
+        "sha256": "c45dd243835bd70803a7bb2e0a11167c9ea5ac912b3f02d415841879873b2a03"
+      },
+      {
+        "path": "cc/private/link/target_types.bzl",
+        "bytes": 4857,
+        "sha256": "12110c7dce405cd2ba4253d694502f08cc97a95bd0004444054ae8aa689da8fd"
+      },
+      {
+        "path": "cc/cc_toolchain_config_lib.bzl",
+        "bytes": 23684,
+        "sha256": "f8418490663f7e188fa060265b215e80b154a5d190b32ef75fcb6d0254017808"
+      }
+    ],
+    "bytes": 116477,
+    "seconds": 0.08316222100984305,
+    "peak_kib": 21972,
+    "sequential_fd_opens": 146,
+    "literal_load_occurrences": 21,
+    "new_edges_unselected": true,
+    "collection_atomic": false,
+    "native_certificate": false,
+    "body_text_ast_retired_per_row": true,
+    "scratch_bytes": 65536,
+    "distinct_literal_load_labels": 13
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp995/native/native-operation.json",
+      "sha256": "63da2242a991b42a55149f273e115981ba052aea8e10c5a06a0157f049592e8f"
+    },
+    "result": {
+      "path": "target/wp995/native/result.json",
+      "sha256": "33b4e232c37a1a183fac2ceac580bda88703b3b47779a7a33d28a828e3efa54f"
+    },
+    "stdout": {
+      "path": "target/wp995/native/native.stdout",
+      "sha256": "0c3c440d5a132822e6f9b912348f2e37084cf632df175031be8afe0f74413d30"
+    },
+    "stderr": {
+      "path": "target/wp995/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 3.780730888945982,
+    "conservative_peak_kib": 108252,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 102,
+      "transferred_bytes": 0,
+      "decoded_bytes": 1172792,
+      "written_bytes": 5228,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "next_need": {
+      "family": "path",
+      "path_len": 223,
+      "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f623637396330323038313365623864363538393230343438613165383231383830633632643239336435366435363435323463386332353465323065343835662f64306534656261612d376666612d346133642d613735352d6335643239653964633738632f63632f707269766174652f6c696e6b2f6370705f6c696e6b5f616374696f6e2e627a6c",
+      "selected_relative": "cc/private/link/cpp_link_action.bzl",
+      "operation": "lstat"
+    },
+    "public_probe": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "ending_resource_credits": {
+      "phase": "after_runtime_drop",
+      "descriptor_used": 0,
+      "descriptor_peak": 131496,
+      "logical_used": 0,
+      "scratch_used": 0
+    },
+    "qualification": "Native prefix fits256MiB; body Weak Seenfalse is not a body lifetime witness; complete Arc/DICE/page/output/freshness/fullSpec/whole-fit unproved. Written5228 is counted accounting comparison only, not completed output."
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "source_bindings": {
+    "ordered_leases": 272,
+    "prefix": 188,
+    "additional": 84,
+    "physical_bytes": 1442377,
+    "before_after_hash_bytes": 2884754,
+    "parent_buffers": 2,
+    "parent_buffer_bytes_each": 65536,
+    "combined_parent_scratch_bytes": 131072,
+    "noninherited": true,
+    "collection_atomic": false,
+    "native_certificate": false
+  },
+  "artifacts": {
+    "design": {
+      "path": "target/wp995/native/design.md",
+      "sha256": "fdd1a6c1252cd54a25d6bad14e28b2b119c54ef05f3e647e32ce2ba312452fab"
+    },
+    "design-review": {
+      "path": "target/wp995/native/design-review.md",
+      "sha256": "8567fe4e20ab80eb90b667a268e42cdf8f4169866bcf35eeef314bd9aab1f30c"
+    },
+    "implementation-source": {
+      "path": "target/wp995/native/implementation-source.md",
+      "sha256": "cfe2aa5f356b37e71b675c7d46021b671d3a2141944a7759dbdb670d9e99209d"
+    },
+    "implementation-evidence": {
+      "path": "target/wp995/native/implementation-evidence.md",
+      "sha256": "ec9747da6985df9f8298f8bd2bd92be3c08c0ff7c4e1f3b605c7aee575d1b3bf"
+    },
+    "preflight-source": {
+      "path": "target/wp995/native/preflight-source.md",
+      "sha256": "d2fe11cc8d8562413f4733183497b3e64fa47b4147f720b4deca3990c311910d"
+    },
+    "preflight-evidence": {
+      "path": "target/wp995/native/preflight-evidence.md",
+      "sha256": "c9ca6c59128c7c160f405d08bfffef01d846d9bc8fa440ac529b6a95b82294b8"
+    },
+    "final-source": {
+      "path": "target/wp995/native/final-source.md",
+      "sha256": "fac9e75c1aa8f18d58f03b7c1648d508bee55be55cdc10d8320bfbbc56e26c20"
+    },
+    "final-evidence": {
+      "path": "target/wp995/native/final-evidence.md",
+      "sha256": "acbbe945978726f9090603e6ee5d20727f57a5d96ab5cddc22978e8b0997b821"
+    },
+    "successor-source": {
+      "path": "target/wp995/native/successor-source.md",
+      "sha256": "974ce90c5b7b311f8d9c8805b2e7c2f61ff542ebe9b34d222a8430be856e7854"
+    },
+    "successor-evidence": {
+      "path": "target/wp995/native/successor-evidence.md",
+      "sha256": "a51a733b08a0bf436de26429de6631ed036eee57ecad47bd791237b661dac185"
+    }
+  },
+  "capture_reviews": {
+    "design": {
+      "path": "target/wp995/capture/design.md",
+      "sha256": "ec5042d21a0ba9017cbdb8fcd5ef87223c4999c7e760aff220f74e13473d171d"
+    },
+    "design-review": {
+      "path": "target/wp995/capture/design-review.md",
+      "sha256": "fb1c2efe3f666cc73c749d05253426b1cafe931a822c16107f1cfcc6be26177c"
+    },
+    "preflight-source": {
+      "path": "target/wp995/capture/preflight-source.md",
+      "sha256": "fb1c2efe3f666cc73c749d05253426b1cafe931a822c16107f1cfcc6be26177c"
+    },
+    "preflight-evidence": {
+      "path": "target/wp995/capture/preflight-evidence.md",
+      "sha256": "4abe79bf91cd3bfeacd0b83bea9353e4659ee02955a17ba443e4067d68a5605a"
+    },
+    "final-source": {
+      "path": "target/wp995/capture/final-source.md",
+      "sha256": "abf901bac496132e3f0a197eaaadeaf12c3b75af356e9428008d62e5a03abbb3"
+    },
+    "final-evidence": {
+      "path": "target/wp995/capture/final-evidence.md",
+      "sha256": "04ef8a4eae06b870aa06b88b3162b0660e36ba1b40604953d76018a758d20c88"
+    }
+  },
+  "continuation": "Continue actual typed prerequisite through one bounded source-declared cohort if matched, otherwise its natural semantic owner; preserve memory caps/ownership/full goal. See current successor source/evidence.",
+  "normal_public_rustc_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "full_goal_active": true,
+  "accepted_at": "2026-10-07T23:37:13.952660+00:00",
+  "residuals": [
+    "Normal publicRustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024\u21922021\u21922024/fullCLI/M7A/MVS/provenance/whole-workload fit remain required.",
+    "Runtime prefix fit does not include aggregate parent/compiler memory or complete graph fit.",
+    "Windows remains minimal stubs/unsupported."
+  ]
+}
