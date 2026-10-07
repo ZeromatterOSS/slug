@@ -131,6 +131,12 @@ native0.243s/67,560KiB pass;9parentbindings9581B/originalroot/Weak/credits check
 Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual package_metadata0.0.3 prerequisite.
 Continue its actual normal owner under borrowing/scoped interning and unchanged caps;
 public Rustc/provenance/whole-workload fit remains open.
+[WP951](./slug-v2-subplans/wp951-native-package-metadata-readiness-2026-10-07.json) accepts package_metadata235B/declared0.0.3
+and normal explicit Local/sharedTen guards.12ordinary2.367s/55,840KiB and
+native0.245s/66,644KiB pass;10parentbindings9816B/originalroot/Weak/credits checked.
+Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support, package_metadata. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual buildozer 8.5.1 prerequisite.
+Continue the actual normal owner under borrowing/scoped interning and unchanged caps;
+public Rustc/provenance/whole-workload fit remains open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

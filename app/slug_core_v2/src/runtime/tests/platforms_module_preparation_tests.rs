@@ -63,29 +63,36 @@ const APPLE_SUPPORT_SHA: [u8; 32] = [
     0x0e, 0x62, 0x47, 0x18, 0x18, 0xaf, 0xfb, 0x9f, 0x0b, 0x26, 0xf1, 0x28, 0x83, 0x1d, 0x5c, 0x40,
     0xb0, 0x74, 0xd3, 0x2e, 0x6d, 0xda, 0x5a, 0x0d, 0x38, 0x52, 0x84, 0x72, 0x15, 0xa4, 0x1c, 0xa4,
 ];
-const ADDITIONAL_IDENTITIES: [(&str, &str); 6] = [
+const PACKAGE_METADATA_SHA: [u8; 32] = [
+    0x77, 0x89, 0x05, 0x52, 0xec, 0xea, 0x9e, 0x28, 0x4b, 0x54, 0x24, 0xc9, 0xde, 0x82, 0x7a, 0x58,
+    0x09, 0x93, 0x48, 0x76, 0x3a, 0x43, 0x59, 0xe9, 0x75, 0xc3, 0x59, 0xa8, 0x3d, 0x4f, 0xaa, 0x83,
+];
+const ADDITIONAL_IDENTITIES: [(&str, &str); 7] = [
     ("bazel_features", "bazel_features+"),
     ("bazel_skylib", "bazel_skylib+"),
     ("rules_cc", "rules_cc+"),
     ("rules_license", "rules_license+"),
     ("rules_shell", "rules_shell+"),
     ("apple_support", "apple_support+"),
+    ("package_metadata", "package_metadata+"),
 ];
-const ADDITIONAL_ENV: [&str; 6] = [
+const ADDITIONAL_ENV: [&str; 7] = [
     "SLUG_NATIVE_BAZEL_FEATURES_ROOT",
     "SLUG_NATIVE_BAZEL_SKYLIB_ROOT",
     "SLUG_NATIVE_RULES_CC_ROOT",
     "SLUG_NATIVE_RULES_LICENSE_ROOT",
     "SLUG_NATIVE_RULES_SHELL_ROOT",
     "SLUG_NATIVE_APPLE_SUPPORT_ROOT",
+    "SLUG_NATIVE_PACKAGE_METADATA_ROOT",
 ];
-const ADDITIONAL_MARKERS: [(&str, &str); 6] = [
+const ADDITIONAL_MARKERS: [(&str, &str); 7] = [
     ("WP945", "bazel_features_root"),
     ("WP946", "bazel_skylib_root"),
     ("WP947", "rules_cc_root"),
     ("WP948", "rules_license_root"),
     ("WP949", "rules_shell_root"),
     ("WP950", "apple_support_root"),
+    ("WP951", "package_metadata_root"),
 ];
 fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
     let (size, hash) = match slot {
@@ -95,6 +102,7 @@ fn additional_bytes(slot: usize, bytes: &[u8]) -> bool {
         3 => (753, LICENSE_SHA),
         4 => (485, SHELL_SHA),
         5 => (1104, APPLE_SUPPORT_SHA),
+        6 => (235, PACKAGE_METADATA_SHA),
         _ => unreachable!(),
     };
     bytes.len() == size && sha2::Sha256::digest(bytes).as_slice() == hash
@@ -108,6 +116,7 @@ enum ModuleMode {
     Seven,
     Eight,
     Nine,
+    Ten,
 }
 impl ModuleMode {
     fn additional_count(self) -> usize {
@@ -119,6 +128,7 @@ impl ModuleMode {
             Self::Seven => 4,
             Self::Eight => 5,
             Self::Nine => 6,
+            Self::Ten => 7,
         }
     }
 }
@@ -129,7 +139,7 @@ struct AdditionalModule {
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
-    additional: [Option<AdditionalModule>; 6],
+    additional: [Option<AdditionalModule>; 7],
 }
 #[derive(Debug)]
 struct Denied {
@@ -144,7 +154,7 @@ impl Bodies {
         Self {
             roots,
             files,
-            additional: [None, None, None, None, None, None],
+            additional: [None, None, None, None, None, None, None],
         }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
@@ -195,6 +205,15 @@ impl Bodies {
         );
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
         self.additional[5] = Some(AdditionalModule { root, file });
+        self
+    }
+    fn with_tenth(mut self, root: NormalizedAbsolutePath) -> Self {
+        assert!(
+            self.additional[..6].iter().all(Option::is_some),
+            "tenth binding requires fourth through ninth"
+        );
+        let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
+        self.additional[6] = Some(AdditionalModule { root, file });
         self
     }
     fn roots(&self) -> impl Iterator<Item = &NormalizedAbsolutePath> {
@@ -320,8 +339,8 @@ struct Milestones {
     preparations: u64,
     effective_empty: bool,
     source: Option<Weak<[u8]>>,
-    additional_source: [Option<Weak<[u8]>>; 6],
-    additional_bytes: [Option<(usize, bool)>; 6],
+    additional_source: [Option<Weak<[u8]>>; 7],
+    additional_bytes: [Option<(usize, bool)>; 7],
     selected_reported: bool,
     bytes: usize,
     hash_match: bool,
@@ -904,6 +923,11 @@ fn ninth_module_need_admission_is_opt_in_and_exact() {
     additional_module_need_admission(ModuleMode::Nine);
 }
 
+#[test]
+fn tenth_module_need_admission_is_opt_in_and_exact() {
+    additional_module_need_admission(ModuleMode::Ten);
+}
+
 fn additional_module_need_admission(mode: ModuleMode) {
     let slot = match mode {
         ModuleMode::Five => 1,
@@ -911,6 +935,7 @@ fn additional_module_need_admission(mode: ModuleMode) {
         ModuleMode::Seven => 3,
         ModuleMode::Eight => 4,
         ModuleMode::Nine => 5,
+        ModuleMode::Ten => 6,
         _ => unreachable!(),
     };
     let roots = [
@@ -920,6 +945,7 @@ fn additional_module_need_admission(mode: ModuleMode) {
         "/license",
         "/shell",
         "/apple",
+        "/metadata",
     ];
     let paths = match mode {
         ModuleMode::Five => [
@@ -962,6 +988,14 @@ fn additional_module_need_admission(mode: ModuleMode) {
             "/apple/BUILD.bazel",
             "/apple/.bazelignore",
         ],
+        ModuleMode::Ten => [
+            "/",
+            "/metadata",
+            "/metadata/MODULE.bazel",
+            "/metadata/BUILD",
+            "/metadata/BUILD.bazel",
+            "/metadata/.bazelignore",
+        ],
         _ => unreachable!(),
     };
     let excluded_paths = match mode {
@@ -994,6 +1028,12 @@ fn additional_module_need_admission(mode: ModuleMode) {
             "/apple/BUILD.bazel",
             "/apple/REPO.bazel",
             "/apple/MODULE.bazel",
+        ],
+        ModuleMode::Ten => [
+            "/metadata_extra/MODULE.bazel",
+            "/metadata/BUILD.bazel",
+            "/metadata/REPO.bazel",
+            "/metadata/MODULE.bazel",
         ],
         _ => unreachable!(),
     };
@@ -1033,6 +1073,9 @@ fn additional_module_need_admission(mode: ModuleMode) {
         if count >= 6 {
             bodies = bodies.with_ninth(normalized(roots[5]));
         }
+        if count >= 7 {
+            bodies = bodies.with_tenth(normalized(roots[6]));
+        }
         bodies
     };
     let body = need(paths[2], PathObservationOperation::FileBytes);
@@ -1054,6 +1097,7 @@ fn additional_module_need_admission(mode: ModuleMode) {
                 ModuleMode::Seven => configured(count).with_seventh(normalized(roots[slot])),
                 ModuleMode::Eight => configured(count).with_eighth(normalized(roots[slot])),
                 ModuleMode::Nine => configured(count).with_ninth(normalized(roots[slot])),
+                ModuleMode::Ten => configured(count).with_tenth(normalized(roots[slot])),
                 _ => unreachable!(),
             })
             .is_err()
@@ -1194,6 +1238,12 @@ fn native_nine_root_local_module_and_mapping_prerequisite() {
     observe_native_modules(ModuleMode::Nine);
 }
 
+#[test]
+#[ignore = "frozen scoped ten-root normal Local MODULE readiness observation"]
+fn native_ten_root_local_module_and_mapping_prerequisite() {
+    observe_native_modules(ModuleMode::Ten);
+}
+
 fn observe_native_modules(mode: ModuleMode) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
@@ -1222,6 +1272,7 @@ fn observe_native_modules(mode: ModuleMode) {
             3 => bodies.with_seventh(extra_root),
             4 => bodies.with_eighth(extra_root),
             5 => bodies.with_ninth(extra_root),
+            6 => bodies.with_tenth(extra_root),
             _ => unreachable!(),
         };
         let (prefix, field) = ADDITIONAL_MARKERS[slot];
@@ -1304,7 +1355,7 @@ fn observe_native_modules(mode: ModuleMode) {
     let mut policy_error = false;
     let mut outcome = None;
     if let Some(runtime) = &runtime {
-        let mut overrides: [Option<String>; 8] = Default::default();
+        let mut overrides: [Option<String>; 9] = Default::default();
         for (slot, (name, _, root)) in bodies.bindings().enumerate() {
             overrides[slot] = Some(format!("{name}={}", root.as_path().display()));
         }
