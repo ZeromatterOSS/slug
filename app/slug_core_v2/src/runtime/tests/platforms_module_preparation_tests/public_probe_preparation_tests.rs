@@ -260,6 +260,7 @@ fn projection_matches(
         && bodies.repo_marker_metadata
         && bodies.ignore_file_bytes
         && bodies.rust_package_metadata
+        && bodies.nightly_package_metadata
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -334,7 +335,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+            .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_nightly_package_metadata(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -375,7 +380,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_ignore = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -386,11 +392,24 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_rust_metadata = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
         &no_rust_metadata,
+        &registry,
+        &nightly_overlay()
+    ));
+    let no_nightly_metadata = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &no_nightly_metadata,
         &registry,
         &nightly_overlay()
     ));
@@ -569,6 +588,84 @@ fn rust_package_metadata_need_is_opt_in_exact_rules_root_only() {
         "/rules/rust",
         Some("/rules"),
     );
+}
+#[test]
+fn nightly_package_metadata_need_is_opt_in_exact_chain_only() {
+    for (relative, selected, spellings) in [
+        (
+            "rust/toolchain",
+            "/rules/rust/toolchain",
+            &[
+                "/other/rust/toolchain",
+                "/rules/rust/other/toolchain",
+                "/rules/rust/toolchain/child",
+                "/rules/rust/toolchain.extra",
+                "/rules/rust/TOOLCHAIN",
+                "/rules/RUST/toolchain",
+                "/rules-other/rust/toolchain",
+            ][..],
+        ),
+        (
+            "rust/toolchain/channel",
+            "/rules/rust/toolchain/channel",
+            &[
+                "/other/rust/toolchain/channel",
+                "/rules/rust/other/channel",
+                "/rules/rust/toolchain/channel/child",
+                "/rules/rust/toolchain/channel.extra",
+                "/rules/rust/toolchain/CHANNEL",
+                "/rules/rust/TOOLCHAIN/channel",
+                "/rules-other/rust/toolchain/channel",
+            ][..],
+        ),
+    ] {
+        assert_exact_root_file_role(
+            relative,
+            PathObservationOperation::Lstat,
+            Bodies::with_nightly_package_metadata,
+            |b| b.nightly_package_metadata,
+            spellings,
+            selected,
+            Some("/rules"),
+        );
+    }
+    let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let need =
+        |p: &str, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let both = need("/rules/rust/toolchain", PathObservationOperation::Lstat)
+        .try_union(&need(
+            "/rules/rust/toolchain/channel",
+            PathObservationOperation::Lstat,
+        ))
+        .unwrap();
+    assert!(bodies.admit(&both).is_ok());
+    for (excluded, operation) in [
+        (
+            "/rules/rust/toolchain/channel/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/toolchain/channel",
+            PathObservationOperation::FileBytes,
+        ),
+    ] {
+        let mixed = both.try_union(&need(excluded, operation.dupe())).unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(denied.family, "path");
+        assert_eq!(denied.operation, path_operation_code(&operation));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
 }
 fn assert_exact_root_file_role(
     name: &str,

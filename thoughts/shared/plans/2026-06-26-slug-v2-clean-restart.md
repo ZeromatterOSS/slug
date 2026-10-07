@@ -149,25 +149,24 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP961](./slug-v2-subplans/wp961-imported-rust-package-metadata-readiness-2026-10-07.json) accepts exact rules_rust root/rust
-Host Lstat through the original public singleton, with a borrowed predicate/defaultfalse
-PublicProbe+PreparedFile bool and actual projection. Shared matrix covers all11roots/
-fourchoices/operations/namespace/mixed requests, selecting one root only;54netRust lines,
-zero new retained strings/body/cache/harness.19ordinary3.759s/56916KiB+4synthetic+1native
-diagnostic pass; separate Core10.039s/CoreCLI7.317s and independent reviews.
-Actual0.382s/conservative76712KiB/142pins/188held284878B leases, SourceNone/105registry
-235521B/12Host11061decoded/transferwrite0, scope/recorder/finalcredits retire. Next202B
-rules_rust_root/rust/toolchain HostLstat is refused before progress; source-ground its
-natural configuration/load/path metadata role under unchanged caps. No directory kind/
-contents/absence, complete Need/importstack or accepted producer is established.
-Private MODULE/native body Weak/freshness remain unobserved/vacuous; cumulative decoded
-history is not per-Arc live credit. [WP960](./slug-v2-subplans/wp960-bounded-host-file-readiness-2026-10-07.json)
-atbbda0952365def42e588dbdc6d5680a878f7f5ca is the unchanged bounded Host reader/ignore
-predecessor; its reader/kernel/bridge controls reuse0runs, while current guard/source/
-lifecycle gates runfresh. WP958 singleton and WP957 finite mapping remain historical.
-Public Rustc/support/data/provider/runfiles/oracle/same-engine restoration/MVS/BCR/
-fullCLI/M7A/wholefit remain open; borrowed/scoped-interned/Arc ownership and all limits
-stay mandatory, with authentic WP954 corpus reused without operations.
+[WP962](./slug-v2-subplans/wp962-nightly-package-chain-metadata-readiness-2026-10-07.json) accepts the closed rules_rust
+nightly package-chain HostLstat role through the original public singleton. Borrowed
+exact rust/toolchain and rust/toolchain/channel predicates/defaultfalse selected bool,
+independent projection and all11root/fourchoice/op/namespace/mixed/coupled-union controls
+add116netRust lines/zero new retained strings/body/cache/production changes.20ordinary
+3.993s/56540KiB+4synthetic+1native diagnostic pass; separate Core10.160s/CoreCLI7.512s
+and independent reviews. Actual0.395s/conservative76504KiB/150pins/188held284878B leases,
+SourceNone105registry235521B/12Host11061decoded/transferwrite0; scope/recorder/finalcredits
+retire. Next222B rules_rust_root/rust/toolchain/channel/BUILD.bazel HostLstat refuses
+before progress; continue the source-grounded normal package/load owner under unchanged
+caps. No directory kind/content/absence, completeNeed/importstack, body availability or
+accepted publicproducer is established. PrivateMODULE/nativebodyWeak/freshness remain
+unobserved/vacuous; cumulativedecodedhistory is notperArclivecredit. WP961 atefb023ba4
+is the root/rust predecessor; WP960 atbbda09523 remains unchanged reader/kernel/bridge
+acceptedreuse0runs. WP958singleton/WP957mapping historical; publicRustc/support/data/
+provider/runfiles/oracle/sameengine/MVS/BCR/fullCLI/M7A/wholefit remain open. Borrowed/
+scoped-interned/Arc ownership and all limits stay mandatory; authenticWP954corpus reused
+without operations.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

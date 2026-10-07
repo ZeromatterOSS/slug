@@ -240,6 +240,7 @@ struct Bodies {
     repo_marker_metadata: bool,
     ignore_file_bytes: bool,
     rust_package_metadata: bool,
+    nightly_package_metadata: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -272,6 +273,7 @@ impl Bodies {
             repo_marker_metadata: false,
             ignore_file_bytes: false,
             rust_package_metadata: false,
+            nightly_package_metadata: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -298,6 +300,15 @@ impl Bodies {
         command: CommandChoice,
     ) -> Self {
         self.rust_package_metadata = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn with_nightly_package_metadata(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.nightly_package_metadata = matches!(registry, RegistryChoice::PreparedFile)
             && matches!(command, CommandChoice::PublicProbe);
         self
     }
@@ -492,6 +503,13 @@ impl Bodies {
                             || (self.rust_package_metadata
                                 && path.parent() == Some(self.roots[1].as_path())
                                 && path.file_name().is_some_and(|name| name == "rust"))
+                            || (self.nightly_package_metadata
+                                && path.strip_prefix(self.roots[1].as_path()).is_ok_and(
+                                    |relative| {
+                                        relative == Path::new("rust/toolchain")
+                                            || relative == Path::new("rust/toolchain/channel")
+                                    },
+                                ))
                             || self.roots().any(|root| {
                                 path.parent() == Some(root.as_path())
                                     && matches!(
@@ -1624,7 +1642,8 @@ fn observe_native_command(
     .with_visible_lockfile_metadata(registry_choice)
     .with_repo_marker_metadata(registry_choice, command)
     .with_ignore_file_bytes(registry_choice, command)
-    .with_rust_package_metadata(registry_choice, command);
+    .with_rust_package_metadata(registry_choice, command)
+    .with_nightly_package_metadata(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
