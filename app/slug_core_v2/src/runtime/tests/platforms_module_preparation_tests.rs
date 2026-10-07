@@ -309,6 +309,7 @@ struct Bodies {
     rules_rust_defs_source: bool,
     rules_rust_defs_import_sources: bool,
     bazel_features_import_sources: bool,
+    generated_features_file_effects: bool,
     bazel_skylib_import_sources: bool,
     rules_cc_import_sources: bool,
 }
@@ -596,10 +597,92 @@ impl fmt::Display for GeneratedPlanDiagnostic<'_> {
         Ok(())
     }
 }
+type GeneratedFileSignature = (&'static str, usize, bool, [u8; 32]);
+const GENERATED_FEATURES_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "BUILD.bazel",
+        266,
+        true,
+        [
+            0xab, 0x75, 0x99, 0x2e, 0xeb, 0xb5, 0xa7, 0x56, 0x5c, 0x45, 0x29, 0xc3, 0x50, 0x89,
+            0x91, 0xf3, 0xc1, 0x2f, 0x20, 0x35, 0xe9, 0xa9, 0x35, 0xad, 0xca, 0x1f, 0x62, 0x1d,
+            0x65, 0x1e, 0x3d, 0xcc,
+        ],
+    ),
+    (
+        "globals.bzl",
+        1585,
+        true,
+        [
+            0xe3, 0xd6, 0x78, 0x0b, 0xb1, 0xa8, 0x69, 0xff, 0x03, 0x2e, 0x2c, 0x2b, 0x88, 0x2b,
+            0xa3, 0xea, 0xc6, 0x01, 0xb0, 0xd2, 0x12, 0x80, 0x50, 0x55, 0x59, 0xe7, 0x7a, 0xe2,
+            0x77, 0x3e, 0x4a, 0x6f,
+        ],
+    ),
+];
+fn generated_features_plan_matches(
+    plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    expected: &[GeneratedFileSignature; 2],
+) -> bool {
+    use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
+    let mut ordered = plan.ordered_effects();
+    let (Some(Effect::File(first)), Some(Effect::File(second))) = (ordered.next(), ordered.next())
+    else {
+        return false;
+    };
+    if ordered.next().is_some() {
+        return false;
+    }
+    let files = [first, second];
+    // Check every shape/length before inspecting any content digest.
+    if files
+        .iter()
+        .zip(expected)
+        .any(|(file, &(path, bytes, executable, _))| {
+            file.path() != path || file.content().len() != bytes || file.executable() != executable
+        })
+    {
+        return false;
+    }
+    files.iter().zip(expected).all(|(file, expected)| {
+        let mut digest = sha2::Sha256::new();
+        digest.update(file.content());
+        digest.finalize().as_slice() == expected.3
+    })
+}
 impl Bodies {
     fn first_denied_materialization<'a>(
         &self,
         needs: &'a SourcePreparationNeeds,
+    ) -> Option<(
+        &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+        &'static str,
+    )> {
+        self.first_denied_materialization_with_plan_matcher(needs, &|plan| {
+            generated_features_plan_matches(plan, &GENERATED_FEATURES_FILES)
+        })
+    }
+    fn generated_features_owner_is_admitted(
+        &self,
+        request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> bool {
+        let label = &request.repo_spec.rule_id.bzl_file;
+        self.generated_features_file_effects
+            && self.bazel_features_import_sources
+            && self.additional[0].is_some()
+            && request.id.workspace == self.roots[0]
+            && request.id.canonical_repo.as_str()
+                == "bazel_features++version_extension+bazel_features_globals"
+            && label.package().repo().as_str() == "bazel_features+"
+            && label.package().package().as_str() == "private"
+            && label.target().as_str() == "globals_repo.bzl"
+            && label.mapping_id().is_none()
+            && request.repo_spec.rule_id.rule_name == "globals_repo"
+    }
+    fn first_denied_materialization_with_plan_matcher<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+        plan_matches: &impl Fn(&slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan) -> bool,
     ) -> Option<(
         &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
         &'static str,
@@ -610,7 +693,10 @@ impl Bodies {
                 RepositoryMaterializationKind::Immutable => {
                     return Some((request, "immutable_kind"));
                 }
-                RepositoryMaterializationKind::GeneratedFileEffects(_) => {
+                RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
+                    if self.generated_features_owner_is_admitted(request) && plan_matches(plan) {
+                        continue;
+                    }
                     return Some((request, "generated_kind"));
                 }
             };
@@ -708,6 +794,7 @@ impl Bodies {
             rules_rust_defs_source: false,
             rules_rust_defs_import_sources: false,
             bazel_features_import_sources: false,
+            generated_features_file_effects: false,
             bazel_skylib_import_sources: false,
             rules_cc_import_sources: false,
         }
@@ -837,6 +924,15 @@ impl Bodies {
                             .iter()
                             .any(|file| relative == Path::new(file))
                 })
+    }
+    fn with_generated_features_file_effects(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.generated_features_file_effects = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
     }
     fn with_bazel_features_import_sources(
         mut self,
@@ -1036,6 +1132,15 @@ impl Bodies {
         )
     }
     fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
+        self.admit_with_plan_matcher(needs, &|plan| {
+            generated_features_plan_matches(plan, &GENERATED_FEATURES_FILES)
+        })
+    }
+    fn admit_with_plan_matcher(
+        &self,
+        needs: &SourcePreparationNeeds,
+        plan_matches: &impl Fn(&slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan) -> bool,
+    ) -> Result<(), Denied> {
         let refusal = |family| Denied {
             family,
             path: None,
@@ -1059,7 +1164,10 @@ impl Bodies {
         if !needs.repository_executes().is_empty() {
             return Err(refusal("execute"));
         }
-        if self.first_denied_materialization(needs).is_some() {
+        if self
+            .first_denied_materialization_with_plan_matcher(needs, plan_matches)
+            .is_some()
+        {
             return Err(refusal("materialization"));
         }
         if let Some(paths) = needs.path_observations() {
@@ -2263,6 +2371,7 @@ fn observe_native_command(
     .with_rules_rust_defs_source(registry_choice, command)
     .with_rules_rust_defs_import_sources(registry_choice, command)
     .with_bazel_features_import_sources(registry_choice, command)
+    .with_generated_features_file_effects(registry_choice, command)
     .with_bazel_skylib_import_sources(registry_choice, command)
     .with_rules_cc_import_sources(registry_choice, command);
     for slot in 0..mode.additional_count() {

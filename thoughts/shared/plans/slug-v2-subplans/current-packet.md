@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated Features materialization readiness
+Status: Generated Features Version plan readiness
 
 ## Observable and source basis
 
@@ -44,23 +44,26 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP983](wp983-generated-features-plan-projection-2026-10-07.json) accepts a borrowed
-ordered Generated Features plan projection on baseline24407f1ab9afaffa6041fb1249230cb07a9ab9ef.
-Admission/first-offender/defaults/production storage remain unchanged. The exact typed
-Globals owner borrows its original request/plan; bounded9visit scan checks8rows,
-512/2048path,1MiB/4MiBcontent,1024mapping+4096owner bytes before streaming SHA/render.
-Header+rows share16KiB LF-inclusive writer. No new retained guard fields, heap report,
-owned strings/requestArc/plan copies/interner. Independent growth review accepts
-508net/510changed cfgtest lines (185formatter/summary/predicate+323focused tests).
-A narrow invalid inert archive URL test fixture correction is preserved; its prior
-33passes are historical0current, and the corrected full35gate batch was refreshed.
+[WP984](wp984-generated-features-globals-permission-2026-10-07.json) accepts finite
+borrowed Globals permission on baselineb323c98e823cdb16908998339ad9036c84102239.
+A default-false inline flag is enabled only for PreparedFile+PublicProbe and checked
+against the actual projection. The original typed workspace/canonical/rule owner,
+mappingNone and exactly two ordered File paths/lengths/digests/modes must match;
+cheap shape checks precede hashing1851borrowed bytes. Native entry points always use
+fixed captured signatures. The shared whole-Need classifier checks every sibling
+before progress. Original request/RepoSpec/plan and normal materializer ownership,
+identity/generation/session/preflight remain intact. No heap strings, plan/spec/Arc
+copies or interner are added. Independent growth review accepts473net/477changed
+cfgtest lines:109matcher/policy plus364focused tests/protected projection integration.
 
-35 fresh Core tests +4 controls +1 normal observer =40 fresh named passes;
+42 fresh Core tests +4 controls +1 normal observer =47 fresh named passes, including
+five existing counted-write/session/cancel/stale-token/preflight lifecycle gates.
 42 unchanged owner/callback checks and11 reader controls are qualified reuse0fresh.
-Current41 successful operations/537union pins include535native pins. Corrected serial
-compile3.849s/check7.441s execute0tests; compiler memory is separate from runtime fit.
-Ordinary runtime totals6.717s, synthetics0.268s. Normal1.788s peaks93,620KiB under256MiB;
-accounted credits zero and scope/recorder Weak expire. Native request/plan/body/registry
+Current48 successful operations/555union pins include553native pins. Serial
+compile10.910s/check7.341s execute0tests; compiler memory is separate from runtime fit.
+Ordinary runtime totals8.087s, synthetics0.278s. Normal1.772s peaks92,888KiB under256MiB;
+accounted credits zero and scope/recorder Weak expire. CurrentBodies192bytes;
+historical layout/total allocation delta unproved. Native request/plan/body/registry
 Arc/DICE/pages and whole-workload fit remain open; bodyWeak is unseen/vacuous.
 All237 ordered parent rows remain918,928physical/1,837,856hash bytes in original188+
 combined49/two64KiB128KiB, non-atomic/noncertifying. Source64/646,987decoded and
@@ -68,36 +71,36 @@ registry105/235,521 remain unchanged, Written0/SourceErrorNone; numerical source
 exhaustion is not quota evidence or cap authority. Public preparation/dispatch/policy
 complete, certificate/observations/analyses/actions/Rustc unavailable.
 
-The actual603-byte LF plan report captures exactly two original purefiles in order:
-BUILD.bazel266B/SHAab75992eebb5a7565c4529c3508991f3c12f2035e9a935adca1f621d651e3dcc,
-then globals.bzl1585B/SHAe3d6780bb1a869ff032e2c2b882ba3eac601b0d21280505559e77ae2773e4a6f,
-both executabletrue. Total1851content/22path bytes, mappingNone/attribute_count1.
-Original canonical bazel_features++version_extension+bazel_features_globals and rule
-@@bazel_features+//private:globals_repo.bzl / globals_repo match the actual fixture
-workspace. This is a bounded plan projection, not fullSpec/attribute values/source
-availability/materialization/inventory evidence.
+The original first denied GeneratedFileEffects request advances from Globals to
+canonical bazel_features++version_extension+bazel_features_version, rule
+@@bazel_features+//private:version_repo.bzl / version_repo. Its mapping, attributes and
+ordered plan remain unobserved. The same combined Need refuses this Version sibling
+BEFORE any progress or writes. This proves exact Globals classifier permission, not
+native materialization/output/epoch/certificate success. Fresh lifecycle fixtures do
+not establish this native write path. No plan report was emitted for the Version owner.
 
 ## Active continuation contract
 
-Continue WP231 using the [grounded successor](../../../../target/wp983/native/successor-source.md),
-SHA2567235ab4828680dd5f5f52271db8f1f8697764be6c4f76450fddecbc4026df90f.
-Review the consequential exactowner/two-file Generated permission as a design checkpoint
-within cohesive implementation. Default-false opt-in only for PreparedFile+PublicProbe;
-borrowed exact typed workspace/canonical/rule owner/mappingNone and bounded original
-File order/path/length/digest/executable with no extra effects. Keep all other Generated/
-Immutable and existing Local predicates unchanged; whole mixedNeed refuses before
-progress. No further diagnostic or acquisition is needed for this already-owned plan.
+Continue WP231 using the [grounded successor](../../../../target/wp984/native/successor-source.md),
+SHA256c6e4ed116210e3e2b8dd6f45904ec0ca4fe0ea9a893e5521944b4d7580c4d548.
+Extend only exact Version owner eligibility of the existing borrowed first-offender
+plan diagnostic alongside unchanged Globals. Reuse its9visit/8row scan,512/2048path,
+1MiB/4MiBcontent,1024mapping+4096owner and16KiB LF-inclusive encoded bounds.
+Emit outside the milestones Mutex; preserve complete/lower-bound distinctions,
+original ordering, actual mapping presence and scalar attributes_count. No arbitrary
+attribute values, Debug/content output, plan/spec/Arc/String copies, acquisition or
+body reads. Reuse the existing facade and pointer/bounds tests; projection grants no
+Version permission and leaves finite Globals admission unchanged.
 
-Pass the SAME original request/RepoSpec/plan through normal Generated route→NativeDemand
-progress→RepositoryMaterializer→write_counted/session/tempdir/epoch/preflight. The writer
-consumes plan bytes and does not interpret opaque attributes; attrslen1 is not fullspec
-proof. Preserve original structural request identity/conflicts/generation, byte credits,
-retirement and final revalidation, with relevant existing materializer/cancellation/
-preflight tests freshly selected or honestly qualified. No proxy Local root, invented
-output/provider/certificate, generic grant, plan clone or effect-specific writer.
-Original237 ordered leases/two64KiB contexts and qualified source reuse remain fixed;
-changed native observation needs relevant fresh gates, no identical retry. A future
-actual quota failure requires its own reviewed resource decision.
+After actual Version plan shape/mapping/identity is observed and reviewed, freeze a
+consequential finite pure-file sibling cohort permission through the same normal
+Generated route and scoped materializer. Preserve the SAME original request/RepoSpec/
+plan, whole-Need admission before writes, structural equality/conflicts/generation,
+byte credits, retirement and final revalidation. No Local proxy, output/provider/
+certificate fabrication, generic grant or effect-specific writer. Original237leases/
+two64KiB contexts and qualified source reuse stay fixed; relevant gates must be fresh
+for changed observation. Do not repeat an unchanged native refusal or raise a cap
+without an actual quota barrier and its reviewed resource decision.
 
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
@@ -109,6 +112,11 @@ same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
 
+[WP983](wp983-generated-features-plan-projection-2026-10-07.json), accepted at
+b323c98e823cdb16908998339ad9036c84102239, records the original Globals plan:
+BUILD.bazel266B then globals.bzl1585B, both executabletrue,1851content/22path bytes,
+mappingNone/attribute_count1. Its bounded projection is not fullSpec/materialization
+proof; captured fixed signatures ground WP984 permission.
 [WP982](wp982-typed-materialization-demand-2026-10-07.json), accepted at
 24407f1ab9afaffa6041fb1249230cb07a9ab9ef, owns the original first-offender
 GeneratedFileEffects identity diagnostic; its report does not describe plan effects.

@@ -293,6 +293,7 @@ fn projection_matches(
         && bodies.probe_package_source
         && bodies.rules_rust_defs_source
         && bodies.rules_rust_defs_import_sources
+        && bodies.generated_features_file_effects
         && bodies.bazel_features_import_sources
         && bodies.additional[0].is_some()
         && bodies.bazel_skylib_import_sources
@@ -668,6 +669,324 @@ fn generated_globals_request(
     request.kind = RepositoryMaterializationKind::GeneratedFileEffects(plan);
     request
 }
+// Known small bytes exercise the same borrowed shape seam; native uses only fixed captured signatures.
+fn small_generated_plan(
+    rows: &[(&str, &[u8], bool)],
+) -> slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan {
+    slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::build(rows.iter().map(
+        |&(path, bytes, executable)| {
+            (
+                compact_str::CompactString::new(path),
+                Arc::from(bytes),
+                executable,
+            )
+        },
+    ))
+    .unwrap()
+}
+#[test]
+fn generated_features_materialization_is_opt_in_and_exact() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let expected: [GeneratedFileSignature; 2] = [
+        ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+        ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+    ];
+    let rows: &[(&str, &[u8], bool)] = &[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", true)];
+    let matches = |plan: &_| generated_features_plan_matches(plan, &expected);
+    let bodies = make()
+        .with_fourth(path("/features"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    let needs = SourcePreparationNeeds::repository(generated_globals_request(
+        &bodies,
+        small_generated_plan(rows),
+    ));
+    assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_ok());
+    assert!(bodies.admit(&needs).is_err()); // The native fixed signature is never the synthetic signature.
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let configured = make()
+                .with_fourth(path("/features"))
+                .with_bazel_features_import_sources(registry, command)
+                .with_generated_features_file_effects(registry, command);
+            assert_eq!(
+                configured.admit_with_plan_matcher(&needs, &matches).is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    for closed in [
+        make(),
+        make().with_fourth(path("/features")),
+        make().with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        ),
+        make()
+            .with_fourth(path("/features"))
+            .with_bazel_features_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
+        make()
+            .with_fourth(path("/features"))
+            .with_generated_features_file_effects(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
+    ] {
+        assert!(closed.admit_with_plan_matcher(&needs, &|_| true).is_err());
+    }
+    let mut wrong_slot = make()
+        .with_fourth(path("/other"))
+        .with_fifth(path("/features"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    wrong_slot.additional[0] = None;
+    assert!(
+        wrong_slot
+            .admit_with_plan_matcher(&needs, &|_| true)
+            .is_err()
+    );
+    // A permissive shape closure cannot bypass any typed owner field or mapping provenance.
+    for index in 0..7 {
+        let mut request = generated_globals_request(&bodies, small_generated_plan(rows));
+        match index {
+            0 => request.id.workspace = path("/other"),
+            1 => {
+                request.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
+            }
+            2 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other//private:globals_repo.bzl").unwrap()
+            }
+            3 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_features+//other:globals_repo.bzl").unwrap()
+            }
+            4 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_features+//private:other.bzl").unwrap()
+            }
+            5 => request.repo_spec.rule_id.rule_name = "other".into(),
+            6 => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("features").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap(),
+                );
+                request.repo_spec.rule_id.bzl_file =
+                    slug_identity_v2::ApparentLabel::parse("@features//private:globals_repo.bzl")
+                        .unwrap()
+                        .resolve(&mapping);
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            bodies
+                .admit_with_plan_matcher(&SourcePreparationNeeds::repository(request), &|_| true)
+                .is_err()
+        );
+    }
+    let invalid: &[&[(&str, &[u8], bool)]] = &[
+        &[],
+        &[("BUILD.bazel", b"a", true)],
+        &[
+            ("BUILD.bazel", b"a", true),
+            ("globals.bzl", b"b", true),
+            ("extra", b"", false),
+        ],
+        &[("globals.bzl", b"b", true), ("BUILD.bazel", b"a", true)],
+        &[("BUILD", b"a", true), ("globals.bzl", b"b", true)],
+        &[("BUILD.bazel", b"aa", true), ("globals.bzl", b"b", true)],
+        &[("BUILD.bazel", b"c", true), ("globals.bzl", b"b", true)],
+        &[("BUILD.bazel", b"a", false), ("globals.bzl", b"b", true)],
+        &[("BUILD.bazel", b"a", true), ("globals.bzl", b"c", true)],
+        &[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", false)],
+    ];
+    for rows in invalid {
+        let needs = SourcePreparationNeeds::repository(generated_globals_request(
+            &bodies,
+            small_generated_plan(rows),
+        ));
+        assert!(bodies.admit_with_plan_matcher(&needs, &matches).is_err());
+    }
+    for symlink in [false, true] {
+        let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+        if symlink {
+            builder
+                .push_symlink(
+                    compact_str::CompactString::new("LINK"),
+                    slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                        path("/source"),
+                        PathObservationNamespace::Host,
+                    )
+                    .unwrap(),
+                    Arc::from(&b"opaque"[..]),
+                )
+                .unwrap();
+        } else {
+            builder
+                .push_archive(
+                    Arc::from([compact_str::CompactString::new(
+                        "https://mirror.example/dist/rustc.tar.xz",
+                    )]),
+                    [0; 32],
+                    compact_str::CompactString::new("prefix"),
+                )
+                .unwrap();
+        }
+        assert!(!matches(&builder.finish()));
+    }
+}
+#[test]
+fn generated_features_materialization_refuses_mixed_need_before_progress() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_fourth(path("/features"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    let expected: [GeneratedFileSignature; 2] = [
+        ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+        ("globals.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
+    ];
+    let matches = |plan: &_| generated_features_plan_matches(plan, &expected);
+    let valid = SourcePreparationNeeds::repository(generated_globals_request(
+        &bodies,
+        small_generated_plan(&[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", true)]),
+    ));
+    let original = valid.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    let count = Arc::strong_count(original);
+    let mut progress = 0;
+    if bodies.admit_with_plan_matcher(&valid, &matches).is_ok() {
+        progress += 1;
+    }
+    assert_eq!(progress, 1);
+    assert_eq!(Arc::strong_count(original), count);
+    assert!(std::ptr::eq(
+        original.as_ref(),
+        valid
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .as_ref()
+    ));
+    let local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone(),
+    );
+    assert!(
+        bodies
+            .admit_with_plan_matcher(&valid.try_union(&local).unwrap(), &matches)
+            .is_ok()
+    );
+    let mut unknown = generated_globals_request(&bodies, small_generated_plan(&[]));
+    unknown.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("unknown+").unwrap();
+    let mut immutable = (*local_native_request(&bodies.roots[0], "immutable+", "/foreign")).clone();
+    immutable.kind = RepositoryMaterializationKind::Immutable;
+    let wrong_local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "platforms+", "/foreign")).clone(),
+    );
+    let denied_path =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/fixture/main.rs"),
+            PathObservationOperation::FileBytes,
+        )));
+    for (excluded, family) in [
+        (
+            SourcePreparationNeeds::repository(unknown),
+            "materialization",
+        ),
+        (
+            SourcePreparationNeeds::repository(immutable),
+            "materialization",
+        ),
+        (wrong_local, "materialization"),
+        (denied_path, "path"),
+        (
+            SourcePreparationNeeds::root_module_bootstrap(
+                slug_bzlmod_v2::RootModuleBootstrapRequest {
+                    workspace: path("/foreign"),
+                },
+            ),
+            "bootstrap",
+        ),
+    ] {
+        for mixed in [
+            valid.try_union(&excluded).unwrap(),
+            excluded.try_union(&valid).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit_with_plan_matcher(&mixed, &matches).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(
+                bodies
+                    .admit_with_plan_matcher(&mixed, &matches)
+                    .unwrap_err()
+                    .family,
+                family
+            );
+            if family == "materialization" {
+                let (offender, _) = bodies
+                    .first_denied_materialization_with_plan_matcher(&mixed, &matches)
+                    .unwrap();
+                let held = mixed
+                    .repository_materializations()
+                    .values()
+                    .find(|r| std::ptr::eq(r.as_ref(), offender))
+                    .unwrap();
+                assert!(std::ptr::eq(held.as_ref(), offender));
+                assert!(!std::ptr::eq(offender, original.as_ref()));
+            }
+        }
+    }
+    // A changed plan keeps the exact owner but cannot progress even beside an otherwise valid Local request.
+    let changed = SourcePreparationNeeds::repository(generated_globals_request(
+        &bodies,
+        small_generated_plan(&[("BUILD.bazel", b"c", true), ("globals.bzl", b"b", true)]),
+    ));
+    for mixed in [
+        local.try_union(&changed).unwrap(),
+        changed.try_union(&local).unwrap(),
+    ] {
+        assert_eq!(
+            bodies
+                .admit_with_plan_matcher(&mixed, &matches)
+                .unwrap_err()
+                .family,
+            "materialization"
+        );
+    }
+    drop(valid);
+    assert!(weak.upgrade().is_none());
+}
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
@@ -983,6 +1302,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             )
+            .with_generated_features_file_effects(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_bazel_skylib_import_sources(
                 RegistryChoice::PreparedFile,
@@ -1035,11 +1358,28 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &registry,
         &nightly_overlay()
     ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .generated_features_file_effects = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .generated_features_file_effects = true;
     let closed = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
         .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
@@ -1058,6 +1398,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
         .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
@@ -1090,6 +1434,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -1116,6 +1464,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
         .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
@@ -1148,6 +1500,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -1177,6 +1533,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -1203,6 +1563,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
         .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )

@@ -35,14 +35,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated Features materialization readiness
+Status: Generated Features Version plan readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-The current manifest now records the borrowed two-file Generated Features plan; the
-next reviewed step is finite permission through the normal scoped materializer.
+The current manifest records exact Globals plan permission and a bounded normal probe
+within92,888KiB. The combined request refuses its Version sibling before any writes;
+next inspect that original owned plan through the existing borrowed diagnostic.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
