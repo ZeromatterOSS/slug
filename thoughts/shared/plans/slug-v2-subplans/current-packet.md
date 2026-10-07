@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP960 bounded Host FileBytes accepted; normal rules_rust directory metadata prerequisite
+Status: WP961 imported rust package metadata accepted; toolchain metadata prerequisite
 
 ## Observable and source basis
 
@@ -44,48 +44,49 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP960](wp960-bounded-host-file-readiness-2026-10-07.json) accepts the shared bounded normal Host FileBytes reader and
-an opt-in exact eleven-root .bazelignore role through the genuine public singleton.
-Existing registry capture is extracted once, retaining fixed64KiB reads, old polling,
-error priority and Registry counters. Host reads charge SourceAttempts and cumulative
-DecodedBytes, reserve against pinned length plus fixed scratch/conversion overlap,
-and reject growth/replacement before publication. Both materializer observation and
-validation preflight use the existing scope while preserving full-demand validation,
-original epoch/IO refinement, unlocked reads and post-IO session checks. Unscoped
-behavior stays original; scoped nonLinux FileBytes remains Unsupported.
+[WP961](wp961-imported-rust-package-metadata-readiness-2026-10-07.json) accepts exact original rules_rust root/rust Host Lstat
+through the genuine public singleton. One default-false metadata bool is enabled only
+PublicProbe/PreparedFile; the predicate borrows basename/parent and original roots[1].
+Actual request projection requires the bool. No body operation, new retained string,
+path/collection/cache/interner or lifecycle is added; production reader/kernel/DICE
+semantics and all caps remain unchanged. The existing all-root role matrix now accepts
+an optional selected root: REPO/ignore retain None, rust admits only the rules_rust root.
+All11roots/fourchoices/alloperations/namespace/spelling/mixed controls and descriptor
+retirement remain. The old ignore projection negative keeps the new flag true so its
+assertion stays independently discriminating. Net54 Rust lines remain one cohesive
+private predicate/projection/shared matrix.
 
-Thirty-nine exact ordinary checks pass7.730s/conservative56852KiB, four synthetic
-controls0.055s/16468KiB, nonignored preflight39/ignored listing1, separate offline Core
-compile8.133s and directCore+CLI check16.427s. Initial fixture-constructor failure and
-successful intermediate pre-registry-correction compile remain qualified historical
-artifacts, not current gate evidence. Independent DESIGN/prelaunch/actual FINAL reviews
-bind current sources and artifact. Net1122 Rust lines comprise one shared reader
-replacing197 registry lines and discriminating reader/epoch/revalidation/exact-role
-companions; no second native harness, string pool, body ledger or semantic cache.
+Nineteen ordinary checks pass3.759s/conservative56916KiB, four synthetic0.065s/16596KiB;
+nonignored preflight19/ignored listing1, separate offline Core compile10.039s and direct
+Core+CLI check7.317s pass. Independent DESIGN/prelaunch/actual FINAL accept current
+sources/artifact. Accepted WP960 reader/kernel/bridge controls are unchanged-owner
+qualified reuse, zero reruns; its superseded executable is not represented as current.
 
-One fresh public policy observation passes0.374s/conservative76880KiB with155 stable
-runtime pins and188 held original leases284878B (569756B physical hash brackets).
-Actual prepare completes, singleton dispatch and policy_checked=true; SourceNone,
-105 registry admissions235521B,12 Host attempts11061 decoded bytes, transfer/write0.
-Recorder complete105/105/no refusal,2114151B charged/3259456B peak; recorder/scope Weak
-and final source/image/scratch credits retire under unchanged caps. The actual
-whole-Need admission refuses at192B rules_rust_root/rust Host Lstat before progress.
+One fresh policy observation passes0.382s/conservative76712KiB with142 stable pins and
+188 held original leases284878B (569756B physical hash brackets). Actual preparation
+completes, dispatch is singleton and policy_checked=true; SourceNone,105registry235521B,
+12Host attempts11061decoded, transfer/write0. Recorder complete105/105/no refusal,
+2114151B charged/3259456B peak; scope/recorder Weak and final source/image/scratch credits
+retire. Actual whole-Need admission now refuses at202B rules_rust_root/rust/toolchain
+Host Lstat before progress. No complete Need cardinality or evaluating stack is recorded.
 
-This advances past .bazelignore but does not independently prove its contents/absence
-or body lifetime. Returned Arc bytes have cumulative history accounting, not per-Arc
-live-bank credit; native Host Weak/freshness is unobserved. Original public terminal,
-certificate, observations, analysis/actions/Rustc remain unavailable; root/all8 extra
-MODULE byte/hash/Weak witnesses are private uninstrumented/unobserved and expiry is
-vacuous. Continue only the natural directory/source owner grounded in
-[target/wp960/native/successor-source.md](../../../../target/wp960/native/successor-source.md),
-with finite exact-role metadata and unchanged caps. No generic descendant/body grant,
-unchanged native retry, corpus operation or silent cap increase follows.
+Advancing past root/rust proves no independently recorded directory kind/content/absence
+or symlink state. Code-selected metadata profile reports directory_kind=unobserved.
+Public certificate/observations/analyses/actions/Rustc remain unavailable; private
+MODULE/body Weak witnesses remain uninstrumented/unobserved/vacuous. Cumulative decoded
+history is not per-Arc live credit, and complete DICE-page/whole-fit remains unproved.
+Continue the normal configuration/load/path owner under
+[target/wp961/native/successor-source.md](../../../../target/wp961/native/successor-source.md)
+with a bounded source-grounded role, no generic descendant/body grant, unchanged native
+retry or cap increase. Existing scoped interning, Arc/Dupe sharing, borrowed views and
+avoidance of unnecessary owned strings apply throughout the broader implementation.
 
-Immediate predecessor [WP959](wp959-repository-marker-metadata-readiness-2026-10-07.json)
-at9294cd83f accepted exact REPO.bazel metadata and stopped at .bazelignore. The current
-reader retains existing interners, Arc/Dupe ownership and borrowed views; use scoped
-interning for repeated retained immutable strings and avoid unnecessary owned copies
-throughout the broader plan.
+Immediate [WP960](wp960-bounded-host-file-readiness-2026-10-07.json) at
+bbda0952365def42e588dbdc6d5680a878f7f5ca accepted the bounded scoped Host reader and exact
+ignore role; it stopped at root/rust. Its shared pinned-length/EOF/identity capture,
+SourceAttempts/cumulativeDecodedBytes and initial/validation epoch/session ownership
+remain unchanged. Detailed source/memory gates and retained-history limits are in that
+receipt/design; this checkpoint does not strengthen native body Weak/freshness coverage.
 
 Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
 and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,

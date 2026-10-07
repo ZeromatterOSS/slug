@@ -259,6 +259,7 @@ fn projection_matches(
         && bodies.visible_lockfile_metadata
         && bodies.repo_marker_metadata
         && bodies.ignore_file_bytes
+        && bodies.rust_package_metadata
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -332,7 +333,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
             .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -372,11 +374,23 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     ));
     let no_ignore = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
-        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
         &no_ignore,
+        &registry,
+        &nightly_overlay()
+    ));
+    let no_rust_metadata = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &no_rust_metadata,
         &registry,
         &nightly_overlay()
     ));
@@ -514,6 +528,7 @@ fn repo_marker_metadata_need_is_opt_in_root_lstat_only() {
             "/fixture/REPO.BAZEL",
         ],
         "/rules/REPO.bazel",
+        None,
     );
 }
 #[test]
@@ -532,6 +547,27 @@ fn ignore_file_bytes_need_is_opt_in_exact_root_only() {
             "/fixture/bazelignore",
         ],
         "/rules/.bazelignore",
+        None,
+    );
+}
+#[test]
+fn rust_package_metadata_need_is_opt_in_exact_rules_root_only() {
+    assert_exact_root_file_role(
+        "rust",
+        PathObservationOperation::Lstat,
+        Bodies::with_rust_package_metadata,
+        |b| b.rust_package_metadata,
+        &[
+            "/other/rust",
+            "/rules/sub/rust",
+            "/rules/rust/child",
+            "/rules/rust.extra",
+            "/rules/RUST",
+            "/rules/Rust",
+            "/rules-other/rust",
+        ],
+        "/rules/rust",
+        Some("/rules"),
     );
 }
 fn assert_exact_root_file_role(
@@ -541,6 +577,7 @@ fn assert_exact_root_file_role(
     is_enabled: fn(&Bodies) -> bool,
     spellings: &[&str],
     selected_path: &str,
+    selected_root: Option<&str>,
 ) {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let make = || {
@@ -597,7 +634,8 @@ fn assert_exact_root_file_role(
         for root in bodies.roots() {
             let marker = NormalizedAbsolutePath::new(root.as_path().join(name)).unwrap();
             let demand = need(host, marker.dupe(), admitted_operation.dupe());
-            if enabled {
+            if enabled && selected_root.is_none_or(|selected| root.as_path() == Path::new(selected))
+            {
                 assert!(bodies.admit(&demand).is_ok());
             } else {
                 let denied = bodies.admit(&demand).unwrap_err();
@@ -635,7 +673,8 @@ fn assert_exact_root_file_role(
             PathObservationOperation::WindowsLongPath,
             PathObservationOperation::WindowsOptionPathLongName,
         ] {
-            if operation == admitted_operation
+            if (operation == admitted_operation
+                && selected_root.is_none_or(|selected| root.as_path() == Path::new(selected)))
                 || (name == ".bazelignore" && operation == PathObservationOperation::Lstat)
             {
                 assert!(

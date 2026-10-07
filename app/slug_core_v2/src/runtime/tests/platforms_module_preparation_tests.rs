@@ -239,6 +239,7 @@ struct Bodies {
     visible_lockfile_metadata: bool,
     repo_marker_metadata: bool,
     ignore_file_bytes: bool,
+    rust_package_metadata: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -270,6 +271,7 @@ impl Bodies {
             visible_lockfile_metadata: false,
             repo_marker_metadata: false,
             ignore_file_bytes: false,
+            rust_package_metadata: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -287,6 +289,15 @@ impl Bodies {
     }
     fn with_ignore_file_bytes(mut self, registry: RegistryChoice, command: CommandChoice) -> Self {
         self.ignore_file_bytes = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn with_rust_package_metadata(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.rust_package_metadata = matches!(registry, RegistryChoice::PreparedFile)
             && matches!(command, CommandChoice::PublicProbe);
         self
     }
@@ -478,6 +489,9 @@ impl Bodies {
                                 && self
                                     .roots()
                                     .any(|root| path.parent() == Some(root.as_path())))
+                            || (self.rust_package_metadata
+                                && path.parent() == Some(self.roots[1].as_path())
+                                && path.file_name().is_some_and(|name| name == "rust"))
                             || self.roots().any(|root| {
                                 path.parent() == Some(root.as_path())
                                     && matches!(
@@ -1609,7 +1623,8 @@ fn observe_native_command(
     ])
     .with_visible_lockfile_metadata(registry_choice)
     .with_repo_marker_metadata(registry_choice, command)
-    .with_ignore_file_bytes(registry_choice, command);
+    .with_ignore_file_bytes(registry_choice, command)
+    .with_rust_package_metadata(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
