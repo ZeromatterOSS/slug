@@ -244,6 +244,7 @@ struct Bodies {
     nightly_build_source: bool,
     nightly_channel_source: bool,
     probe_package_source: bool,
+    rules_rust_defs_source: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -280,6 +281,7 @@ impl Bodies {
             nightly_build_source: false,
             nightly_channel_source: false,
             probe_package_source: false,
+            rules_rust_defs_source: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -369,6 +371,21 @@ impl Bodies {
                         || relative == Path::new("pkg/BUILD.bazel")
                         || relative == Path::new("pkg/BUILD")
                 })
+    }
+    fn with_rules_rust_defs_source(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.rules_rust_defs_source = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_rules_rust_defs_source(&self, path: &Path) -> bool {
+        self.rules_rust_defs_source
+            && path
+                .strip_prefix(self.roots[1].as_path())
+                .is_ok_and(|relative| relative == Path::new("rust/defs.bzl"))
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
@@ -542,7 +559,8 @@ impl Bodies {
                             || (operation == PathObservationOperation::FileBytes
                                 && (self.admits_nightly_build_source(path)
                                     || self.admits_nightly_channel_source(path)
-                                    || self.admits_probe_package_source(path, false)))
+                                    || self.admits_probe_package_source(path, false)
+                                    || self.admits_rules_rust_defs_source(path)))
                             || (self.ignore_file_bytes
                                 && operation == PathObservationOperation::FileBytes
                                 && path.file_name().is_some_and(|name| name == ".bazelignore")
@@ -555,6 +573,7 @@ impl Bodies {
                             || self.admits_nightly_build_source(path)
                             || self.admits_nightly_channel_source(path)
                             || self.admits_probe_package_source(path, true)
+                            || self.admits_rules_rust_defs_source(path)
                             || (self.visible_lockfile_metadata
                                 && path.parent() == Some(self.roots[0].as_path())
                                 && path
@@ -1711,7 +1730,8 @@ fn observe_native_command(
     .with_nightly_package_metadata(registry_choice, command)
     .with_nightly_build_source(registry_choice, command)
     .with_nightly_channel_source(registry_choice, command)
-    .with_probe_package_source(registry_choice, command);
+    .with_probe_package_source(registry_choice, command)
+    .with_rules_rust_defs_source(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {

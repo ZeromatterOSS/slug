@@ -1,0 +1,959 @@
+{
+  "checkpoint": "WP969",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "8199046d2100700d82e31d4d4ef152f7dcc16399",
+  "compatibility": "Slug-native private exact defs Lstat/FileBytes opt-in admission; normal source/parser owners unchanged",
+  "implementation": {
+    "record": {
+      "path": "target/wp969/native/implementation.json",
+      "sha256": "fb95c743ded8c60c988268aa4787943d2332588df038f4a3a1c1ec5cfc185ee9"
+    },
+    "measured": {
+      "baseline": "8199046d2100700d82e31d4d4ef152f7dcc16399",
+      "sources": {
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "48cb1e3dd0e77d4652014502d6210da200ac447cf783968122fd8102cc228b7f",
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "c79f0736d0037d827fde4ce98425e9b271a82212c2b29f03cbc769ba504df95e"
+      },
+      "net_lines": {
+        "parent": 20,
+        "child": 74,
+        "total": 94
+      },
+      "production_lines": 0,
+      "private_harness": "One defaultfalse bool, borrowed exact defs path predicate, whole-Need Lstat and FileBytes only; PublicProbe PreparedFile wiring and completeness. No retained strings/cache/interner/body copies or DICE/reader changes.",
+      "tests": "One exact role matrix plus mixed child/digest refusal; existing completeness negatives isolate prior flags and new missing defs flag through unique Arc mutation.",
+      "rust_files": [
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs"
+      ]
+    },
+    "owners": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "48cb1e3dd0e77d4652014502d6210da200ac447cf783968122fd8102cc228b7f"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "c79f0736d0037d827fde4ce98425e9b271a82212c2b29f03cbc769ba504df95e"
+      }
+    ]
+  },
+  "predecessor": {
+    "path": "thoughts/shared/plans/slug-v2-subplans/wp968-root-build-command-local-readiness-2026-10-07.json",
+    "sha256": "9c0d7ff26d1517a34f8145c5b6818afd651c41f55a309ac4cd17295c4d85ff8d"
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp969/native/design-source.md",
+      "sha256": "7c247c040370230fc72c66ec6ddbf9db0b944ca10003798c07dc8a4f935f5d51"
+    },
+    "design-evidence": {
+      "path": "target/wp969/native/design-evidence.md",
+      "sha256": "aa7d7f7774fa256261312761591778b61c26fc1e1c5158cf8ed5d4f058a7b0c5"
+    },
+    "preflight-source": {
+      "path": "target/wp969/native/preflight-source.md",
+      "sha256": "16da0a9679119d8f23feb42dca0e1929b03d60cc3a91b036de93fdeabf3c79e0"
+    },
+    "preflight-evidence": {
+      "path": "target/wp969/native/preflight-evidence.md",
+      "sha256": "fbce6bfc146606895f5dcdab655f451cca8cfdcf446eb1d5fc2fe7958c37bfcb"
+    },
+    "final-source": {
+      "path": "target/wp969/native/final-source.md",
+      "sha256": "aff185739772a3a65a4546150f3971300d4eae6ccf2f02debd7bc1cc7d08f3c1"
+    },
+    "final-evidence": {
+      "path": "target/wp969/native/final-evidence.md",
+      "sha256": "bdc5b07f159eb0e9305dab9afabcffc10b7a2ec0c544e94c48f9a826a19cee59"
+    }
+  },
+  "preparation": [
+    {
+      "mode": "compile",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0"
+      ],
+      "elapsed_seconds": 9.917581181973219,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "monitored_rss_kib": 82572,
+      "child_rusage_peak_kib": 1857956,
+      "operation": {
+        "path": "target/wp969/native/compile.json",
+        "sha256": "9b6795e3161ff1a4b6f3a276d53ea18d7163916df90b0104063696484ef951f0"
+      },
+      "stdout": {
+        "path": "target/wp969/native/compile.stdout",
+        "sha256": "4c8832c5311d5447409e534790e2ae4b2ddeda8db2ecb0556f911646a72c2d07"
+      },
+      "stderr": {
+        "path": "target/wp969/native/compile.stderr",
+        "sha256": "bee16ef3465526a2fe694d0dcfb9924933ae66dce6b5527c13ff907cb353c3da"
+      },
+      "qualification": "Pinned nightly/offline/jobs1/six dev-package opt0/debug0,60s cap; compiler memory is not runtime fit"
+    },
+    {
+      "mode": "check",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0"
+      ],
+      "elapsed_seconds": 7.518737238016911,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "monitored_rss_kib": 87272,
+      "child_rusage_peak_kib": 642816,
+      "operation": {
+        "path": "target/wp969/native/check.json",
+        "sha256": "0b7dde5790afe4728782ad64dd2ea181a77dcfcf76aaa7633fbd6553041726cf"
+      },
+      "stdout": {
+        "path": "target/wp969/native/check.stdout",
+        "sha256": "a1a879e0663484288f5be6a149a70baf9cbdb7bb76aef49059d808b6bd256436"
+      },
+      "stderr": {
+        "path": "target/wp969/native/check.stderr",
+        "sha256": "9315139f686de4ca8e7a80155b0a3abab0d8bd0185f9e6bce58beb93709c3ebf"
+      },
+      "qualification": "Pinned nightly/offline/jobs1/six dev-package opt0/debug0,60s cap; compiler memory is not runtime fit"
+    }
+  ],
+  "ordinary": {
+    "selected": 24,
+    "passed": 24,
+    "selectors": [
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::eleventh_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::tenth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::ninth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::eighth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::seventh_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::sixth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fifth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fourth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::complete_need_admission_refuses_mixed_and_wrong_operation_before_progress",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::registry_first_row_reporter_preserves_raw_domains_bounds_and_offline_qualification",
+      "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+      "runtime::dice::tests::source_input_tests::native_source_digest_is_revalidated_before_acceptance",
+      "runtime::request_revision::tests::native_epoch_certificate_preserves_equal_and_replaces_only_changed_arcs",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::prepared_file_registry_policy_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::visible_lockfile_metadata_need_is_opt_in_and_root_lstat_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::guarded_singleton_preserves_dispatch_policy_and_whole_need",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::repo_marker_metadata_need_is_opt_in_root_lstat_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::ignore_file_bytes_need_is_opt_in_exact_root_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::rust_package_metadata_need_is_opt_in_exact_rules_root_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_package_metadata_need_is_opt_in_exact_chain_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_build_source_need_is_opt_in_exact_package_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_channel_source_need_is_opt_in_exact_import_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::probe_package_source_need_is_opt_in_exact_fixture_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::rules_rust_defs_source_need_is_opt_in_exact_import_only"
+    ],
+    "operations": [
+      {
+        "path": "target/wp969/native/ordinary-0-operation.json",
+        "sha256": "5dc8361296bece7e40516fa76fe21b09bdd87ab77f6bcd96c328430c2ea7f932"
+      },
+      {
+        "path": "target/wp969/native/ordinary-1-operation.json",
+        "sha256": "3ed7276dc5845a663f1fb805d57e14c1a2536a944228bab3217d12b0877546f6"
+      },
+      {
+        "path": "target/wp969/native/ordinary-2-operation.json",
+        "sha256": "4d1e4c2c0745e03271b5c3a3966a5f665e30532029b8cf82e37c964ded5e93cd"
+      },
+      {
+        "path": "target/wp969/native/ordinary-3-operation.json",
+        "sha256": "6b508a4b986ca847e305021828afe28129df3c84570bd37684722b82ba2e2185"
+      },
+      {
+        "path": "target/wp969/native/ordinary-4-operation.json",
+        "sha256": "d065702f40865ffcaf8c7a6cb86b81836410f92d58b9622e017e4689ac55da50"
+      },
+      {
+        "path": "target/wp969/native/ordinary-5-operation.json",
+        "sha256": "f036183e686016e600f55fdfa4c463d126c99723214ecda1f8dfaa07bdaa2645"
+      },
+      {
+        "path": "target/wp969/native/ordinary-6-operation.json",
+        "sha256": "bc72d27ba87ecae2cec42214ba82cd4bc4eaa9fb0298dc34f8dc530e87c2a4f2"
+      },
+      {
+        "path": "target/wp969/native/ordinary-7-operation.json",
+        "sha256": "60a2bb8810b0d7e5c85324521610689ae24fe246bd767460665ba61e471fc2f9"
+      },
+      {
+        "path": "target/wp969/native/ordinary-8-operation.json",
+        "sha256": "d35150912e9c94c42d71ed37a419a4482decc6b13a88f247e86b443234bd9609"
+      },
+      {
+        "path": "target/wp969/native/ordinary-9-operation.json",
+        "sha256": "d93d479bb13868ce4a4cc9033538f1ec448e06a15380d9e81db614b002e573f6"
+      },
+      {
+        "path": "target/wp969/native/ordinary-10-operation.json",
+        "sha256": "eee27cacd7f76fad8657a13f67f5cfd3a633217ef1c0b13f415e150e9b763eef"
+      },
+      {
+        "path": "target/wp969/native/ordinary-11-operation.json",
+        "sha256": "1738fadfcbf1c051ca10ab9b551301dad80445bca36140f5f6c8452b8752807b"
+      },
+      {
+        "path": "target/wp969/native/ordinary-12-operation.json",
+        "sha256": "212c39df92a471aa2f31f64a409a4a4f76816a0bdc93cb45f1fd5a80611c6909"
+      },
+      {
+        "path": "target/wp969/native/ordinary-13-operation.json",
+        "sha256": "60718954c84a6dc62f8439d7975e3fe34b038286664883ca19feadc8c7d91505"
+      },
+      {
+        "path": "target/wp969/native/ordinary-14-operation.json",
+        "sha256": "7a67c76ce0eb9a9bd4273f54729e6aa54efecab2968bec8982dbe19096fdb2de"
+      },
+      {
+        "path": "target/wp969/native/ordinary-15-operation.json",
+        "sha256": "bfee2296509583dead33005d85068c43cb9b90201d1414b5023f9d0106caf645"
+      },
+      {
+        "path": "target/wp969/native/ordinary-16-operation.json",
+        "sha256": "3bdaf3d06b3ae3c4c041bb3c684f9484cf83a45e426bf48a860ba45b5df567f6"
+      },
+      {
+        "path": "target/wp969/native/ordinary-17-operation.json",
+        "sha256": "057eaff979567077db964cd5139c159febb5f6d8c3a12a7ac7028ac815bc2a79"
+      },
+      {
+        "path": "target/wp969/native/ordinary-18-operation.json",
+        "sha256": "925726494ad6c0d3d6fe2b428c217444c3f9195fd2ec6dbef675e766f5e1e15e"
+      },
+      {
+        "path": "target/wp969/native/ordinary-19-operation.json",
+        "sha256": "6fb202bce256bcbf6ee2f58b7df2694acde7dca443794db8b6aeb031d29d7568"
+      },
+      {
+        "path": "target/wp969/native/ordinary-20-operation.json",
+        "sha256": "555c75adc587b71e539eb4c9410c6695255e8094626b6b244138148d8a0cf084"
+      },
+      {
+        "path": "target/wp969/native/ordinary-21-operation.json",
+        "sha256": "4c792777fe559f12790bdfe08510f44e0f90119fd9f05df2c2404a7ebf787e4b"
+      },
+      {
+        "path": "target/wp969/native/ordinary-22-operation.json",
+        "sha256": "bbb203510f757053632373408583c28d3629d1063173d8f98cfb74c196e88507"
+      },
+      {
+        "path": "target/wp969/native/ordinary-23-operation.json",
+        "sha256": "bfe0110901eebf73324326676782e1be3942d72ff5620c366d7a99eb7997a0ff"
+      }
+    ],
+    "preflight": {
+      "path": "target/wp969/native/preflight-operation.json",
+      "sha256": "81dbc09f6753d87ec1f713e2e9c27f730cc7e0df180c8c9fed81d9e2afbff724"
+    },
+    "ignored_listing": {
+      "path": "target/wp969/native/list-operation.json",
+      "sha256": "bfd37e1723ef9f38c91712a5017b061ed4822d36d06829e94cf9cac298b7b0d1"
+    },
+    "artifact_record": {
+      "path": "target/wp969/native/executable.json",
+      "sha256": "a2c03bd3a14c85776c033e1cdb449e2f7f41d334371db81653ac0820119b93cf"
+    },
+    "artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-58d119fd73bef4f4",
+      "sha256": "ee4070d34ff70589f251fc2fe20b084b7080be9fab8c4f495af674e413592b7d"
+    },
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "slug_core_v2",
+      "src_path": "/run/media/system/Colossus/dev/slug/app/slug_core_v2/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "features": [
+      "default"
+    ],
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "elapsed_seconds": 7.114983804989606,
+    "conservative_peak_kib": 58276
+  },
+  "controls": {
+    "selected": 4,
+    "passed": 4,
+    "selectors": [
+      "test_defs_admitted_operations_cannot_be_reported_denied",
+      "test_defs_role_is_required_and_public_policy_scoped",
+      "test_defs_children_spellings_roots_and_operations_remain_closed",
+      "test_defs_denied_capture_and_marker_consistency_are_preserved"
+    ],
+    "operation": {
+      "path": "target/wp969/native/protocol-controls/operation.json",
+      "sha256": "65231ffb92f37169535ac5f7ff2020f70fe476c53b4a00b789a5e1a48bcb4c14"
+    },
+    "stdout": {
+      "path": "target/wp969/native/protocol-controls/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "target/wp969/native/protocol-controls/stderr",
+      "sha256": "cb09e15bf0450fd330cb184dc0fa6afd436d60ccfd8d46b5e85bbec41828b162"
+    },
+    "supplemental_pins": {
+      "path": "target/wp969/native/protocol-controls/additional-pins.json",
+      "sha256": "d72df739bde4946a8bdaca2ac36dcc275810e08e3842be6ac734a93e880059d9"
+    },
+    "elapsed_seconds": 0.045682416995987296,
+    "conservative_peak_kib": 17396,
+    "qualification": "Four new finite current-decoder controls reject falsely denied exact admitted leaf and preserve unadmitted children; synthetic text is not native evidence"
+  },
+  "qualified_reuse": {
+    "prior_loading_named": 23,
+    "prior_bzlmod_named": 3,
+    "fresh_loading": 0,
+    "fresh_bzlmod": 0,
+    "unchanged_owners": [
+      {
+        "path": "app/slug_loading_v2/src/root_repository_load_route.rs",
+        "sha256": "b70d8228358e9eabd76d59bce5ef3290c8cbc9fee2b3719c1d38079757961c46"
+      },
+      {
+        "path": "app/slug_loading_v2/src/root_repository_load_route_tests.rs",
+        "sha256": "91481a0eea66eaacd728ddffa177ea212f72f49e5c1971a7552210ae1ba5bfc2"
+      },
+      {
+        "path": "app/slug_loading_v2/src/canonical_repository_route_tests.rs",
+        "sha256": "459a98dbb2b7c54f02c8f6d2f620de657e92a84708d403c2fed34f4fc0e81fab"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/host_module.rs",
+        "sha256": "d3ed13414b4a0c86ca5190a2098f8e2b273ce11f1d0e222737aa73cbee7bae75"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/root_repository_route_diagnostic_tests.rs",
+        "sha256": "08c80b7d0fd5db51494b98f2866700d14d113c7f73c63015d984509758bf1612"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/module_eval.rs",
+        "sha256": "08426dbc75bfbcdfe51d3cc8bde4698c82a5f450ad03a9cd92dc78da8c16db3b"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/source_preparation.rs",
+        "sha256": "58ca0a535437c46a5e02e49ba11966744ec9c482eabc92133fecc576b502930f"
+      },
+      {
+        "path": "app/slug_bzlmod_v2/src/selected_graph.rs",
+        "sha256": "50fbcee5eacad1653665fce91a9cffdd852cacd7078fd63ad720fc51eb8f33c2"
+      }
+    ],
+    "qualification": "Narrow unchanged-owner WP968 evidence only; old replaced Core artifact and corrected preparation histories are not current evidence"
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp969/native/native-operation.json",
+      "sha256": "0eeccb023089a59f9da7fa91c7db08a8eb7cd7e5033d0540d3adde87ef3c4dd4"
+    },
+    "result": {
+      "path": "target/wp969/native/result.json",
+      "sha256": "682478915eae352de40251f4a6bc1bad5c7756ddc091c9654bc7d67d1d265528"
+    },
+    "stdout": {
+      "path": "target/wp969/native/native.stdout",
+      "sha256": "32308ea62dd5d8191c61d7800a00319831535d87224434600868cf1436f9b124"
+    },
+    "stderr": {
+      "path": "target/wp969/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 0.5803040820173919,
+    "conservative_peak_kib": 82760,
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304,
+      "file_bytes": 16777216
+    },
+    "stable_runtime_pins": 305,
+    "source_leases": 189,
+    "physical_bracket_bytes": 290970,
+    "before_after_hash_read_bytes": 581940,
+    "stop_reason": null,
+    "joined": true,
+    "owned_group_empty": true,
+    "outcome": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "attempts": null,
+      "terminal_roots": null
+    },
+    "public_probe": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "request": {
+      "role": "public_probe",
+      "target": "//pkg:probe",
+      "channel": "nightly"
+    },
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 16,
+      "transferred_bytes": 0,
+      "decoded_bytes": 19029,
+      "written_bytes": 0,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "resources": [
+      {
+        "phase": "before_command",
+        "descriptor_used": 0,
+        "descriptor_peak": 0,
+        "logical_used": 0,
+        "scratch_used": 0
+      },
+      {
+        "phase": "after_command",
+        "descriptor_used": 0,
+        "descriptor_peak": 47048,
+        "logical_used": 0,
+        "scratch_used": 0
+      },
+      {
+        "phase": "after_runtime_drop",
+        "descriptor_used": 0,
+        "descriptor_peak": 47048,
+        "logical_used": 0,
+        "scratch_used": 0
+      }
+    ],
+    "phases": [
+      {
+        "phase": "baseline",
+        "rss_kib": 17864
+      },
+      {
+        "phase": "after_runtime",
+        "rss_kib": 40660
+      },
+      {
+        "phase": "after_command",
+        "rss_kib": 82760
+      },
+      {
+        "phase": "after_terminal_drop",
+        "rss_kib": 82760
+      },
+      {
+        "phase": "after_runtime_drop",
+        "rss_kib": 82760
+      },
+      {
+        "phase": "after_scope_drop",
+        "rss_kib": 80708
+      }
+    ],
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "mapping": {
+      "state": "not_started",
+      "codes": [],
+      "termination": "none",
+      "native_detail": false
+    },
+    "denied": {
+      "family": "path",
+      "path_len": 200,
+      "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f336634393533633231363966656461343531303738633034373863626636313663306230326334343337616238616265336361626531353064376663386332352f34323761363835662d386232612d346239382d616166352d6434353338633933323539612f727573742f70726976617465",
+      "capture": "captured"
+    },
+    "root_source": {
+      "seen": false,
+      "calls": 0,
+      "policy_checked": false,
+      "bytes": 0,
+      "hash_match": false,
+      "anchor": "not_started",
+      "outer_variant": "None"
+    },
+    "additional_sources": [
+      {
+        "owner": "bazel_features_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "bazel_skylib_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_cc_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_license_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_shell_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "apple_support_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "package_metadata_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "buildozer_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      }
+    ],
+    "registry_body_weak": "unobserved",
+    "registry_choice": {
+      "choice": "file",
+      "url_len": "64",
+      "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f7265676973747279",
+      "policy_checked": true
+    },
+    "selected_limits": {
+      "registry_attempts": 128,
+      "source_attempts": 16,
+      "live_buffer_bytes": 16777216
+    },
+    "selected_semantic_request": {
+      "capture": "missing",
+      "decoded": {
+        "name": null,
+        "version": null,
+        "url": null
+      }
+    },
+    "root_lockfile_metadata": {
+      "enabled": true,
+      "denied_operation": "lstat"
+    },
+    "repo_marker_metadata": {
+      "enabled": true,
+      "policy_checked": true
+    },
+    "bounded_host_file_bytes": {
+      "enabled": true,
+      "policy_checked": true,
+      "object_bytes": 1048576,
+      "history_counter": "decoded_bytes",
+      "history_limit_bytes": 16777216,
+      "source_attempt_limit": 16,
+      "history_is_per_arc_live_credit": false,
+      "body_weak": "unobserved",
+      "freshness": "unproved"
+    },
+    "rust_package_metadata": {
+      "enabled": true,
+      "policy_checked": true,
+      "operation": "lstat",
+      "directory_kind": "unobserved"
+    },
+    "nightly_package_metadata": {
+      "enabled": true,
+      "policy_checked": true,
+      "operation": "lstat",
+      "directory_kind": "unobserved",
+      "basis_need": "rust/toolchain",
+      "source_candidate": "rust/toolchain/channel"
+    },
+    "nightly_build_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "operations": [
+        "lstat",
+        "file_bytes"
+      ],
+      "basis_need": "rust/toolchain/channel/BUILD.bazel",
+      "fallback_candidate": "rust/toolchain/channel/BUILD",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "nightly_channel_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "operations": [
+        "lstat",
+        "file_bytes"
+      ],
+      "basis_need": "rust/toolchain/channel/channel.bzl",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "probe_package_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "basis_need": "pkg",
+      "marker_candidates": [
+        "pkg/BUILD.bazel",
+        "pkg/BUILD"
+      ],
+      "directory_kind": "unobserved",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "rules_rust_defs_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "admitted_relative": "rust/defs.bzl",
+      "admitted_operations": [
+        "lstat",
+        "file_bytes"
+      ],
+      "metadata_witness": "unobserved",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "package_cause": {
+      "stage": "none",
+      "detail": "unavailable",
+      "domain": "Slug-native ASCII escaped presentation",
+      "cause_owner": null,
+      "qualified_complete": false,
+      "semantic_identity": false,
+      "source_availability_proved": false
+    },
+    "attribution": {
+      "attempted": 105,
+      "admitted": 105,
+      "scope_admitted": 105,
+      "distinct": 105,
+      "repeated": 0,
+      "retained": 105,
+      "refused": 0,
+      "sticky": 0,
+      "charged": 2114151,
+      "visited": 105,
+      "complete": true,
+      "qualified": false,
+      "capture": "captured",
+      "first_row": {
+        "ordinal": 1,
+        "admissions": 1,
+        "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f72656769737472792f6d6f64756c65732f7a6c69622f312e332e312e6263722e352f4d4f44554c452e62617a656c",
+        "local_path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f72656769737472792f6d6f64756c65732f7a6c69622f312e332e312e6263722e352f4d4f44554c452e62617a656c",
+        "url_utf8": "file:///run/media/system/Colossus/dev/slug/target/wp954/registry/modules/zlib/1.3.1.bcr.5/MODULE.bazel"
+      },
+      "meaning": "first distinct partial diagnostic identity only",
+      "module_version_file_kind_proved": false,
+      "wrapped_error_causal_chain_proved": false
+    },
+    "aggregate_delta_from_predecessor": {
+      "source_attempts": 1,
+      "decoded_bytes": 6092
+    },
+    "qualification": "Actual original outcome only; no hypothetical effect/cause/closure inferred. Parent189 non-atomic/noninherited FD/name/fullhash brackets are not child semantic bytes or source certificates. defs metadata/body/Weak witnesses remain unobserved; uninstrumented private reporter expiry is vacuous. Counters are cumulative history, not per-Arc credit; final credits do not prove all DICE/page release. Fit is the observed prefix only",
+    "parent_hash_scratch": {
+      "bytes": 131072,
+      "contexts": 2,
+      "bytes_each": 65536,
+      "qualification": "Nested unchanged lease owners each hold one reusable64KiB hash scratch; parent-only, no retained body and separate from child source/image/scratch budgets"
+    }
+  },
+  "counts": {
+    "fresh_rust": 25,
+    "ordinary_rust": 24,
+    "native_rust": 1,
+    "fresh_python": 4,
+    "total_named_passes": 29,
+    "fresh_loading": 0,
+    "fresh_bzlmod": 0,
+    "fresh_corpus_operations": 0
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "source_role": {
+    "binding": {
+      "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a/rust/defs.bzl",
+      "bytes": 6092,
+      "sha256": "5b71e4344a6c6ee04ade488c741784479f392b71d42f2102eedc5e4993654512"
+    },
+    "historical_basis": {
+      "path": "target/wp935/result.json",
+      "sha256": "24f1dc348871a7b6e5b17c1bd7c1a080b7b2132922d6a3c69718827f46686c3a"
+    },
+    "qualification": "Saved6092B/hash authentic availability grounds the parent lease/role, not current atomic identity/native source certificate/evaluated exports; eleven partial imports grant no children"
+  },
+  "next": {
+    "source": {
+      "path": "target/wp969/native/successor-source.md",
+      "sha256": "07eb34d85667c074c34ae32f88b600afb1e00a3386a8997a9ca8edfeb4646cb7"
+    },
+    "qualification": "Only actual finalized source-grounded continuation; no source-bank expansion, speculative child grant or automatic native repeat"
+  },
+  "residual": "Genuine public probe/support/data/Rustc/toolchain/providers/actions/runfiles/executable/oracle/same-engine2024\u21922021\u21922024/fullCLI/M7A/whole-workload fit, body provenance/Weak/freshness/MVS/complete DICE retirement remain open. Original source16/registry128/object1MiB/history/live/image/scratch16MiB and runtime caps stay fixed; Windows stays minimally unsupported",
+  "artifacts": {
+    "design.md": {
+      "path": "target/wp969/native/design.md",
+      "sha256": "204be409f4314710e5402408d113c6728df60bd5c1884aa1c07f086756f97893"
+    },
+    "inputs.json": {
+      "path": "target/wp969/native/inputs.json",
+      "sha256": "ef86a40719353d0342f97becf0b2e8a4a3dcbb71a8161bfd03232349635ee508"
+    },
+    "selectors.json": {
+      "path": "target/wp969/native/selectors.json",
+      "sha256": "d3470e468b51ce83731a69815ae234052047e5b9f40809c9b4340494d7dc7579"
+    },
+    "toolchain.json": {
+      "path": "target/wp969/native/toolchain.json",
+      "sha256": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07"
+    },
+    "prepare.py": {
+      "path": "target/wp969/native/prepare.py",
+      "sha256": "81147312f449298b79ba54a068b10954620da93e7a1b89fc31f3739e2b028f17"
+    },
+    "supervise.py": {
+      "path": "target/wp969/native/supervise.py",
+      "sha256": "12bcdd037c10ce17f908e0b3e314f20fbbeaa4dec9af0f3d5f7eeed00d8b9597"
+    },
+    "protocol.py": {
+      "path": "target/wp969/native/protocol.py",
+      "sha256": "570b674e1b1bff69e40a82267961c36ff903de6e3eb236fb7aec4459ac24bf62"
+    },
+    "protocol_controls.py": {
+      "path": "target/wp969/native/protocol_controls.py",
+      "sha256": "7dea7505e8bf4991636055a1a1a3d7cac65e46642c109b6c2d8694355a0d4df6"
+    },
+    "protocol_control_run.py": {
+      "path": "target/wp969/native/protocol_control_run.py",
+      "sha256": "f0ff29fb19041dee2da6748e6064b9b607efa27fae150e3d540a7866558528d3"
+    },
+    "audit.py": {
+      "path": "target/wp969/native/audit.py",
+      "sha256": "2eb0391af873c8fb3091b43d967ea4210bb0574c5402a540b93c05cf12683dcf"
+    },
+    "receipt.py": {
+      "path": "target/wp969/native/receipt.py",
+      "sha256": "69b9af8299cd80e9f3e0bd884ee623859c4e52da9d425864e1dc36298c35c9d1"
+    }
+  },
+  "preparation_history": {
+    "current_failed_attempts": 0,
+    "qualification": "Prior WP968 histories remain predecessor evidence; no failed current operation is counted as a passing gate"
+  },
+  "packet_start": {
+    "baseline": "8199046d2100700d82e31d4d4ef152f7dcc16399",
+    "started": "2026-10-07T07:09:26.820336+00:00"
+  },
+  "recorded_utc": "2026-10-07T07:25:19.997935+00:00",
+  "packet_elapsed_seconds": 953.177599,
+  "static_reviews": {
+    "implementation-source": {
+      "path": "target/wp969/native/implementation-source.md",
+      "sha256": "74fce72522926e0db97dfb467b1b70e571f12b140b9abe0145368cf3cba2a9fd"
+    },
+    "implementation-evidence": {
+      "path": "target/wp969/native/implementation-evidence.md",
+      "sha256": "113ec946800513948677fc7a6608c21dd208987fca98402c0aced5f7480a446e"
+    },
+    "implementation-integration": {
+      "path": "target/wp969/native/implementation-integration.md",
+      "sha256": "44aa575e5c8770572a17ca1d4578f38bb67ef656606ed80ed1bf465ea962365a"
+    }
+  },
+  "current_evidence_audit": {
+    "operations": 30,
+    "material_union_pins": 318,
+    "native_runtime_pins": 305,
+    "qualified_unchanged_owner_reuse_fresh_runs": 0
+  },
+  "static_correction": {
+    "executed_compiler_or_test_failure": false,
+    "description": "Independent static review caught a moved Arc and missing-flag assertion masked by altered request. Root moved the assertion before request mutation/ownership move and restored the true flag before protected controls; corrected before first compile.",
+    "review": {
+      "path": "target/wp969/native/implementation-source.md",
+      "sha256": "74fce72522926e0db97dfb467b1b70e571f12b140b9abe0145368cf3cba2a9fd"
+    }
+  },
+  "review_only_incident": {
+    "underlying_source_reads": 1,
+    "bytes": 6092,
+    "operation": "Integration reviewer overly broad direct-reference traversal included the source_role.binding cached defs leaf and hash-read it once",
+    "controlled_operation": false,
+    "source_body_printed": false,
+    "source_or_cache_mutation": false,
+    "new_native_or_test_run": false,
+    "availability_or_certificate_credit": false,
+    "qualification": "Outside instructed recorded-only review sequence. Excluded from preparation/runtime/native/corpus/provenance evidence; original once-native and all gated results remain immutable. Correct review reference traversal selects exact path/sha256 two-key objects and excludes path/bytes/sha256 source-role bindings."
+  },
+  "integration_review": {
+    "path": "target/wp969/native/integration-review.md",
+    "sha256": "4ad1ff6fe57e22d030abf4559fd3dc84f03d25d73417b27c2872ea408793fb30"
+  },
+  "integration_qualification": "Independent Rust/docs/receipt integration; helper author reviews his assembler under explicit authorship qualification, while source/evidence helpers/raw have independent FINAL accepts. Integration note binds pre-note-addition receipt hash to avoid a self-hash cycle; only this note reference and qualification are added after its ACCEPT."
+}

@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches rules_rust defs source prerequisite
+Status: Normal public probe reaches rules_rust private import-directory prerequisite
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,29 +149,29 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP968](./slug-v2-subplans/wp968-root-build-command-local-readiness-2026-10-07.json)
-accepts narrow RootBuild command Local canonical-source admission with exact selected
-kind/path policy/Local request/key-target-route consistency.37net production loans views
-and shares existing Arc-backed input/mapping/epochs; one necessary phase-owned name copy,
-zero new retained strings/collections/source grants.390net tests cover original mapping,
-alias/Ordinary/default negatives, same-engine warmA→B→A/Need/release.46ordinary+1native
-Rust pass; Loading/Core/CoreCLI preparation passes. Preserved E0308 and stale empty-context
-fixture failures/superseded13passes are history; fresh all23Loading pass unchanged assertions.
-Actual0.697s/82,692KiB/371pins/188held284878B leases and569756B brackets reach normal
-rules_rust rust/defs.bzl lstat Need, exact201B resolved path. Unsupported package route
-is cleared; resultnative_refusal/computation, preparationcomplete/singleton/policytrue,
-certificate/observations/analysis/actions/Rustc unavailable; package cause none/unavailable.
-SourceNone105registry235521B/15Host12937Decoded/transfer-write0 and finalcredits remain
-bounded. Actual request proves no file metadata/body/import/provider availability.
-Continue cohesive exact defs metadata/body admission through original normal guard/reader
-from target/wp968/native/successor-source.md and accepted authentic evidence; allcaps
-remain fixed. Immediate[WP967](./slug-v2-subplans/wp967-nested-root-route-readiness-2026-10-07.json)
-at0a6631cb0 identified Unsupported through borrowed bounded diagnostics; its replaced
-Core/Loading executables remain historical. Bzlmod3/decoder4 are qualifiedreuse0fresh.
-Preserve Ordinary/builtin/registry/generated semantics, fixture/support/data, observed
-source owners and scopedinterning/borrowedArc discipline. Source15of16 notsufficiency;
-privateMODULE/bodyWeak/freshness unobserved/vacuous, finalcredits notallDICEArc/page release.
-PublicRustc/provider/runfiles/oracle/restoration/MVS/BCR/fullCLI/M7A/wholefit stay open.
+[WP969](./slug-v2-subplans/wp969-rules-rust-defs-source-readiness-2026-10-07.json)
+accepts private exact rules_rust rust/defs.bzl Host Lstat/FileBytes admission only for
+PreparedFile+PublicProbe.94net private/test lines, zero production/retained string/cache/
+interner/source copy or DICE change; original whole-Need/source/parser/epoch owners remain.
+24Core ordinary+4synthetic+1native pass with currentCore/CLI preparation; unchanged
+Loading23/Bzlmod3qualifiedreuse0fresh. Static ownership/polarity correction was resolved
+before compilation; no failed current operation. Once0.580s/82,760KiB/305nativepins/
+318current union pins and189parent290970B leases/581940B brackets reach exact200B
+rules_rust rust/private HostLstat Need. Publicnative_refusal/computation/prepcomplete/
+singleton/policytrue still has unavailable certificate/observations/actions/Rustc;
+packagecause none/unavailable. SourceNone105registry235521B is unchanged;16Host19029Decoded
+is aggregate+1/6092, not a native per-file identity/hash/Weak proof. Parent128KiB scratch
+and individually bracketed/noninherited leases stay separate from child semantic bytes.
+Scope/recorder/credits retire with no all-DICE Arc/page release or whole-workload fit claim.
+Next: cohesive finite authentic direct-import table and explicitly reviewed
+source-attempt choice from target/wp969/native/successor-source.md, before any operation.
+Current16attempts exhausted; actual refusal is path guard, not source-budget error.
+All memory/byte/RSS/runtime caps, fixture/support/data/normal selected owners remain;
+publicRustc/provider/toolchain/runfiles/oracle/restoration/MVS/fullCLI/M7A/wholefit open.
+Immediate [WP968](./slug-v2-subplans/wp968-root-build-command-local-readiness-2026-10-07.json),
+at8199046d2100700d82e31d4d4ef152f7dcc16399, accepted narrow RootBuild command Local
+input/mapping/epoch ownership and cleared package Unsupported; its historical correction
+records and earlier readiness receipts remain immutable reference evidence.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

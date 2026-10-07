@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches rules_rust defs source prerequisite
+Status: Normal public probe reaches rules_rust private import-directory prerequisite
 
 ## Observable and source basis
 
@@ -44,58 +44,59 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP968](wp968-root-build-command-local-readiness-2026-10-07.json) admits the genuine
-RootBuild command Local canonical input only for SelectedNonregistry + CommandAbsolute +
-original Request(Local), with exact key/target/route/request workspace and canonical
-agreement. Ordinary/builtin/direct syntax Local/selected registry/generated behavior is
-preserved. The borrowed predicate adds37net production; the successful result shares the
-original Arc-backed selected definition/request/mapping and observed epoch unions. One
-necessary phase-owned canonical-name copy retains the target across the owned child key;
-no new retained strings, collections, interner, cache or source grant.390net tests reuse
-one finite adapter and three identity/mapping/closed-negative/warmA→B→A/Need/release
-controls.46ordinary Rust and one native pass; Loading/Core no-run and CoreCLIcheck pass.
-Bzlmod3/decoder4/version controls remain qualified historicalreuse0fresh runs.
+[WP969](wp969-rules-rust-defs-source-readiness-2026-10-07.json) adds one
+private defaultfalse source role: PreparedFile+PublicProbe, exact selected rules_rust
+`rust/defs.bzl`, Host Lstat/FileBytes only. Borrowed root/relative-path comparison leaves
+MODULE/digest/ancestor/other-root/import grants unchanged; the whole Need is checked before
+progress. Normal source reader, parser/evaluator, epochs and retained storage remain the
+owners.94net lines in two existing private test files add no production code, strings,
+cache/interner, source copy or DICE change. One exact-role matrix and mixed child/digest
+refusal plus independent missing-flag projection preserve all23 prior Core controls.
+24ordinary Rust, four finite synthetic controls and one native pass; current Core no-run
+and CoreCLIcheck pass. Unchanged Loading23/Bzlmod3 are qualified reuse0fresh, old Core
+artifact is historical. A static test ownership/polarity defect was fixed before any
+compilation or test execution; there is no current failed operation.
 
-The once public observation advances past the retained Unsupported package error to an
-actual lstat Need for the selected command Local rules_rust `rust/defs.bzl`, captured as
-an exact201B resolved path. Original preparationcomplete/singleton/policytrue remains;
-result is native_refusal/computation, certificate/observations/analysis/actions/Rustc
-unavailable. No terminal package error exists, so package diagnostic none/unavailable is
-correct.0.697s/conservative82,692KiB/371runtimepins/188held284878B leases and569756B parent
-brackets fit this observed prefix. SourceNone105registry235521B/15Host12937Decoded/
-transfer-write0 is unchanged; no file metadata/body availability or source identity
-certificate is inferred from the denied request. Scope/recorder/finalcredits retire
-without proving complete DICE Arc/page release or native body provenance/freshness.
+The once public command advances to an actual Host Lstat Need for the selected rules_rust
+`rust/private` directory, captured as an exact200B path. Preparationcomplete/singleton/
+policytrue remains; native_refusal/computation has unavailable certificate, observations,
+analyses/actions/Rustc. Package cause none/unavailable is correct at pending Need.
+0.580s/conservative82,760KiB/305nativepins (318union current materials) fits the observed
+prefix. SourceNone105registry235521B remains; Host16/19029Decoded increases by1/6092,
+aggregate history rather than a per-file hash/body-Arc witness. All189 parent-only held
+leases verify290970B and581940B before/after hashes; individually bracketed/non-atomic
+and noninherited, these do not supply child source bytes or a semantic certificate.
+Nested accepted lease owners hold two64KiB reusable hash buffers,128KiB parent scratch.
+Scope/recorder/final credits retire, without proving all DICE Arc/page release. Private
+MODULE/body hash/Weak/freshness remain unobserved/vacuous. Public producer/full fit is open.
 
-One E0308 fixture path constructor and a stale shared fixture missing explicit empty
-download transaction were corrected. Their raw failures and superseded13 Loading passes
-stay historical; all23Loading gates were rebuilt/reselected/rerun. The empty context has
-zero authorized owners/verified entries, supplies no bytes and preserves normal Need.
-No executed-baseline failure or waived assertion is claimed.
+Continue from [target/wp969/native/successor-source.md](../../../../target/wp969/native/successor-source.md)
+using this actual directory prerequisite and accepted authentic source records. Prefer a
+cohesive finite known direct-import table over separate metadata/body checkpoints;
+freeze exact role/table and a reviewed source-attempt allowance before another operation.
+The current16-attempt limit is exhausted but did not produce this path-guard refusal;
+no silent cap increase or retry is selected. Preserve object/cumulative/live/image/scratch/
+RSS/runtime limits and normal selected-source ownership. Unknown imports/providers and
+full closure stay unproved until observed.
 
-Continue the exact observed defs prerequisite using
-[target/wp968/native/successor-source.md](../../../../target/wp968/native/successor-source.md)
-and already accepted authentic source evidence. Freeze cohesive exact-file metadata/body
-admission through the original guard/reader and normal selected owner before another
-operation; preserve whole-Need-before-progress, all source/memory/runtime limits and
-fixture probe/support/data. The observation authenticates the request, not availability,
-bytes, imports or providers. No automatic retry, speculative transitive grant or source
-bank increase is selected.
-
-Immediate[WP967](wp967-nested-root-route-readiness-2026-10-07.json), at
-0a6631cb087ab5fae6ef8dde42ab41015d2a279f, borrowed the nested typed cause without source/
-semantic changes and identified Unsupported @rules_rust module=rules_rust at83,168KiB.
-Its43named passes and preparation history remain accepted predecessor evidence; replaced
-Core/Loading executables are historical. Unchanged reader/kernel/bridge are owned by
-[WP960](wp960-bounded-host-file-readiness-2026-10-07.json); singleton/mapping provenance
-are reachable through the predecessor's WP958/WP957 references.
+Immediate [WP968](wp968-root-build-command-local-readiness-2026-10-07.json), at
+8199046d2100700d82e31d4d4ef152f7dcc16399, admits only genuine RootBuild SelectedNonregistry/
+CommandAbsolute/Request(Local) with exact key-target-route-request agreement, sharing
+original canonical input/mapping/epochs.37netproduction/390nettests,46ordinary+1native,
+0.697s/82,692KiB advanced beyond package Unsupported to defs.bzl Lstat. One necessary
+phase-owned canonical-name copy remains qualified. Its E0308 and empty-download-context
+fixture corrections/superseded13passes are preserved predecessor history; all23Loading
+were rebuilt/reselected/rerun. Original Ordinary/builtin/registry/generated semantics
+remain protected. Older readiness/diagnostic and memory contracts are reachable through
+its immutable receipt; unchanged reader/kernel/bridge belong to
+[WP960](wp960-bounded-host-file-readiness-2026-10-07.json).
 
 Reuse authentic177-file/273940B corpus from
 [WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11source rows
 10938B without extraction/availability retry.152available MODULEs do not prove selected
 closure or sufficiency. Borrow/transfer string storage and use existing scoped interners
 for repeated retained strings when their cleanup fits; do not intern temporary unique
-scratch. Source15of16 is a bound, not sufficiency; cumulative history is not per-Arc live
+scratch. Source16of16 is exhausted, not source-closure sufficiency; cumulative history is not per-Arc live
 credit; private MODULE/body Weak witnesses remain unobserved/vacuous. Public Rustc/support/
 data/toolchain/provider/executable/config/runfiles/oracle/same-engine2024→2021→2024,
 MVS/BCR provenance, fullCLI/M7A and whole-workload fit remain required. Windows may stay
@@ -150,7 +151,8 @@ Bazel graphs, use a standalone external-rule evaluator, bypass source/frontier g
 invoke compiler/wrapper/backend, or add path-provenance APIs speculatively. A typed
 borrowed Args occurrence visitor may be a later comparator prerequisite; it is not this
 packet's substitute for a real retained producer. Execution grants/run/cache/.expanded
-writes, source16/17/18/F3/full-genuine-root retries and network/BCR/archive acquisition
+writes, repeats of historical probes named source16/source17/source18/F3/full-genuine-root,
+and network/BCR/archive acquisition
 are excluded. A missing local source/request/provider stays a typed prerequisite with
 no fallback or recovery. Existing source/whole-fit refusals remain separate.
 
