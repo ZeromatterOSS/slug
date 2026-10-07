@@ -237,6 +237,7 @@ struct Bodies {
     files: [NormalizedAbsolutePath; 3],
     additional: [Option<AdditionalModule>; 8],
     visible_lockfile_metadata: bool,
+    repo_marker_metadata: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -266,10 +267,20 @@ impl Bodies {
             files,
             additional: [None, None, None, None, None, None, None, None],
             visible_lockfile_metadata: false,
+            repo_marker_metadata: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
         self.visible_lockfile_metadata = matches!(choice, RegistryChoice::PreparedFile);
+        self
+    }
+    fn with_repo_marker_metadata(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.repo_marker_metadata = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
         self
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
@@ -449,6 +460,11 @@ impl Bodies {
                                 && path
                                     .file_name()
                                     .is_some_and(|name| name == "MODULE.bazel.lock"))
+                            || (self.repo_marker_metadata
+                                && path.file_name().is_some_and(|name| name == "REPO.bazel")
+                                && self
+                                    .roots()
+                                    .any(|root| path.parent() == Some(root.as_path())))
                             || self.roots().any(|root| {
                                 path.parent() == Some(root.as_path())
                                     && matches!(
@@ -1578,7 +1594,8 @@ fn observe_native_command(
         root("SLUG_NATIVE_RULES_RUST_ROOT"),
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
     ])
-    .with_visible_lockfile_metadata(registry_choice);
+    .with_visible_lockfile_metadata(registry_choice)
+    .with_repo_marker_metadata(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {

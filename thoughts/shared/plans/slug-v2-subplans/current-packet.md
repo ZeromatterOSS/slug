@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP958 ordinary public singleton dispatch accepted; finite repository-marker metadata prerequisite next
+Status: WP959 accepted repository-root metadata; bounded .bazelignore body owner next
 
 ## Observable and source basis
 
@@ -44,69 +44,65 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP958](wp958-public-singleton-producer-readiness-2026-10-07.json) accepts the genuine
-ordinary prepare_build_request → SingletonRootSingleBuildCommandKey → drive_command
-route for //pkg:probe with actual nightly overlay, unchanged11 Local overrides, prepared
-file registry and Off mode. A private adapter delegates every natural root hook and its
-exact original terminal/certificate/selection/reconciliation; the complete returned Need
-passes unchanged Bodies before any progress. Shared setup, once-built bindings and
-resource/drop/grace sequence remain one lifecycle. Original mapping/default branches stay
-unchanged. Scalar Display reports actual finite categories/counts without temporary strings;
-only one64B request API URL copy is required. No production/API/DICE/key/fixture/cache or
-new interner/global retained-string change. Formatted530net lines were independently
-reviewed as cohesive delegation, original-terminal report, projection and one control.
+[WP959](wp959-repository-marker-metadata-readiness-2026-10-07.json) accepts an opt-in
+repository-root REPO.bazel metadata role through the genuine public singleton route.
+One default-false bool is enabled only for PublicProbe/PreparedFile; Host Lstat admits
+exact basename REPO.bazel with parent equal to an existing bound root (workspace plus
+ten Local overrides). Actual request projection requires that bool. Whole-Need checking,
+original terminal/certificate/association/reconciliation hooks and shared lifecycle stay
+unchanged. Borrowed root iteration adds no retained strings, copied paths or body/cache
+owner. The formatted193net Rust lines were independently reviewed as one predicate,
+projection and eleven-root/four-choice/namespace/all-operation/mixed-request matrix.
 
-Sixteen ordinary controls pass3.196s/55396KiB; four synthetic protocol controls pass,
-including actual dispatch-after-successful-preparation, early-category and8192/8193 path
-bounds. Current preflight16/listing1, separate offline Core compile38.584s and direct
-Core/CLI check7.570s pass. Independent DESIGN/prelaunch/actual FINAL accept the sole new
-public observation. No failed native operation or repeated mapping-only probe occurred.
+Seventeen ordinary tests pass3.383s/55496KiB and four synthetic controls pass0.056s/
+16396KiB. Nonignored preflight17/ignored listing1 and separate offline Core compilation
+10.183s/direct Core+CLI check7.543s pass. Current independent DESIGN/prelaunch/actual
+FINAL accepts bind the unchanged sources and artifact. One fresh policy-specific public
+observation passes0.366s/conservative76396KiB with121 stable pins and188 held original
+Local/prepared leases284878B (569756B physical hash brackets). Source errorNone,
+105registry admissions235521B, sourceAttempts/transfer/decode/write0; recorder complete
+105/105/no refusal,2114151B charged/3259456B peak source buffer. Scope/recorder Weak and
+final source/image/scratch credits retire under unchanged128/16/byte/time/RSS caps.
 
-Actual preparation complete/dispatch singleton/policy checked reaches a guarded Host
-Lstat for exact198B rules_rust_root/REPO.bazel. Saved diagnostic passes0.354s/conservative
-76244KiB under unchanged256MiB runtime cap,113 stable pins and188 held original Local/
-prepared leases284878B (569756B bracket reads). Source errorNone/105 registry admissions/
-235521B; recorder complete105/105/no refusals,2114151B charged/3259456B peak source buffer.
-Original recorder/scope Weak and final buffer/image/scratch credits retire. The guarded
-request is refused before progress, not an accepted build result. Producer certificate,
-observations, analyses/actions/Rustc counts are unavailable. Root/all8 extra MODULE byte/
-hash/Weak witnesses are UNINSTRUMENTED/UNOBSERVED in this public adapter and their Weak
-expiry is vacuous; this proves no module absence, non-evaluation or actual epoch coverage.
-No mapping certificate is transplanted and no graph result/provider is fabricated.
+Actual preparation completes, dispatch is singleton and policy_checked=true; the next
+whole returned Need is exact200B rules_rust_root/.bazelignore Host FileBytes, family=path,
+refused before progress. This is not an accepted public build terminal: certificate,
+observations, analyses/actions/Rustc counts remain unavailable. Advancing past the earlier
+REPO.bazel guard proves no independently recorded marker presence/absence/content or
+symlink state. Root/all8 extra MODULE byte/hash/Weak witnesses remain uninstrumented/
+unobserved; expiry is vacuous and proves no module absence, non-evaluation or actual
+source epoch coverage. No mapping certificate is transplanted or provider fabricated.
 
-Select one bounded source-grounded root REPO.bazel metadata role under
-[target/wp958/native/successor-source.md](../../../../target/wp958/native/successor-source.md).
-The natural observed preflight/HostNonregistryRepoFile/RepositorySourceFile owner uses this
-same repository-root filename for the selected Local binding table. Review public+
-PreparedFile opt-in, Host namespace and exact bound-root parent/basename Lstat only,
-without descendant/prefix/new-root or body/link/image/Windows grants. Preserve old/default
-selectors, whole-Need checking, original singleton/certificate behavior and all128/16/
-byte/RSS/time caps. No cache metadata/presence/absence/body was read to ground this next
-role. Freeze DESIGN/current FINAL prelaunch before one source-specific new observation;
-actual present body/link requests remain separately bounded owner prerequisites.
+Continue source-grounding the natural repository-ignore owner and a bounded read role
+under [the current recommendation](../../../../target/wp959/native/successor-source.md).
+Generic Host FileBytes currently uses an unbounded read and must not simply be admitted.
+Reuse existing source/observation owners and original path/result semantics; freeze and
+independently review finite exact-role bytes/identity/retirement limits before a new body
+operation. Do not guess that .bazelignore is small/absent or grant directory/link/descendant/
+arbitrary body reads. No next operation or unchanged native retry is authorized by this
+checkpoint. Existing public singleton observer/lifecycle, fixed roots/corpus and old/default
+selectors remain shared; no redundant adapter/harness or cap increase.
 
 Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
 and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,
 MVS/BCR provenance, original registry-body Weak/mutable same-URL freshness and whole-fit
-remain open. Existing scoped interning, Arc/Dupe graph/recipe owners, borrowed views and
-source/whole-workload memory policy remain mandatory; zero credits do not prove all
-DICE Arc/page release. The successful mapping predecessor is evidence of a finite source
-phase, not public configured producer completion.
+remain open. Scoped interning, Arc/Dupe graph/recipe owners, borrowed views and source/
+whole-workload memory policy remain mandatory; zero credits do not prove all DICE Arc/
+page release. Genuine singleton dispatch was established by immediate predecessor
+[WP958](wp958-public-singleton-producer-readiness-2026-10-07.json) at92ab38a59.
+[WP957](wp957-root-lockfile-metadata-readiness-2026-10-07.json), at7aec52b3b, genuinely
+completed finite normal mapping/all11Host MODULE fullhash/root Arc/original nonempty
+certificate and8extra Weak retirement; this is historical phase evidence, not current
+uninstrumented public witness coverage. Earlier attempt and lock metadata boundaries
+remain recorded in [WP956](wp956-normal-registry-discovery-readiness-2026-10-07.json).
 
-Immediate predecessor [WP957](wp957-root-lockfile-metadata-readiness-2026-10-07.json),
-accepted at7aec52b3b, genuinely completed normal mapping in0.361s/71680KiB with all11 Local
-MODULE fullhash/root Arc identity/original nonempty Host certificate and genuine8extra
-Weak retirement. That original success remains historical evidence, not uninstrumented
-WP958 witness coverage. [WP956](wp956-normal-registry-discovery-readiness-2026-10-07.json),
-at3ada356a0, cleared the attempt barrier with85 admissions but stopped path-only lockfile
-Need; earlier policy history [WP955](wp955-file-registry-attempt-policy-2026-10-07.json)
-at85edc2a93 remains reachable. Reuse authentic177-file/273940B corpus from
-[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11Local rows10938B,
-without extraction/availability retry.152available MODULEs are not selected closure or
-sufficiency; six direct metadata objects/absent bazel_registry.json remain outside corpus.
-Prior3FD/15availability/1version/larger-recorder controls remain qualified reuse0runs,
-including target/wp955/native/recorder-reuse.md. The deferred registry source owner is
-target/wp956/native/registry-owner-source.md.
+Reuse authentic177-file/273940B corpus from
+[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11source rows
+10938B without extraction/availability retry.152 available MODULEs are not selected
+closure/sufficiency; six direct metadata objects/absent bazel_registry.json remain outside
+the corpus. Prior3FD/15availability/1version/larger-recorder controls remain qualified
+reuse0runs, including target/wp955/native/recorder-reuse.md. Deferred registry source
+ownership remains target/wp956/native/registry-owner-source.md.
 
 ## Reusable evidence and predecessor
 

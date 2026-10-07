@@ -257,6 +257,7 @@ fn projection_matches(
         && inner.0.workspace == bodies.roots[0]
         && matches!(inner.0.targets.as_ref(), [pattern] if pattern.as_ref() == "//pkg:probe")
         && bodies.visible_lockfile_metadata
+        && bodies.repo_marker_metadata
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -328,7 +329,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let bodies = Arc::new(
         Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
-            .with_visible_lockfile_metadata(RegistryChoice::PreparedFile),
+            .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+            .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -354,6 +356,15 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &inner,
         &request,
         &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    let closed = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_visible_lockfile_metadata(RegistryChoice::PreparedFile);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &closed,
         &registry,
         &nightly_overlay()
     ));
@@ -475,6 +486,171 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         "none"
     );
 }
+#[test]
+fn repo_marker_metadata_need_is_opt_in_root_lstat_only() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || {
+        Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+            .with_fourth(path("/features"))
+            .with_fifth(path("/skylib"))
+            .with_sixth(path("/cc"))
+            .with_seventh(path("/license"))
+            .with_eighth(path("/shell"))
+            .with_ninth(path("/apple"))
+            .with_tenth(path("/metadata"))
+            .with_eleventh(path("/buildozer"))
+    };
+    let budget = slug_workspace_v2::ImageDescriptorBudget::new(4096);
+    let need = |namespace, leaf: NormalizedAbsolutePath, operation| {
+        let demand = match operation {
+            PathObservationOperation::WindowsLongPath => {
+                assert_eq!(namespace, PathObservationNamespace::Host);
+                PathObservationDemand::windows_long_path(leaf, Arc::from([b'x' as u16]))
+            }
+            PathObservationOperation::WindowsOptionPathLongName => {
+                assert_eq!(namespace, PathObservationNamespace::Host);
+                PathObservationDemand::windows_option_path_long_name(leaf, Arc::from([b'x' as u16]))
+            }
+            PathObservationOperation::InputImage(request) => PathObservationDemand::input_image(
+                namespace,
+                slug_workspace_v2::ImageChargedPath::pin_existing(leaf, &budget).unwrap(),
+                request,
+            )
+            .unwrap(),
+            _ => PathObservationDemand::new(namespace, leaf, operation),
+        };
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(demand))
+    };
+    let host = PathObservationNamespace::Host;
+    assert!(!make().repo_marker_metadata);
+    for (registry, command, enabled) in [
+        (RegistryChoice::DefaultBcr, CommandChoice::Modules, false),
+        (
+            RegistryChoice::DefaultBcr,
+            CommandChoice::PublicProbe,
+            false,
+        ),
+        (RegistryChoice::PreparedFile, CommandChoice::Modules, false),
+        (
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+            true,
+        ),
+    ] {
+        let bodies = make().with_repo_marker_metadata(registry, command);
+        assert_eq!(bodies.repo_marker_metadata, enabled);
+        assert_eq!(bodies.roots().count(), 11);
+        for root in bodies.roots() {
+            let marker = NormalizedAbsolutePath::new(root.as_path().join("REPO.bazel")).unwrap();
+            let demand = need(host, marker.dupe(), PathObservationOperation::Lstat);
+            if enabled {
+                assert!(bodies.admit(&demand).is_ok());
+            } else {
+                let denied = bodies.admit(&demand).unwrap_err();
+                assert_eq!((denied.family, denied.operation), ("path", "lstat"));
+                assert_eq!(denied.path.as_ref(), Some(&marker));
+            }
+        }
+    }
+    let admitted =
+        make().with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let foreign = PathObservationNamespace::Materialization(
+        slug_workspace_v2::PathObservationInstanceId::new(1),
+    );
+    for root in admitted.roots() {
+        let marker = NormalizedAbsolutePath::new(root.as_path().join("REPO.bazel")).unwrap();
+        let anchor =
+            slug_workspace_v2::ImageChargedPath::pin_existing(root.dupe(), &budget).unwrap();
+        let image = slug_workspace_v2::ImageObservationRequest::new(
+            anchor,
+            slug_workspace_v2::ImageObservationOperation::Lstat,
+        );
+        for operation in [
+            PathObservationOperation::FileBytes,
+            PathObservationOperation::FileDigest,
+            PathObservationOperation::ReadLink,
+            PathObservationOperation::DirectoryEntries,
+            PathObservationOperation::InputImage(image),
+            PathObservationOperation::WindowsLongPath,
+            PathObservationOperation::WindowsOptionPathLongName,
+        ] {
+            let code = path_operation_code(&operation);
+            let denied = admitted
+                .admit(&need(host, marker.dupe(), operation))
+                .unwrap_err();
+            assert_eq!(denied.operation, code);
+            assert_eq!(denied.path.as_ref(), Some(&marker));
+        }
+        let denied = admitted
+            .admit(&need(
+                foreign,
+                marker.dupe(),
+                PathObservationOperation::Lstat,
+            ))
+            .unwrap_err();
+        assert_eq!((denied.family, denied.operation), ("namespace", "lstat"));
+        assert_eq!(denied.path.as_ref(), Some(&marker));
+    }
+    assert_eq!(budget.used_bytes(), 0);
+    for spelling in [
+        "/other/REPO.bazel",
+        "/fixture/sub/REPO.bazel",
+        "/fixture/REPO.bazel/child",
+        "/fixture/REPO.bazel.other",
+        "/fixture/repo.bazel",
+        "/fixture/REPO.BAZEL",
+    ] {
+        let denied = admitted
+            .admit(&need(host, path(spelling), PathObservationOperation::Lstat))
+            .unwrap_err();
+        assert_eq!((denied.family, denied.operation), ("path", "lstat"));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(spelling));
+    }
+    let allowed = need(
+        host,
+        path("/rules/REPO.bazel"),
+        PathObservationOperation::Lstat,
+    );
+    let mut progress_calls = 0;
+    for (excluded, family, operation) in [
+        (
+            need(
+                host,
+                path("/rules/REPO.bazel"),
+                PathObservationOperation::FileBytes,
+            ),
+            "path",
+            "file_bytes",
+        ),
+        (
+            need(
+                foreign,
+                path("/rules/REPO.bazel"),
+                PathObservationOperation::Lstat,
+            ),
+            "namespace",
+            "lstat",
+        ),
+        (
+            SourcePreparationNeeds::root_module_bootstrap(
+                slug_bzlmod_v2::RootModuleBootstrapRequest {
+                    workspace: path("/foreign"),
+                },
+            ),
+            "bootstrap",
+            "none",
+        ),
+    ] {
+        let mixed = allowed.try_union(&excluded).unwrap();
+        if admitted.admit(&mixed).is_ok() {
+            progress_calls += 1;
+        }
+        let denied = admitted.admit(&mixed).unwrap_err();
+        assert_eq!((denied.family, denied.operation), (family, operation));
+    }
+    assert_eq!(progress_calls, 0);
+}
+
 #[test]
 #[ignore = "bounded normal public producer observation; frozen supervisor inputs required"]
 fn native_eleven_root_prepared_file_public_probe_prerequisite() {
