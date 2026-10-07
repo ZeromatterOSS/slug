@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP956 registry-attempt barrier cleared; normal visible-lockfile path Need is next
+Status: WP957 normal module mapping and genuine finite source certificate accepted; ordinary public producer next
 
 ## Observable and source basis
 
@@ -44,50 +44,58 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP956](wp956-normal-registry-discovery-readiness-2026-10-07.json) accepts the existing
-production default128 as the opt-in PreparedFile diagnostic attempt count, preserving
-DefaultBCR16 and every byte/sourceAttempt/RSS/time cap. Two Rust lines change in the
-existing companion; no new retained strings, interner, representation, DICE, production
-API or fixture. The same limits marker reports actual128/source16/live16MiB. Fourteen
-ordinary tests pass2.752s/55836KiB; three synthetic decoder controls pass, including
-128/129 boundary, partial-history and mismatched marker/counter negatives. Separate
-Core compile3.683s and direct Core/CLI check7.298s pass; compiler RSS is preparation.
+[WP957](wp957-root-lockfile-metadata-readiness-2026-10-07.json) accepts exact opt-in
+PreparedFile root Host Lstat for MODULE.bazel.lock and borrowed static denied-operation
+reporting in the existing private companion. No body/link/directory/image/Windows
+admission, production API/DICE/key/fixture change or new retained string follows.
+DefaultBCR16/PreparedFile128 and all byte/source16/RSS/time caps remain unchanged.
+Fifteen ordinary tests pass2.991s/56420KiB; four synthetic decoder controls pass;
+separate offline Core compile7.861s and Core/CLI check7.318s pass. A negative-test
+constructor correction was fixed before ordinary execution, with initial preparation
+preserved; no failed or repeated native operation occurred. Both independent DESIGN,
+prelaunch and actual FINAL reviews accept150 changed/net144 added cohesive Rust lines.
 
-One fresh normal observation passes0.329s/conservative72728KiB with100 stable runtime
-pins and188 original noninherited Local/prepared leases284878B (569756B hash reads).
-Registry attempts85/admitted229746B, first source errorNone, peak buffer3259456B;
-recorder reserved2114151B/complete=true/85 calls, admissions, distinct and visited,
-zero refused/sticky, qualified=false. The attempt barrier is cleared without a memory,
-byte or time ceiling increase. No further count increase or identical retry follows.
+One fresh normal mapping request completes in0.361s/conservative71680KiB under the
+unchanged256MiB runtime cap, with106 stable pins and188 original noninherited Local/
+prepared leases284878B (569756B bracket hash reads). Actual105 registry admissions/
+235521B, source errorNone, recorder complete105/105/no refusals,2114151B charged and
+3259456B peak source buffer. Root426B/anchor/fullhash/original Arc identity and all11
+Local MODULE fullhash Host coverage pass. The genuine nonempty original mapping epoch
+constructs its SourceCertificate; normal driver returns Complete after34 drives with5
+terminal roots. All8 extra sources are genuinely seen/hash-true, their original Weak
+witnesses expire, and root/scope/recorder Weak/final buffer/image/scratch credits retire.
+There is no remaining denied path or operation. This is actual finite mapping evidence,
+not an injected certificate, physical-FD substitute or a public Rustc action.
 
-Root426B/anchor/fullhash/original Weak and scope/recorder Weak/final credits pass.
-All eight extra Local sources are UNSEEN in this returned epoch, bytes/hash unavailable
-and Weak expiry vacuous. Earlier WP955 genuine observed/retired coverage remains
-historical; physical parent hashes do not turn unseen inputs into Host observations.
-Original registry-body Weak retirement remains unobserved; zero credits do not prove
-DICE Arc or RSS-page release. Successful all11 Host-certificate coverage is unexecuted.
+Proceed with a bounded design for the normal prepare_build_request →
+SingletonRootSingleBuildCommandKey → drive_command loading/configured-rule route and
+unchanged public //pkg:probe fixture, using
+[target/wp957/native/successor-source.md](../../../../target/wp957/native/successor-source.md).
+Keep support/data inputs, extension-generated toolchain registration, execution platform
+and provider provenance; reuse existing source corpus and borrowed Spawn view/query APIs.
+No guessed source-admission widening or repeated mapping-only probe is selected.
+Freeze the exact public-command projection, finite source/Need guard and retained owner
+before one actual observation. Ground any future typed prerequisite in its normal owner.
+Public Rustc/action/configuration/runfiles and same-engine edition2024→2021→2024 remain
+required, as do fullCLI closure/execution and M7A/whole-workload fit.
 
-Actual mapping stateNeed stops at the exact119B Host path workspace/MODULE.bazel.lock.
-The denied marker captures path/family only, not operation, body, absence or contents;
-there is no selected semantic module tuple and no mapping/MVS/provider/public Rustc or
-whole-workload completion. Ground the visible lockfile demand in the existing
-HostVisibleLockfileObservationKey/HostFileBytesObservationKey and Bodies::admit owner,
-then independently review exact finite root metadata admission before another normal
-operation. Preserve whole-Need refusal ordering, body restrictions, source scopes and
-all original source/retirement/certificate guards. No lockfile fabrication or broad
-workspace read, new dependency mode or evaluator is selected.
+Successful mapping does not independently report lockfile absence/body/read operation,
+registry original-body Weak retirement or mutable same-URL freshness. Registry source
+ownership remains deferred under target/wp956/native/registry-owner-source.md; zero
+credits do not prove every DICE Arc/page release. Explicit Local declaration/version/
+repo-name differences and full MVS/BCR authenticity limits remain inherited.
 
-Reuse the authentic177-file/273940B immutable corpus from
-[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11 Local rows10938B
-without extraction or source-availability retry. Immediate predecessor
-[WP955](wp955-file-registry-attempt-policy-2026-10-07.json), accepted at85edc2a93, records
-the32-attempt observation and source-grounded natural128 selection. Its47 calls included
-refused/sticky calls;152 available MODULEs are not selected closure or sufficiency.
-Qualified larger natural recorder-owner evidence remains target/wp955/native/recorder-reuse.md.
-The deferred registry source-owner recommendation is target/wp956/native/registry-owner-source.md:
-a generic generation dependency or naive unbounded Host read cannot replace scoped
-regular-file/object/admission/credit/cancellation and genuine original Arc/epoch ownership.
-Mutable same-URL Found freshness and full producer/whole-fit remain open.
+Immediate predecessor [WP956](wp956-normal-registry-discovery-readiness-2026-10-07.json),
+accepted at3ada356a0, cleared the attempt barrier with85 admissions under the same caps
+but stopped at the path-only root lockfile Need; all8 extras were unseen/vacuous in that
+older epoch. Its operation/absence was not inferred. Earlier policy history is
+[WP955](wp955-file-registry-attempt-policy-2026-10-07.json), accepted at85edc2a93.
+Reuse the authentic177-file/273940B corpus from
+[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11 Local rows10938B,
+without extraction or availability retry.152 available MODULEs are not selected closure
+or sufficiency; six direct metadata objects and absent bazel_registry.json stay outside
+the corpus. Prior3FD/15availability/1version/natural larger-recorder owner controls remain
+qualified reuse with zero fresh runs, including target/wp955/native/recorder-reuse.md.
 
 ## Reusable evidence and predecessor
 

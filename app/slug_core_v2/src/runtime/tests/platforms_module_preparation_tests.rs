@@ -229,11 +229,25 @@ struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
     additional: [Option<AdditionalModule>; 8],
+    visible_lockfile_metadata: bool,
 }
 #[derive(Debug)]
 struct Denied {
     family: &'static str,
     path: Option<NormalizedAbsolutePath>,
+    operation: &'static str,
+}
+fn path_operation_code(operation: &PathObservationOperation) -> &'static str {
+    match operation {
+        PathObservationOperation::InputImage(_) => "input_image",
+        PathObservationOperation::Lstat => "lstat",
+        PathObservationOperation::ReadLink => "read_link",
+        PathObservationOperation::FileBytes => "file_bytes",
+        PathObservationOperation::FileDigest => "file_digest",
+        PathObservationOperation::DirectoryEntries => "directory_entries",
+        PathObservationOperation::WindowsLongPath => "windows_long_path",
+        PathObservationOperation::WindowsOptionPathLongName => "windows_option_path_long_name",
+    }
 }
 impl Bodies {
     fn new(roots: [NormalizedAbsolutePath; 3]) -> Self {
@@ -244,7 +258,12 @@ impl Bodies {
             roots,
             files,
             additional: [None, None, None, None, None, None, None, None],
+            visible_lockfile_metadata: false,
         }
+    }
+    fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
+        self.visible_lockfile_metadata = matches!(choice, RegistryChoice::PreparedFile);
+        self
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
@@ -354,7 +373,11 @@ impl Bodies {
         )
     }
     fn admit(&self, needs: &SourcePreparationNeeds) -> Result<(), Denied> {
-        let refusal = |family| Denied { family, path: None };
+        let refusal = |family| Denied {
+            family,
+            path: None,
+            operation: "none",
+        };
         if needs.scratch_elf_metadata_requests().is_some() {
             return Err(refusal("scratch"));
         }
@@ -398,20 +421,27 @@ impl Bodies {
         }
         if let Some(paths) = needs.path_observations() {
             for demand in paths.demands() {
+                let operation = demand.operation();
                 let deny = |family| Denied {
                     family,
                     path: Some(demand.path().dupe()),
+                    operation: path_operation_code(&operation),
                 };
                 if demand.namespace() != PathObservationNamespace::Host {
                     return Err(deny("namespace"));
                 }
                 let path = demand.path().as_path();
-                let allowed = match demand.operation() {
+                let allowed = match operation {
                     PathObservationOperation::FileBytes | PathObservationOperation::FileDigest => {
                         self.files().any(|file| file.as_path() == path)
                     }
                     PathObservationOperation::Lstat => {
                         self.files().any(|file| file.as_path().starts_with(path))
+                            || (self.visible_lockfile_metadata
+                                && path.parent() == Some(self.roots[0].as_path())
+                                && path
+                                    .file_name()
+                                    .is_some_and(|name| name == "MODULE.bazel.lock"))
                             || self.roots().any(|root| {
                                 path.parent() == Some(root.as_path())
                                     && matches!(
@@ -724,6 +754,111 @@ fn report_selected(selected: Option<(&str, &str, &slug_bzlmod_v2::RegistryFileUr
         values[2].len(),
         RegistryHex(captured.then_some(values[2]))
     );
+}
+
+#[test]
+fn visible_lockfile_metadata_need_is_opt_in_and_root_lstat_only() {
+    let normalized = |path: &str| NormalizedAbsolutePath::new(Path::new(path)).unwrap();
+    let make = || {
+        Bodies::new([
+            normalized("/fixture"),
+            normalized("/rules"),
+            normalized("/platforms"),
+        ])
+    };
+    let need = |namespace, path: &str, operation| {
+        let path = normalized(path);
+        let demand = match operation {
+            PathObservationOperation::WindowsLongPath => {
+                assert_eq!(namespace, PathObservationNamespace::Host);
+                PathObservationDemand::windows_long_path(path, Arc::from([b'x' as u16]))
+            }
+            PathObservationOperation::WindowsOptionPathLongName => {
+                assert_eq!(namespace, PathObservationNamespace::Host);
+                PathObservationDemand::windows_option_path_long_name(path, Arc::from([b'x' as u16]))
+            }
+            _ => PathObservationDemand::new(namespace, path, operation),
+        };
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(demand))
+    };
+    let lock = need(
+        PathObservationNamespace::Host,
+        "/fixture/MODULE.bazel.lock",
+        PathObservationOperation::Lstat,
+    );
+    assert!(make().admit(&lock).is_err());
+    let closed = make().with_visible_lockfile_metadata(RegistryChoice::DefaultBcr);
+    let denied = closed.admit(&lock).unwrap_err();
+    assert_eq!((denied.family, denied.operation), ("path", "lstat"));
+    let admitted = make().with_visible_lockfile_metadata(RegistryChoice::PreparedFile);
+    assert!(admitted.admit(&lock).is_ok());
+    let mut progress_calls = 0;
+    for path in [
+        "/other/MODULE.bazel.lock",
+        "/rules/MODULE.bazel.lock",
+        "/platforms/MODULE.bazel.lock",
+        "/fixture/MODULE.bazel.lock.other",
+        "/fixture/MODULE.bazel.lock/child",
+    ] {
+        let foreign = need(
+            PathObservationNamespace::Host,
+            path,
+            PathObservationOperation::Lstat,
+        );
+        let mixed = lock.try_union(&foreign).unwrap();
+        if admitted.admit(&mixed).is_ok() {
+            progress_calls += 1;
+        }
+        let denied = admitted.admit(&mixed).unwrap_err();
+        assert_eq!((denied.family, denied.operation), ("path", "lstat"));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(path));
+    }
+    for operation in [
+        PathObservationOperation::FileBytes,
+        PathObservationOperation::FileDigest,
+        PathObservationOperation::ReadLink,
+        PathObservationOperation::DirectoryEntries,
+        PathObservationOperation::WindowsLongPath,
+        PathObservationOperation::WindowsOptionPathLongName,
+    ] {
+        let code = path_operation_code(&operation);
+        let denied = admitted
+            .admit(&need(
+                PathObservationNamespace::Host,
+                "/fixture/MODULE.bazel.lock",
+                operation,
+            ))
+            .unwrap_err();
+        assert_eq!(denied.operation, code);
+        assert_eq!(
+            denied.path.unwrap().as_path(),
+            Path::new("/fixture/MODULE.bazel.lock")
+        );
+    }
+    let denied = admitted
+        .admit(&need(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(1),
+            ),
+            "/fixture/MODULE.bazel.lock",
+            PathObservationOperation::Lstat,
+        ))
+        .unwrap_err();
+    assert_eq!((denied.family, denied.operation), ("namespace", "lstat"));
+    let mixed = lock
+        .try_union(&SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: normalized("/other"),
+            },
+        ))
+        .unwrap();
+    if admitted.admit(&mixed).is_ok() {
+        progress_calls += 1;
+    }
+    let denied = admitted.admit(&mixed).unwrap_err();
+    assert_eq!((denied.family, denied.operation), ("bootstrap", "none"));
+    assert!(denied.path.is_none());
+    assert_eq!(progress_calls, 0);
 }
 
 #[test]
@@ -1428,7 +1563,8 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
         workspace.clone(),
         root("SLUG_NATIVE_RULES_RUST_ROOT"),
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
-    ]);
+    ])
+    .with_visible_lockfile_metadata(registry_choice);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
@@ -1461,6 +1597,7 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
         bodies.roots[2].as_path().display(),
         request_registry
     );
+    let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
     let start = Instant::now();
     let limits = SourceServiceLimits {
         allow_network: false,
@@ -1669,6 +1806,13 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
                 "missing"
             }
         );
+        if matches!(registry_choice, RegistryChoice::PreparedFile) {
+            println!(
+                "WP957_METADATA enabled={} denied_operation={}",
+                visible_lockfile_metadata,
+                state.denied.as_ref().map_or("none", |d| d.operation)
+            );
+        }
         (state.source.clone(), state.additional_source.clone())
     };
     let counters = scope.snapshot();
