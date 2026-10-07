@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Rustc local import pair accepted; continue selected Skylib import cohort
+Status: Selected Skylib cohort accepted; selected rules_cc cohort next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,24 +149,28 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP974](./slug-v2-subplans/wp974-rules-rust-rustc-import-readiness-2026-10-07.json)
-accepts exact resource_set7348/stamp646B first capture7994B/.042s/20,232KiB/41pins,
-unchanged strict reader/64KiB scratch/per-row retirement. Two decisions are not tests.
-Original26prefix→28bodies/3metadata/59Needs,2net cfgtest lines/32descriptor57literal
-bytes/zero heap strings; source64/default16/allcaps and production owners unchanged.
-Current28ordinary+4synthetic+1normal native pass; pinned Core/CLI preparation passes.
-The zero-child launcher correction is preserved, no actual test repeated. Native.713s/
-83,860KiB reaches exact191B selectedskylibroot/lib HostLstat, SourceNone105registry235521/
-27Host334004Decoded unchanged, no newbody attribution.413runtimepins/456union/35ops
-includecapture1;217leases768379physical1536758hashbytes/same128KiB parent contexts
-are non-atomic/noninherited/noncertifying. PublicRustc/actions/certificates remain null;
-privateWeakunseen/finalcredits do not prove wholeDICE/page release. Ground nextcohesive
-three-body Skylib cohort and exact lib/rules metadata via existing additional[1] owner,
-with capture/role eligibility still future.81-edge Python subset/29callers and separate
-qualified historical native AstLoads12 are incomplete syntax, not mapping/freshness.
-Full publicproducer/support/data/providers/toolchains/runfiles/oracle/restoration/fullCLI/
-M7A/MVS/provenance/whole-fit remain open. PriorWP973 chronology is Git-reachable at
-5fbdb82916ba973dacf60ca4fc8b0806818d6113; borrowing/scoped interning and Windowsminimum persist.
+[WP975](./slug-v2-subplans/wp975-skylib-declared-import-readiness-2026-10-07.json)
+accepts three exact Skylib availability rows: paths10378B/structs1265B/common_settings6421B,
+18064B total/.052s/19,592KiB, unchanged strict reader/64KiB scratch/per-row retirement.
+Three observations are not test passes. Separate defaultfalse PreparedFile/PublicProbe
+role borrows selected additional[1], admits three exact bodies/two Lstat-only directories,
+and preserves whole-Need-before-progress plus every existing projection negative.
+245net cfgtest lines add one bool/80descriptor61literal bytes/zero guardheap strings;
+growth beyond120–220 estimate is independently accepted for discriminating controls.
+Original rulesRust28/3metadata/source64/default16/production owners and caps are unchanged.
+29ordinary+4synthetic+1normal native pass; pinned Core/CLI preparation passes.
+Once native.708s/83,648KiB reaches exact190B selected rules_cc_root/cc HostLstat;
+SourceNone105registry235521/27Host334004Decoded unchanged, no newbody attribution.
+434runtimepins/477union/36ops include capture1;220leases786443physical1572886hashbytes
+use the same two64KiB parent contexts, non-atomic/noninherited/noncertifying.
+Public Rustc/actions/certificates remain null; privateWeakunseen/finalcredits do not prove
+wholeDICE/page release. Next cohesive rules_cc three-body declared family and exact
+cc/cc/common metadata uses existing additional[2], after reviewed first capture.
+81-edge Python subset/32callers plus separate qualified historical native AstLoads12
+are incomplete syntax, not mapping/freshness. Public producer/support/data/providers/
+toolchains/runfiles/oracle/restoration/fullCLI/M7A/MVS/provenance/whole-fit remain open.
+PriorWP974 chronology is Git-reachable at64d6334982f6657ec31ab8cc324c19fafab36b18;
+borrowing/scoped interning and Windowsminimum persist.
 [WP972](./slug-v2-subplans/wp972-rules-rust-import-frontier-readiness-2026-10-07.json)
 captures seven exact local imports122679B once at0.093s/22,976KiB/35pins with the
 unchanged strict FD/facts owner;11reader checks qualifiedreuse0fresh, seven observations

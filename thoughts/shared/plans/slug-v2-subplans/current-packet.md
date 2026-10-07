@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Rustc local import pair accepted; continue selected Skylib import cohort
+Status: Selected Skylib cohort accepted; selected rules_cc cohort next
 
 ## Observable and source basis
 
@@ -42,48 +42,91 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Current checkpoint and selected continuation
+## Current accepted checkpoint and continuation
 
-[WP974](wp974-rules-rust-rustc-import-readiness-2026-10-07.json), baseline
-5fbdb82916ba973dacf60ca4fc8b0806818d6113, captures exactly resource_set7348B and stamp646B
-once:7994B/0.042s/20,232KiB/41stable pins, no overflow. Strict FD/facts/64KiB scratch
-and per-row body/text/AST retirement are unchanged. Two observed decisions are not tests;
-partial zero-load facts do not establish dependency absence.11reader controls reused0fresh.
-The original26 body prefix becomes28 with all3 HostLstat metadata paths, defaultfalse
-PreparedFile+PublicProbe roles and source64/default16/all byte/runtime caps unchanged.
-Two net cfgtest lines add32 static descriptor/57 literal bytes/zero heap strings and no
-production/newflag/parser/reader/DICE/cache/interner/fixture growth. Existing loop controls
-cover28leaves/3directories/59positive Needs and all prior negatives before progress.
+[WP975](wp975-skylib-declared-import-readiness-2026-10-07.json) accepts the selected
+Skylib finite readiness role on baseline64d6334982f6657ec31ab8cc324c19fafab36b18.
+Three first diagnostic captures total18064B;29ordinary+4synthetic+1native pass.
+One borrowed guard bool/static3body+2metadata tables add no heap strings. Existing
+source64/default16/object1MiB/all16MiB byte budgets and production owners are unchanged.
+Native.708s/83,648KiB reaches exact190B HostLstat selected rules_cc_root/cc; source27/
+334004 unchanged.220 diagnostic parentleases786443physical/1572886before-after hash
+bytes use two64KiB contexts.434runtimepins/477union/36operations include capture1.
+All public Rustc/action/certificate fields remain null. Fit covers the observed prefix,
+not the complete compiler workload. Private unseen Weak expiry is vacuous; aggregate
+counters and final credits do not prove body evaluation/freshness or all DICE/page release.
 
-Pinned current Core no-run5.289s/CoreCLIcheck7.458s pass;28ordinary8.417s/58,568KiB plus
-4synthetic0.086s/18,096KiB pass. Unchanged Loading23/Bzlmod3 are qualified reuse0fresh.
-A wrong supervisor argument asserted before any child/lease/test; the preserved correction
-executes all28 tests once with the successful preflight reused. Compiler memory is separate.
-Once normal native0.713s/conservative83,860KiB advances to exact191B selected
-bazel_skylib_root/lib HostLstat. SourceNone105registry235521B/27Host334004Decoded remain
-unchanged: whole-Need refusal precedes additional body progress, with no per-file attribution.
-413runtime pins versus456union materials/35operation records include one two-row capture.
-All217 ordered parent leases verify768379physical/1536758 before-after hash bytes through
-the same two64KiB contexts128KiB, non-atomic/noninherited/not semantic child certificates.
-Public preparationcomplete/singleton/policytrue still returns native_refusal/computation
-with null certificate/analyses/actions/Rustc and unavailable packagecause. Final credits/
-scope/recorder retire; unseen private Weak expiry is vacuous, not full DICE/page/perArc proof.
+Continue the broader normal producer plan through one cohesive selected rules_cc
+declared-family checkpoint, grounded by [source successor](../../../../target/wp975/native/successor-source.md)
+and [owner assessment](../../../../target/wp975/native/successor-owner-assessment.md).
+Freeze the accepted checkout baseline, current selected rules_cc_root and ordered leaves
+cc/find_cc_toolchain.bzl,cc/common/cc_common.bzl,cc/common/cc_info.bzl before execution.
+Actual /cc denial grounds this selected root only; saved foreign import declarations
+ground the three candidates, not current availability/caller evaluation/closure.
+Bodies.additional[2]/with_sixth is the existing normal typed Local override owner for
+rules_cc/rules_cc+. Preserve recorded local0.2.17/requested0.2.4 qualification; cached
+root/version names are not authentic registry/MVS/provenance or mapping certificates.
 
-[The source successor](../../../../target/wp974/native/successor-source.md) and
-[owner assessment](../../../../target/wp974/native/next-owner-assessment.md) ground one
-cohesive first capture of lib/paths.bzl, lib/structs.bzl and rules/common_settings.bzl.
-Use existing selected additional[1] root and normal mapping/source owner; after actual
-eligibility, a separate defaultfalse PreparedFile+PublicProbe finite borrowed predicate
-may admit those three leaves and exact lib/rules HostLstat-only metadata. No new source
-operation or role is activated by this recommendation; sizes/hashes/availability remain
-unknown. Freeze the next contract before operation. Existing81 Python edges/29partial
-callers and separate historicalWP937 native AstLoads12 yield28 combined local candidates
-in the current table, not complete closure. Foreign/builtin/newtransitive grants remain
-closed. Genuine public Rustc/support/data/toolchain/providers/actions/runfiles/oracle/
-same-DICE restoration/fullCLI/M7A/MVS/provenance/whole-workload fit stay open. Keep
-borrowing/transferring/shared storage and existing scoped interners only when retention
-and cleanup fit; Windows remains minimal Unsupported.
+First design/captureprelaunch independently reviewed. Reuse the unchanged strict
+held-all-ancestor NOFOLLOW/regular/EOF/identity/name/fullSHA reader and Budget/facts
+owners, exact frozen two-component-or-three-component leaves;1MiBobject/16MiBaggregate,
+one64KiB scratch/facts256KiB/strictUTF8/8192postparse nodes/128loads/1024scalar/depth8.
+Body/text/AST retire per row, retain compact facts only;11reader checks qualified reuse,
+zero fresh. Three availability decisions are not tests/certificates. Missing/symlink/
+nonregular/changed/overcap preserves typed refusal, no fallback scan/acquisition/capraise/
+identical retry. Capture once with exclusive outputs and terminal validation/hashes
+within10s/sharedabsolute3sTERM/KILL/leaderjoin/residualgroupempty. Actual FINAL eligibility
+precedes conditional code. Artifactrefs exact{path,sha256} only; review never follows
+underlying sourcebinding path/bytes/hash targets.
+
+Conditional same two cfgtest owners only: platforms_module_preparation_tests.rs and
+public_probe_preparation_tests.rs. New separate defaultfalse PreparedFile+PublicProbe
+rules_cc role borrows additional[2] selectedroot, absent/wrongslot closed; exact3body
+Lstat/FileBytes and cc/cc/common Lstat-only metadata. No recursive/BUILD/unknownchild/
+digest/readlink/Image/othernamespace/Windows grant. Preserve original rulesRust28/
+3metadata and Skylib3/2metadata tables, wholeNeed admission before progress, exact
+request/registry/overlay/override-count/root projection checks. Require newrole and
+selectedslot; existing positive/eachmissingflag controls get matching sixthroot/override
+so they remain independent. Add maskedflag/missingslot negatives; transfer policy
+storage rather than cloning it. Reuse all11roots×4modes×Hostops/namespaces/spellings
+matrix plus8allowed union, mixedrefusal/no progress, sparse/wrongslot/default16 controls.
+Append one ordinary selector to original29; preserve four synthetic named cases and
+all original negative controls. Estimate120–260net cfgtest lines, zero production,
+onebool/80staticdescriptor bytes/literal bytes measured/zero guardheap. Existing private
+guard/control owners remain cohesive; estimates trigger review, not automatic refusal.
+
+Root owns frozen inputs/Rust/three status docs/compact receipt/local commit; ignored
+capture/native8helpers owned separately. Preserve original220lease prefix and add
+only eligible actual three rows→223 through same two64KiB parent contexts. Totals
+measured after capture, no third bank/context/retained sourcebody/cache/interner.
+Decoder extends the separate rules_cc table/root/flag/meta domain, default16/selected64
+scalar policy unchanged; four synthetic controls extend all domains, never native proof.
+No production/parser/reader/API/DICE/key/equality/lock/sourcebank change or copied bodies.
+Borrow/transfer existing storage; use scoped interners for repeated immutable retained
+strings whose owner/lifetime/cleanup fits. No global pool or interning unique scratch.
+Windows remains minimal Unsupported.
+
+After independent static implementation FINAL, resolve actual TOML rust-toolchain
+nightly2025-09-14 via rustupwhich. Offline/jobs1/sixdev opt0/debug0 Core--lib no-run and
+CoreCLIcheck separately≤60s; compilerRSS is not runtimefit. Current unique executable
+30ordinary preflight+30actual ordinary+4synthetic+ignoredlisting1/pass0, then independent
+nativeprelaunch before one changed normal public observer. Loading23/Bzlmod3/reader11
+qualifiedreuse0fresh; no broader suite/neworacle absent demonstrated gap. Runtime
+10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB; source64/default16/
+registry128/defaultBCR16/networkfalse/object1MiB/all decoded/transferred/written/live/
+image/scratch16MiB/thread2/work5cleanup8 remain fixed. Source numeric37headroom does
+not prove closure/sufficiency. Preserve raw actual Need/nullproducer/error/retirement
+qualifiers; actual FINAL/source-grounded nextowner, compactreceipt/docs/source/plan/
+archive/diff checks and accepted localcommit. Normal producer/support/data/providers/
+toolchains/runfiles/oracle/restoration/fullCLI/M7A/MVS/provenance/whole-fit remain open.
+Further rules_cc imports/Skylib children/bazel_tools remain closed until selected and
+reviewed; @bazel_tools must be verbatim pinned upstream when needed. known_shas4749878B
+remains hash-only/overcap closed. No automatic native repeat or invented providers.
 
 ## Immediate predecessor
 
-WP973 accepted in `5fbdb82916ba973dacf60ca4fc8b0806818d6113`; [receipt](wp973-rules-rust-local-toolchain-import-readiness-2026-10-07.json) preserves its full bindings and reviews. Two net cfgtest lines admitted lto/semver without heap string growth. 33 named checks passed; the once normal observer stayed at84,180KiB and exposed resource_set HostLstat before new body progress. Source27/decoded334004 stayed unchanged. Genuine producer and whole fit remain open. The saved [successor](../../../../target/wp973/native/successor-source.md) grounds this cohesive two-row continuation. Prior chronology is reachable at that commit in this manifest and canonical/bootstrap owners.
+WP974 accepted at64d6334982f6657ec31ab8cc324c19fafab36b18;
+[receipt](wp974-rules-rust-rustc-import-readiness-2026-10-07.json) retains33named passes,
+217leases768379physical1536758hash bytes and191B selected Skylib/lib Need at83,860KiB.
+Source27/334004 unchanged; fullproducer/wholefit open. Prior chronology remains
+Git-reachable at that commit and manifest path.

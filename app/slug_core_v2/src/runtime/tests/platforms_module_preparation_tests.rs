@@ -264,6 +264,12 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 28] = [
     "rust/private/stamp.bzl",
 ];
 const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
+const BAZEL_SKYLIB_IMPORTS: [&str; 3] = [
+    "lib/paths.bzl",
+    "lib/structs.bzl",
+    "rules/common_settings.bzl",
+];
+const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -278,6 +284,7 @@ struct Bodies {
     probe_package_source: bool,
     rules_rust_defs_source: bool,
     rules_rust_defs_import_sources: bool,
+    bazel_skylib_import_sources: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -316,6 +323,7 @@ impl Bodies {
             probe_package_source: false,
             rules_rust_defs_source: false,
             rules_rust_defs_import_sources: false,
+            bazel_skylib_import_sources: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -443,6 +451,30 @@ impl Bodies {
                             .iter()
                             .any(|file| relative == Path::new(file))
                 })
+    }
+    fn with_bazel_skylib_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.bazel_skylib_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_bazel_skylib_import_source(&self, path: &Path, metadata: bool) -> bool {
+        self.bazel_skylib_import_sources
+            && self.additional[1].as_ref().is_some_and(|module| {
+                path.strip_prefix(module.root.as_path())
+                    .is_ok_and(|relative| {
+                        (metadata
+                            && BAZEL_SKYLIB_IMPORT_METADATA
+                                .iter()
+                                .any(|directory| relative == Path::new(directory)))
+                            || BAZEL_SKYLIB_IMPORTS
+                                .iter()
+                                .any(|file| relative == Path::new(file))
+                    })
+            })
     }
     fn source_limits(&self, registry: RegistryChoice) -> SourceServiceLimits {
         SourceServiceLimits {
@@ -636,7 +668,8 @@ impl Bodies {
                                     || self.admits_nightly_channel_source(path)
                                     || self.admits_probe_package_source(path, false)
                                     || self.admits_rules_rust_defs_source(path)
-                                    || self.admits_rules_rust_defs_import_source(path, false)))
+                                    || self.admits_rules_rust_defs_import_source(path, false)
+                                    || self.admits_bazel_skylib_import_source(path, false)))
                             || (self.ignore_file_bytes
                                 && operation == PathObservationOperation::FileBytes
                                 && path.file_name().is_some_and(|name| name == ".bazelignore")
@@ -651,6 +684,7 @@ impl Bodies {
                             || self.admits_probe_package_source(path, true)
                             || self.admits_rules_rust_defs_source(path)
                             || self.admits_rules_rust_defs_import_source(path, true)
+                            || self.admits_bazel_skylib_import_source(path, true)
                             || (self.visible_lockfile_metadata
                                 && path.parent() == Some(self.roots[0].as_path())
                                 && path
@@ -1809,7 +1843,8 @@ fn observe_native_command(
     .with_nightly_channel_source(registry_choice, command)
     .with_probe_package_source(registry_choice, command)
     .with_rules_rust_defs_source(registry_choice, command)
-    .with_rules_rust_defs_import_sources(registry_choice, command);
+    .with_rules_rust_defs_import_sources(registry_choice, command)
+    .with_bazel_skylib_import_sources(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
