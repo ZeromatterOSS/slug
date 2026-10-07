@@ -189,6 +189,9 @@ struct GuardedSingleton {
 impl GuardedSingleton {
     fn check_need(&self, needs: &SourcePreparationNeeds) -> Result<(), NativeDemandSessionError> {
         self.bodies.admit(needs).map_err(|denied| {
+            if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
+                println!("{diagnostic}");
+            }
             self.milestones.lock().unwrap().denied = Some(denied);
             refusal()
         })
@@ -357,6 +360,292 @@ pub(super) fn prepare_and_drive(
             milestones,
         },
     ))
+}
+
+#[test]
+fn materialization_refusal_projection_preserves_kind_checks_and_precedence() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let valid = || (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone();
+    let allowed = SourcePreparationNeeds::repository(valid());
+    assert!(bodies.admit(&allowed).is_ok());
+    assert!(bodies.first_denied_materialization(&allowed).is_none());
+    let reasons = [
+        "workspace",
+        "binding",
+        "attributes_count",
+        "path_attribute",
+        "rule_name",
+        "rule_mapping",
+        "rule_repository",
+        "rule_package",
+        "rule_target",
+    ];
+    for (index, reason) in reasons.into_iter().enumerate() {
+        let mut request = valid();
+        match index {
+            0 => request.id.workspace = path("/foreign"),
+            1 => {
+                request.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("rules_rust+").unwrap()
+            }
+            2 => {
+                Arc::make_mut(&mut request.repo_spec.attributes)
+                    .insert("extra".into(), OverrideAttributeValue::Bool(true));
+            }
+            3 => {
+                Arc::make_mut(&mut request.repo_spec.attributes)
+                    .insert("path".into(), OverrideAttributeValue::Bool(false));
+            }
+            4 => request.repo_spec.rule_id.rule_name = "other".into(),
+            5 => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("bazel_tools").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("bazel_tools").unwrap(),
+                );
+                request.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                    "@bazel_tools//tools/build_defs/repo:local.bzl",
+                )
+                .unwrap()
+                .resolve(&mapping);
+            }
+            6 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other//tools/build_defs/repo:local.bzl").unwrap()
+            }
+            7 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_tools//other:local.bzl").unwrap()
+            }
+            8 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:other.bzl").unwrap()
+            }
+            _ => unreachable!(),
+        }
+        let rejected = SourcePreparationNeeds::repository(request);
+        let original = rejected
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap();
+        let (borrowed, actual) = bodies.first_denied_materialization(&rejected).unwrap();
+        assert!(std::ptr::eq(borrowed, original.as_ref()));
+        assert_eq!(actual, reason);
+        assert_eq!(
+            bodies.admit(&rejected).unwrap_err().family,
+            "materialization"
+        );
+        assert_eq!(Arc::strong_count(original), 1);
+    }
+    for attributes in [
+        Arc::new(starlark_map::small_map::SmallMap::from_iter([(
+            compact_str::CompactString::new("other"),
+            OverrideAttributeValue::Bool(false),
+        )])),
+        Arc::new(starlark_map::small_map::SmallMap::from_iter([(
+            compact_str::CompactString::new("path"),
+            OverrideAttributeValue::String("/other".into()),
+        )])),
+    ] {
+        let mut request = valid();
+        request.repo_spec.attributes = attributes;
+        assert_eq!(
+            bodies
+                .first_denied_materialization(&SourcePreparationNeeds::repository(request))
+                .unwrap()
+                .1,
+            "path_attribute"
+        );
+    }
+    // Canonical name and logical root matching different bindings must fail together.
+    let mut wrong_root = valid();
+    wrong_root.kind = RepositoryMaterializationKind::Local {
+        logical_root: path("/rules"),
+    };
+    assert_eq!(
+        bodies
+            .first_denied_materialization(&SourcePreparationNeeds::repository(wrong_root))
+            .unwrap()
+            .1,
+        "binding"
+    );
+    for kind in [
+        RepositoryMaterializationKind::Immutable,
+        RepositoryMaterializationKind::GeneratedFileEffects(
+            slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::build([]).unwrap(),
+        ),
+    ] {
+        let mut request = valid();
+        request.id.workspace = path("/foreign");
+        request.kind = kind;
+        let rejected = SourcePreparationNeeds::repository(request);
+        let (borrowed, reason) = bodies.first_denied_materialization(&rejected).unwrap();
+        assert_eq!(
+            reason,
+            if matches!(&borrowed.kind, RepositoryMaterializationKind::Immutable) {
+                "immutable_kind"
+            } else {
+                "generated_kind"
+            }
+        );
+        assert!(MaterializationDiagnostic::new(borrowed, reason).fields[6].is_none());
+    }
+    let mut first = (*local_native_request(&bodies.roots[0], "rules_rust+", "/rules")).clone();
+    first.repo_spec.rule_id.rule_name = "first".into();
+    let mut second = valid();
+    second.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    second.repo_spec.rule_id.rule_name = "second".into();
+    let first = SourcePreparationNeeds::repository(first);
+    let second = SourcePreparationNeeds::repository(second);
+    let mixed = allowed
+        .try_union(&first)
+        .unwrap()
+        .try_union(&second)
+        .unwrap();
+    let reversed = allowed
+        .try_union(&second)
+        .unwrap()
+        .try_union(&first)
+        .unwrap();
+    let reversed_first = reversed
+        .repository_materializations()
+        .values()
+        .find(|r| r.repo_spec.rule_id.rule_name != "local_repository")
+        .unwrap();
+    assert!(std::ptr::eq(
+        bodies.first_denied_materialization(&reversed).unwrap().0,
+        reversed_first.as_ref()
+    ));
+    let owner_first = mixed
+        .repository_materializations()
+        .values()
+        .find(|r| r.repo_spec.rule_id.rule_name != "local_repository")
+        .unwrap();
+    assert!(std::ptr::eq(
+        bodies.first_denied_materialization(&mixed).unwrap().0,
+        owner_first.as_ref()
+    ));
+    let body =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/fixture/MODULE.bazel"),
+            PathObservationOperation::FileBytes,
+        )));
+    let mut progress = 0;
+    if bodies.admit(&mixed.try_union(&body).unwrap()).is_ok() {
+        progress += 1;
+    }
+    assert_eq!(progress, 0);
+    assert_eq!(
+        bodies
+            .admit(&mixed.try_union(&body).unwrap())
+            .unwrap_err()
+            .family,
+        "materialization"
+    );
+    let bootstrap =
+        SourcePreparationNeeds::root_module_bootstrap(slug_bzlmod_v2::RootModuleBootstrapRequest {
+            workspace: path("/foreign"),
+        });
+    assert_eq!(
+        bodies
+            .admit(&mixed.try_union(&bootstrap).unwrap())
+            .unwrap_err()
+            .family,
+        "bootstrap"
+    );
+    let environment = SourcePreparationNeeds::environment(
+        slug_bzlmod_v2::NeedRepositoryEnvironmentNames::new(
+            path("/fixture"),
+            slug_bzlmod_v2::RepositoryEnvironmentNameFrontier::from_unsorted([
+                compact_str::CompactString::new("PATH"),
+            ]),
+        )
+        .unwrap(),
+    );
+    for (earlier, family) in [(bootstrap, "bootstrap"), (environment, "environment")] {
+        let rejected = mixed.try_union(&earlier).unwrap();
+        let denied = bodies.admit(&rejected).unwrap_err();
+        assert_eq!(denied.family, family);
+        assert!(
+            bodies
+                .materialization_diagnostic(&rejected, &denied)
+                .is_none()
+        );
+    }
+    let denied = bodies.admit(&mixed).unwrap_err();
+    assert!(bodies.materialization_diagnostic(&mixed, &denied).is_some());
+    assert!(bodies.admit(&body).is_ok());
+}
+#[test]
+fn materialization_refusal_projection_is_bounded_and_borrowed() {
+    use fmt::Write;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let mut request = (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone();
+    request.kind = RepositoryMaterializationKind::Immutable;
+    let needs = SourcePreparationNeeds::repository(request);
+    let original = needs.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    {
+        let (borrowed, reason) = bodies.first_denied_materialization(&needs).unwrap();
+        let view = MaterializationDiagnostic::new(borrowed, reason);
+        assert!(std::ptr::eq(
+            view.fields[1].unwrap().as_ptr(),
+            borrowed.id.canonical_repo.as_str().as_bytes().as_ptr()
+        ));
+        let encoded = view.to_string();
+        assert!(encoded.starts_with(
+            "WP982_MATERIALIZATION capture=captured kind=immutable reason=immutable_kind "
+        ));
+        assert!(encoded.ends_with(" logical_root_len=none logical_root_hex=none"));
+        assert_eq!(Arc::strong_count(original), 1);
+        assert!(encoded.len() + 1 <= MATERIALIZATION_MARKER_BYTES);
+    }
+    drop(needs);
+    assert!(weak.upgrade().is_none());
+    let mut view = MaterializationDiagnostic {
+        kind: "local",
+        reason: "binding",
+        fields: [Some(&[]); 7],
+    };
+    assert!(view.to_string().contains("workspace_len=0 workspace_hex=-"));
+    let unicode = "\0\né".as_bytes();
+    view.fields[0] = Some(unicode);
+    assert!(
+        view.to_string()
+            .contains("workspace_len=4 workspace_hex=000ac3a9")
+    );
+    let exact = [b'x'; MATERIALIZATION_FIELD_BYTES];
+    let overflow = [b'x'; MATERIALIZATION_FIELD_BYTES + 1];
+    view.fields = [Some(&[]); 7];
+    view.fields[0] = Some(&exact);
+    assert!(view.captured());
+    view.fields[0] = Some(&overflow);
+    assert!(!view.captured());
+    view.fields = [Some(&[]); 7];
+    for field in &mut view.fields[..4] {
+        *field = Some(&exact);
+    }
+    assert!(view.captured());
+    assert!(view.to_string().len() + 1 <= MATERIALIZATION_MARKER_BYTES);
+    view.fields[4] = Some(b"x");
+    assert!(!view.captured());
+    let encoded = view.to_string();
+    assert!(encoded.starts_with("WP982_MATERIALIZATION capture=bounds_refused "));
+    assert_eq!(encoded.matches("_hex=none").count(), 7);
+    assert!(encoded.contains("workspace_len=1024 workspace_hex=none"));
+    let mut output = String::new();
+    let mut writer = MaterializationWriter {
+        writer: &mut output,
+        bytes: MATERIALIZATION_MARKER_BYTES - 1,
+    };
+    assert!(writer.write_str("x").is_err());
+    assert!(output.is_empty());
 }
 
 #[test]

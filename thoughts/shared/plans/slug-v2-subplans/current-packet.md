@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Typed materialization demand readiness
+Status: Generated Features repository plan readiness
 
 ## Observable and source basis
 
@@ -44,55 +44,64 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP981](wp981-features-extension-import-readiness-2026-10-07.json) accepts the finite
-Features3→8/wholeNeed7→17 and Skylib3→4/wholeNeed8→10 cohort on baseline
-09d0cf38e876375648fb35d58f31dd84e8232e13. Four strict captures observed six bodies
-with10,125 bytes, one64KiB scratch and per-row body/text/AST retirement. Two cfgtest
-owners add81net lines (85insert/4delete),96B static descriptors/121literal bytes;
-no new fields, flags, separate guard heap or guard-owned strings. Defaultfalse
-PreparedFile/PublicProbe borrowed slots0/1, metadata, namespace/root/operation,
-projection and mixed-no-progress contracts remain exact. Current Bodies192B is
-measured; historic layout/per-allocation/total-retention delta remains unproved.
+[WP982](wp982-typed-materialization-demand-2026-10-07.json) accepts the bounded
+original materialization diagnostic on baseline1457d644882237c0f4864528259aff57b70a3e67.
+Bodies admission and GuardedSingleton share the original borrowed first offender,
+kind/nine Local predicates and family precedence. Seven borrowed identity fields
+stream immediately before refusal, outside the milestone mutex, under1024perfield/
+4096aggregate raw bytes and10240encoded bytes including LF. No marker for other
+families/success, no new retained fields/guard heap/strings/requestArc/interner.
+Two cfgtest files add442net lines (464insert/22delete); independent review accepted
+cohesive classifier/formatter/two-test growth beyond120–200estimate. Scratch/download/
+execute earlier branches are static/protected-source qualified; fresh bootstrap/
+environment suppression, crossed bindings, reversed order, all kinds/Local checks,
+byte bounds and test-request Weak retirement discriminate the changed seam.
 
-31 fresh Core tests +4 synthetic controls +1 normal observer =36 fresh named passes;
+33 fresh Core tests +4 synthetic controls +1 normal observer =38 fresh named passes;
 42 unchanged owner/callback checks and11 reader controls are qualified reuse0fresh.
-Pinned serial preparations9.243s/7.305s execute no tests; compiler memory is separate.
-Ordinary runtime totals5.971s, synthetics0.228s. Normal1.787s peaks93,732KiB under256MiB;
-scope/recorder cleanup and final credits retire. BodyWeak remains unseen/vacuous;
-all DICE/allocator pages and whole-workload fit remain open. Current37 operations/
-525 union pins include523 native pins. Original231 ordered parent rows are preserved
-as an exact prefix, with six appended within original188+combined49=237 leases.
-Physical918,928 bytes/1,837,856 hash bytes use two64KiB contexts128KiB, non-atomic
-and noncertifying.
+Current39 operations/531 union pins include529 native pins. Corrected serial
+compile37.402s/check7.305s execute0tests; prior18.849s E0283 test-key inference failure
+is preserved separately with0tests. Compiler memory is separate from runtime fit.
+Ordinary runtime totals6.344s, synthetics0.248s. Normal1.770s peaks93,576KiB under256MiB;
+accounted credits zero and scope/recorder Weak expire. Native request/plan retirement,
+bodyWeak (unseen/vacuous), registrybodyWeak/DICE/pages and whole-workload fit remain open.
+All237 ordered WP981 parent rows are unchanged,918,928 physical bytes/1,837,856 hash
+bytes in original188+combined49/two64KiB128KiB, non-atomic/noncertifying.
 
-Actual source64/646,987 decoded is aggregate+12/+104,148 relative to WP980, without
-per-file consumption attribution; registry105/235,521 unchanged. SourceErrorNone at
-limit64 is not a quota error or authority to raise caps. Public preparation is complete/
-policychecked, while terminal/certificate/observations/analyses/actions/Rustc remain
-unavailable. The actual next refused family is materialization; kind/request identity/
-repo spec/failed predicate and path are unobserved. No source or generated alias guess.
+Actual source64/646,987 decoded and registry105/235,521 are unchanged fromWP981;
+SourceErrorNone is not a quota error or cap authority. Public preparation/dispatch/
+policy is complete; certificate/observations/analyses/actions/Rustc unavailable.
+Exactly one749-byte LF marker captures207 raw identity bytes: GeneratedFileEffects,
+generated_kind, canonical bazel_features++version_extension+bazel_features_globals,
+original rule @@bazel_features+//private:globals_repo.bzl / globals_repo and actual
+fixture workspace. Nonlocal logical root is unavailable. Plan shape, effect contents,
+attributes, complete semantic identity/source association and inventory are unobserved.
 
 ## Active continuation contract
 
 Continue WP231 toward the genuine normal producer using the
-[grounded successor](../../../../target/wp981/native/successor-source.md), SHA256
-2dc8ca1aafa93db2cb405377ec3ac3fda9bec2581abe4084b46e59b463f5017e.
-Freeze and independently review a bounded typed diagnostic before one changed normal
-observation. Share the existing materialization predicate/first-offender order between
-Bodies::admit and GuardedSingleton::check_need. Report the original borrowed request
-immediately before refusal/progress and outside the milestone mutex, without cloning
-request/spec/attributes/plan/name/path, Debug rendering, extra Arc retention or new
-semantic identity. Admission/default modes, precedence, epochs and certificates stay
-unchanged. Kind and static failed-check tags plus bounded borrowed canonical/rule ID
-fields and scalar checks select the natural owner; per-field/aggregate bounds and
-unavailable/bounds-refused states must be explicit. Do not render arbitrary attributes
-or generated plans. The first refused request is not a complete inventory.
+[grounded successor](../../../../target/wp982/native/successor-source.md), SHA256
+43f3d6546a9eabeb19774b7e9d7b19a8a77cb2e32d3505339d3f00b52b908670.
+The typed plan is already owned in the original request: freeze/review a bounded
+borrowed ordered-effects/spec projection for this exact offender, immediately before
+refusal and outside the milestone mutex. Preserve typed workspace/canonical/rule
+identity and original plan order; cap rows/path/encoded aggregate and checked content
+lengths before reporting file path/executable/content size and optional streaming
+content digest. Archive/symlink kinds remain explicit; overflow/unknown shapes refuse.
+Never copy/render the plan or arbitrary attributes, infer generated roots/output
+contents, read another source/cache body or retain a diagnostic request/report.
+The prior1888B globals_repo source's partial syntax does not prove an actual plan.
 
-Fresh controls discriminate all three kinds/every Local predicate, old admission and
-mixed batch zero progress, bounded identity/no retention, exact marker/unknown domains
-and untouched old raw lines. Reuse original237 ordered leases and two64KiB contexts.
-Only actual typed evidence selects subsequent materialization implementation; no
-materialization/effect/provider grant or identical retry accompanies diagnostics.
+Once actual shape grounds it, independently review finite pure-file materialization
+admission as a design checkpoint in cohesive implementation work. Reuse the normal
+Generated source→NativeDemand progress→RepositoryMaterializer→write_counted/session/
+epoch/preflight owners; preserve whole-Need no-progress, original RepoSpec/identity/
+generation, object/write/memory caps, tempdir/join/cancellation/shutdown retirement
+and final revalidation. No proxy Local root, fabricated provider/certificate, generic
+Generated grant, production source bypass or cap increase follows from diagnostics.
+Keep original237 ordered leases/two64KiB contexts and qualified reuse; each changed
+native observation requires relevant fresh gates, no identical retry. Source64 is
+numerical exhaustion only; a future actual quota failure needs its own resource design.
 
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
@@ -106,11 +115,12 @@ same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
 
+[WP981](wp981-features-extension-import-readiness-2026-10-07.json), accepted at
+1457d644882237c0f4864528259aff57b70a3e67, owns finite Features3→8 and Skylib3→4,
+four captures/six observed bodies,237 ordered parent rows and the opaque materialization
+refusal. Those captures are qualified prior eligibility,0current capture passes.
 [WP980](wp980-bazel-features-import-readiness-2026-10-07.json), accepted at
-09d0cf38e876375648fb35d58f31dd84e8232e13, owns the initial finite Features3 role,
-private metadata and the exact extensions.bzl Need.
-[WP979](wp979-private-cc-import-readiness-2026-10-07.json), accepted at
-4edecf56514696b73e9818a3284f49161cd32a03, owns finite CC8/meta4.
+09d0cf38e876375648fb35d58f31dd84e8232e13, owns the initial Features3 role.
 [WP977](wp977-command-local-extension-readiness-2026-10-07.json), accepted at
 53b58b455d39966aa889f85a3689c7740b3df171, owns checked CommandAbsolute Local extension
 routes, shared mappings and source lifecycle. Production identity/alias/RootBuild/

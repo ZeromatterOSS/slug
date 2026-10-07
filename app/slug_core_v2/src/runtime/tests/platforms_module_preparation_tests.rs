@@ -330,7 +330,180 @@ fn path_operation_code(operation: &PathObservationOperation) -> &'static str {
         PathObservationOperation::WindowsOptionPathLongName => "windows_option_path_long_name",
     }
 }
+const MATERIALIZATION_FIELD_BYTES: usize = 1024;
+const MATERIALIZATION_AGGREGATE_BYTES: usize = 4096;
+const MATERIALIZATION_MARKER_BYTES: usize = 10240;
+struct MaterializationDiagnostic<'a> {
+    kind: &'static str,
+    reason: &'static str,
+    fields: [Option<&'a [u8]>; 7],
+}
+impl<'a> MaterializationDiagnostic<'a> {
+    fn new(
+        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+        reason: &'static str,
+    ) -> Self {
+        let (kind, logical_root) = match &request.kind {
+            RepositoryMaterializationKind::Local { logical_root } => {
+                ("local", Some(logical_root.as_path().as_os_str().as_bytes()))
+            }
+            RepositoryMaterializationKind::Immutable => ("immutable", None),
+            RepositoryMaterializationKind::GeneratedFileEffects(_) => {
+                ("generated_file_effects", None)
+            }
+        };
+        let label = &request.repo_spec.rule_id.bzl_file;
+        Self {
+            kind,
+            reason,
+            fields: [
+                Some(request.id.workspace.as_path().as_os_str().as_bytes()),
+                Some(request.id.canonical_repo.as_str().as_bytes()),
+                Some(label.package().repo().as_str().as_bytes()),
+                Some(label.package().package().as_str().as_bytes()),
+                Some(label.target().as_str().as_bytes()),
+                Some(request.repo_spec.rule_id.rule_name.as_bytes()),
+                logical_root,
+            ],
+        }
+    }
+    fn captured(&self) -> bool {
+        self.fields
+            .iter()
+            .flatten()
+            .try_fold(0usize, |sum, bytes| {
+                (bytes.len() <= MATERIALIZATION_FIELD_BYTES).then_some(())?;
+                sum.checked_add(bytes.len())
+                    .filter(|sum| *sum <= MATERIALIZATION_AGGREGATE_BYTES)
+            })
+            .is_some()
+    }
+}
+struct MaterializationWriter<'a, W> {
+    writer: &'a mut W,
+    bytes: usize,
+}
+impl<W: fmt::Write> fmt::Write for MaterializationWriter<'_, W> {
+    fn write_str(&mut self, text: &str) -> fmt::Result {
+        self.bytes = self
+            .bytes
+            .checked_add(text.len())
+            .filter(|n| *n < MATERIALIZATION_MARKER_BYTES)
+            .ok_or(fmt::Error)?;
+        self.writer.write_str(text)
+    }
+}
+impl fmt::Display for MaterializationDiagnostic<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use fmt::Write;
+        let captured = self.captured();
+        let mut writer = MaterializationWriter {
+            writer: formatter,
+            bytes: 0,
+        };
+        write!(
+            writer,
+            "WP982_MATERIALIZATION capture={} kind={} reason={}",
+            if captured {
+                "captured"
+            } else {
+                "bounds_refused"
+            },
+            self.kind,
+            self.reason
+        )?;
+        for (name, bytes) in [
+            "workspace",
+            "canonical",
+            "rule_repo",
+            "rule_package",
+            "rule_target",
+            "rule_name",
+            "logical_root",
+        ]
+        .into_iter()
+        .zip(self.fields)
+        {
+            match bytes {
+                Some(bytes) => write!(
+                    writer,
+                    " {name}_len={} {name}_hex={}",
+                    bytes.len(),
+                    RegistryHex(captured.then_some(bytes))
+                )?,
+                None => write!(writer, " {name}_len=none {name}_hex=none")?,
+            }
+        }
+        Ok(())
+    }
+}
 impl Bodies {
+    fn first_denied_materialization<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+    ) -> Option<(
+        &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+        &'static str,
+    )> {
+        for (_, request) in needs.repository_materializations().iter() {
+            let logical_root = match &request.kind {
+                RepositoryMaterializationKind::Local { logical_root } => logical_root,
+                RepositoryMaterializationKind::Immutable => {
+                    return Some((request, "immutable_kind"));
+                }
+                RepositoryMaterializationKind::GeneratedFileEffects(_) => {
+                    return Some((request, "generated_kind"));
+                }
+            };
+            let label = &request.repo_spec.rule_id.bzl_file;
+            let attributes = &request.repo_spec.attributes;
+            let checks = [
+                (request.id.workspace == self.roots[0], "workspace"),
+                (
+                    self.bindings().any(|(_, canonical, root)| {
+                        request.id.canonical_repo.as_str() == canonical && logical_root == root
+                    }),
+                    "binding",
+                ),
+                (attributes.len() == 1, "attributes_count"),
+                (
+                    matches!(attributes.get("path"), Some(OverrideAttributeValue::String(path)) if Path::new(path.as_str()) == logical_root.as_path()),
+                    "path_attribute",
+                ),
+                (
+                    request.repo_spec.rule_id.rule_name == "local_repository",
+                    "rule_name",
+                ),
+                (label.mapping_id().is_none(), "rule_mapping"),
+                (
+                    label.package().repo().as_str() == "bazel_tools",
+                    "rule_repository",
+                ),
+                (
+                    label.package().package().as_str() == "tools/build_defs/repo",
+                    "rule_package",
+                ),
+                (label.target().as_str() == "local.bzl", "rule_target"),
+            ];
+            if let Some((_, reason)) = checks.into_iter().find(|(valid, _)| !valid) {
+                return Some((request, reason));
+            }
+        }
+        None
+    }
+    fn materialization_diagnostic<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+        denied: &Denied,
+    ) -> Option<MaterializationDiagnostic<'a>> {
+        if denied.family != "materialization" {
+            return None;
+        }
+        let (request, reason) = self
+            .first_denied_materialization(needs)
+            .expect("materialization refusal preserves its original offender");
+        Some(MaterializationDiagnostic::new(request, reason))
+    }
     fn new(roots: [NormalizedAbsolutePath; 3]) -> Self {
         let files = roots
             .each_ref()
@@ -701,28 +874,8 @@ impl Bodies {
         if !needs.repository_executes().is_empty() {
             return Err(refusal("execute"));
         }
-        for (_, request) in needs.repository_materializations().iter() {
-            let RepositoryMaterializationKind::Local { logical_root } = &request.kind else {
-                return Err(refusal("materialization"));
-            };
-            let expected = self.bindings().any(|(_, canonical, root)| {
-                request.id.canonical_repo.as_str() == canonical && logical_root == root
-            });
-            let label = &request.repo_spec.rule_id.bzl_file;
-            let attributes = &request.repo_spec.attributes;
-            let path_matches = matches!(attributes.get("path"), Some(OverrideAttributeValue::String(path)) if Path::new(path.as_str()) == logical_root.as_path());
-            if request.id.workspace != self.roots[0]
-                || !expected
-                || attributes.len() != 1
-                || !path_matches
-                || request.repo_spec.rule_id.rule_name != "local_repository"
-                || label.mapping_id().is_some()
-                || label.package().repo().as_str() != "bazel_tools"
-                || label.package().package().as_str() != "tools/build_defs/repo"
-                || label.target().as_str() != "local.bzl"
-            {
-                return Err(refusal("materialization"));
-            }
+        if self.first_denied_materialization(needs).is_some() {
+            return Err(refusal("materialization"));
         }
         if let Some(paths) = needs.path_observations() {
             for demand in paths.demands() {
