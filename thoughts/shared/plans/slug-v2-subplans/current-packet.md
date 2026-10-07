@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: owned file registry advances all eight Local sources; reviewed attempt-capacity continuation
+Status: WP955 file-registry32 accepted; measured47 requests ground normal admission continuation
 
 ## Observable and source basis
 
@@ -44,47 +44,42 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) prepares the authentic
-owned177 metadata files/273940B from three pinned inputs464102B. Five controls and the
-once preparation pass in0.790s/conservative27768KiB; source bodies retire after exact
-verification/write/readback, with compact provenance only. Traced22854062B peak and
-5096363B retained helpers/rows exclude encoding and do not measure Slug savings.
+[WP955](wp955-file-registry-attempt-policy-2026-10-07.json) accepts PreparedFile-only32
+registry attempts, DefaultBCR16 and unchanged byte/time/RSS/sourceAttempt limits.
+The existing recorder naturally reserves541287B; the only Rust delta is15 net lines
+in the private companion, no retained string/storage/DICE/API/production change.
+14 ordinary tests pass2.775s/55732KiB and three synthetic decoder controls pass; Core
+compile9.005s and direct Core/CLI check7.324s are separate compiler preparation.
+Complete=false diagnostic snapshots remain unqualified and decoded without imposing
+complete-history equalities. Existing Arc/Dupe/borrowed source/report ownership stays.
 
-The existing Eleven companion now has one closed opt-in PreparedFile registry choice,
-with normal RegistryUrls/request and actual RootModuleRegistryUrlsKey equality before
-anchor computation. DefaultBCR wrappers/markers and the whole-Need/all11 Host-success
-certificate guards stay intact. Arc-backed RegistryUrls Dupe and borrowed diagnostics
-avoid repeated URL/body ownership; no interner/global pool or second semantic cache.
-Fourteen ordinary Rust tests pass in2.748s/53116KiB; two synthetic decoder controls pass.
-Separate Core compile38.620s and direct Core/CLI check7.310s pass.
+The once normal observation passes0.300s/conservative69600KiB with100 stable pins and
+188 held original Local/prepared registry leases284878B (569756B fullhash reads).
+Root426B/anchor/fullhash and all eight extra Local module sources are observed/hash-true;
+original root/extra Weak handles expire, scope/recorder Weak expire and final credits
+are zero. Registry-body Weak remains unobserved; credit0 does not prove DICE Arc/page
+release. Successful all11 Host-certificate coverage is unexecuted.
 
-One new normal file-registry observer passes in0.293s/conservative69544KiB with95stable
-runtime pins and188 held original regular source/output leases284878B (569756B fullhash
-before/after reads). Root426B/anchor/fullhash and all eight extra Local module sources
-are actually observed/fullhash-true; their original Weak handles expire along with scope
-and recorder, and final tracked credits/image/scratch resources are zero. Successful
-all11 native Host-certificate coverage remains unexecuted. Registry-body Weak retirement
-is unobserved, and zero live credits do not prove DICE Arc or RSS-page release.
+Actual mapping/computation refuses with RegistryFileLocalRead and first sticky
+Some(Limit(RegistryAttempts)):32 admissions/113862 bytes, peak buffer1686592B.
+Recorder complete=true attempted47/admitted32/distinct32/refused15/sticky14/visited32,
+qualified=false; first zlib row is distinct from the borrowed selected rules_android
+0.1.1/105B file MODULE URL. This proves no absence, completed MVS/mapping/providers/
+public Rustc or whole-fit. No unchanged retry or automatic doubling follows.
 
-The actual terminal is computation/semantic refusal, RegistryFileLocalRead, with sticky
-Some(Limit(RegistryAttempts)):16 admitted attempts/96781 admitted bytes, peak live buffer
-1424448B. The original borrowed selected tuple names abseil-cpp20250814.1 and its107B
-file-registry MODULE URL. The first diagnostic zlib row is distinct and unqualified.
-No whole-Need denial occurred. The attempt stop establishes no missing object, completed
-mapping/MVS/provider/public Rustc or whole-workload fit. No retry or cap increase follows.
-
-Next independently review PreparedFile-only32 registry attempts and matching decoder
-bounds using the existing naturally scaled diagnostic recorder:541287B reserved at32,
-+262144B versus16, below unchanged16MiB source/live caps. Default BCR stays16; all
-object/byte/RSS/time/sourceAttempt limits remain. The actual selected abseil MODULE is
-already prepared1376B/fullSHA; absence is not the issue. The current source recommendation
-lives at target/wp954/native/successor-source.md. No operation or cap change is activated
-until this concrete policy's independent design and focused validation pass. Existing object/byte/image/scratch/RSS/time caps and all prior spent-source
-refusals remain. A changed packet attempt estimate requires measured justification and
-independent design; never grow a fixed module mode per dependency or silently raise limits.
-Mutable same-URL local registry invalidation remains separately owned: successful local
-RegistryFileFound currently has no generation dependency or Host body certificate row.
-This fresh immutable corpus and held physical brackets qualify one runtime only.
+The prepared authentic177-file corpus remains from
+[WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json),273940B. Reuse its
+full output identities and exact existing URL plus11 Local source rows10938B; no new
+extraction, writer or source-availability retry. Full preparation/native history and
+unchanged readiness details remain in that receipt and current-packet.md at cdba815c2.
+Next ground a consequential bounded normal admission correction from actual47 calls,
+existing natural scope/recorder policies and measured memory headroom, then independently
+review before activation. Maintain all existing object/byte/sourceAttempt/RSS/time caps
+and all spent source refusals; count177 inventory is neither actual demand nor a proof
+of sufficiency. Prefer one normal owner over dependency-specific modes or copied harnesses.
+Mutable same-URL local RegistryFileFound freshness still lacks generation/Host-body
+certificate dependency; immutable fresh runtime/188 physical brackets qualify one
+observation only. Production source ownership and full producer gates remain open.
 
 ## Reusable evidence and predecessor
 

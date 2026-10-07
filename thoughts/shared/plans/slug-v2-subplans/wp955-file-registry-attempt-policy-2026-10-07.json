@@ -1,0 +1,341 @@
+{
+  "checkpoint": "WP955",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "cdba815c22b57dee6ab8aedd7fd1401a04b4d525",
+  "outcome": "progress: reviewed file-registry32 admits sixteen additional distinct requests; actual RegistryAttempts barrier selects rules_android0.1.1",
+  "compatibility": "Slug-native diagnostic policy only; exact source/hash guards inherited; production policy unchanged",
+  "implementation": {
+    "file": {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "sha256": "e48b11810a128c6175002d40785d94093d2eec8e41dcf9c3bf90b4c229f079c7"
+    },
+    "net_lines": 15,
+    "default_bcr_attempts": 16,
+    "prepared_file_attempts": 32,
+    "new_retained_strings": 0,
+    "production_api_dependency_fixture_changes": 0
+  },
+  "corpus": {
+    "receipt": {
+      "path": "thoughts/shared/plans/slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json",
+      "sha256": "b23f611ab040611b549d6d809ae9dbb7f977dbc4e3f8981a4e968df3f5b884a6"
+    },
+    "result": {
+      "path": "target/wp954/corpus/result.json",
+      "sha256": "ee373fef2f89203c1650c79ce3918a5905476fd83af4d7ee5e7a77cd030a3962"
+    },
+    "fresh_preparations": 0,
+    "local_files": 11,
+    "registry_files": 177,
+    "physical_bytes": 284878,
+    "before_after_hash_read_bytes": 569756,
+    "physical_brackets_are_host_certificate": false
+  },
+  "preparation": [
+    {
+      "mode": "compile",
+      "elapsed_seconds": 9.004739793017507,
+      "exit_code": 0,
+      "monitored_rss_kib": 82676,
+      "child_rusage_peak_kib": 1908028,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      }
+    },
+    {
+      "mode": "check",
+      "elapsed_seconds": 7.323782890103757,
+      "exit_code": 0,
+      "monitored_rss_kib": 87132,
+      "child_rusage_peak_kib": 640448,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      }
+    }
+  ],
+  "ordinary": {
+    "selected": 14,
+    "passed": 14,
+    "elapsed_seconds": 2.774685411946848,
+    "conservative_peak_kib": 55732,
+    "operations": [
+      {
+        "path": "target/wp955/native/ordinary-0-operation.json",
+        "sha256": "c5da6cc9bb4b90d4a7d43d915dfdfabe669f1efb6683dc04b9b4e7b180fefc18"
+      },
+      {
+        "path": "target/wp955/native/ordinary-1-operation.json",
+        "sha256": "87000d4cee7d5ae2b246f2697037bdd05f251857c1f489746f87ba396a5814cb"
+      },
+      {
+        "path": "target/wp955/native/ordinary-2-operation.json",
+        "sha256": "1e3440dfd5d374c21412e6d0c3cd4a80c59cd82e9f5525274aabc52ddc8c065a"
+      },
+      {
+        "path": "target/wp955/native/ordinary-3-operation.json",
+        "sha256": "00394c40da351310003e8baacc6c6113d4e6b0e75775447935708ce8b6d6ea3e"
+      },
+      {
+        "path": "target/wp955/native/ordinary-4-operation.json",
+        "sha256": "c11d7ce9e937693cef4b31519391388975d5072535789b9fab5031c644ee6ba9"
+      },
+      {
+        "path": "target/wp955/native/ordinary-5-operation.json",
+        "sha256": "2b2d222e619fd1c363268bb32a31fafe6d9bdd1add06e08707e75f296abb177a"
+      },
+      {
+        "path": "target/wp955/native/ordinary-6-operation.json",
+        "sha256": "87031c34981f1e2b2a972d0667ecccd8e143182e5c55c140c78f51fb74a3e16c"
+      },
+      {
+        "path": "target/wp955/native/ordinary-7-operation.json",
+        "sha256": "75159c0949588cba8c74fec1440d6d0f01a5711298fc8479f807e358488a0a39"
+      },
+      {
+        "path": "target/wp955/native/ordinary-8-operation.json",
+        "sha256": "aa2dea3d0af454a5d7eb6fa6a6639880453a70bdbf6b8dea0a39a3a6a240a028"
+      },
+      {
+        "path": "target/wp955/native/ordinary-9-operation.json",
+        "sha256": "eb8b0d45a6c84e86dc4b6487f8ce3b5a1789e242a754fd80f3170a852078f053"
+      },
+      {
+        "path": "target/wp955/native/ordinary-10-operation.json",
+        "sha256": "5559874b47bcbae76f210477b6606bf33d604df94ce8c6df91ef30b5336c4f8d"
+      },
+      {
+        "path": "target/wp955/native/ordinary-11-operation.json",
+        "sha256": "31afc0260881ae4ea8fe32a570078af8fa7111f4bee9157ad92e966458084c8e"
+      },
+      {
+        "path": "target/wp955/native/ordinary-12-operation.json",
+        "sha256": "b51ca6953f3c4e046627725d02a49e840b031778f37ef9e17c2edd2a50486eca"
+      },
+      {
+        "path": "target/wp955/native/ordinary-13-operation.json",
+        "sha256": "781a6423463f50d236218810d6282b11713b5530511c3be82af47032a3c33f5f"
+      }
+    ],
+    "preflight": {
+      "path": "target/wp955/native/preflight-operation.json",
+      "sha256": "1498cb45da54765f699553ab9fb84f7f895f71513a0d1f40260a8a80ccfc30e1"
+    },
+    "ignored_listing": {
+      "path": "target/wp955/native/list-operation.json",
+      "sha256": "31748a9e74256e534f8d6fd9bb974ab74396ac71a5275ef6cbb3dc1d7f1a8eb2"
+    }
+  },
+  "controls": {
+    "synthetic_only": true,
+    "selected": 3,
+    "passed": 3,
+    "elapsed_seconds": 0.04497075907420367,
+    "conservative_peak_kib": 17120,
+    "operation": {
+      "path": "target/wp955/native/protocol-controls/operation.json",
+      "sha256": "e41357a9bcc3aa46ba9dd43e9abbbdb796b33c9d2be40a0587e975ca7f09c66f"
+    },
+    "recorder_owner_reuse": {
+      "path": "target/wp955/native/recorder-reuse.md",
+      "sha256": "8551736d646e45e82f12d8d986b88bd9150863460a8d91efde03aa24d5b74c6d"
+    },
+    "fresh_prior_fd_availability_version_runs": 0
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp955/native/native-operation.json",
+      "sha256": "3ea7281a7078e34a6bdf475b135d163fc618a3aa21f0d64e272cffb1dec3136c"
+    },
+    "result": {
+      "path": "target/wp955/native/result.json",
+      "sha256": "1f11069d336e2d75952c7f911e67d1230f0e19bd156587c50342717b9d60f9cb"
+    },
+    "stdout": {
+      "path": "target/wp955/native/native.stdout",
+      "sha256": "cfdc64de450b75b12ea5a0f5542e73c1204cec8c4ffe00c2104433a342c3d381"
+    },
+    "stderr": {
+      "path": "target/wp955/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 0.30036570806987584,
+    "conservative_peak_kib": 69600,
+    "stable_runtime_pins": 100,
+    "held_noninherited_source_leases": 188,
+    "source_error": "Some(Limit(RegistryAttempts))",
+    "source_counters": {
+      "registry_attempts": 32,
+      "registry_admitted_bytes": 113862,
+      "source_attempts": 0,
+      "transferred_bytes": 0,
+      "decoded_bytes": 0,
+      "written_bytes": 0,
+      "live_buffer_bytes_before_drop": 541287,
+      "peak_buffer_bytes": 1686592
+    },
+    "selected_semantic_request": {
+      "name": "rules_android",
+      "version": "0.1.1",
+      "url": "file:///run/media/system/Colossus/dev/slug/target/wp954/registry/modules/rules_android/0.1.1/MODULE.bazel"
+    },
+    "recorder": {
+      "attempted": 47,
+      "admitted": 32,
+      "scope_admitted": 32,
+      "distinct": 32,
+      "repeated": 0,
+      "retained": 32,
+      "refused": 15,
+      "sticky": 14,
+      "charged": 541287,
+      "visited": 32,
+      "complete": true,
+      "qualified": false
+    },
+    "root": {
+      "seen": true,
+      "calls": 33,
+      "policy_checked": true,
+      "bytes": 426,
+      "hash_match": true,
+      "anchor": "complete",
+      "outer_variant": "None"
+    },
+    "all_eight_local_sources_seen_hashed_original_weak_expired": true,
+    "retirement": {
+      "source_weak_seen": true,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "registry_body_weak": "unobserved",
+    "mapping": {
+      "state": "semantic_refusal",
+      "codes": [
+        "RootMappingPredecessor",
+        "ExtensionMappingsRoutes",
+        "RoutesGraph",
+        "GraphDiscoveryLeaf",
+        "DiscoverySourcePreparation",
+        "ModuleSourceRegistryFile",
+        "RegistryFileLocalRead"
+      ],
+      "termination": "Classified",
+      "native_detail": true
+    },
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304,
+      "file_bytes": 16777216
+    },
+    "stop_reason": null,
+    "joined": true,
+    "owned_group_empty": true
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp955/native/design-source.md",
+      "sha256": "0f7e0a87c4eefdf46851d7cccd981e3ce60b97937e4563275bfd6b5b0a9d295f"
+    },
+    "design-evidence": {
+      "path": "target/wp955/native/design-evidence.md",
+      "sha256": "fc8e820f9026a3f6ee268245451f0994aa95bf9f9d697bcd9abb528a3522a649"
+    },
+    "preflight-source": {
+      "path": "target/wp955/native/preflight-source.md",
+      "sha256": "489ab5f15a3f57a4748033a8fd9b2c91c0a7be69c777c87babd044fe13289a99"
+    },
+    "preflight-evidence": {
+      "path": "target/wp955/native/preflight-evidence.md",
+      "sha256": "6c61ad60b19985be37813599b1c477d80704dbcc829bf14370948e05f9296d69"
+    },
+    "final-source": {
+      "path": "target/wp955/native/final-source.md",
+      "sha256": "c2d2a1dda137e30107a3a37710e87ba1102dc3286d46e9444e3ec072e9b3e498"
+    },
+    "final-evidence": {
+      "path": "target/wp955/native/final-evidence.md",
+      "sha256": "ab71719acac85918569d3905fd78610fe87b88a0481aba82c28748a1a6ad8115"
+    }
+  },
+  "artifacts": {
+    "design.md": {
+      "path": "target/wp955/native/design.md",
+      "sha256": "fe20569c8a89fac93bbed58f159a42132173d2ec99a927722b96925c744a65bc"
+    },
+    "inputs.json": {
+      "path": "target/wp955/native/inputs.json",
+      "sha256": "e6852ceca1ddc4e2cb8fdbb8af337fcec0ff435a6a87f3dc33b0c73392a4f35c"
+    },
+    "prepare.py": {
+      "path": "target/wp955/native/prepare.py",
+      "sha256": "4509f27bc17b6c4b96399bd03558524b0369c5eca93ce478b34d49b811ed71ee"
+    },
+    "supervise.py": {
+      "path": "target/wp955/native/supervise.py",
+      "sha256": "1af195956f1863979b4db9dd2afba854c50d50af4b02df9073ae819c72dfd435"
+    },
+    "protocol.py": {
+      "path": "target/wp955/native/protocol.py",
+      "sha256": "1e8a906cbc44b36e04b429eeb48c9ef93f2702017039ac573268ba9a6fbab1b3"
+    },
+    "attribution_protocol.py": {
+      "path": "target/wp955/native/attribution_protocol.py",
+      "sha256": "ecf3940791a5d0bf421b7cc894151a5e3552562e8252cce2379e86edc90d283c"
+    },
+    "protocol_controls.py": {
+      "path": "target/wp955/native/protocol_controls.py",
+      "sha256": "7ddca69e8a125c92e58e8a997b50a2ebb58276d7e5f86f26eb417e59865980a0"
+    },
+    "protocol_control_run.py": {
+      "path": "target/wp955/native/protocol_control_run.py",
+      "sha256": "85778b3417bb23fafbb9e319085f55323ac30bbeaac788097b66a57a7c57334c"
+    },
+    "toolchain.json": {
+      "path": "target/wp955/native/toolchain.json",
+      "sha256": "de89f89618ad39c1c2e38b4a76dfdf5c19d8da71966c29c915152e21850758a9"
+    },
+    "compile.json": {
+      "path": "target/wp955/native/compile.json",
+      "sha256": "0ce50049bf4284161336fbef6cb090e708423d2a776071f1266f9047504fdeff"
+    },
+    "check.json": {
+      "path": "target/wp955/native/check.json",
+      "sha256": "eaebb4f7fd60bdb6375435fe75cfb220e5742b56c6f01b101223529cd039e6e5"
+    },
+    "executable.json": {
+      "path": "target/wp955/native/executable.json",
+      "sha256": "5c7b2526e6290bfb1c28a1573815102a542813c8da58000dbdc269136c2bb172"
+    }
+  },
+  "counts": {
+    "fresh_rust": 15,
+    "fresh_python_synthetic": 3,
+    "fresh_corpus_operations": 0,
+    "total_named_passes": 18
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": "Source-grounded review of natural admission policy after measured47 attempted requests; existing memory/time ceilings remain. No automatic retry/doubling or absence claim.",
+  "checks": [
+    "format sole Rust companion",
+    "plan status checker",
+    "archive status shell",
+    "git diff --check"
+  ],
+  "recorded_utc": "2026-10-07T02:30:06.906170+00:00",
+  "packet_elapsed_seconds": 507.385737
+}

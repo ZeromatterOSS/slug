@@ -148,13 +148,15 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP954](./slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json)
-prepares177 authentic metadata files/273940B at27MiBRSS, then advances the existing
-normal file-registry observer at68MiBRSS: all8 extra Local sources now observed/fullhash
-checked/original Weak retired.14 ordinary+2decoder+5writer+1native gates pass; the actual
-next boundary is registry attempt16 while selecting abseil-cpp20250814.1. Review the
-normal attempt/diagnostic-capacity policy before another run; mapping/public Rustc,
-mutable registry freshness/original registry Arc retirement and wholefit remain open.
+[WP955](./slug-v2-subplans/wp955-file-registry-attempt-policy-2026-10-07.json) accepts
+PreparedFile32/DefaultBCR16 with unchanged memory/time/source caps and no new retained
+strings.14 ordinary+3synthetic+1native checks pass; normal discovery0.300s/69600KiB
+keeps all8 source/hash/Weak and188 parent brackets. Actual47 attempted/32 admitted
+requests still reach RegistryAttempts, selecting rules_android0.1.1. Review a measured
+normal admission correction before another run; no automatic doubling/absence or
+mapping/provider/public Rustc/wholefit claim. Authentic177-file source corpus is reused
+from [WP954](./slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json);
+mutable registry freshness and original registry Arc retirement remain open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

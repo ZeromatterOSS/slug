@@ -150,6 +150,12 @@ enum RegistryChoice {
     PreparedFile,
 }
 impl RegistryChoice {
+    fn registry_attempts(self) -> u64 {
+        match self {
+            Self::DefaultBcr => 16,
+            Self::PreparedFile => 32,
+        }
+    }
     fn urls(self, prepared: impl FnOnce() -> RegistryUrls) -> RegistryUrls {
         match self {
             Self::DefaultBcr => RegistryUrls::new(["https://bcr.bazel.build/"]),
@@ -176,6 +182,8 @@ fn registry_policy_matches(actual: &RootModuleRegistryUrls, expected: &RegistryU
 }
 #[test]
 fn prepared_file_registry_policy_is_opt_in_and_exact() {
+    assert_eq!(RegistryChoice::DefaultBcr.registry_attempts(), 16);
+    assert_eq!(RegistryChoice::PreparedFile.registry_attempts(), 32);
     let expected = Path::new("/task/registry");
     let file = prepared_file_registry("/task/registry", expected).unwrap();
     assert_eq!(file.as_slice().len(), 1);
@@ -1454,24 +1462,31 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
         request_registry
     );
     let start = Instant::now();
+    let limits = SourceServiceLimits {
+        allow_network: false,
+        registry_object_bytes: 1 << 20,
+        registry_attempts: registry_choice.registry_attempts(),
+        registry_admitted_bytes: 16 << 20,
+        source_attempts: 16,
+        transferred_bytes: 16 << 20,
+        decoded_bytes: 16 << 20,
+        written_bytes: 16 << 20,
+        live_buffer_bytes: 16 << 20,
+        blocking_threads: Some(2),
+    };
     let scope = SourceServiceScope::new_for_test(
         workspace.clone(),
         start + Duration::from_secs(5),
         start + Duration::from_secs(8),
-        SourceServiceLimits {
-            allow_network: false,
-            registry_object_bytes: 1 << 20,
-            registry_attempts: 16,
-            registry_admitted_bytes: 16 << 20,
-            source_attempts: 16,
-            transferred_bytes: 16 << 20,
-            decoded_bytes: 16 << 20,
-            written_bytes: 16 << 20,
-            live_buffer_bytes: 16 << 20,
-            blocking_threads: Some(2),
-        },
+        limits,
     )
     .unwrap();
+    if matches!(registry_choice, RegistryChoice::PreparedFile) {
+        println!(
+            "WP955_LIMITS registry_attempts={} source_attempts={} live_buffer_bytes={}",
+            limits.registry_attempts, limits.source_attempts, limits.live_buffer_bytes
+        );
+    }
     let scope_weak = Arc::downgrade(&scope);
     let (recorder, arm_error) = match scope.arm_registry_association_for_test() {
         Ok(r) => (Some(r), None),
