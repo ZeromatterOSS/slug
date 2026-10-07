@@ -149,23 +149,25 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP964](./slug-v2-subplans/wp964-nightly-channel-import-readiness-2026-10-07.json) accepts exact nightly channel.bzl
-HostLstat/FileBytes through originalpublicsingleton/normalLoading resolvedsource+epoch/
-boundedreader. Defaultfalse selectedbool/sharedborrowed exactpath/projection and shared
-all11root/fourchoice/op/namespace/mixed/twomemberunion controls add103netRust/zero new
-retainedstrings/productionowners.22ordinary4.368s/55236KiB+4synthetic+1native diagnostic
-pass; Core9.724s/CoreCLI7.349s and independentreviews. Actual0.436s/conservative81032KiB/
-166pins/188held284878B leases; SourceNone105registry235521B/14Host12645decoded/transfer
-write0, scope/recorder/finalcredits retire. Extra1attempt/958decoded is aggregate without
-perfilekind/body/hash attribution. Next105B fixtureworkspace/pkg HostLstat refuses before
-progress; continue normal publicpackage source owner under unchangedcaps. Source14of16
-leaves two possible admissions, not producer sufficiency. No completeNeed/importstack/
-channeloptionvalue/bodyWeak/freshness/sourcecertificate/publicproducer/wholefit claim.
-PrivateMODULEwitnesses unobserved/vacuous; history is notperArclivecredit. WP963 at3a8289476
-is immediateBUILD predecessor; WP960 atbbda09523 reader/kernel/bridge acceptedreuse0runs.
-PublicRustc/support/data/provider/runfiles/oracle/sameengine/MVS/BCR/fullCLI/M7A/wholefit
-remain open; borrowing/scopedinterning/Arc owners and all limits mandatory, authentic
-WP954corpus reusedwithoutoperations.
+[WP965](./slug-v2-subplans/wp965-probe-package-source-readiness-2026-10-07.json) accepts finite originalfixture
+pkg metadata and BUILD.bazel/BUILD metadata/body admission through original publicsingleton/
+normal package lookup/selected scopedreader+epoch. Defaultfalse selected scalar/sharedborrowed
+predicate/projection, three existing matrices and coupled five-member/mixed unions add144net
+Rust/zero retainedstrings or productionowners. Current23ordinary4.602s/56220KiB+4synthetic+
+1native diagnostic pass; Core3.768s/CoreCLI7.578s and independentreviews. Failed inherited
+BUILDnegative was corrected to excludedmain.rs; failed/preformat attempts remain historical,
+all currentgates use formatted replacement. Actual0.454s/conservative81344KiB/174pins/
+188held284878B leases; SourceNone105registry235521B/15Host12937Decoded/transferwrite0,
+scope/recorder/finalcredits retire. Extra1Host/292Decoded is aggregate without perfilekind/
+body/hash attribution. Actualbuild_refusal/complete/publickindpackage/prepcomplete/singleton/
+policytrue/certificatefalse/observations73; analyses/actions/Rustc unavailable. Deniedfamily/
+opnone/pathcapturemissing: no observed pathNeed. Next project actualborrowedtypedpackage
+cause at originalterminalowner before any new native/source operation or source grant.
+Source15of16 is bound, not sufficiency. BodyWeak/freshness/privateMODULE witnesses unobserved/
+vacuous; cumulativehistory notperArclivecredit. WP964 at085fb57aa immediatepredecessor;
+WP960 atbbda09523 unchangedreader/kernel/bridge acceptedreuse0runs. FullpublicRustc/support/
+data/provider/runfiles/oracle/sameengine/MVS/BCR/fullCLI/M7A/wholefit open; allmemorycaps,
+borrowing/scopedinterning/Arc ownership and authenticWP954corpus reuse remain mandatory.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

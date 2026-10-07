@@ -263,6 +263,7 @@ fn projection_matches(
         && bodies.nightly_package_metadata
         && bodies.nightly_build_source
         && bodies.nightly_channel_source
+        && bodies.probe_package_source
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -340,7 +341,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+            .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -384,7 +386,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -398,7 +401,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -412,7 +416,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -426,7 +431,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -440,11 +446,27 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
         &no_channel_source,
+        &registry,
+        &nightly_overlay()
+    ));
+    let no_package_source = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &no_package_source,
         &registry,
         &nightly_overlay()
     ));
@@ -523,10 +545,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let mut progress = 0;
     for (excluded, operation) in [
         (
-            demand(
-                "/fixture/pkg/BUILD.bazel",
-                PathObservationOperation::FileBytes,
-            ),
+            demand("/fixture/pkg/main.rs", PathObservationOperation::FileBytes),
             "file_bytes",
         ),
         (
@@ -849,6 +868,107 @@ fn nightly_channel_source_need_is_opt_in_exact_import_only() {
         ),
     ] {
         let mixed = both.try_union(&need(excluded, operation.dupe())).unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(denied.family, "path");
+        assert_eq!(denied.operation, path_operation_code(&operation));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+}
+#[test]
+fn probe_package_source_need_is_opt_in_exact_fixture_only() {
+    for (relative, selected, operations, spellings) in [
+        (
+            "pkg",
+            "/fixture/pkg",
+            &[PathObservationOperation::Lstat][..],
+            &[
+                "/other/pkg",
+                "/fixture/other/pkg",
+                "/fixture/pkg/child",
+                "/fixture/pkg.extra",
+                "/fixture/PKG",
+                "/fixture/Pkg",
+                "/fixture-other/pkg",
+            ][..],
+        ),
+        (
+            "pkg/BUILD.bazel",
+            "/fixture/pkg/BUILD.bazel",
+            &[
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ][..],
+            &[
+                "/other/pkg/BUILD.bazel",
+                "/fixture/other/BUILD.bazel",
+                "/fixture/pkg/BUILD.bazel/child",
+                "/fixture/pkg/BUILD.bazel.extra",
+                "/fixture/pkg/build.bazel",
+                "/fixture/PKG/BUILD.bazel",
+                "/fixture-other/pkg/BUILD.bazel",
+            ][..],
+        ),
+        (
+            "pkg/BUILD",
+            "/fixture/pkg/BUILD",
+            &[
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ][..],
+            &[
+                "/other/pkg/BUILD",
+                "/fixture/other/BUILD",
+                "/fixture/pkg/BUILD/child",
+                "/fixture/pkg/BUILD.extra",
+                "/fixture/pkg/build",
+                "/fixture/PKG/BUILD",
+                "/fixture-other/pkg/BUILD",
+            ][..],
+        ),
+    ] {
+        assert_exact_root_file_role(
+            relative,
+            operations,
+            Bodies::with_probe_package_source,
+            |b| b.probe_package_source,
+            spellings,
+            selected,
+            Some("/fixture"),
+        );
+    }
+    let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let need =
+        |p: &str, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let mut all = need("/fixture/pkg", PathObservationOperation::Lstat);
+    for (marker, operation) in [
+        ("/fixture/pkg/BUILD.bazel", PathObservationOperation::Lstat),
+        (
+            "/fixture/pkg/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/fixture/pkg/BUILD", PathObservationOperation::Lstat),
+        ("/fixture/pkg/BUILD", PathObservationOperation::FileBytes),
+    ] {
+        all = all.try_union(&need(marker, operation)).unwrap();
+    }
+    assert!(bodies.admit(&all).is_ok());
+    for (excluded, operation) in [
+        ("/fixture/pkg", PathObservationOperation::FileBytes),
+        ("/fixture/pkg/child", PathObservationOperation::Lstat),
+        ("/fixture/pkg/main.rs", PathObservationOperation::FileBytes),
+    ] {
+        let mixed = all.try_union(&need(excluded, operation.dupe())).unwrap();
         let mut progress = 0;
         if bodies.admit(&mixed).is_ok() {
             progress += 1;

@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP964 exact channel import accepted; next fixture package source prerequisite
+Status: WP965 accepted package source admission; actual package error projection next
 
 ## Observable and source basis
 
@@ -44,53 +44,43 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP964](wp964-nightly-channel-import-readiness-2026-10-07.json) accepts the exact
-nightly channel import role through the original public singleton. A default-false
-PublicProbe/PreparedFile scalar shares borrowed original-root/static-Path equality for
-rust/toolchain/channel/channel.bzl, Host Lstat/FileBytes only. Normal Loading/Bzlmod
-resolved-source ownership chooses the body and unions its original epoch/bytes through
-the unchanged bounded reader. Prior BUILD/directory roles remain separate; actual
-projection binds the bool, old missing-role cases enable it independently and a new
-negative isolates missingchannel. Existing borrowed-operation matrix covers all11roots/
-fourchoices/allops/namespaces/spellings/mixed/credits. SamefileLstat+FileBytes union admits;
-child/digest mixed unions refuse before progress. The117changed/103net privateRust lines
-fit70–120 estimate and add no retainedString/Path/collection/interner/cache/semantic
-reader/DICE owner. Existing UTF8 parserString cost remains under the original memory cap.
+[WP965](wp965-probe-package-source-readiness-2026-10-07.json) accepts the finite original
+fixture-root pkg Lstat and pkg/{BUILD.bazel,BUILD} Lstat/FileBytes role. The borrowed
+predicate excludes directory bodies, source files, descendants, other roots and other
+operations; normal package lookup/selected reader/epoch ownership remain unchanged.
+Defaultfalse PublicProbe/PreparedFile flag, projection and three reused exact matrices
+plus five-member/mixed unions add144net Rust/zero retained strings or production owners.
+Current23ordinary4.602s/56,220KiB,4synthetic and one native diagnostic pass; pinned
+Core3.768s/CoreCLI7.578s and independent DESIGN/prelaunch/actual FINAL reviews. An
+inherited mixed-negative BUILD body case was changed to still-excluded main.rs after its
+recorded failure; all current gates ran on the formatted replacement artifact. Earlier
+failed/preformat attempts are historical evidence, not current passes or native retries.
 
-Twenty-two ordinary checks pass4.368s/conservative55236KiB, four synthetic0.095s/17148KiB;
-nonignoredpreflight22/ignoredlisting1. Separate offlineCore compile9.724s/directCore+CLI
-check7.349s pass, independent DESIGN/prelaunch/actualFINAL accept current source/artifact.
-WP960 reader/kernel/bridge/error/race/counter/epoch protections remain qualified accepted
-reuse0runs; superseded executables are not current evidence.
+The one actual public singleton observation completes in0.454s/conservative81,344KiB,
+174runtime pins/188held284878B leases with original parent-only hash brackets. Source
+errorNone,105registry235521B/15Host12937decoded/zero transfer/write; recorder2114151charged/
+3259456peak, scope/recorder and final source/image/scratch credits retire. Extra1Host/
+292Decoded is aggregate history, without per-BUILD kind/body/hash/Weak attribution.
+Actualterminal build_refusal/complete, public kindpackage/preparationcomplete/singleton/
+policytrue, certificatefalse, observations73 and analysis/action/Rustc unavailable.
+Denied family/opnone and pathcapturemissing: there is no observed next path Need.
 
-One changed-policy diagnostic passes0.436s/conservative81032KiB,166 stable material pins
-and188 original held leases284878B (569756B physical hash brackets). Public preparation
-completes, singletondispatch/policy_checked=true; SourceNone,105registry235521B,14Host
-attempts12645 cumulativeDecoded/transferwrite0. Compared with WP963, one extra attempt
-and958 decoded bytes are aggregate, with no per-file kind/content/hash attribution.
-Recorder105/105/complete/no refusal,2114151B charged/3259456B peak; scope/recorder Weak
-and final source/image/scratch credits retire. Nextactual105B originalfixtureworkspace/pkg
-Host Lstat is refused by whole-Need admission before progress. CompleteNeed/importstack,
-channel kind/body/hash/Weak/freshness/configured option value/provider remain unobserved.
+Continue the original public terminal/package error owner grounded in
+[target/wp965/native/successor-source.md](../../../../target/wp965/native/successor-source.md).
+Project the actual borrowed typed package cause before another native/source operation
+or import grant; do not infer the cause from fixture text or the aggregate292B delta.
+Preserve original fixture probe/support/data, normal source/epoch/provider ownership,
+scoped interning/Arc/Dupe/borrowed views and all caps. Source15of16 is an admission bound,
+not producer sufficiency; privateMODULE/nativebody witnesses remain unobserved/vacuous,
+cumulative history is not per-Arc live credit. Public producer and whole-workload fit
+remain open.
 
-Continue the normal public fixture package source owner grounded in
-[target/wp964/native/successor-source.md](../../../../target/wp964/native/successor-source.md),
-selecting one exact fixture-root pkg directory Host Lstat plus pkg/{BUILD.bazel,BUILD}
-Host Lstat and bounded FileBytes for the normally selected marker. Preserve original
-BUILD.bazel→BUILD lookup/epoch/byte ownership and probe/support/data declarations; no
-directory/sourcefile body grants or prefetch.
-Source14of16 leaves two possible admissions, not closure/producer sufficiency. Keep all
-source/object/decoded/live/time/RSS caps; no prefetch/graph/epoch/provider injection.
-Cumulative history is not per-Arc live credit; privateMODULE/nativebody witnesses remain
-unobserved/vacuous. Existing scopedinterning, Arc/Dupe owners and borrowed views remain
-mandatory. Publiccertificate/observations/analyses/actions/Rustc and whole-fit remain open.
-
-Immediate [WP963](wp963-nightly-build-source-readiness-2026-10-07.json) at
-3a8289476bb6dab652f030825ff3cc565130a84b accepted finite BUILD.bazel/BUILD metadata/body
-admission, normal lookup order/selected reader and recorded channel.bzl Lstat; its26named
-checks/source artifact are historical predecessor evidence. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json)
-atbbda0952365def42e588dbdc6d5680a878f7f5ca owns the unchanged shared pinned-length/EOF/
-identity reader and initial+validation epoch/session contract.
+Immediate [WP964](wp964-nightly-channel-import-readiness-2026-10-07.json) at
+085fb57aa4f641386b5616bf693bac0fe7b7ab47 accepted exact channel.bzl admission and recorded
+fixture pkg Lstat; its27named checks/source artifact remain historical predecessor
+coverage. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json) at
+bbda0952365def42e588dbdc6d5680a878f7f5ca owns the unchanged shared pinned-length/EOF/
+identity reader and initial+validation epoch/session contract; accepted reuse0freshruns.
 
 Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
 and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,
