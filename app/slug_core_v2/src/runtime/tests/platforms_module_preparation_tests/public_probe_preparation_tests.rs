@@ -101,10 +101,14 @@ impl ProbeReport {
         outcome: Option<&ObservationOutcome>,
     ) {
         let mut certificate = "unavailable";
+        let mut package_cause = None;
         let mut observations = None;
         let mut counts = None;
         let kind = match outcome {
             Some(ObservationOutcome::Probe(ProbeOutcome::PrepareRefusal(error))) => {
+                if let BuildCommandErrorKind::Package(cause) = &error.kind {
+                    package_cause = Some(cause);
+                }
                 build_kind(error)
             }
             Some(ObservationOutcome::Probe(ProbeOutcome::DispatchRefusal)) => "dispatch",
@@ -121,7 +125,12 @@ impl ProbeReport {
                     .as_ref()
                     .map(|epoch| epoch.observations().len());
                 match terminal.result.as_ref() {
-                    Err(error) => build_kind(error),
+                    Err(error) => {
+                        if let BuildCommandErrorKind::Package(cause) = &error.kind {
+                            package_cause = Some(cause);
+                        }
+                        build_kind(error)
+                    }
                     Ok(evaluation) => {
                         let mut analyses = 0;
                         let mut actions = 0;
@@ -156,6 +165,15 @@ impl ProbeReport {
             Scalar(counts.map(|n| n.1)),
             Scalar(counts.map(|n| n.2))
         );
+        if let Some(cause) = package_cause {
+            println!(
+                "WP966_PACKAGE stage={} detail={}",
+                cause.diagnostic_stage(),
+                cause.diagnostic()
+            );
+        } else {
+            println!("WP966_PACKAGE stage=none detail=unavailable");
+        }
     }
 }
 

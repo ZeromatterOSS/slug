@@ -149,25 +149,27 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP965](./slug-v2-subplans/wp965-probe-package-source-readiness-2026-10-07.json) accepts finite originalfixture
-pkg metadata and BUILD.bazel/BUILD metadata/body admission through original publicsingleton/
-normal package lookup/selected scopedreader+epoch. Defaultfalse selected scalar/sharedborrowed
-predicate/projection, three existing matrices and coupled five-member/mixed unions add144net
-Rust/zero retainedstrings or productionowners. Current23ordinary4.602s/56220KiB+4synthetic+
-1native diagnostic pass; Core3.768s/CoreCLI7.578s and independentreviews. Failed inherited
-BUILDnegative was corrected to excludedmain.rs; failed/preformat attempts remain historical,
-all currentgates use formatted replacement. Actual0.454s/conservative81344KiB/174pins/
-188held284878B leases; SourceNone105registry235521B/15Host12937Decoded/transferwrite0,
-scope/recorder/finalcredits retire. Extra1Host/292Decoded is aggregate without perfilekind/
-body/hash attribution. Actualbuild_refusal/complete/publickindpackage/prepcomplete/singleton/
-policytrue/certificatefalse/observations73; analyses/actions/Rustc unavailable. Deniedfamily/
-opnone/pathcapturemissing: no observed pathNeed. Next project actualborrowedtypedpackage
-cause at originalterminalowner before any new native/source operation or source grant.
-Source15of16 is bound, not sufficiency. BodyWeak/freshness/privateMODULE witnesses unobserved/
-vacuous; cumulativehistory notperArclivecredit. WP964 at085fb57aa immediatepredecessor;
-WP960 atbbda09523 unchangedreader/kernel/bridge acceptedreuse0runs. FullpublicRustc/support/
-data/provider/runfiles/oracle/sameengine/MVS/BCR/fullCLI/M7A/wholefit open; allmemorycaps,
-borrowing/scopedinterning/Arc ownership and authenticWP954corpus reuse remain mandatory.
+[WP966](./slug-v2-subplans/wp966-retained-package-cause-readiness-2026-10-07.json)
+accepts a borrowed static stage/bounded Display over original RootPackageLoadError, reusing
+3072B ASCII scratch sink/global32 walker; strict cycle scalar and Factored wrapper depth
+protect bounded allocation.184net production/230tests/18private Core report add zero
+retained strings/collections or semantic/source owners.31ordinary+4synthetic+1native pass;
+Loading/Core no-run/CoreCLIcheck pass. Three60s preparation refusals and superseded Loading
+gates remain history; four completed libraries/eight pinned artifacts were verified fresh
+for remaining Core compilation, without cap increase or runtime-memory inference.
+Actual0.443s/conservative83548KiB/198pins/188held284878B leases, original569756B parent hash
+brackets. SourceNone105registry235521B/15Host12937Decoded/transfer-write0 unchanged from
+WP965, scope/recorder/finalcredits retire. Actualpackage build_refusal/complete/prepcomplete/
+singleton/policytrue/certificatefalse/73observations, analysis/actions/Rustc unavailable.
+New actualstage external_route for @rules_rust//rust:defs.bzl remains explicitincomplete:
+underlying typed route cause must be borrowed/projected before semantic/source correction,
+using target/wp966/native/successor-source.md; no deniedNeed/pathcapturemissing or source
+availability/cause inference. Immediate WP965 at215b1d917 accepted exact fixture pkg/BUILD
+admission; WP960 reader/kernel/bridge is unchanged acceptedreuse0fresh runs. Source15of16
+not sufficiency; privateMODULE/bodyWeak/freshness unobserved/vacuous, cumulativehistory not
+perArc livecredit and finalcredits notwholegraph/page retirement. Genuine publicRustc/
+support/data/provider/runfiles/oracle/sameengine/MVS/BCR/fullCLI/M7A/wholefit remain open;
+all memorycaps, borrowing/scopedinterning/Arc ownership and authenticWP954 corpus required.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

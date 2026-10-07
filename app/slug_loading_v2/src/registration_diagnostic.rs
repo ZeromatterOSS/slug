@@ -13,6 +13,8 @@ use crate::bzl_module::ExternalBzlModuleError;
 use crate::bzl_module::ExternalBzlRouteError;
 use crate::bzl_module::HostBzlModuleError;
 use crate::bzl_module::RepositoryPackageLoadDiagnostic;
+use crate::bzl_module::RootPackageLoadDiagnostic;
+use crate::bzl_module::RootPackageLoadError;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind as Load;
 use crate::canonical_repository_route::HostCanonicalRepositoryRouteError;
@@ -112,6 +114,51 @@ impl Write for Buffer {
 }
 
 struct Diagnostic<'a>(&'a ModuleRegistrationExpansionError);
+
+struct RootPackageDiagnostic<'a>(&'a RootPackageLoadError);
+
+impl RootPackageLoadError {
+    /// Bounded borrowed Slug-native presentation, separate from typed equality.
+    pub fn diagnostic(&self) -> impl fmt::Display + '_ {
+        RootPackageDiagnostic(self)
+    }
+}
+
+impl fmt::Display for RootPackageDiagnostic<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = Buffer::new();
+        let result = render_root_package(&mut out, self.0);
+        debug_assert!(result.is_ok() || out.stopped);
+        f.write_str(out.text())
+    }
+}
+
+fn render_root_package(out: &mut Buffer, error: &RootPackageLoadError) -> fmt::Result {
+    write!(out, "{}: ", error.diagnostic_stage())?;
+    let node = match error.diagnostic_view() {
+        RootPackageLoadDiagnostic::Leaf(error) => return error.write(out),
+        RootPackageLoadDiagnostic::Bzl {
+            origin,
+            load,
+            error,
+        } => {
+            write!(out, "{origin} load {load}: ")?;
+            Node::RootBzl(error)
+        }
+        RootPackageLoadDiagnostic::ExternalBzl {
+            origin,
+            load,
+            label,
+            error,
+        } => {
+            write!(out, "{origin} load {load} ")?;
+            out.label(label)?;
+            out.write_str(": ")?;
+            Node::ExternalBzl(error)
+        }
+    };
+    walk_with_mode(out, node, true)
+}
 
 impl ModuleRegistrationExpansionError {
     /// Bounded Slug-native presentation; never use it as semantic identity.
@@ -218,8 +265,12 @@ fn render(out: &mut Buffer, error: &ModuleRegistrationExpansionError) -> fmt::Re
     walk(out, node)
 }
 
+fn walk(out: &mut Buffer, node: Node<'_>) -> fmt::Result {
+    walk_with_mode(out, node, false)
+}
+
 #[rustfmt::skip]
-fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
+fn walk_with_mode(out: &mut Buffer, mut node: Node<'_>, strict: bool) -> fmt::Result {
     for _ in 0..32 {
         node = match node {
             Node::Load(error) => {
@@ -285,9 +336,9 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                 }
             }
             Node::Pure(error) => {
-                let mut error = error;
-                while let Pure::Factored { error: inner, .. } = error {
-                    error = inner.as_ref();
+                if let Pure::Factored { error, .. } = error {
+                    node = Node::Pure(error);
+                    continue;
                 }
                 out.write_str("Pure: ")?;
                 match error {
@@ -295,7 +346,7 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     Pure::Compute(message) => return write!(out, "Compute: {message}"),
                     Pure::AfterInputs { message, .. } => return write!(out, "AfterInputs: {message}"),
                     Pure::SourceOperational { error, .. } => return write!(out, "Source: {error}"),
-                    Pure::Factored { .. } => unreachable!("factored selected error was unwrapped"),
+                    Pure::Factored { .. } => unreachable!("factored selected error consumes a walk step"),
                 }
             }
             Node::Innate(error) => {
@@ -345,6 +396,7 @@ fn walk(out: &mut Buffer, mut node: Node<'_>) -> fmt::Result {
                     E::Absent { label } => { out.write_str("Absent ")?; return out.label(label); }
                     E::Encoding { label } => { out.write_str("Encoding ")?; return out.label(label); }
                     E::Cycle(_) => return out.write_str("Cycle"),
+                    E::DependencyCycle(_) if strict => return out.write_str("DependencyCycle"),
                     E::DependencyCycle(cycle) => return write!(out, "DependencyCycle: {cycle}"),
                     E::Source { .. } => return out.incomplete("Source"),
                     E::SourceObservation { label, error } => {

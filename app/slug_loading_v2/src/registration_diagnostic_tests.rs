@@ -588,6 +588,38 @@ fn registration_diagnostic_scalar_and_innate_causes() {
     );
 }
 
+#[tokio::test]
+async fn registration_diagnostic_factored_wrappers_consume_depth() {
+    use crate::module_extension::HostSelectedExtensionOwnerPureKey;
+    use crate::module_extension_repository_instantiation::tests::WORKSPACE;
+    let (mut tx, owner) = owner_fixture(false).await;
+    let result = complete(
+        tx.compute(&HostSelectedExtensionOwnerPureKey::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            owner,
+        ))
+        .await
+        .unwrap(),
+    );
+    let factors = result.as_ref().as_ref().unwrap().factors.clone();
+    let count = Arc::strong_count(&factors);
+    let mut error = Arc::new(Pure::Compute("LEAF".into()));
+    for depth in 0..=32 {
+        let text = render_node(Node::Pure(&error));
+        if depth < 32 {
+            assert_eq!(text, "Pure: Compute: LEAF");
+        } else {
+            assert_eq!(text, DEPTH_STOP);
+        }
+        error = Arc::new(Pure::Factored {
+            factors: factors.clone(),
+            error,
+        });
+    }
+    drop(error);
+    assert_eq!(Arc::strong_count(&factors), count);
+}
+
 #[test]
 fn registration_diagnostic_recursive_bzl_cause_and_depth() {
     use ExternalBzlModuleError as E;

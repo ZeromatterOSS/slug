@@ -2071,7 +2071,139 @@ impl RootPackageLoadError {
     fn new(inner: RootPackageLoadErrorInner) -> Self {
         Self { inner }
     }
+
+    /// Slug-native presentation stage; never a semantic identity or input.
+    pub fn diagnostic_stage(&self) -> &'static str {
+        match &self.inner {
+            RootPackageLoadErrorInner::RootModule(_) => "root_module",
+            RootPackageLoadErrorInner::Source(_) => "source",
+            RootPackageLoadErrorInner::Input(_) => "input",
+            RootPackageLoadErrorInner::Parse { .. } => "parse",
+            RootPackageLoadErrorInner::LoadLabel { .. } => "load_label",
+            RootPackageLoadErrorInner::RepositoryMapping { .. } => "repository_mapping",
+            RootPackageLoadErrorInner::RepositoryMappingInfrastructure { .. } => {
+                "repository_mapping_infrastructure"
+            }
+            RootPackageLoadErrorInner::Bzl { .. } => "bzl",
+            RootPackageLoadErrorInner::ExternalRoute { .. } => "external_route",
+            RootPackageLoadErrorInner::ExternalInfrastructure { .. } => "external_infrastructure",
+            RootPackageLoadErrorInner::ExternalBzl { .. } => "external_bzl",
+            RootPackageLoadErrorInner::Attempt(HostPackageAttemptError::Loading(_)) => {
+                "attempt_loading"
+            }
+            RootPackageLoadErrorInner::Attempt(HostPackageAttemptError::Glob(_)) => "attempt_glob",
+            RootPackageLoadErrorInner::Attempt(HostPackageAttemptError::Input(_)) => {
+                "attempt_input"
+            }
+            RootPackageLoadErrorInner::Attempt(HostPackageAttemptError::Invariant(_)) => {
+                "attempt_invariant"
+            }
+        }
+    }
+
+    pub(crate) fn diagnostic_view(&self) -> RootPackageLoadDiagnostic<'_> {
+        match &self.inner {
+            RootPackageLoadErrorInner::Bzl {
+                origin,
+                load,
+                error,
+                ..
+            } => RootPackageLoadDiagnostic::Bzl {
+                origin,
+                load,
+                error,
+            },
+            RootPackageLoadErrorInner::ExternalBzl {
+                origin,
+                load,
+                label,
+                error,
+            } => RootPackageLoadDiagnostic::ExternalBzl {
+                origin,
+                load,
+                label,
+                error,
+            },
+            inner => RootPackageLoadDiagnostic::Leaf(RootPackageLoadDiagnosticLeaf(inner)),
+        }
+    }
 }
+
+pub(crate) enum RootPackageLoadDiagnostic<'a> {
+    Leaf(RootPackageLoadDiagnosticLeaf<'a>),
+    Bzl {
+        origin: &'a str,
+        load: &'a str,
+        error: &'a HostBzlModuleError,
+    },
+    ExternalBzl {
+        origin: &'a str,
+        load: &'a str,
+        label: &'a CanonicalLabel,
+        error: &'a ExternalBzlModuleError,
+    },
+}
+
+pub(crate) struct RootPackageLoadDiagnosticLeaf<'a>(&'a RootPackageLoadErrorInner);
+
+impl RootPackageLoadDiagnosticLeaf<'_> {
+    pub(crate) fn write(&self, out: &mut dyn fmt::Write) -> fmt::Result {
+        use RootPackageLoadErrorInner as E;
+        match self.0 {
+            E::RootModule(_) => out.write_str("[diagnostic incomplete: RootModule]"),
+            E::Source(error) if error.is_missing() => out.write_str("Missing"),
+            E::Source(_) => out.write_str("[diagnostic incomplete: Source]"),
+            E::Input(error) => {
+                let (kind, path) = match error {
+                    HostSourceInputError::UnsupportedSourceEncoding { logical_path } => {
+                        ("UnsupportedSourceEncoding", logical_path)
+                    }
+                    #[cfg(not(unix))]
+                    HostSourceInputError::UnsupportedPathEncoding { logical_path } => {
+                        ("UnsupportedPathEncoding", logical_path)
+                    }
+                };
+                write!(out, "{kind} path=hex:")?;
+                for byte in path.as_path().as_os_str().as_encoded_bytes() {
+                    write!(out, "{byte:02x}")?;
+                }
+                Ok(())
+            }
+            E::Parse { package, message } => write!(out, "//{package}: {message}"),
+            E::LoadLabel { package, .. } => {
+                write!(out, "//{package} [diagnostic incomplete: LoadLabel]")
+            }
+            E::RepositoryMapping { message } | E::RepositoryMappingInfrastructure { message } => {
+                out.write_str(message)
+            }
+            E::ExternalRoute {
+                load,
+                apparent_repo,
+                ..
+            } => write!(
+                out,
+                "{load} @{} [diagnostic incomplete: ExternalRoute]",
+                apparent_repo.as_str()
+            ),
+            E::ExternalInfrastructure { load, message } => write!(out, "{load}: {message}"),
+            E::Attempt(HostPackageAttemptError::Loading(error)) => write!(out, "{error}"),
+            E::Attempt(HostPackageAttemptError::Invariant(message)) => out.write_str(message),
+            E::Attempt(HostPackageAttemptError::Glob(_)) => {
+                out.write_str("[diagnostic incomplete: Attempt.Glob]")
+            }
+            E::Attempt(HostPackageAttemptError::Input(_)) => {
+                out.write_str("[diagnostic incomplete: Attempt.Input]")
+            }
+            E::Bzl { .. } | E::ExternalBzl { .. } => {
+                unreachable!("bzl causes have borrowed traversable views")
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "root_package_diagnostic_tests.rs"]
+mod root_package_diagnostic_tests;
 
 impl fmt::Display for RootPackageLoadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

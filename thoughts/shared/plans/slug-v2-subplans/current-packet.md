@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP965 accepted package source admission; actual package error projection next
+Status: WP966 accepted; nested external-route cause continuation
 
 ## Observable and source basis
 
@@ -44,43 +44,46 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP965](wp965-probe-package-source-readiness-2026-10-07.json) accepts the finite original
-fixture-root pkg Lstat and pkg/{BUILD.bazel,BUILD} Lstat/FileBytes role. The borrowed
-predicate excludes directory bodies, source files, descendants, other roots and other
-operations; normal package lookup/selected reader/epoch ownership remain unchanged.
-Defaultfalse PublicProbe/PreparedFile flag, projection and three reused exact matrices
-plus five-member/mixed unions add144net Rust/zero retained strings or production owners.
-Current23ordinary4.602s/56,220KiB,4synthetic and one native diagnostic pass; pinned
-Core3.768s/CoreCLI7.578s and independent DESIGN/prelaunch/actual FINAL reviews. An
-inherited mixed-negative BUILD body case was changed to still-excluded main.rs after its
-recorded failure; all current gates ran on the formatted replacement artifact. Earlier
-failed/preformat attempts are historical evidence, not current passes or native retries.
+[WP966](wp966-retained-package-cause-readiness-2026-10-07.json) adds a borrowed
+RootPackageLoadError stage/Display view using the existing3072B ASCII sink and global32
+walker. Strict dependency cycles stay scalar; each Factored wrapper consumes a walk step.
+184net Loading production/230tests/18private Core report lines add zero retained strings,
+collections, source grants or semantic owners.31ordinary Rust,4synthetic and one native
+observation pass; pinned Loading/Core no-run and CoreCLIcheck pass. Three clean60s
+preparation stops and superseded Loading gates remain historical; completed four-library/
+eight-artifact checkpoint was pinned and verified fresh for remaining Core compilation.
+Compiler memory is separately qualified, with no runtime or whole-fit inference.
 
-The one actual public singleton observation completes in0.454s/conservative81,344KiB,
-174runtime pins/188held284878B leases with original parent-only hash brackets. Source
-errorNone,105registry235521B/15Host12937decoded/zero transfer/write; recorder2114151charged/
-3259456peak, scope/recorder and final source/image/scratch credits retire. Extra1Host/
-292Decoded is aggregate history, without per-BUILD kind/body/hash/Weak attribution.
-Actualterminal build_refusal/complete, public kindpackage/preparationcomplete/singleton/
-policytrue, certificatefalse, observations73 and analysis/action/Rustc unavailable.
-Denied family/opnone and pathcapturemissing: there is no observed next path Need.
+The actual public singleton reports external_route for @rules_rust//rust:defs.bzl,
+borrowing its retained RootPackageLoadError. Detail is Slug-native bounded presentation:
+`external_route: @rules_rust//rust:defs.bzl @rules_rust [diagnostic incomplete: ExternalRoute]`.
+This leaves the underlying typed route cause unprojected; no source availability,
+mapping/import/body/provider or semantic cause is inferred. The once observation completes
+in0.443s/conservative83,548KiB,198runtime pins/188original held284878B leases and569756B
+parent-only hash brackets. Actualbuild_refusal/complete/package/preparationcomplete/
+singleton/policytrue, certificatefalse/observations73; analysis/actions/Rustc unavailable.
+SourceNone105registry235521B/15Host12937Decoded/zero transfer-write, noDeniedNeed/pathcapture
+missing; aggregate source counters unchanged from WP965. Scope/recorder and final source/
+image/scratch credits retire; no completeDICEArc/page retirement claim follows.
 
-Continue the original public terminal/package error owner grounded in
-[target/wp965/native/successor-source.md](../../../../target/wp965/native/successor-source.md).
-Project the actual borrowed typed package cause before another native/source operation
-or import grant; do not infer the cause from fixture text or the aggregate292B delta.
+Continue the original external-route error owner grounded in
+[target/wp966/native/successor-source.md](../../../../target/wp966/native/successor-source.md).
+Project the actual nested typed cause before another semantic correction/source grant;
+do not guess from the apparent repo, fixture, counter history or opaque presentation.
 Preserve original fixture probe/support/data, normal source/epoch/provider ownership,
 scoped interning/Arc/Dupe/borrowed views and all caps. Source15of16 is an admission bound,
 not producer sufficiency; privateMODULE/nativebody witnesses remain unobserved/vacuous,
 cumulative history is not per-Arc live credit. Public producer and whole-workload fit
 remain open.
 
-Immediate [WP964](wp964-nightly-channel-import-readiness-2026-10-07.json) at
-085fb57aa4f641386b5616bf693bac0fe7b7ab47 accepted exact channel.bzl admission and recorded
-fixture pkg Lstat; its27named checks/source artifact remain historical predecessor
-coverage. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json) at
-bbda0952365def42e588dbdc6d5680a878f7f5ca owns the unchanged shared pinned-length/EOF/
-identity reader and initial+validation epoch/session contract; accepted reuse0freshruns.
+Immediate [WP965](wp965-probe-package-source-readiness-2026-10-07.json), at
+215b1d9172b5a05c51b8cb5c794f000b98233a09, accepted finite original fixture pkg Lstat and
+pkg/{BUILD.bazel,BUILD} Lstat/FileBytes with defaultfalse selected flag, borrowed exact
+predicate/projection and coupled guard matrices. Its28named passes, once81,344KiB package
+refusal and +1Host/+292Decoded aggregate remain historical predecessor evidence; that
+checkpoint did not project this package cause. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json),
+atbbda0952365def42e588dbdc6d5680a878f7f5ca, owns unchanged pinned-length/EOF/identity
+reader and initial+validation epoch/session controls, qualified accepted reuse0fresh runs.
 
 Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
 and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,
