@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Local toolchain import pair accepted; continue grounded rustc imports
+Status: Rustc local import pair accepted; continue selected Skylib import cohort
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,23 +149,24 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP973](./slug-v2-subplans/wp973-rules-rust-local-toolchain-import-readiness-2026-10-07.json)
-observes lto4417B once at0.042s/18,944KiB/35pins using unchanged strictFD/facts/64KiB
-scratch/per-row retirement;11reader checks reused0fresh, one observation not a test.
-Historical semver1916B plus lto append to original24prefix/26 exact bodies/3metadata,
-defaultfalse/source64default16/allcaps unchanged.2net cfgtest lines/32descriptor43literal
-bytes/zero guardheap/production/newflags/cache/DICE/reader/interner/fixture change.
-Existing55Need matrix and negatives pass;28ordinary+4synthetic+1native/currentCoreCLIprep.
-Once0.708s/84,180KiB reaches exact223B rustc_resource_set.bzl HostLstat, countersSourceNone/
-105registry235521B/27Host334004Decoded unchanged, no newbody semantic attribution.
-393runtimepins versus430union/35opsinclcapture1;215parentleases760385B1520770hashbytes
-share same two64KiBcontexts128KiB/non-atomic/noninherited/noncert. Publicnative_refusal/
-prepcomplete/singletonpolicytrue/nullRustc remains; finalcredits/privateWeakunseen-vacuous
-not allDICE/page/body freshness. Reuse exact historicalWP937 native AstLoads12/raw/hash
-for cohesive resource_set+stamp successor:81-edge Pythonnode-limit subset is incomplete,
-no newrustc/header probe required; parser syntax is not native evaluation/certification.
-Foreign/new transitives stay closed, caps fixed. PublicRustc/support/data/providers/
-runfiles/oracle/restoration/fullCLI/M7A/MVS/provenance/wholefit remain open. Immediate
+[WP974](./slug-v2-subplans/wp974-rules-rust-rustc-import-readiness-2026-10-07.json)
+accepts exact resource_set7348/stamp646B first capture7994B/.042s/20,232KiB/41pins,
+unchanged strict reader/64KiB scratch/per-row retirement. Two decisions are not tests.
+Original26prefix→28bodies/3metadata/59Needs,2net cfgtest lines/32descriptor57literal
+bytes/zero heap strings; source64/default16/allcaps and production owners unchanged.
+Current28ordinary+4synthetic+1normal native pass; pinned Core/CLI preparation passes.
+The zero-child launcher correction is preserved, no actual test repeated. Native.713s/
+83,860KiB reaches exact191B selectedskylibroot/lib HostLstat, SourceNone105registry235521/
+27Host334004Decoded unchanged, no newbody attribution.413runtimepins/456union/35ops
+includecapture1;217leases768379physical1536758hashbytes/same128KiB parent contexts
+are non-atomic/noninherited/noncertifying. PublicRustc/actions/certificates remain null;
+privateWeakunseen/finalcredits do not prove wholeDICE/page release. Ground nextcohesive
+three-body Skylib cohort and exact lib/rules metadata via existing additional[1] owner,
+with capture/role eligibility still future.81-edge Python subset/29callers and separate
+qualified historical native AstLoads12 are incomplete syntax, not mapping/freshness.
+Full publicproducer/support/data/providers/toolchains/runfiles/oracle/restoration/fullCLI/
+M7A/MVS/provenance/whole-fit remain open. PriorWP973 chronology is Git-reachable at
+5fbdb82916ba973dacf60ca4fc8b0806818d6113; borrowing/scoped interning and Windowsminimum persist.
 [WP972](./slug-v2-subplans/wp972-rules-rust-import-frontier-readiness-2026-10-07.json)
 captures seven exact local imports122679B once at0.093s/22,976KiB/35pins with the
 unchanged strict FD/facts owner;11reader checks qualifiedreuse0fresh, seven observations
