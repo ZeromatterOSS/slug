@@ -287,7 +287,7 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "lib/modules.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
-const RULES_CC_IMPORTS: [&str; 14] = [
+const RULES_CC_IMPORTS: [&str; 35] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
@@ -302,13 +302,37 @@ const RULES_CC_IMPORTS: [&str; 14] = [
     "cc/private/debug_package_info.bzl",
     "cc/private/objc_info.bzl",
     "cc/private/toolchain_config/cc_toolchain_config_info.bzl",
+    "cc/common/cc_helper_internal.bzl",
+    "cc/private/cc_internal.bzl",
+    "cc/private/cc_launcher_info.bzl",
+    "cc/private/cc_shared_library_hint_info.bzl",
+    "cc/private/compile/cc_compilation_outputs.bzl",
+    "cc/private/compile/compile.bzl",
+    "cc/private/compile/compile_build_variables.bzl",
+    "cc/private/compile/linkstamp_compile.bzl",
+    "cc/private/compile/lto_compilation_context.bzl",
+    "cc/private/link/create_extra_link_time_library.bzl",
+    "cc/private/link/create_library_to_link.bzl",
+    "cc/private/link/create_linker_input.bzl",
+    "cc/private/link/create_linking_context_from_compilation_outputs.bzl",
+    "cc/private/link/create_linkstamp.bzl",
+    "cc/private/link/link.bzl",
+    "cc/private/link/link_build_variables.bzl",
+    "cc/private/link/lto_backends.bzl",
+    "cc/private/rules_impl/cc_toolchain_info.bzl",
+    "cc/private/rules_impl/native_cc_common.bzl",
+    "cc/private/toolchain_config/configure_features.bzl",
+    "cc/private/toolchain_config/legacy_features.bzl",
 ];
-const RULES_CC_IMPORT_METADATA: [&str; 5] = [
+const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc",
     "cc/common",
     "cc/private",
     "cc/private/toolchain",
     "cc/private/toolchain_config",
+    "cc/private/compile",
+    "cc/private/link",
+    "cc/private/rules_impl",
 ];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],

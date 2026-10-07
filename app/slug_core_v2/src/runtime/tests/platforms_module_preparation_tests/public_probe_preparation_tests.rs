@@ -4445,7 +4445,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 33);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 78);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -4454,6 +4454,56 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/compile",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/compile",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/cc/cc/private/link", PathObservationOperation::FileBytes),
+        ("/cc/cc/private/link", PathObservationOperation::FileDigest),
+        (
+            "/cc/cc/private/rules_impl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/cc/cc/common/cc_helper_internal.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/common/cc_helper_internal.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/common/Cc_helper_internal.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/common/cc_helper_internal_sibling.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/common/cc_helper_internal.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/common/cc_helper_internal.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/cc/cc/private/compile/compile.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/link/link.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
         (
             "/cc/cc/private/cc_common.bzl/child",
             PathObservationOperation::Lstat,
