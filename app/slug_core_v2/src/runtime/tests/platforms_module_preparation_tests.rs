@@ -382,13 +382,14 @@ impl<'a> MaterializationDiagnostic<'a> {
 struct MaterializationWriter<'a, W> {
     writer: &'a mut W,
     bytes: usize,
+    limit: usize,
 }
 impl<W: fmt::Write> fmt::Write for MaterializationWriter<'_, W> {
     fn write_str(&mut self, text: &str) -> fmt::Result {
         self.bytes = self
             .bytes
             .checked_add(text.len())
-            .filter(|n| *n < MATERIALIZATION_MARKER_BYTES)
+            .filter(|n| *n < self.limit)
             .ok_or(fmt::Error)?;
         self.writer.write_str(text)
     }
@@ -400,6 +401,7 @@ impl fmt::Display for MaterializationDiagnostic<'_> {
         let mut writer = MaterializationWriter {
             writer: formatter,
             bytes: 0,
+            limit: MATERIALIZATION_MARKER_BYTES,
         };
         write!(
             writer,
@@ -432,6 +434,163 @@ impl fmt::Display for MaterializationDiagnostic<'_> {
                     RegistryHex(captured.then_some(bytes))
                 )?,
                 None => write!(writer, " {name}_len=none {name}_hex=none")?,
+            }
+        }
+        Ok(())
+    }
+}
+const GENERATED_PLAN_ROWS: usize = 8;
+const GENERATED_PLAN_PATH_BYTES: usize = 512;
+const GENERATED_PLAN_PATH_SUM: usize = 2048;
+const GENERATED_PLAN_CONTENT_BYTES: usize = 1 << 20;
+const GENERATED_PLAN_CONTENT_SUM: usize = 4 << 20;
+const GENERATED_PLAN_MARKER_BYTES: usize = 16 << 10;
+struct OptionalCount(Option<usize>);
+impl fmt::Display for OptionalCount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.0 {
+            Some(value) => write!(f, "{value}"),
+            None => f.write_str("none"),
+        }
+    }
+}
+struct GeneratedPlanSummary {
+    rows: usize,
+    counts: Option<[usize; 3]>,
+    paths: Option<usize>,
+    content: Option<usize>,
+    captured: bool,
+}
+struct GeneratedPlanDiagnostic<'a> {
+    request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+    plan: &'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+}
+impl GeneratedPlanDiagnostic<'_> {
+    fn mapping(&self) -> Option<&[u8]> {
+        self.request
+            .repo_spec
+            .rule_id
+            .bzl_file
+            .mapping_id()
+            .map(|id| id.as_str().as_bytes())
+    }
+    fn summary(&self) -> GeneratedPlanSummary {
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
+        let mut result = GeneratedPlanSummary {
+            rows: 0,
+            counts: Some([0; 3]),
+            paths: Some(0),
+            content: Some(0),
+            captured: true,
+        };
+        for effect in self.plan.ordered_effects().take(GENERATED_PLAN_ROWS + 1) {
+            result.rows += 1;
+            if result.rows > GENERATED_PLAN_ROWS {
+                return GeneratedPlanSummary {
+                    rows: result.rows,
+                    counts: None,
+                    paths: None,
+                    content: None,
+                    captured: false,
+                };
+            }
+            let kind = match effect {
+                Effect::File(file) => {
+                    result.paths = result
+                        .paths
+                        .and_then(|sum| sum.checked_add(file.path().len()));
+                    result.content = result
+                        .content
+                        .and_then(|sum| sum.checked_add(file.content().len()));
+                    result.captured &= file.path().len() <= GENERATED_PLAN_PATH_BYTES
+                        && file.content().len() <= GENERATED_PLAN_CONTENT_BYTES;
+                    0
+                }
+                Effect::Archive(_) => 1,
+                Effect::Symlink(_) => 2,
+            };
+            result.counts.as_mut().unwrap()[kind] += 1;
+        }
+        let owner = MaterializationDiagnostic::new(self.request, "generated_kind");
+        let owner_sum = owner
+            .fields
+            .iter()
+            .flatten()
+            .try_fold(0usize, |sum, bytes| sum.checked_add(bytes.len()));
+        let mapping = self.mapping();
+        result.captured &= owner.captured()
+            && mapping.is_none_or(|bytes| bytes.len() <= MATERIALIZATION_FIELD_BYTES)
+            && owner_sum
+                .and_then(|sum| sum.checked_add(mapping.map_or(0, <[u8]>::len)))
+                .is_some_and(|sum| sum <= MATERIALIZATION_AGGREGATE_BYTES)
+            && result
+                .paths
+                .is_some_and(|sum| sum <= GENERATED_PLAN_PATH_SUM)
+            && result
+                .content
+                .is_some_and(|sum| sum <= GENERATED_PLAN_CONTENT_SUM);
+        result
+    }
+}
+impl fmt::Display for GeneratedPlanDiagnostic<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use fmt::Write;
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
+        let summary = self.summary();
+        let mapping = self.mapping();
+        let mut writer = MaterializationWriter {
+            writer: f,
+            bytes: 0,
+            limit: GENERATED_PLAN_MARKER_BYTES,
+        };
+        write!(
+            writer,
+            "WP983_GENERATED_PLAN capture={} counts_complete={} ordered_rows={} file_count={} archive_count={} symlink_count={} path_bytes={} content_bytes={} mapping_len={} mapping_hex={} attribute_count={}",
+            if summary.captured {
+                "captured"
+            } else {
+                "bounds_refused"
+            },
+            summary.counts.is_some(),
+            summary.rows,
+            OptionalCount(summary.counts.map(|n| n[0])),
+            OptionalCount(summary.counts.map(|n| n[1])),
+            OptionalCount(summary.counts.map(|n| n[2])),
+            OptionalCount(summary.paths),
+            OptionalCount(summary.content),
+            OptionalCount(mapping.map(<[u8]>::len)),
+            RegistryHex(mapping.filter(|_| summary.captured)),
+            self.request.repo_spec.attributes.len()
+        )?;
+        if summary.captured {
+            for (ordinal, effect) in self.plan.ordered_effects().enumerate() {
+                match effect {
+                    Effect::File(file) => {
+                        let mut digest = sha2::Sha256::new();
+                        digest.update(file.content());
+                        let digest = digest.finalize();
+                        write!(
+                            writer,
+                            "\nWP983_GENERATED_EFFECT ordinal={ordinal} kind=file path_len={} path_hex={} content_len={} content_sha256={} executable={}",
+                            file.path().len(),
+                            RegistryHex(Some(file.path().as_bytes())),
+                            file.content().len(),
+                            RegistryHex(Some(digest.as_slice())),
+                            file.executable()
+                        )?;
+                    }
+                    Effect::Archive(_) | Effect::Symlink(_) => {
+                        let kind = if matches!(effect, Effect::Archive(_)) {
+                            "archive"
+                        } else {
+                            "symlink"
+                        };
+                        write!(
+                            writer,
+                            "\nWP983_GENERATED_EFFECT ordinal={ordinal} kind={kind} path_len=none path_hex=none content_len=none content_sha256=none executable=none"
+                        )?;
+                    }
+                }
             }
         }
         Ok(())
@@ -503,6 +662,32 @@ impl Bodies {
             .first_denied_materialization(needs)
             .expect("materialization refusal preserves its original offender");
         Some(MaterializationDiagnostic::new(request, reason))
+    }
+    fn generated_plan_diagnostic<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+        denied: &Denied,
+    ) -> Option<GeneratedPlanDiagnostic<'a>> {
+        if denied.family != "materialization" {
+            return None;
+        }
+        let (request, reason) = self.first_denied_materialization(needs)?;
+        let label = &request.repo_spec.rule_id.bzl_file;
+        if reason != "generated_kind"
+            || request.id.workspace != self.roots[0]
+            || request.id.canonical_repo.as_str()
+                != "bazel_features++version_extension+bazel_features_globals"
+            || label.package().repo().as_str() != "bazel_features+"
+            || label.package().package().as_str() != "private"
+            || label.target().as_str() != "globals_repo.bzl"
+            || request.repo_spec.rule_id.rule_name != "globals_repo"
+        {
+            return None;
+        }
+        let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind else {
+            unreachable!()
+        };
+        Some(GeneratedPlanDiagnostic { request, plan })
     }
     fn new(roots: [NormalizedAbsolutePath; 3]) -> Self {
         let files = roots

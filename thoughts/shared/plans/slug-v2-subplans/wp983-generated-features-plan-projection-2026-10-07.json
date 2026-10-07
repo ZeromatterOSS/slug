@@ -1,0 +1,308 @@
+{
+  "checkpoint": "WP983",
+  "baseline": "24407f1ab9afaffa6041fb1249230cb07a9ab9ef",
+  "started_at": "2026-10-07T16:10:07.512410+00:00",
+  "accepted_at": "2026-10-07T16:40:58.731498+00:00",
+  "elapsed_wall_seconds": 1851.219088,
+  "implementation": {
+    "production_files": 0,
+    "cfgtest_files": 2,
+    "insertions": 509,
+    "deletions": 1,
+    "net_lines": 508,
+    "changed_lines": 510,
+    "estimated_net_lines": [
+      120,
+      220
+    ],
+    "growth_review": "Independent cohesive reassessment accepted185 borrowed phase formatter/summary/predicate plus323 focused testlines. Narrow inert archive URL fixture correction reviewed and preserved.",
+    "new_retained_fields": 0,
+    "new_guard_heap_allocations": 0,
+    "new_guard_owned_strings": 0,
+    "new_request_arc_refs": 0,
+    "new_interner": false,
+    "phase_writer_limit_bytes": 8,
+    "contract": "Unchanged admission and original first offender; exactowner borrowed orderedplan summary before milestoneMutex; <=9scan, bounds before SHA/render; no retained plan/spec/Arc/path/content copies.",
+    "limits": {
+      "rows": 8,
+      "visits": 9,
+      "path_per_file": 512,
+      "path_aggregate": 2048,
+      "content_per_file": 1048576,
+      "content_aggregate": 4194304,
+      "mapping_bytes": 1024,
+      "owner_and_mapping_raw": 4096,
+      "encoded_including_lf": 16384
+    },
+    "source_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "ceb3d91b93de1e5542b65800d2a42d83a928a60ab8d64d014dc503a7ec1b88c8"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "fada4500e307048d312b9b0d49c06dc1af99f295bd628e36e38e3c42f5a19911"
+      }
+    ]
+  },
+  "counts": {
+    "current_operations": 41,
+    "material_pins": 537,
+    "fresh_core_ordinary": 35,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "reused_owner_ordinary": 42,
+    "reused_owner_fresh_runs": 0,
+    "preparation_operations": 2,
+    "compiler_memory_is_runtime_fit": false,
+    "source_leases": 237,
+    "fresh_capture_operations": 0,
+    "qualified_prior_capture_operations": 4,
+    "qualified_prior_capture_decisions": 6,
+    "total_fresh_named_passes": 40,
+    "reused_reader_controls": 11,
+    "reused_reader_fresh_runs": 0,
+    "successful_preparation_operations": 2,
+    "preparation_attempts_including_superseded": 4
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp983/native/compile.json",
+        "sha256": "6637b9729dae000de8e048ddcf159465f4910f6d1177de53c974323198d3e60a"
+      },
+      "elapsed_seconds": 3.8487136909971014,
+      "rusage_peak_kib": 1805336,
+      "executed_tests": 0
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp983/native/check.json",
+        "sha256": "4801a33a97bac09ee81c1e471a1893772ec1726890084661c4c2688bb186d3b2"
+      },
+      "elapsed_seconds": 7.441161791910417,
+      "rusage_peak_kib": 643588,
+      "executed_tests": 0
+    },
+    "compiler_memory_is_runtime_fit": false
+  },
+  "runtime_seconds": {
+    "ordinary_35_sum": 6.717338603688404,
+    "synthetic_4": 0.2681809429777786,
+    "normal_once": 1.7883390409406275
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp983/native/native-operation.json",
+      "sha256": "9a67c533ed9ebd2aae08ff88e3bece99f8dbbe62d3786ceea1e76acdda955b2d"
+    },
+    "result": {
+      "path": "target/wp983/native/result.json",
+      "sha256": "94e936315e11f56432498515e6977567752785322e02994b20de3ec3b4d2b93f"
+    },
+    "stdout": {
+      "path": "target/wp983/native/native.stdout",
+      "sha256": "38cbf3bf96f8a1961d3a92ee440488bb5f48326084d33116ced3ed61c403745e"
+    },
+    "stderr": {
+      "path": "target/wp983/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 1.7883390409406275,
+    "conservative_peak_kib": 93620,
+    "runtime_pins": 535,
+    "source_leases": 237,
+    "physical_bytes": 918928,
+    "before_after_hash_bytes": 1837856
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 64,
+    "transferred_bytes": 0,
+    "decoded_bytes": 646987,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 2114151,
+    "peak_buffer_bytes": 3259456
+  },
+  "retirement": {
+    "source_weak_seen": false,
+    "source_weak_expired": true,
+    "live_buffer_zero": true,
+    "scope_weak_expired": true,
+    "recorder_weak_expired": true
+  },
+  "source_error": "None",
+  "generated_plan_refusal": {
+    "capture": "captured",
+    "counts_complete": true,
+    "ordered_rows": 2,
+    "ordered_rows_is_lower_bound": false,
+    "kind_counts": {
+      "file": 2,
+      "archive": 0,
+      "symlink": 0
+    },
+    "path_bytes": 22,
+    "content_bytes": 1851,
+    "mapping_len": null,
+    "mapping_hex": null,
+    "attribute_count": 1,
+    "effects": [
+      {
+        "ordinal": 0,
+        "kind": "file",
+        "path_len": 11,
+        "path_hex": "4255494c442e62617a656c",
+        "content_len": 266,
+        "content_sha256": "ab75992eebb5a7565c4529c3508991f3c12f2035e9a935adca1f621d651e3dcc",
+        "executable": true
+      },
+      {
+        "ordinal": 1,
+        "kind": "file",
+        "path_len": 11,
+        "path_hex": "676c6f62616c732e627a6c",
+        "content_len": 1585,
+        "content_sha256": "e3d6780bb1a869ff032e2c2b882ba3eac601b0d21280505559e77ae2773e4a6f",
+        "executable": true
+      }
+    ],
+    "original_order_preserved": true,
+    "repeated_original_paths_preserved": true,
+    "archive_symlink_payload_proved": false,
+    "full_repo_spec_proved": false,
+    "source_availability_proved": false,
+    "materialization_admission_proved": false,
+    "bounds_failure_reason_proved": false
+  },
+  "marker_encoded_bytes_including_lf": 603,
+  "materialization_refusal": {
+    "capture": "captured",
+    "kind": "generated_file_effects",
+    "reason": "generated_kind",
+    "identities": {
+      "workspace": {
+        "length": 101,
+        "raw_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+      },
+      "canonical": {
+        "length": 56,
+        "raw_hex": "62617a656c5f66656174757265732b2b76657273696f6e5f657874656e73696f6e2b62617a656c5f66656174757265735f676c6f62616c73"
+      },
+      "rule_repo": {
+        "length": 15,
+        "raw_hex": "62617a656c5f66656174757265732b"
+      },
+      "rule_package": {
+        "length": 7,
+        "raw_hex": "70726976617465"
+      },
+      "rule_target": {
+        "length": 16,
+        "raw_hex": "676c6f62616c735f7265706f2e627a6c"
+      },
+      "rule_name": {
+        "length": 12,
+        "raw_hex": "676c6f62616c735f7265706f"
+      },
+      "logical_root": {
+        "length": null,
+        "raw_hex": null
+      }
+    },
+    "raw_bytes_sum": 207,
+    "complete_identity_captured": true,
+    "first_offender_only": true,
+    "semantic_cause_chain_proved": false,
+    "source_availability_proved": false
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp983/native/design-source.md",
+      "sha256": "72e77391282bfdb1eecb4e648c4919cb45e5017c2489345150e7f64f0e55214f"
+    },
+    "design-evidence": {
+      "path": "target/wp983/native/design-evidence.md",
+      "sha256": "c6b944018feee86f65b8f717e634e2771068f962442aff2ec9b84e9608096e1a"
+    },
+    "implementation-source": {
+      "path": "target/wp983/native/implementation-source.md",
+      "sha256": "3246307abc51d4fc30fb9e5b5f8ec2a3daf3da0c9c4aa11d1e3d21cd079e476f"
+    },
+    "implementation-evidence": {
+      "path": "target/wp983/native/implementation-evidence.md",
+      "sha256": "5adde048766ecf4fb105303678b9ec23eebeee8c9d81bcda467fd255fe5ca332"
+    },
+    "preflight-source": {
+      "path": "target/wp983/native/preflight-source.md",
+      "sha256": "ac94965b1f2c244a0e723014feacc9d4e9b0aac3505d2eb55bb443837a593523"
+    },
+    "preflight-evidence": {
+      "path": "target/wp983/native/preflight-evidence.md",
+      "sha256": "3ea5c4b3ca0a3d74de18c49770a8cf875863be3b05d626a0d9d00d14dff16d2b"
+    },
+    "final-source": {
+      "path": "target/wp983/native/final-source.md",
+      "sha256": "848b6e26b00bb642ed61a06283fba9eacd20c9f7159a9a20e9ffc1b67a5490c3"
+    },
+    "final-evidence": {
+      "path": "target/wp983/native/final-evidence.md",
+      "sha256": "18fc76e65ba0a6f4c8cf50d56bd88ce0ce952a314252c9d60b66135cf9899d42"
+    },
+    "final-root": {
+      "path": "target/wp983/native/final-root.md",
+      "sha256": "c232faa72405f39be44a5ff04caa6f173b6813cf60c900769f0323cd34cf47f2"
+    }
+  },
+  "implementation_source_is_author_handoff": true,
+  "memory_summary": {
+    "path": "target/wp983/native/memory-summary.json",
+    "sha256": "99626614dc128d735c2e507381934455cadebc0cbe392c9bcab61181ea1f9d6d"
+  },
+  "operational_summary": {
+    "path": "target/wp983/native/operational-summary.json",
+    "sha256": "bea365d30d5d10a21671427aca8e975544efd4fd6848a014cd890f9e1b3a4139"
+  },
+  "successor_source": {
+    "path": "target/wp983/native/successor-source.md",
+    "sha256": "7235ab4828680dd5f5f52271db8f1f8697764be6c4f76450fddecbc4026df90f"
+  },
+  "next_prerequisite": "Independently review exactowner original two-file Generated plan permission through normal materializer; no further diagnostic needed, attrscount not fullspec proof.",
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "qualification": "New bounded ordered generated-plan presentation only; no admission/source change. Original231 prefix plus six eligible Features/Skylib cohort rows; two64KiB128KiB parent contexts, noninherited non-atomic diagnostic correspondence, not native certificates. Body Weak/freshness uninstrumented; cumulative history is not per-Arc credit. Bzlmod11/Loading29/callback2 are qualified prior source/raw reuse0fresh. Callback three direct includes are newly pinned accepted-Git source artifacts, not historical runtime pins. No old executable target is followed. Native10s/all byte caps unchanged; genuine producer and whole-fit open. Original mappingNone/attrs1 scalar and SHA projection do not establish fullSpec/attributes/sourceavailability/nativeplan/body/DICE retirement. Scope/recorderWeaks and credits retire; bodyWeak unseen/vacuous. Source64/ErrorNone is not quota/cap authority. Allocation discipline uses borrowing/sharing/transfer and existing scoped interners where retained lifetime fits; Windows minimal. Full normal producer and restoration obligations remain in current manifest.",
+  "superseded_validation": {
+    "correction": {
+      "path": "target/wp983/native/validation-correction.json",
+      "sha256": "0a6fa40db62dc5846f18183a8dc3baf01f026abf48be07031b01cccd9db5feac"
+    },
+    "failed_operation": {
+      "path": "target/wp983/native/validation-failure-1/ordinary-33-operation.json",
+      "sha256": "e885f8ab2976fc029879da93b2d4622db16169cfe8d80b7b899d05e5fcb974eb"
+    },
+    "raw_stdout": {
+      "path": "target/wp983/native/validation-failure-1/ordinary-33.stdout",
+      "sha256": "146472e88a169448a96338b8814d2f83f1f131da52a0fa3675b3404c0937c0d5"
+    },
+    "raw_stderr": {
+      "path": "target/wp983/native/validation-failure-1/ordinary-33.stderr",
+      "sha256": "a30e1653ea5a91d01a8ddff26537cf2b022d100a915076f1ade55bd297ecbca0"
+    },
+    "reason": "InvalidArchiveUrl in inert test fixture; valid existing .tar.xz URL correction only, no fetch.",
+    "supervisor_selected_count": 0,
+    "raw_selected_count": 1,
+    "pass_count": 0,
+    "superseded_passes": 33,
+    "current_credit": 0,
+    "compile": {
+      "path": "target/wp983/native/validation-failure-1/compile.json",
+      "sha256": "bb8c54aca3dc8f81884af42de7052e79cbc4fd67320707e5a51291e95f777a2b"
+    },
+    "check": {
+      "path": "target/wp983/native/validation-failure-1/check.json",
+      "sha256": "cc2fd3372821f49755eeaf4afaf8f643b6457207c27a56f644d9b9c0c89961bf"
+    },
+    "historical_executable_target_followed": false
+  }
+}

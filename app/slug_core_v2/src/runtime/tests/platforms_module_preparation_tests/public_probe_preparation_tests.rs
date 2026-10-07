@@ -191,6 +191,9 @@ impl GuardedSingleton {
         self.bodies.admit(needs).map_err(|denied| {
             if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
                 println!("{diagnostic}");
+                if let Some(plan) = self.bodies.generated_plan_diagnostic(needs, &denied) {
+                    println!("{plan}");
+                }
             }
             self.milestones.lock().unwrap().denied = Some(denied);
             refusal()
@@ -643,8 +646,328 @@ fn materialization_refusal_projection_is_bounded_and_borrowed() {
     let mut writer = MaterializationWriter {
         writer: &mut output,
         bytes: MATERIALIZATION_MARKER_BYTES - 1,
+        limit: MATERIALIZATION_MARKER_BYTES,
     };
     assert!(writer.write_str("x").is_err());
+    assert!(output.is_empty());
+}
+
+fn generated_globals_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = (*local_native_request(
+        &bodies.roots[0],
+        "bazel_features++version_extension+bazel_features_globals",
+        "/features",
+    ))
+    .clone();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@bazel_features+//private:globals_repo.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "globals_repo".into();
+    request.kind = RepositoryMaterializationKind::GeneratedFileEffects(plan);
+    request
+}
+#[test]
+fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
+    use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let plan = Plan::build([
+        (
+            compact_str::CompactString::new("FIRST"),
+            Arc::from(&b"abc"[..]),
+            false,
+        ),
+        (
+            compact_str::CompactString::new("SECOND"),
+            Arc::from(&b"changed"[..]),
+            true,
+        ),
+    ])
+    .unwrap();
+    let needs = SourcePreparationNeeds::repository(generated_globals_request(&bodies, plan));
+    let original = needs.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    let denied = bodies.admit(&needs).unwrap_err();
+    let view = bodies.generated_plan_diagnostic(&needs, &denied).unwrap();
+    assert!(std::ptr::eq(view.request, original.as_ref()));
+    let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &original.kind else {
+        unreachable!()
+    };
+    assert!(std::ptr::eq(view.plan, plan));
+    assert_eq!(Arc::strong_count(original), 1);
+    let encoded = view.to_string();
+    assert!(encoded.contains("ordered_rows=2 file_count=2 archive_count=0 symlink_count=0 path_bytes=11 content_bytes=10 mapping_len=none mapping_hex=none"));
+    assert!(encoded.contains("ordinal=0 kind=file path_len=5 path_hex=4649525354 content_len=3 content_sha256=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad executable=false"));
+    assert!(encoded.contains("ordinal=1 kind=file path_len=6 path_hex=5345434f4e44"));
+    assert!(encoded.ends_with("executable=true"));
+    let reversed = Plan::build(plan.effects().iter().rev().map(|file| {
+        (
+            compact_str::CompactString::new(file.path()),
+            Arc::from(file.content()),
+            file.executable(),
+        )
+    }))
+    .unwrap();
+    let reversed = SourcePreparationNeeds::repository(generated_globals_request(&bodies, reversed));
+    let reversed = bodies
+        .generated_plan_diagnostic(&reversed, &denied)
+        .unwrap()
+        .to_string();
+    assert!(reversed.contains("ordinal=0 kind=file path_len=6 path_hex=5345434f4e44"));
+    assert_ne!(encoded, reversed);
+    let edited = Plan::build(plan.effects().iter().map(|file| {
+        (
+            compact_str::CompactString::new(file.path()),
+            Arc::from(if file.path() == "FIRST" {
+                &b"abd"[..]
+            } else {
+                file.content()
+            }),
+            file.executable(),
+        )
+    }))
+    .unwrap();
+    let edited = SourcePreparationNeeds::repository(generated_globals_request(&bodies, edited));
+    let edited = bodies
+        .generated_plan_diagnostic(&edited, &denied)
+        .unwrap()
+        .to_string();
+    assert!(!edited.contains("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"));
+    drop(needs);
+    assert!(weak.upgrade().is_none());
+    for index in 0..8 {
+        let mut request = generated_globals_request(&bodies, Plan::build([]).unwrap());
+        match index {
+            0 => request.id.workspace = path("/other"),
+            1 => {
+                request.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
+            }
+            2 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other//private:globals_repo.bzl").unwrap()
+            }
+            3 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_features+//other:globals_repo.bzl").unwrap()
+            }
+            4 => {
+                request.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@bazel_features+//private:other.bzl").unwrap()
+            }
+            5 => request.repo_spec.rule_id.rule_name = "other".into(),
+            6 => request.kind = RepositoryMaterializationKind::Immutable,
+            7 => {
+                request.kind = RepositoryMaterializationKind::Local {
+                    logical_root: path("/features"),
+                }
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            bodies
+                .generated_plan_diagnostic(&SourcePreparationNeeds::repository(request), &denied)
+                .is_none()
+        );
+    }
+    let mut request = generated_globals_request(&bodies, Plan::build([]).unwrap());
+    let mut mapping = slug_identity_v2::RepositoryMapping::new(
+        slug_identity_v2::RepositoryMappingId::new("owner-map").unwrap(),
+    );
+    mapping.insert(
+        slug_identity_v2::ApparentRepoName::new("features").unwrap(),
+        slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap(),
+    );
+    request.repo_spec.rule_id.bzl_file =
+        slug_identity_v2::ApparentLabel::parse("@features//private:globals_repo.bzl")
+            .unwrap()
+            .resolve(&mapping);
+    let mapped = SourcePreparationNeeds::repository(request);
+    assert!(
+        bodies
+            .generated_plan_diagnostic(&mapped, &denied)
+            .unwrap()
+            .to_string()
+            .contains("mapping_len=9 mapping_hex=6f776e65722d6d6170")
+    );
+    let bootstrap =
+        SourcePreparationNeeds::root_module_bootstrap(slug_bzlmod_v2::RootModuleBootstrapRequest {
+            workspace: path("/other"),
+        });
+    let mixed = mapped.try_union(&bootstrap).unwrap();
+    assert!(
+        bodies
+            .generated_plan_diagnostic(&mixed, &bodies.admit(&mixed).unwrap_err())
+            .is_none()
+    );
+    let mut progress = 0;
+    if bodies.admit(&mapped).is_ok() {
+        progress += 1;
+    }
+    assert_eq!(progress, 0);
+    for symlink in [false, true] {
+        let mut builder = Plan::builder();
+        if symlink {
+            builder
+                .push_symlink(
+                    compact_str::CompactString::new("LINK"),
+                    slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                        path("/source"),
+                        PathObservationNamespace::Host,
+                    )
+                    .unwrap(),
+                    Arc::from(&b"opaque"[..]),
+                )
+                .unwrap();
+        } else {
+            builder
+                .push_archive(
+                    Arc::from([compact_str::CompactString::new(
+                        "https://mirror.example/dist/rustc.tar.xz",
+                    )]),
+                    [0; 32],
+                    compact_str::CompactString::new("prefix"),
+                )
+                .unwrap();
+        }
+        let needs = SourcePreparationNeeds::repository(generated_globals_request(
+            &bodies,
+            builder.finish(),
+        ));
+        let encoded = bodies
+            .generated_plan_diagnostic(&needs, &denied)
+            .unwrap()
+            .to_string();
+        assert!(encoded.contains(if symlink {
+            "kind=symlink"
+        } else {
+            "kind=archive"
+        }));
+        assert!(encoded.ends_with(
+            "path_len=none path_hex=none content_len=none content_sha256=none executable=none"
+        ));
+        assert!(!encoded.contains("opaque") && !encoded.contains("mirror.example"));
+    }
+}
+#[test]
+fn generated_plan_refusal_projection_is_bounded() {
+    use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let check = |lengths: &[usize], content_size: usize, captured: bool| {
+        let content: Arc<[u8]> = vec![b'x'; content_size].into();
+        let plan = Plan::build(lengths.iter().enumerate().map(|(i, len)| {
+            (
+                compact_str::CompactString::new(format!("{}{}", "x".repeat(len - 1), i)),
+                content.clone(),
+                i % 2 == 0,
+            )
+        }))
+        .unwrap();
+        let needs = SourcePreparationNeeds::repository(generated_globals_request(&bodies, plan));
+        let denied = bodies.admit(&needs).unwrap_err();
+        let view = bodies.generated_plan_diagnostic(&needs, &denied).unwrap();
+        assert_eq!(view.summary().captured, captured);
+        let encoded = view.to_string();
+        assert!(encoded.len() + 1 <= GENERATED_PLAN_MARKER_BYTES);
+        assert_eq!(
+            encoded.matches("WP983_GENERATED_EFFECT").count(),
+            if captured { lengths.len() } else { 0 }
+        );
+        if !captured {
+            assert!(encoded.contains("mapping_hex=none"));
+        }
+        if lengths.len() == 9 {
+            assert!(encoded.contains("counts_complete=false ordered_rows=9 file_count=none archive_count=none symlink_count=none path_bytes=none content_bytes=none"));
+        }
+    };
+    for n in [0, 1, 8, 9] {
+        check(&vec![1; n], 0, n <= 8);
+    }
+    check(&[512], 0, true);
+    check(&[513], 0, false);
+    check(&[512; 4], 0, true);
+    check(&[512, 512, 512, 512, 1], 0, false);
+    check(&[1], 1 << 20, true);
+    check(&[1], (1 << 20) + 1, false);
+    check(&[1; 4], 1 << 20, true);
+    // Four shared1MiB payloads plus one byte cross the exact aggregate boundary.
+    let content: Arc<[u8]> = vec![b'x'; 1 << 20].into();
+    let plan = Plan::build((0..5).map(|i| {
+        (
+            compact_str::CompactString::new(format!("f{i}")),
+            if i == 4 {
+                Arc::from(&b"x"[..])
+            } else {
+                content.clone()
+            },
+            false,
+        )
+    }))
+    .unwrap();
+    let needs = SourcePreparationNeeds::repository(generated_globals_request(&bodies, plan));
+    let view = bodies
+        .generated_plan_diagnostic(&needs, &bodies.admit(&needs).unwrap_err())
+        .unwrap();
+    assert_eq!(view.summary().content, Some((4 << 20) + 1));
+    assert!(!view.summary().captured);
+    assert_eq!(
+        view.to_string().matches("WP983_GENERATED_EFFECT").count(),
+        0
+    );
+    drop(needs);
+    drop(content);
+    for size in [1024, 1025] {
+        let mut request = generated_globals_request(&bodies, Plan::build([]).unwrap());
+        let mut mapping = slug_identity_v2::RepositoryMapping::new(
+            slug_identity_v2::RepositoryMappingId::new("x".repeat(size)).unwrap(),
+        );
+        mapping.insert(
+            slug_identity_v2::ApparentRepoName::new("features").unwrap(),
+            slug_identity_v2::CanonicalRepoName::new("bazel_features+").unwrap(),
+        );
+        request.repo_spec.rule_id.bzl_file =
+            slug_identity_v2::ApparentLabel::parse("@features//private:globals_repo.bzl")
+                .unwrap()
+                .resolve(&mapping);
+        let needs = SourcePreparationNeeds::repository(request);
+        let view = bodies
+            .generated_plan_diagnostic(&needs, &bodies.admit(&needs).unwrap_err())
+            .unwrap();
+        assert_eq!(view.summary().captured, size == 1024);
+        assert_eq!(view.mapping().unwrap().len(), size);
+        if size == 1025 {
+            assert!(
+                view.to_string()
+                    .contains("mapping_len=1025 mapping_hex=none")
+            );
+        }
+    }
+    let plan = Plan::build([(
+        compact_str::CompactString::new("\né"),
+        Arc::from(&b""[..]),
+        false,
+    )])
+    .unwrap();
+    let needs = SourcePreparationNeeds::repository(generated_globals_request(&bodies, plan));
+    assert!(
+        bodies
+            .generated_plan_diagnostic(&needs, &bodies.admit(&needs).unwrap_err())
+            .unwrap()
+            .to_string()
+            .contains("path_len=3 path_hex=0ac3a9 content_len=0")
+    );
+    assert_eq!(RegistryHex(Some(b"")).to_string(), "-");
+    assert_eq!(RegistryHex(Some("\né".as_bytes())).to_string(), "0ac3a9");
+    let mut output = String::new();
+    let mut writer = MaterializationWriter {
+        writer: &mut output,
+        bytes: GENERATED_PLAN_MARKER_BYTES - 1,
+        limit: GENERATED_PLAN_MARKER_BYTES,
+    };
+    assert!(fmt::Write::write_str(&mut writer, "x").is_err());
     assert!(output.is_empty());
 }
 

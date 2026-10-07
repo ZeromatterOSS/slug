@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated Features repository plan readiness
+Status: Generated Features materialization readiness
 
 ## Observable and source basis
 
@@ -44,77 +44,74 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP982](wp982-typed-materialization-demand-2026-10-07.json) accepts the bounded
-original materialization diagnostic on baseline1457d644882237c0f4864528259aff57b70a3e67.
-Bodies admission and GuardedSingleton share the original borrowed first offender,
-kind/nine Local predicates and family precedence. Seven borrowed identity fields
-stream immediately before refusal, outside the milestone mutex, under1024perfield/
-4096aggregate raw bytes and10240encoded bytes including LF. No marker for other
-families/success, no new retained fields/guard heap/strings/requestArc/interner.
-Two cfgtest files add442net lines (464insert/22delete); independent review accepted
-cohesive classifier/formatter/two-test growth beyond120–200estimate. Scratch/download/
-execute earlier branches are static/protected-source qualified; fresh bootstrap/
-environment suppression, crossed bindings, reversed order, all kinds/Local checks,
-byte bounds and test-request Weak retirement discriminate the changed seam.
+[WP983](wp983-generated-features-plan-projection-2026-10-07.json) accepts a borrowed
+ordered Generated Features plan projection on baseline24407f1ab9afaffa6041fb1249230cb07a9ab9ef.
+Admission/first-offender/defaults/production storage remain unchanged. The exact typed
+Globals owner borrows its original request/plan; bounded9visit scan checks8rows,
+512/2048path,1MiB/4MiBcontent,1024mapping+4096owner bytes before streaming SHA/render.
+Header+rows share16KiB LF-inclusive writer. No new retained guard fields, heap report,
+owned strings/requestArc/plan copies/interner. Independent growth review accepts
+508net/510changed cfgtest lines (185formatter/summary/predicate+323focused tests).
+A narrow invalid inert archive URL test fixture correction is preserved; its prior
+33passes are historical0current, and the corrected full35gate batch was refreshed.
 
-33 fresh Core tests +4 synthetic controls +1 normal observer =38 fresh named passes;
+35 fresh Core tests +4 controls +1 normal observer =40 fresh named passes;
 42 unchanged owner/callback checks and11 reader controls are qualified reuse0fresh.
-Current39 operations/531 union pins include529 native pins. Corrected serial
-compile37.402s/check7.305s execute0tests; prior18.849s E0283 test-key inference failure
-is preserved separately with0tests. Compiler memory is separate from runtime fit.
-Ordinary runtime totals6.344s, synthetics0.248s. Normal1.770s peaks93,576KiB under256MiB;
-accounted credits zero and scope/recorder Weak expire. Native request/plan retirement,
-bodyWeak (unseen/vacuous), registrybodyWeak/DICE/pages and whole-workload fit remain open.
-All237 ordered WP981 parent rows are unchanged,918,928 physical bytes/1,837,856 hash
-bytes in original188+combined49/two64KiB128KiB, non-atomic/noncertifying.
+Current41 successful operations/537union pins include535native pins. Corrected serial
+compile3.849s/check7.441s execute0tests; compiler memory is separate from runtime fit.
+Ordinary runtime totals6.717s, synthetics0.268s. Normal1.788s peaks93,620KiB under256MiB;
+accounted credits zero and scope/recorder Weak expire. Native request/plan/body/registry
+Arc/DICE/pages and whole-workload fit remain open; bodyWeak is unseen/vacuous.
+All237 ordered parent rows remain918,928physical/1,837,856hash bytes in original188+
+combined49/two64KiB128KiB, non-atomic/noncertifying. Source64/646,987decoded and
+registry105/235,521 remain unchanged, Written0/SourceErrorNone; numerical source
+exhaustion is not quota evidence or cap authority. Public preparation/dispatch/policy
+complete, certificate/observations/analyses/actions/Rustc unavailable.
 
-Actual source64/646,987 decoded and registry105/235,521 are unchanged fromWP981;
-SourceErrorNone is not a quota error or cap authority. Public preparation/dispatch/
-policy is complete; certificate/observations/analyses/actions/Rustc unavailable.
-Exactly one749-byte LF marker captures207 raw identity bytes: GeneratedFileEffects,
-generated_kind, canonical bazel_features++version_extension+bazel_features_globals,
-original rule @@bazel_features+//private:globals_repo.bzl / globals_repo and actual
-fixture workspace. Nonlocal logical root is unavailable. Plan shape, effect contents,
-attributes, complete semantic identity/source association and inventory are unobserved.
+The actual603-byte LF plan report captures exactly two original purefiles in order:
+BUILD.bazel266B/SHAab75992eebb5a7565c4529c3508991f3c12f2035e9a935adca1f621d651e3dcc,
+then globals.bzl1585B/SHAe3d6780bb1a869ff032e2c2b882ba3eac601b0d21280505559e77ae2773e4a6f,
+both executabletrue. Total1851content/22path bytes, mappingNone/attribute_count1.
+Original canonical bazel_features++version_extension+bazel_features_globals and rule
+@@bazel_features+//private:globals_repo.bzl / globals_repo match the actual fixture
+workspace. This is a bounded plan projection, not fullSpec/attribute values/source
+availability/materialization/inventory evidence.
 
 ## Active continuation contract
 
-Continue WP231 toward the genuine normal producer using the
-[grounded successor](../../../../target/wp982/native/successor-source.md), SHA256
-43f3d6546a9eabeb19774b7e9d7b19a8a77cb2e32d3505339d3f00b52b908670.
-The typed plan is already owned in the original request: freeze/review a bounded
-borrowed ordered-effects/spec projection for this exact offender, immediately before
-refusal and outside the milestone mutex. Preserve typed workspace/canonical/rule
-identity and original plan order; cap rows/path/encoded aggregate and checked content
-lengths before reporting file path/executable/content size and optional streaming
-content digest. Archive/symlink kinds remain explicit; overflow/unknown shapes refuse.
-Never copy/render the plan or arbitrary attributes, infer generated roots/output
-contents, read another source/cache body or retain a diagnostic request/report.
-The prior1888B globals_repo source's partial syntax does not prove an actual plan.
+Continue WP231 using the [grounded successor](../../../../target/wp983/native/successor-source.md),
+SHA2567235ab4828680dd5f5f52271db8f1f8697764be6c4f76450fddecbc4026df90f.
+Review the consequential exactowner/two-file Generated permission as a design checkpoint
+within cohesive implementation. Default-false opt-in only for PreparedFile+PublicProbe;
+borrowed exact typed workspace/canonical/rule owner/mappingNone and bounded original
+File order/path/length/digest/executable with no extra effects. Keep all other Generated/
+Immutable and existing Local predicates unchanged; whole mixedNeed refuses before
+progress. No further diagnostic or acquisition is needed for this already-owned plan.
 
-Once actual shape grounds it, independently review finite pure-file materialization
-admission as a design checkpoint in cohesive implementation work. Reuse the normal
-Generated source→NativeDemand progress→RepositoryMaterializer→write_counted/session/
-epoch/preflight owners; preserve whole-Need no-progress, original RepoSpec/identity/
-generation, object/write/memory caps, tempdir/join/cancellation/shutdown retirement
-and final revalidation. No proxy Local root, fabricated provider/certificate, generic
-Generated grant, production source bypass or cap increase follows from diagnostics.
-Keep original237 ordered leases/two64KiB contexts and qualified reuse; each changed
-native observation requires relevant fresh gates, no identical retry. Source64 is
-numerical exhaustion only; a future actual quota failure needs its own resource design.
+Pass the SAME original request/RepoSpec/plan through normal Generated route→NativeDemand
+progress→RepositoryMaterializer→write_counted/session/tempdir/epoch/preflight. The writer
+consumes plan bytes and does not interpret opaque attributes; attrslen1 is not fullspec
+proof. Preserve original structural request identity/conflicts/generation, byte credits,
+retirement and final revalidation, with relevant existing materializer/cancellation/
+preflight tests freshly selected or honestly qualified. No proxy Local root, invented
+output/provider/certificate, generic grant, plan clone or effect-specific writer.
+Original237 ordered leases/two64KiB contexts and qualified source reuse remain fixed;
+changed native observation needs relevant fresh gates, no identical retry. A future
+actual quota failure requires its own reviewed resource decision.
 
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
-FSIZE16MiB. Reuse unchanged source/raw proofs honestly; modified gates need fresh
-Cargo-derived artifact and exact selection. Actual next Need grounds the correction,
-with no automatic identical retry. Borrow/transfer/share existing storage; use existing
-scoped interners for repeated retained strings where lifetime and cleanup fit. Windows
-remains minimal. Local0.2.17/requested0.2.4 and caller-alias/defining-self domains remain
-distinct. Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/
+FSIZE16MiB. Borrow/transfer/share existing storage; use existing scoped interners for
+repeated retained strings when lifetime and cleanup fit. Windows remains minimal.
+Local0.2.17/requested0.2.4 and caller-alias/defining-self domains remain distinct.
+Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/
 same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
 
+[WP982](wp982-typed-materialization-demand-2026-10-07.json), accepted at
+24407f1ab9afaffa6041fb1249230cb07a9ab9ef, owns the original first-offender
+GeneratedFileEffects identity diagnostic; its report does not describe plan effects.
 [WP981](wp981-features-extension-import-readiness-2026-10-07.json), accepted at
 1457d644882237c0f4864528259aff57b70a3e67, owns finite Features3→8 and Skylib3→4,
 four captures/six observed bodies,237 ordered parent rows and the opaque materialization
