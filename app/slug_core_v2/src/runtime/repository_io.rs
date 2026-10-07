@@ -424,7 +424,12 @@ impl RepositoryMaterializer {
         demands: impl IntoIterator<Item = PathObservationDemand>,
     ) -> Result<RepositoryNativePreflight, RepositorySessionError> {
         self.preflight_impl(token, demands, |root_owners, roots, demands| {
-            super::path_observation::observe_native(&root_owners, roots, demands)
+            super::path_observation::observe_native_scoped(
+                &root_owners,
+                roots,
+                demands,
+                self.source_scope.as_ref(),
+            )
         })
     }
 
@@ -467,8 +472,8 @@ impl RepositoryMaterializer {
             .collect::<Vec<_>>();
         demands.sort_unstable();
         demands.dedup();
-        let observed = observe(&root_owners, roots, demands)
-            .map_err(RepositorySessionError::NativeObservation)?;
+        let observed = observe(&root_owners, roots, demands).map_err(native_observation_error)?;
+        self.check_source_scope(self.source_scope.as_ref())?;
         let reusable = accepted
             .into_iter()
             .filter(|accepted| !validation_epoch_is_dirty(&accepted.validation, &observed))
@@ -948,6 +953,7 @@ impl RepositoryMaterializer {
         token: RepositorySessionToken,
         demands: impl IntoIterator<Item = PathObservationDemand>,
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
+        self.check_source_scope(self.source_scope.as_ref())?;
         let root_owners = {
             let state = self
                 .state
@@ -968,8 +974,14 @@ impl RepositoryMaterializer {
             roots
         };
         let roots = normalize_retained_roots(&root_owners)?;
-        let observed = super::path_observation::observe_native(&root_owners, roots, demands)
-            .map_err(RepositorySessionError::NativeObservation);
+        let observed = super::path_observation::observe_native_scoped(
+            &root_owners,
+            roots,
+            demands,
+            self.source_scope.as_ref(),
+        )
+        .map_err(native_observation_error);
+        self.check_source_scope(self.source_scope.as_ref())?;
         let state = self
             .state
             .lock()
@@ -2491,6 +2503,17 @@ pub(crate) fn install(builder: &mut DiceDataBuilder) {
     install_repository_io(builder, Arc::new(LocalRepositoryIo::new()));
 }
 
+fn native_observation_error(
+    error: super::path_observation::PathObservationKernelError,
+) -> RepositorySessionError {
+    match error {
+        super::path_observation::PathObservationKernelError::SourceService(error) => {
+            RepositorySessionError::SourceService(error)
+        }
+        error => RepositorySessionError::NativeObservation(error),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -3716,6 +3739,126 @@ mod tests {
             &RepositoryMaterializationResultEpoch::new(workspace, []).unwrap()
         );
         empty.discard(token).unwrap();
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn retained_scoped_file_preflight_rereads_original_validation_and_maps_source_refusal() {
+        use std::time::Duration;
+        use std::time::Instant;
+
+        use crate::runtime::dice::source_service::SourceServiceLimits;
+
+        let directory = tempfile::tempdir().unwrap();
+        let workspace = NormalizedAbsolutePath::new(directory.path().to_path_buf()).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let scope = SourceServiceScope::new_for_test(
+            workspace.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let materializer =
+            RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+        let file = directory.path().join("body");
+        std::fs::write(&file, b"abc").unwrap();
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(file.clone()).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        std::fs::create_dir(directory.path().join("local-scoped")).unwrap();
+        let request = native_request(
+            &workspace,
+            "scoped",
+            local_spec("local-scoped"),
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new(directory.path().join("local-scoped"))
+                    .unwrap(),
+            },
+        );
+        let token = materializer.begin().unwrap();
+        materializer.preflight_native(token, []).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        materializer
+            .materialize_native_with_runtime(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(1),
+                &runtime,
+                Some(&scope),
+            )
+            .unwrap();
+        let initial = materializer
+            .observe_native(token, [demand.clone()])
+            .unwrap();
+        materializer
+            .accept(
+                token,
+                &[request.clone()],
+                vec![RepositoryValidation::new(
+                    request,
+                    vec![(demand.clone(), epoch_result(&initial, &demand))],
+                )],
+            )
+            .unwrap();
+        assert_eq!(scope.snapshot().source_attempts, 1);
+        assert_eq!(scope.snapshot().decoded_bytes, 3);
+
+        std::fs::write(&file, b"xyz").unwrap();
+        let token = materializer.begin().unwrap();
+        let preflight = materializer
+            .preflight_native(token, [demand.clone(), demand.clone()])
+            .unwrap();
+        assert!(preflight.reusable_requests().is_empty());
+        assert_eq!(
+            epoch_result(preflight.path_observations(), &demand),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(&b"xyz"[..])))
+        );
+        assert_eq!(scope.snapshot().source_attempts, 2);
+        assert_eq!(scope.snapshot().decoded_bytes, 6);
+        assert_eq!(scope.snapshot().registry_attempts, 0);
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+        scope.cancel();
+        assert_eq!(
+            materializer.observe_native(token, [demand]),
+            Err(RepositorySessionError::SourceService(
+                SourceServiceError::Cancelled
+            ))
+        );
+        materializer.discard(token).unwrap();
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let scope = SourceServiceScope::new_for_test(
+            workspace.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let materializer = RepositoryMaterializer::new_scoped(workspace, scope.clone()).unwrap();
+        let token = materializer.begin().unwrap();
+        std::fs::File::create(&file)
+            .unwrap()
+            .set_len((crate::runtime::dice::source_service::HOST_FILE_OBJECT_BYTES + 1) as u64)
+            .unwrap();
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(file).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        assert!(matches!(
+            materializer.preflight_native(token, [demand]),
+            Err(RepositorySessionError::SourceService(
+                SourceServiceError::Limit(source_service::SourceCounter::DecodedBytes)
+            ))
+        ));
+        assert_eq!(scope.snapshot().source_attempts, 1);
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+        materializer.discard(token).unwrap();
     }
 
     #[test]

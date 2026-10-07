@@ -11,6 +11,8 @@
  */
 
 mod file_digest;
+#[cfg(all(test, target_os = "linux"))]
+mod scoped_file_tests;
 
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -36,6 +38,9 @@ use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WindowsOptionPathLongNameOutcome;
+
+use super::dice::source_service::SourceServiceError;
+use super::dice::source_service::SourceServiceScope;
 
 #[derive(Debug, PartialEq, Eq, Allocative)]
 struct RetainedMaterializationRoot {
@@ -63,6 +68,7 @@ pub(super) enum PathObservationKernelError {
     UnsupportedLstat,
     UnauthorizedInputImage(PathObservationDemand),
     Epoch(PathObservationEpochError),
+    SourceService(SourceServiceError),
 }
 
 pub(super) fn observe_native<T>(
@@ -78,6 +84,28 @@ pub(super) fn observe_native<T>(
     #[cfg(windows)]
     {
         windows_native::observe_windows(&retained, demands)
+    }
+}
+
+/// The scoped path shares demand validation with the ordinary kernel. Only
+/// FileBytes uses the bounded source reader; operational refusal is not an epoch.
+pub(super) fn observe_native_scoped<T>(
+    owner: &T,
+    roots: impl IntoIterator<Item = (PathObservationInstanceId, NormalizedAbsolutePath)>,
+    demands: impl IntoIterator<Item = PathObservationDemand>,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<PathObservationEpoch, PathObservationKernelError> {
+    if scope.is_none() {
+        return observe_native(owner, roots, demands);
+    }
+    let retained = RetainedMaterializationRoots::new(owner, roots)?;
+    #[cfg(unix)]
+    {
+        observe_with_scoped(&retained, demands, &mut UnixPathObservationAdapter, scope)
+    }
+    #[cfg(windows)]
+    {
+        windows_native::observe_windows_scoped(&retained, demands, scope)
     }
 }
 
@@ -152,6 +180,15 @@ fn observe_with(
     demands: impl IntoIterator<Item = PathObservationDemand>,
     operations: &mut impl ObservationOperations,
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
+    observe_with_scoped(retained, demands, operations, None)
+}
+
+fn observe_with_scoped(
+    retained: &RetainedMaterializationRoots<'_>,
+    demands: impl IntoIterator<Item = PathObservationDemand>,
+    operations: &mut impl ObservationOperations,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<PathObservationEpoch, PathObservationKernelError> {
     let mut demands = demands.into_iter().collect::<Vec<_>>();
     demands.sort_unstable();
 
@@ -191,11 +228,86 @@ fn observe_with(
         return Err(PathObservationKernelError::UnsupportedLstat);
     }
 
-    let observations = demands.into_iter().map(|demand| {
-        let result = observe_one(&demand, operations);
-        (demand, result)
-    });
+    if scope.is_none() {
+        let observations = demands.into_iter().map(|demand| {
+            let result = observe_one(&demand, operations);
+            (demand, result)
+        });
+        return PathObservationEpoch::new(observations).map_err(PathObservationKernelError::Epoch);
+    }
+    let mut observations = Vec::with_capacity(demands.len());
+    check_scope(scope)?;
+    for demand in demands {
+        check_scope(scope)?;
+        let result = if demand.operation() == PathObservationOperation::FileBytes {
+            match scope {
+                Some(scope) => scoped_file_bytes(demand.path(), operations, scope)?,
+                None => observe_one(&demand, operations),
+            }
+        } else {
+            observe_one(&demand, operations)
+        };
+        check_scope(scope)?;
+        observations.push((demand, result));
+    }
+    check_scope(scope)?;
     PathObservationEpoch::new(observations).map_err(PathObservationKernelError::Epoch)
+}
+
+fn check_scope(scope: Option<&Arc<SourceServiceScope>>) -> Result<(), PathObservationKernelError> {
+    scope
+        .map_or(Ok(()), |scope| scope.check())
+        .map_err(PathObservationKernelError::SourceService)
+}
+
+#[cfg(target_os = "linux")]
+fn scoped_file_bytes(
+    path: &NormalizedAbsolutePath,
+    operations: &mut impl ObservationOperations,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<PathObservationResult, PathObservationKernelError> {
+    use super::dice::source_service::RegularFileError;
+    use super::dice::source_service::read_host_file;
+
+    let result = match read_host_file(scope, path.as_path()) {
+        Ok(bytes) => PathOperationResult::Present(bytes),
+        Err(RegularFileError::Scope(error)) => {
+            return Err(PathObservationKernelError::SourceService(error));
+        }
+        Err(RegularFileError::Io { error, .. }) => {
+            let original = path_io_error(&error);
+            if is_missing_error(&error) || error.kind() == std::io::ErrorKind::IsADirectory {
+                refine_file_bytes(original, operations.lstat(path))
+            } else {
+                PathOperationResult::Error(original)
+            }
+        }
+        Err(RegularFileError::NonRegular {
+            kind: PathNodeKind::Directory,
+        }) => {
+            // Preserve the original file-read refinement, including a directory
+            // removed between the failed read and its auxiliary Lstat.
+            let original = path_io_error(&std::io::Error::from_raw_os_error(nix::libc::EISDIR));
+            refine_file_bytes(original, operations.lstat(path))
+        }
+        Err(RegularFileError::NonRegular { .. } | RegularFileError::Changed { .. }) => {
+            return Err(PathObservationKernelError::SourceService(
+                scope.poison(SourceServiceError::UnsupportedSourceOwner),
+            ));
+        }
+    };
+    Ok(PathObservationResult::FileBytes(result))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn scoped_file_bytes(
+    _path: &NormalizedAbsolutePath,
+    _operations: &mut impl ObservationOperations,
+    scope: &Arc<SourceServiceScope>,
+) -> Result<PathObservationResult, PathObservationKernelError> {
+    Err(PathObservationKernelError::SourceService(
+        scope.poison(SourceServiceError::UnsupportedSourceOwner),
+    ))
 }
 
 fn observe_one(
@@ -1796,6 +1908,14 @@ mod windows_native {
         demands: impl IntoIterator<Item = PathObservationDemand>,
     ) -> Result<PathObservationEpoch, PathObservationKernelError> {
         observe_with(retained, demands, &mut WindowsPathObservationAdapter)
+    }
+
+    pub(super) fn observe_windows_scoped(
+        retained: &RetainedMaterializationRoots<'_>,
+        demands: impl IntoIterator<Item = PathObservationDemand>,
+        scope: Option<&Arc<SourceServiceScope>>,
+    ) -> Result<PathObservationEpoch, PathObservationKernelError> {
+        observe_with_scoped(retained, demands, &mut WindowsPathObservationAdapter, scope)
     }
 
     struct WindowsPathObservationAdapter;

@@ -149,23 +149,26 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
+[WP960](./slug-v2-subplans/wp960-bounded-host-file-readiness-2026-10-07.json) accepts bounded scoped normal Host FileBytes
+and exact eleven-root .bazelignore admission through the existing public singleton.
+Shared capture preserves registry accounting/polling; Host uses pinned-length allocation,
+EOF/identity brackets, source/decode caps and original observation/validation ownership.
+39ordinary7.730s/56852KiB+4synthetic+1native diagnostic pass; separate Core8.133s/
+CoreCLI16.427s checks and independent DESIGN/prelaunch/actual FINAL accepts.
+Actual0.374s/conservative76880KiB/155pins/188held leases: SourceNone,105registry235521B,
+12Host attempts11061decoded, transfer/write0; recorder/scope/finalcredits retire.
+Next exact192B rules_rust_root/rust Host Lstat is refused before progress. The natural
+bounded metadata owner is next; no generic descendant/body grant or unchanged native
+retry. Native body Weak/freshness and private MODULE coverage remain unobserved/vacuous;
+DecodedBytes is cumulative history, not per-Arc live credit. Net1122Rust lines are one
+extracted reader/bridge plus focused companions, no new string pool/cache/harness.
 [WP959](./slug-v2-subplans/wp959-repository-marker-metadata-readiness-2026-10-07.json)
-accepts exact opt-in eleven-root REPO.bazel Host Lstat metadata through the existing
-public singleton route, with no new retained strings or lifecycle.17ordinary3.383s/
-55496KiB+4synthetic+1native diagnostic pass; separate Core10.183s/CoreCLI7.543s checks.
-Actual0.366s/conservative76396KiB/121pins/188physical leases advances to exact rules_rust
-root .bazelignore Host FileBytes, denied before progress. SourceNone/105admissions235521B
-and recorder/scope/finalcredits retire under unchanged caps. No accepted producer terminal/
-certificate/action/provider result or marker presence/absence/content is established;
-private MODULE witnesses remain uninstrumented/vacuous. Ground/review the natural ignore
-owner and bounded body read next; generic unbounded Host FileBytes must not simply be
-admitted.193net formatted Rust lines are one scalar predicate/projection/all-operation
-matrix, preserving borrowing/scoped interning. Immediate
-[WP958](./slug-v2-subplans/wp958-public-singleton-producer-readiness-2026-10-07.json)
-at92ab38a59 established genuine public prepare/singleton/drive; WP957 at7aec52b3b completed
-finite original mapping/source certification historically. Public Rustc/support/data/runfiles/
-oracle/edition restoration, registry Arc/freshness/MVS/BCR provenance/M7A/wholefit remain
-open; authentic corpus remains reused WP954 with no extraction/body/availability retry.
+at9294cd83f is immediate repository-metadata predecessor. WP958 at92ab38a59 established
+genuine singleton routing; WP957 at7aec52b3b completed original finite mapping/source
+certification historically. Public Rustc/support/data/provider/runfiles/oracle/edition
+restoration, registryArc/MVS/BCRprovenance/M7A/wholefit remain open. Borrowing, existing
+scoped interning, Arc/Dupe sharing and unchanged caps apply to all continuation work;
+authentic WP954 corpus is reused with no extraction/availability operation.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

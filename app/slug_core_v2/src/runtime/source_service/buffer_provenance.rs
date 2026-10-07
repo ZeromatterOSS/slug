@@ -18,6 +18,7 @@ code_enum!(SourceBufferSite {
     HttpDuplexParser = 6, ArchiveAddress = 7, SelectedPayload = 8,
     SelectedScratch = 9, PatchCapture = 10, PatchTarget = 11,
     SharedIoBuffer = 12, AssociationRecorder = 13,
+    HostCapture = 14, HostArc = 15, HostFileRead = 16,
     RegistryUrlLength = 20, HttpUrlLength = 21, ArchiveUrlLength = 22,
     RedirectLength = 23, DnsCardinality = 24, SelectedPayloadGrowth = 25,
 });
@@ -77,6 +78,9 @@ impl SourceBufferOrigin {
                 | S::PatchTarget
                 | S::SharedIoBuffer
                 | S::AssociationRecorder
+                | S::HostCapture
+                | S::HostArc
+                | S::HostFileRead
         );
         match self.kind {
             K::ReservationCeiling | K::ReservationOverflow => {

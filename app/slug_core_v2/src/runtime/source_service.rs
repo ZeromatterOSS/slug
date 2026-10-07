@@ -14,6 +14,8 @@ mod registry;
 #[cfg(all(test, target_os = "linux"))]
 #[path = "source_service/registry_association.rs"]
 mod registry_association;
+#[path = "source_service/regular_file.rs"]
+mod regular_file;
 #[path = "source_service/scope.rs"]
 mod scope;
 #[cfg(test)]
@@ -46,6 +48,10 @@ pub(in crate::runtime) use registry_association::RegistryAssociationSnapshot;
 pub(in crate::runtime) use registry_association::RegistryLimitRelation;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use registry_association::RegistryRequestAssociation;
+pub(in crate::runtime) use regular_file::HOST_FILE_OBJECT_BYTES;
+pub(in crate::runtime) use regular_file::RegularFileError;
+pub(in crate::runtime) use regular_file::RegularFileStage;
+pub(in crate::runtime) use regular_file::read_host_file;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceServiceCounters;

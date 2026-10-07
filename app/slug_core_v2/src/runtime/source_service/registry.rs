@@ -10,7 +10,6 @@ use slug_bzlmod_v2::RegistryRefusalDetail;
 use slug_bzlmod_v2::RegistryRefusalSite;
 use slug_bzlmod_v2::RegistryTransportError;
 
-use super::SourceBufferReservation;
 use super::SourceBufferSite;
 use super::SourceBufferUnit;
 use super::SourceCounter;
@@ -18,6 +17,11 @@ use super::SourceHttpAdmission;
 use super::SourceServiceError;
 use super::SourceServiceScope;
 use super::SourceTransportFailure;
+use super::regular_file::Capture;
+use super::regular_file::ReadPolicy;
+use super::regular_file::RegularFileError;
+use super::regular_file::RegularFileStage;
+use super::regular_file::read_regular;
 use super::request_scoped_typed;
 
 pub(in crate::runtime) struct ScopedRegistryIo {
@@ -33,77 +37,6 @@ fn error(error: SourceServiceError) -> RegistryTransportError {
 }
 fn opaque(site: RegistryRefusalSite, message: &'static str) -> RegistryTransportError {
     SourceTransportFailure::opaque(site, message).into_registry()
-}
-
-// Value before its reservation, including on every early return. Registry raw
-// results cannot carry a bank guard: cumulative admitted bytes instead remain
-// charged for the entire consumed scope/engine lifetime.
-struct RegistryBuffer {
-    bytes: Vec<u8>,
-    _credit: SourceBufferReservation,
-}
-impl RegistryBuffer {
-    fn new(scope: &Arc<SourceServiceScope>) -> Result<Self, RegistryTransportError> {
-        let maximum = usize::try_from(scope.limits().registry_object_bytes).map_err(|_| {
-            opaque(
-                RegistryRefusalSite::InternalState,
-                "out of range integral type conversion attempted",
-            )
-        })?;
-        let credit = scope
-            .reserve_buffer_at(
-                maximum + std::mem::size_of::<Vec<u8>>(),
-                SourceBufferSite::RegistryCapture,
-            )
-            .map_err(error)?;
-        let mut bytes = Vec::new();
-        bytes
-            .try_reserve_exact(maximum)
-            .map_err(|_| error(scope.poison(SourceServiceError::Allocation)))?;
-        // Exact reserve requests are explicit; reject an unexpectedly larger
-        // reported capacity rather than using uncredited spare capacity.
-        if bytes.capacity() > maximum {
-            return Err(error(scope.poison(SourceServiceError::Allocation)));
-        }
-        Ok(Self {
-            bytes,
-            _credit: credit,
-        })
-    }
-    fn append(
-        &mut self,
-        scope: &SourceServiceScope,
-        bytes: &[u8],
-    ) -> Result<(), RegistryTransportError> {
-        let len = self.bytes.len().checked_add(bytes.len()).ok_or_else(|| {
-            error(scope.poison(SourceServiceError::Overflow(SourceCounter::RegistryBytes)))
-        })?;
-        if len as u64 > scope.limits().registry_object_bytes {
-            return Err(error(
-                scope.poison(SourceServiceError::Limit(SourceCounter::RegistryBytes)),
-            ));
-        }
-        scope
-            .charge(SourceCounter::RegistryBytes, bytes.len() as u64)
-            .map_err(error)?;
-        self.bytes.extend_from_slice(bytes);
-        Ok(())
-    }
-    fn finish(
-        self,
-        scope: &Arc<SourceServiceScope>,
-    ) -> Result<RegistryIoOutcome, RegistryTransportError> {
-        scope.check().map_err(error)?;
-        // Arc conversion may allocate: reserve its entire block while Vec
-        // bytes and credit remain live. Scope cumulative bytes pins history.
-        let _conversion = scope
-            .reserve_buffer_at(self.bytes.len() + 64, SourceBufferSite::RegistryArc)
-            .map_err(error)?;
-        let result = Arc::<[u8]>::from(self.bytes.as_slice());
-        scope.check().map_err(error)?;
-        drop(self);
-        Ok(RegistryIoOutcome::Found(result))
-    }
 }
 
 #[async_trait]
@@ -202,15 +135,18 @@ pub(super) async fn read_response(
                 }
             }
         }
-        let mut buffer = RegistryBuffer::new(scope)?;
+        let mut buffer = Capture::new(scope, ReadPolicy::Registry).map_err(error)?;
         while let Some(chunk) = response
             .next_data_typed()
             .await
             .map_err(SourceTransportFailure::into_registry)?
         {
-            buffer.append(scope, &chunk)?;
+            buffer.append(scope, &chunk).map_err(error)?;
         }
-        buffer.finish(scope)
+        buffer
+            .finish(scope)
+            .map(RegistryIoOutcome::Found)
+            .map_err(error)
     }
     .await;
     let disposed = response.dispose_typed().await;
@@ -224,136 +160,45 @@ pub(super) async fn read_response(
     }
 }
 
-#[cfg(target_os = "linux")]
 fn read_local(
     scope: &Arc<SourceServiceScope>,
     path: &Path,
 ) -> Result<RegistryIoOutcome, RegistryTransportError> {
-    use std::fs::OpenOptions;
-    use std::io::Read;
-    use std::os::fd::AsRawFd;
-    use std::os::unix::fs::MetadataExt;
-    use std::os::unix::fs::OpenOptionsExt;
-    scope.check().map_err(error)?;
-    let pin = match OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_PATH | libc::O_CLOEXEC)
-        .open(path)
-    {
-        Ok(file) => file,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+    match read_regular(scope, path, ReadPolicy::Registry) {
+        Ok(bytes) => Ok(RegistryIoOutcome::Found(bytes)),
+        Err(RegularFileError::Scope(value)) => Err(error(value)),
+        Err(RegularFileError::Io {
+            stage: RegularFileStage::Pin,
+            error: io,
+            ..
+        }) if io.kind() == std::io::ErrorKind::NotFound => {
             scope.check().map_err(error)?;
-            return Ok(RegistryIoOutcome::NotFound);
+            Ok(RegistryIoOutcome::NotFound)
         }
-        Err(e) => {
-            return Err(SourceTransportFailure::io(
-                RegistryRefusalSite::LocalPin,
-                &e,
-                "scoped registry inode pin failed",
-            )
-            .into_registry());
+        Err(RegularFileError::Io {
+            stage,
+            error: io,
+            message,
+        }) => {
+            let site = match stage {
+                RegularFileStage::Pin => RegistryRefusalSite::LocalPin,
+                RegularFileStage::Stat => RegistryRefusalSite::LocalStat,
+                RegularFileStage::Reopen => RegistryRefusalSite::LocalReopen,
+                RegularFileStage::Read => RegistryRefusalSite::LocalRead,
+                RegularFileStage::Identity => RegistryRefusalSite::LocalIdentity,
+            };
+            Err(SourceTransportFailure::io(site, &io, message).into_registry())
         }
-    };
-    let before = pin.metadata().map_err(|e| {
-        SourceTransportFailure::io(
-            RegistryRefusalSite::LocalStat,
-            &e,
-            "scoped registry pinned stat failed",
-        )
-        .into_registry()
-    })?;
-    if !before.is_file() {
-        return Err(error(
+        Err(RegularFileError::NonRegular { .. }) => Err(error(
             scope.poison(SourceServiceError::UnsupportedSourceOwner),
-        ));
-    }
-    if before.len() > scope.limits().registry_object_bytes {
-        return Err(error(
-            scope.poison(SourceServiceError::Limit(SourceCounter::RegistryBytes)),
-        ));
-    }
-    scope.check().map_err(error)?;
-    let mut input = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
-        .open(format!("/proc/self/fd/{}", pin.as_raw_fd()))
-        .map_err(|e| {
-            SourceTransportFailure::io(
-                RegistryRefusalSite::LocalReopen,
-                &e,
-                "scoped registry data reopen failed",
-            )
-            .into_registry()
-        })?;
-    let identity = |m: &std::fs::Metadata| {
-        (
-            m.dev(),
-            m.ino(),
-            m.mode(),
-            m.len(),
-            m.mtime(),
-            m.mtime_nsec(),
-            m.ctime(),
-            m.ctime_nsec(),
-        )
-    };
-    if identity(&input.metadata().map_err(|e| {
-        SourceTransportFailure::io(
-            RegistryRefusalSite::LocalStat,
-            &e,
-            "scoped registry data stat failed",
-        )
-        .into_registry()
-    })?) != identity(&before)
-    {
-        return Err(opaque(
+        )),
+        Err(RegularFileError::Changed { before_read }) => Err(opaque(
             RegistryRefusalSite::LocalIdentity,
-            "scoped registry pinned identity changed",
-        ));
+            if before_read {
+                "scoped registry pinned identity changed"
+            } else {
+                "scoped registry inode changed while reading"
+            },
+        )),
     }
-    let mut buffer = RegistryBuffer::new(scope)?;
-    let _read_credit = scope
-        .reserve_buffer_at(64 * 1024, SourceBufferSite::RegistryFileRead)
-        .map_err(error)?;
-    let mut chunk = [0u8; 64 * 1024];
-    loop {
-        scope.check().map_err(error)?;
-        let read = input.read(&mut chunk).map_err(|e| {
-            SourceTransportFailure::io(
-                RegistryRefusalSite::LocalRead,
-                &e,
-                "scoped registry local read failed",
-            )
-            .into_registry()
-        })?;
-        scope.check().map_err(error)?;
-        if read == 0 {
-            break;
-        }
-        buffer.append(scope, &chunk[..read])?;
-    }
-    let after = input.metadata().map_err(|e| {
-        SourceTransportFailure::io(
-            RegistryRefusalSite::LocalStat,
-            &e,
-            "scoped registry final stat failed",
-        )
-        .into_registry()
-    })?;
-    if identity(&after) != identity(&before) || buffer.bytes.len() as u64 != before.len() {
-        return Err(opaque(
-            RegistryRefusalSite::LocalIdentity,
-            "scoped registry inode changed while reading",
-        ));
-    }
-    buffer.finish(scope)
-}
-#[cfg(not(target_os = "linux"))]
-fn read_local(
-    scope: &Arc<SourceServiceScope>,
-    _path: &Path,
-) -> Result<RegistryIoOutcome, RegistryTransportError> {
-    Err(error(
-        scope.poison(SourceServiceError::UnsupportedSourceOwner),
-    ))
 }

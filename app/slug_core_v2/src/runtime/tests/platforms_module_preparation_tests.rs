@@ -238,6 +238,7 @@ struct Bodies {
     additional: [Option<AdditionalModule>; 8],
     visible_lockfile_metadata: bool,
     repo_marker_metadata: bool,
+    ignore_file_bytes: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -268,6 +269,7 @@ impl Bodies {
             additional: [None, None, None, None, None, None, None, None],
             visible_lockfile_metadata: false,
             repo_marker_metadata: false,
+            ignore_file_bytes: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -280,6 +282,11 @@ impl Bodies {
         command: CommandChoice,
     ) -> Self {
         self.repo_marker_metadata = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn with_ignore_file_bytes(mut self, registry: RegistryChoice, command: CommandChoice) -> Self {
+        self.ignore_file_bytes = matches!(registry, RegistryChoice::PreparedFile)
             && matches!(command, CommandChoice::PublicProbe);
         self
     }
@@ -452,6 +459,12 @@ impl Bodies {
                 let allowed = match operation {
                     PathObservationOperation::FileBytes | PathObservationOperation::FileDigest => {
                         self.files().any(|file| file.as_path() == path)
+                            || (self.ignore_file_bytes
+                                && operation == PathObservationOperation::FileBytes
+                                && path.file_name().is_some_and(|name| name == ".bazelignore")
+                                && self
+                                    .roots()
+                                    .any(|root| path.parent() == Some(root.as_path())))
                     }
                     PathObservationOperation::Lstat => {
                         self.files().any(|file| file.as_path().starts_with(path))
@@ -1595,7 +1608,8 @@ fn observe_native_command(
         root("SLUG_NATIVE_PLATFORMS_ROOT"),
     ])
     .with_visible_lockfile_metadata(registry_choice)
-    .with_repo_marker_metadata(registry_choice, command);
+    .with_repo_marker_metadata(registry_choice, command)
+    .with_ignore_file_bytes(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
