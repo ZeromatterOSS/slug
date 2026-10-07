@@ -286,6 +286,8 @@ fn projection_matches(
         && bodies.rules_rust_defs_import_sources
         && bodies.bazel_skylib_import_sources
         && bodies.additional[1].is_some()
+        && bodies.rules_cc_import_sources
+        && bodies.additional[2].is_some()
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -359,6 +361,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
             .with_fourth(path("/features"))
             .with_fifth(path("/skylib"))
+            .with_sixth(path("/cc"))
+            .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_bazel_skylib_import_sources(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
@@ -397,6 +401,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             "platforms=/platforms",
             "bazel_features=/features",
             "bazel_skylib=/skylib",
+            "rules_cc=/cc",
         ],
     )
     .unwrap();
@@ -412,6 +417,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let closed = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile);
     assert!(!projection_matches(
@@ -424,6 +431,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_ignore = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -447,6 +456,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_rust_metadata = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -470,6 +481,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_nightly_metadata = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -493,6 +506,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_build_source = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -516,6 +531,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_channel_source = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -539,6 +556,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     let no_package_source = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -605,6 +624,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
                 "rules_rust=/rules",
                 "platforms=/platforms",
                 "bazel_features=/features",
+                "rules_cc=/cc",
             ],
         )
         .unwrap(),
@@ -617,6 +637,47 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &nightly_overlay()
     ));
     Arc::get_mut(&mut bodies).unwrap().additional[1] = selected;
+    request.command_policy = selected_policy;
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().rules_cc_import_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().rules_cc_import_sources = true;
+    let selected = Arc::get_mut(&mut bodies).unwrap().additional[2].take();
+    let selected_policy = std::mem::replace(
+        &mut request.command_policy,
+        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            Path::new("/fixture"),
+            [
+                "rules_rust=/rules",
+                "platforms=/platforms",
+                "bazel_features=/features",
+                "bazel_skylib=/skylib",
+            ],
+        )
+        .unwrap(),
+    );
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().additional[2] = selected;
     request.command_policy = selected_policy;
     assert!(projection_matches(
         &inner,
@@ -1541,6 +1602,150 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         .with_fourth(path("/skylib"))
         .with_fifth(path("/other"))
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(wrong_slot.admit(&all).is_err());
+}
+#[test]
+fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
+    let operations = [
+        PathObservationOperation::Lstat,
+        PathObservationOperation::FileBytes,
+    ];
+    for relative in RULES_CC_IMPORTS {
+        let selected = Path::new("/cc").join(relative);
+        assert_exact_root_file_role(
+            relative,
+            &operations,
+            Bodies::with_rules_cc_import_sources,
+            |b| b.rules_cc_import_sources,
+            &[],
+            selected.to_str().unwrap(),
+            Some("/cc"),
+        );
+    }
+    for relative in RULES_CC_IMPORT_METADATA {
+        let selected = Path::new("/cc").join(relative);
+        assert_exact_root_file_role(
+            relative,
+            &[PathObservationOperation::Lstat],
+            Bodies::with_rules_cc_import_sources,
+            |b| b.rules_cc_import_sources,
+            &[],
+            selected.to_str().unwrap(),
+            Some("/cc"),
+        );
+    }
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let need = |p: &Path, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(p).unwrap(),
+            operation,
+        )))
+    };
+    let bodies = make()
+        .with_fourth(path("/features"))
+        .with_fifth(path("/skylib"))
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let mut all = need(Path::new("/cc/cc"), PathObservationOperation::Lstat);
+    all = all
+        .try_union(&need(
+            Path::new("/cc/cc/common"),
+            PathObservationOperation::Lstat,
+        ))
+        .unwrap();
+    for relative in RULES_CC_IMPORTS {
+        let selected = Path::new("/cc").join(relative);
+        for operation in &operations {
+            all = all.try_union(&need(&selected, operation.dupe())).unwrap();
+        }
+    }
+    assert_eq!(all.path_observations().unwrap().demands().len(), 8);
+    assert!(bodies.admit(&all).is_ok());
+    assert_eq!(
+        bodies
+            .source_limits(RegistryChoice::PreparedFile)
+            .source_attempts,
+        16
+    );
+    for (excluded, operation) in [
+        ("/cc/cc", PathObservationOperation::FileBytes),
+        ("/cc/cc/common", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/find_cc_toolchain.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/find_cc_toolchain.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/Find_cc_toolchain.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/CC/find_cc_toolchain.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/common/unknown.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/common/cc_common.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/find_cc_toolchain.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/cc/find_cc_toolchain.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/cc/cc/BUILD.bazel", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/common/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/find_cc_toolchain.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+    ] {
+        let mixed = all
+            .try_union(&need(Path::new(excluded), operation.dupe()))
+            .unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(
+            (denied.family, denied.operation),
+            ("path", path_operation_code(&operation))
+        );
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+    for sparse in [
+        make(),
+        make().with_fourth(path("/cc")),
+        make()
+            .with_fourth(path("/features"))
+            .with_fifth(path("/cc")),
+    ] {
+        let sparse = sparse
+            .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert!(sparse.rules_cc_import_sources);
+        assert!(sparse.admit(&all).is_err());
+    }
+    let wrong_slot = make()
+        .with_fourth(path("/features"))
+        .with_fifth(path("/cc"))
+        .with_sixth(path("/other"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(wrong_slot.admit(&all).is_err());
 }
 fn assert_exact_root_file_role(

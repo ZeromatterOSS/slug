@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Selected Skylib cohort accepted; selected rules_cc cohort next
+Status: Selected rules_cc cohort accepted; normal compatibility-proxy owner prerequisite next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,28 +149,34 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP975](./slug-v2-subplans/wp975-skylib-declared-import-readiness-2026-10-07.json)
-accepts three exact Skylib availability rows: paths10378B/structs1265B/common_settings6421B,
-18064B total/.052s/19,592KiB, unchanged strict reader/64KiB scratch/per-row retirement.
-Three observations are not test passes. Separate defaultfalse PreparedFile/PublicProbe
-role borrows selected additional[1], admits three exact bodies/two Lstat-only directories,
-and preserves whole-Need-before-progress plus every existing projection negative.
-245net cfgtest lines add one bool/80descriptor61literal bytes/zero guardheap strings;
-growth beyond120–220 estimate is independently accepted for discriminating controls.
-Original rulesRust28/3metadata/source64/default16/production owners and caps are unchanged.
-29ordinary+4synthetic+1normal native pass; pinned Core/CLI preparation passes.
-Once native.708s/83,648KiB reaches exact190B selected rules_cc_root/cc HostLstat;
-SourceNone105registry235521/27Host334004Decoded unchanged, no newbody attribution.
-434runtimepins/477union/36ops include capture1;220leases786443physical1572886hashbytes
-use the same two64KiB parent contexts, non-atomic/noninherited/noncertifying.
-Public Rustc/actions/certificates remain null; privateWeakunseen/finalcredits do not prove
-wholeDICE/page release. Next cohesive rules_cc three-body declared family and exact
-cc/cc/common metadata uses existing additional[2], after reviewed first capture.
-81-edge Python subset/32callers plus separate qualified historical native AstLoads12
-are incomplete syntax, not mapping/freshness. Public producer/support/data/providers/
-toolchains/runfiles/oracle/restoration/fullCLI/M7A/MVS/provenance/whole-fit remain open.
-PriorWP974 chronology is Git-reachable at64d6334982f6657ec31ab8cc324c19fafab36b18;
-borrowing/scoped interning and Windowsminimum persist.
+[WP976](./slug-v2-subplans/wp976-rules-cc-declared-import-readiness-2026-10-07.json)
+accepts three exact rules_cc availability rows6234B/.042s/19,044KiB/43pins,
+unchanged strict reader/64KiB scratch/per-row retirement; three observations are not tests.
+Separate defaultfalse PreparedFile/PublicProbe role borrows selected additional[2],
+three exact bodies/two Lstat-only metadata paths; all prior projection masks remain
+independent.240net cfgtest lines/onebool/80descriptor79literal bytes/zero guardheap
+strings; original rulesRust28/3metadata/Skylib3/2metadata/source64/default16/caps and
+production owners unchanged.30ordinary+4synthetic+1normal native pass; pinned Core/CLI
+preparation passes. One zero-child launcher packaging correction is preserved; no
+actual source/native/test/compile operation was repeated. Once native.995s/86,792KiB
+advances to build_refusal/complete59attempts/1terminalroot, public package error with
+73observations/certificatefalse and null analyses/actions/Rustc, no Host denial.
+Original retained RootPackageLoadError provides qualifiedcomplete bounded external_bzl
+presentation through cc_common to generated rules_cc++compatibility_proxy+cc_compatibility_proxy:
+Loading/Pure/Inputs Unsupported rules_cc++compatibility_proxy. This is not semantic
+identity/source availability/MVS/provenance or successful compiler production.
+SourceNone105registry235521/49Host518820Decoded; aggregate+22/+184816 is not per-file
+read/Arc/evaluation proof.455runtimepins/499union/37acceptedops include capture1;
+223leases792677physical1585354hashbytes/same128KiB parent contexts are diagnostic,
+non-atomic/noninherited/noncertifying. Scope/recorder/credits retire; unseen private
+bodyWeak expiry remains vacuous and wholeDICE/page release is unproved.
+Next the actual normal selected extension-owner input prerequisite, reusing existing
+genuine compatibility-proxy callback/loading fixtures rather than a proxy snapshot.
+84-edge Python subset/35callers plus separate historical native AstLoads12 remain
+partial syntax; foreignproxy/generatedsource availability is still unproved.
+Full publicproducer/support/data/providers/toolchains/runfiles/oracle/restoration/
+fullCLI/M7A/MVS/provenance/whole-fit remain open. PriorWP975 chronology is Git-reachable
+at76528b9d10f85b235f67cc20f658a7cbfd05a803; borrowing/scoped interning/Windowsminimum persist.
 [WP972](./slug-v2-subplans/wp972-rules-rust-import-frontier-readiness-2026-10-07.json)
 captures seven exact local imports122679B once at0.093s/22,976KiB/35pins with the
 unchanged strict FD/facts owner;11reader checks qualifiedreuse0fresh, seven observations
