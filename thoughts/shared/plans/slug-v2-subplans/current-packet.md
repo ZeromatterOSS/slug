@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Bazel features import source readiness
+Status: Features private extension source readiness
 
 ## Observable and source basis
 
@@ -44,61 +44,66 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP979](wp979-private-cc-import-readiness-2026-10-07.json) accepts the finite private
-rules_cc toolchain import cohort on baseline26d4e1daa0649106e778851aecf8b1b37accc1fa.
-Two strict captures observed four bodies totaling91,519 bytes, using one64KiB scratch
-and per-row body/text/AST retirement. The existing exact table4→8 and metadata2→4
-cover20 Host demands, preserve old cases and add12 mixed refusal cases. Two cfgtest
-owners add53 net lines,96 bytes static descriptors and195 literal bytes; zero new
-guard heap, flags or production changes. Borrowed selected additional[2] policy remains.
+[WP980](wp980-bazel-features-import-readiness-2026-10-07.json) accepts the finite
+Features source role on baseline4edecf56514696b73e9818a3284f49161cd32a03.
+Two strict captures observed three bodies totaling16,976 bytes, single64KiB scratch
+and per-row body/text/AST retirement. Defaultfalse PreparedFile/PublicProbe uses
+borrowed additional[0], three body leaves HostLstat/FileBytes and private Lstat only.
+Seven whole Needs and shared root/mode/namespace/operation/refusal tests preserve
+all old roles. Two cfgtest owners add281 lines,64B static descriptors/52 literal bytes,
+one inline bool; no separate heap allocation or owned strings. Current Bodies192B
+is measured; old layout/payload delta remains unproved. Growth was independently
+reviewed; wrong-slot fixture prefixes were corrected before compilation.
 
-30 fresh Core tests +4 synthetic controls +1 normal observer =35 fresh named passes;
+31 fresh Core tests +4 synthetic controls +1 normal observer =36 fresh named passes;
 42 unchanged owner/callback checks and11 reader controls are qualified reuse0fresh.
-Pinned serial preparations5.250s/7.296s execute no tests; compiler memory is separate.
-Ordinary tests total5.710s, synthetics0.148s. Normal1.099s peaks88,936KiB under256MiB,
-with scope/recorder cleanup and final credits retired. BodyWeak remains unseen/vacuous;
-all DICE/allocator-page/whole-workload fit remains open. Current36 operations/499 union
-pins include497 native pins. Ordered228 parent leases bracket891,827 physical bytes/
-1,783,654 hash bytes with two64KiB contexts128KiB, non-atomic and noncertifying.
+Pinned serial preparations10.401s/7.312s execute no tests; compiler memory is separate.
+Ordinary runtime totals5.990s, synthetics0.187s. Normal1.243s peaks89,700KiB under256MiB;
+scope/recorder cleanup and final credits retire. BodyWeak remains unseen/vacuous;
+all DICE/allocator pages and whole-workload fit remain open. Current37 operations/
+501 union pins include499 native pins. Ordered231 parent leases bracket908,803 physical
+bytes/1,817,606 hash bytes using two64KiB contexts128KiB, non-atomic and noncertifying.
 
-The actual next200-byte Host Lstat is bazel_features_root/features.bzl. Whole-Need
-refusal leaves source51/528,367 decoded bytes and registry105/235,521 unchanged;
-there is no new private-body native read/evaluation attribution. Public preparation is
-complete and policy checked; terminal/certificate/observations/analyses/actions/Rustc
-remain unavailable. Source64 leaves13 numeric attempts, not unique files or closure.
+Actual source52/542,839 decoded is aggregate+1/+14,472 relative to WP979, without
+per-file consumption attribution; registry105/235,521 unchanged. Public preparation
+is complete/policychecked, while terminal/certificate/observations/analyses/actions/
+Rustc remain unavailable. The next exact210B Host Lstat is selected Features root/
+private/extensions.bzl. Source64 leaves12 numeric attempts, not files or closure.
 
 ## Active continuation contract
 
 Continue WP231 toward the genuine normal producer using the
-[grounded successor](../../../../target/wp979/native/successor-source.md). The actual
-Features Lstat plus captured cc/extensions.bzl partial literal loads at16/17 select
-exactly features.bzl and private/util.bzl under the explicit selected Features root.
-Freeze the next baseline/design/inputs and independently review helpers before one
-strict first capture. Availability, size/hash, private directory kind and import closure
-remain unknown. Actual eligibility must precede any finite source-role code admission.
+[grounded successor](../../../../target/wp980/native/successor-source.md), SHA256
+cab6c8a7540fc3f342b5f7a7fe32216ac66d1e31cd82f8f77f9fafb4dc492deb.
+Freeze the next baseline/design/inputs and independently review unchanged strict
+reader bindings before one exact private/extensions.bzl capture (two components).
+Body size/hash/import facts remain unknown. Require both actual eligibility FINALs
+before any finite source-role change. Further same-root literal imports require
+separate bounded eligibility; foreign generated globals/version remain closed.
 
-Use the natural selected Local definition and credited external-source owners, borrowed
-additional[0] Features identity and whole-Need refusal before progress. Preserve accepted
-CC additional[2] and every existing source role. A defaultfalse PreparedFile/PublicProbe
-Features role may conditionally admit exactly two Host Lstat/FileBytes bodies and private
-metadata Lstat, with meaningful exact-root/mode/namespace/operation/mixed-no-progress
-controls. Root must freeze actual scope/growth/current validation before implementation;
-there is no recursive import, alias, generated proxy/provider or fallback grant.
+If usable, append only that leaf to Features3→4, union7→9, preserving borrowed
+additional[0]/defaultfalse mode/namespace/operation/mixed-no-progress/projection tests.
+No new flag/heap/owned strings/sourcebank/cache/production identity changes. Natural
+checked Local definition/credited ExternalBzl/Need/epoch/certificate owners stay intact.
+Original231 parent prefix may append only eligible rows using the same two64KiB
+contexts128KiB. Freeze actual scope/growth/current validation before implementation;
+no recursive import, generated alias/proxy/provider or broader prefix fallback.
 
-Original228 parent prefix may append only eligible rows through the same two64KiB
-contexts128KiB. Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB
-byte banks, serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/
-report4MiB/FSIZE16MiB. Existing unchanged source/raw proofs may be reused honestly;
-current modified gates need a fresh Cargo-derived artifact and exact selection.
-
-Borrow or transfer existing string storage. Use existing scoped interners for repeated
-immutable retained strings when lifetime and cleanup fit. Windows remains minimal.
-Local0.2.17/requested0.2.4 and caller-alias/defining-self mapping domains stay distinct.
-Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE
-2024→2021→2024/fullCLI/M7A/MVS/provenance and whole-workload fit remain required.
-Actual next Need selects the next grounded prerequisite; no automatic identical retry.
+Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
+serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
+FSIZE16MiB. Reuse unchanged source/raw proofs honestly; modified gates need fresh
+Cargo-derived artifact and exact selection. Actual next Need grounds the correction,
+with no automatic identical retry. Borrow/transfer/share existing storage; use existing
+scoped interners for repeated retained strings where lifetime and cleanup fit. Windows
+remains minimal. Local0.2.17/requested0.2.4 and caller-alias/defining-self domains remain
+distinct. Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/
+same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessors
+
+[WP979](wp979-private-cc-import-readiness-2026-10-07.json), accepted at
+4edecf56514696b73e9818a3284f49161cd32a03, owns finite CC8/meta4
+and the prior Features/features.bzl Need. Earlier source chronology is Git-reachable.
 
 [WP978](wp978-local-extension-source-readiness-2026-10-07.json), accepted at
 26d4e1daa0649106e778851aecf8b1b37accc1fa, admits the independently observed exact

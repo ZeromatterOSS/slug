@@ -94,6 +94,9 @@ impl Default for ProbeReport {
     }
 }
 impl ProbeReport {
+    pub(super) fn policy_checked(&self) -> bool {
+        self.policy_checked
+    }
     pub(super) fn report(
         &self,
         stage: &str,
@@ -284,6 +287,8 @@ fn projection_matches(
         && bodies.probe_package_source
         && bodies.rules_rust_defs_source
         && bodies.rules_rust_defs_import_sources
+        && bodies.bazel_features_import_sources
+        && bodies.additional[0].is_some()
         && bodies.bazel_skylib_import_sources
         && bodies.additional[1].is_some()
         && bodies.rules_cc_import_sources
@@ -362,6 +367,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_fourth(path("/features"))
             .with_fifth(path("/skylib"))
             .with_sixth(path("/cc"))
+            .with_bazel_features_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_bazel_skylib_import_sources(
                 RegistryChoice::PreparedFile,
@@ -418,6 +427,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile);
@@ -432,6 +445,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -457,6 +474,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -482,6 +503,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -507,6 +532,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -532,6 +561,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -557,6 +590,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
@@ -678,6 +715,51 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &nightly_overlay()
     ));
     Arc::get_mut(&mut bodies).unwrap().additional[2] = selected;
+    request.command_policy = selected_policy;
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .bazel_features_import_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .bazel_features_import_sources = true;
+    let selected = Arc::get_mut(&mut bodies).unwrap().additional[0].take();
+    let selected_policy = std::mem::replace(
+        &mut request.command_policy,
+        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            Path::new("/fixture"),
+            [
+                "rules_rust=/rules",
+                "platforms=/platforms",
+                "bazel_skylib=/skylib",
+                "rules_cc=/cc",
+            ],
+        )
+        .unwrap(),
+    );
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().additional[0] = selected;
     request.command_policy = selected_policy;
     assert!(projection_matches(
         &inner,
@@ -1470,6 +1552,164 @@ fn probe_package_source_need_is_opt_in_exact_fixture_only() {
         assert_eq!(denied.family, "path");
         assert_eq!(denied.operation, path_operation_code(&operation));
         assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+}
+#[test]
+fn bazel_features_import_sources_need_is_opt_in_exact_table_only() {
+    let operations = [
+        PathObservationOperation::Lstat,
+        PathObservationOperation::FileBytes,
+    ];
+    for relative in BAZEL_FEATURES_IMPORTS {
+        let selected = Path::new("/features").join(relative);
+        assert_exact_root_file_role(
+            relative,
+            &operations,
+            Bodies::with_bazel_features_import_sources,
+            |b| b.bazel_features_import_sources,
+            &[],
+            selected.to_str().unwrap(),
+            Some("/features"),
+        );
+    }
+    for relative in BAZEL_FEATURES_IMPORT_METADATA {
+        let selected = Path::new("/features").join(relative);
+        assert_exact_root_file_role(
+            relative,
+            &[PathObservationOperation::Lstat],
+            Bodies::with_bazel_features_import_sources,
+            |b| b.bazel_features_import_sources,
+            &[],
+            selected.to_str().unwrap(),
+            Some("/features"),
+        );
+    }
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let need = |p: &Path, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(p).unwrap(),
+            operation,
+        )))
+    };
+    let bodies = make()
+        .with_fourth(path("/features"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    let mut all = need(
+        Path::new("/features/private"),
+        PathObservationOperation::Lstat,
+    );
+    for relative in BAZEL_FEATURES_IMPORTS {
+        let selected = Path::new("/features").join(relative);
+        for operation in &operations {
+            all = all.try_union(&need(&selected, operation.dupe())).unwrap();
+        }
+    }
+    assert_eq!(all.path_observations().unwrap().demands().len(), 7);
+    assert!(bodies.admit(&all).is_ok());
+    assert_eq!(
+        bodies
+            .source_limits(RegistryChoice::PreparedFile)
+            .source_attempts,
+        16
+    );
+    for (excluded, operation) in [
+        ("/features/private", PathObservationOperation::FileBytes),
+        ("/features/private", PathObservationOperation::FileDigest),
+        (
+            "/features/features.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/features.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/Features.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/util.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/private/util.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/Util.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/parse.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/private/parse.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/Parse.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/parse_extra.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/private/unknown.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/PRIVATE/parse.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/private/parse.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/rules/features.bzl", PathObservationOperation::Lstat),
+        (
+            "/skylib/private/parse.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/cc/private/util.bzl", PathObservationOperation::FileBytes),
+    ] {
+        let mixed = all
+            .try_union(&need(Path::new(excluded), operation.dupe()))
+            .unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(
+            (denied.family, denied.operation),
+            ("path", path_operation_code(&operation))
+        );
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+    for sparse in [
+        make(),
+        make()
+            .with_fourth(path("/other"))
+            .with_fifth(path("/features")),
+        make()
+            .with_fourth(path("/other"))
+            .with_fifth(path("/skylib"))
+            .with_sixth(path("/features")),
+    ] {
+        let sparse = sparse.with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+        assert!(sparse.bazel_features_import_sources);
+        assert!(sparse.admit(&all).is_err());
     }
 }
 #[test]

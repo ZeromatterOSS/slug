@@ -264,6 +264,8 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 28] = [
     "rust/private/stamp.bzl",
 ];
 const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
+const BAZEL_FEATURES_IMPORTS: [&str; 3] = ["features.bzl", "private/util.bzl", "private/parse.bzl"];
+const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
 const BAZEL_SKYLIB_IMPORTS: [&str; 3] = [
     "lib/paths.bzl",
     "lib/structs.bzl",
@@ -296,6 +298,7 @@ struct Bodies {
     probe_package_source: bool,
     rules_rust_defs_source: bool,
     rules_rust_defs_import_sources: bool,
+    bazel_features_import_sources: bool,
     bazel_skylib_import_sources: bool,
     rules_cc_import_sources: bool,
 }
@@ -336,6 +339,7 @@ impl Bodies {
             probe_package_source: false,
             rules_rust_defs_source: false,
             rules_rust_defs_import_sources: false,
+            bazel_features_import_sources: false,
             bazel_skylib_import_sources: false,
             rules_cc_import_sources: false,
         }
@@ -465,6 +469,30 @@ impl Bodies {
                             .iter()
                             .any(|file| relative == Path::new(file))
                 })
+    }
+    fn with_bazel_features_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.bazel_features_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_bazel_features_import_source(&self, path: &Path, metadata: bool) -> bool {
+        self.bazel_features_import_sources
+            && self.additional[0].as_ref().is_some_and(|module| {
+                path.strip_prefix(module.root.as_path())
+                    .is_ok_and(|relative| {
+                        (metadata
+                            && BAZEL_FEATURES_IMPORT_METADATA
+                                .iter()
+                                .any(|directory| relative == Path::new(directory)))
+                            || BAZEL_FEATURES_IMPORTS
+                                .iter()
+                                .any(|file| relative == Path::new(file))
+                    })
+            })
     }
     fn with_bazel_skylib_import_sources(
         mut self,
@@ -707,6 +735,7 @@ impl Bodies {
                                     || self.admits_probe_package_source(path, false)
                                     || self.admits_rules_rust_defs_source(path)
                                     || self.admits_rules_rust_defs_import_source(path, false)
+                                    || self.admits_bazel_features_import_source(path, false)
                                     || self.admits_bazel_skylib_import_source(path, false)
                                     || self.admits_rules_cc_import_source(path, false)))
                             || (self.ignore_file_bytes
@@ -723,6 +752,7 @@ impl Bodies {
                             || self.admits_probe_package_source(path, true)
                             || self.admits_rules_rust_defs_source(path)
                             || self.admits_rules_rust_defs_import_source(path, true)
+                            || self.admits_bazel_features_import_source(path, true)
                             || self.admits_bazel_skylib_import_source(path, true)
                             || self.admits_rules_cc_import_source(path, true)
                             || (self.visible_lockfile_metadata
@@ -1884,6 +1914,7 @@ fn observe_native_command(
     .with_probe_package_source(registry_choice, command)
     .with_rules_rust_defs_source(registry_choice, command)
     .with_rules_rust_defs_import_sources(registry_choice, command)
+    .with_bazel_features_import_sources(registry_choice, command)
     .with_bazel_skylib_import_sources(registry_choice, command)
     .with_rules_cc_import_sources(registry_choice, command);
     for slot in 0..mode.additional_count() {
@@ -1919,6 +1950,8 @@ fn observe_native_command(
         request_registry
     );
     let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
+    let features_import_sources = bodies.bazel_features_import_sources;
+    let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
     let limits = bodies.source_limits(registry_choice);
     let scope = SourceServiceScope::new_for_test(
@@ -2066,6 +2099,14 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP980_FEATURES_IMPORT_SOURCES enabled={} policy_checked={} additional0_present={} source_attempt_limit={} bodies_size={}",
+            features_import_sources,
+            probe_report.policy_checked(),
+            features_root_present,
+            limits.source_attempts,
+            std::mem::size_of::<Bodies>()
+        );
     }
     let (source_weak, additional_weak) = {
         let state = milestones.lock().unwrap();
