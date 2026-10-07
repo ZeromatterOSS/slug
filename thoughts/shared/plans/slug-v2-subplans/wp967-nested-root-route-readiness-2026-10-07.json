@@ -1,0 +1,1288 @@
+{
+  "checkpoint": "WP967",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "4c854854a20d9cc40dad2d7c947897d533d078a3",
+  "outcome": "progress: borrowed nested root-load route presentation over the original public Package error; actual next prerequisite recorded below",
+  "compatibility": "Slug-native bounded borrowed diagnostic presentation; Core observer/marker, source reader, production filesystem/kernel and semantic route/equality/epoch behavior unchanged",
+  "implementation": {
+    "owners": [
+      {
+        "path": "app/slug_bzlmod_v2/src/host_module.rs",
+        "sha256": "d3ed13414b4a0c86ca5190a2098f8e2b273ce11f1d0e222737aa73cbee7bae75"
+      },
+      {
+        "path": "app/slug_loading_v2/src/bzl_module.rs",
+        "sha256": "906549e83b95b3e5941d6e654d8b840ebf794b33b369989393333b9400999c15"
+      },
+      {
+        "path": "app/slug_loading_v2/src/root_repository_load_route.rs",
+        "sha256": "d388c60095f3fc408b0816acdc6df0e0e931020914093585db3ea0fd71eaf3e7"
+      },
+      {
+        "path": "app/slug_loading_v2/src/registration_diagnostic.rs",
+        "sha256": "ecdb893562dac97a6865abeb869acbc5f216d3b5df56ab69028f0c07a586fcf1"
+      }
+    ],
+    "tests": [
+      {
+        "path": "app/slug_bzlmod_v2/src/root_repository_route_diagnostic_tests.rs",
+        "sha256": "08c80b7d0fd5db51494b98f2866700d14d113c7f73c63015d984509758bf1612"
+      },
+      {
+        "path": "app/slug_loading_v2/src/root_repository_load_route_tests.rs",
+        "sha256": "af12098d4ab508b397377455eca0e73a6e4241322ca3c0da0886ec6d7255ef25"
+      },
+      {
+        "path": "app/slug_loading_v2/src/registration_diagnostic_tests.rs",
+        "sha256": "b06ec60e440f151c59dde188a6b651094bbab3110767b4d8e5fd4471f7ba22eb"
+      },
+      {
+        "path": "app/slug_loading_v2/src/root_package_diagnostic_tests.rs",
+        "sha256": "09a97bc25ad6c3ce1a2cc0ac23fcd77b4a1840bcb7c674ecbb15164b8c275211"
+      }
+    ],
+    "unchanged_mapping_owner": {
+      "path": "app/slug_loading_v2/src/canonical_repository_mapping.rs",
+      "sha256": "fc4612b17297886b66705aa52204bf4e5dfa67c3afc1b84d52fee53bb89819c3"
+    },
+    "unchanged_core_observer": {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+      "sha256": "a4488f01847824bb03738e9c6189a3486dab0b0c32ba2b118be2c06dcb23d95b"
+    },
+    "changed_lines": 514,
+    "net_added_lines": 490,
+    "production_net": 115,
+    "loading_production_net": 79,
+    "bzlmod_production_net": 36,
+    "tests_net": 375,
+    "core_report_net": 0,
+    "new_retained_strings": 0,
+    "new_retained_collections": 0,
+    "growth": "Original ExternalRoute loan, seven-kind borrowed route view, shared global32 walker and finite Bzlmod safe3/opaque3 writer; no Arc bump, new buffer/walker/cache/interner/semantic owner. Test estimate excess reviewed for sibling identity, real predecessor poison, original ownership/release and nested edge/depth/output controls"
+  },
+  "corpus": {
+    "receipt": {
+      "path": "thoughts/shared/plans/slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json",
+      "sha256": "b23f611ab040611b549d6d809ae9dbb7f977dbc4e3f8981a4e968df3f5b884a6"
+    },
+    "result": {
+      "path": "target/wp954/corpus/result.json",
+      "sha256": "ee373fef2f89203c1650c79ce3918a5905476fd83af4d7ee5e7a77cd030a3962"
+    },
+    "fresh_preparations": 0,
+    "local_files": 11,
+    "registry_files": 177,
+    "physical_bytes": 284878,
+    "before_after_hash_read_bytes": 569756,
+    "physical_brackets_are_host_certificate": false
+  },
+  "preparation": [
+    {
+      "mode": "bzlmod-compile",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_bzlmod_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0",
+        "--config",
+        "profile.test.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.test.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.test.package.slug_bzlmod_v2.codegen-units=128"
+      ],
+      "elapsed_seconds": 27.9810572930146,
+      "exit_code": 0,
+      "monitored_rss_kib": 77268,
+      "child_rusage_peak_kib": 1979520,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "operation": {
+        "path": "target/wp967/native/bzlmod-compile.json",
+        "sha256": "beb5df0a4bf4f9d9a213d9f7f79860691ef7c5ba28700fcb440e3fb16c76a055"
+      },
+      "qualification": "Serial pinned nightly/offline/jobs1 preparation under original feature roots/six dev-package opt0/debug0 overrides. Bzlmod test alone additionally sets explicit test-package opt0/debug0/CGU128 for artifact isolation. Preparation/compiler memory is separate from runtime fit"
+    },
+    {
+      "mode": "loading-compile",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0"
+      ],
+      "elapsed_seconds": 35.92771603597794,
+      "exit_code": 0,
+      "monitored_rss_kib": 79192,
+      "child_rusage_peak_kib": 3183972,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "operation": {
+        "path": "target/wp967/native/loading-compile.json",
+        "sha256": "de6b1b75bd27b1029f7b3ef1d637fc8e4af179080de84e22228413ee47dfdd3a"
+      },
+      "qualification": "Serial pinned nightly/offline/jobs1 preparation under original feature roots/six dev-package opt0/debug0 overrides. Bzlmod test alone additionally sets explicit test-package opt0/debug0/CGU128 for artifact isolation. Preparation/compiler memory is separate from runtime fit"
+    },
+    {
+      "mode": "compile",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0"
+      ],
+      "elapsed_seconds": 34.26738877396565,
+      "exit_code": 0,
+      "monitored_rss_kib": 82776,
+      "child_rusage_peak_kib": 2723116,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "operation": {
+        "path": "target/wp967/native/compile.json",
+        "sha256": "233ad3a586e2cad24c2f04a6e48d6ef5a63024e3cd3c4b03a0047103c63d2c82"
+      },
+      "qualification": "Serial pinned nightly/offline/jobs1 preparation under original feature roots/six dev-package opt0/debug0 overrides. Bzlmod test alone additionally sets explicit test-package opt0/debug0/CGU128 for artifact isolation. Preparation/compiler memory is separate from runtime fit"
+    },
+    {
+      "mode": "check",
+      "command": [
+        "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+        "check",
+        "-p",
+        "slug_core_v2",
+        "-p",
+        "slug_cli_v2",
+        "--offline",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0"
+      ],
+      "elapsed_seconds": 31.179817856056616,
+      "exit_code": 0,
+      "monitored_rss_kib": 87436,
+      "child_rusage_peak_kib": 1110588,
+      "caps": {
+        "seconds": 60,
+        "term_seconds": 3,
+        "offline": true,
+        "jobs": 1
+      },
+      "operation": {
+        "path": "target/wp967/native/check.json",
+        "sha256": "0144b9724fb489e12a8651b30963df31a9a1be45dcb97ba1380bc28eefad1f59"
+      },
+      "qualification": "Serial pinned nightly/offline/jobs1 preparation under original feature roots/six dev-package opt0/debug0 overrides. Bzlmod test alone additionally sets explicit test-package opt0/debug0/CGU128 for artifact isolation. Preparation/compiler memory is separate from runtime fit"
+    }
+  ],
+  "ordinary": {
+    "selected": 23,
+    "passed": 23,
+    "selectors": [
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::eleventh_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::tenth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::ninth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::eighth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::seventh_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::sixth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fifth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::fourth_module_need_admission_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::complete_need_admission_refuses_mixed_and_wrong_operation_before_progress",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::registry_first_row_reporter_preserves_raw_domains_bounds_and_offline_qualification",
+      "runtime::dice::source_service::tests::scoped_offline_registry_keeps_local_bytes_and_refuses_http",
+      "runtime::dice::tests::source_input_tests::native_source_digest_is_revalidated_before_acceptance",
+      "runtime::request_revision::tests::native_epoch_certificate_preserves_equal_and_replaces_only_changed_arcs",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::prepared_file_registry_policy_is_opt_in_and_exact",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::visible_lockfile_metadata_need_is_opt_in_and_root_lstat_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::guarded_singleton_preserves_dispatch_policy_and_whole_need",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::repo_marker_metadata_need_is_opt_in_root_lstat_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::ignore_file_bytes_need_is_opt_in_exact_root_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::rust_package_metadata_need_is_opt_in_exact_rules_root_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_package_metadata_need_is_opt_in_exact_chain_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_build_source_need_is_opt_in_exact_package_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::nightly_channel_source_need_is_opt_in_exact_import_only",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::probe_package_source_need_is_opt_in_exact_fixture_only"
+    ],
+    "elapsed_seconds": 4.379515532986261,
+    "conservative_peak_kib": 58508,
+    "operations": [
+      {
+        "path": "target/wp967/native/ordinary-0-operation.json",
+        "sha256": "d90230baa8bdfb0659cae8cd4f70b441b45eafc22988607f1e30db39df2900b1"
+      },
+      {
+        "path": "target/wp967/native/ordinary-1-operation.json",
+        "sha256": "d64fc9a8a1a92413a9aa4ad1d9689d1bf3c627cb4d1556f77af0e908bec6033a"
+      },
+      {
+        "path": "target/wp967/native/ordinary-2-operation.json",
+        "sha256": "6820f80ea52f96fefcc5cef910bd163901a55f74e9fbec279279c0206655f49a"
+      },
+      {
+        "path": "target/wp967/native/ordinary-3-operation.json",
+        "sha256": "ca4fb3af2ea70f1e6269cca17a9225cba6da54b85af9428de09fa60da4a42c77"
+      },
+      {
+        "path": "target/wp967/native/ordinary-4-operation.json",
+        "sha256": "591514a2ac271d7e9030741d97540684aeeaf0b8f9a0d286ceb32476334c60bf"
+      },
+      {
+        "path": "target/wp967/native/ordinary-5-operation.json",
+        "sha256": "2ecbedbf724321e75dda1476221bb310a47d1b01d40fc6d4c8930ef05fd9ce71"
+      },
+      {
+        "path": "target/wp967/native/ordinary-6-operation.json",
+        "sha256": "7bc1570aaa2a6e97be1b97b1ce71ba6cd0632addb26e5632b3e7d98b56603618"
+      },
+      {
+        "path": "target/wp967/native/ordinary-7-operation.json",
+        "sha256": "d69198c049896bbf5e63938e7ae323336f5c85b4d78a77e46bfe938db74ef3be"
+      },
+      {
+        "path": "target/wp967/native/ordinary-8-operation.json",
+        "sha256": "ae682fe9628f9c2118ca5601776ffbc7da499fb4a41f7f985fcc53c12459845a"
+      },
+      {
+        "path": "target/wp967/native/ordinary-9-operation.json",
+        "sha256": "2a0305fad4ce73b2fa7dacb976cd12a8a35275bf3c0a5caa75b2997f6aa2cc8f"
+      },
+      {
+        "path": "target/wp967/native/ordinary-10-operation.json",
+        "sha256": "343a9aa43e29fb122cd0ddad13b791959422c84c915f59a494cb413bda81ce39"
+      },
+      {
+        "path": "target/wp967/native/ordinary-11-operation.json",
+        "sha256": "77ef933c7539219d69891c7a16002c2e8e8abd6c29e179048062970764766846"
+      },
+      {
+        "path": "target/wp967/native/ordinary-12-operation.json",
+        "sha256": "1d0a05ff4222c885f768ac00888fa68a9f59b05291b5ef2569acc0019bfef7d3"
+      },
+      {
+        "path": "target/wp967/native/ordinary-13-operation.json",
+        "sha256": "eea945fe3380ed487393992e10186a33dea524a73c54d479d87baa0b03f721f0"
+      },
+      {
+        "path": "target/wp967/native/ordinary-14-operation.json",
+        "sha256": "d43d7e65f855d93eca72fb42284e936e6377e1fd2c4befd96e9256535d56b60c"
+      },
+      {
+        "path": "target/wp967/native/ordinary-15-operation.json",
+        "sha256": "775a7f8117faea31859a4c3aec461a6baadedb00daaaf8c8344867b6fb7e98d8"
+      },
+      {
+        "path": "target/wp967/native/ordinary-16-operation.json",
+        "sha256": "de0f5f6bbe53abeb433c0793169dd59e1ba4a2204c155beceb720b970c166d27"
+      },
+      {
+        "path": "target/wp967/native/ordinary-17-operation.json",
+        "sha256": "d4662cebb93481d1b163d3897f7c2c987462458a131d2abe40b96c24a5f30e44"
+      },
+      {
+        "path": "target/wp967/native/ordinary-18-operation.json",
+        "sha256": "554b6f7bd72a3d946954cea6e736e90714dd9922eccdd3ae56568615bf1de7fc"
+      },
+      {
+        "path": "target/wp967/native/ordinary-19-operation.json",
+        "sha256": "929107114ef189c6c6c3b017db77e711c4665f901ed724dac5c013944d0a6b22"
+      },
+      {
+        "path": "target/wp967/native/ordinary-20-operation.json",
+        "sha256": "aee8507fe87ffa3ae19f04ecc3d8f6717e7779f840536321ee0319ffbd1cd024"
+      },
+      {
+        "path": "target/wp967/native/ordinary-21-operation.json",
+        "sha256": "82beba280fe40ddf80957d56c40654c8ddfc6cc0bc6fc09e5b8fd012fb77ee38"
+      },
+      {
+        "path": "target/wp967/native/ordinary-22-operation.json",
+        "sha256": "4a7083d96d6897c054b8b50413f347be0bcc1ce9bdaf7a2f438f9e8139239106"
+      }
+    ],
+    "preflight": {
+      "path": "target/wp967/native/preflight-operation.json",
+      "sha256": "d30d4cb1c1c0545b07c2d323149476c29db2bb4cdf107fd9b89dd67cab33ce1c"
+    },
+    "artifact_record": {
+      "path": "target/wp967/native/executable.json",
+      "sha256": "64ecb41eff2646b7c85310d1f198dfe873906aa5a6f85a28ba95cb722ee55307"
+    },
+    "ignored_listing": {
+      "path": "target/wp967/native/list-operation.json",
+      "sha256": "e90228c62f1215eeb023dfec7c924fb5f785c3fc9f7ba3ca245c6d09e5eaa46d"
+    }
+  },
+  "controls": {
+    "synthetic_only": true,
+    "selected": 4,
+    "passed": 4,
+    "elapsed_seconds": 0.1364602040266618,
+    "conservative_peak_kib": 17368,
+    "operation": {
+      "path": "target/wp967/native/protocol-controls/operation.json",
+      "sha256": "f3e8a12d7ff4ec9162f4346a13e6cb87900b3a7972fd3739a99c0aa830784796"
+    },
+    "recorder_owner_reuse": {
+      "path": "target/wp955/native/recorder-reuse.md",
+      "sha256": "8551736d646e45e82f12d8d986b88bd9150863460a8d91efde03aa24d5b74c6d"
+    },
+    "fresh_prior_fd_availability_version_runs": 0,
+    "supplemental_pins": {
+      "path": "target/wp967/native/protocol-controls/additional-pins.json",
+      "sha256": "850b037fdc23da7220f620baad1e1187cf6f2931a607083fbf68516bec76dbb3"
+    },
+    "qualification": "Four current inherited selectors/current unchanged WP966 decoder; synthetic nested text is presentation only, never native cause or producer evidence"
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp967/native/native-operation.json",
+      "sha256": "5864f71257f33225e679717794349f2d45f4a24f8a93652deee934c20ca98afd"
+    },
+    "result": {
+      "path": "target/wp967/native/result.json",
+      "sha256": "8df74f25f6b90d912c67f87f36f50c94ce2fec45b471980c829daa62b61c661f"
+    },
+    "stdout": {
+      "path": "target/wp967/native/native.stdout",
+      "sha256": "3e88e489923508efb2fd9061a4f2a982f4b49e4fc6f35d152995d474e021081d"
+    },
+    "stderr": {
+      "path": "target/wp967/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 0.4543602439807728,
+    "conservative_peak_kib": 83168,
+    "stable_runtime_pins": 233,
+    "held_noninherited_source_leases": 188,
+    "request": {
+      "role": "public_probe",
+      "target": "//pkg:probe",
+      "channel": "nightly"
+    },
+    "public_probe": {
+      "stage": "build_refusal",
+      "kind": "package",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": false,
+      "observations": 73,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "outcome": {
+      "stage": "build_refusal",
+      "kind": "complete",
+      "attempts": 49,
+      "terminal_roots": 1
+    },
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 15,
+      "transferred_bytes": 0,
+      "decoded_bytes": 12937,
+      "written_bytes": 0,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "recorder": {
+      "attempted": 105,
+      "admitted": 105,
+      "scope_admitted": 105,
+      "distinct": 105,
+      "repeated": 0,
+      "retained": 105,
+      "refused": 0,
+      "sticky": 0,
+      "charged": 2114151,
+      "visited": 105,
+      "complete": true,
+      "qualified": false
+    },
+    "root": {
+      "seen": false,
+      "calls": 0,
+      "policy_checked": false,
+      "bytes": 0,
+      "hash_match": false,
+      "anchor": "not_started",
+      "outer_variant": "None"
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "mapping": {
+      "state": "not_started",
+      "codes": [],
+      "termination": "none",
+      "native_detail": false
+    },
+    "registry_body_weak": "unobserved",
+    "registry_choice": {
+      "choice": "file",
+      "url_len": "64",
+      "url_hex": "66696c653a2f2f2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f7461726765742f77703935342f7265676973747279",
+      "policy_checked": true
+    },
+    "selected_limits": {
+      "registry_attempts": 128,
+      "source_attempts": 16,
+      "live_buffer_bytes": 16777216
+    },
+    "root_lockfile_metadata": {
+      "enabled": true,
+      "denied_operation": "none"
+    },
+    "repo_marker_metadata": {
+      "enabled": true,
+      "policy_checked": true
+    },
+    "additional_sources": [
+      {
+        "owner": "bazel_features_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "bazel_skylib_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_cc_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_license_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "rules_shell_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "apple_support_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "package_metadata_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      },
+      {
+        "owner": "buildozer_root",
+        "source": {
+          "seen": false,
+          "bytes": null,
+          "hash_match": null
+        },
+        "retirement": {
+          "source_weak_seen": false,
+          "source_weak_expired": true
+        }
+      }
+    ],
+    "caps": {
+      "seconds": 10,
+      "term_seconds": 3,
+      "as_bytes": 536870912,
+      "rss_bytes": 268435456,
+      "log_bytes_each": 1048576,
+      "report_bytes": 4194304,
+      "file_bytes": 16777216
+    },
+    "stop_reason": null,
+    "joined": true,
+    "owned_group_empty": true,
+    "denied": {
+      "family": "none",
+      "path_len": null,
+      "path_hex": "none",
+      "capture": "missing",
+      "decoded_path": null,
+      "operation_kind": "none",
+      "absence_content_proved": false
+    },
+    "module_witness_qualification": "Root/eight private MODULE byte/hash/Weak witnesses remain uninstrumented/unobserved; expiry is vacuous and proves no graph absence/non-evaluation. Parent leases are physical brackets, not native source certificates. Body provenance/freshness and complete DICE/page release remain unproved",
+    "bounded_host_file_bytes": {
+      "enabled": true,
+      "policy_checked": true,
+      "object_bytes": 1048576,
+      "history_counter": "decoded_bytes",
+      "history_limit_bytes": 16777216,
+      "source_attempt_limit": 16,
+      "history_is_per_arc_live_credit": false,
+      "body_weak": "unobserved",
+      "freshness": "unproved"
+    },
+    "rust_package_metadata": {
+      "enabled": true,
+      "policy_checked": true,
+      "operation": "lstat",
+      "directory_kind": "unobserved"
+    },
+    "nightly_package_metadata": {
+      "enabled": true,
+      "policy_checked": true,
+      "operation": "lstat",
+      "directory_kind": "unobserved",
+      "basis_need": "rust/toolchain",
+      "source_candidate": "rust/toolchain/channel"
+    },
+    "nightly_build_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "operations": [
+        "lstat",
+        "file_bytes"
+      ],
+      "basis_need": "rust/toolchain/channel/BUILD.bazel",
+      "fallback_candidate": "rust/toolchain/channel/BUILD",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "nightly_channel_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "operations": [
+        "lstat",
+        "file_bytes"
+      ],
+      "basis_need": "rust/toolchain/channel/channel.bzl",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "probe_package_source": {
+      "enabled": true,
+      "policy_checked": true,
+      "basis_need": "pkg",
+      "marker_candidates": [
+        "pkg/BUILD.bazel",
+        "pkg/BUILD"
+      ],
+      "directory_kind": "unobserved",
+      "body_witness": "unobserved",
+      "freshness": "unproved",
+      "history_is_per_arc_live_credit": false
+    },
+    "selected_semantic_request": {
+      "name": null,
+      "version": null,
+      "url": null
+    },
+    "aggregate_delta_from_predecessor": {
+      "source_attempts": 0,
+      "decoded_bytes": 0,
+      "qualification": "Actual aggregate cumulative-history delta only; no file/Arc body/hash/Weak/freshness attribution or cause inferred"
+    },
+    "package_cause": {
+      "stage": "external_route",
+      "detail": "external_route: @rules_rust//rust:defs.bzl @rules_rust: RootLoad: Unsupported @rules_rust module=rules_rust",
+      "domain": "Slug-native ASCII escaped presentation",
+      "cause_owner": "original retained RootPackageLoadError",
+      "qualified_complete": true,
+      "semantic_identity": false,
+      "source_availability_proved": false
+    },
+    "package_boundary": {
+      "kind": "package",
+      "observations": 73,
+      "denied_need_observed": false,
+      "qualification": "Original retained typed diagnostic presentation; qualified_complete describes bounded/opaque presentation coverage, never semantic identity, source availability or accepted producer/provider evidence"
+    },
+    "public_observer_qualification": "Original Core observer, WP966_PACKAGE marker and WP966 decoder are unchanged; current thin protocol composes that decoder without raw/history normalization"
+  },
+  "reviews": {
+    "design-source": {
+      "path": "target/wp967/native/design-source.md",
+      "sha256": "ce755a7b5b56f36c3264cb4553594a81c1a5bc26bace9c46742a534752e958b3"
+    },
+    "design-evidence": {
+      "path": "target/wp967/native/design-evidence.md",
+      "sha256": "9d8dfaf186a8bb0c721754865af269d0d7deb11e1e264321b0c9c0c6c7b77865"
+    },
+    "preflight-source": {
+      "path": "target/wp967/native/preflight-source.md",
+      "sha256": "54522e8bab449f692b4e6c0d3a38a9a627c5b07690f4ea4bef8cd95330f63607"
+    },
+    "preflight-evidence": {
+      "path": "target/wp967/native/preflight-evidence.md",
+      "sha256": "c742d676258e55eca9f9dac389d6b26806460b692bee57000b28a0ac168df340"
+    },
+    "final-source": {
+      "path": "target/wp967/native/final-source.md",
+      "sha256": "f39636214d74c41f83b7b83574c96c8075047bc06a473991c2e77e1850a3fdfc"
+    },
+    "final-evidence": {
+      "path": "target/wp967/native/final-evidence.md",
+      "sha256": "84731db2fc467c390d67c3c22ea1bd788ff1f502a59b125c298123cf6bdf0464"
+    }
+  },
+  "artifacts": {
+    "design.md": {
+      "path": "target/wp967/native/design.md",
+      "sha256": "13155fd4410008517a28870fad12f4fd022bac9e4f75fb4c1e41d3badc1091db"
+    },
+    "inputs.json": {
+      "path": "target/wp967/native/inputs.json",
+      "sha256": "be78033421f853f3b7a60aff723afdbe7334a5d85169ad66fbad28df5e561437"
+    },
+    "prepare.py": {
+      "path": "target/wp967/native/prepare.py",
+      "sha256": "7acc378efb22f4b6588951e4b3d77a146b657f54c1a1c98bf901f39cd00f0c97"
+    },
+    "owner-gates.py": {
+      "path": "target/wp967/native/owner-gates.py",
+      "sha256": "2cb72812692b9f7c5e2181f15be8d05ebefc68f3c678eca33f3bd77f39011cfa"
+    },
+    "supervise.py": {
+      "path": "target/wp967/native/supervise.py",
+      "sha256": "e9f1843c8aa39417b446b66eebb98eb46a99cac04c984a76de9d1aab38f6051a"
+    },
+    "protocol.py": {
+      "path": "target/wp967/native/protocol.py",
+      "sha256": "82e41ab80ae5bfeda3341973818df869ed0353b19277f4d46f461521221abac4"
+    },
+    "protocol_controls.py": {
+      "path": "target/wp967/native/protocol_controls.py",
+      "sha256": "01ae60e48b1eaf2ba7f51489ae457766aaf692a56a817b1bdf052ac540e3d923"
+    },
+    "protocol_control_run.py": {
+      "path": "target/wp967/native/protocol_control_run.py",
+      "sha256": "19a16c8aa339f3c3315974a7476a960dc701f381b0d5055bb1220196de0b994c"
+    },
+    "toolchain.json": {
+      "path": "target/wp967/native/toolchain.json",
+      "sha256": "3ef19150ff9bfb7ee304b0ac67a05ac590f22aeb62bbe789bdc6c79748cd1e07"
+    },
+    "bzlmod-compile.json": {
+      "path": "target/wp967/native/bzlmod-compile.json",
+      "sha256": "beb5df0a4bf4f9d9a213d9f7f79860691ef7c5ba28700fcb440e3fb16c76a055"
+    },
+    "loading-compile.json": {
+      "path": "target/wp967/native/loading-compile.json",
+      "sha256": "de6b1b75bd27b1029f7b3ef1d637fc8e4af179080de84e22228413ee47dfdd3a"
+    },
+    "compile.json": {
+      "path": "target/wp967/native/compile.json",
+      "sha256": "233ad3a586e2cad24c2f04a6e48d6ef5a63024e3cd3c4b03a0047103c63d2c82"
+    },
+    "check.json": {
+      "path": "target/wp967/native/check.json",
+      "sha256": "0144b9724fb489e12a8651b30963df31a9a1be45dcb97ba1380bc28eefad1f59"
+    },
+    "bzlmod-executable.json": {
+      "path": "target/wp967/native/bzlmod-executable.json",
+      "sha256": "04a974de84e682acc715a2a9ba8462537a23b318220602e008b3405855d03a92"
+    },
+    "loading-executable.json": {
+      "path": "target/wp967/native/loading-executable.json",
+      "sha256": "d0169c9c1138645cbb72a2a3fb83b6d56d704d9f2030c60c1cb24fc5598cb955"
+    },
+    "executable.json": {
+      "path": "target/wp967/native/executable.json",
+      "sha256": "64ecb41eff2646b7c85310d1f198dfe873906aa5a6f85a28ba95cb722ee55307"
+    },
+    "implementation.md": {
+      "path": "target/wp967/native/implementation.md",
+      "sha256": "b2c6b9166292531ed39c54d429e97068d4c7fe9bc27d47903619a4321137312b"
+    },
+    "successor-source.md": {
+      "path": "target/wp967/native/successor-source.md",
+      "sha256": "237cf904e42cf24fa5030673ef4585d28903719f3b9f509a63b86601bd72ea7b"
+    },
+    "selectors.json": {
+      "path": "target/wp967/native/selectors.json",
+      "sha256": "47a979c134689ee62a2d4a021eace19ddc357775a767454b7127cd77b5e587bd"
+    },
+    "bzlmod-selectors.json": {
+      "path": "target/wp967/native/bzlmod-selectors.json",
+      "sha256": "0edd7e404ae668db5bd8cffc1576296a1a68d6f6f1797ae0ab2130887701c800"
+    },
+    "loading-selectors.json": {
+      "path": "target/wp967/native/loading-selectors.json",
+      "sha256": "781bbe1d00a94f5d1e971c42c98904a9029629bc1a3e035401cac571c221f1cc"
+    },
+    "receipt.py": {
+      "path": "target/wp967/native/receipt.py",
+      "sha256": "741140f4b0f945f5ca9b2d82a6a52d2adbcea17569c162c917926d8825e70aa9"
+    },
+    "audit.py": {
+      "path": "target/wp967/native/audit.py",
+      "sha256": "8e5e62f77189928a3fa2b9ff7f6b042483c22f7789eec7ec9c9ebdc0a3aa0c59"
+    },
+    "core-resume.py": {
+      "path": "target/wp967/native/core-resume.py",
+      "sha256": "db2de0428534b0898679dc6669b6e8cf81f7201c7d4e0527f5283567cb6ab5bb"
+    },
+    "core-resume-dependencies.json": {
+      "path": "target/wp967/native/core-resume-dependencies.json",
+      "sha256": "6dabdcb8e7b0720461b5bad14eadf5b1249c56e8efcae12c3d381d31401aef33"
+    },
+    "core-resume-verified.json": {
+      "path": "target/wp967/native/core-resume-verified.json",
+      "sha256": "0e33be7b1692f4f9b8debc3b77f3e3eb656c316d7e9a21991e963dc947dd2230"
+    },
+    "predecessor-successor-source.md": {
+      "path": "target/wp966/native/successor-source.md",
+      "sha256": "39e0928623e0cbb63e57149630a419108eb6f79ba16763458f3a53cde7d75c60"
+    },
+    "attribution_protocol.py": {
+      "path": "target/wp956/native/attribution_protocol.py",
+      "sha256": "473584c8ff67d0eab7d0cbe84b5b3c72942415ebd8bbd9f8edfa2c4d489a4797"
+    },
+    "shared_control_run.py": {
+      "path": "target/wp957/native/protocol_control_run.py",
+      "sha256": "c5dc1786a5430c0e0595ba8d07e40424d0c2e380dc91ee227cd841f8fda1fdbf"
+    },
+    "registry-owner-source.md": {
+      "path": "target/wp956/native/registry-owner-source.md",
+      "sha256": "3b872fe629d1289142fbec89e043e43c0d43aa7f70be7ec7871ea7bd45d26604"
+    }
+  },
+  "counts": {
+    "fresh_rust": 39,
+    "fresh_python_synthetic": 4,
+    "fresh_corpus_operations": 0,
+    "total_named_passes": 43
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": "Continue only the actual source-grounded retained cause recorded in successor-source.md; preserve original fixture/support/data/providers, source/allocation/interning/caps. Public Rustc/oracle/same-engine restoration/M7A and whole-workload fit remain open",
+  "checks": [
+    "pinned rustfmt on changed natural owners/tests",
+    "plan status checker",
+    "archive status shell",
+    "git diff --check",
+    "current operation/raw/artifact/profile/direct-reference hashes"
+  ],
+  "recorded_utc": "2026-10-07T06:33:26.866976+00:00",
+  "packet_elapsed_seconds": 1781.848951,
+  "packet_start": {
+    "baseline": "4c854854a20d9cc40dad2d7c947897d533d078a3",
+    "started": "2026-10-07T06:03:45.018025+00:00"
+  },
+  "predecessor": {
+    "path": "thoughts/shared/plans/slug-v2-subplans/wp966-retained-package-cause-readiness-2026-10-07.json",
+    "sha256": "3e077310d3776060c6576d98fe4536e7ae6217bb65e4eacd156129f080975e3c"
+  },
+  "source_reader_reuse": {
+    "receipt": {
+      "path": "thoughts/shared/plans/slug-v2-subplans/wp960-bounded-host-file-readiness-2026-10-07.json",
+      "sha256": "04581dcaab5eb746002fe061ce89dfbef87dad523a6e4074be35e0d6834895d5"
+    },
+    "fresh_runs": 0,
+    "qualification": "Reader/kernel/bridge production source and admitted read contract unchanged; WP960 focused counter/error/race/epoch/validation controls are historical accepted reuse; current guard/projection/source-certificate/lifecycle checks run fresh"
+  },
+  "loading_ordinary": {
+    "selected": 12,
+    "passed": 12,
+    "selectors": [
+      "bzl_module::root_package_diagnostic_tests::root_package_diagnostic_preserves_borrowed_stage_and_nested_cause",
+      "bzl_module::root_package_diagnostic_tests::root_package_diagnostic_escapes_bounds_and_retires_original_owner",
+      "registration_diagnostic::tests::registration_diagnostic_factored_wrappers_consume_depth",
+      "registration_diagnostic::tests::registration_diagnostic_repository_package_attempt_loading_cause",
+      "registration_diagnostic::tests::registration_diagnostic_root_bzl_cause_and_boundaries",
+      "registration_diagnostic::tests::registration_diagnostic_utf8_escapes_budget_and_writer_failure",
+      "registration_diagnostic::tests::registration_diagnostic_recursive_bzl_cause_and_depth",
+      "registration_diagnostic::tests::registration_diagnostic_scalar_and_innate_causes",
+      "root_repository_load_route::tests::root_load_diagnostic_views_borrow_original_siblings",
+      "root_repository_load_route::tests::root_load_diagnostic_walks_nested_routes_and_bounds_messages",
+      "registration_diagnostic::tests::registration_diagnostic_apparent_mapping_skips_predecessors_and_counts_edges",
+      "bzl_module::root_package_diagnostic_tests::root_package_external_route_diagnostic_borrows_original_cause"
+    ],
+    "elapsed_seconds": 3.178250308148563,
+    "conservative_peak_kib": 50304,
+    "operations": [
+      {
+        "path": "target/wp967/native/ordinary-loading-0.json",
+        "sha256": "9b691892f070b3b42e9f30baadbb57869cdd25b2bccc7a315afe4089c13a7fae"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-1.json",
+        "sha256": "f1201e08c776ff8ef8409e7ba029f8ff59958db323fd0c7fe6a4056204d928d6"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-2.json",
+        "sha256": "84e22ec0f6d6b3c7fec9b64b91bfbf3bb75a00397d0daa495f3f05a5e67593fc"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-3.json",
+        "sha256": "cb081947408f42959725217f2d2efb47ec9a0139a73274fbd2f532d22b8f548d"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-4.json",
+        "sha256": "3bb41540b6723c639923b3130e4e808b7afb6b2f6457947ecc3e20d25013ec09"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-5.json",
+        "sha256": "7079c2abfebc7f9b476fa473bd29dbc2a5c20fd22c01b07bfc2c553c5fc7ad10"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-6.json",
+        "sha256": "042313b7d4b76c7cc1421ace349b106f6f4e26022f3a6dab9d14de50719050ae"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-7.json",
+        "sha256": "832038f1e80a88bda813ff71e201bcf2ccd0c4e4058d6c82c7f24547dc3745eb"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-8.json",
+        "sha256": "9778edd2a70f10a473cf8d11f82427715e05498c3d4e56b85cb60e5e172b5200"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-9.json",
+        "sha256": "b12a25c1bdc6d11a9c9a57fb88e746969162c4d59b92dd734d2646586d4dd5b8"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-10.json",
+        "sha256": "404f2cc9a63fd39fa46243d70dc205d35b22b6bdca022b64dbe79a9d94ab4418"
+      },
+      {
+        "path": "target/wp967/native/ordinary-loading-11.json",
+        "sha256": "d47cbf894bbf482e924617ba0d88aefe500bfc9b5d2efea69125e95ec4d08d4b"
+      }
+    ],
+    "preflight": {
+      "path": "target/wp967/native/preflight-loading.json",
+      "sha256": "6cbb62d64dfa3958fab4f00ec50f0c30a331cae8f40c4c7067ee07476ca3a7b2"
+    },
+    "artifact_record": {
+      "path": "target/wp967/native/loading-executable.json",
+      "sha256": "d0169c9c1138645cbb72a2a3fb83b6d56d704d9f2030c60c1cb24fc5598cb955"
+    },
+    "coverage_qualification": "Meaningful original-loan/sibling/poison/output/depth controls; unavailable opaque constructors remain explicitly source-qualified, not freshly constructed"
+  },
+  "preparation_resume": {
+    "source_operation": {
+      "path": "target/wp967/native/compile-attempt-1/compile.json",
+      "sha256": "787c53a5857aa51525eafd82b80c705b7a9f9b0b7a0538eac6cdbd42f1135e50"
+    },
+    "source_stdout": {
+      "path": "target/wp967/native/compile-attempt-1/compile.stdout",
+      "sha256": "e68cf3d87be2141db28d835ed26c698f0fb7c9bce71870916f567999aa5fb571"
+    },
+    "dependency_record": {
+      "path": "target/wp967/native/core-resume-dependencies.json",
+      "sha256": "6dabdcb8e7b0720461b5bad14eadf5b1249c56e8efcae12c3d381d31401aef33"
+    },
+    "verification": {
+      "path": "target/wp967/native/core-resume-verified.json",
+      "sha256": "0e33be7b1692f4f9b8debc3b77f3e3eb656c316d7e9a21991e963dc947dd2230"
+    },
+    "wrapper": {
+      "path": "target/wp967/native/core-resume.py",
+      "sha256": "db2de0428534b0898679dc6669b6e8cf81f7201c7d4e0527f5283567cb6ab5bb"
+    },
+    "fresh_dependencies": [
+      "slug_analysis_v2",
+      "slug_bzlmod_v2",
+      "slug_loading_v2",
+      "slug_query_v2"
+    ],
+    "dependency_artifacts": [
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_bzlmod_v2-c2f41bae67d483b5.rlib",
+        "sha256": "31584660e878daec3274a1487369e35f67c29ea2f4eb679bccf8a6267338b26b"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_bzlmod_v2-c2f41bae67d483b5.rmeta",
+        "sha256": "a1e4ea6a866603ae0eb83ab67a1fe218ce1cac9440f5913796b8bc52ec245cbf"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_loading_v2-c585dccd39118f2a.rlib",
+        "sha256": "c775285fa7dd30244368a779f17882b2fcea4b53027cdcfb5bd0ab1345a56604"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_loading_v2-c585dccd39118f2a.rmeta",
+        "sha256": "9d7d91eaf3ae2551898f24631540372b37938926b8d70d8638846031b43df5f8"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_query_v2-764aa5e4247a455a.rlib",
+        "sha256": "214aeb080c23bc9c36ec6040f33ba4c040ded05aebe67ab59202c7ff216fbf5f"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_query_v2-764aa5e4247a455a.rmeta",
+        "sha256": "230b3ad6f239a2ac7741726747922e85612905e9097ef8a2aeb9cffec342cd18"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_analysis_v2-701809485929a103.rlib",
+        "sha256": "7e3e12361d55a8ce495b0b19289dd24f09d438a9d60f3aa4c494ce7908c5e634"
+      },
+      {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/libslug_analysis_v2-701809485929a103.rmeta",
+        "sha256": "330f6c9a1d57facc9513e7eeacb40f6924a030b3b9b6b71b478ed5902ef257f6"
+      }
+    ],
+    "qualification": "Four completed Bzlmod/Loading/Query/Analysis libraries/eight artifact hashes froze the measured remaining-Core prerequisite state. Final compile keeps the identical original command, sources including unchanged preparation wrapper, feature roots, six-package profile and caps; all four dependency Cargo records are fresh with identical target/features/profile/filenames. Earlier timeout remains failed preparation; no cap increase, native attempt or runtime-fit inference"
+  },
+  "historical_preparation": {
+    "failed_attempts": [
+      {
+        "mode": "compile",
+        "command": [
+          "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+          "test",
+          "-p",
+          "slug_core_v2",
+          "--lib",
+          "--no-run",
+          "--offline",
+          "--message-format=json",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_bzlmod_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_loading_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_core_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_analysis_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_query_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_query_v2.debug=0",
+          "--config",
+          "profile.dev.package.slug_build_api_v2.opt-level=0",
+          "--config",
+          "profile.dev.package.slug_build_api_v2.debug=0"
+        ],
+        "elapsed_seconds": 60.20544640801381,
+        "exit_code": -15,
+        "stop_reason": "60s deadline",
+        "joined": true,
+        "owned_group_empty": true,
+        "monitored_rss_kib": 82628,
+        "child_rusage_peak_kib": 1773816,
+        "caps": {
+          "seconds": 60,
+          "term_seconds": 3,
+          "offline": true,
+          "jobs": 1
+        },
+        "operation": {
+          "path": "target/wp967/native/compile-attempt-1/compile.json",
+          "sha256": "787c53a5857aa51525eafd82b80c705b7a9f9b0b7a0538eac6cdbd42f1135e50"
+        },
+        "stdout": {
+          "path": "target/wp967/native/compile-attempt-1/compile.stdout",
+          "sha256": "e68cf3d87be2141db28d835ed26c698f0fb7c9bce71870916f567999aa5fb571"
+        },
+        "stderr": {
+          "path": "target/wp967/native/compile-attempt-1/compile.stderr",
+          "sha256": "792e21907c2d67c2f54d7f1877498495ffb3091c23317090fc8e075153ed2586"
+        },
+        "native_spent": false,
+        "current_pass_evidence": false
+      }
+    ],
+    "qualification": "One WP967 bounded Core preparation deadline only; no semantic failure or passing Core gate inferred. Completed prerequisites are separately verified by preparation_resume. WP966 preparation history remains predecessor evidence"
+  },
+  "bzlmod_artifact_isolation": {
+    "record": {
+      "path": "target/wp967/native/bzlmod-executable.json",
+      "sha256": "04a974de84e682acc715a2a9ba8462537a23b318220602e008b3405855d03a92"
+    },
+    "current_artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-0276790ce71ed2fb",
+      "sha256": "f829921048fe63e9c81bef3fe10c911d70057782c2cdf87ac65800866875a7c3"
+    },
+    "original_version_record": {
+      "path": "target/wp943/executable.json",
+      "sha256": "9a2ade064a00056bbe948f24a0bebe67c01a31cdfe4db54d9dba30cb343dbfb2"
+    },
+    "original_version_artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+      "sha256": "31e71f6cb35d9b977a53213c1267fbfb51db45aa78524fb475442472a64d9510"
+    },
+    "target": {
+      "kind": [
+        "lib"
+      ],
+      "crate_types": [
+        "lib"
+      ],
+      "name": "slug_bzlmod_v2",
+      "src_path": "/run/media/system/Colossus/dev/slug/app/slug_bzlmod_v2/src/lib.rs",
+      "edition": "2024",
+      "doc": true,
+      "doctest": true,
+      "test": true
+    },
+    "features": [],
+    "profile": {
+      "opt_level": "0",
+      "debuginfo": 0,
+      "debug_assertions": true,
+      "overflow_checks": true,
+      "test": true
+    },
+    "isolation": {
+      "setting": "profile.test.package.slug_bzlmod_v2.codegen-units=128",
+      "settings": [
+        "profile.test.package.slug_bzlmod_v2.opt-level=0",
+        "profile.test.package.slug_bzlmod_v2.debug=0",
+        "profile.test.package.slug_bzlmod_v2.codegen-units=128"
+      ],
+      "old_artifact": {
+        "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+        "sha256": "31e71f6cb35d9b977a53213c1267fbfb51db45aa78524fb475442472a64d9510"
+      },
+      "old_digest_unchanged": true,
+      "actual_new_path_and_digest_distinct": true,
+      "historical_version_owner_reuse_fresh_runs": 0
+    },
+    "raw_cargo": {
+      "path": "target/wp967/native/bzlmod-compile.stdout",
+      "sha256": "4f32898d1c55fd7fcab059f086352bf9347e040bf07de0ad60dab751436b21c5"
+    },
+    "qualification": "Actual distinct raw-Cargo test path/digest and opt0/debug0/assertions/overflow profile prove isolation; a setting alone does not. Original version binary is preserved before/after all current phases; no relocation/transplant or historical harness change"
+  },
+  "bzlmod_ordinary": {
+    "selected": 3,
+    "passed": 3,
+    "selectors": [
+      "host_module::root_repository_route_diagnostic_tests::route_diagnostic_distinguishes_original_safe_and_opaque_stages",
+      "host_module::root_repository_route_diagnostic_tests::route_diagnostic_borrows_message_and_propagates_writer_stop",
+      "host_module::tests::generated_route_fallback_classifier_is_limited_to_nonroot_route_errors"
+    ],
+    "elapsed_seconds": 0.725734003004618,
+    "conservative_peak_kib": 12944,
+    "operations": [
+      {
+        "path": "target/wp967/native/ordinary-bzlmod-0.json",
+        "sha256": "14d249c53e45771896d8365dfe3e8668f0e2cfd6a2f281c1a3e4f16671f7ce34"
+      },
+      {
+        "path": "target/wp967/native/ordinary-bzlmod-1.json",
+        "sha256": "45215b71c7e75d9f2c5ad7643b3e487f3ba93e6a891bb82bc5a306e45de4c5d9"
+      },
+      {
+        "path": "target/wp967/native/ordinary-bzlmod-2.json",
+        "sha256": "ef69333b2d06046c5d2c8a695e065bf6390018bf815d0773e88a34f14b982edd"
+      }
+    ],
+    "preflight": {
+      "path": "target/wp967/native/preflight-bzlmod.json",
+      "sha256": "89e8a603b7c2b7f4db41cdc50a07a7693e3919f5ea3f9493aca3f210fc62fdb8"
+    },
+    "artifact_record": {
+      "path": "target/wp967/native/bzlmod-executable.json",
+      "sha256": "04a974de84e682acc715a2a9ba8462537a23b318220602e008b3405855d03a92"
+    },
+    "coverage_qualification": "Meaningful original-loan/sibling/poison/output/depth controls; unavailable opaque constructors remain explicitly source-qualified, not freshly constructed"
+  },
+  "preparation_history_qualification": {
+    "current_failed_attempts": 1,
+    "predecessor": {
+      "path": "thoughts/shared/plans/slug-v2-subplans/wp966-retained-package-cause-readiness-2026-10-07.json",
+      "sha256": "3e077310d3776060c6576d98fe4536e7ae6217bb65e4eacd156129f080975e3c"
+    },
+    "qualification": "WP966 failed/superseded preparations and remaining-Core resume stay accepted predecessor history; they are not WP967 attempts, successes or waived gates. The single current WP967 timeout and distinct verified resume are separately retained above"
+  },
+  "historical_version_guard_reuse": {
+    "operation": {
+      "path": "target/wp947/native/ordinary-version.json",
+      "sha256": "7741720457832370d90f42dad22a7a4529422dfc2628049cbafc004b293de902"
+    },
+    "artifact_record": {
+      "path": "target/wp943/executable.json",
+      "sha256": "9a2ade064a00056bbe948f24a0bebe67c01a31cdfe4db54d9dba30cb343dbfb2"
+    },
+    "unchanged_source_owners": [
+      "app/slug_bzlmod_v2/src/module_eval.rs",
+      "app/slug_bzlmod_v2/src/source_preparation.rs",
+      "app/slug_bzlmod_v2/src/selected_graph.rs"
+    ],
+    "fresh_runs": 0,
+    "qualification": "Original expected-empty declaration/version-owner discriminator remains historical accepted reuse; current changed Bzlmod diagnostic and fallback-classifier gates use the distinct current artifact"
+  }
+}

@@ -806,3 +806,88 @@ async fn registration_diagnostic_generated_retains_identity_without_graph_render
         );
     }
 }
+
+// Test-only bridge: private route-owner tests exercise the same bounded walker.
+pub(crate) fn render_root_load(error: &HostRootRepositoryLoadRouteError) -> String {
+    render_node(Node::RootLoad(error))
+}
+
+#[tokio::test]
+async fn registration_diagnostic_apparent_mapping_skips_predecessors_and_counts_edges() {
+    use slug_bzlmod_v2::HostRootRepositoryMappingKey;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalRepoName;
+
+    use crate::canonical_repository_mapping::ApparentMappingPredecessor;
+    use crate::module_extension_repository_instantiation::tests::WORKSPACE;
+    let (mut tx, _) = owner_fixture(false).await;
+    let root = complete(
+        tx.compute(&HostRootRepositoryMappingKey::new(
+            slug_workspace_v2::NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        ))
+        .await
+        .unwrap(),
+    );
+    let predecessor = ApparentMappingPredecessor::Root(root.as_ref().as_ref().unwrap().clone());
+    // The successful predecessor contains the existing fixture's `first` mapping;
+    // neither scalar error is permitted to visit or print it.
+    assert!(format!("{predecessor:?}").contains("first"));
+    for (kind, tail) in [
+        (
+            Mapping::Missing {
+                predecessor: predecessor.clone(),
+            },
+            "Missing",
+        ),
+        (Mapping::ContextMismatch { predecessor }, "ContextMismatch"),
+        (Mapping::RootApparent, "RootApparent"),
+        (
+            Mapping::RootMappingCompute("CAUSE".into()),
+            "RootMappingCompute: CAUSE",
+        ),
+        (Mapping::RouteCompute("CAUSE".into()), "RouteCompute: CAUSE"),
+    ] {
+        let error = HostCanonicalRepositoryApparentMappingError {
+            context_repo: CanonicalRepoName::new("ctx+").unwrap(),
+            apparent_repo: ApparentRepoName::new("child").unwrap(),
+            kind,
+        };
+        assert_eq!(
+            render_node(Node::ApparentMapping(&error)),
+            format!("ApparentMapping ctx+ @child: {tail}")
+        );
+    }
+    let certificate = effect_certificate().await;
+    let address = RepositoryLabelPathAddress::from_label(
+        &CanonicalLabel::parse("@@repo+//:leaf.bzl").unwrap(),
+    );
+    let repo = CanonicalRepoName::new("r+").unwrap();
+    let mut load = Arc::new(HostCanonicalRepositoryLoadRouteError {
+        canonical_repo: repo.clone(),
+        kind: Load::RouteCompute("LEAF_POISON".into()),
+    });
+    let weak = Arc::downgrade(&load);
+    for depth in 1..=16 {
+        load = Arc::new(HostCanonicalRepositoryLoadRouteError {
+            canonical_repo: repo.clone(),
+            kind: Load::Effect(Effect::LabelPathRoute {
+                certificate: certificate.clone(),
+                ordinal: 0,
+                address: address.clone(),
+                error: load,
+            }),
+        });
+        if depth >= 15 {
+            let root =
+                crate::root_repository_load_route::tests::diagnostic_load(load.as_ref().clone());
+            let text = render_root_load(&root);
+            if depth == 15 {
+                assert!(text.ends_with("RouteCompute: LEAF_POISON"));
+            } else {
+                assert!(text.ends_with(DEPTH_STOP) && !text.contains("LEAF_POISON"));
+            }
+        }
+    }
+    drop(load);
+    assert!(weak.upgrade().is_none());
+}

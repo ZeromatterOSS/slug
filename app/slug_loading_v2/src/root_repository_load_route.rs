@@ -79,6 +79,42 @@ pub struct HostRootRepositoryLoadRouteError {
     kind: HostRootRepositoryLoadRouteErrorKind,
 }
 
+pub(crate) enum RootLoadDiagnostic<'a> {
+    Root(&'a RootRepositoryRouteError),
+    Mapping(&'a HostCanonicalRepositoryApparentMappingError),
+    LoadRoute(&'a HostCanonicalRepositoryLoadRouteError),
+    RootCompute(&'a str),
+    MappingCompute(&'a str),
+    LoadRouteCompute(&'a str),
+    Projection(&'a str),
+}
+
+impl HostRootRepositoryLoadRouteError {
+    pub(crate) fn diagnostic_view(&self) -> RootLoadDiagnostic<'_> {
+        match &self.kind {
+            HostRootRepositoryLoadRouteErrorKind::Root(error) => RootLoadDiagnostic::Root(error),
+            HostRootRepositoryLoadRouteErrorKind::Mapping(error) => {
+                RootLoadDiagnostic::Mapping(error)
+            }
+            HostRootRepositoryLoadRouteErrorKind::LoadRoute(error) => {
+                RootLoadDiagnostic::LoadRoute(error)
+            }
+            HostRootRepositoryLoadRouteErrorKind::RootCompute(message) => {
+                RootLoadDiagnostic::RootCompute(message)
+            }
+            HostRootRepositoryLoadRouteErrorKind::MappingCompute(message) => {
+                RootLoadDiagnostic::MappingCompute(message)
+            }
+            HostRootRepositoryLoadRouteErrorKind::LoadRouteCompute(message) => {
+                RootLoadDiagnostic::LoadRouteCompute(message)
+            }
+            HostRootRepositoryLoadRouteErrorKind::Projection(message) => {
+                RootLoadDiagnostic::Projection(message)
+            }
+        }
+    }
+}
+
 impl fmt::Display for HostRootRepositoryLoadRouteError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
@@ -711,4 +747,4 @@ impl Key for HostRootRepositoryLoadRouteObservationKey {
 
 #[cfg(test)]
 #[path = "root_repository_load_route_tests.rs"]
-mod tests;
+pub(crate) mod tests;

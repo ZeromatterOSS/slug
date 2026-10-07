@@ -17,6 +17,8 @@ use crate::bzl_module::RootPackageLoadDiagnostic;
 use crate::bzl_module::RootPackageLoadError;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
 use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind as Load;
+use crate::canonical_repository_mapping::HostCanonicalRepositoryApparentMappingError;
+use crate::canonical_repository_mapping::HostCanonicalRepositoryApparentMappingErrorKind as Mapping;
 use crate::canonical_repository_route::HostCanonicalRepositoryRouteError;
 use crate::canonical_repository_route::HostCanonicalRepositoryRouteErrorKind as Route;
 use crate::generated_repository_definition::HostGeneratedRepositoryDefinitionError;
@@ -29,6 +31,8 @@ use crate::module_extension_repository_validation::HostModuleExtensionValidation
 use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateError;
 use crate::module_extension_repository_validation::HostValidateModuleExtensionRequestError as Validate;
 use crate::module_extension_repository_validation::PrivateOwnerCertificateError as Certificate;
+use crate::root_repository_load_route::HostRootRepositoryLoadRouteError;
+use crate::root_repository_load_route::RootLoadDiagnostic;
 
 const LIMIT: usize = 3072;
 const OUTPUT_STOP: &str = "[diagnostic incomplete: output limit]";
@@ -36,7 +40,7 @@ const DEPTH_STOP: &str = "[diagnostic incomplete: depth limit]";
 
 #[cfg(test)]
 #[path = "registration_diagnostic_tests.rs"]
-mod tests;
+pub(crate) mod tests;
 
 struct Buffer {
     bytes: [u8; LIMIT],
@@ -137,6 +141,14 @@ fn render_root_package(out: &mut Buffer, error: &RootPackageLoadError) -> fmt::R
     write!(out, "{}: ", error.diagnostic_stage())?;
     let node = match error.diagnostic_view() {
         RootPackageLoadDiagnostic::Leaf(error) => return error.write(out),
+        RootPackageLoadDiagnostic::ExternalRoute {
+            load,
+            apparent_repo,
+            error,
+        } => {
+            write!(out, "{load} @{}: ", apparent_repo.as_str())?;
+            Node::RootLoad(error)
+        }
         RootPackageLoadDiagnostic::Bzl {
             origin,
             load,
@@ -178,6 +190,8 @@ impl fmt::Display for Diagnostic<'_> {
 }
 
 enum Node<'a> {
+    RootLoad(&'a HostRootRepositoryLoadRouteError),
+    ApparentMapping(&'a HostCanonicalRepositoryApparentMappingError),
     Load(&'a HostCanonicalRepositoryLoadRouteError),
     Effect(&'a Effect),
     Route(&'a HostCanonicalRepositoryRouteError),
@@ -273,6 +287,30 @@ fn walk(out: &mut Buffer, node: Node<'_>) -> fmt::Result {
 fn walk_with_mode(out: &mut Buffer, mut node: Node<'_>, strict: bool) -> fmt::Result {
     for _ in 0..32 {
         node = match node {
+            Node::RootLoad(error) => {
+                out.write_str("RootLoad: ")?;
+                match error.diagnostic_view() {
+                    RootLoadDiagnostic::Root(error) => return error.write_route_diagnostic(out),
+                    RootLoadDiagnostic::Mapping(error) => Node::ApparentMapping(error),
+                    RootLoadDiagnostic::LoadRoute(error) => Node::Load(error),
+                    RootLoadDiagnostic::RootCompute(message) => return write!(out, "RootCompute: {message}"),
+                    RootLoadDiagnostic::MappingCompute(message) => return write!(out, "MappingCompute: {message}"),
+                    RootLoadDiagnostic::LoadRouteCompute(message) => return write!(out, "LoadRouteCompute: {message}"),
+                    RootLoadDiagnostic::Projection(message) => return write!(out, "Projection: {message}"),
+                }
+            }
+            Node::ApparentMapping(error) => {
+                write!(out, "ApparentMapping {} @{}: ", error.context_repo.as_str(), error.apparent_repo.as_str())?;
+                match &error.kind {
+                    Mapping::RootApparent => return out.write_str("RootApparent"),
+                    Mapping::Missing { .. } => return out.write_str("Missing"),
+                    Mapping::ContextMismatch { .. } => return out.write_str("ContextMismatch"),
+                    Mapping::RootMapping(_) => return out.incomplete("RootMapping"),
+                    Mapping::RootMappingCompute(message) => return write!(out, "RootMappingCompute: {message}"),
+                    Mapping::RouteCompute(message) => return write!(out, "RouteCompute: {message}"),
+                    Mapping::Route(error) => Node::Route(error),
+                }
+            }
             Node::Load(error) => {
                 write!(out, "CanonicalRoute {}: ", error.canonical_repo.as_str())?;
                 match &error.kind {

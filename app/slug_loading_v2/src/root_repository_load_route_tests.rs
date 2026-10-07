@@ -663,3 +663,153 @@ async fn observed_route_need_warm_cancellation_and_generated_missing_generated_a
         &restored_value
     ));
 }
+
+// Private test bridges, not semantic constructors or public API.
+pub(crate) fn diagnostic_projection(message: Arc<str>) -> HostRootRepositoryLoadRouteError {
+    HostRootRepositoryLoadRouteError {
+        apparent_repo: ApparentRepoName::new("repo").unwrap(),
+        kind: HostRootRepositoryLoadRouteErrorKind::Projection(message),
+    }
+}
+pub(crate) fn diagnostic_load(
+    error: HostCanonicalRepositoryLoadRouteError,
+) -> HostRootRepositoryLoadRouteError {
+    HostRootRepositoryLoadRouteError {
+        apparent_repo: ApparentRepoName::new("repo").unwrap(),
+        kind: HostRootRepositoryLoadRouteErrorKind::LoadRoute(error),
+    }
+}
+
+#[tokio::test]
+async fn root_load_diagnostic_views_borrow_original_siblings() {
+    use HostRootRepositoryLoadRouteErrorKind as E;
+
+    use super::RootLoadDiagnostic as V;
+    use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind as L;
+    use crate::canonical_repository_mapping::HostCanonicalRepositoryApparentMappingErrorKind as M;
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+    let SourcePreparationOutcome::Complete(original) = tx
+        .compute(
+            &RootRepositoryRouteKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                ApparentRepoName::new("missing").unwrap(),
+            )
+            .unwrap(),
+        )
+        .await
+        .unwrap()
+    else {
+        panic!("retained root error")
+    };
+    let root = HostRootRepositoryLoadRouteError {
+        apparent_repo: ApparentRepoName::new("repo").unwrap(),
+        kind: E::Root(original.as_ref().as_ref().unwrap_err().clone()),
+    };
+    let (E::Root(retained), V::Root(view)) = (&root.kind, root.diagnostic_view()) else {
+        panic!("Root")
+    };
+    assert!(std::ptr::eq(retained, view));
+    assert_eq!(
+        crate::registration_diagnostic::tests::render_root_load(&root),
+        "RootLoad: Unknown @missing"
+    );
+    let mapping = HostRootRepositoryLoadRouteError {
+        apparent_repo: ApparentRepoName::new("repo").unwrap(),
+        kind: E::Mapping(HostCanonicalRepositoryApparentMappingError {
+            context_repo: CanonicalRepoName::new("ctx+").unwrap(),
+            apparent_repo: ApparentRepoName::new("child").unwrap(),
+            kind: M::RootApparent,
+        }),
+    };
+    let (E::Mapping(retained), V::Mapping(view)) = (&mapping.kind, mapping.diagnostic_view())
+    else {
+        panic!("Mapping")
+    };
+    assert!(std::ptr::eq(retained, view));
+    let load = diagnostic_load(HostCanonicalRepositoryLoadRouteError {
+        canonical_repo: CanonicalRepoName::new("ctx+").unwrap(),
+        kind: L::RouteCompute("CAUSE".into()),
+    });
+    let (E::LoadRoute(retained), V::LoadRoute(view)) = (&load.kind, load.diagnostic_view()) else {
+        panic!("LoadRoute")
+    };
+    assert!(std::ptr::eq(retained, view));
+    let message: Arc<str> = Arc::from("CAUSE");
+    let weak = Arc::downgrade(&message);
+    for kind in [
+        E::RootCompute(message.clone()),
+        E::MappingCompute(message.clone()),
+        E::LoadRouteCompute(message.clone()),
+        E::Projection(message.clone()),
+    ] {
+        let owner = HostRootRepositoryLoadRouteError {
+            apparent_repo: ApparentRepoName::new("repo").unwrap(),
+            kind,
+        };
+        let before = Arc::strong_count(&message);
+        let (view, name) = match owner.diagnostic_view() {
+            V::RootCompute(s) => (s, "RootCompute"),
+            V::MappingCompute(s) => (s, "MappingCompute"),
+            V::LoadRouteCompute(s) => (s, "LoadRouteCompute"),
+            V::Projection(s) => (s, "Projection"),
+            _ => panic!("message sibling"),
+        };
+        assert_eq!(view.as_ptr(), message.as_ptr());
+        assert_eq!(
+            crate::registration_diagnostic::tests::render_root_load(&owner),
+            format!("RootLoad: {name}: CAUSE")
+        );
+        assert_eq!(Arc::strong_count(&message), before);
+    }
+    drop(message);
+    assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn root_load_diagnostic_walks_nested_routes_and_bounds_messages() {
+    use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind as L;
+    use crate::canonical_repository_mapping::HostCanonicalRepositoryApparentMappingErrorKind as M;
+    use crate::canonical_repository_route::HostCanonicalRepositoryRouteError;
+    use crate::canonical_repository_route::HostCanonicalRepositoryRouteErrorKind as R;
+    use crate::registration_diagnostic::tests::render_root_load;
+    let repo = CanonicalRepoName::new("ctx+").unwrap();
+    let route = || HostCanonicalRepositoryRouteError {
+        canonical_repo: repo.clone(),
+        kind: R::SelectedCompute("CAUSE".into()),
+    };
+    let load = diagnostic_load(HostCanonicalRepositoryLoadRouteError {
+        canonical_repo: repo.clone(),
+        kind: L::Route(route()),
+    });
+    assert_eq!(
+        render_root_load(&load),
+        "RootLoad: CanonicalRoute ctx+: Route ctx+: SelectedCompute: CAUSE"
+    );
+    let mapping = HostRootRepositoryLoadRouteError {
+        apparent_repo: ApparentRepoName::new("repo").unwrap(),
+        kind: HostRootRepositoryLoadRouteErrorKind::Mapping(
+            HostCanonicalRepositoryApparentMappingError {
+                context_repo: repo.clone(),
+                apparent_repo: ApparentRepoName::new("child").unwrap(),
+                kind: M::Route(route()),
+            },
+        ),
+    };
+    assert_eq!(
+        render_root_load(&mapping),
+        "RootLoad: ApparentMapping ctx+ @child: Route ctx+: SelectedCompute: CAUSE"
+    );
+    assert_eq!(
+        render_root_load(&diagnostic_projection("line\n\u{e9}\t".into())),
+        "RootLoad: Projection: line\\n\\u{e9}\\t"
+    );
+    let owner = diagnostic_projection(format!("{}TAIL_POISON", "\u{e9}".repeat(3072)).into());
+    let text = render_root_load(&owner);
+    assert!(
+        text.is_ascii()
+            && text.len() <= 3072
+            && text.ends_with("[diagnostic incomplete: output limit]")
+            && !text.contains("TAIL_POISON")
+    );
+}

@@ -196,3 +196,48 @@ async fn root_package_diagnostic_escapes_bounds_and_retires_original_owner() {
     drop(owner);
     assert!(error_weak.upgrade().is_none());
 }
+
+#[test]
+fn root_package_external_route_diagnostic_borrows_original_cause() {
+    let message: Arc<str> = Arc::from("CAUSE\n\u{e9}");
+    let weak = Arc::downgrade(&message);
+    let owner = RootPackageLoadError::new(RootPackageLoadErrorInner::ExternalRoute {
+        load: "@repo//pkg:defs.bzl".into(),
+        apparent_repo: slug_identity_v2::ApparentRepoName::new("repo").unwrap(),
+        error: crate::root_repository_load_route::tests::diagnostic_projection(message),
+    });
+    let RootPackageLoadErrorInner::ExternalRoute {
+        load: retained_load,
+        apparent_repo: retained_repo,
+        error: retained,
+    } = &owner.inner
+    else {
+        panic!("original external route")
+    };
+    let RootPackageLoadDiagnostic::ExternalRoute {
+        load,
+        apparent_repo,
+        error,
+    } = owner.diagnostic_view()
+    else {
+        panic!("borrowed route")
+    };
+    assert!(std::ptr::eq(error, retained) && std::ptr::eq(apparent_repo, retained_repo));
+    assert_eq!(load.as_ptr(), retained_load.as_ptr());
+    assert_eq!(owner.diagnostic_stage(), "external_route");
+    let before = weak.strong_count();
+    assert_eq!(
+        owner.diagnostic().to_string(),
+        "external_route: @repo//pkg:defs.bzl @repo: RootLoad: Projection: CAUSE\\n\\u{e9}"
+    );
+    assert_eq!(weak.strong_count(), before);
+    struct Reject;
+    impl std::fmt::Write for Reject {
+        fn write_str(&mut self, _: &str) -> std::fmt::Result {
+            Err(std::fmt::Error)
+        }
+    }
+    assert!(write!(Reject, "{}", owner.diagnostic()).is_err());
+    drop(owner);
+    assert!(weak.upgrade().is_none());
+}

@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP966 accepted; nested external-route cause continuation
+Status: RootBuild command Local override routing correction selected
 
 ## Observable and source basis
 
@@ -44,67 +44,60 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP966](wp966-retained-package-cause-readiness-2026-10-07.json) adds a borrowed
-RootPackageLoadError stage/Display view using the existing3072B ASCII sink and global32
-walker. Strict dependency cycles stay scalar; each Factored wrapper consumes a walk step.
-184net Loading production/230tests/18private Core report lines add zero retained strings,
-collections, source grants or semantic owners.31ordinary Rust,4synthetic and one native
-observation pass; pinned Loading/Core no-run and CoreCLIcheck pass. Three clean60s
-preparation stops and superseded Loading gates remain historical; completed four-library/
-eight-artifact checkpoint was pinned and verified fresh for remaining Core compilation.
-Compiler memory is separately qualified, with no runtime or whole-fit inference.
+[WP967](wp967-nested-root-route-readiness-2026-10-07.json) exposes the original
+ExternalRoute→RootLoad cause through borrowed views and the existing global32 walker/
+3072B ASCII sink. The finite Bzlmod writer streams safe original fields and qualifies
+opaque children.115net production/375tests add no retained strings, collections or source
+capabilities; original DICE/epoch/fallback behavior and Core observer/decoder stay intact.
+38ordinary Rust,4synthetic and one native observation pass; Bzlmod/Loading/Core no-run
+and CoreCLIcheck pass. One clean60s Core preparation stop is retained; four completed
+libraries/eight artifact hashes are verified fresh for a bounded34.267s remaining phase.
+Compiler memory is separate from runtime fit. Fresh Bzlmod tests use a measured distinct
+artifact while the historical version guard retains its unchanged binary/owners.
 
-The actual public singleton reports external_route for @rules_rust//rust:defs.bzl,
-borrowing its retained RootPackageLoadError. Detail is Slug-native bounded presentation:
-`external_route: @rules_rust//rust:defs.bzl @rules_rust [diagnostic incomplete: ExternalRoute]`.
-This leaves the underlying typed route cause unprojected; no source availability,
-mapping/import/body/provider or semantic cause is inferred. The once observation completes
-in0.443s/conservative83,548KiB,198runtime pins/188original held284878B leases and569756B
-parent-only hash brackets. Actualbuild_refusal/complete/package/preparationcomplete/
-singleton/policytrue, certificatefalse/observations73; analysis/actions/Rustc unavailable.
-SourceNone105registry235521B/15Host12937Decoded/zero transfer-write, noDeniedNeed/pathcapture
-missing; aggregate source counters unchanged from WP965. Scope/recorder and final source/
-image/scratch credits retire; no completeDICEArc/page retirement claim follows.
+Actual0.454s/conservative83,168KiB/233pins/188held284878B source leases and569756B
+parent hash brackets fit the observed prefix. The public singleton remains package
+build_refusal, complete/preparationcomplete/policytrue/certificatefalse/73observations;
+analysis/actions/Rustc are unavailable. Its retained cause is now:
+`external_route: @rules_rust//rust:defs.bzl @rules_rust: RootLoad: Unsupported @rules_rust module=rules_rust`.
+Qualified completeness describes this bounded presentation, not source or provider
+availability. SourceNone105registry235521B/15Host12937Decoded/transfer-write0 is unchanged;
+no deniedNeed/pathcapturemissing. Scope/recorder and final credits retire without proving
+all DICE Arc/page release or native body provenance/freshness.
 
-Continue the original external-route error owner grounded in
-[target/wp966/native/successor-source.md](../../../../target/wp966/native/successor-source.md).
-Project the actual nested typed cause before another semantic correction/source grant;
-do not guess from the apparent repo, fixture, counter history or opaque presentation.
-Preserve original fixture probe/support/data, normal source/epoch/provider ownership,
-scoped interning/Arc/Dupe/borrowed views and all caps. Source15of16 is an admission bound,
-not producer sufficiency; privateMODULE/nativebody witnesses remain unobserved/vacuous,
-cumulative history is not per-Arc live credit. Public producer and whole-workload fit
-remain open.
+Continue normal RootBuild routing using
+[target/wp967/native/successor-source.md](../../../../target/wp967/native/successor-source.md).
+The direct root route reads syntax-only local overrides; its selected fallback accepts
+Registry definitions, while command Local overrides are NonRegistry. Loading already
+owns the genuine selected canonical input and complete bzl mapping, but restores the
+original error unless its kind is Generated. Review RootBuild-only command Local admission
+at that existing Loading boundary, reusing effective override/selected definition/source
+owners and observed epoch unions. Preserve Ordinary behavior, builtins/nodep/alias rules,
+selected registry fallback, immutable policy invalidation and original probe/support/data.
+Freeze design and meaningful owner/dependent tests
+before implementation or another native operation. No new source grant is selected.
 
-Immediate [WP965](wp965-probe-package-source-readiness-2026-10-07.json), at
-215b1d9172b5a05c51b8cb5c794f000b98233a09, accepted finite original fixture pkg Lstat and
-pkg/{BUILD.bazel,BUILD} Lstat/FileBytes with defaultfalse selected flag, borrowed exact
-predicate/projection and coupled guard matrices. Its28named passes, once81,344KiB package
-refusal and +1Host/+292Decoded aggregate remain historical predecessor evidence; that
-checkpoint did not project this package cause. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json),
-atbbda0952365def42e588dbdc6d5680a878f7f5ca, owns unchanged pinned-length/EOF/identity
-reader and initial+validation epoch/session controls, qualified accepted reuse0fresh runs.
-
-Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
-and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,
-MVS/BCR provenance, original registry-body Weak/mutable same-URL freshness and whole-fit
-remain open. Scoped interning, Arc/Dupe graph/recipe owners, borrowed views and source/
-whole-workload memory policy remain mandatory; zero credits do not prove all DICE Arc/
-page release. Genuine singleton dispatch was established by immediate predecessor
-[WP958](wp958-public-singleton-producer-readiness-2026-10-07.json) at92ab38a59.
-[WP957](wp957-root-lockfile-metadata-readiness-2026-10-07.json), at7aec52b3b, genuinely
-completed finite normal mapping/all11Host MODULE fullhash/root Arc/original nonempty
-certificate and8extra Weak retirement; this is historical phase evidence, not current
-uninstrumented public witness coverage. Earlier attempt and lock metadata boundaries
-remain recorded in [WP956](wp956-normal-registry-discovery-readiness-2026-10-07.json).
+Immediate [WP966](wp966-retained-package-cause-readiness-2026-10-07.json), accepted at
+4c854854a20d9cc40dad2d7c947897d533d078a3, introduced the bounded package facade and
+established the original external-route boundary at83,548KiB. Its36named passes and
+preparation history are accepted predecessor evidence; its replaced Core/Loading binaries
+are historical. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json) reader/kernel/
+bridge remain unchanged acceptedreuse0fresh runs. Genuine singleton dispatch is owned by
+[WP958](wp958-public-singleton-producer-readiness-2026-10-07.json); finite normal mapping/
+nonempty certificate succeeded historically in
+[WP957](wp957-root-lockfile-metadata-readiness-2026-10-07.json).
 
 Reuse authentic177-file/273940B corpus from
 [WP954](wp954-owned-registry-corpus-native-readiness-2026-10-07.json) and11source rows
-10938B without extraction/availability retry.152 available MODULEs are not selected
-closure/sufficiency; six direct metadata objects/absent bazel_registry.json remain outside
-the corpus. Prior3FD/15availability/1version/larger-recorder controls remain qualified
-reuse0runs, including target/wp955/native/recorder-reuse.md. Deferred registry source
-ownership remains target/wp956/native/registry-owner-source.md.
+10938B without extraction/availability retry.152available MODULEs are not selected closure
+or sufficiency; six direct metadata objects/absent bazel_registry.json stay outside it.
+Prior3FD/15availability/1version/larger-recorder controls remain qualifiedreuse0runs.
+Borrow/transfer existing strings and use scoped interners where repeated retained strings
+justify them. Source15of16 is a bound, not sufficiency; cumulative history is not per-Arc
+live credit; private MODULE/body Weak witnesses remain unobserved/vacuous. Public Rustc/
+support/data/toolchain/provider/executable/config/runfiles/oracle/same-engine2024→2021→2024,
+MVS/BCR provenance, fullCLI/M7A and whole-workload fit remain required. Windows may stay
+minimal Unsupported. Preserve every source/allocation/runtime cap below.
 
 ## Reusable evidence and predecessor
 

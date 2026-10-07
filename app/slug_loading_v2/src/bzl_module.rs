@@ -2124,12 +2124,26 @@ impl RootPackageLoadError {
                 label,
                 error,
             },
+            RootPackageLoadErrorInner::ExternalRoute {
+                load,
+                apparent_repo,
+                error,
+            } => RootPackageLoadDiagnostic::ExternalRoute {
+                load,
+                apparent_repo,
+                error,
+            },
             inner => RootPackageLoadDiagnostic::Leaf(RootPackageLoadDiagnosticLeaf(inner)),
         }
     }
 }
 
 pub(crate) enum RootPackageLoadDiagnostic<'a> {
+    ExternalRoute {
+        load: &'a str,
+        apparent_repo: &'a slug_identity_v2::ApparentRepoName,
+        error: &'a HostRootRepositoryLoadRouteError,
+    },
     Leaf(RootPackageLoadDiagnosticLeaf<'a>),
     Bzl {
         origin: &'a str,
@@ -2176,15 +2190,6 @@ impl RootPackageLoadDiagnosticLeaf<'_> {
             E::RepositoryMapping { message } | E::RepositoryMappingInfrastructure { message } => {
                 out.write_str(message)
             }
-            E::ExternalRoute {
-                load,
-                apparent_repo,
-                ..
-            } => write!(
-                out,
-                "{load} @{} [diagnostic incomplete: ExternalRoute]",
-                apparent_repo.as_str()
-            ),
             E::ExternalInfrastructure { load, message } => write!(out, "{load}: {message}"),
             E::Attempt(HostPackageAttemptError::Loading(error)) => write!(out, "{error}"),
             E::Attempt(HostPackageAttemptError::Invariant(message)) => out.write_str(message),
@@ -2194,7 +2199,7 @@ impl RootPackageLoadDiagnosticLeaf<'_> {
             E::Attempt(HostPackageAttemptError::Input(_)) => {
                 out.write_str("[diagnostic incomplete: Attempt.Input]")
             }
-            E::Bzl { .. } | E::ExternalBzl { .. } => {
+            E::Bzl { .. } | E::ExternalBzl { .. } | E::ExternalRoute { .. } => {
                 unreachable!("bzl causes have borrowed traversable views")
             }
         }

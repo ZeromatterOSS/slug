@@ -1590,6 +1590,38 @@ pub struct RootRepositoryRouteError {
 }
 
 impl RootRepositoryRouteError {
+    /// Stream borrowed Slug-native presentation; the caller owns escaping and
+    /// the output budget. Opaque children retain explicit qualifications.
+    #[doc(hidden)]
+    pub fn write_route_diagnostic(&self, out: &mut dyn fmt::Write) -> fmt::Result {
+        match &self.kind {
+            RootRepositoryRouteErrorKind::Unknown { apparent_repo } => {
+                write!(out, "Unknown @{}", apparent_repo.as_str())
+            }
+            RootRepositoryRouteErrorKind::Unsupported {
+                apparent_repo,
+                module_name,
+            } => write!(
+                out,
+                "Unsupported @{} module={}",
+                apparent_repo.as_str(),
+                module_name.as_str()
+            ),
+            RootRepositoryRouteErrorKind::SelectedInfrastructure(message) => {
+                write!(out, "SelectedInfrastructure: {message}")
+            }
+            RootRepositoryRouteErrorKind::Root(_) => {
+                out.write_str("Root [diagnostic incomplete: Root]")
+            }
+            RootRepositoryRouteErrorKind::SelectedMapping(_) => {
+                out.write_str("SelectedMapping [diagnostic incomplete: SelectedMapping]")
+            }
+            RootRepositoryRouteErrorKind::SelectedDefinition(_) => {
+                out.write_str("SelectedDefinition [diagnostic incomplete: SelectedDefinition]")
+            }
+        }
+    }
+
     /// Distinguishes the two nonroot route failure kinds so core's external
     /// build branch can fall back to the generated-repository bridge while
     /// preserving every other diagnostic byte-exactly.
@@ -1637,6 +1669,10 @@ impl fmt::Display for RootRepositoryRouteError {
 }
 
 impl std::error::Error for RootRepositoryRouteError {}
+
+#[cfg(test)]
+#[path = "root_repository_route_diagnostic_tests.rs"]
+mod root_repository_route_diagnostic_tests;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RootRepositoryRouteKey {
