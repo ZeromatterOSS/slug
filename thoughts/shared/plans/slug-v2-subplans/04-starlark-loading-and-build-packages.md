@@ -7714,16 +7714,26 @@ generated apparent name stops before the canonical load route. Loading is the
 natural shared owner because it already owns canonical apparent mapping,
 generated definition/effect composition and external-Bzl/package consumers.
 
-Design one admission-aware `HostRootRepositoryLoadRoute` key family over
-workspace plus nonroot apparent name. It preserves ordinary versus root-BUILD
-admission, returns the existing root source route when available, and only on
-the exact Unknown/Unsupported polarity resolves the producer-recorded
-canonical target and requires the existing canonical load route to be
-Generated. Missing or mapped non-generated fallback restores the original
-route error. Root direct `.bzl`, external query and exported-source build must
-consume the same value; core's temporary generated-package bridge is deleted.
-No apparent alias, mapping copy, generated-effect duplicate, parser/ruleset or
-C++ special case is permitted.
+The admission-aware `HostRootRepositoryLoadRoute` key family owns workspace plus
+nonroot apparent name and ordinary versus root-BUILD mode. It returns an existing
+root source route when available; only exact Unknown/Unsupported polarity computes
+the producer-recorded apparent mapping and canonical load route. Generated canonical
+inputs retain their accepted shared path. [WP968](wp968-root-build-command-local-readiness-2026-10-07.json)
+additionally admits RootBuild command Local through the original canonical input:
+SelectedNonregistry, CommandAbsolute and original Request(Local), with exact
+key/target/route/request workspace/canonical agreement. Ordinary and every other
+non-generated fallback restore the original error. This is Slug-native admission
+of existing source semantics; no additional exact parity claim follows.
+
+The predicate borrows original views. Successful results share existing Arc-backed
+selected definition/request/complete bzl mapping; route/mapping/source epochs merge
+before publication, with Need/error outcomes preserved. No DirectLocal shortcut,
+authored alias/spec/certificate, deep mapping/source copy, second cache or interner
+is introduced. Root direct `.bzl`, external query and exported-source build consume
+the same owner; core's temporary generated-package bridge stays deleted. Tests use
+actual normal keys/command policy and cover mapped input/epoch identity, Ordinary
+and closed negatives, warm command A→B→A, Need recovery and last-owner retirement.
+Physical source availability/full configured producer certification remain separate.
 
 Pinned Bazel 9.2 `ModuleExtensionResolutionTest.simpleExtension` and
 `generatedReposHaveCorrectMappings` own direct-load/mapping behavior. Zabel

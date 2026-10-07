@@ -813,3 +813,388 @@ fn root_load_diagnostic_walks_nested_routes_and_bounds_messages() {
             && !text.contains("TAIL_POISON")
     );
 }
+
+const COMMAND_LOCAL_MODULE: &str =
+    "module(name='bazel_tools')\nbazel_dep(name='local',version='1',repo_name='local_alias')\n";
+
+async fn command_local_transaction(
+    dice: &Arc<Dice>,
+    root_module: &str,
+    command_root: Option<&str>,
+) -> (dice::DiceTransaction, PathObservationEpoch) {
+    use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+    use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+    use slug_bzlmod_v2::RepositoryMaterializationResult;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RepositoryMaterializationSuccess;
+    let command = command_root.map(|root| format!("local={root}"));
+    let policy = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        std::path::Path::new(WORKSPACE),
+        command.as_deref(),
+    )
+    .unwrap();
+    let mut tx = crate::canonical_repository_route_tests::tests::transaction_with_policy(
+        dice,
+        root_module,
+        EXTENSION_A,
+        true,
+        None,
+        policy,
+    )
+    .await;
+    let old = tx.compute(&PathObservationEpochKey).await.unwrap();
+    let root = command_root
+        .map(str::to_owned)
+        .unwrap_or_else(|| format!("{WORKSPACE}/local"));
+    let demand = |suffix: &str, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(format!("{root}{suffix}")).unwrap(),
+            operation,
+        )
+    };
+    let body_demand = demand("/MODULE.bazel", PathObservationOperation::FileBytes);
+    let replaced = [
+        body_demand.clone(),
+        demand("", PathObservationOperation::Lstat),
+        demand("/MODULE.bazel", PathObservationOperation::Lstat),
+        demand("/REPO.bazel", PathObservationOperation::Lstat),
+        demand("/.bazelignore", PathObservationOperation::Lstat),
+    ];
+    let mut rows = old
+        .observations()
+        .iter()
+        .filter(|(key, _)| !replaced.contains(key))
+        .map(|(key, value)| (key.clone(), value.clone()))
+        .collect::<Vec<_>>();
+    for (suffix, kind) in [
+        ("", PathNodeKind::Directory),
+        ("/MODULE.bazel", PathNodeKind::RegularFile),
+    ] {
+        rows.push((
+            demand(suffix, PathObservationOperation::Lstat),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(kind, 36, 1, 1, 1, 0o755),
+            ))),
+        ));
+    }
+    for suffix in ["/REPO.bazel", "/.bazelignore"] {
+        rows.push((
+            demand(suffix, PathObservationOperation::Lstat),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        ));
+    }
+    rows.push((
+        body_demand,
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(
+                b"module(name='local',version='2')\n".as_slice(),
+            )),
+        )),
+    ));
+    let epoch = PathObservationEpoch::from_shared(rows).unwrap();
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, epoch.clone())])
+        .unwrap();
+    let mut tx = updater.commit().await;
+    let key = HostCanonicalRepositoryLoadRouteKey::new(
+        NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        CanonicalRepoName::new("local+").unwrap(),
+    );
+    let SourcePreparationOutcome::Need(need) = tx.compute(&key).await.unwrap() else {
+        panic!("normal Local requires materialization")
+    };
+    let request = need
+        .repository_materializations()
+        .values()
+        .next()
+        .expect("original materialization request")
+        .clone();
+    assert!(
+        matches!(&request.kind, slug_bzlmod_v2::RepositoryMaterializationKind::Local { logical_root } if logical_root.as_path() == std::path::Path::new(&root))
+    );
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to([(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    (updater.commit().await, epoch)
+}
+
+fn command_local_input(
+    value: &<HostRootRepositoryLoadRouteObservationKey as Key>::Value,
+) -> &HostCanonicalRepositorySourceInput {
+    let observed = observed_route(value);
+    let HostRepositorySourceRoute::Canonical(input) =
+        observed.result().as_ref().as_ref().unwrap().source()
+    else {
+        panic!("original canonical input")
+    };
+    input
+}
+
+#[tokio::test]
+async fn root_build_command_local_preserves_selected_input_mapping_and_epoch() {
+    use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionKey;
+    use slug_bzlmod_v2::HostCanonicalSelectedModuleIdentity;
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let root = format!("{WORKSPACE}/local");
+    let (mut tx, epoch) = command_local_transaction(&dice, COMMAND_LOCAL_MODULE, Some(&root)).await;
+    let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    let apparent = ApparentRepoName::new("local_alias").unwrap();
+    let target = CanonicalRepoName::new("local+").unwrap();
+    let canonical = tx
+        .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
+            workspace.clone(),
+            target.clone(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(canonical)) = canonical else {
+        panic!("canonical producer")
+    };
+    let key = HostRootRepositoryLoadRouteObservationKey::for_root_build(
+        workspace.clone(),
+        apparent.clone(),
+    )
+    .unwrap();
+    let value = tx.compute(&key).await.unwrap();
+    let input = command_local_input(&value);
+    assert!(Arc::ptr_eq(
+        input.view().route(),
+        canonical.result().as_ref().as_ref().unwrap().route()
+    ));
+    assert_eq!(
+        input.view().route().bzl_repository_mapping(),
+        canonical
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .route()
+            .bzl_repository_mapping()
+    );
+    let mapping = input.view().route().bzl_repository_mapping();
+    assert!(!mapping.is_empty());
+    assert!(
+        mapping
+            .iter()
+            .any(|(name, target)| name.as_str() == "local" && target.as_str() == "local+")
+    );
+    let view = input.view().route().view();
+    assert_eq!(
+        view.kind(),
+        HostCanonicalRepositoryRouteKind::SelectedNonregistry
+    );
+    assert_eq!(
+        view.local_path_policy(),
+        Some(HostRepositoryLocalPathPolicy::CommandAbsolute)
+    );
+    assert_eq!(view.associated_module_metadata(), Some(("local", "2")));
+    let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+    else {
+        panic!("Local request")
+    };
+    assert_eq!(request.repo_spec, *view.repo_spec().unwrap());
+    assert!(
+        matches!(&request.kind, RepositoryMaterializationKind::Local { logical_root } if logical_root.as_path() == std::path::Path::new(&root))
+    );
+    let SourcePreparationOutcome::Complete(definition) = tx
+        .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
+            workspace.clone(),
+            target,
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("selected owner")
+    };
+    assert!(matches!(
+        definition.as_ref().as_ref().unwrap().view().identity(),
+        HostCanonicalSelectedModuleIdentity::Module {
+            name: "local",
+            normalized_version: ""
+        }
+    ));
+    for (demand, original) in canonical.observations().observations() {
+        assert!(Arc::ptr_eq(
+            original,
+            observed_route(&value).observations().get(demand).unwrap()
+        ));
+    }
+    for (demand, observed) in observed_route(&value).observations().observations() {
+        assert!(Arc::ptr_eq(observed, epoch.get(demand).unwrap()));
+    }
+    let ordinary = tx
+        .compute(&HostRootRepositoryLoadRouteKey::new(workspace, apparent).unwrap())
+        .await
+        .unwrap();
+    assert!(
+        matches!(ordinary, SourcePreparationOutcome::Complete(value) if value.as_ref().is_err())
+    );
+}
+
+#[tokio::test]
+async fn root_build_command_local_admission_is_exact_and_fail_closed() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let root = format!("{WORKSPACE}/local");
+    let (mut tx, _) = command_local_transaction(&dice, COMMAND_LOCAL_MODULE, Some(&root)).await;
+    let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    let apparent = ApparentRepoName::new("local_alias").unwrap();
+    let target = CanonicalRepoName::new("local+").unwrap();
+    let key = HostRootRepositoryLoadRouteObservationKey::for_root_build(
+        workspace.clone(),
+        apparent.clone(),
+    )
+    .unwrap();
+    let value = tx.compute(&key).await.unwrap();
+    let input = command_local_input(&value);
+    assert!(command_local_input_admitted(&key.0, &target, input));
+    assert!(!command_local_input_admitted(
+        &HostRootRepositoryLoadRouteKey::new(workspace.clone(), apparent.clone()).unwrap(),
+        &target,
+        input
+    ));
+    assert!(!command_local_input_admitted(
+        &HostRootRepositoryLoadRouteKey::for_root_build(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+            apparent
+        )
+        .unwrap(),
+        &target,
+        input
+    ));
+    assert!(!command_local_input_admitted(
+        &key.0,
+        &CanonicalRepoName::new("other+").unwrap(),
+        input
+    ));
+    let module_local = "module(name='bazel_tools')\nbazel_dep(name='local',version='1',repo_name='local_alias')\nlocal_path_override(module_name='local',path='local')\n";
+    let other_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let (mut other, _) = command_local_transaction(&other_dice, module_local, None).await;
+    let result = other
+        .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+            workspace.clone(),
+            target.clone(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(result) = result else {
+        panic!("MODULE Local producer")
+    };
+    assert!(!command_local_input_admitted(
+        &key.0,
+        &target,
+        result.as_ref().as_ref().unwrap().input()
+    ));
+    let no_command = registry_dice(PARENT_MODULE, LEAF_MAPPING_A, SOURCE_A);
+    let mut registry = transaction(&no_command, ROOT_MODULE, EXTENSION_A, true, None).await;
+    let target = CanonicalRepoName::new("parent+").unwrap();
+    let result = registry
+        .compute(&HostCanonicalRepositoryLoadRouteKey::new(
+            workspace,
+            target.clone(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(result) = result else {
+        panic!("registry producer")
+    };
+    let input = result.as_ref().as_ref().unwrap().input();
+    assert_eq!(
+        input.view().route().view().kind(),
+        HostCanonicalRepositoryRouteKind::SelectedRegistry
+    );
+    assert!(!command_local_input_admitted(&key.0, &target, input));
+}
+
+#[tokio::test]
+async fn root_build_command_local_warm_change_restore_and_need_remain_owned() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let a = format!("{WORKSPACE}/local");
+    let b = format!("{WORKSPACE}/local-b");
+    let key = HostRootRepositoryLoadRouteObservationKey::for_root_build(
+        NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        ApparentRepoName::new("local_alias").unwrap(),
+    )
+    .unwrap();
+    let (mut tx, epoch) = command_local_transaction(&dice, COMMAND_LOCAL_MODULE, Some(&a)).await;
+    let first = tx.compute(&key).await.unwrap();
+    let warm = tx.compute(&key).await.unwrap();
+    assert!(Arc::ptr_eq(
+        observed_route(&first).result(),
+        observed_route(&warm).result()
+    ));
+    let retained = command_local_input(&first).clone();
+    let weak = Arc::downgrade(retained.view().route());
+    let before = Arc::strong_count(retained.view().route());
+    assert!(command_local_input_admitted(
+        &key.0,
+        &CanonicalRepoName::new("local+").unwrap(),
+        &retained
+    ));
+    assert_eq!(Arc::strong_count(retained.view().route()), before);
+    drop(tx);
+    let (mut changed_tx, _) =
+        command_local_transaction(&dice, COMMAND_LOCAL_MODULE, Some(&b)).await;
+    let changed = changed_tx.compute(&key).await.unwrap();
+    assert_ne!(command_local_input(&changed), &retained);
+    assert!(
+        matches!(retained.view().disposition(), HostRepositorySourceInputDispositionView::Request(request) if matches!(&request.kind, RepositoryMaterializationKind::Local { logical_root } if logical_root.as_path() == std::path::Path::new(&a)))
+    );
+    drop(changed_tx);
+    let (mut restored_tx, _) =
+        command_local_transaction(&dice, COMMAND_LOCAL_MODULE, Some(&a)).await;
+    let restored = restored_tx.compute(&key).await.unwrap();
+    assert_eq!(command_local_input(&restored), &retained);
+    let mut updater = restored_tx.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    let mut pending = updater.commit().await;
+    assert!(matches!(
+        pending.compute(&key).await.unwrap(),
+        SourcePreparationOutcome::Need(_)
+    ));
+    let mut updater = pending.into_updater();
+    updater
+        .changed_to([(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut recovered = updater.commit().await;
+    assert_eq!(
+        command_local_input(&recovered.compute(&key).await.unwrap()),
+        &retained
+    );
+    drop(recovered);
+    drop(first);
+    drop(warm);
+    drop(changed);
+    drop(restored);
+    drop(dice);
+    assert!(weak.upgrade().is_some());
+    drop(retained);
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        while weak.upgrade().is_some() {
+            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+        }
+    })
+    .await
+    .expect("original route retires after DICE history and last handle drop");
+}

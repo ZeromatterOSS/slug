@@ -17,8 +17,12 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostCanonicalRepositoryRouteKind;
+use slug_bzlmod_v2::HostCanonicalRepositorySourceInput;
+use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
+use slug_bzlmod_v2::HostRepositorySourceInputDispositionView;
 use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedObservationFrontier;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
 use slug_bzlmod_v2::RootRepositoryRouteError;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::RootRepositoryRouteObservationError;
@@ -526,6 +530,27 @@ async fn mapping_predecessor(
     }
 }
 
+fn command_local_input_admitted(
+    key: &HostRootRepositoryLoadRouteKey,
+    target: &CanonicalRepoName,
+    input: &HostCanonicalRepositorySourceInput,
+) -> bool {
+    let view = input.view();
+    let route = view.route().view();
+    if key.admission != RootRepositoryLoadAdmission::RootBuild
+        || route.kind() != HostCanonicalRepositoryRouteKind::SelectedNonregistry
+        || route.local_path_policy() != Some(HostRepositoryLocalPathPolicy::CommandAbsolute)
+        || route.workspace() != &key.workspace
+        || route.canonical_repo() != target
+    {
+        return false;
+    }
+    matches!(view.disposition(), HostRepositorySourceInputDispositionView::Request(request)
+        if matches!(request.kind, RepositoryMaterializationKind::Local { .. })
+            && request.id.workspace == key.workspace
+            && &request.id.canonical_repo == target)
+}
+
 async fn load_predecessor(
     ctx: &mut DiceComputations<'_>,
     key: &HostRootRepositoryLoadRouteKey,
@@ -560,7 +585,7 @@ async fn load_predecessor(
         LoadRouteMode::Observed => match ctx
             .compute(&HostCanonicalRepositoryLoadRouteObservationKey::new(
                 key.workspace.dupe(),
-                target,
+                target.clone(),
             ))
             .await
         {
@@ -625,6 +650,18 @@ async fn load_predecessor(
         ),
         RootPredecessor::GeneratedFallback(_)
             if route.route().view().kind() == HostCanonicalRepositoryRouteKind::Generated =>
+        {
+            complete(
+                key,
+                Ok(HostRootRepositoryLoadRoute {
+                    apparent_repo: key.apparent_repo.clone(),
+                    source: HostRepositorySourceRoute::canonical(route.input().clone()),
+                }),
+                observations,
+            )
+        }
+        RootPredecessor::GeneratedFallback(_)
+            if command_local_input_admitted(key, &target, route.input()) =>
         {
             complete(
                 key,

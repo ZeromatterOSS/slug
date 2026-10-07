@@ -429,7 +429,7 @@ ext=module_extension(implementation=impl)
         PathObservationEpoch::new(observations).unwrap()
     }
 
-    async fn transaction_with_policy(
+    pub(crate) async fn transaction_with_policy(
         dice: &Arc<Dice>,
         module: &str,
         extension: &str,
@@ -447,6 +447,11 @@ ext=module_extension(implementation=impl)
         user_data
             .data
             .set(RepositoryHostInputTransaction::default());
+        user_data
+            .data
+            .set(slug_bzlmod_v2::SelectedExtensionDownloadTransaction::empty(
+                workspace.dupe(),
+            ));
         let mut updater = dice.updater_with_data(user_data);
         updater
             .changed_to(vec![(
