@@ -153,7 +153,7 @@ impl RegistryChoice {
     fn registry_attempts(self) -> u64 {
         match self {
             Self::DefaultBcr => 16,
-            Self::PreparedFile => 32,
+            Self::PreparedFile => 128,
         }
     }
     fn urls(self, prepared: impl FnOnce() -> RegistryUrls) -> RegistryUrls {
@@ -183,7 +183,7 @@ fn registry_policy_matches(actual: &RootModuleRegistryUrls, expected: &RegistryU
 #[test]
 fn prepared_file_registry_policy_is_opt_in_and_exact() {
     assert_eq!(RegistryChoice::DefaultBcr.registry_attempts(), 16);
-    assert_eq!(RegistryChoice::PreparedFile.registry_attempts(), 32);
+    assert_eq!(RegistryChoice::PreparedFile.registry_attempts(), 128);
     let expected = Path::new("/task/registry");
     let file = prepared_file_registry("/task/registry", expected).unwrap();
     assert_eq!(file.as_slice().len(), 1);

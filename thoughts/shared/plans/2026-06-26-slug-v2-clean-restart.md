@@ -148,15 +148,16 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP955](./slug-v2-subplans/wp955-file-registry-attempt-policy-2026-10-07.json) accepts
-PreparedFile32/DefaultBCR16 with unchanged memory/time/source caps and no new retained
-strings.14 ordinary+3synthetic+1native checks pass; normal discovery0.300s/69600KiB
-keeps all8 source/hash/Weak and188 parent brackets. Actual47 attempted/32 admitted
-requests still reach RegistryAttempts, selecting rules_android0.1.1. Review a measured
-normal admission correction before another run; no automatic doubling/absence or
-mapping/provider/public Rustc/wholefit claim. Authentic177-file source corpus is reused
-from [WP954](./slug-v2-subplans/wp954-owned-registry-corpus-native-readiness-2026-10-07.json);
-mutable registry freshness and original registry Arc retirement remain open.
+[WP956](./slug-v2-subplans/wp956-normal-registry-discovery-readiness-2026-10-07.json)
+accepts PreparedFile128/DefaultBCR16 with unchanged byte/memory/time limits.14 ordinary,
+3 synthetic and1 native gates pass; normal observation0.329s/72728KiB admits85 registry
+requests/229746B with no source error. Root/hash/Weak/zero credits and188 physical
+brackets pass; all8 extra Local sources remain unseen in this epoch, with unavailable
+hash/body and vacuous Weak expiry. Normal mapping now needs the exact root lockfile path;
+ground/review finite metadata admission next, without inferring absence or operation.
+No mapping/provider/public Rustc/wholefit claim; original registry Arc and mutable source
+freshness remain open. Source corpus is reused from WP954; measured policy history is
+[WP955](./slug-v2-subplans/wp955-file-registry-attempt-policy-2026-10-07.json).
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
