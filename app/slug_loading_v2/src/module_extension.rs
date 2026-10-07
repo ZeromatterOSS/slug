@@ -123,6 +123,7 @@ use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::PreparedModuleExtensionInput;
 use crate::bzl_module::PreparedModuleExtensionTag;
 use crate::bzl_module::RepositoryBzlLabel;
+use crate::bzl_module::selected_extension_definition_route;
 use crate::dependency_cycle::DependencyCycleGuard;
 use crate::dependency_cycle::compute_guarded;
 use crate::module_extension_repository_rule::RepositoryRuleCallRecord;
@@ -133,6 +134,9 @@ use crate::package::prepare_module_extension_tag_attributes;
 use crate::package::validate_module_extension_tag_schema;
 use crate::starlark_label::StarlarkLabel;
 pub(crate) mod guest_namespace;
+#[cfg(test)]
+#[path = "module_extension/local_definition_route_tests.rs"]
+mod local_definition_route_tests;
 mod owner_invocation;
 pub(crate) mod runtime_sources;
 pub(crate) mod selected_label_data;
@@ -388,10 +392,9 @@ async fn pure_host_bzl(ctx: &mut DiceComputations<'_>, workspace: &NormalizedAbs
     let target = RootPackageBzlTarget::parse(request.parts().0.target().as_str()).map_err(|error| {
         pure_complete(Err(after(HostPureModuleExtensionInvocationError::Label(error.to_string().into()))), observations.dupe())
     })?;
-    let selected = match request.source() {
-        HostSelectedExtensionDefinitionSource::Root => None,
-        source => RootRepositoryRoute::for_selected_extension_definition(workspace.dupe(), source),
-    };
+    let selected = selected_extension_definition_route(workspace.dupe(), request.source()).map_err(|message| {
+        pure_complete(Err(after(HostPureModuleExtensionInvocationError::Invocation(message.into()))), observations.dupe())
+    })?;
     let child: PureHostBzlChild = match (mode, selected) {
         (PureInvocationsMode::Legacy, None) => match compute_guarded(ctx, &HostBzlModuleEvalKey::new_bzlmod(workspace.dupe(), label)).await {
             Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
@@ -1039,10 +1042,7 @@ async fn owner_bzl(ctx: &mut DiceComputations<'_>, key: &HostSelectedExtensionOw
     let request = inputs.request();
     let target = RootPackageBzlTarget::parse(request.parts().0.target().as_str()).map_err(|error| owner_complete(Err(owner_after(inputs, Arc::from([]), error.to_string())), observations.dupe()))?;
     let label = HostRootBzlLabel::new(request.parts().0.package().package().clone(), target.dupe());
-    let selected = match request.source() {
-        HostSelectedExtensionDefinitionSource::Root => None,
-        source => RootRepositoryRoute::for_selected_extension_definition(key.workspace.dupe(), source),
-    };
+    let selected = selected_extension_definition_route(key.workspace.dupe(), request.source()).map_err(|message| owner_complete(Err(owner_after(inputs, Arc::from([]), message)), observations.dupe()))?;
     let child = match (mode, selected) {
         (PureInvocationsMode::Legacy, None) => match compute_guarded(ctx, &HostBzlModuleEvalKey::new_bzlmod(key.workspace.dupe(), label.clone())).await {
             Ok(SourcePreparationOutcome::Need(need)) => return Err(SourcePreparationOutcome::Need(need)),
@@ -8013,7 +8013,9 @@ ext = module_extension(implementation=impl, environ=['FACTOR', 'MISSING', 'FACTO
         let production = &source[..source.find("mod tests {").unwrap()];
         let owner = &production[production.find("async fn owner_bzl").unwrap()..];
         let preparation = include_str!("module_extension/owner_invocation.rs");
-        assert!(owner.contains("RootRepositoryRoute::for_selected_extension_definition"));
+        assert!(owner.contains(
+            "selected_extension_definition_route(key.workspace.dupe(), request.source())"
+        ));
         assert!(owner.contains("ExternalBzlModuleEvalKey::new_bzlmod"));
         assert!(owner.contains("ExternalBzlModuleObservationKey::new_bzlmod"));
         assert!(preparation.contains("owner_bzl(ctx, key, &inputs, None"));

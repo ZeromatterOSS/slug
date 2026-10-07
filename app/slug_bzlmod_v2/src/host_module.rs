@@ -1027,6 +1027,13 @@ impl PartialEq for SelectedRegistryRepositoryRoute {
 impl Eq for SelectedRegistryRepositoryRoute {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[doc(hidden)]
+pub struct SelectedLocalRepositoryRoute {
+    definition: HostCanonicalSelectedModuleDefinition,
+    mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum RootRepositorySource {
     DirectLocal(RepoSpec),
     BuiltinBazelTools(BuiltinBazelToolsRouteIdentity),
@@ -1040,6 +1047,7 @@ pub enum RootRepositorySource {
         local_path_policy: crate::HostRepositoryLocalPathPolicy,
         plan: GeneratedRepositoryFileEffectPlan,
     },
+    SelectedLocal(SelectedLocalRepositoryRoute),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -1249,6 +1257,19 @@ impl Hash for SelectedRegistryRepositoryRoute {
     }
 }
 
+impl Hash for SelectedLocalRepositoryRoute {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let view = self.definition.view();
+        view.associated_module_metadata().hash(state);
+        hash_repo_spec(
+            view.repo_spec().expect("checked selected Local spec"),
+            state,
+        );
+        view.local_path_policy().hash(state);
+        self.mapping.hash(state);
+    }
+}
+
 impl Hash for RootRepositorySource {
     fn hash<H: Hasher>(&self, state: &mut H) {
         std::mem::discriminant(self).hash(state);
@@ -1265,6 +1286,7 @@ impl Hash for RootRepositorySource {
                 local_path_policy.hash(state);
                 plan.hash(state);
             }
+            Self::SelectedLocal(route) => route.hash(state),
         }
     }
 }
@@ -1348,6 +1370,17 @@ impl RootRepositoryRoute {
                     route.local_path_policy,
                 )
             }
+            RootRepositorySource::SelectedLocal(route) => {
+                let view = route.definition.view();
+                HostRepositorySourceCapability::from_repo_spec(
+                    self.workspace.dupe(),
+                    self.apparent_repo.clone(),
+                    self.canonical_repo.clone(),
+                    view.repo_spec().expect("checked selected Local spec"),
+                    view.local_path_policy()
+                        .expect("checked selected Local policy"),
+                )
+            }
             RootRepositorySource::BuiltinBazelTools(identity) => {
                 HostRepositorySourceCapability::builtin(
                     self.workspace.dupe(),
@@ -1380,6 +1413,9 @@ impl RootRepositoryRoute {
             RootRepositorySource::SelectedRegistry(route) => {
                 Some(route.definition.view().associated_module_metadata())
             }
+            RootRepositorySource::SelectedLocal(route) => {
+                Some(route.definition.view().associated_module_metadata())
+            }
             RootRepositorySource::DirectLocal(_)
             | RootRepositorySource::BuiltinBazelTools(_)
             | RootRepositorySource::Generated { .. } => None,
@@ -1400,6 +1436,7 @@ impl RootRepositoryRoute {
     pub fn bzl_repository_mapping(&self) -> Arc<[(ApparentRepoName, CanonicalRepoName)]> {
         match &self.source {
             RootRepositorySource::SelectedRegistry(route) => route.mapping.clone(),
+            RootRepositorySource::SelectedLocal(route) => route.mapping.dupe(),
             _ => Arc::from([]),
         }
     }
@@ -1431,6 +1468,34 @@ impl RootRepositoryRoute {
             return None;
         };
         let view = definition.view();
+        if view.kind() == HostCanonicalSelectedModuleKind::SelectedNonregistry {
+            if view.local_path_policy()
+                != Some(crate::HostRepositoryLocalPathPolicy::CommandAbsolute)
+                || !crate::source_preparation::is_command_local_repository_spec(view.repo_spec()?)
+                || view.canonical_repo().is_root()
+                || view.canonical_repo().as_str() == "bazel_tools"
+                || apparent_repo.is_root()
+                || view.mapping_context() != view.canonical_repo()
+            {
+                return None;
+            }
+            let HostCanonicalSelectedModuleIdentity::Module { name, .. } = view.identity() else {
+                return None;
+            };
+            return Some(Self {
+                workspace,
+                apparent_repo: apparent_repo.clone(),
+                module_name: CompactString::new(name),
+                canonical_repo: view.canonical_repo().clone(),
+                source: RootRepositorySource::SelectedLocal(SelectedLocalRepositoryRoute {
+                    definition: definition.clone(),
+                    mapping: view
+                        .mapping()
+                        .map(|(name, target)| (name.clone(), target.clone()))
+                        .collect(),
+                }),
+            });
+        }
         if view.kind() != HostCanonicalSelectedModuleKind::SelectedRegistry {
             return None;
         }
@@ -1463,10 +1528,12 @@ impl RootRepositoryRoute {
         &self,
         apparent: &ApparentRepoName,
     ) -> Option<RootRepositoryBzlLoadRoute> {
-        let RootRepositorySource::SelectedRegistry(route) = &self.source else {
-            return None;
+        let definition = match &self.source {
+            RootRepositorySource::SelectedRegistry(route) => &route.definition,
+            RootRepositorySource::SelectedLocal(route) => &route.definition,
+            _ => return None,
         };
-        match route.definition.mapped_bzl_load(apparent)? {
+        match definition.mapped_bzl_load(apparent)? {
             HostSelectedBzlLoadSource::Selected(definition) => {
                 Self::for_selected_extension_definition(
                     self.workspace.dupe(),
@@ -1529,6 +1596,11 @@ impl RootRepositoryRoute {
         match &self.source {
             RootRepositorySource::DirectLocal(spec) => spec,
             RootRepositorySource::SelectedRegistry(route) => &route.repo_spec,
+            RootRepositorySource::SelectedLocal(route) => route
+                .definition
+                .view()
+                .repo_spec()
+                .expect("checked selected Local spec"),
             RootRepositorySource::Generated { repo_spec, .. } => repo_spec,
             RootRepositorySource::BuiltinBazelTools(_) => {
                 panic!("built-in bazel_tools has no RepoSpec")
@@ -1899,6 +1971,9 @@ fn selected_route(
     key: &RootRepositoryRouteKey,
     definition: HostCanonicalSelectedModuleDefinition,
 ) -> Option<RootRepositoryRoute> {
+    if definition.view().kind() != HostCanonicalSelectedModuleKind::SelectedRegistry {
+        return None;
+    }
     let source = HostSelectedExtensionDefinitionSource::Selected {
         definition,
         apparent_repo: key.apparent_repo.clone(),

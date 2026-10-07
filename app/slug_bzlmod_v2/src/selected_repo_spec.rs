@@ -4502,7 +4502,18 @@ fn selected_extension_definition_source(
         routes: Arc::new(Ok((**routes).clone())),
         ordinal,
     };
-    (definition.view().kind() == HostCanonicalSelectedModuleKind::SelectedRegistry).then_some(())?;
+    let view = definition.view();
+    match view.kind() {
+        HostCanonicalSelectedModuleKind::SelectedRegistry => {}
+        HostCanonicalSelectedModuleKind::SelectedNonregistry
+            if view.local_path_policy()
+                == Some(crate::HostRepositoryLocalPathPolicy::CommandAbsolute)
+                && view.mapping_context() == canonical_repo
+                && crate::source_preparation::is_command_local_repository_spec(
+                    view.repo_spec()?,
+                ) => {}
+        _ => return None,
+    }
     let apparent_repo = mapping
         .order
         .iter()
@@ -6385,6 +6396,11 @@ fn selected_registry_proof_spec(module: HostGraphModuleKey) -> HostSelectedRegis
         ),
     }
 }
+
+#[cfg(test)]
+mod local_extension_definition_tests;
+#[cfg(test)]
+pub(crate) use local_extension_definition_tests::testing_selected_command_local_source;
 
 #[cfg(test)]
 mod tests {

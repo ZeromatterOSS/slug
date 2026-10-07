@@ -480,178 +480,192 @@ fn utils_digest(result: &ConfiguredNodeResult) -> [u8; 32] {
         .digest
 }
 
+fn prove_callback_mode(observed: bool) {
+    let (root, _archives) = workspace();
+    let runtime = test_runtime(&root).unwrap();
+    let fast = configured(false);
+    // Cold materialization creates immutable roots under /tmp and changes
+    // genuinely observed ancestor metadata. Establish the warm-source
+    // baseline once; never retry publication equality until it succeeds.
+    let warm = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
+    check(&warm, "rust_consumer", "A", false);
+    let first = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
+    let first_inputs = accepted_native_snapshot(&runtime);
+    check(&first, "rust_consumer", "A", false);
+    let fresh = request(
+        &runtime,
+        &root,
+        observed,
+        "rust_fresh_consumer",
+        fast.clone(),
+    )
+    .unwrap();
+    let fresh_inputs = accepted_native_snapshot(&runtime);
+    let changed_paths: Vec<_> = first_inputs
+        .path_observations
+        .observations()
+        .iter()
+        .filter(|(demand, value)| {
+            fresh_inputs
+                .path_observations
+                .get(demand)
+                .is_some_and(|fresh| fresh != *value)
+        })
+        .map(|(demand, _)| {
+            format!(
+                "{:?}:{:?}:{:?}",
+                demand.namespace(),
+                demand.path(),
+                demand.operation()
+            )
+        })
+        .collect();
+    let shared_paths = first_inputs
+        .path_observations
+        .observations()
+        .iter()
+        .filter(|(demand, _)| fresh_inputs.path_observations.get(demand).is_some())
+        .count();
+    assert!(
+        shared_paths > 0,
+        "warm publication compares real shared observations"
+    );
+    assert!(
+        changed_paths.is_empty(),
+        "warm publication inputs changed: {changed_paths:?}"
+    );
+    assert!(
+        first_inputs
+            .path_observations
+            .observations()
+            .keys()
+            .any(
+                |demand| demand.namespace() == PathObservationNamespace::Host
+                    && demand.path().as_path() == Path::new("/tmp")
+                    && demand.operation() == PathObservationOperation::Lstat
+                    && fresh_inputs.path_observations.get(demand).is_some()
+            ),
+        "the previously changing ancestor remains observed"
+    );
+    check(&fresh, "rust_fresh_consumer", "A", false);
+    let first_model = callback(&first).model();
+    let fresh_model = callback(&fresh).model();
+    let AnalysisValueKind::Provider(first_cc) = first_model.cc_toolchain.kind() else {
+        panic!("CC provider")
+    };
+    let AnalysisValueKind::Provider(fresh_cc) = fresh_model.cc_toolchain.kind() else {
+        panic!("fresh CC provider")
+    };
+    let changed_cc_fields: Vec<_> = first_cc
+        .fields()
+        .iter()
+        .filter_map(|(name, value)| {
+            (!fresh_cc
+                .field(name)
+                .is_some_and(|fresh| value.publication_eq(fresh)))
+            .then_some(name.as_str())
+        })
+        .collect();
+    assert!(
+        field(&first, "callback").publication_eq(field(&fresh, "callback")),
+        "route_observed={observed}; caller_eq={}; helper_eq={}; captures_eq={:?}; cc_identity_eq={}; cc_schema_eq={}; cc_field_counts={:?}; changed_cc_fields={changed_cc_fields:?}",
+        first_model.source.caller == fresh_model.source.caller,
+        first_model.source.helper == fresh_model.source.helper,
+        [
+            first_model
+                .cc_toolchain
+                .publication_eq(&fresh_model.cc_toolchain),
+            first_model
+                .feature_configuration
+                .publication_eq(&fresh_model.feature_configuration),
+            first_model
+                .experimental_link_std_dylib
+                .publication_eq(&fresh_model.experimental_link_std_dylib),
+            first_model.rust_std.publication_eq(&fresh_model.rust_std)
+        ],
+        first_cc.identity() == fresh_cc.identity(),
+        first_cc.has_schema() == fresh_cc.has_schema(),
+        (first_cc.fields().len(), fresh_cc.fields().len())
+    );
+
+    let changed = request(&runtime, &root, observed, "rust_consumer", configured(true)).unwrap();
+    check(&changed, "rust_consumer", "A", true);
+    let fresh_dynamic = request(
+        &runtime,
+        &root,
+        observed,
+        "rust_fresh_consumer",
+        configured(true),
+    )
+    .unwrap();
+    check(&fresh_dynamic, "rust_fresh_consumer", "A", true);
+    assert!(field(&changed, "callback").publication_eq(field(&fresh_dynamic, "callback")));
+    let solib_output = |result: &ConfiguredNodeResult| {
+        result
+            .actions()
+            .iter()
+            .find_map(|action| {
+                action
+                    .solib_symlink_spec()
+                    .map(|spec| spec.output().clone())
+            })
+            .unwrap()
+    };
+    assert_ne!(solib_output(&changed), solib_output(&fresh_dynamic));
+    assert!(!field(&first, "callback").publication_eq(field(&changed, "callback")));
+    assert_eq!(
+        request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap(),
+        first
+    );
+    source(&root, "B");
+    let changed = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
+    check(&changed, "rust_consumer", "B", false);
+    assert_ne!(changed, first);
+    source(&root, "A");
+    assert_eq!(
+        request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap(),
+        first
+    );
+
+    let path = root.join(UTILS);
+    let original = fs::read(&path).unwrap();
+    let mut edited = original.clone();
+    edited.extend_from_slice(b"\n# authored transitive import discriminator\n");
+    fs::write(&path, edited).unwrap();
+    let changed = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
+    check(&changed, "rust_consumer", "A", false);
+    assert_ne!(utils_digest(&changed), utils_digest(&first));
+    assert_ne!(
+        callback(&changed).model().source.helper.fingerprint,
+        callback(&first).model().source.helper.fingerprint
+    );
+    assert!(!field(&changed, "callback").publication_eq(field(&first, "callback")));
+    fs::write(path, original).unwrap();
+    let restored = request(&runtime, &root, observed, "rust_consumer", fast).unwrap();
+    check(&restored, "rust_consumer", "A", false);
+    assert_eq!(utils_digest(&restored), utils_digest(&first));
+    assert_eq!(
+        callback(&restored).model().source,
+        callback(&first).model().source
+    );
+    assert_eq!(restored, first);
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn original_rust_callback_publishes_aliases_invokes_fresh_consumers_and_restores_imports() {
     for observed in [false, true] {
-        let (root, _archives) = workspace();
-        let runtime = test_runtime(&root).unwrap();
-        let fast = configured(false);
-        // Cold materialization creates immutable roots under /tmp and changes
-        // genuinely observed ancestor metadata. Establish the warm-source
-        // baseline once; never retry publication equality until it succeeds.
-        let warm = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
-        check(&warm, "rust_consumer", "A", false);
-        let first = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
-        let first_inputs = accepted_native_snapshot(&runtime);
-        check(&first, "rust_consumer", "A", false);
-        let fresh = request(
-            &runtime,
-            &root,
-            observed,
-            "rust_fresh_consumer",
-            fast.clone(),
-        )
-        .unwrap();
-        let fresh_inputs = accepted_native_snapshot(&runtime);
-        let changed_paths: Vec<_> = first_inputs
-            .path_observations
-            .observations()
-            .iter()
-            .filter(|(demand, value)| {
-                fresh_inputs
-                    .path_observations
-                    .get(demand)
-                    .is_some_and(|fresh| fresh != *value)
-            })
-            .map(|(demand, _)| {
-                format!(
-                    "{:?}:{:?}:{:?}",
-                    demand.namespace(),
-                    demand.path(),
-                    demand.operation()
-                )
-            })
-            .collect();
-        let shared_paths = first_inputs
-            .path_observations
-            .observations()
-            .iter()
-            .filter(|(demand, _)| fresh_inputs.path_observations.get(demand).is_some())
-            .count();
-        assert!(
-            shared_paths > 0,
-            "warm publication compares real shared observations"
-        );
-        assert!(
-            changed_paths.is_empty(),
-            "warm publication inputs changed: {changed_paths:?}"
-        );
-        assert!(
-            first_inputs
-                .path_observations
-                .observations()
-                .keys()
-                .any(
-                    |demand| demand.namespace() == PathObservationNamespace::Host
-                        && demand.path().as_path() == Path::new("/tmp")
-                        && demand.operation() == PathObservationOperation::Lstat
-                        && fresh_inputs.path_observations.get(demand).is_some()
-                ),
-            "the previously changing ancestor remains observed"
-        );
-        check(&fresh, "rust_fresh_consumer", "A", false);
-        let first_model = callback(&first).model();
-        let fresh_model = callback(&fresh).model();
-        let AnalysisValueKind::Provider(first_cc) = first_model.cc_toolchain.kind() else {
-            panic!("CC provider")
-        };
-        let AnalysisValueKind::Provider(fresh_cc) = fresh_model.cc_toolchain.kind() else {
-            panic!("fresh CC provider")
-        };
-        let changed_cc_fields: Vec<_> = first_cc
-            .fields()
-            .iter()
-            .filter_map(|(name, value)| {
-                (!fresh_cc
-                    .field(name)
-                    .is_some_and(|fresh| value.publication_eq(fresh)))
-                .then_some(name.as_str())
-            })
-            .collect();
-        assert!(
-            field(&first, "callback").publication_eq(field(&fresh, "callback")),
-            "route_observed={observed}; caller_eq={}; helper_eq={}; captures_eq={:?}; cc_identity_eq={}; cc_schema_eq={}; cc_field_counts={:?}; changed_cc_fields={changed_cc_fields:?}",
-            first_model.source.caller == fresh_model.source.caller,
-            first_model.source.helper == fresh_model.source.helper,
-            [
-                first_model
-                    .cc_toolchain
-                    .publication_eq(&fresh_model.cc_toolchain),
-                first_model
-                    .feature_configuration
-                    .publication_eq(&fresh_model.feature_configuration),
-                first_model
-                    .experimental_link_std_dylib
-                    .publication_eq(&fresh_model.experimental_link_std_dylib),
-                first_model.rust_std.publication_eq(&fresh_model.rust_std)
-            ],
-            first_cc.identity() == fresh_cc.identity(),
-            first_cc.has_schema() == fresh_cc.has_schema(),
-            (first_cc.fields().len(), fresh_cc.fields().len())
-        );
-
-        let changed =
-            request(&runtime, &root, observed, "rust_consumer", configured(true)).unwrap();
-        check(&changed, "rust_consumer", "A", true);
-        let fresh_dynamic = request(
-            &runtime,
-            &root,
-            observed,
-            "rust_fresh_consumer",
-            configured(true),
-        )
-        .unwrap();
-        check(&fresh_dynamic, "rust_fresh_consumer", "A", true);
-        assert!(field(&changed, "callback").publication_eq(field(&fresh_dynamic, "callback")));
-        let solib_output = |result: &ConfiguredNodeResult| {
-            result
-                .actions()
-                .iter()
-                .find_map(|action| {
-                    action
-                        .solib_symlink_spec()
-                        .map(|spec| spec.output().clone())
-                })
-                .unwrap()
-        };
-        assert_ne!(solib_output(&changed), solib_output(&fresh_dynamic));
-        assert!(!field(&first, "callback").publication_eq(field(&changed, "callback")));
-        assert_eq!(
-            request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap(),
-            first
-        );
-        source(&root, "B");
-        let changed = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
-        check(&changed, "rust_consumer", "B", false);
-        assert_ne!(changed, first);
-        source(&root, "A");
-        assert_eq!(
-            request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap(),
-            first
-        );
-
-        let path = root.join(UTILS);
-        let original = fs::read(&path).unwrap();
-        let mut edited = original.clone();
-        edited.extend_from_slice(b"\n# authored transitive import discriminator\n");
-        fs::write(&path, edited).unwrap();
-        let changed = request(&runtime, &root, observed, "rust_consumer", fast.clone()).unwrap();
-        check(&changed, "rust_consumer", "A", false);
-        assert_ne!(utils_digest(&changed), utils_digest(&first));
-        assert_ne!(
-            callback(&changed).model().source.helper.fingerprint,
-            callback(&first).model().source.helper.fingerprint
-        );
-        assert!(!field(&changed, "callback").publication_eq(field(&first, "callback")));
-        fs::write(path, original).unwrap();
-        let restored = request(&runtime, &root, observed, "rust_consumer", fast).unwrap();
-        check(&restored, "rust_consumer", "A", false);
-        assert_eq!(utils_digest(&restored), utils_digest(&first));
-        assert_eq!(
-            callback(&restored).model().source,
-            callback(&first).model().source
-        );
-        assert_eq!(restored, first);
-        fs::remove_dir_all(root).unwrap();
+        prove_callback_mode(observed);
     }
+}
+
+#[test]
+fn original_rust_callback_legacy_publishes_aliases_invokes_fresh_consumers_and_restores_imports() {
+    prove_callback_mode(false);
+}
+
+#[test]
+fn original_rust_callback_observed_publishes_aliases_invokes_fresh_consumers_and_restores_imports()
+{
+    prove_callback_mode(true);
 }

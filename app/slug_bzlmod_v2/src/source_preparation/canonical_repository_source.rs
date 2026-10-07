@@ -203,7 +203,8 @@ impl HostRepositorySourceRoute {
                     is_immutable_repository_spec(route.repo_spec())
                 }
                 crate::RootRepositorySource::DirectLocal(_)
-                | crate::RootRepositorySource::BuiltinBazelTools(_) => false,
+                | crate::RootRepositorySource::BuiltinBazelTools(_)
+                | crate::RootRepositorySource::SelectedLocal(_) => false,
             },
             Self::Canonical(input) => match input.view().disposition() {
                 HostRepositorySourceInputDispositionView::Request(request) => matches!(

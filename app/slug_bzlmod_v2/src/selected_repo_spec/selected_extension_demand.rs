@@ -1839,8 +1839,10 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn owner_input_request_retains_selected_definition_source() {
+    fn selected_definition_mappings() -> (
+        Arc<HostSelectedExtensionOwner>,
+        HostSelectedExtensionMappings,
+    ) {
         let (_, mut mappings) = owner_inputs_mappings();
         let id = HostSelectedExtensionId {
             bzl_file: CanonicalLabel::parse("@@dep+1.0//:extension.bzl").unwrap(),
@@ -1885,6 +1887,14 @@ mod tests {
             extension_projection: testing_extension_mapping_projection(),
         });
 
+        (owner, mappings)
+    }
+
+    #[test]
+    fn owner_input_request_retains_selected_definition_source() {
+        let (owner, mappings) = selected_definition_mappings();
+        let id = owner.id.clone();
+        let canonical = CanonicalRepoName::new("dep+1.0").unwrap();
         let expected =
             selected_extension_definition_source(&mappings.routes, &mappings.mappings[1], &id)
                 .unwrap();
@@ -1910,6 +1920,132 @@ mod tests {
             inputs.request().source(),
             HostSelectedExtensionDefinitionSource::Selected { .. }
         ));
+    }
+
+    #[test]
+    fn command_local_owner_source_is_checked_and_retained() {
+        use crate::HostRepositoryLocalPathPolicy as Policy;
+        let local_spec = |path: &str| {
+            repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                "local_repository",
+                SmallMap::from_iter([(
+                    CompactString::new("path"),
+                    crate::OverrideAttributeValue::String(path.into()),
+                )]),
+            )
+        };
+        let (owner, mut mappings) = selected_definition_mappings();
+        let install = |mappings: &mut HostSelectedExtensionMappings, spec, policy| {
+            let HostSelectedExtensionDefinitionSource::Selected { definition, .. } =
+                testing_selected_command_local_source(spec, policy, &[("dep", "dep+1.0")])
+            else {
+                unreachable!()
+            };
+            let mut routes = mappings.routes.entries.to_vec();
+            routes[1] = definition.routes.as_ref().as_ref().unwrap().entries[0].clone();
+            mappings.routes = Arc::new(HostSelectedModuleRoutes {
+                entries: routes.into(),
+                extension_projection: testing_extension_mapping_projection(),
+            });
+        };
+        install(
+            &mut mappings,
+            local_spec("/selected-local"),
+            Policy::CommandAbsolute,
+        );
+        let inputs = owner_inputs(owner.dupe(), &mappings).unwrap();
+        let HostSelectedExtensionDefinitionSource::Selected { definition, .. } =
+            inputs.request().source()
+        else {
+            panic!("command Local must retain a selected source")
+        };
+        let retained = definition.routes.clone();
+        let routes = retained.as_ref().as_ref().unwrap();
+        assert!(Arc::ptr_eq(&routes.entries, &mappings.routes.entries));
+        assert!(Arc::ptr_eq(
+            &routes.extension_projection,
+            &mappings.routes.extension_projection
+        ));
+        assert_eq!(
+            definition.view().kind(),
+            HostCanonicalSelectedModuleKind::SelectedNonregistry
+        );
+        assert_eq!(
+            definition.view().associated_module_metadata(),
+            ("dep", "0.2.17")
+        );
+        assert_eq!(
+            definition.view().local_path_policy(),
+            Some(Policy::CommandAbsolute)
+        );
+        for (path, policy) in [
+            ("/selected-local", Policy::WorkspaceRelative),
+            ("/selected-local", Policy::LocalUnsupported),
+            ("relative", Policy::CommandAbsolute),
+            ("/selected-local/../other", Policy::CommandAbsolute),
+        ] {
+            let mut rejected = mappings.clone();
+            install(&mut rejected, local_spec(path), policy);
+            assert!(matches!(
+                owner_inputs(owner.dupe(), &rejected),
+                Err(HostSelectedExtensionOwnerInputsError(
+                    OwnerInputsError::Unsupported { .. }
+                ))
+            ));
+        }
+        let mut bad_rule = local_spec("/selected-local");
+        bad_rule.rule_id.rule_name = "http_archive".into();
+        let mut rejected = mappings.clone();
+        install(&mut rejected, bad_rule, Policy::CommandAbsolute);
+        assert!(owner_inputs(owner.dupe(), &rejected).is_err());
+        let mut missing = mappings.clone();
+        let mut routes = missing.routes.entries.to_vec();
+        routes.remove(1);
+        missing.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(owner.dupe(), &missing),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Missing { .. }
+            ))
+        ));
+        let mut duplicate = mappings.clone();
+        let mut routes = duplicate.routes.entries.to_vec();
+        routes.push(routes[1].clone());
+        duplicate.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: routes.into(),
+            extension_projection: testing_extension_mapping_projection(),
+        });
+        assert!(matches!(
+            owner_inputs(owner.dupe(), &duplicate),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
+            ))
+        ));
+        let mut mismatch = mappings.clone();
+        let mut final_mappings = mismatch.mappings.to_vec();
+        final_mappings[1].context_repo = CanonicalRepoName::root();
+        mismatch.mappings = final_mappings.into();
+        assert!(matches!(
+            owner_inputs(owner.dupe(), &mismatch),
+            Err(HostSelectedExtensionOwnerInputsError(
+                OwnerInputsError::Inconsistent { .. }
+            ))
+        ));
+        let mut isolated_owner = (*owner).clone();
+        isolated_owner.id.isolation = Some(HostSelectedExtensionIsolation::Root {
+            proxy: "private".into(),
+        });
+        assert!(owner_inputs(Arc::new(isolated_owner), &mappings).is_err());
+        drop(mappings);
+        assert_eq!(definition.view().canonical_repo().as_str(), "dep+1.0");
+        let weak = Arc::downgrade(&retained);
+        drop(retained);
+        drop(inputs);
+        assert!(weak.upgrade().is_none());
     }
 
     fn builtin_xcode_owner_mappings() -> (

@@ -3023,6 +3023,33 @@ impl HostNonregistryPreparedClosure {
     pub(crate) fn local_path_policy(&self) -> HostRepositoryLocalPathPolicy {
         self.local_path_policy
     }
+
+    #[cfg(test)]
+    pub(crate) fn for_selected_local_test(
+        repo_spec: RepoSpec,
+        local_path_policy: HostRepositoryLocalPathPolicy,
+    ) -> Self {
+        // Pure structural fixture, supplying no Host observations or source
+        // certificate. Runtime tests derive their closure through normal keys.
+        let bytes: Arc<[u8]> = Arc::from(b"module(name='dep',version='0.2.17')\n".as_slice());
+        let logical_path = NormalizedAbsolutePath::new("/selected-local/MODULE.bazel").unwrap();
+        let inspection = crate::inspect_nonroot_module_file(
+            crate::LogicalModuleFileId::new("/selected-local/MODULE.bazel"),
+            &bytes,
+        )
+        .unwrap();
+        Self {
+            module: NonrootModuleKey::new("dep", "1.0+build"),
+            source_identity: HostNonregistryModuleSourceIdentity::Local { repo_spec },
+            local_path_policy,
+            root: HostNonregistryModuleRoot {
+                logical_path,
+                bytes,
+                inspection,
+            },
+            fragments: Arc::from([]),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -5193,50 +5220,68 @@ fn is_immutable_repository_spec(repo_spec: &RepoSpec) -> bool {
         )
 }
 
+fn is_local_repository_spec(repo_spec: &RepoSpec) -> bool {
+    let label = &repo_spec.rule_id.bzl_file;
+    label.package().repo().as_str() == "bazel_tools"
+        && label.package().package().as_str() == "tools/build_defs/repo"
+        && label.target().as_str() == "local.bzl"
+        && repo_spec.rule_id.rule_name == "local_repository"
+}
+
+fn validated_local_repository_path(
+    repo_spec: &RepoSpec,
+    local_path_policy: HostRepositoryLocalPathPolicy,
+) -> Result<&Path, &'static str> {
+    if local_path_policy == HostRepositoryLocalPathPolicy::LocalUnsupported {
+        return Err("local_repository is unsupported for this repository source");
+    }
+    if repo_spec.attributes.len() != 1 {
+        return Err("local_repository has unsupported attributes");
+    }
+    let Some(OverrideAttributeValue::String(path)) = repo_spec.attributes.get("path") else {
+        return Err("local_repository requires a string path");
+    };
+    let source = Path::new(path.as_str());
+    if source.as_os_str().is_empty()
+        || source.components().any(|component| {
+            !matches!(
+                component,
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+            )
+        })
+        || source.is_absolute()
+            != (local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute)
+    {
+        return Err(
+            if local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute {
+                "command local_repository path must be normalized and absolute"
+            } else {
+                "local_repository path must be normalized and workspace-relative"
+            },
+        );
+    }
+    Ok(source)
+}
+
+/// Eligibility inspection shares the materializer's borrowed validation. It
+/// neither observes a source nor creates an owned request or path.
+pub(crate) fn is_command_local_repository_spec(repo_spec: &RepoSpec) -> bool {
+    is_local_repository_spec(repo_spec)
+        && validated_local_repository_path(
+            repo_spec,
+            HostRepositoryLocalPathPolicy::CommandAbsolute,
+        )
+        .is_ok()
+}
+
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
     local_path_policy: HostRepositoryLocalPathPolicy,
 ) -> Result<RepositoryMaterializationKind, RepositoryMaterializationError> {
-    let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
-        .expect("pinned local repository label is canonical");
-    if repo_spec.rule_id.bzl_file == local_bzl && repo_spec.rule_id.rule_name == "local_repository"
-    {
-        if local_path_policy == HostRepositoryLocalPathPolicy::LocalUnsupported {
-            return Err(RepositoryMaterializationError::Spec(
-                "local_repository is unsupported for this repository source".into(),
-            ));
-        }
-        if repo_spec.attributes.len() != 1 {
-            return Err(RepositoryMaterializationError::Spec(
-                "local_repository has unsupported attributes".into(),
-            ));
-        }
-        let Some(OverrideAttributeValue::String(path)) = repo_spec.attributes.get("path") else {
-            return Err(RepositoryMaterializationError::Spec(
-                "local_repository requires a string path".into(),
-            ));
-        };
-        let source = Path::new(path.as_str());
-        if source.as_os_str().is_empty()
-            || source.components().any(|component| {
-                !matches!(
-                    component,
-                    Component::Prefix(_) | Component::RootDir | Component::Normal(_)
-                )
-            })
-            || source.is_absolute()
-                != (local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute)
-        {
-            return Err(RepositoryMaterializationError::Spec(
-                if local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute {
-                    "command local_repository path must be normalized and absolute"
-                } else {
-                    "local_repository path must be normalized and workspace-relative"
-                }
-                .into(),
-            ));
-        }
+    if is_local_repository_spec(repo_spec) {
+        let source = validated_local_repository_path(repo_spec, local_path_policy)
+            .map_err(|message| RepositoryMaterializationError::Spec(message.into()))?;
         let root = NormalizedAbsolutePath::new(
             if local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute {
                 source.to_owned()

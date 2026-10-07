@@ -1,0 +1,231 @@
+{
+  "checkpoint": "WP977",
+  "baseline": "d559d55f7a27673b5a2e67c4a60d429facf42836",
+  "accepted_at": "2026-10-07T12:54:51.838215+00:00",
+  "started_at": "2026-10-07T11:04:16.933923+00:00",
+  "elapsed_wall_seconds": 6634.904292,
+  "implementation": {
+    "production_files": 7,
+    "test_files": 6,
+    "net_production_lines": 181,
+    "net_test_lines": 954,
+    "test_estimate_excess_lines": 54,
+    "growth_qualification": "Cohesive independently reviewed route retention and three-consumer coverage; callback body partition adds14 net test lines, preserves1294 lexical tokens and all assertions.",
+    "representation": "Borrow Local classifier fields and retain original definition with one shared mapping Arc. No graph/spec copy or global interner.",
+    "measured_retained_increment_bytes": {
+      "route": 826,
+      "capability": 323,
+      "request": 328
+    },
+    "retention": "64 retained Arc routes share mapping; actual final Weak release checked. Separate request/capability lifetime retained."
+  },
+  "counts": {
+    "core_ordinary": 32,
+    "owner_ordinary": 40,
+    "native_rust": 1,
+    "fresh_python": 4,
+    "fresh_capture": 0,
+    "total_named_passes": 77,
+    "current_accepted_operations": 82,
+    "union_material_pins": 486,
+    "native_runtime_pins": 484,
+    "ordinary_rust_passes": 72,
+    "all_rust_passes": 73,
+    "preparations_not_passes": 4
+  },
+  "preparation": {
+    "bzlmod-compile": {
+      "operation": {
+        "path": "target/wp977/native/bzlmod-compile.json",
+        "sha256": "37c2ad8678c275b2539c11fb75acb351ac08cab3f02a5faae565bb37ddb55d5d"
+      },
+      "elapsed_seconds": 0.10621415101923048,
+      "exit_code": 0,
+      "executed_tests": 0,
+      "compiler_memory_separate_from_runtime_fit": true
+    },
+    "loading-compile": {
+      "operation": {
+        "path": "target/wp977/native/loading-compile.json",
+        "sha256": "2ee92d40942bd4c5a8655381ea284e8649bca82153306fb434485a94a432c5d9"
+      },
+      "elapsed_seconds": 0.10609324101824313,
+      "exit_code": 0,
+      "executed_tests": 0,
+      "compiler_memory_separate_from_runtime_fit": true
+    },
+    "compile": {
+      "operation": {
+        "path": "target/wp977/native/compile.json",
+        "sha256": "d90d146b160b789aa671685a2c453ceeb01d7f719df49da908e84533e99af5a3"
+      },
+      "elapsed_seconds": 9.744118661037646,
+      "exit_code": 0,
+      "executed_tests": 0,
+      "compiler_memory_separate_from_runtime_fit": true
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp977/native/check.json",
+        "sha256": "5d631189c529f59e5445622d157fab912d4cf95ba11e9eda2f15f146852186c3"
+      },
+      "elapsed_seconds": 7.328630011063069,
+      "exit_code": 0,
+      "executed_tests": 0,
+      "compiler_memory_separate_from_runtime_fit": true
+    }
+  },
+  "callback_modes": [
+    {
+      "selector": "runtime::dice::tests::rust_toolchain_callback_tests::original_rust_callback_legacy_publishes_aliases_invokes_fresh_consumers_and_restores_imports",
+      "operation": {
+        "path": "target/wp977/native/ordinary-30-operation.json",
+        "sha256": "968f3f549a68d841798a53f90971912439ff32d19ea834df6c8a1ba60fd9f5a0"
+      },
+      "elapsed_seconds": 13.953416885924526,
+      "conservative_peak_kib": 193856,
+      "deadline_seconds": 20,
+      "pass_count": 1
+    },
+    {
+      "selector": "runtime::dice::tests::rust_toolchain_callback_tests::original_rust_callback_observed_publishes_aliases_invokes_fresh_consumers_and_restores_imports",
+      "operation": {
+        "path": "target/wp977/native/ordinary-31-operation.json",
+        "sha256": "5c3a24175b935662dd60dedc6fc331156fe44add0e23daeea226b84bb348f4a4"
+      },
+      "elapsed_seconds": 12.915965251042508,
+      "conservative_peak_kib": 157712,
+      "deadline_seconds": 20,
+      "pass_count": 1
+    }
+  ],
+  "operational_summary": {
+    "path": "target/wp977/native/operational-summary.json",
+    "sha256": "38a81745c705c75667c4c1d933ffc38a5ef49a4c7e9e9ebaf52d83fecb09e71e"
+  },
+  "reviews": {
+    "implementation-source": {
+      "path": "target/wp977/native/implementation-source.md",
+      "sha256": "0045edef52eed44c5b2a4e56c98c7ea876cd876442d08dedea7a8b114715953f"
+    },
+    "implementation-evidence": {
+      "path": "target/wp977/native/implementation-evidence.md",
+      "sha256": "9d6a226b8d54204afd272f1424bbc025fb0ef89fa6b50e6da889583b06849907"
+    },
+    "preflight-source": {
+      "path": "target/wp977/native/preflight-source.md",
+      "sha256": "f5b13e0d340b8780c5e89eb349a6fc60490d2ee1e08b9fbc56fdad632dc8efa4"
+    },
+    "preflight-evidence": {
+      "path": "target/wp977/native/preflight-evidence.md",
+      "sha256": "7aacbfda89b43c20a40bf8bc5368dca92d69774d47ddd595909c278593a6b4b8"
+    },
+    "final-source": {
+      "path": "target/wp977/native/final-source.md",
+      "sha256": "318c3e01e6d6c147b98f604f4ce8c86491f1941e825b77095e87234109cb8830"
+    },
+    "final-evidence": {
+      "path": "target/wp977/native/final-evidence.md",
+      "sha256": "2fd23cb685316c70c52193b8e991fb5fd8bf518f59bca4f069247316990e237d"
+    }
+  },
+  "successor_source": {
+    "path": "target/wp977/native/successor-source.md",
+    "sha256": "a921ac9830767d4f241b363b35a816caff6b738470c28f923587ef647f2cbd32"
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp977/native/native-operation.json",
+      "sha256": "84fa02ce883ef7c3dd4c602f6a6c541c6860d47598212f50f8518f2a685d2d4a"
+    },
+    "result": {
+      "path": "target/wp977/native/result.json",
+      "sha256": "6704a546e180a5cc1a96d9d182b666a08a143752c7d6d4c4e6ee1c977273b801"
+    },
+    "stdout": {
+      "path": "target/wp977/native/native.stdout",
+      "sha256": "d154f5b8ef361f7af383440c6303c80f6e175623c4ef627ee597de79fc7e5028"
+    },
+    "stderr": {
+      "path": "target/wp977/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 1.1540102859726176,
+    "conservative_peak_kib": 87620,
+    "stable_runtime_pins": 484,
+    "source_leases": 223,
+    "physical_bracket_bytes": 792677,
+    "before_after_hash_read_bytes": 1585354
+  },
+  "actual_outcome": {
+    "stage": "native_refusal",
+    "kind": "computation",
+    "attempts": null,
+    "terminal_roots": null
+  },
+  "public_probe": {
+    "stage": "native_refusal",
+    "kind": "computation",
+    "preparation": "complete",
+    "dispatch": "singleton",
+    "policy_checked": true,
+    "certificate": null,
+    "observations": null,
+    "analyses": null,
+    "actions": null,
+    "rustc": null
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 48,
+    "transferred_bytes": 0,
+    "decoded_bytes": 513510,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 2114151,
+    "peak_buffer_bytes": 3259456
+  },
+  "next_prerequisite": {
+    "operation": "lstat",
+    "family": "HostLstat",
+    "path_len": 205,
+    "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f623637396330323038313365623864363538393230343438613165383231383830633632643239336435366435363435323463386332353465323065343835662f64306534656261612d376666612d346133642d613735352d6335643239653964633738632f63632f657874656e73696f6e732e627a6c",
+    "basis": "Current exact denied path equals current inputs.additional[2].rules_cc_root + /cc/extensions.bzl. No target read/stat/hash performed in this packet.",
+    "next": "Separately frozen bounded capture, then conditional same-role exact-leaf Lstat/FileBytes admission after availability. Imports wait usable partial facts.",
+    "capture_authorized_by_this_receipt": false
+  },
+  "historical_corrections": {
+    "failed_bounded_operations": 10,
+    "groups": [
+      "First Bzlmod compile E0283 corrected with explicit CompactString construction",
+      "Initial Core60s preparation stop preserved; missing preparation only completed",
+      "Wrong caller-alias/selfmapping assumption failed new Loading control; corrected scopes",
+      "One60s feature-subset warm preparation stop; original four-preparation pipeline restored",
+      "Three distinct protected RootBuild controls failed Canonical input; registry-only RootBuild caller guard preserved original graph-owned Local fallback",
+      "Original combined callback10s and20s stops; diagnostic20s trace only; exact source restoration and current two-mode partition"
+    ],
+    "current_combined_callback_pass": false,
+    "historical_executable_targets_opaque": true,
+    "historical_tests_not_current_passes": true
+  },
+  "caps": {
+    "ordinary_seconds": 10,
+    "callback_mode_seconds": 20,
+    "native_seconds": 10,
+    "prepare_seconds": 60,
+    "address_space_mib": 512,
+    "runtime_rss_mib": 256,
+    "source_attempts_selected": 64,
+    "source_attempts_default": 16,
+    "registry_attempts_selected": 128,
+    "registry_attempts_default": 16,
+    "object_mib": 1,
+    "byte_banks_mib": 16,
+    "parent_scratch_kib": 128,
+    "source_attempts_remaining_numeric": 16,
+    "remaining_is_not_unique_file_or_closure_proof": true
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "qualification": "One changed actual readiness observation only; retained payload sharing tests are not whole-workload fit. Source64/default16 and all byte/runtime caps unchanged. Original223 noninherited/non-atomic parent leases and128KiB scratch do not prove native source identity/Weak/freshness; cumulative counters are not per-Arc live credit. Old version receipt is historical; its fresh current Bzlmod control executes once. Compiler memory is separate from runtime fit. Declared Local0.2.17/requested0.2.4 remain distinct; no registry/MVS authentication. Private body Weak unobserved/expiry vacuous; scoped/recorder Weak and zero final credits are actual. Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024\u21922021\u21922024/fullCLI/M7A remain open. Windows minimal Unsupported."
+}

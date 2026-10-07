@@ -1304,7 +1304,9 @@ fn direct_local_module_support_route(
 
 fn requires_direct_local_module_support(route: &RootRepositoryRoute) -> bool {
     match route.source() {
-        RootRepositorySource::Generated { .. } | RootRepositorySource::SelectedRegistry(_) => false,
+        RootRepositorySource::Generated { .. }
+        | RootRepositorySource::SelectedRegistry(_)
+        | RootRepositorySource::SelectedLocal(_) => false,
         RootRepositorySource::DirectLocal(_) | RootRepositorySource::BuiltinBazelTools(_) => true,
     }
 }

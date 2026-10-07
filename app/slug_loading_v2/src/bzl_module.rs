@@ -1273,6 +1273,7 @@ fn resolve_external_bzl_load_label(
     if !matches!(
         route.source(),
         slug_bzlmod_v2::RootRepositorySource::SelectedRegistry(_)
+            | slug_bzlmod_v2::RootRepositorySource::SelectedLocal(_)
     ) {
         return resolve_external_load_label(package, load)
             .map(|label| (RootRepositoryBzlLoadRoute::Root(route.clone()), label));
@@ -3554,6 +3555,19 @@ async fn loaded_extension_definition_requests(
     }
 }
 
+/// Root is the only definition source that may select workspace evaluation.
+pub(crate) fn selected_extension_definition_route(
+    workspace: NormalizedAbsolutePath,
+    source: &HostSelectedExtensionDefinitionSource,
+) -> Result<Option<RootRepositoryRoute>, &'static str> {
+    match source {
+        HostSelectedExtensionDefinitionSource::Root => Ok(None),
+        source => RootRepositoryRoute::for_selected_extension_definition(workspace, source)
+            .map(Some)
+            .ok_or("selected extension definition source has no supported external route"),
+    }
+}
+
 async fn loaded_extension_definition_bzl(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
@@ -3569,10 +3583,21 @@ async fn loaded_extension_definition_bzl(
     let selected_label =
         RepositoryBzlLabel::new(request.parts().0.package().package().clone(), target)
             .expect("the definition target was parsed before selected-source dispatch");
-    let selected_route = match request.source() {
-        HostSelectedExtensionDefinitionSource::Root => None,
-        source => RootRepositoryRoute::for_selected_extension_definition(workspace.dupe(), source),
-    };
+    let selected_route =
+        match selected_extension_definition_route(workspace.dupe(), request.source()) {
+            Ok(route) => route,
+            Err(message) => {
+                return Ok((
+                    DefinitionBzlModuleCarrier::Selected(Arc::new(Err(
+                        ExternalBzlModuleError::SourceCompute {
+                            label: request.parts().0.clone(),
+                            message: Arc::from(message),
+                        },
+                    ))),
+                    PathObservationEpoch::empty(),
+                ));
+            }
+        };
     match (mode, selected_route) {
         (LoadedModuleExtensionDefinitionsMode::Legacy, None) => {
             match host_dice_invariant(
@@ -8252,6 +8277,10 @@ mod host_package_attempt_tests;
 mod host_package_load_tests;
 
 #[cfg(test)]
+#[path = "bzl_module/local_extension_definition_tests.rs"]
+pub(crate) mod local_extension_definition_tests;
+
+#[cfg(test)]
 mod module_extension_definition_loading_tests {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
@@ -12025,8 +12054,19 @@ mod module_extension_definition_loading_tests {
             .unwrap()
             + definition_start;
         let definition = &production[definition_start..definition_end];
-        assert!(definition.contains("match request.source()"));
-        assert!(definition.contains("RootRepositoryRoute::for_selected_extension_definition"));
+        assert!(
+            definition.contains(
+                "selected_extension_definition_route(workspace.dupe(), request.source())"
+            )
+        );
+        let dispatch = &production[production
+            .find("pub(crate) fn selected_extension_definition_route")
+            .unwrap()..definition_start];
+        assert!(dispatch.contains("HostSelectedExtensionDefinitionSource::Root => Ok(None)"));
+        assert!(dispatch.contains("RootRepositoryRoute::for_selected_extension_definition"));
+        assert!(dispatch.contains(
+            ".ok_or(\"selected extension definition source has no supported external route\")"
+        ));
         assert!(definition.contains("ExternalBzlModuleEvalKey::new_bzlmod"));
         assert!(definition.contains("ExternalBzlModuleObservationKey::new_bzlmod"));
         let resolver = &production[production
