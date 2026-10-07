@@ -186,18 +186,106 @@ struct GuardedSingleton {
     bodies: Arc<Bodies>,
     milestones: Arc<Mutex<Milestones>>,
 }
+const MATERIALIZATION_NAMESPACE_ENTRIES: usize = 32;
+struct NamespaceDiagnostic<'a> {
+    instance: slug_workspace_v2::PathObservationInstanceId,
+    operation: &'static str,
+    association: &'static str,
+    owner: Option<MaterializationDiagnostic<'a>>,
+}
+impl fmt::Display for NamespaceDiagnostic<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "WP987_NAMESPACE association={} namespace=materialization instance={} operation={}",
+            self.association,
+            self.instance.value(),
+            self.operation
+        )?;
+        if let Some(owner) = &self.owner {
+            writeln!(formatter)?;
+            owner.write_marker(formatter, "WP987_NAMESPACE_OWNER")?;
+        }
+        Ok(())
+    }
+}
+fn namespace_diagnostic<'a>(
+    bodies: &Bodies,
+    needs: &SourcePreparationNeeds,
+    denied: &Denied,
+    epoch: Option<&'a slug_bzlmod_v2::RepositoryMaterializationResultEpoch>,
+) -> Option<NamespaceDiagnostic<'a>> {
+    use slug_bzlmod_v2::RepositoryMaterializationInstanceLookupError as LookupError;
+    if denied.family != "namespace" {
+        return None;
+    }
+    let (demand, family) = bodies.first_denied_path(needs)?;
+    if family != denied.family
+        || denied.path.as_ref() != Some(demand.path())
+        || denied.operation != path_operation_code(&demand.operation())
+    {
+        return None;
+    }
+    let PathObservationNamespace::Materialization(instance) = demand.namespace() else {
+        return None;
+    };
+    let (association, owner) = match epoch.map(|epoch| {
+        epoch.borrowed_request_for_instance(
+            &bodies.roots[0],
+            instance,
+            MATERIALIZATION_NAMESPACE_ENTRIES,
+        )
+    }) {
+        None => ("unavailable", None),
+        Some(Ok(None)) => ("missing", None),
+        Some(Ok(Some(request))) => (
+            "unique",
+            Some(MaterializationDiagnostic::new(
+                request,
+                "observation_instance",
+            )),
+        ),
+        Some(Err(LookupError::WrongWorkspace)) => ("wrong_workspace", None),
+        Some(Err(LookupError::InvalidInstance)) => ("invalid_instance", None),
+        Some(Err(LookupError::TooManyEntries)) => ("bounds_refused", None),
+        Some(Err(LookupError::AmbiguousInstance)) => ("ambiguous", None),
+    };
+    Some(NamespaceDiagnostic {
+        instance,
+        operation: denied.operation,
+        association,
+        owner,
+    })
+}
+async fn current_materialization_epoch(
+    tx: &mut dice::DiceTransaction,
+    workspace: &NormalizedAbsolutePath,
+) -> Option<slug_bzlmod_v2::RepositoryMaterializationResultEpoch> {
+    tx.compute(&slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
+        workspace: workspace.dupe(),
+    })
+    .await
+    .ok()
+}
 impl GuardedSingleton {
     fn check_need(&self, needs: &SourcePreparationNeeds) -> Result<(), NativeDemandSessionError> {
-        self.bodies.admit(needs).map_err(|denied| {
-            if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
-                println!("{diagnostic}");
-                if let Some(plan) = self.bodies.generated_plan_diagnostic(needs, &denied) {
-                    println!("{plan}");
-                }
+        self.bodies
+            .admit(needs)
+            .map_err(|denied| self.record_denied(needs, denied))
+    }
+    fn record_denied(
+        &self,
+        needs: &SourcePreparationNeeds,
+        denied: Denied,
+    ) -> NativeDemandSessionError {
+        if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
+            println!("{diagnostic}");
+            if let Some(plan) = self.bodies.generated_plan_diagnostic(needs, &denied) {
+                println!("{plan}");
             }
-            self.milestones.lock().unwrap().denied = Some(denied);
-            refusal()
-        })
+        }
+        self.milestones.lock().unwrap().denied = Some(denied);
+        refusal()
     }
 }
 #[async_trait]
@@ -258,7 +346,18 @@ impl NativeCommandRoot for GuardedSingleton {
     ) -> Result<SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError> {
         let outcome = NativeCommandRoot::compute(&self.inner, tx).await?;
         if let SourcePreparationOutcome::Need(needs) = &outcome {
-            self.check_need(needs)?;
+            if let Err(denied) = self.bodies.admit(needs) {
+                if denied.family == "namespace" {
+                    // Read this attempt's injected epoch before taking the reporting lock.
+                    let epoch = current_materialization_epoch(tx, &self.bodies.roots[0]).await;
+                    if let Some(diagnostic) =
+                        namespace_diagnostic(&self.bodies, needs, &denied, epoch.as_ref())
+                    {
+                        println!("{diagnostic}");
+                    }
+                }
+                return Err(self.record_denied(needs, denied));
+            }
         }
         Ok(outcome)
     }
@@ -683,6 +782,147 @@ fn small_generated_plan(
         },
     ))
     .unwrap()
+}
+fn namespace_test_epoch(
+    bodies: &Bodies,
+    requests: impl IntoIterator<Item = Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>>,
+    instance: slug_workspace_v2::PathObservationInstanceId,
+) -> slug_bzlmod_v2::RepositoryMaterializationResultEpoch {
+    slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+        bodies.roots[0].dupe(),
+        requests.into_iter().map(
+            |request| slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                request,
+                result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                    slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("test"),
+                        generation_root: PathBuf::from("/generation"),
+                        observation_instance: instance,
+                    },
+                ),
+            },
+        ),
+    )
+    .unwrap()
+}
+#[test]
+fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let need = |namespace, spelling| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            namespace,
+            path(spelling),
+            PathObservationOperation::Lstat,
+        )))
+    };
+    let needs = need(PathObservationNamespace::Materialization(instance), "/");
+    let request = Arc::new(generated_globals_request(
+        &bodies,
+        small_generated_plan(&[]),
+    ));
+    let epoch = namespace_test_epoch(&bodies, [request.clone()], instance);
+    let count = Arc::strong_count(&request);
+    let denied = bodies.admit(&needs).unwrap_err();
+    let diagnostic = namespace_diagnostic(&bodies, &needs, &denied, Some(&epoch)).unwrap();
+    assert_eq!(diagnostic.association, "unique");
+    let original = request.id.canonical_repo.as_str().as_bytes();
+    assert_eq!(
+        diagnostic.owner.as_ref().unwrap().fields[1]
+            .unwrap()
+            .as_ptr(),
+        original.as_ptr()
+    );
+    assert_eq!(Arc::strong_count(&request), count);
+    let printed = diagnostic.to_string();
+    assert!(printed.starts_with("WP987_NAMESPACE association=unique namespace=materialization instance=17 operation=lstat\nWP987_NAMESPACE_OWNER capture=captured kind=generated_file_effects reason=observation_instance "));
+    assert!(printed.len() < MATERIALIZATION_MARKER_BYTES + 256);
+    let empty = namespace_test_epoch(&bodies, [], instance);
+    for (epoch, status) in [(None, "unavailable"), (Some(&empty), "missing")] {
+        let diagnostic = namespace_diagnostic(&bodies, &needs, &denied, epoch).unwrap();
+        assert_eq!(diagnostic.association, status);
+        assert!(diagnostic.owner.is_none());
+        assert!(!diagnostic.to_string().contains("NAMESPACE_OWNER"));
+    }
+    let mut other = request.as_ref().clone();
+    other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let ambiguous = namespace_test_epoch(&bodies, [request.clone(), Arc::new(other)], instance);
+    let diagnostic = namespace_diagnostic(&bodies, &needs, &denied, Some(&ambiguous)).unwrap();
+    assert_eq!(diagnostic.association, "ambiguous");
+    assert!(diagnostic.owner.is_none());
+    let mixed = needs
+        .try_union(&need(PathObservationNamespace::Host, "/unknown"))
+        .unwrap();
+    let earlier = bodies.admit(&mixed).unwrap_err();
+    assert_eq!(earlier.family, "path");
+    assert!(namespace_diagnostic(&bodies, &mixed, &earlier, Some(&epoch)).is_none());
+    let mixed = needs
+        .try_union(&SourcePreparationNeeds::repository(
+            request.as_ref().clone(),
+        ))
+        .unwrap();
+    let earlier = bodies.admit(&mixed).unwrap_err();
+    assert_eq!(earlier.family, "materialization");
+    assert!(namespace_diagnostic(&bodies, &mixed, &earlier, Some(&epoch)).is_none());
+    let mut oversized = request.as_ref().clone();
+    oversized.repo_spec.rule_id.rule_name = "x".repeat(MATERIALIZATION_FIELD_BYTES + 1).into();
+    let bounded = namespace_test_epoch(&bodies, [Arc::new(oversized)], instance);
+    let diagnostic = namespace_diagnostic(&bodies, &needs, &denied, Some(&bounded)).unwrap();
+    let owner = diagnostic.owner.as_ref().unwrap();
+    assert!(!owner.captured());
+    let printed = diagnostic.to_string();
+    assert!(printed.contains("NAMESPACE_OWNER capture=bounds_refused"));
+    assert!(printed.contains("canonical_hex=none"));
+    assert_eq!(Arc::strong_count(&request), count + 1);
+}
+#[tokio::test]
+async fn namespace_owner_read_uses_current_transaction() {
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let a = Arc::new(generated_globals_request(
+        &bodies,
+        small_generated_plan(&[]),
+    ));
+    let mut b = a.as_ref().clone();
+    b.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let b = Arc::new(b);
+    let dice = dice::Dice::builder().build(dice::DetectCycles::Enabled);
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let mut old = None;
+    for (index, request) in [a.as_ref(), b.as_ref(), a.as_ref()].into_iter().enumerate() {
+        let mut updater = dice.updater();
+        let owned = if index == 1 { b.clone() } else { a.clone() };
+        updater
+            .changed_to(vec![(
+                slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
+                    workspace: bodies.roots[0].dupe(),
+                },
+                namespace_test_epoch(&bodies, [owned], instance),
+            )])
+            .unwrap();
+        let mut tx = updater.commit().await;
+        let current = current_materialization_epoch(&mut tx, &bodies.roots[0])
+            .await
+            .unwrap();
+        assert!(std::ptr::eq(
+            current
+                .borrowed_request_for_instance(&bodies.roots[0], instance, 32)
+                .unwrap()
+                .unwrap(),
+            request
+        ));
+        if index == 0 {
+            old = Some(current);
+        }
+    }
+    assert!(std::ptr::eq(
+        old.unwrap()
+            .borrowed_request_for_instance(&bodies.roots[0], instance, 32)
+            .unwrap()
+            .unwrap(),
+        a.as_ref()
+    ));
 }
 #[test]
 fn generated_features_materialization_is_opt_in_and_exact() {

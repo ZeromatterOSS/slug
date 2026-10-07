@@ -503,6 +503,16 @@ pub enum RepositoryMaterializationResultEpochError {
     SuccessKindMismatch { canonical_repo: CanonicalRepoName },
 }
 
+/// A bounded borrowed namespace lookup refuses uncertainty instead of
+/// reconstructing a repository identity from its operational instance.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RepositoryMaterializationInstanceLookupError {
+    WrongWorkspace,
+    InvalidInstance,
+    TooManyEntries,
+    AmbiguousInstance,
+}
+
 impl RepositoryMaterializationResultEpoch {
     pub fn new(
         workspace: NormalizedAbsolutePath,
@@ -548,6 +558,45 @@ impl RepositoryMaterializationResultEpoch {
             workspace,
             entries: Arc::new(result),
         })
+    }
+
+    /// Borrows the unique original successful request for a materialization
+    /// instance in this epoch. The caller owns the finite entry bound; no
+    /// request, index, generation root or source identity is copied.
+    #[doc(hidden)]
+    pub fn borrowed_request_for_instance(
+        &self,
+        workspace: &NormalizedAbsolutePath,
+        instance: PathObservationInstanceId,
+        max_entries: usize,
+    ) -> Result<
+        Option<&RepositoryMaterializationRequest>,
+        RepositoryMaterializationInstanceLookupError,
+    > {
+        use RepositoryMaterializationInstanceLookupError as Error;
+        if workspace != &self.workspace {
+            return Err(Error::WrongWorkspace);
+        }
+        if instance.value() == 0 {
+            return Err(Error::InvalidInstance);
+        }
+        if self.entries.len() > max_entries {
+            return Err(Error::TooManyEntries);
+        }
+        let mut found = None;
+        for entry in self.entries.values() {
+            if matches!(
+                &entry.result,
+                RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable { observation_instance, .. })
+                    if *observation_instance == instance
+            ) {
+                if found.is_some() {
+                    return Err(Error::AmbiguousInstance);
+                }
+                found = Some(entry.request.as_ref());
+            }
+        }
+        Ok(found)
     }
 
     fn get(
@@ -8745,6 +8794,9 @@ impl Key for HostNonregistryModuleClosureObservationKey {
         value.is_complete()
     }
 }
+#[cfg(test)]
+mod materialization_namespace_tests;
+
 #[cfg(test)]
 mod tests {
     use std::collections::hash_map::DefaultHasher;

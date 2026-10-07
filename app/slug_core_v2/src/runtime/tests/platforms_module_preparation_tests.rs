@@ -395,8 +395,8 @@ impl<W: fmt::Write> fmt::Write for MaterializationWriter<'_, W> {
         self.writer.write_str(text)
     }
 }
-impl fmt::Display for MaterializationDiagnostic<'_> {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl MaterializationDiagnostic<'_> {
+    fn write_marker(&self, formatter: &mut fmt::Formatter<'_>, marker: &str) -> fmt::Result {
         use fmt::Write;
         let captured = self.captured();
         let mut writer = MaterializationWriter {
@@ -406,7 +406,7 @@ impl fmt::Display for MaterializationDiagnostic<'_> {
         };
         write!(
             writer,
-            "WP982_MATERIALIZATION capture={} kind={} reason={}",
+            "{marker} capture={} kind={} reason={}",
             if captured {
                 "captured"
             } else {
@@ -438,6 +438,11 @@ impl fmt::Display for MaterializationDiagnostic<'_> {
             }
         }
         Ok(())
+    }
+}
+impl fmt::Display for MaterializationDiagnostic<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.write_marker(formatter, "WP982_MATERIALIZATION")
     }
 }
 const GENERATED_PLAN_ROWS: usize = 8;
@@ -1226,16 +1231,24 @@ impl Bodies {
         {
             return Err(refusal("materialization"));
         }
+        if let Some((demand, family)) = self.first_denied_path(needs) {
+            return Err(Denied {
+                family,
+                path: Some(demand.path().dupe()),
+                operation: path_operation_code(&demand.operation()),
+            });
+        }
+        Ok(())
+    }
+    fn first_denied_path<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+    ) -> Option<(&'a PathObservationDemand, &'static str)> {
         if let Some(paths) = needs.path_observations() {
             for demand in paths.demands() {
                 let operation = demand.operation();
-                let deny = |family| Denied {
-                    family,
-                    path: Some(demand.path().dupe()),
-                    operation: path_operation_code(&operation),
-                };
                 if demand.namespace() != PathObservationNamespace::Host {
-                    return Err(deny("namespace"));
+                    return Some((demand, "namespace"));
                 }
                 let path = demand.path().as_path();
                 let allowed = match operation {
@@ -1295,14 +1308,14 @@ impl Bodies {
                                     )
                             })
                     }
-                    _ => return Err(deny("operation")),
+                    _ => return Some((demand, "operation")),
                 };
                 if !allowed {
-                    return Err(deny("path"));
+                    return Some((demand, "path"));
                 }
             }
         }
-        Ok(())
+        None
     }
 }
 

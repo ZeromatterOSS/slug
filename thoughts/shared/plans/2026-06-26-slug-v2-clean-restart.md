@@ -35,17 +35,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Materialization namespace owner readiness
+Status: Generated Features namespace permission readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-The current manifest records finite permission for both original sibling plans and
-2,064 accounted write bytes through the normal scoped materializer. The bounded probe
-peaks94,224KiB and now refuses a namespace/Lstat demand at logical root /. Next bind
-that original namespace to its genuine current materialization epoch owner; counted
-bytes and slash identify no repository or completed output. Allocation discipline holds.
+The current manifest records finite sibling-plan permission and2,064 accounted write
+bytes through the normal materializer. WP987 now borrows the same current epoch's
+original Globals request for Materialization(instance1)/Lstat at /. The bounded probe
+peaks93,804KiB;54 fresh checks pass. Next admit only fixed generated files and their
+necessary metadata ancestors using borrowed genuine root/request context. The kernel's
+known-instance check does not confine paths. Completed outputs, public Rustc and full
+workload fit remain open; allocation discipline holds.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

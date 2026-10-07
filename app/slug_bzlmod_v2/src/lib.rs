@@ -720,6 +720,7 @@ pub use source_preparation::RepositoryMaterializationEpochEntry;
 pub use source_preparation::RepositoryMaterializationError;
 pub use source_preparation::RepositoryMaterializationGeneration;
 pub use source_preparation::RepositoryMaterializationGenerationKey;
+pub use source_preparation::RepositoryMaterializationInstanceLookupError;
 pub use source_preparation::RepositoryMaterializationKey;
 pub use source_preparation::RepositoryMaterializationKind;
 pub use source_preparation::RepositoryMaterializationRequest;
