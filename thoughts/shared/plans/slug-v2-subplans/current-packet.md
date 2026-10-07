@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: WP963 finite nightly BUILD source accepted; next channel import prerequisite
+Status: WP964 exact channel import accepted; next fixture package source prerequisite
 
 ## Observable and source basis
 
@@ -44,53 +44,53 @@ REAPI and M7A/full-root remain open.
 
 ## Current checkpoint and selected continuation
 
-[WP963](wp963-nightly-build-source-readiness-2026-10-07.json) accepts the finite normal
-nightly-package BUILD metadata/body role through the original public singleton. One
-default-false PublicProbe/PreparedFile scalar shares a borrowed exact predicate for
-rust/toolchain/channel/{BUILD.bazel,BUILD} under original roots[1], Host Lstat/FileBytes
-only. Normal lookup keeps BUILD.bazel-before-BUILD preference and requests only the
-selected body through the unchanged scoped reader; no prefetch or source bypass. Actual
-projection binds the bool and preserves each old missing-flag negative independently.
-The existing shared matrix takes borrowed operation slices: singleton old roles and the
-new2marker×2operation role cover all11roots/fourchoices/namespace/spellings/mixed/credits;
-four-member valid union admits, child/digest mixed unions refuse before progress.
-The cohesive private diff is289changed/141netRust, within100–160 estimate; no new retained
-String/Path/collection/cache/interner/reader/DICE ownership. Existing parser sourceString
-may now be reached and remains subject to the original memory cap, with no zero-copy claim.
+[WP964](wp964-nightly-channel-import-readiness-2026-10-07.json) accepts the exact
+nightly channel import role through the original public singleton. A default-false
+PublicProbe/PreparedFile scalar shares borrowed original-root/static-Path equality for
+rust/toolchain/channel/channel.bzl, Host Lstat/FileBytes only. Normal Loading/Bzlmod
+resolved-source ownership chooses the body and unions its original epoch/bytes through
+the unchanged bounded reader. Prior BUILD/directory roles remain separate; actual
+projection binds the bool, old missing-role cases enable it independently and a new
+negative isolates missingchannel. Existing borrowed-operation matrix covers all11roots/
+fourchoices/allops/namespaces/spellings/mixed/credits. SamefileLstat+FileBytes union admits;
+child/digest mixed unions refuse before progress. The117changed/103net privateRust lines
+fit70–120 estimate and add no retainedString/Path/collection/interner/cache/semantic
+reader/DICE owner. Existing UTF8 parserString cost remains under the original memory cap.
 
-Twenty-one ordinary checks pass4.151s/conservative57056KiB and four synthetic0.085s/
-16928KiB; nonignored preflight21/ignored listing1. Separate offline Core compile10.056s
-and directCore+CLI check7.345s pass. Independent DESIGN/prelaunch/actual FINAL accept
-current source/artifact. Unchanged WP960 reader/kernel/bridge controls remain qualified
-accepted-owner reuse0runs; superseded executables are not current evidence.
+Twenty-two ordinary checks pass4.368s/conservative55236KiB, four synthetic0.095s/17148KiB;
+nonignoredpreflight22/ignoredlisting1. Separate offlineCore compile9.724s/directCore+CLI
+check7.349s pass, independent DESIGN/prelaunch/actualFINAL accept current source/artifact.
+WP960 reader/kernel/bridge/error/race/counter/epoch protections remain qualified accepted
+reuse0runs; superseded executables are not current evidence.
 
-One changed-policy diagnostic passes0.404s/conservative78100KiB,158 stable material pins
+One changed-policy diagnostic passes0.436s/conservative81032KiB,166 stable material pins
 and188 original held leases284878B (569756B physical hash brackets). Public preparation
-completes, dispatch is singleton/policy_checked=true; SourceNone,105registry235521B,
-13Host attempts11687 cumulativeDecoded, zero transfer/write. Relative to WP962, one
-attempt and626 decoded bytes were added; no per-file kind/body/hash or attribution of
-that delta is independently recorded. Recorder105/105/complete/no refusal,2114151B
-charged/3259456B peak; scope/recorder Weak and final source/image/scratch credits retire.
-The next actual222B path is rules_rust_root/rust/toolchain/channel/channel.bzl Host Lstat,
-refused by whole-Need admission before progress. Complete Need/cardinality/importstack,
-BUILD fallback availability/content and native body/hash/Weak/freshness remain unobserved.
+completes, singletondispatch/policy_checked=true; SourceNone,105registry235521B,14Host
+attempts12645 cumulativeDecoded/transferwrite0. Compared with WP963, one extra attempt
+and958 decoded bytes are aggregate, with no per-file kind/content/hash attribution.
+Recorder105/105/complete/no refusal,2114151B charged/3259456B peak; scope/recorder Weak
+and final source/image/scratch credits retire. Nextactual105B originalfixtureworkspace/pkg
+Host Lstat is refused by whole-Need admission before progress. CompleteNeed/importstack,
+channel kind/body/hash/Weak/freshness/configured option value/provider remain unobserved.
 
-Continue the source-grounded normal import owner in
-[target/wp963/native/successor-source.md](../../../../target/wp963/native/successor-source.md)
-selecting exact channel.bzl Host Lstat and bounded FileBytes through the original Loading
-source/epoch owner, with no descendant/import wildcard or prefetch. Source13 of16 leaves
-three possible admissions, not a sufficiency claim. Keep source16/1MiBobject/decoded16MiB/live16MiB and runtime
-256MiB limits. Cumulative history is not per-Arc live credit. Existing scoped interning,
-Arc/Dupe graph/recipe ownership and borrowed views remain mandatory throughout broader
-work. No accepted public certificate/observations/analyses/actions/Rustc or whole-fit is
-established; private MODULE witnesses remain uninstrumented/unobserved/vacuous.
+Continue the normal public fixture package source owner grounded in
+[target/wp964/native/successor-source.md](../../../../target/wp964/native/successor-source.md),
+selecting one exact fixture-root pkg directory Host Lstat plus pkg/{BUILD.bazel,BUILD}
+Host Lstat and bounded FileBytes for the normally selected marker. Preserve original
+BUILD.bazel→BUILD lookup/epoch/byte ownership and probe/support/data declarations; no
+directory/sourcefile body grants or prefetch.
+Source14of16 leaves two possible admissions, not closure/producer sufficiency. Keep all
+source/object/decoded/live/time/RSS caps; no prefetch/graph/epoch/provider injection.
+Cumulative history is not per-Arc live credit; privateMODULE/nativebody witnesses remain
+unobserved/vacuous. Existing scopedinterning, Arc/Dupe owners and borrowed views remain
+mandatory. Publiccertificate/observations/analyses/actions/Rustc and whole-fit remain open.
 
-Immediate [WP962](wp962-nightly-package-chain-metadata-readiness-2026-10-07.json) at
-dd49947fd4930ceade32c97118af32fe5c5c1131 accepted exact rust/toolchain/channel-chain
-metadata and recorded BUILD.bazel Lstat; its25named checks and sources are historical
-predecessor evidence. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json) at
-bbda0952365def42e588dbdc6d5680a878f7f5ca owns the unchanged reader/ignore role and
-pinned-length/EOF/identity/initial+validation epoch/session contract.
+Immediate [WP963](wp963-nightly-build-source-readiness-2026-10-07.json) at
+3a8289476bb6dab652f030825ff3cc565130a84b accepted finite BUILD.bazel/BUILD metadata/body
+admission, normal lookup order/selected reader and recorded channel.bzl Lstat; its26named
+checks/source artifact are historical predecessor evidence. [WP960](wp960-bounded-host-file-readiness-2026-10-07.json)
+atbbda0952365def42e588dbdc6d5680a878f7f5ca owns the unchanged shared pinned-length/EOF/
+identity reader and initial+validation epoch/session contract.
 
 Public Rustc/support/data/toolchain/provider/executable/config/runfiles/oracle comparisons
 and same-engine edition2024→2021→2024 remain required. FullCLI closure/execution, M7A,
