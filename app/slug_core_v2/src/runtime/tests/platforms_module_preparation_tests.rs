@@ -759,14 +759,27 @@ impl Bodies {
         }
         let (request, reason) = self.first_denied_materialization(needs)?;
         let label = &request.repo_spec.rule_id.bzl_file;
+        let exact_owner = matches!(
+            (
+                request.id.canonical_repo.as_str(),
+                label.target().as_str(),
+                request.repo_spec.rule_id.rule_name.as_str()
+            ),
+            (
+                "bazel_features++version_extension+bazel_features_globals",
+                "globals_repo.bzl",
+                "globals_repo"
+            ) | (
+                "bazel_features++version_extension+bazel_features_version",
+                "version_repo.bzl",
+                "version_repo"
+            )
+        );
         if reason != "generated_kind"
             || request.id.workspace != self.roots[0]
-            || request.id.canonical_repo.as_str()
-                != "bazel_features++version_extension+bazel_features_globals"
             || label.package().repo().as_str() != "bazel_features+"
             || label.package().package().as_str() != "private"
-            || label.target().as_str() != "globals_repo.bzl"
-            || request.repo_spec.rule_id.rule_name != "globals_repo"
+            || !exact_owner
         {
             return None;
         }

@@ -1,0 +1,313 @@
+{
+  "checkpoint": "WP985",
+  "baseline": "e39dad56809b8b87db51374611106a01bee27115",
+  "started_at": "2026-10-07T17:24:46.936839+00:00",
+  "accepted_at": "2026-10-07T17:44:48.569733+00:00",
+  "elapsed_wall_seconds": 1201.632894,
+  "compatibility": "Slug-native cfgtest exact owner diagnostic selection; all admitted exact source/oracle surfaces unchanged",
+  "implementation": {
+    "production_files": 0,
+    "cfgtest_files": 2,
+    "insertions": 392,
+    "deletions": 274,
+    "changed_lines": 666,
+    "net_lines": 118,
+    "estimated_net_lines": [
+      20,
+      100
+    ],
+    "growth_review": "Independent reassessment accepted parent13net atomic borrowed tuple and child105net: original formatter harnesses nested for both owners, crossed-tuple and no-grant controls. No duplicate formatter or retained owner.",
+    "new_retained_fields": 0,
+    "new_native_heap_allocations": 0,
+    "new_native_owned_strings": 0,
+    "new_native_arc_refs": 0,
+    "new_interner": false,
+    "source_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "0509f8229f5df2b01f6e5e82bcba567c3ec7e01e9a3c72cf264beed431de4aea"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "e8ced50e53c50a331486174dd54d6cd7a389a8554b0eb818308a8f454cedecf1"
+      }
+    ]
+  },
+  "counts": {
+    "current_operations": 48,
+    "material_pins": 559,
+    "fresh_core_ordinary": 42,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "reused_owner_ordinary": 42,
+    "reused_owner_fresh_runs": 0,
+    "preparation_operations": 2,
+    "compiler_memory_is_runtime_fit": false,
+    "source_leases": 237,
+    "fresh_capture_operations": 0,
+    "qualified_prior_capture_operations": 4,
+    "qualified_prior_capture_decisions": 6,
+    "total_fresh_named_passes": 47,
+    "reused_reader_controls": 11,
+    "reused_reader_fresh_runs": 0,
+    "fresh_materializer_lifecycle": 5
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp985/native/compile.json",
+        "sha256": "653c23523f4ac3d3076103bea914764f4aafd83ee4c382d29f62120a53bb9dc3"
+      },
+      "elapsed_seconds": 9.965604619006626,
+      "rusage_peak_kib": 1874456,
+      "executed_tests": 0
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp985/native/check.json",
+        "sha256": "6705d8b24da9232886edb2d20be90030d6f0de7d11d9e1833a1c8c6a25e70c02"
+      },
+      "elapsed_seconds": 7.297723678988405,
+      "rusage_peak_kib": 643568,
+      "executed_tests": 0
+    }
+  },
+  "runtime_seconds": {
+    "ordinary_42_sum": 8.017572549753822,
+    "synthetic_4": 0.2982663620496169,
+    "native_once": 1.7986323850927874
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp985/native/native-operation.json",
+      "sha256": "086ddc533c228c621a6670db81814413075cfe5650539e0626f21297a4720693"
+    },
+    "result": {
+      "path": "target/wp985/native/result.json",
+      "sha256": "b45a0e8fa81e8bb5c322f7cb3cb3e9c51764291bb21bebecec71c612258c336d"
+    },
+    "stdout": {
+      "path": "target/wp985/native/native.stdout",
+      "sha256": "6e5c501c02401b3d9abd709ff2a375608d313708dd9fa46385c6f0d9d70753f3"
+    },
+    "stderr": {
+      "path": "target/wp985/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 1.7986323850927874,
+    "conservative_peak_kib": 94708,
+    "runtime_pins": 557,
+    "source_leases": 237,
+    "physical_bytes": 918928,
+    "before_after_hash_bytes": 1837856,
+    "rss_cap_kib": 262144
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 64,
+    "transferred_bytes": 0,
+    "decoded_bytes": 646987,
+    "written_bytes": 0,
+    "live_buffer_bytes_before_drop": 2114151,
+    "peak_buffer_bytes": 3259456
+  },
+  "source_error": "None",
+  "retirement": {
+    "source_weak_seen": false,
+    "source_weak_expired": true,
+    "live_buffer_zero": true,
+    "scope_weak_expired": true,
+    "recorder_weak_expired": true
+  },
+  "retirement_qualification": "Scope/recorder expiry and live credit zero observed; body witness unseen/vacuous, native plan/body/materializer/registryArc/DICE/pages unobserved.",
+  "current_bodies_bytes": 192,
+  "allocation_layout_delta_proved": false,
+  "parent_brackets": {
+    "leases": 237,
+    "physical_bytes": 918928,
+    "before_after_hash_bytes": 1837856,
+    "scratch_contexts": 2,
+    "scratch_total_bytes": 131072,
+    "fd_inherited": false,
+    "collection_atomic": false,
+    "native_certificate": false
+  },
+  "materialization_refusal": {
+    "capture": "captured",
+    "kind": "generated_file_effects",
+    "reason": "generated_kind",
+    "identities": {
+      "workspace": {
+        "length": 101,
+        "raw_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+      },
+      "canonical": {
+        "length": 56,
+        "raw_hex": "62617a656c5f66656174757265732b2b76657273696f6e5f657874656e73696f6e2b62617a656c5f66656174757265735f76657273696f6e"
+      },
+      "rule_repo": {
+        "length": 15,
+        "raw_hex": "62617a656c5f66656174757265732b"
+      },
+      "rule_package": {
+        "length": 7,
+        "raw_hex": "70726976617465"
+      },
+      "rule_target": {
+        "length": 16,
+        "raw_hex": "76657273696f6e5f7265706f2e627a6c"
+      },
+      "rule_name": {
+        "length": 12,
+        "raw_hex": "76657273696f6e5f7265706f"
+      },
+      "logical_root": {
+        "length": null,
+        "raw_hex": null
+      }
+    },
+    "raw_bytes_sum": 207,
+    "complete_identity_captured": true,
+    "first_offender_only": true,
+    "semantic_cause_chain_proved": false,
+    "source_availability_proved": false
+  },
+  "generated_plan_projection": {
+    "capture": "captured",
+    "counts_complete": true,
+    "ordered_rows": 2,
+    "ordered_rows_is_lower_bound": false,
+    "kind_counts": {
+      "file": 2,
+      "archive": 0,
+      "symlink": 0
+    },
+    "path_bytes": 22,
+    "content_bytes": 213,
+    "mapping_len": null,
+    "mapping_hex": null,
+    "attribute_count": 0,
+    "effects": [
+      {
+        "ordinal": 0,
+        "kind": "file",
+        "path_len": 11,
+        "path_hex": "4255494c442e62617a656c",
+        "content_len": 196,
+        "content_sha256": "c2b2a661255d1ba6a3785f0fc6570d48760daf24972855001997476fe9b1ecc9",
+        "executable": true
+      },
+      {
+        "ordinal": 1,
+        "kind": "file",
+        "path_len": 11,
+        "path_hex": "76657273696f6e2e627a6c",
+        "content_len": 17,
+        "content_sha256": "1a7753dd368896d0cbc7cebc84d19502b9952085c25630af579506df109baa86",
+        "executable": true
+      }
+    ],
+    "original_order_preserved": true,
+    "repeated_original_paths_preserved": true,
+    "archive_symlink_payload_proved": false,
+    "full_repo_spec_proved": false,
+    "source_availability_proved": false,
+    "materialization_admission_proved": false,
+    "bounds_failure_reason_proved": false
+  },
+  "generated_plan_diagnostic_owner": "version",
+  "plan_report_lf_encoded_bytes": 600,
+  "whole_need_refused_before_progress": true,
+  "native_materialization_performed": false,
+  "native_materialization_epoch_proved": false,
+  "public_probe": {
+    "stage": "native_refusal",
+    "kind": "computation",
+    "preparation": "complete",
+    "dispatch": "singleton",
+    "policy_checked": true,
+    "certificate": null,
+    "observations": null,
+    "analyses": null,
+    "actions": null,
+    "rustc": null
+  },
+  "source_numeric_headroom": 0,
+  "quota_error_observed": false,
+  "preparatory_invocation_correction": "Initial rustup lookup passed TOML text as channel; parsed channel with tomllib before any preparation/test/native operation; zero tests.",
+  "reviews": {
+    "design-source": {
+      "path": "target/wp985/native/design-source.md",
+      "sha256": "b3f56975d25c99e528395d9382e0aa7d79b04a2cac7bc2789edf7fc6795c6d5e"
+    },
+    "design-evidence": {
+      "path": "target/wp985/native/design-evidence.md",
+      "sha256": "03f406ffeefb997777b614c3ea51347cb9f8d4ff7557afb7deb1d15befdcc22b"
+    },
+    "design-review": {
+      "path": "target/wp985/native/design-review.md",
+      "sha256": "16af9e979d98f0a190dd8460ac0f95875f70d110a2f805ce530ec85c458908cd"
+    },
+    "implementation-source": {
+      "path": "target/wp985/native/implementation-source.md",
+      "sha256": "c3e4511c3ae4ab9674ca1761da54173717dbd831e9b574022e2c46d7f4aff182"
+    },
+    "implementation-evidence": {
+      "path": "target/wp985/native/implementation-evidence.md",
+      "sha256": "bfea5a5cda688480abd1c70b3d90dfa1a78334e6c72df0287276fca992d05e06"
+    },
+    "preflight-source": {
+      "path": "target/wp985/native/preflight-source.md",
+      "sha256": "a015038f02a44f4ab238aab0056bbd58fc064a053857bc1cecb147eeeb51713f"
+    },
+    "preflight-evidence": {
+      "path": "target/wp985/native/preflight-evidence.md",
+      "sha256": "0ff64debe7ece08d32449e73040c2b770be326c9796c110748cd5df3b6af0873"
+    },
+    "final-source": {
+      "path": "target/wp985/native/final-source.md",
+      "sha256": "24a8da1c5605db14f33d99561e56fd46cee18a1af859c7563ac75cba64d815e8"
+    },
+    "final-evidence": {
+      "path": "target/wp985/native/final-evidence.md",
+      "sha256": "32da676408b9520da979e3a2954501f046667b568ace603609ed5d45c6fe5075"
+    },
+    "final-root": {
+      "path": "target/wp985/native/final-root.md",
+      "sha256": "d13469454eb2c3f2268846b3bf16572c8cf9a8ea857ff2957058b4ce41069acb"
+    }
+  },
+  "design": {
+    "path": "target/wp985/native/design.md",
+    "sha256": "a8df39e0d159a4378b210657c131a98e2c06e3eb434955b65b52cc332ae4961b"
+  },
+  "inputs": {
+    "path": "target/wp985/native/inputs.json",
+    "sha256": "cb8aa1cabe5eb5597ac16504da2421450efd0d17ff8d832e825c94f702d87097"
+  },
+  "selectors": {
+    "path": "target/wp985/native/selectors.json",
+    "sha256": "a1a6e2ad2b2c623f75452e5c4b80ff847e1de8adb0eb6037940cc24bcbe1dc4a"
+  },
+  "activation": {
+    "path": "target/wp985/native/activation.json",
+    "sha256": "33a81434830d5f402f22b1802b42b9da3f8f5c4e93c2399a3f1fe4e729dbafe0"
+  },
+  "memory_snapshot": {
+    "path": "target/wp985/native/memory-summary.json",
+    "sha256": "ffea8197ff358706442b6173634a92ddb652b095ee1e961996f7f47cbe67a9b7"
+  },
+  "operational_summary": {
+    "path": "target/wp985/native/operational-summary.json",
+    "sha256": "1b7eb639b3041ce5f43a09c9f82b185043d302d5003789f07884e03990c368ee"
+  },
+  "grounded_successor": {
+    "path": "target/wp985/native/successor-source.md",
+    "sha256": "33abb1e72a616517f266b9793e52a3554dd4305de77460234032858dc43c3d14"
+  },
+  "next_prerequisite": "Consequential reviewed finite original Globals+Version sibling permission with owner-selected exact ordered signatures and original spec/plan through same whole-Need and natural scoped materializer; observed2064B cohort content is not a global bank/output proof.",
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "qualification": "No new source captures/acquisition, output/body plaintext copies or caps. Two exact diagnostic owners; Globals-only permission unchanged. Full public Rustc/support/data/provider/toolchain/actions/runfiles/oracle/same-DICE restoration/fullCLI/M7A/MVS/provenance/whole-workload fit remains required. Windows minimal."
+}
