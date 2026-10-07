@@ -192,6 +192,7 @@ struct NamespaceDiagnostic<'a> {
     operation: &'static str,
     association: &'static str,
     owner: Option<MaterializationDiagnostic<'a>>,
+    policy: NamespacePolicy,
 }
 impl fmt::Display for NamespaceDiagnostic<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -206,8 +207,104 @@ impl fmt::Display for NamespaceDiagnostic<'_> {
             writeln!(formatter)?;
             owner.write_marker(formatter, "WP987_NAMESPACE_OWNER")?;
         }
-        Ok(())
+        write!(
+            formatter,
+            "\nWP988_NAMESPACE_POLICY owner_plan_allowed={} path_class={}",
+            self.policy.owner_plan_allowed, self.policy.path_class
+        )
     }
+}
+#[derive(Clone, Copy)]
+struct NamespacePolicy {
+    owner_plan_allowed: bool,
+    path_class: &'static str,
+}
+impl NamespacePolicy {
+    fn admits(self, operation: &PathObservationOperation) -> bool {
+        self.owner_plan_allowed
+            && match self.path_class {
+                "ancestor" | "root" => operation == &PathObservationOperation::Lstat,
+                "fixed_file" => matches!(
+                    operation,
+                    PathObservationOperation::Lstat | PathObservationOperation::FileBytes
+                ),
+                _ => false,
+            }
+    }
+}
+fn namespace_policy(
+    bodies: &Bodies,
+    demand: &PathObservationDemand,
+    epoch: Option<&slug_bzlmod_v2::RepositoryMaterializationResultEpoch>,
+    plan_matches: &impl Fn(
+        &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+        &[GeneratedFileSignature; 2],
+    ) -> bool,
+) -> NamespacePolicy {
+    let unavailable = NamespacePolicy {
+        owner_plan_allowed: false,
+        path_class: "unavailable",
+    };
+    let PathObservationNamespace::Materialization(instance) = demand.namespace() else {
+        return unavailable;
+    };
+    let Some(view) = epoch.and_then(|epoch| {
+        epoch
+            .borrowed_instance_for_namespace(
+                &bodies.roots[0],
+                instance,
+                MATERIALIZATION_NAMESPACE_ENTRIES,
+            )
+            .ok()
+            .flatten()
+    }) else {
+        return unavailable;
+    };
+    let request = view.request();
+    let Some(files) = bodies.generated_features_owner_signatures(request) else {
+        return NamespacePolicy {
+            owner_plan_allowed: false,
+            path_class: "other",
+        };
+    };
+    let owner_plan_allowed = matches!(
+        &request.kind,
+        RepositoryMaterializationKind::GeneratedFileEffects(plan) if plan_matches(plan, files)
+    );
+    let path = demand.path().as_path();
+    let root = view.generation_root();
+    let path_class = if path == root {
+        "root"
+    } else if root.starts_with(path) {
+        "ancestor"
+    } else if let Ok(relative) = path.strip_prefix(root) {
+        if files.iter().any(|file| relative == Path::new(file.0)) {
+            "fixed_file"
+        } else if files
+            .iter()
+            .any(|file| Path::new(file.0).starts_with(relative))
+        {
+            "ancestor"
+        } else {
+            "other"
+        }
+    } else {
+        "other"
+    };
+    NamespacePolicy {
+        owner_plan_allowed,
+        path_class,
+    }
+}
+fn admit_with_materialization_epoch(
+    bodies: &Bodies,
+    needs: &SourcePreparationNeeds,
+    epoch: Option<&slug_bzlmod_v2::RepositoryMaterializationResultEpoch>,
+) -> Result<(), Denied> {
+    bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|demand| {
+        namespace_policy(bodies, demand, epoch, &generated_features_plan_matches)
+            .admits(&demand.operation())
+    })
 }
 fn namespace_diagnostic<'a>(
     bodies: &Bodies,
@@ -219,7 +316,10 @@ fn namespace_diagnostic<'a>(
     if denied.family != "namespace" {
         return None;
     }
-    let (demand, family) = bodies.first_denied_path(needs)?;
+    let (demand, family) = bodies.first_denied_path_with_namespace_matcher(needs, &|demand| {
+        namespace_policy(bodies, demand, epoch, &generated_features_plan_matches)
+            .admits(&demand.operation())
+    })?;
     if family != denied.family
         || denied.path.as_ref() != Some(demand.path())
         || denied.operation != path_operation_code(&demand.operation())
@@ -230,7 +330,7 @@ fn namespace_diagnostic<'a>(
         return None;
     };
     let (association, owner) = match epoch.map(|epoch| {
-        epoch.borrowed_request_for_instance(
+        epoch.borrowed_instance_for_namespace(
             &bodies.roots[0],
             instance,
             MATERIALIZATION_NAMESPACE_ENTRIES,
@@ -238,10 +338,10 @@ fn namespace_diagnostic<'a>(
     }) {
         None => ("unavailable", None),
         Some(Ok(None)) => ("missing", None),
-        Some(Ok(Some(request))) => (
+        Some(Ok(Some(view))) => (
             "unique",
             Some(MaterializationDiagnostic::new(
-                request,
+                view.request(),
                 "observation_instance",
             )),
         ),
@@ -249,12 +349,14 @@ fn namespace_diagnostic<'a>(
         Some(Err(LookupError::InvalidInstance)) => ("invalid_instance", None),
         Some(Err(LookupError::TooManyEntries)) => ("bounds_refused", None),
         Some(Err(LookupError::AmbiguousInstance)) => ("ambiguous", None),
+        Some(Err(LookupError::InvalidGenerationRoot)) => ("invalid_generation_root", None),
     };
     Some(NamespaceDiagnostic {
         instance,
         operation: denied.operation,
         association,
         owner,
+        policy: namespace_policy(bodies, demand, epoch, &generated_features_plan_matches),
     })
 }
 async fn current_materialization_epoch(
@@ -347,16 +449,21 @@ impl NativeCommandRoot for GuardedSingleton {
         let outcome = NativeCommandRoot::compute(&self.inner, tx).await?;
         if let SourcePreparationOutcome::Need(needs) = &outcome {
             if let Err(denied) = self.bodies.admit(needs) {
-                if denied.family == "namespace" {
-                    // Read this attempt's injected epoch before taking the reporting lock.
-                    let epoch = current_materialization_epoch(tx, &self.bodies.roots[0]).await;
+                if denied.family != "namespace" {
+                    return Err(self.record_denied(needs, denied));
+                }
+                // Read this attempt's injected epoch before taking the reporting lock.
+                let epoch = current_materialization_epoch(tx, &self.bodies.roots[0]).await;
+                if let Err(denied) =
+                    admit_with_materialization_epoch(&self.bodies, needs, epoch.as_ref())
+                {
                     if let Some(diagnostic) =
                         namespace_diagnostic(&self.bodies, needs, &denied, epoch.as_ref())
                     {
                         println!("{diagnostic}");
                     }
+                    return Err(self.record_denied(needs, denied));
                 }
-                return Err(self.record_denied(needs, denied));
             }
         }
         Ok(outcome)
@@ -788,6 +895,14 @@ fn namespace_test_epoch(
     requests: impl IntoIterator<Item = Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>>,
     instance: slug_workspace_v2::PathObservationInstanceId,
 ) -> slug_bzlmod_v2::RepositoryMaterializationResultEpoch {
+    namespace_test_epoch_at(bodies, requests, instance, "/generation")
+}
+fn namespace_test_epoch_at(
+    bodies: &Bodies,
+    requests: impl IntoIterator<Item = Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>>,
+    instance: slug_workspace_v2::PathObservationInstanceId,
+    root: &str,
+) -> slug_bzlmod_v2::RepositoryMaterializationResultEpoch {
     slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
         bodies.roots[0].dupe(),
         requests.into_iter().map(
@@ -796,7 +911,7 @@ fn namespace_test_epoch(
                 result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                     slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
                         source_identity: Arc::from("test"),
-                        generation_root: PathBuf::from("/generation"),
+                        generation_root: PathBuf::from(root),
                         observation_instance: instance,
                     },
                 ),
@@ -898,18 +1013,40 @@ async fn namespace_owner_read_uses_current_transaction() {
                 slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
                     workspace: bodies.roots[0].dupe(),
                 },
-                namespace_test_epoch(&bodies, [owned], instance),
+                namespace_test_epoch_at(
+                    &bodies,
+                    [owned],
+                    instance,
+                    if index == 1 {
+                        "/other-generation"
+                    } else {
+                        "/generation"
+                    },
+                ),
             )])
             .unwrap();
         let mut tx = updater.commit().await;
         let current = current_materialization_epoch(&mut tx, &bodies.roots[0])
             .await
             .unwrap();
+        assert_eq!(
+            current
+                .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
+                .unwrap()
+                .unwrap()
+                .generation_root(),
+            Path::new(if index == 1 {
+                "/other-generation"
+            } else {
+                "/generation"
+            })
+        );
         assert!(std::ptr::eq(
             current
-                .borrowed_request_for_instance(&bodies.roots[0], instance, 32)
+                .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
                 .unwrap()
-                .unwrap(),
+                .unwrap()
+                .request(),
             request
         ));
         if index == 0 {
@@ -918,11 +1055,339 @@ async fn namespace_owner_read_uses_current_transaction() {
     }
     assert!(std::ptr::eq(
         old.unwrap()
-            .borrowed_request_for_instance(&bodies.roots[0], instance, 32)
+            .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         a.as_ref()
     ));
+}
+fn small_namespace_plan_matches(
+    plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    selected: &[GeneratedFileSignature; 2],
+) -> bool {
+    let second = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
+        "globals.bzl"
+    } else {
+        assert!(std::ptr::eq(selected, &GENERATED_FEATURES_VERSION_FILES));
+        "version.bzl"
+    };
+    generated_features_plan_matches(
+        plan,
+        &[
+            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
+            (second, 1, true, sha2::Sha256::digest(b"b").into()),
+        ],
+    )
+}
+fn namespace_test_bodies() -> Bodies {
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_fourth(path("/features"))
+        .with_bazel_features_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_generated_features_file_effects(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+}
+fn namespace_test_request(
+    bodies: &Bodies,
+    version: bool,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = generated_globals_request(
+        bodies,
+        small_generated_plan(&[
+            ("BUILD.bazel", b"a", true),
+            (
+                if version {
+                    "version.bzl"
+                } else {
+                    "globals.bzl"
+                },
+                b"b",
+                true,
+            ),
+        ]),
+    );
+    if version {
+        request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+            "bazel_features++version_extension+bazel_features_version",
+        )
+        .unwrap();
+        request.repo_spec.rule_id.bzl_file =
+            CanonicalLabel::parse("@@bazel_features+//private:version_repo.bzl").unwrap();
+        request.repo_spec.rule_id.rule_name = "version_repo".into();
+    }
+    request
+}
+#[test]
+fn generated_features_namespace_is_finite_and_exact() {
+    let bodies = namespace_test_bodies();
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let demand = |path, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Materialization(instance),
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    for version in [false, true] {
+        let request = Arc::new(namespace_test_request(&bodies, version));
+        let epoch =
+            namespace_test_epoch_at(&bodies, [request.clone()], instance, "/parent/generation");
+        let count = Arc::strong_count(&request);
+        let fixed = if version {
+            "/parent/generation/version.bzl"
+        } else {
+            "/parent/generation/globals.bzl"
+        };
+        for (path, class) in [
+            ("/", "ancestor"),
+            ("/parent", "ancestor"),
+            ("/parent/generation", "root"),
+            ("/parent/generation/BUILD.bazel", "fixed_file"),
+            (fixed, "fixed_file"),
+        ] {
+            for operation in [
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+                PathObservationOperation::FileDigest,
+                PathObservationOperation::ReadLink,
+                PathObservationOperation::DirectoryEntries,
+            ] {
+                let d = demand(path, operation.dupe());
+                let policy =
+                    namespace_policy(&bodies, &d, Some(&epoch), &small_namespace_plan_matches);
+                assert!(policy.owner_plan_allowed);
+                assert_eq!(policy.path_class, class);
+                assert_eq!(
+                    policy.admits(&operation),
+                    operation == PathObservationOperation::Lstat
+                        || class == "fixed_file"
+                            && operation == PathObservationOperation::FileBytes
+                );
+                // The normal seam uses fixed captured signatures, never the tiny test signatures.
+                assert!(
+                    !namespace_policy(&bodies, &d, Some(&epoch), &generated_features_plan_matches)
+                        .admits(&operation)
+                );
+            }
+        }
+        for path in [
+            "/outside",
+            "/parent/generation-sibling/BUILD.bazel",
+            "/parent/generation/child/BUILD.bazel",
+            "/parent/generation/BUILD.bazel/child",
+            "/parent/generation/build.bazel",
+            "/parent/generation/BUILD.bazel.bak",
+            if version {
+                "/parent/generation/globals.bzl"
+            } else {
+                "/parent/generation/version.bzl"
+            },
+        ] {
+            for operation in [
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ] {
+                assert!(
+                    !namespace_policy(
+                        &bodies,
+                        &demand(path, operation.dupe()),
+                        Some(&epoch),
+                        &small_namespace_plan_matches
+                    )
+                    .admits(&operation)
+                );
+            }
+        }
+        let d = demand(fixed, PathObservationOperation::FileBytes);
+        let budget = slug_workspace_v2::ImageDescriptorBudget::new(4096);
+        let pinned =
+            slug_workspace_v2::ImageChargedPath::pin_existing(d.path().dupe(), &budget).unwrap();
+        let image = PathObservationDemand::input_image(
+            PathObservationNamespace::Materialization(instance),
+            pinned.dupe(),
+            slug_workspace_v2::ImageObservationRequest::new(
+                pinned,
+                slug_workspace_v2::ImageObservationOperation::Lstat,
+            ),
+        )
+        .unwrap();
+        assert!(
+            !namespace_policy(&bodies, &image, Some(&epoch), &small_namespace_plan_matches)
+                .admits(&image.operation())
+        );
+        for index in 0..4 {
+            let mut closed = namespace_test_bodies();
+            match index {
+                0 => closed.generated_features_file_effects = false,
+                1 => closed.bazel_features_import_sources = false,
+                2 => closed.additional[0] = None,
+                3 => closed.roots[0] = NormalizedAbsolutePath::new("/wrong").unwrap(),
+                _ => unreachable!(),
+            }
+            assert!(
+                !namespace_policy(&closed, &d, Some(&epoch), &|_, _| true).admits(&d.operation())
+            );
+        }
+        for index in 0..4 {
+            let mut wrong = request.as_ref().clone();
+            match index {
+                0 => {
+                    wrong.id.canonical_repo =
+                        slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
+                }
+                1 => wrong.repo_spec.rule_id.rule_name = "other".into(),
+                2 => wrong.kind = RepositoryMaterializationKind::Immutable,
+                3 => wrong.kind = namespace_test_request(&bodies, !version).kind,
+                _ => unreachable!(),
+            }
+            let wrong =
+                namespace_test_epoch_at(&bodies, [Arc::new(wrong)], instance, "/parent/generation");
+            assert!(
+                !namespace_policy(&bodies, &d, Some(&wrong), &small_namespace_plan_matches)
+                    .admits(&d.operation())
+            );
+        }
+        assert_eq!(Arc::strong_count(&request), count);
+    }
+}
+#[test]
+fn generated_features_namespace_refuses_mixed_need_before_progress() {
+    let bodies = namespace_test_bodies();
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let a = Arc::new(namespace_test_request(&bodies, false));
+    let b = Arc::new(namespace_test_request(&bodies, true));
+    let epoch = namespace_test_epoch(&bodies, [a.clone()], instance);
+    let need = |namespace, path| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            namespace,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            PathObservationOperation::Lstat,
+        )))
+    };
+    let valid = need(
+        PathObservationNamespace::Materialization(instance),
+        "/generation/BUILD.bazel",
+    );
+    let admits =
+        |needs: &SourcePreparationNeeds,
+         epoch: Option<&slug_bzlmod_v2::RepositoryMaterializationResultEpoch>| {
+            bodies.admit_with_matchers(needs, &small_namespace_plan_matches, &|demand| {
+                namespace_policy(&bodies, demand, epoch, &small_namespace_plan_matches)
+                    .admits(&demand.operation())
+            })
+        };
+    assert!(admits(&valid, Some(&epoch)).is_ok());
+    let sibling_instance = slug_workspace_v2::PathObservationInstanceId::new(18);
+    let paired = slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+        bodies.roots[0].dupe(),
+        [
+            (a.clone(), instance, "/generation"),
+            (b.clone(), sibling_instance, "/version-generation"),
+        ]
+        .into_iter()
+        .map(|(request, observation_instance, root)| {
+            slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                request,
+                result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                    slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                        source_identity: Arc::from("test"),
+                        generation_root: PathBuf::from(root),
+                        observation_instance,
+                    },
+                ),
+            }
+        }),
+    )
+    .unwrap();
+    let cohort = valid
+        .try_union(&need(
+            PathObservationNamespace::Materialization(sibling_instance),
+            "/version-generation/version.bzl",
+        ))
+        .unwrap();
+    assert!(admits(&cohort, Some(&paired)).is_ok());
+    let crossed = cohort
+        .try_union(&need(
+            PathObservationNamespace::Materialization(instance),
+            "/version-generation/version.bzl",
+        ))
+        .unwrap();
+    assert!(admits(&crossed, Some(&paired)).is_err());
+    let mut progress = 0;
+    for bad in [
+        need(
+            PathObservationNamespace::Materialization(instance),
+            "/generation/outside",
+        ),
+        need(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(18),
+            ),
+            "/generation/BUILD.bazel",
+        ),
+        need(PathObservationNamespace::Host, "/unknown"),
+    ] {
+        let mixed = valid.try_union(&bad).unwrap();
+        if admits(&mixed, Some(&epoch)).is_ok() {
+            progress += 1;
+        }
+        let denied = admits(&mixed, Some(&epoch)).unwrap_err();
+        let (first, family) = bodies
+            .first_denied_path_with_namespace_matcher(&mixed, &|demand| {
+                namespace_policy(&bodies, demand, Some(&epoch), &small_namespace_plan_matches)
+                    .admits(&demand.operation())
+            })
+            .unwrap();
+        assert_eq!(denied.family, family);
+        assert_eq!(denied.path.as_ref(), Some(first.path()));
+        assert_eq!(
+            first.path(),
+            bad.path_observations()
+                .unwrap()
+                .demands()
+                .first()
+                .unwrap()
+                .path()
+        );
+    }
+    assert_eq!(progress, 0);
+    for unavailable in [
+        None,
+        Some(namespace_test_epoch(&bodies, [], instance)),
+        Some(namespace_test_epoch(&bodies, [a.clone(), b], instance)),
+        Some(namespace_test_epoch_at(
+            &bodies,
+            [a.clone()],
+            instance,
+            "/new-generation",
+        )),
+    ] {
+        assert!(admits(&valid, unavailable.as_ref()).is_err());
+    }
+    let mixed = valid
+        .try_union(&SourcePreparationNeeds::repository(namespace_test_request(
+            &bodies, false,
+        )))
+        .unwrap();
+    assert!(admits(&mixed, Some(&epoch)).is_ok());
+    let mut bad = namespace_test_request(&bodies, false);
+    bad.repo_spec.rule_id.rule_name = "unknown".into();
+    let mixed = mixed
+        .try_union(&SourcePreparationNeeds::repository({
+            bad.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("unknown+").unwrap();
+            bad
+        }))
+        .unwrap();
+    assert_eq!(
+        admits(&mixed, Some(&epoch)).unwrap_err().family,
+        "materialization"
+    );
 }
 #[test]
 fn generated_features_materialization_is_opt_in_and_exact() {

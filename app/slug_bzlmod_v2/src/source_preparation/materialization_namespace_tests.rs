@@ -31,13 +31,14 @@ fn request(
 fn success(
     request: &Arc<RepositoryMaterializationRequest>,
     instance: u64,
+    root: &str,
 ) -> RepositoryMaterializationEpochEntry {
     RepositoryMaterializationEpochEntry {
         request: request.clone(),
         result: RepositoryMaterializationResult::Success(
             RepositoryMaterializationSuccess::Immutable {
                 source_identity: Arc::from("phase-only-fixture"),
-                generation_root: PathBuf::from("/inert-generation"),
+                generation_root: PathBuf::from(root),
                 observation_instance: PathObservationInstanceId::new(instance),
             },
         ),
@@ -67,7 +68,7 @@ fn materialization_namespace_lookup_is_bounded_unique_and_borrowed() {
     let epoch = RepositoryMaterializationResultEpoch::new(
         workspace(),
         [
-            success(&original, 7),
+            success(&original, 7, "/inert-generation"),
             RepositoryMaterializationEpochEntry {
                 request: local,
                 result: RepositoryMaterializationResult::Success(
@@ -78,42 +79,63 @@ fn materialization_namespace_lookup_is_bounded_unique_and_borrowed() {
                 request: failed,
                 result: RepositoryMaterializationResult::SpecError("error".into()),
             },
-            success(&generated, 9),
+            success(&generated, 9, "/inert-generation"),
         ],
     )
     .unwrap();
     let count = Arc::strong_count(&original);
     assert!(std::ptr::eq(
         epoch
-            .borrowed_request_for_instance(&workspace(), instance, 4)
+            .borrowed_instance_for_namespace(&workspace(), instance, 4)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         original.as_ref()
     ));
     assert_eq!(Arc::strong_count(&original), count);
+    let view = epoch
+        .borrowed_instance_for_namespace(&workspace(), instance, 4)
+        .unwrap()
+        .unwrap();
+    let RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+        generation_root,
+        ..
+    }) = &epoch.get(original.as_ref()).unwrap().result
+    else {
+        panic!("fixture must hold the original successful entry");
+    };
+    assert_eq!(view.generation_root(), Path::new("/inert-generation"));
+    assert_eq!(
+        view.generation_root()
+            .as_os_str()
+            .as_encoded_bytes()
+            .as_ptr(),
+        generation_root.as_os_str().as_encoded_bytes().as_ptr()
+    );
     assert!(std::ptr::eq(
         epoch
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(9), 4)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(9), 4)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         generated.as_ref()
     ));
     assert!(
         epoch
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(8), 4)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(8), 4)
             .unwrap()
             .is_none()
     );
     assert_eq!(
-        epoch.borrowed_request_for_instance(&workspace(), instance, 3),
+        epoch.borrowed_instance_for_namespace(&workspace(), instance, 3),
         Err(Error::TooManyEntries)
     );
     assert_eq!(
-        epoch.borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(0), 0),
+        epoch.borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(0), 0),
         Err(Error::InvalidInstance)
     );
     assert_eq!(
-        epoch.borrowed_request_for_instance(
+        epoch.borrowed_instance_for_namespace(
             &NormalizedAbsolutePath::new("/other").unwrap(),
             PathObservationInstanceId::new(0),
             0
@@ -123,21 +145,43 @@ fn materialization_namespace_lookup_is_bounded_unique_and_borrowed() {
     let duplicate = request("duplicate+", RepositoryMaterializationKind::Immutable);
     let ambiguous = RepositoryMaterializationResultEpoch::new(
         workspace(),
-        [success(&original, 7), success(&duplicate, 7)],
+        [
+            success(&original, 7, "/inert-generation"),
+            success(&duplicate, 7, "invalid-relative-root"),
+        ],
     )
     .unwrap();
     assert_eq!(
-        ambiguous.borrowed_request_for_instance(&workspace(), instance, 2),
+        ambiguous.borrowed_instance_for_namespace(&workspace(), instance, 2),
         Err(Error::AmbiguousInstance)
     );
     assert_eq!(
-        ambiguous.borrowed_request_for_instance(&workspace(), instance, 1),
+        ambiguous.borrowed_instance_for_namespace(&workspace(), instance, 1),
         Err(Error::TooManyEntries)
     );
+    for root in ["relative-root", "/generation/../other", "/../generation"] {
+        let invalid =
+            RepositoryMaterializationResultEpoch::new(workspace(), [success(&duplicate, 7, root)])
+                .unwrap();
+        assert_eq!(
+            invalid.borrowed_instance_for_namespace(&workspace(), instance, 1),
+            Err(Error::InvalidGenerationRoot)
+        );
+        assert_eq!(
+            invalid.borrowed_instance_for_namespace(&workspace(), instance, 0),
+            Err(Error::TooManyEntries)
+        );
+        assert!(
+            invalid
+                .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(8), 1)
+                .unwrap()
+                .is_none()
+        );
+    }
     let empty = RepositoryMaterializationResultEpoch::new(workspace(), []).unwrap();
     assert!(
         empty
-            .borrowed_request_for_instance(&workspace(), instance, 0)
+            .borrowed_instance_for_namespace(&workspace(), instance, 0)
             .unwrap()
             .is_none()
     );
@@ -158,8 +202,16 @@ async fn materialization_namespace_lookup_tracks_same_dice_epoch() {
     let a = request("a+", RepositoryMaterializationKind::Immutable);
     let b = request("b+", RepositoryMaterializationKind::Immutable);
     let weak = Arc::downgrade(&a);
-    let epoch_a = RepositoryMaterializationResultEpoch::new(workspace(), [success(&a, 7)]).unwrap();
-    let epoch_b = RepositoryMaterializationResultEpoch::new(workspace(), [success(&b, 9)]).unwrap();
+    let epoch_a = RepositoryMaterializationResultEpoch::new(
+        workspace(),
+        [success(&a, 7, "/inert-generation")],
+    )
+    .unwrap();
+    let epoch_b = RepositoryMaterializationResultEpoch::new(
+        workspace(),
+        [success(&b, 9, "/inert-other-generation")],
+    )
+    .unwrap();
     let mut updater = dice.updater();
     updater
         .changed_to(vec![(key.clone(), epoch_a.clone())])
@@ -167,10 +219,18 @@ async fn materialization_namespace_lookup_tracks_same_dice_epoch() {
     let mut tx_a = updater.commit().await;
     let held = tx_a.compute(&key).await.unwrap();
     let a_count = Arc::strong_count(&a);
+    let held_root = held
+        .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
+        .unwrap()
+        .unwrap()
+        .generation_root();
+    assert_eq!(held_root, Path::new("/inert-generation"));
+    let root_pointer = held_root.as_os_str().as_encoded_bytes().as_ptr();
     assert!(std::ptr::eq(
-        held.borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(7), 1)
+        held.borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         a.as_ref()
     ));
     assert_eq!(Arc::strong_count(&a), a_count);
@@ -180,37 +240,64 @@ async fn materialization_namespace_lookup_tracks_same_dice_epoch() {
     let current = tx_b.compute(&key).await.unwrap();
     assert!(
         current
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(7), 1)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
             .unwrap()
             .is_none()
     );
     assert!(std::ptr::eq(
         current
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(9), 1)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(9), 1)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         b.as_ref()
     ));
+    let current_root = current
+        .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(9), 1)
+        .unwrap()
+        .unwrap()
+        .generation_root();
+    assert_eq!(current_root, Path::new("/inert-other-generation"));
+    assert_ne!(
+        current_root.as_os_str().as_encoded_bytes().as_ptr(),
+        root_pointer
+    );
+    assert_eq!(
+        held_root.as_os_str().as_encoded_bytes().as_ptr(),
+        root_pointer
+    );
     assert!(std::ptr::eq(
-        held.borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(7), 1)
+        held.borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         a.as_ref()
     ));
     let mut updater = dice.updater();
     updater.changed_to(vec![(key.clone(), epoch_a)]).unwrap();
     let mut tx_restored = updater.commit().await;
     let restored = tx_restored.compute(&key).await.unwrap();
+    let restored_root = restored
+        .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
+        .unwrap()
+        .unwrap()
+        .generation_root();
+    assert_eq!(restored_root, Path::new("/inert-generation"));
+    assert_eq!(
+        restored_root.as_os_str().as_encoded_bytes().as_ptr(),
+        root_pointer
+    );
     assert!(std::ptr::eq(
         restored
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(7), 1)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(7), 1)
             .unwrap()
-            .unwrap(),
+            .unwrap()
+            .request(),
         a.as_ref()
     ));
     assert!(
         restored
-            .borrowed_request_for_instance(&workspace(), PathObservationInstanceId::new(9), 1)
+            .borrowed_instance_for_namespace(&workspace(), PathObservationInstanceId::new(9), 1)
             .unwrap()
             .is_none()
     );

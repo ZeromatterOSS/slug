@@ -1202,6 +1202,17 @@ impl Bodies {
             &[GeneratedFileSignature; 2],
         ) -> bool,
     ) -> Result<(), Denied> {
+        self.admit_with_matchers(needs, plan_matches, &|_| false)
+    }
+    fn admit_with_matchers(
+        &self,
+        needs: &SourcePreparationNeeds,
+        plan_matches: &impl Fn(
+            &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+            &[GeneratedFileSignature; 2],
+        ) -> bool,
+        namespace_matches: &impl Fn(&PathObservationDemand) -> bool,
+    ) -> Result<(), Denied> {
         let refusal = |family| Denied {
             family,
             path: None,
@@ -1231,7 +1242,9 @@ impl Bodies {
         {
             return Err(refusal("materialization"));
         }
-        if let Some((demand, family)) = self.first_denied_path(needs) {
+        if let Some((demand, family)) =
+            self.first_denied_path_with_namespace_matcher(needs, namespace_matches)
+        {
             return Err(Denied {
                 family,
                 path: Some(demand.path().dupe()),
@@ -1240,14 +1253,18 @@ impl Bodies {
         }
         Ok(())
     }
-    fn first_denied_path<'a>(
+    fn first_denied_path_with_namespace_matcher<'a>(
         &self,
         needs: &'a SourcePreparationNeeds,
+        namespace_matches: &impl Fn(&PathObservationDemand) -> bool,
     ) -> Option<(&'a PathObservationDemand, &'static str)> {
         if let Some(paths) = needs.path_observations() {
             for demand in paths.demands() {
                 let operation = demand.operation();
                 if demand.namespace() != PathObservationNamespace::Host {
+                    if namespace_matches(demand) {
+                        continue;
+                    }
                     return Some((demand, "namespace"));
                 }
                 let path = demand.path().as_path();

@@ -511,6 +511,26 @@ pub enum RepositoryMaterializationInstanceLookupError {
     InvalidInstance,
     TooManyEntries,
     AmbiguousInstance,
+    InvalidGenerationRoot,
+}
+
+/// The original successful request and generation root borrowed from one
+/// current epoch entry. This view provides no filesystem authority.
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RepositoryMaterializationInstanceView<'a> {
+    request: &'a RepositoryMaterializationRequest,
+    generation_root: &'a Path,
+}
+
+impl<'a> RepositoryMaterializationInstanceView<'a> {
+    pub fn request(&self) -> &'a RepositoryMaterializationRequest {
+        self.request
+    }
+
+    pub fn generation_root(&self) -> &'a Path {
+        self.generation_root
+    }
 }
 
 impl RepositoryMaterializationResultEpoch {
@@ -560,17 +580,17 @@ impl RepositoryMaterializationResultEpoch {
         })
     }
 
-    /// Borrows the unique original successful request for a materialization
+    /// Borrows the unique original successful entry for a materialization
     /// instance in this epoch. The caller owns the finite entry bound; no
     /// request, index, generation root or source identity is copied.
     #[doc(hidden)]
-    pub fn borrowed_request_for_instance(
+    pub fn borrowed_instance_for_namespace(
         &self,
         workspace: &NormalizedAbsolutePath,
         instance: PathObservationInstanceId,
         max_entries: usize,
     ) -> Result<
-        Option<&RepositoryMaterializationRequest>,
+        Option<RepositoryMaterializationInstanceView<'_>>,
         RepositoryMaterializationInstanceLookupError,
     > {
         use RepositoryMaterializationInstanceLookupError as Error;
@@ -585,15 +605,35 @@ impl RepositoryMaterializationResultEpoch {
         }
         let mut found = None;
         for entry in self.entries.values() {
-            if matches!(
-                &entry.result,
-                RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable { observation_instance, .. })
-                    if *observation_instance == instance
-            ) {
-                if found.is_some() {
-                    return Err(Error::AmbiguousInstance);
+            if let RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Immutable {
+                    observation_instance,
+                    generation_root,
+                    ..
+                },
+            ) = &entry.result
+            {
+                if *observation_instance == instance {
+                    if found.is_some() {
+                        return Err(Error::AmbiguousInstance);
+                    }
+                    found = Some(RepositoryMaterializationInstanceView {
+                        request: entry.request.as_ref(),
+                        generation_root: generation_root.as_path(),
+                    });
                 }
-                found = Some(entry.request.as_ref());
+            }
+        }
+        if let Some(view) = &found {
+            if !view.generation_root.is_absolute()
+                || view.generation_root.components().any(|component| {
+                    !matches!(
+                        component,
+                        Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+                    )
+                })
+            {
+                return Err(Error::InvalidGenerationRoot);
             }
         }
         Ok(found)

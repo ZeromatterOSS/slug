@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated Features namespace permission readiness
+Status: Source-attempt quota attribution readiness
 
 ## Observable and source basis
 
@@ -44,77 +44,83 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP987](wp987-materialization-namespace-owner-2026-10-07.json) adds a bounded readonly
-lookup at the existing RepositoryMaterializationResultEpoch owner. It returns the
-unique original borrowed request for a nonzero observation instance within the
-expected workspace and caller bound; missing/ambiguous/overlimit states remain explicit.
-The same current transaction reads its injected epoch only after actual namespace
-refusal. Shared first-path-offender order, complete-Need precedence and original
-bounded identity formatting remain intact; no lock spans the await. Production50net
-lines add no retained state, request/plan/content/root copies, index or interner.
-Tests and wiring488net lines have independent cohesive ownership/transaction review.
+[WP988](wp988-generated-features-namespace-observations-2026-10-07.json) replaces the
+request-only accessor with one bounded borrowed successful-instance view exposing the
+original request and generation root. Workspace/nonzero/count checks precede the unique
+scan; ambiguity precedes lexical absolute-root validation. Constructor/equality and
+natural materializer/session/epoch ownership remain intact. The normal probe borrows the
+same transaction's injected epoch after namespace refusal, then validates the complete
+original Need before progress. Each demand requires its own current unique instance,
+exact typed Globals/Version context and OWN fixed two-file plan signatures. Only finite
+component ancestors/root Lstat and exact fixed-file Lstat/FileBytes pass. Other paths,
+operations, owners and nonunique/unavailable epochs refuse in the original family/order.
+No new retained fields, indexes, maps, interners or request/plan/content/root/string
+copies in the query/policy. Existing shallow Arc/keypath transport remains qualified.
 
-Fresh5 Bzlmod +44 Core +4 protocol controls +1 normal observer =54 named passes.
-57 successful current operations/461 union pins. Three current preparation gates
-execute0tests; ten total preparation attempts include eight zero-test successes and
-separate timeout/import failures. One superseded lookup pass and one failed immediate
-retirement assertion receive0current credit. The corrected real-DICE test drains
-cancellation, drops the engine and observes actual Weak expiry within the existing
-bounded actor-shutdown contract. Historical affected whole-file owner/callback claims
-are stale/uncredited; unchanged reader/capture evidence retains its scoped qualification.
+Independent design/static/prelaunch/final reviews accept42 net production and569
+cfgtest lines across the same five source files. The focused matrices include distinct
+Globals/Version instances/roots in one Need, crossed roots, wrong own plans/contexts,
+exact paths/operations, first offenders and same-DICE A/B/A root/pointer retirement.
+Fresh46 Core +5 Bzlmod +4 strict controls +1 normal observer =56 named passes;
+59 successful current operations/468 union pins/465 native pins. Three current serial
+preparations execute0tests. Seven total attempts include five zero-test successes and
+separate unchanged60s dependency timeout/E0597 synthetic closure lifetime failures;
+older attempts have0current credit. Affected historical whole-owner/callback claims
+remain stale/uncredited; unchanged reader/capture evidence retains its original scope.
 
-The normal probe takes1.881s and peaks93,804KiB under256MiB. It uniquely associates
-Materialization(instance1), Lstat at normalized '/' with the SAME current epoch's
-original GeneratedFileEffects Globals request: canonical
-bazel_features++version_extension+bazel_features_globals, rule repo bazel_features+,
-package private, target globals_repo.bzl and rule name globals_repo. Its207 original
-identity bytes are borrowed and bounded; no physical generation-root output.
-This establishes the current request/incarnation association, not namespace permission
-or independent completed files/digests/modes/fullSpec/certificate/producer evidence.
-Normal accounted WrittenBytes2064 remains unchanged, as do source64/646,987 decoded,
-registry105/235,521, Transfer0 and ErrorNone. Numeric source exhaustion remains no
-quota or cap-raise authority. Descriptor/logical/scratch live credits clear; scope and
-recorder Weak expire. Native body/plan/materializer/registryArc/fullDICE/page/wholefit
-remain unproved; ordinary actor-retirement proof is not native body retention proof.
+The changed normal probe passes in2.216s and peaks93,020KiB under256MiB. The previous
+namespace admission refusal clears. Actual normal repository computation now reports
+Some(Limit(SourceAttempts)) at64, with denied family none and no namespace/owner/policy,
+materialization or plan refusal marker. Source64/646,987 decoded, registry105/235,521,
+Transfer0 and Written2064 remain unchanged. This is a concrete quota refusal, but its
+original failed read/demand/path/owner is unobserved. Absence of an admission refusal
+and counted writes do not independently prove completed namespace observations,
+outputs/modes/digests/fullSpec/epoch/certificate/provider/Rustc. Public preparation is
+complete/singleton/policy checked; terminal certificate/observations/analyses/actions
+and Rustc remain unavailable. Descriptor/logical/scratch/live buffer credits clear and
+scope/recorder Weak expire; native body/plan/materializer/registryArc/fullDICE/page
+retention/freshness and whole-workload fit remain unproved. Child RSS does not establish
+supervisor or parent+child aggregate RSS.
 
 ## Active continuation contract
 
-Use the [grounded successor](../../../../target/wp987/native/successor-source.md)
-and WP987 receipt to freeze consequential finite Generated Features namespace permission.
-The normal observation kernel validates known nonzero instances but permits paths
-outside their generation roots; known namespace alone provides no confinement.
-Borrow the natural current successful generation root and original request through a
-minimal bounded readonly view, preserving workspace/instance/uniqueness/full typed
-owner/context/own fixed plan signatures. Keep the same transaction's existing epoch
-alive through immediate admission without retained mirrors, map/spec/plan/path/root
-copies or reconstructed output authority.
+Use the [grounded successor](../../../../target/wp988/native/successor-source.md)
+(SHA25645d5101e57e58686a1c72eb336229fee8dc53e769c56bd9e4794e86d9e98b96f)
+and WP988 receipt to freeze bounded first-created source-attempt refusal attribution.
+Scope charge refuses before IO and stores a sticky scalar. The original read path/demand
+is still borrowed at the charge/kernel seam, but scalar conversion and the native bridge's
+postcheck can discard its association. Counters, later Needs and sticky propagation cannot
+identify the first refused read; archive charge sites also exist. Source64 is the service
+maximum while the ordinary probe default16 is separate. No cap increase is activated.
 
-Validate every demand in the complete Need before progress. Admit only source-proved
-fixed output files and their finite component ancestors for necessary Lstat operations;
-exact FileBytes/Lstat paths may use borrowed strip_prefix/components rather than join
-allocations. Reject unknown/mixed owners, sibling prefixes, outside paths, child paths,
-unsupported operations and unavailable/nonunique epochs. The first original offender
-and all family/default ordering remain authoritative. No generic Materialization,
-root-prefix/recursive grant or fabricated provider/root/certificate. Preserve normal
-materializer/scoped reader, structural equality, generation/session/cancellation,
-preflight, epoch and final revalidation. Obtain design/final review and discriminating
-owner/path/whole-Need/epoch/lifecycle tests before one changed bounded native probe.
+Prefer an atomic first-created discriminator under the existing charge critical section,
+then synchronous bounded projection of the original borrowed demand/path outside scope
+and session locks, before the bridge postcheck. Preserve original error/cancellation,
+charge-before-IO/session/epoch/preflight/final-validation behavior and all other charge
+sites as explicitly unassociated when not observed. Avoid retained path/String/PathBuf,
+plan/request mirrors, global callback stores or new interner/cache. Freeze the minimal
+source/API/diagnostic scope and obtain design/final review before implementation. Reuse
+small source-scope/file/kernel/bridge fixtures for original versus sticky failures,
+unsupported sites, exact limits before IO, bounds, first-error order and release; use
+fresh affected owner/direct-dependent gates before one changed capped probe. If the
+association reveals repeated reads, inspect natural revalidation/epochs before changing
+reuse. A higher allowance requires a separate reviewed service-ceiling/policy decision.
 
 Original237 ordered parent leases remain918,928 physical/1,837,856 hash bytes,
 original188+combined49/two64KiB128KiB, non-inherited/non-atomic/noncertifying.
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
 FSIZE16MiB. Borrow/transfer/share storage; use existing scoped interners for repeated
-retained strings where lifetime and cleanup fit. Windows remains minimal.
+retained immutable strings where lifetime and cleanup fit. Windows remains minimal.
 Local0.2.17/requested0.2.4 and caller-alias/defining-self domains remain distinct.
 Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/
 same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
 
 ## Immediate predecessor
 
-[WP986](wp986-generated-features-sibling-permission-2026-10-07.json), accepted at
-5581399edd7c21352c8d22b915ab9463b9841d00, grants each original Globals/Version owner
-its own fixed two-file plan through the normal materializer. It reaches2064 counted
-write bytes and namespace refusal; charging precedes IO and does not certify completed
-outputs. Original source/capture/identity/lifecycle decisions remain Git-reachable through
-that receipt and the predecessor manifest at the accepted commit.
+[WP987](wp987-materialization-namespace-owner-2026-10-07.json), accepted at
+240fadb719181ee81b3fab993c0bc5a3e0fca631, first associated Materialization(instance1)
+Lstat at '/' with the same current epoch's original generated Globals request. It
+peaked93,804KiB under256MiB with54 fresh checks and no namespace grant. Earlier exact
+source/owner/plan/capture/lifecycle decisions remain Git-reachable through that receipt
+and its predecessor manifest at the accepted commit.
