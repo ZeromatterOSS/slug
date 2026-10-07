@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal finite module mapping accepted; ordinary public Rustc producer continues
+Status: Ordinary public singleton dispatch reaches finite repository metadata prerequisite
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,19 +149,21 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
+[WP958](./slug-v2-subplans/wp958-public-singleton-producer-readiness-2026-10-07.json)
+accepts genuine ordinary singleton dispatch for public //pkg:probe/nightly with the
+original root terminal/certificate policies and finite whole-Need guard.16ordinary+
+4synthetic+1native diagnostic checks pass; sole0.354s/76244KiB observation reaches exact
+rules_rust Local-root REPO.bazel Host Lstat, rejected before progress. Source errorNone/
+105admissions235521B,113pins/188physical brackets and recorder/scope/finalcredits pass.
+Module byte/Weak witnesses are uninstrumented/vacuous here, not actual source absence;
+no producer terminal/certificate/action/provider completion is claimed. Ground/review
+one finite root metadata role next, preserving memory/interning/ownership/caps. Immediate
 [WP957](./slug-v2-subplans/wp957-root-lockfile-metadata-readiness-2026-10-07.json)
-accepts exact PreparedFile root lockfile Host Lstat with unchanged caps and no new
-retained strings.15 ordinary+4 synthetic+1 native gates pass. The0.361s/71680KiB normal
-mapping completes after34 drives with105 registry admissions235521B/sourceErrorNone.
-All11 original Local source hashes/root Arc identity and genuine nonempty Host epoch
-certificate pass; all8 extra original sources are genuinely seen and retired.106pins/
-188 physical brackets and final credit/Weak guards pass. Proceed through existing normal
-BuildCommandRoot/loading/configured-rule owners toward the public Rustc/support/data
-producer; same-engine edition restoration/public provider/action/wholefit remain open.
-No further source-admission widening or mapping-only retry is selected. Original registry
-Arc/freshness and lockfile absence/content remain unproved. Source corpus is reused from
-WP954; immediate predecessor [WP956](./slug-v2-subplans/wp956-normal-registry-discovery-readiness-2026-10-07.json)
-cleared the85-attempt barrier but stopped at the exact path-only lockfile Need.
+at7aec52b3b genuinely completed finite normal mapping/all11Host source coverage and
+original nonempty certificate; it is historical phase evidence, not this public result.
+Actual public Rustc/support/data/runfiles/oracle/edition restoration and wholefit remain
+open. Authentic corpus is reused from WP954; registry Arc/freshness, MVS/BCR provenance
+and lockfile absence/content stay unproved.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

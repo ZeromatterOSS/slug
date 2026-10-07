@@ -1,0 +1,486 @@
+use super::*;
+
+#[derive(Clone, Copy)]
+pub(super) enum CommandChoice {
+    Modules,
+    PublicProbe,
+}
+pub(super) enum ObservationOutcome {
+    Modules(Result<DrivenCommand<ModuleTerminal>, NativeDemandSessionError>),
+    Probe(ProbeOutcome),
+}
+pub(super) enum ProbeOutcome {
+    PrepareRefusal(BuildCommandError),
+    DispatchRefusal,
+    Driven(
+        Result<DrivenCommand<SingletonRootSingleBuildCommandTerminal>, NativeDemandSessionError>,
+    ),
+}
+impl ObservationOutcome {
+    pub(super) fn is_ok(&self) -> bool {
+        matches!(
+            self,
+            Self::Modules(Ok(_)) | Self::Probe(ProbeOutcome::Driven(Ok(_)))
+        )
+    }
+    pub(super) fn stage(&self) -> &'static str {
+        match self {
+            Self::Modules(Ok(_)) => "mapping_complete",
+            Self::Modules(Err(_)) | Self::Probe(ProbeOutcome::Driven(Err(_))) => "native_refusal",
+            Self::Probe(ProbeOutcome::PrepareRefusal(_) | ProbeOutcome::DispatchRefusal) => {
+                "prepare_refusal"
+            }
+            Self::Probe(ProbeOutcome::Driven(Ok(driven))) => {
+                if driven.accepted.terminal().result.is_ok() {
+                    "build_complete"
+                } else {
+                    "build_refusal"
+                }
+            }
+        }
+    }
+    pub(super) fn report_native(&self) {
+        let result = match self {
+            Self::Modules(Ok(driven)) => {
+                assert!(root_bytes(&driven.accepted.terminal().source));
+                (
+                    "complete",
+                    Some((driven.attempts, driven.terminal_root_count)),
+                )
+            }
+            Self::Probe(ProbeOutcome::Driven(Ok(driven))) => (
+                "complete",
+                Some((driven.attempts, driven.terminal_root_count)),
+            ),
+            Self::Modules(Err(error)) | Self::Probe(ProbeOutcome::Driven(Err(error))) => {
+                (native_kind(error), None)
+            }
+            _ => ("unavailable", None),
+        };
+        if let Some((attempts, roots)) = result.1 {
+            println!(
+                "WP942_NATIVE kind={} attempts={attempts} roots={roots}",
+                result.0
+            );
+        } else {
+            println!(
+                "WP942_NATIVE kind={} attempts=unavailable roots=unavailable",
+                result.0
+            );
+        }
+    }
+}
+pub(super) struct ProbeReport {
+    preparation: &'static str,
+    dispatch: &'static str,
+    policy_checked: bool,
+}
+struct Scalar(Option<usize>);
+impl std::fmt::Display for Scalar {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.0 {
+            Some(value) => write!(f, "{value}"),
+            None => f.write_str("unavailable"),
+        }
+    }
+}
+impl Default for ProbeReport {
+    fn default() -> Self {
+        Self {
+            preparation: "not_started",
+            dispatch: "not_started",
+            policy_checked: false,
+        }
+    }
+}
+impl ProbeReport {
+    pub(super) fn report(
+        &self,
+        stage: &str,
+        early_kind: &str,
+        outcome: Option<&ObservationOutcome>,
+    ) {
+        let mut certificate = "unavailable";
+        let mut observations = None;
+        let mut counts = None;
+        let kind = match outcome {
+            Some(ObservationOutcome::Probe(ProbeOutcome::PrepareRefusal(error))) => {
+                build_kind(error)
+            }
+            Some(ObservationOutcome::Probe(ProbeOutcome::DispatchRefusal)) => "dispatch",
+            Some(ObservationOutcome::Probe(ProbeOutcome::Driven(Err(error)))) => native_kind(error),
+            Some(ObservationOutcome::Probe(ProbeOutcome::Driven(Ok(driven)))) => {
+                let terminal = driven.accepted.terminal();
+                certificate = if terminal.source_certificate().is_some() {
+                    "true"
+                } else {
+                    "false"
+                };
+                observations = terminal
+                    .observations
+                    .as_ref()
+                    .map(|epoch| epoch.observations().len());
+                match terminal.result.as_ref() {
+                    Err(error) => build_kind(error),
+                    Ok(evaluation) => {
+                        let mut analyses = 0;
+                        let mut actions = 0;
+                        let mut rustc = 0;
+                        for analysis in evaluation.analyses() {
+                            analyses += 1;
+                            actions += analysis.actions().len();
+                            rustc += analysis
+                                .actions()
+                                .iter()
+                                .filter(|action| {
+                                    action
+                                        .spawn_spec()
+                                        .is_some_and(|spawn| spawn.mnemonic() == "Rustc")
+                                })
+                                .count();
+                        }
+                        counts = Some((analyses, actions, rustc));
+                        "complete"
+                    }
+                }
+            }
+            _ => early_kind,
+        };
+        println!(
+            "WP958_RESULT stage={stage} kind={kind} preparation={} dispatch={} policy_checked={} certificate={certificate} observations={} analyses={} actions={} rustc={}",
+            self.preparation,
+            self.dispatch,
+            self.policy_checked,
+            Scalar(observations),
+            Scalar(counts.map(|n| n.0)),
+            Scalar(counts.map(|n| n.1)),
+            Scalar(counts.map(|n| n.2))
+        );
+    }
+}
+
+#[derive(Clone)]
+struct GuardedSingleton {
+    inner: SingletonRootSingleBuildCommandKey,
+    bodies: Arc<Bodies>,
+    milestones: Arc<Mutex<Milestones>>,
+}
+impl GuardedSingleton {
+    fn check_need(&self, needs: &SourcePreparationNeeds) -> Result<(), NativeDemandSessionError> {
+        self.bodies.admit(needs).map_err(|denied| {
+            self.milestones.lock().unwrap().denied = Some(denied);
+            refusal()
+        })
+    }
+}
+#[async_trait]
+impl NativeCommandRoot for GuardedSingleton {
+    type Terminal = SingletonRootSingleBuildCommandTerminal;
+    fn complete<'a>(
+        &'a self,
+        terminal: &'a mut Self::Terminal,
+        context: NativeCommandCompletionContext<'a, '_>,
+    ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
+        self.inner.complete(terminal, context)
+    }
+    fn publish(&self, terminal: &mut Self::Terminal) -> std::io::Result<()> {
+        self.inner.publish(terminal)
+    }
+    fn publication_completed(&self, terminal: &Self::Terminal) -> bool {
+        self.inner.publication_completed(terminal)
+    }
+    fn initializes_request_revision(&self) -> bool {
+        self.inner.initializes_request_revision()
+    }
+    fn requires_workspace_status_inputs(&self) -> bool {
+        self.inner.requires_workspace_status_inputs()
+    }
+    fn source_certificate<'a>(
+        &self,
+        terminal: &'a Self::Terminal,
+    ) -> Option<&'a SourceCertificate> {
+        self.inner.source_certificate(terminal)
+    }
+    fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        self.inner.observations(terminal)
+    }
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        self.inner.observed_selection_association()
+    }
+    fn terminal_observed_selection_association(
+        &self,
+        terminal: &Self::Terminal,
+    ) -> ObservedSelectionAssociation {
+        self.inner.terminal_observed_selection_association(terminal)
+    }
+    fn terminal_demand_association(&self, terminal: &Self::Terminal) -> TerminalDemandAssociation {
+        self.inner.terminal_demand_association(terminal)
+    }
+    fn event_reconciliation_policy(&self, terminal: &Self::Terminal) -> EventReconciliationPolicy {
+        self.inner.event_reconciliation_policy(terminal)
+    }
+    fn allows_empty_terminal(&self) -> bool {
+        self.inner.allows_empty_terminal()
+    }
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        self.inner.allows_unavailable_terminal_roots(terminal)
+    }
+    async fn compute(
+        &self,
+        tx: &mut dice::DiceTransaction,
+    ) -> Result<SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError> {
+        let outcome = NativeCommandRoot::compute(&self.inner, tx).await?;
+        if let SourcePreparationOutcome::Need(needs) = &outcome {
+            self.check_need(needs)?;
+        }
+        Ok(outcome)
+    }
+}
+fn nightly_overlay() -> CommandConfigurationOverlay {
+    CommandConfigurationOverlay::from(vec![
+        slug_configuration_v2::CommandConfigurationOccurrence::starlark(
+            "@rules_rust//rust/toolchain/channel",
+            Some("nightly"),
+            false,
+        ),
+    ])
+}
+fn projection_matches(
+    inner: &SingletonRootSingleBuildCommandKey,
+    request: &NativeDemandRequestInputBundle,
+    bodies: &Bodies,
+    registry: &RegistryUrls,
+    overlay: &CommandConfigurationOverlay,
+) -> bool {
+    request.registry_urls == *registry
+        && request.lockfile_mode == LockfileMode::Off
+        && inner.0.workspace == bodies.roots[0]
+        && matches!(inner.0.targets.as_ref(), [pattern] if pattern.as_ref() == "//pkg:probe")
+        && bodies.visible_lockfile_metadata
+        && inner.0.configuration_overlay == *overlay
+        && request.command_policy.module_overrides().count() == bodies.bindings().count()
+        && bodies.bindings().all(|(name, _, root)| {
+            request
+                .command_policy
+                .module_overrides()
+                .any(|(actual, path)| actual == name && path == root.as_path())
+        })
+}
+pub(super) fn prepare_and_drive(
+    runtime: &WorkspaceRuntime,
+    bodies: Arc<Bodies>,
+    policy: BzlmodCommandPolicyKey,
+    registry: &RegistryUrls,
+    milestones: Arc<Mutex<Milestones>>,
+    report: &mut ProbeReport,
+) -> ProbeOutcome {
+    let target = [TargetPattern::parse("//pkg:probe").expect("fixed public singleton")];
+    let environment = BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+        .expect("absent yanked versions");
+    let urls = [registry.as_slice()[0].as_str().to_owned()];
+    let overlay = nightly_overlay();
+    let prepared = runtime.prepare_build_request(
+        &target,
+        policy,
+        environment,
+        LockfileMode::Off,
+        &urls,
+        slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+        overlay.clone(),
+    );
+    let (key, request) = match prepared {
+        Err(error) => {
+            report.preparation = "refused";
+            return ProbeOutcome::PrepareRefusal(error);
+        }
+        Ok(prepared) => {
+            report.preparation = "complete";
+            prepared
+        }
+    };
+    if BuildCommandRootObservationKey::new(key.clone()).is_some() {
+        report.dispatch = "refused";
+        return ProbeOutcome::DispatchRefusal;
+    }
+    let Some(inner) = SingletonRootSingleBuildCommandKey::new(key) else {
+        report.dispatch = "refused";
+        return ProbeOutcome::DispatchRefusal;
+    };
+    report.dispatch = "singleton";
+    report.policy_checked = projection_matches(&inner, &request, &bodies, registry, &overlay);
+    if !report.policy_checked {
+        report.dispatch = "refused";
+        return ProbeOutcome::DispatchRefusal;
+    }
+    milestones.lock().unwrap().registry_policy_checked = true;
+    ProbeOutcome::Driven(runtime.drive_command(
+        request,
+        GuardedSingleton {
+            inner,
+            bodies,
+            milestones,
+        },
+    ))
+}
+
+#[test]
+fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Arc::new(
+        Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+            .with_visible_lockfile_metadata(RegistryChoice::PreparedFile),
+    );
+    let root = BuildCommandRootKey::new_with_overlay(
+        path("/fixture"),
+        &[TargetPattern::parse("//pkg:probe").unwrap()],
+        build_test_configuration("probe-dispatch"),
+        nightly_overlay(),
+    )
+    .unwrap();
+    assert!(BuildCommandRootObservationKey::new(root.clone()).is_none());
+    let inner = SingletonRootSingleBuildCommandKey::new(root).unwrap();
+    let registry = RegistryUrls::new(["file:///task/registry"]);
+    let mut request = NativeDemandRequestInputBundle::normalized_initial();
+    request.command_policy = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        Path::new("/fixture"),
+        ["rules_rust=/rules", "platforms=/platforms"],
+    )
+    .unwrap();
+    request.lockfile_mode = LockfileMode::Off;
+    request.registry_urls = registry.dupe();
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    request.lockfile_mode = LockfileMode::Update;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    request.lockfile_mode = LockfileMode::Off;
+    request.registry_urls = RegistryUrls::new(["https://bcr.bazel.build"]);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    let milestones = Arc::new(Mutex::new(Milestones::default()));
+    let guarded = GuardedSingleton {
+        inner: inner.clone(),
+        bodies,
+        milestones: milestones.clone(),
+    };
+    assert!(guarded.initializes_request_revision());
+    assert_eq!(
+        guarded.requires_workspace_status_inputs(),
+        inner.requires_workspace_status_inputs()
+    );
+    assert_eq!(
+        std::mem::discriminant(&guarded.observed_selection_association()),
+        std::mem::discriminant(&inner.observed_selection_association())
+    );
+    assert!(!guarded.allows_empty_terminal());
+    // Only a synthetic metadata error is supplied for delegation; no build producer is claimed.
+    let terminal = SingletonRootSingleBuildCommandTerminal {
+        result: Arc::new(Err(BuildCommandError::infrastructure("unit delegation"))),
+        observations: None,
+    };
+    assert!(guarded.source_certificate(&terminal).is_none());
+    assert!(guarded.observations(&terminal).is_none());
+    assert_eq!(
+        std::mem::discriminant(&guarded.terminal_observed_selection_association(&terminal)),
+        std::mem::discriminant(&inner.terminal_observed_selection_association(&terminal))
+    );
+    assert_eq!(
+        std::mem::discriminant(&guarded.terminal_demand_association(&terminal)),
+        std::mem::discriminant(&inner.terminal_demand_association(&terminal))
+    );
+    assert_eq!(
+        std::mem::discriminant(&guarded.event_reconciliation_policy(&terminal)),
+        std::mem::discriminant(&inner.event_reconciliation_policy(&terminal))
+    );
+    assert_eq!(
+        guarded.allows_unavailable_terminal_roots(&terminal),
+        inner.allows_unavailable_terminal_roots(&terminal)
+    );
+    assert_eq!(
+        guarded.publication_completed(&terminal),
+        inner.publication_completed(&terminal)
+    );
+    assert!(Arc::ptr_eq(&terminal.result, &terminal.clone().result));
+    let demand =
+        |p: &str, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let allowed = demand(
+        "/fixture/MODULE.bazel.lock",
+        PathObservationOperation::Lstat,
+    );
+    assert!(guarded.check_need(&allowed).is_ok());
+    let mut progress = 0;
+    for (excluded, operation) in [
+        (
+            demand(
+                "/fixture/pkg/BUILD.bazel",
+                PathObservationOperation::FileBytes,
+            ),
+            "file_bytes",
+        ),
+        (
+            SourcePreparationNeeds::root_module_bootstrap(
+                slug_bzlmod_v2::RootModuleBootstrapRequest {
+                    workspace: path("/foreign"),
+                },
+            ),
+            "none",
+        ),
+    ] {
+        let mixed = allowed.try_union(&excluded).unwrap();
+        if guarded.check_need(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert!(guarded.check_need(&mixed).is_err());
+        assert_eq!(
+            milestones
+                .lock()
+                .unwrap()
+                .denied
+                .as_ref()
+                .unwrap()
+                .operation,
+            operation
+        );
+    }
+    assert_eq!(progress, 0);
+    assert_eq!(
+        milestones
+            .lock()
+            .unwrap()
+            .denied
+            .as_ref()
+            .unwrap()
+            .operation,
+        "none"
+    );
+}
+#[test]
+#[ignore = "bounded normal public producer observation; frozen supervisor inputs required"]
+fn native_eleven_root_prepared_file_public_probe_prerequisite() {
+    observe_native_command(
+        ModuleMode::Eleven,
+        RegistryChoice::PreparedFile,
+        CommandChoice::PublicProbe,
+    );
+}

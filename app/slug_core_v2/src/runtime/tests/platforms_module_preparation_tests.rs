@@ -19,6 +19,13 @@ use slug_workspace_v2::ObservedPathFrontierError;
 
 use super::*;
 
+mod public_probe_preparation_tests {
+    include!("platforms_module_preparation_tests/public_probe_preparation_tests.rs");
+}
+use public_probe_preparation_tests::CommandChoice;
+use public_probe_preparation_tests::ObservationOutcome;
+use public_probe_preparation_tests::ProbeReport;
+
 const PLATFORMS_SHA: [u8; 32] = [
     0x1c, 0x0c, 0x09, 0xf5, 0xbd, 0xcf, 0x4b, 0x3f, 0x92, 0x47, 0x20, 0xd2, 0x47, 0x8a, 0x37, 0x11,
     0xcb, 0x39, 0xf4, 0x97, 0x70, 0x19, 0xca, 0x59, 0x88, 0x68, 0x5e, 0x5b, 0x7e, 0x18, 0xb3, 0xd2,
@@ -1531,6 +1538,13 @@ fn observe_native_modules(mode: ModuleMode) {
     observe_native_modules_with_registry(mode, RegistryChoice::DefaultBcr);
 }
 fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: RegistryChoice) {
+    observe_native_command(mode, registry_choice, CommandChoice::Modules);
+}
+fn observe_native_command(
+    mode: ModuleMode,
+    registry_choice: RegistryChoice,
+    command: CommandChoice,
+) {
     phase("baseline");
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1666,6 +1680,12 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
     let milestones = Arc::new(Mutex::new(Milestones::default()));
     let mut policy_error = false;
     let mut outcome = None;
+    let mut probe_report = ProbeReport::default();
+    if matches!(command, CommandChoice::PublicProbe) {
+        assert!(matches!(mode, ModuleMode::Eleven));
+        assert!(matches!(registry_choice, RegistryChoice::PreparedFile));
+        println!("WP958_REQUEST role=public_probe target=//pkg:probe channel=nightly");
+    }
     if let Some(runtime) = &runtime {
         let mut overrides: [Option<String>; 10] = Default::default();
         for (slot, (name, _, root)) in bodies.bindings().enumerate() {
@@ -1679,24 +1699,37 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
         ) {
             Err(_) => policy_error = true,
             Ok(policy) => {
-                let mut request = NativeDemandRequestInputBundle::normalized_initial();
-                request.command_policy = policy;
-                request.lockfile_mode = LockfileMode::Off;
-                request.registry_urls = registry_urls.dupe();
-                outcome = Some(
-                    runtime.drive_command(
-                        request,
-                        ModuleRoot {
+                if matches!(command, CommandChoice::PublicProbe) {
+                    outcome = Some(ObservationOutcome::Probe(
+                        public_probe_preparation_tests::prepare_and_drive(
+                            runtime,
                             bodies,
-                            expected_registry: matches!(
-                                registry_choice,
-                                RegistryChoice::PreparedFile
-                            )
-                            .then(|| registry_urls.dupe()),
-                            milestones: milestones.clone(),
-                        },
-                    ),
-                );
+                            policy,
+                            &registry_urls,
+                            milestones.clone(),
+                            &mut probe_report,
+                        ),
+                    ));
+                } else {
+                    let mut request = NativeDemandRequestInputBundle::normalized_initial();
+                    request.command_policy = policy;
+                    request.lockfile_mode = LockfileMode::Off;
+                    request.registry_urls = registry_urls.dupe();
+                    outcome = Some(ObservationOutcome::Modules(
+                        runtime.drive_command(
+                            request,
+                            ModuleRoot {
+                                bodies,
+                                expected_registry: matches!(
+                                    registry_choice,
+                                    RegistryChoice::PreparedFile
+                                )
+                                .then(|| registry_urls.dupe()),
+                                milestones: milestones.clone(),
+                            },
+                        ),
+                    ));
+                }
             }
         }
     }
@@ -1707,25 +1740,36 @@ fn observe_native_modules_with_registry(mode: ModuleMode, registry_choice: Regis
         "constructor_refusal"
     } else if policy_error {
         "policy_refusal"
-    } else if matches!(outcome, Some(Ok(_))) {
+    } else if matches!(command, CommandChoice::PublicProbe) {
+        outcome.as_ref().unwrap().stage()
+    } else if outcome.as_ref().is_some_and(ObservationOutcome::is_ok) {
         "mapping_complete"
     } else {
         "native_refusal"
     };
     println!("WP942_STAGE {stage}");
-    match &outcome {
-        Some(Ok(driven)) => {
-            assert!(root_bytes(&driven.accepted.terminal().source));
-            println!(
-                "WP942_NATIVE kind=complete attempts={} roots={}",
-                driven.attempts, driven.terminal_root_count
-            );
-        }
-        Some(Err(error)) => println!(
-            "WP942_NATIVE kind={} attempts=unavailable roots=unavailable",
-            native_kind(error)
-        ),
-        None => println!("WP942_NATIVE kind=unavailable attempts=unavailable roots=unavailable"),
+    if let Some(outcome) = &outcome {
+        outcome.report_native();
+    } else {
+        println!("WP942_NATIVE kind=unavailable attempts=unavailable roots=unavailable");
+    }
+    if matches!(command, CommandChoice::PublicProbe) {
+        let early_kind = if arm_error.is_some() {
+            "source_service"
+        } else if let Some(error) = &constructor_error {
+            if error.downcast_ref::<SourceServiceError>().is_some() {
+                "source_service"
+            } else if error.downcast_ref::<std::io::Error>().is_some() {
+                "io"
+            } else {
+                "anyhow"
+            }
+        } else if policy_error {
+            "module_overrides"
+        } else {
+            "unavailable"
+        };
+        probe_report.report(stage, early_kind, outcome.as_ref());
     }
     let (source_weak, additional_weak) = {
         let state = milestones.lock().unwrap();
