@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bounded native memory/lifecycle gates pass; actual rules_license1.0.0 prerequisite
+Status: bounded native memory/lifecycle gates pass; actual rules_shell0.6.1 prerequisite
 
 ## Observable and source basis
 
@@ -196,9 +196,37 @@ runtime operations fit unchanged caps; mapping/providers/public Rustc/full fit s
 Next follow [the source recommendation](../../../../target/wp947/native/successor-source.md)
 to ground the actual rules_license prerequisite before its separately frozen source step.
 
+## Accepted WP948 continuation
+
+[WP948](wp948-native-license-source-readiness-2026-10-06.json) observes the grounded rules_license+ target187B
+and exact MODULE753B/fullSHAa7fda60e… at0.031s/17,532KiB and0.042s/18,596KiB.
+Supported literal facts declare rules_license1.0.0/compatibility1 and4dev dependencies,
+with0unsupported directives. Name/version correspondence supports the physical candidate;
+it proves no evaluation or BCR/MVS provenance. The concrete normal Local binding uses
+existing empty-effective-key/name-check semantics; prior version test16pins/raw is reused
+with0newruns, and earlier rules_cc0.2.4 versus Local0.2.17 mismatch remains explicit.
+
+The shared companion adds fixed4extras/closedSeven and all-prior paired crossing checks:
+Fifth2/Sixth4cases preserved, Seventh6pairs cover every earlier root/canonical. Net58lines,
+no production/dependency/fixture growth or new string/source cache. Nine Core tests pass
+1.774s/53,924KiB; separate Core compile9.705s and direct Core/CLI check7.309s pass.
+One seven-root native observer passes0.242s at conservative67,012KiB RSS under256MiB,
+with75current pins and7parent MODULE brackets7992B. Original root426B/hash/Weak and
+all tracked credit/recorder/scope retirement succeed. All4extras remain unseen in the
+returned epoch; source/hash/evaluation unavailable and their Weak expiry vacuous.
+
+The actual held semantic mapping error now reports rules_shell0.6.1/outer62B MODULE
+request, a retained discovery association rather than completed selection/provenance.
+Scope1registryattempt/0bytes and unqualified recorder9attempts/1admitted/8refused stay
+separate. Ten fresh Rust checks=9Coreordinary+1native;2physical decisions are observations.
+15availability/3FD/1version controls are reused with0reruns. Runtime memory fits unchanged
+caps, while mapping/providers/public Rustc/full-workload fit remain open. Follow
+[the source recommendation](../../../../target/wp948/native/successor-source.md) for
+one separately frozen source-specific correction to the actual rules_shell prerequisite.
+
 ## Ownership, scope and allocation
 
-The latest checkpoint shares three fixed optional bindings, borrowed diagnostic reporting and
+The latest checkpoint shares four fixed optional bindings, borrowed diagnostic reporting and
 focused whole-Need controls in the existing test companion; no production change.
 WP943 retains its26-line accessor on the existing Bzlmod mapping-error owner and
 189 lines in its existing private test companion. All tuple references borrow the original
@@ -209,14 +237,14 @@ detail is opaque. Representation, equality/invalidation/Need policies and existi
 interners remain unchanged. The diagnostic tuple cannot outlive or retain its owner.
 
 WP942's actual native root anchor and mapping share one normal scoped DICE request;
-whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth
+whole-Need admission preserves the three-root default and opt-in exact fourth/fifth/sixth/seventh
 MODULE bodies with finite metadata/Local roles. Successful certification would require
 the original covered mapping epoch, exact root/platforms sources and root Arc identity. That branch remains source-reviewed,
 unexecuted by the accepted refusal. No injected snapshot/bootstrap/private graph export
 or fabricated source/provider certificate is admitted.
 
 Root owns bounded wrappers, integration and compact receipts. The next contract must
-freeze the independently grounded source-specific correction for the actual rules_license
+freeze the independently grounded source-specific correction for the actual rules_shell
 request before another source/native operation. Consequential ownership/representation/operation changes
 receive independent design and final review. Prefer existing natural owners and bounded
 companions to copied large harnesses; record any concrete shared-boundary growth reason.

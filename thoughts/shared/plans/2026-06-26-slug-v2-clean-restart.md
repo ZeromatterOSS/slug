@@ -111,6 +111,14 @@ root/hash/Weak and final credits succeed. All3extras remain unseen in the native
 Separate Core10.095s/CoreCLI7.324s pass. Actual next request is rules_license1.0.0/outer64B.
 Continue its normal source owner under borrowing/scoped interning and unchanged caps;
 mapping/provenance/provider/public Rustc/full-workload fit remain open.
+[WP948](./slug-v2-subplans/wp948-native-license-source-readiness-2026-10-06.json)
+accepts exact license753B/literal1.0.0 local availability and shared Seven observer.
+Nine controls1.774s/53,924KiB and native0.242s/67,012KiB pass;7parent bindings7992B,
+root426B/hash/Weak and zero credits succeed. All4extras remain unseen in the epoch.
+Separate Core9.705s/CoreCLI7.309s pass; prior version evidence is reused0newruns.
+Actual next typed request is rules_shell0.6.1/outer62B MODULE. Continue its source-specific
+normal owner under existing memory/borrowing/interning limits; no mapping/providers/public
+Rustc/MVS/provenance/full-workload fit admission.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
