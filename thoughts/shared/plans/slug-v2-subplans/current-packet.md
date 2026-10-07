@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Source-attempt quota attribution readiness
+Status: Generated-source observation phase readiness
 
 ## Observable and source basis
 
@@ -44,83 +44,88 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint and continuation
 
-[WP988](wp988-generated-features-namespace-observations-2026-10-07.json) replaces the
-request-only accessor with one bounded borrowed successful-instance view exposing the
-original request and generation root. Workspace/nonzero/count checks precede the unique
-scan; ambiguity precedes lexical absolute-root validation. Constructor/equality and
-natural materializer/session/epoch ownership remain intact. The normal probe borrows the
-same transaction's injected epoch after namespace refusal, then validates the complete
-original Need before progress. Each demand requires its own current unique instance,
-exact typed Globals/Version context and OWN fixed two-file plan signatures. Only finite
-component ancestors/root Lstat and exact fixed-file Lstat/FileBytes pass. Other paths,
-operations, owners and nonunique/unavailable epochs refuse in the original family/order.
-No new retained fields, indexes, maps, interners or request/plan/content/root/string
-copies in the query/policy. Existing shallow Arc/keypath transport remains qualified.
+[WP989](wp989-source-attempt-demand-origin-2026-10-07.json) adds bounded cfgtest/Linux
+first-created source-attempt attribution. Scope uses the original charge critical
+section once; only the creator of SourceAttempts Limit gets a synchronous callback
+after lock release and before IO. The original scalar error, ordinary reader, charge,
+cancellation, session checks and epoch/refinement behavior remain intact. Kernel
+borrows the original FileBytes demand. A focused formatter streams opaque Unix bytes
+as lower hex up to1,024B, otherwise length/none; the ASCII LF marker is at most4,096B.
+No new retained path/request/plan/String/state/map/interner or callback store exists.
+Non-test Linux uses the original reader; Windows keeps its Unsupported stub.
 
-Independent design/static/prelaunch/final reviews accept42 net production and569
-cfgtest lines across the same five source files. The focused matrices include distinct
-Globals/Version instances/roots in one Need, crossed roots, wrong own plans/contexts,
-exact paths/operations, first offenders and same-DICE A/B/A root/pointer retirement.
-Fresh46 Core +5 Bzlmod +4 strict controls +1 normal observer =56 named passes;
-59 successful current operations/468 union pins/465 native pins. Three current serial
-preparations execute0tests. Seven total attempts include five zero-test successes and
-separate unchanged60s dependency timeout/E0597 synthetic closure lifetime failures;
-older attempts have0current credit. Affected historical whole-owner/callback claims
-remain stale/uncredited; unchanged reader/capture evidence retains its original scope.
+Independent design/static/correction/prelaunch/final reviews accept381 net Rust lines
+across six files, including369 focused cfgtest facade/formatter/test lines and12 net
+kernel wiring lines. Tests cover exact first/sticky/other poison, actual cancellation/
+closed/deadline, overflow, concurrency, lock reentry, before-IO refusal, reader parity,
+retirement, original pointers and opaque/exact/exceeded encoding bounds. Original46
+Core plus13 focused/existing controls =59 ordinary passes, with4 strict decoder
+controls and1 normal observer:64 fresh named passes,65 successful current operations,
+484 union pins/482 native pins. Bzlmod's unchanged five WP988 owner passes remain
+qualified prior0fresh. Current compile3.688s/check7.345s execute0tests. The first
+attempt's eight-thread EAGAIN/barrier deadline and46 prior passes are preserved with
+0current credit; two synchronized callers preserve exactly-one-creator assertions
+under unchanged caps, followed by fresh compilation/selection/all59+4 gates. The
+precise exhausted OS resource was not proved.
 
-The changed normal probe passes in2.216s and peaks93,020KiB under256MiB. The previous
-namespace admission refusal clears. Actual normal repository computation now reports
-Some(Limit(SourceAttempts)) at64, with denied family none and no namespace/owner/policy,
-materialization or plan refusal marker. Source64/646,987 decoded, registry105/235,521,
-Transfer0 and Written2064 remain unchanged. This is a concrete quota refusal, but its
-original failed read/demand/path/owner is unobserved. Absence of an admission refusal
-and counted writes do not independently prove completed namespace observations,
-outputs/modes/digests/fullSpec/epoch/certificate/provider/Rustc. Public preparation is
-complete/singleton/policy checked; terminal certificate/observations/analyses/actions
-and Rustc remain unavailable. Descriptor/logical/scratch/live buffer credits clear and
-scope/recorder Weak expire; native body/plan/materializer/registryArc/fullDICE/page
-retention/freshness and whole-workload fit remain unproved. Child RSS does not establish
-supervisor or parent+child aggregate RSS.
+The sole changed normal probe passes in2.242s and peaks94,204KiB (conservative phase/
+sample/rusage maximum) under256MiB. It captures the ORIGINAL Materialization(instance1)
+FileBytes demand,27 opaque path bytes ending in globals.bzl, whose regular-file charge
+first creates Some(Limit(SourceAttempts)) at64. This is charge-origin association,
+not a successful read, current request owner, phase, output, permission or budget
+increase proof. Source64/646,987 decoded, registry105/235,521, Transfer0 and Written2064
+remain unchanged. Materialization/plan/namespace owner/policy refusal markers are
+absent. Public preparation remains complete/singleton/policy checked; terminal
+certificate/observations/analyses/actions/Rustc remain unavailable. Descriptor/logical/
+scratch/live buffer credits clear and Scope/recorder Weak expire; native body/plan/
+materializer/registryArc/DICE/pages/freshness/full-workload fit remain unproved.
+Parent/supervisor and aggregate RSS are not established by the Rust child.
 
 ## Active continuation contract
 
-Use the [grounded successor](../../../../target/wp988/native/successor-source.md)
-(SHA25645d5101e57e58686a1c72eb336229fee8dc53e769c56bd9e4794e86d9e98b96f)
-and WP988 receipt to freeze bounded first-created source-attempt refusal attribution.
-Scope charge refuses before IO and stores a sticky scalar. The original read path/demand
-is still borrowed at the charge/kernel seam, but scalar conversion and the native bridge's
-postcheck can discard its association. Counters, later Needs and sticky propagation cannot
-identify the first refused read; archive charge sites also exist. Source64 is the service
-maximum while the ordinary probe default16 is separate. No cap increase is activated.
+Use [the actual grounded callflow](../../../../target/wp989/native/successor-callflow.md)
+(SHA2566739aba7d2994328a7184cad58822caa367439d49977dd067b837e3b8c9246f9)
+and WP989 receipt. Normal command progress already filters FULL demands in its current
+PathObservationEpoch. Preflight combines/deduplicates a batch and reobserves it before
+reuse; equal result Arcs are preserved after actual observation. Certificate precheck/
+finalization independently revalidate selected keys. Matching physical path bytes do
+not make different namespace/instance/operation/session/phase reads redundant.
 
-Prefer an atomic first-created discriminator under the existing charge critical section,
-then synchronous bounded projection of the original borrowed demand/path outside scope
-and session locks, before the bridge postcheck. Preserve original error/cancellation,
-charge-before-IO/session/epoch/preflight/final-validation behavior and all other charge
-sites as explicitly unassociated when not observed. Avoid retained path/String/PathBuf,
-plan/request mirrors, global callback stores or new interner/cache. Freeze the minimal
-source/API/diagnostic scope and obtain design/final review before implementation. Reuse
-small source-scope/file/kernel/bridge fixtures for original versus sticky failures,
-unsupported sites, exact limits before IO, bounds, first-error order and release; use
-fresh affected owner/direct-dependent gates before one changed capped probe. If the
-association reveals repeated reads, inspect natural revalidation/epochs before changing
-reuse. A higher allowance requires a separate reviewed service-ceiling/policy decision.
+Associate the original first-refused demand with its CURRENT command-owned repository
+result epoch/request and exact observe phase at a synchronous borrowed boundary.
+Reuse WP988's bounded unique successful-instance view and original generation root;
+retain unavailable/zero/overbound/missing/ambiguous/invalid/mismatch states. The retained
+kernel root snapshot authorizes an instance but lacks request identity; natural accepted/
+active entries and injected repository-result epochs already own the original request.
+Do not infer owner from globals.bzl basename, an earlier guard report, source counters,
+counted writes or a later Need. Freeze the minimal seam and obtain independent design/
+final review before implementation. Preserve scope/session lock release, sticky error/
+postcheck behavior, whole-set preflight and certificate revalidation. Borrow/transfer/
+share existing storage; no Scope request/path mirror, global callback/index/read cache
+or request/plan/string copy. No cap change or reuse bypass is selected by this checkpoint.
+The association must distinguish acquisition from required revalidation before a
+separately reviewed service-ceiling/policy or natural reuse decision.
 
-Original237 ordered parent leases remain918,928 physical/1,837,856 hash bytes,
-original188+combined49/two64KiB128KiB, non-inherited/non-atomic/noncertifying.
+Reuse focused scope/reader/kernel/bridge and same-epoch owner controls; fresh affected
+owner/direct-dependent gates precede one CHANGED capped observer. No identical WP989
+probe retry. Original237 ordered parent leases remain918,928 physical/1,837,856 hash
+bytes, original188+combined49/two64KiB128KiB, non-inherited/non-atomic/noncertifying.
 Budgets stay source64/default16, registry128/default16, object1MiB/all16MiB byte banks,
 serial preparation60s, normal10s/TERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
-FSIZE16MiB. Borrow/transfer/share storage; use existing scoped interners for repeated
-retained immutable strings where lifetime and cleanup fit. Windows remains minimal.
-Local0.2.17/requested0.2.4 and caller-alias/defining-self domains remain distinct.
-Full public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/
-same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit remain required.
+FSIZE16MiB. Use existing scoped interners for repeated retained immutable strings when
+lifetime/cleanup fit; avoid pools for transient unique paths. Windows stays minimal.
+Local0.2.17/requested0.2.4 and caller-alias/defining-self remain distinct. Full public
+Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/
+fullCLI/M7A/MVS/provenance/wholefit remain required; the full goal stays active.
 
 ## Immediate predecessor
 
-[WP987](wp987-materialization-namespace-owner-2026-10-07.json), accepted at
-240fadb719181ee81b3fab993c0bc5a3e0fca631, first associated Materialization(instance1)
-Lstat at '/' with the same current epoch's original generated Globals request. It
-peaked93,804KiB under256MiB with54 fresh checks and no namespace grant. Earlier exact
-source/owner/plan/capture/lifecycle decisions remain Git-reachable through that receipt
-and its predecessor manifest at the accepted commit.
+[WP988](wp988-generated-features-namespace-observations-2026-10-07.json), accepted at
+cbce4ba31bce80979971c3019a2ed596f12b797f, borrows each current epoch's unique successful
+request/root and requires its own exact typed Globals/Version context and own two-file
+plan signatures. Only finite component ancestor/root Lstat and exact fixed-file Lstat/
+FileBytes pass; the complete original Need is checked before progress. The normal
+probe cleared the prior namespace refusal and reached SourceAttempts64 at93,020KiB.
+WP988's original constructor/equality/lifecycle and same-DICE A/B/A owner/root/pointer
+proofs remain scoped to its receipt. Earlier source/owner/plan decisions remain Git-
+reachable there and through its predecessor manifest.

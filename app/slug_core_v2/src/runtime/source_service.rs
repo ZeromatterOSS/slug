@@ -52,6 +52,8 @@ pub(in crate::runtime) use regular_file::HOST_FILE_OBJECT_BYTES;
 pub(in crate::runtime) use regular_file::RegularFileError;
 pub(in crate::runtime) use regular_file::RegularFileStage;
 pub(in crate::runtime) use regular_file::read_host_file;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use regular_file::read_host_file_with_charge_origin;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceServiceCounters;

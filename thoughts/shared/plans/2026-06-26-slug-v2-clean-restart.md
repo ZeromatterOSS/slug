@@ -35,20 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Source-attempt quota attribution readiness
+Status: Generated-source observation phase readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-The current manifest records finite sibling-plan permission and2,064 accounted write
-bytes through the normal materializer. WP988 now borrows each current epoch's genuine
-request/root to admit only its own fixed generated files and required Lstat ancestors,
-validating the entire original Need before progress. The bounded probe peaks93,020KiB;
-56 fresh checks pass. The prior namespace refusal clears and actual normal repository
-computation reaches Some(Limit(SourceAttempts)) at64. Next ground the original rejected
-read/demand before a budget decision; no cap increase is activated. Completed outputs,
-public Rustc and full workload fit remain open; allocation discipline holds.
+WP989 now captures the original Materialization1 FileBytes demand whose regular-file
+charge first refuses at SourceAttempts64, using only borrowed bounded cfgtest/Linux
+projection outside locks. The sole changed probe passes in2.242s/94,204KiB under256MiB;
+64 fresh named checks and65 current operations pass. A focused eight-thread fixture's
+EAGAIN/barrier stop is preserved; two synchronized callers retain the concurrency
+assertion and pass after fresh gates without raising caps. The failed demand's current
+request owner and observe phase remain unproved. Normal exact-demand filtering already
+exists, while preflight/certificate revalidation performs legitimate reads before reuse.
+Next associate the original failed demand with the current epoch/phase using existing
+borrowed ownership before a separately reviewed quota or reuse decision. No cap increase
+or global read cache is activated. Completed outputs, public Rustc and full workload fit
+remain open; allocation discipline holds. See the current manifest for compact evidence.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

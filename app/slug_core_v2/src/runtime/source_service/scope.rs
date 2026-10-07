@@ -392,6 +392,17 @@ impl SourceServiceScope {
         let mut state = self.state();
         self.charge_locked(&mut state, counter, amount)
     }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn charge_source_attempt_with_origin(
+        &self,
+    ) -> (Result<(), SourceServiceError>, bool) {
+        let mut state = self.state();
+        let unpoisoned = state.first.is_none();
+        let result = self.charge_locked(&mut state, SourceCounter::SourceAttempts, 1);
+        let created =
+            unpoisoned && result == Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+        (result, created)
+    }
     fn charge_locked(
         &self,
         state: &mut ScopeState,
@@ -716,3 +727,7 @@ impl Drop for SourceBufferReservation {
         state.counters.live_buffer_bytes -= self.bytes;
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_attempt_origin_tests.rs"]
+mod source_attempt_origin_tests;

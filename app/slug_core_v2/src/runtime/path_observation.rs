@@ -13,6 +13,8 @@
 mod file_digest;
 #[cfg(all(test, target_os = "linux"))]
 mod scoped_file_tests;
+#[cfg(all(test, target_os = "linux"))]
+mod source_attempt_diagnostic;
 
 use std::marker::PhantomData;
 use std::path::PathBuf;
@@ -241,7 +243,7 @@ fn observe_with_scoped(
         check_scope(scope)?;
         let result = if demand.operation() == PathObservationOperation::FileBytes {
             match scope {
-                Some(scope) => scoped_file_bytes(demand.path(), operations, scope)?,
+                Some(scope) => scoped_file_bytes(&demand, operations, scope)?,
                 None => observe_one(&demand, operations),
             }
         } else {
@@ -262,14 +264,24 @@ fn check_scope(scope: Option<&Arc<SourceServiceScope>>) -> Result<(), PathObserv
 
 #[cfg(target_os = "linux")]
 fn scoped_file_bytes(
-    path: &NormalizedAbsolutePath,
+    demand: &PathObservationDemand,
     operations: &mut impl ObservationOperations,
     scope: &Arc<SourceServiceScope>,
 ) -> Result<PathObservationResult, PathObservationKernelError> {
     use super::dice::source_service::RegularFileError;
+    #[cfg(not(test))]
     use super::dice::source_service::read_host_file;
 
-    let result = match read_host_file(scope, path.as_path()) {
+    let path = demand.path();
+    #[cfg(test)]
+    let read = super::dice::source_service::read_host_file_with_charge_origin(
+        scope,
+        path.as_path(),
+        || source_attempt_diagnostic::report(demand),
+    );
+    #[cfg(not(test))]
+    let read = read_host_file(scope, path.as_path());
+    let result = match read {
         Ok(bytes) => PathOperationResult::Present(bytes),
         Err(RegularFileError::Scope(error)) => {
             return Err(PathObservationKernelError::SourceService(error));
@@ -301,7 +313,7 @@ fn scoped_file_bytes(
 
 #[cfg(not(target_os = "linux"))]
 fn scoped_file_bytes(
-    _path: &NormalizedAbsolutePath,
+    _demand: &PathObservationDemand,
     _operations: &mut impl ObservationOperations,
     scope: &Arc<SourceServiceScope>,
 ) -> Result<PathObservationResult, PathObservationKernelError> {

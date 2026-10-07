@@ -163,6 +163,22 @@ pub(in crate::runtime) fn read_host_file(
     read_regular(scope, path, ReadPolicy::Host)
 }
 
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) fn read_host_file_with_charge_origin(
+    scope: &Arc<SourceServiceScope>,
+    path: &Path,
+    on_first_refusal: impl FnOnce(),
+) -> Result<Arc<[u8]>, RegularFileError> {
+    let (admission, created) = scope.charge_source_attempt_with_origin();
+    if let Err(error) = admission {
+        if created {
+            on_first_refusal();
+        }
+        return Err(RegularFileError::Scope(error));
+    }
+    read_regular(scope, path, ReadPolicy::Host)
+}
+
 #[cfg(target_os = "linux")]
 pub(super) fn read_regular(
     scope: &Arc<SourceServiceScope>,
