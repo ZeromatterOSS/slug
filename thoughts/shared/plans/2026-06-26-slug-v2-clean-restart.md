@@ -125,6 +125,12 @@ native0.240s/66,184KiB pass;8parentbindings8477B/originalroot/Weak/credits check
 Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual apple_support1.24.1 prerequisite.
 Continue its actual normal owner under borrowing/scoped interning and unchanged caps;
 public Rustc/provenance/whole-workload fit remains open.
+[WP950](./slug-v2-subplans/wp950-native-apple-local-readiness-2026-10-06.json) accepts apple1104B/Localdecl1.24.2 versus requested1.24.1
+and preservedrepo_name; normal explicit Local/sharedNine guards.11ordinary2.183s/55,652KiB and
+native0.243s/67,560KiB pass;9parentbindings9581B/originalroot/Weak/credits checked.
+Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual package_metadata0.0.3 prerequisite.
+Continue its actual normal owner under borrowing/scoped interning and unchanged caps;
+public Rustc/provenance/whole-workload fit remains open.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared
