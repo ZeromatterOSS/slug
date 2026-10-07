@@ -261,6 +261,7 @@ fn projection_matches(
         && bodies.ignore_file_bytes
         && bodies.rust_package_metadata
         && bodies.nightly_package_metadata
+        && bodies.nightly_build_source
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -336,10 +337,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_nightly_package_metadata(
-                RegistryChoice::PreparedFile,
-                CommandChoice::PublicProbe,
-            ),
+            .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -381,7 +380,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -393,7 +393,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
@@ -405,11 +406,25 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(!projection_matches(
         &inner,
         &request,
         &no_nightly_metadata,
+        &registry,
+        &nightly_overlay()
+    ));
+    let no_build_source = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &no_build_source,
         &registry,
         &nightly_overlay()
     ));
@@ -535,7 +550,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
 fn repo_marker_metadata_need_is_opt_in_root_lstat_only() {
     assert_exact_root_file_role(
         "REPO.bazel",
-        PathObservationOperation::Lstat,
+        &[PathObservationOperation::Lstat],
         Bodies::with_repo_marker_metadata,
         |b| b.repo_marker_metadata,
         &[
@@ -554,7 +569,7 @@ fn repo_marker_metadata_need_is_opt_in_root_lstat_only() {
 fn ignore_file_bytes_need_is_opt_in_exact_root_only() {
     assert_exact_root_file_role(
         ".bazelignore",
-        PathObservationOperation::FileBytes,
+        &[PathObservationOperation::FileBytes],
         Bodies::with_ignore_file_bytes,
         |b| b.ignore_file_bytes,
         &[
@@ -573,7 +588,7 @@ fn ignore_file_bytes_need_is_opt_in_exact_root_only() {
 fn rust_package_metadata_need_is_opt_in_exact_rules_root_only() {
     assert_exact_root_file_role(
         "rust",
-        PathObservationOperation::Lstat,
+        &[PathObservationOperation::Lstat],
         Bodies::with_rust_package_metadata,
         |b| b.rust_package_metadata,
         &[
@@ -621,7 +636,7 @@ fn nightly_package_metadata_need_is_opt_in_exact_chain_only() {
     ] {
         assert_exact_root_file_role(
             relative,
-            PathObservationOperation::Lstat,
+            &[PathObservationOperation::Lstat],
             Bodies::with_nightly_package_metadata,
             |b| b.nightly_package_metadata,
             spellings,
@@ -667,9 +682,104 @@ fn nightly_package_metadata_need_is_opt_in_exact_chain_only() {
         assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
     }
 }
+#[test]
+fn nightly_build_source_need_is_opt_in_exact_package_only() {
+    for (relative, selected, spellings) in [
+        (
+            "rust/toolchain/channel/BUILD.bazel",
+            "/rules/rust/toolchain/channel/BUILD.bazel",
+            &[
+                "/other/rust/toolchain/channel/BUILD.bazel",
+                "/rules/rust/toolchain/other/BUILD.bazel",
+                "/rules/rust/toolchain/channel/BUILD.bazel/child",
+                "/rules/rust/toolchain/channel/BUILD.bazel.extra",
+                "/rules/rust/toolchain/channel/build.bazel",
+                "/rules/rust/TOOLCHAIN/channel/BUILD.bazel",
+                "/rules-other/rust/toolchain/channel/BUILD.bazel",
+            ][..],
+        ),
+        (
+            "rust/toolchain/channel/BUILD",
+            "/rules/rust/toolchain/channel/BUILD",
+            &[
+                "/other/rust/toolchain/channel/BUILD",
+                "/rules/rust/toolchain/other/BUILD",
+                "/rules/rust/toolchain/channel/BUILD/child",
+                "/rules/rust/toolchain/channel/BUILD.extra",
+                "/rules/rust/toolchain/channel/build",
+                "/rules/rust/TOOLCHAIN/channel/BUILD",
+                "/rules-other/rust/toolchain/channel/BUILD",
+            ][..],
+        ),
+    ] {
+        assert_exact_root_file_role(
+            relative,
+            &[
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ],
+            Bodies::with_nightly_build_source,
+            |b| b.nightly_build_source,
+            spellings,
+            selected,
+            Some("/rules"),
+        );
+    }
+    let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let need =
+        |p: &str, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let mut all = need(
+        "/rules/rust/toolchain/channel/BUILD.bazel",
+        PathObservationOperation::Lstat,
+    );
+    for (marker, operation) in [
+        (
+            "/rules/rust/toolchain/channel/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/toolchain/channel/BUILD",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/toolchain/channel/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+    ] {
+        all = all.try_union(&need(marker, operation)).unwrap();
+    }
+    assert!(bodies.admit(&all).is_ok());
+    for (excluded, operation) in [
+        (
+            "/rules/rust/toolchain/channel/BUILD.bazel/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/toolchain/channel/BUILD",
+            PathObservationOperation::FileDigest,
+        ),
+    ] {
+        let mixed = all.try_union(&need(excluded, operation.dupe())).unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(denied.family, "path");
+        assert_eq!(denied.operation, path_operation_code(&operation));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+}
 fn assert_exact_root_file_role(
     name: &str,
-    admitted_operation: PathObservationOperation,
+    admitted_operations: &[PathObservationOperation],
     select: fn(Bodies, RegistryChoice, CommandChoice) -> Bodies,
     is_enabled: fn(&Bodies) -> bool,
     spellings: &[&str],
@@ -730,17 +840,20 @@ fn assert_exact_root_file_role(
         assert_eq!(bodies.roots().count(), 11);
         for root in bodies.roots() {
             let marker = NormalizedAbsolutePath::new(root.as_path().join(name)).unwrap();
-            let demand = need(host, marker.dupe(), admitted_operation.dupe());
-            if enabled && selected_root.is_none_or(|selected| root.as_path() == Path::new(selected))
-            {
-                assert!(bodies.admit(&demand).is_ok());
-            } else {
-                let denied = bodies.admit(&demand).unwrap_err();
-                assert_eq!(
-                    (denied.family, denied.operation),
-                    ("path", path_operation_code(&admitted_operation))
-                );
-                assert_eq!(denied.path.as_ref(), Some(&marker));
+            for admitted_operation in admitted_operations {
+                let demand = need(host, marker.dupe(), admitted_operation.dupe());
+                if enabled
+                    && selected_root.is_none_or(|selected| root.as_path() == Path::new(selected))
+                {
+                    assert!(bodies.admit(&demand).is_ok());
+                } else {
+                    let denied = bodies.admit(&demand).unwrap_err();
+                    assert_eq!(
+                        (denied.family, denied.operation),
+                        ("path", path_operation_code(&admitted_operation))
+                    );
+                    assert_eq!(denied.path.as_ref(), Some(&marker));
+                }
             }
         }
     }
@@ -770,7 +883,7 @@ fn assert_exact_root_file_role(
             PathObservationOperation::WindowsLongPath,
             PathObservationOperation::WindowsOptionPathLongName,
         ] {
-            if (operation == admitted_operation
+            if (admitted_operations.contains(&operation)
                 && selected_root.is_none_or(|selected| root.as_path() == Path::new(selected)))
                 || (name == ".bazelignore" && operation == PathObservationOperation::Lstat)
             {
@@ -788,61 +901,65 @@ fn assert_exact_root_file_role(
             assert_eq!(denied.operation, code);
             assert_eq!(denied.path.as_ref(), Some(&marker));
         }
-        let denied = admitted
-            .admit(&need(foreign, marker.dupe(), admitted_operation.dupe()))
-            .unwrap_err();
-        assert_eq!(
-            (denied.family, denied.operation),
-            ("namespace", path_operation_code(&admitted_operation))
-        );
-        assert_eq!(denied.path.as_ref(), Some(&marker));
+        for admitted_operation in admitted_operations {
+            let denied = admitted
+                .admit(&need(foreign, marker.dupe(), admitted_operation.dupe()))
+                .unwrap_err();
+            assert_eq!(
+                (denied.family, denied.operation),
+                ("namespace", path_operation_code(&admitted_operation))
+            );
+            assert_eq!(denied.path.as_ref(), Some(&marker));
+        }
     }
     assert_eq!(budget.used_bytes(), 0);
-    for &spelling in spellings {
-        let denied = admitted
-            .admit(&need(host, path(spelling), admitted_operation.dupe()))
-            .unwrap_err();
-        assert_eq!(
-            (denied.family, denied.operation),
-            ("path", path_operation_code(&admitted_operation))
-        );
-        assert_eq!(denied.path.unwrap().as_path(), Path::new(spelling));
-    }
-    let allowed = need(host, path(selected_path), admitted_operation.dupe());
-    let mut progress_calls = 0;
-    for (excluded, family, operation) in [
-        (
-            need(
-                host,
-                path(selected_path),
-                PathObservationOperation::FileDigest,
-            ),
-            "path",
-            "file_digest",
-        ),
-        (
-            need(foreign, path(selected_path), admitted_operation.dupe()),
-            "namespace",
-            path_operation_code(&admitted_operation),
-        ),
-        (
-            SourcePreparationNeeds::root_module_bootstrap(
-                slug_bzlmod_v2::RootModuleBootstrapRequest {
-                    workspace: path("/foreign"),
-                },
-            ),
-            "bootstrap",
-            "none",
-        ),
-    ] {
-        let mixed = allowed.try_union(&excluded).unwrap();
-        if admitted.admit(&mixed).is_ok() {
-            progress_calls += 1;
+    for admitted_operation in admitted_operations {
+        for &spelling in spellings {
+            let denied = admitted
+                .admit(&need(host, path(spelling), admitted_operation.dupe()))
+                .unwrap_err();
+            assert_eq!(
+                (denied.family, denied.operation),
+                ("path", path_operation_code(&admitted_operation))
+            );
+            assert_eq!(denied.path.unwrap().as_path(), Path::new(spelling));
         }
-        let denied = admitted.admit(&mixed).unwrap_err();
-        assert_eq!((denied.family, denied.operation), (family, operation));
+        let allowed = need(host, path(selected_path), admitted_operation.dupe());
+        let mut progress_calls = 0;
+        for (excluded, family, operation) in [
+            (
+                need(
+                    host,
+                    path(selected_path),
+                    PathObservationOperation::FileDigest,
+                ),
+                "path",
+                "file_digest",
+            ),
+            (
+                need(foreign, path(selected_path), admitted_operation.dupe()),
+                "namespace",
+                path_operation_code(&admitted_operation),
+            ),
+            (
+                SourcePreparationNeeds::root_module_bootstrap(
+                    slug_bzlmod_v2::RootModuleBootstrapRequest {
+                        workspace: path("/foreign"),
+                    },
+                ),
+                "bootstrap",
+                "none",
+            ),
+        ] {
+            let mixed = allowed.try_union(&excluded).unwrap();
+            if admitted.admit(&mixed).is_ok() {
+                progress_calls += 1;
+            }
+            let denied = admitted.admit(&mixed).unwrap_err();
+            assert_eq!((denied.family, denied.operation), (family, operation));
+        }
+        assert_eq!(progress_calls, 0);
     }
-    assert_eq!(progress_calls, 0);
 }
 
 #[test]
