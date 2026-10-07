@@ -538,33 +538,64 @@ static GENERATED_FEATURES_VERSION_FILES: [GeneratedFileSignature; 2] = [
         ],
     ),
 ];
+static GENERATED_CC_PROXY_FILES: [GeneratedFileSignature; 3] = [
+    (
+        "BUILD",
+        634,
+        true,
+        [
+            0x58, 0x51, 0x58, 0xf0, 0x98, 0xdd, 0xc1, 0xbb, 0x1e, 0xc0, 0x21, 0x7d, 0xe7, 0xca,
+            0x2c, 0xbe, 0x08, 0x98, 0x2e, 0xb8, 0x06, 0x03, 0xd2, 0x98, 0x98, 0x7a, 0xf2, 0xb0,
+            0xa7, 0x39, 0x3c, 0x5e,
+        ],
+    ),
+    (
+        "proxy.bzl",
+        1776,
+        true,
+        [
+            0x81, 0xfb, 0x7b, 0xb1, 0x2b, 0x7a, 0xb4, 0xa5, 0x3a, 0x3d, 0x11, 0xfb, 0x8e, 0xc9,
+            0xb2, 0x56, 0xfe, 0x7d, 0xc7, 0x65, 0x2a, 0x59, 0xb1, 0xbe, 0x41, 0x3e, 0xec, 0xf3,
+            0x44, 0x04, 0xb8, 0xea,
+        ],
+    ),
+    (
+        "symbols.bzl",
+        754,
+        true,
+        [
+            0x2a, 0xde, 0xde, 0xea, 0xaa, 0xd8, 0xc0, 0xe6, 0x64, 0xdc, 0x35, 0xe9, 0xbf, 0x14,
+            0x80, 0xb1, 0xd6, 0xdc, 0x3d, 0x78, 0x40, 0x03, 0x4f, 0x9e, 0xfe, 0x3e, 0xe7, 0x84,
+            0x76, 0xfc, 0x59, 0x02,
+        ],
+    ),
+];
 fn generated_features_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-    expected: &[GeneratedFileSignature; 2],
+    expected: &[GeneratedFileSignature],
 ) -> bool {
     use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
-    let mut ordered = plan.ordered_effects();
-    let (Some(Effect::File(first)), Some(Effect::File(second))) = (ordered.next(), ordered.next())
-    else {
-        return false;
-    };
-    if ordered.next().is_some() {
+    if !matches!(expected.len(), 2 | 3) {
         return false;
     }
-    let files = [first, second];
-    // Check every shape/length before inspecting any content digest.
-    if files
-        .iter()
-        .zip(expected)
-        .any(|(file, &(path, bytes, executable, _))| {
-            file.path() != path || file.content().len() != bytes || file.executable() != executable
-        })
-    {
+    let mut ordered = plan.ordered_effects();
+    let mut files = [None; 3];
+    // Check the complete bounded shape before inspecting any content digest.
+    for (index, &(path, bytes, executable, _)) in expected.iter().enumerate() {
+        let Some(Effect::File(file)) = ordered.next() else {
+            return false;
+        };
+        if file.path() != path || file.content().len() != bytes || file.executable() != executable {
+            return false;
+        }
+        files[index] = Some(file);
+    }
+    if ordered.next().is_some() {
         return false;
     }
     files.iter().zip(expected).all(|(file, expected)| {
         let mut digest = sha2::Sha256::new();
-        digest.update(file.content());
+        digest.update(file.unwrap().content());
         digest.finalize().as_slice() == expected.3
     })
 }
@@ -581,42 +612,62 @@ impl Bodies {
     fn generated_features_owner_signatures(
         &self,
         request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
-    ) -> Option<&'static [GeneratedFileSignature; 2]> {
+    ) -> Option<&'static [GeneratedFileSignature]> {
         let label = &request.repo_spec.rule_id.bzl_file;
         if !self.generated_features_file_effects
-            || !self.bazel_features_import_sources
-            || self.additional[0].is_none()
             || request.id.workspace != self.roots[0]
-            || label.package().repo().as_str() != "bazel_features+"
-            || label.package().package().as_str() != "private"
             || label.mapping_id().is_some()
         {
             return None;
         }
-        match (
+        let identity = (
             request.id.canonical_repo.as_str(),
+            label.package().repo().as_str(),
+            label.package().package().as_str(),
             label.target().as_str(),
             request.repo_spec.rule_id.rule_name.as_str(),
-        ) {
+        );
+        match identity {
             (
                 "bazel_features++version_extension+bazel_features_globals",
+                "bazel_features+",
+                "private",
                 "globals_repo.bzl",
                 "globals_repo",
-            ) => Some(&GENERATED_FEATURES_FILES),
+            ) if self.bazel_features_import_sources && self.additional[0].is_some() => {
+                Some(&GENERATED_FEATURES_FILES)
+            }
             (
                 "bazel_features++version_extension+bazel_features_version",
+                "bazel_features+",
+                "private",
                 "version_repo.bzl",
                 "version_repo",
-            ) => Some(&GENERATED_FEATURES_VERSION_FILES),
+            ) if self.bazel_features_import_sources && self.additional[0].is_some() => {
+                Some(&GENERATED_FEATURES_VERSION_FILES)
+            }
+            (
+                "rules_cc++compatibility_proxy+cc_compatibility_proxy",
+                "rules_cc+",
+                "cc",
+                "extensions.bzl",
+                "_compatibility_proxy_repo_rule",
+            ) if self.rules_cc_import_sources
+                && self.additional[2].is_some()
+                && request.repo_spec.attributes.is_empty() =>
+            {
+                Some(&GENERATED_CC_PROXY_FILES)
+            }
             _ => None,
         }
     }
+
     fn first_denied_materialization_with_plan_matcher<'a>(
         &self,
         needs: &'a SourcePreparationNeeds,
         plan_matches: &impl Fn(
             &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-            &[GeneratedFileSignature; 2],
+            &[GeneratedFileSignature],
         ) -> bool,
     ) -> Option<(
         &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
@@ -1090,7 +1141,7 @@ impl Bodies {
         needs: &SourcePreparationNeeds,
         plan_matches: &impl Fn(
             &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-            &[GeneratedFileSignature; 2],
+            &[GeneratedFileSignature],
         ) -> bool,
     ) -> Result<(), Denied> {
         self.admit_with_matchers(needs, plan_matches, &|_| false)
@@ -1100,7 +1151,7 @@ impl Bodies {
         needs: &SourcePreparationNeeds,
         plan_matches: &impl Fn(
             &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-            &[GeneratedFileSignature; 2],
+            &[GeneratedFileSignature],
         ) -> bool,
         namespace_matches: &impl Fn(&PathObservationDemand) -> bool,
     ) -> Result<(), Denied> {

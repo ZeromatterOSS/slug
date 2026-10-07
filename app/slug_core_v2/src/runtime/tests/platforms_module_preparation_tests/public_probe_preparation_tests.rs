@@ -242,7 +242,7 @@ fn namespace_policy(
     epoch: Option<&slug_bzlmod_v2::RepositoryMaterializationResultEpoch>,
     plan_matches: &impl Fn(
         &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-        &[GeneratedFileSignature; 2],
+        &[GeneratedFileSignature],
     ) -> bool,
 ) -> NamespacePolicy {
     let unavailable = NamespacePolicy {
@@ -1066,9 +1066,108 @@ async fn namespace_owner_read_uses_current_transaction() {
         a.as_ref()
     ));
 }
+// Literal output bytes from the exact reviewed cc/extensions.bzl reference; no evaluation is substituted.
+const PROXY_LITERAL_0: &[u8] = br###"
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+bzl_library(
+  name = "proxy_bzl",
+  srcs = ["proxy.bzl"],
+  deps = [
+    "@rules_cc//cc/private/rules_impl:core_rules",
+    "@rules_cc//cc/private/rules_impl:toolchain_rules",
+    "@rules_cc//cc/private:cc_common",
+  ],
+  visibility = ["@rules_cc//cc:__subpackages__"],
+)
+bzl_library(
+  name = "symbols_bzl",
+  srcs = ["symbols.bzl"],
+  deps = [
+    "@rules_cc//cc/private:cc_common",
+    "@rules_cc//cc/private:cc_shared_library_info_bzl",
+    "@rules_cc//cc/private/toolchain_config:toolchain_config_bzl",
+  ],
+  visibility = ["@rules_cc//cc:__subpackages__"],
+)
+            "###;
+const PROXY_LITERAL_1: &[u8] = br###"
+load("@rules_cc//cc/private/rules_impl:cc_binary.bzl", _cc_binary = "cc_binary")
+load("@rules_cc//cc/private/rules_impl:cc_import.bzl", _cc_import = "cc_import")
+load("@rules_cc//cc/private/rules_impl:cc_library.bzl", _cc_library = "cc_library")
+load("@rules_cc//cc/private/rules_impl:cc_shared_library.bzl", _cc_shared_library = "cc_shared_library")
+load("@rules_cc//cc/private/rules_impl:cc_static_library.bzl", _cc_static_library = "cc_static_library")
+load("@rules_cc//cc/private/rules_impl:cc_test.bzl", _cc_test = "cc_test")
+load("@rules_cc//cc/private/rules_impl:objc_import.bzl", _objc_import = "objc_import")
+load("@rules_cc//cc/private/rules_impl:objc_library.bzl", _objc_library = "objc_library")
+load("@rules_cc//cc/private/rules_impl/fdo:fdo_prefetch_hints.bzl", _fdo_prefetch_hints = "fdo_prefetch_hints")
+load("@rules_cc//cc/private/rules_impl/fdo:fdo_profile.bzl", _fdo_profile = "fdo_profile")
+load("@rules_cc//cc/private/rules_impl/fdo:memprof_profile.bzl", _memprof_profile = "memprof_profile")
+load("@rules_cc//cc/private/rules_impl/fdo:propeller_optimize.bzl", _propeller_optimize = "propeller_optimize")
+load("@rules_cc//cc/private/rules_impl:cc_toolchain.bzl", _cc_toolchain = "cc_toolchain")
+load("@rules_cc//cc/private/rules_impl:cc_toolchain_alias.bzl", _cc_toolchain_alias = "cc_toolchain_alias")
+
+cc_binary = _cc_binary
+cc_import = _cc_import
+cc_library = _cc_library
+cc_shared_library = _cc_shared_library
+cc_static_library = _cc_static_library
+cc_test = _cc_test
+objc_import = _objc_import
+objc_library = _objc_library
+fdo_prefetch_hints = _fdo_prefetch_hints
+fdo_profile = _fdo_profile
+memprof_profile = _memprof_profile
+propeller_optimize = _propeller_optimize
+cc_toolchain = _cc_toolchain
+cc_toolchain_alias = _cc_toolchain_alias
+            "###;
+const PROXY_LITERAL_2: &[u8] = br###"
+load("@rules_cc//cc/private:cc_common.bzl", _cc_common = "cc_common")
+load("@rules_cc//cc/private:cc_info.bzl", _CcInfo = "CcInfo")
+load("@rules_cc//cc/private:cc_shared_library_info.bzl", _CcSharedLibraryInfo = "CcSharedLibraryInfo")
+load("@rules_cc//cc/private:debug_package_info.bzl", _DebugPackageInfo = "DebugPackageInfo")
+load("@rules_cc//cc/private:objc_info.bzl", _ObjcInfo = "ObjcInfo")
+load("@rules_cc//cc/private/toolchain_config:cc_toolchain_config_info.bzl", _CcToolchainConfigInfo = "CcToolchainConfigInfo")
+
+cc_common = _cc_common
+CcInfo = _CcInfo
+DebugPackageInfo = _DebugPackageInfo
+CcToolchainConfigInfo = _CcToolchainConfigInfo
+ObjcInfo = _ObjcInfo
+new_objc_provider = _ObjcInfo
+CcSharedLibraryInfo = _CcSharedLibraryInfo
+            "###;
+fn proxy_literal_rows() -> [(&'static str, &'static [u8], bool); 3] {
+    [
+        ("BUILD", PROXY_LITERAL_0, true),
+        ("proxy.bzl", PROXY_LITERAL_1, true),
+        ("symbols.bzl", PROXY_LITERAL_2, true),
+    ]
+}
+fn proxy_generated_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = generated_globals_request(bodies, plan);
+    request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+        "rules_cc++compatibility_proxy+cc_compatibility_proxy",
+    )
+    .unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_cc+//cc:extensions.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "_compatibility_proxy_repo_rule".into();
+    request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+    request
+}
+fn proxy_test_bodies() -> Bodies {
+    namespace_test_bodies()
+        .with_fifth(NormalizedAbsolutePath::new("/skylib").unwrap())
+        .with_sixth(NormalizedAbsolutePath::new("/cc").unwrap())
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+}
 fn small_namespace_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-    selected: &[GeneratedFileSignature; 2],
+    selected: &[GeneratedFileSignature],
 ) -> bool {
     let second = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
         "globals.bzl"
@@ -1259,6 +1358,102 @@ fn generated_features_namespace_is_finite_and_exact() {
         }
         assert_eq!(Arc::strong_count(&request), count);
     }
+
+    let bodies = proxy_test_bodies();
+    let request = Arc::new(proxy_generated_request(
+        &bodies,
+        small_generated_plan(&proxy_literal_rows()),
+    ));
+    let weak = Arc::downgrade(&request);
+    let epoch = namespace_test_epoch_at(
+        &bodies,
+        [request.clone()],
+        instance,
+        "/parent/proxy-generation",
+    );
+    let count = Arc::strong_count(&request);
+    for (path, class) in [
+        ("/", "ancestor"),
+        ("/parent", "ancestor"),
+        ("/parent/proxy-generation", "root"),
+        ("/parent/proxy-generation/BUILD", "fixed_file"),
+        ("/parent/proxy-generation/proxy.bzl", "fixed_file"),
+        ("/parent/proxy-generation/symbols.bzl", "fixed_file"),
+    ] {
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+            PathObservationOperation::FileDigest,
+            PathObservationOperation::ReadLink,
+            PathObservationOperation::DirectoryEntries,
+        ] {
+            let d = demand(path, operation.dupe());
+            let policy =
+                namespace_policy(&bodies, &d, Some(&epoch), &generated_features_plan_matches);
+            assert!(policy.owner_plan_allowed);
+            assert_eq!(policy.path_class, class);
+            assert_eq!(
+                policy.admits(&operation),
+                operation == PathObservationOperation::Lstat
+                    || class == "fixed_file" && operation == PathObservationOperation::FileBytes
+            );
+        }
+    }
+    for path in [
+        "/parent/proxy-generation/BUILD.bazel",
+        "/parent/proxy-generation/Proxy.bzl",
+        "/parent/proxy-generation/proxy.bzl.bak",
+        "/parent/proxy-generation/symbols.bzl/child",
+        "/parent/proxy-generation-sibling/proxy.bzl",
+        "/outside",
+    ] {
+        let d = demand(path, PathObservationOperation::Lstat);
+        assert!(
+            !namespace_policy(&bodies, &d, Some(&epoch), &generated_features_plan_matches)
+                .admits(&d.operation())
+        );
+    }
+    let d = demand(
+        "/parent/proxy-generation/proxy.bzl",
+        PathObservationOperation::FileBytes,
+    );
+    for absent in [
+        None,
+        Some(namespace_test_epoch_at(
+            &bodies,
+            [request.clone()],
+            instance,
+            "/other-generation",
+        )),
+        Some(namespace_test_epoch_at(
+            &bodies,
+            [request.clone()],
+            slug_workspace_v2::PathObservationInstanceId::new(18),
+            "/parent/proxy-generation",
+        )),
+    ] {
+        assert!(
+            !namespace_policy(
+                &bodies,
+                &d,
+                absent.as_ref(),
+                &generated_features_plan_matches
+            )
+            .admits(&d.operation())
+        );
+    }
+    assert!(std::ptr::eq(
+        epoch
+            .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
+            .unwrap()
+            .unwrap()
+            .request(),
+        request.as_ref()
+    ));
+    assert_eq!(Arc::strong_count(&request), count);
+    drop(epoch);
+    drop(request);
+    assert!(weak.upgrade().is_none());
 }
 #[test]
 fn generated_features_namespace_refuses_mixed_need_before_progress() {
@@ -1407,7 +1602,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             ("version.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
         ],
     ];
-    let matches = |plan: &_, selected: &[GeneratedFileSignature; 2]| {
+    let matches = |plan: &_, selected: &[GeneratedFileSignature]| {
         let index = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
             0
         } else {
@@ -1687,6 +1882,188 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             ));
         }
     }
+
+    let bodies = proxy_test_bodies();
+    let rows = proxy_literal_rows();
+    let request = || proxy_generated_request(&bodies, small_generated_plan(&rows));
+    let valid = SourcePreparationNeeds::repository(request());
+    assert!(bodies.admit(&valid).is_ok()); // Full native descriptor positive, not a tiny-signature closure.
+    let actual_plan = small_generated_plan(&rows);
+    for expected in [
+        &GENERATED_CC_PROXY_FILES[..0],
+        &GENERATED_CC_PROXY_FILES[..1],
+    ] {
+        assert!(!generated_features_plan_matches(&actual_plan, expected));
+    }
+    let oversized = [
+        GENERATED_CC_PROXY_FILES[0],
+        GENERATED_CC_PROXY_FILES[1],
+        GENERATED_CC_PROXY_FILES[2],
+        GENERATED_CC_PROXY_FILES[2],
+    ];
+    assert!(!generated_features_plan_matches(&actual_plan, &oversized));
+
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let configured = proxy_test_bodies()
+                .with_generated_features_file_effects(registry, command)
+                .with_rules_cc_import_sources(registry, command);
+            assert_eq!(
+                configured.admit(&valid).is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    for index in 0..4 {
+        let mut closed = proxy_test_bodies();
+        match index {
+            0 => closed.generated_features_file_effects = false,
+            1 => closed.rules_cc_import_sources = false,
+            2 => closed.additional[2] = None,
+            3 => closed.roots[0] = path("/other"),
+            _ => unreachable!(),
+        }
+        assert!(
+            closed
+                .admit_with_plan_matcher(&valid, &|_, _| true)
+                .is_err()
+        );
+    }
+    for index in 0..8 {
+        let mut wrong = request();
+        match index {
+            0 => wrong.id.workspace = path("/other"),
+            1 => {
+                wrong.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("rules_cc++compatibility_proxy+other")
+                        .unwrap()
+            }
+            2 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other+//cc:extensions.bzl").unwrap()
+            }
+            3 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_cc+//private:extensions.bzl").unwrap()
+            }
+            4 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_cc+//cc:other.bzl").unwrap()
+            }
+            5 => wrong.repo_spec.rule_id.rule_name = "other".into(),
+            6 => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("cc").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("rules_cc+").unwrap(),
+                );
+                wrong.repo_spec.rule_id.bzl_file =
+                    slug_identity_v2::ApparentLabel::parse("@cc//cc:extensions.bzl")
+                        .unwrap()
+                        .resolve(&mapping);
+            }
+            7 => {
+                let mut attributes = starlark_map::small_map::SmallMap::new();
+                attributes.insert(
+                    compact_str::CompactString::new("unexpected"),
+                    slug_bzlmod_v2::OverrideAttributeValue::None,
+                );
+                wrong.repo_spec.attributes = Arc::new(attributes);
+            }
+            _ => unreachable!(),
+        }
+        assert!(
+            bodies
+                .admit_with_plan_matcher(&SourcePreparationNeeds::repository(wrong), &|_, _| true)
+                .is_err()
+        );
+    }
+    let reject = |rows: &[(&str, &[u8], bool)]| {
+        assert!(
+            bodies
+                .admit(&SourcePreparationNeeds::repository(
+                    proxy_generated_request(&bodies, small_generated_plan(rows))
+                ))
+                .is_err()
+        );
+    };
+    reject(&[]);
+    reject(&rows[..2]);
+    reject(&[rows[0], rows[1], rows[2], ("extra", b"", true)]);
+    let mut reversed = rows;
+    reversed.swap(0, 2);
+    reject(&reversed);
+    let mutant = [b'x'; 1776];
+    for file in 0..3 {
+        for change in 0..4 {
+            let mut changed = rows;
+            match change {
+                0 => changed[file].0 = "wrong.bzl",
+                1 => changed[file].1 = b"",
+                2 => changed[file].1 = &mutant[..rows[file].1.len()],
+                3 => changed[file].2 = false,
+                _ => unreachable!(),
+            }
+            reject(&changed);
+        }
+    }
+    // Older branch lengths are closed even if the owner is exact.
+    reject(&[
+        ("BUILD", &mutant[..436], true),
+        ("proxy.bzl", &mutant[..609], true),
+        ("symbols.bzl", &mutant[..718], true),
+    ]);
+    // Neither cohort can borrow the other's shape, even under the correct owner.
+    reject(&[("BUILD.bazel", b"a", true), ("globals.bzl", b"b", true)]);
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(
+                generated_globals_request(&bodies, small_generated_plan(&rows))
+            ))
+            .is_err()
+    );
+    for symlink in [false, true] {
+        let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+        for (path, bytes, executable) in rows {
+            builder
+                .push(
+                    compact_str::CompactString::new(path),
+                    Arc::from(bytes),
+                    executable,
+                )
+                .unwrap();
+        }
+        if symlink {
+            builder
+                .push_symlink(
+                    compact_str::CompactString::new("LINK"),
+                    slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                        path("/source"),
+                        PathObservationNamespace::Host,
+                    )
+                    .unwrap(),
+                    Arc::from(&b"opaque"[..]),
+                )
+                .unwrap();
+        } else {
+            builder
+                .push_archive(
+                    Arc::from([compact_str::CompactString::new(
+                        "https://mirror.example/dist/closed.tar.xz",
+                    )]),
+                    [0; 32],
+                    compact_str::CompactString::new("prefix"),
+                )
+                .unwrap();
+        }
+        assert!(!generated_features_plan_matches(
+            &builder.finish(),
+            &GENERATED_CC_PROXY_FILES
+        ));
+    }
 }
 #[test]
 fn generated_features_materialization_refuses_mixed_need_before_progress() {
@@ -1711,7 +2088,7 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             ("version.bzl", 1, true, sha2::Sha256::digest(b"b").into()),
         ],
     ];
-    let matches = |plan: &_, selected: &[GeneratedFileSignature; 2]| {
+    let matches = |plan: &_, selected: &[GeneratedFileSignature]| {
         let index = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
             0
         } else {
@@ -1897,11 +2274,99 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         }
     }
     drop(cohort);
+
+    let bodies = proxy_test_bodies();
+    let proxy = SourcePreparationNeeds::repository(proxy_generated_request(
+        &bodies,
+        small_generated_plan(&proxy_literal_rows()),
+    ));
+    let held = proxy.repository_materializations().values().next().unwrap();
+    let proxy_weak = Arc::downgrade(held);
+    let count = Arc::strong_count(held);
+    let matcher = |plan: &_, signatures: &[GeneratedFileSignature]| {
+        if std::ptr::eq(signatures, &GENERATED_CC_PROXY_FILES[..]) {
+            generated_features_plan_matches(plan, signatures)
+        } else {
+            matches(plan, signatures)
+        }
+    };
+    let features = valid.try_union(&version).unwrap();
+    for cohort in [
+        features.try_union(&proxy).unwrap(),
+        proxy.try_union(&features).unwrap(),
+    ] {
+        assert!(bodies.admit_with_plan_matcher(&cohort, &matcher).is_ok());
+        assert!(
+            cohort
+                .repository_materializations()
+                .values()
+                .any(|request| Arc::ptr_eq(request, held))
+        );
+        let mut unknown =
+            proxy_generated_request(&bodies, small_generated_plan(&proxy_literal_rows()));
+        unknown.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("unknown+").unwrap();
+        let excluded = SourcePreparationNeeds::repository(unknown);
+        for mixed in [
+            cohort.try_union(&excluded).unwrap(),
+            excluded.try_union(&cohort).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit_with_plan_matcher(&mixed, &matcher).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            let (original, _) = bodies
+                .first_denied_materialization_with_plan_matcher(&mixed, &matcher)
+                .unwrap();
+            assert_eq!(original.id.canonical_repo.as_str(), "unknown+");
+            assert!(
+                mixed
+                    .repository_materializations()
+                    .values()
+                    .any(|request| std::ptr::eq(request.as_ref(), original))
+            );
+        }
+    }
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(19);
+    let epoch = namespace_test_epoch_at(&bodies, [held.clone()], instance, "/proxy-generation");
+    let leaf = |path| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Materialization(instance),
+            NormalizedAbsolutePath::new(path).unwrap(),
+            PathObservationOperation::FileBytes,
+        )))
+    };
+    let own = proxy
+        .try_union(&leaf("/proxy-generation/symbols.bzl"))
+        .unwrap();
+    let admit = |needs: &SourcePreparationNeeds| {
+        bodies.admit_with_matchers(needs, &matcher, &|demand| {
+            namespace_policy(&bodies, demand, Some(&epoch), &matcher).admits(&demand.operation())
+        })
+    };
+    assert!(admit(&own).is_ok());
+    let mixed = own
+        .try_union(&leaf("/proxy-generation/unknown.bzl"))
+        .unwrap();
+    let mut progress = 0;
+    if admit(&mixed).is_ok() {
+        progress += 1;
+    }
+    assert_eq!(progress, 0);
+    assert_eq!(admit(&mixed).unwrap_err().family, "namespace");
+    drop(mixed);
+    drop(own);
+    drop(epoch);
+    assert_eq!(Arc::strong_count(held), count);
+    drop(proxy);
+    assert!(proxy_weak.upgrade().is_none());
+    drop(features);
     drop(version);
     drop(valid);
     assert!(weak.upgrade().is_none());
     assert!(version_weak.upgrade().is_none());
 }
+
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;

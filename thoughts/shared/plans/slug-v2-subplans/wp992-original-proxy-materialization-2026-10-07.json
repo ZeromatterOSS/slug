@@ -1,0 +1,300 @@
+{
+  "checkpoint": "WP992",
+  "baseline": "2655fad31e012a224044b2222ce4252c322297f4",
+  "compatibility": {
+    "changed": "Slug-native cfgtest/Linux finite original-plan admission",
+    "exact": "Observed pinned local source bytes and literal signatures only",
+    "deferred": "Other plan branches, full producer/parity/provenance/whole-workload fit"
+  },
+  "implementation": {
+    "rust_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "4af08148a0281b7c967d34219e16da83014b3452ca8ecfc4ed5e162f39df0cd3"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "04a271638e09c18b2a473443dd12ab52ae15174ba0fd31acf729ea304a4b1b13"
+      }
+    ],
+    "growth": {
+      "insertions": 549,
+      "deletions": 33,
+      "changed": 582,
+      "net": 516,
+      "reason": "Static exact descriptors,3164B literal fixture and cohesive extensions of existing named guard/namespace/whole-Need controls; independent review accepted growth."
+    },
+    "natural_owner": "Original authenticated RepoSpec/evaluated GeneratedRepositoryFileEffectPlan and scoped materializer; policy borrows original ordered content and current-epoch namespace.",
+    "owner_predicate": "Existing opt-in + selected CC role/root + original workspace and atomic canonical/defining repo/package/target/rule tuple; mappingNone/emptyattrs.",
+    "memory": {
+      "new_retained_strings": 0,
+      "new_retained_containers": 0,
+      "new_flags": 0,
+      "static_signature_rows": 3,
+      "static_signature_tuple_bytes": 192,
+      "cfgtest_literal_bytes": 3164,
+      "borrowed_stack_file_refs_max": 3,
+      "allocation_policy": "Borrow/transfer/share existing storage; use existing scoped interners for repeated retained immutable strings when lifetime/cleanup fit. No global pool for transient unique paths."
+    },
+    "features_preserved": true,
+    "production_windows_unchanged": true
+  },
+  "counts": {
+    "current_operations": 70,
+    "native_gate_operations": 69,
+    "fresh_reference_operations": 1,
+    "fresh_reference_observations": 1,
+    "reference_test_passes": 0,
+    "material_pins": 527,
+    "fresh_core_ordinary": 63,
+    "fresh_bzlmod_ordinary": 0,
+    "qualified_prior_bzlmod_passes": 5,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "reused_owner_ordinary": 0,
+    "affected_historical_owner_claims_stale": true,
+    "reused_owner_fresh_runs": 0,
+    "preparation_operations": 2,
+    "compiler_memory_is_runtime_fit": false,
+    "source_leases": 237,
+    "fresh_capture_operations": 0,
+    "qualified_prior_capture_operations": 4,
+    "qualified_prior_capture_decisions": 6,
+    "fresh_named_passes": 68,
+    "native_runtime_pins": 514,
+    "native_child_starts": 2,
+    "credited_native_terminal_observations": 1,
+    "failed_outer_invocations": 1,
+    "failed_outer_pass_credit": 0
+  },
+  "preparation": {
+    "compile_seconds": 10.674994178931229,
+    "check_seconds": 7.36826178105548,
+    "offline": true,
+    "jobs": 1,
+    "seconds_limit_each": 60,
+    "executed_tests": 0,
+    "actual_cargo_json_bound": true,
+    "executable": {
+      "path": "target/wp992/native/executable.json",
+      "sha256": "e90095b6e702597b9a45f0705f231c750fc4fcd20cf0f5d8e3c2d76b624f9bb3"
+    },
+    "compiler_memory_is_runtime_fit": false
+  },
+  "tests": {
+    "ordinary_passes": 63,
+    "ordinary_elapsed_sum_seconds": 12.165850615594536,
+    "ordinary_peak_kib": 58148,
+    "synthetic_passes": 4,
+    "synthetic_elapsed_seconds": 0.5964948469772935,
+    "synthetic_peak_kib": 21340
+  },
+  "reference": {
+    "operation": {
+      "path": "target/wp992/reference/operation.json",
+      "sha256": "8c04084dec8e278e008c854adcc2692c29fc25306ce9a731f32311ab70a10145"
+    },
+    "result": {
+      "path": "target/wp992/reference/result.json",
+      "sha256": "034d324a7ee0379678a63d960a09e2ea16cdd09994e6d4f76be3c0190975d36f"
+    },
+    "source": {
+      "path": "target/wp992/reference/source.bzl",
+      "sha256": "a190a467ac48329a76e1a9ccab1fea53519af4bb2202e22346b23fc24dcf9872"
+    },
+    "signatures": {
+      "path": "target/wp992/reference/source-file-signatures.json",
+      "sha256": "91d6920acc3e49c76c557da436ecdbd7396ae409914f842f0683c440509659b9"
+    },
+    "source_bytes": 7631,
+    "elapsed_seconds": 0.02128379000350833,
+    "peak_kib": 16272,
+    "retired_descriptors": 17,
+    "source_observations": 1,
+    "test_passes": 0,
+    "modern_file_lengths": [
+      634,
+      1776,
+      754
+    ],
+    "modern_total": 3164,
+    "original_source_target_reopened": false,
+    "source_inspection_is_native_plan_or_output_proof": false,
+    "prelaunch_corrections": "Bounded post-KILL joins and historical schema authority correction; pre-Popen schema failure had zero source bytes/credit. Preserved reference artifacts retain all corrections.",
+    "final_reviews": [
+      {
+        "path": "target/wp992/reference/final-source.md",
+        "sha256": "f8ac619a291980300d8293c9567e0a4880b75e903cefa98e97188c270deb7744"
+      },
+      {
+        "path": "target/wp992/reference/final-evidence.md",
+        "sha256": "121b56189772866dc1f05086d3618a7ceb63107669218490bbc84edcd043ddb4"
+      }
+    ]
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp992/native/native-operation.json",
+      "sha256": "61eea39cb43c7584d360b8e85541235158b615ef3dc2751ccc11c5e1a7f5686d"
+    },
+    "result": {
+      "path": "target/wp992/native/result.json",
+      "sha256": "89ec0b799898dc2279d91fa219627084628228449cc2d5edc183552d035d828d"
+    },
+    "stdout": {
+      "path": "target/wp992/native/native.stdout",
+      "sha256": "2656459ada679fc65d85b88aba72836e813612b0b9bd814f45a703f8a12cb1d8"
+    },
+    "stderr": {
+      "path": "target/wp992/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 2.8707942969631404,
+    "conservative_peak_kib": 98060,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 67,
+      "transferred_bytes": 0,
+      "decoded_bytes": 649343,
+      "written_bytes": 5228,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "next_need": {
+      "family": "path",
+      "operation": "lstat",
+      "path_bytes": 212,
+      "relative_path": "cc/private/cc_common.bzl",
+      "selected_owner": "rules_cc_root",
+      "path_capture_is_body_availability_or_certificate": false
+    },
+    "public_probe": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "qualification": "Proxy materialization refusal cleared and actual counted work advanced to the declared private symbol source demand.5228 total Written matches an expected Features+Proxy comparison only, not completed output, full Spec association or source certificate. Native body/plan/registry/materializer Arc/DICE/page/freshness retirement uninstrumented; source_weak_seenFalse is unavailable rather than a positive body witness."
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "source_bindings": {
+    "ordered_leases": 237,
+    "prefix": 188,
+    "additional": 49,
+    "physical_bytes": 918928,
+    "before_after_hash_bytes": 1837856,
+    "parent_buffers": 2,
+    "parent_buffer_bytes_each": 65536,
+    "combined_parent_scratch_bytes": 131072,
+    "noninherited": true,
+    "collection_atomic": false,
+    "native_certificate": false
+  },
+  "invocation_failure": {
+    "record": {
+      "path": "target/wp992/native/failed-outer-launch/invocation-failure.json",
+      "sha256": "e70d263f09807bf1233c9be53900baf42db24341329ffc307bbacbc8cdf48067"
+    },
+    "raw": [
+      {
+        "path": "target/wp992/native/failed-outer-launch/native.stdout",
+        "sha256": "c166df9dfc7a7093c016b03a3e44f5b182787a0263e511666a11f635da13f7d5"
+      },
+      {
+        "path": "target/wp992/native/failed-outer-launch/native.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "qualification": "Artificial root outer16s timeout included parent verification outside native clock; interrupted first child start has no terminal/pass/RSS/postcheck/retirement credit. Direct supervised launch corrected only missing native gate with unchanged10s/3s/AS/RSS/byte caps and unchanged source/helpers. No identical terminal refusal replay or cap increase."
+  },
+  "artifacts": {
+    "design.md": {
+      "path": "target/wp992/native/design.md",
+      "sha256": "5d89a8a24ad181131cdfbfe606f9870ddf19666a1671d53ab786f0f55872b770"
+    },
+    "design-review.md": {
+      "path": "target/wp992/native/design-review.md",
+      "sha256": "1ef061f6b863a8ade47acaf3004f1eb7fabbea3065d8458619f045195cc62a97"
+    },
+    "implementation-source.md": {
+      "path": "target/wp992/native/implementation-source.md",
+      "sha256": "ee48f50ac973e69e79eb0ba8c344aa054389323ccb8f8bcb6493ffe7f3197b9f"
+    },
+    "implementation-evidence.md": {
+      "path": "target/wp992/native/implementation-evidence.md",
+      "sha256": "109a7534b8de768d7d4688db51d94ba8f2ca36e37a46cd35d521f9037c57d47c"
+    },
+    "activation.json": {
+      "path": "target/wp992/native/activation.json",
+      "sha256": "e266a1df680cafbbbab19a9ccf380935a7b9d2cb14d211685f043048f245ce05"
+    },
+    "preflight-source.md": {
+      "path": "target/wp992/native/preflight-source.md",
+      "sha256": "fef6e5473e145580016cf8b53693f948fe9247555071622d364b42b790e44b61"
+    },
+    "preflight-evidence.md": {
+      "path": "target/wp992/native/preflight-evidence.md",
+      "sha256": "27a1544e1087667cfb74532180c85a6679931719c464cb1a340260800bb7a933"
+    },
+    "final-source.md": {
+      "path": "target/wp992/native/final-source.md",
+      "sha256": "e5787fb8b758ffc059e0c3d5fc6128ff04274f1cf740a331e41a88b565eb3ec6"
+    },
+    "final-evidence.md": {
+      "path": "target/wp992/native/final-evidence.md",
+      "sha256": "d39829be4d1a408470531f418cf0ceac364c92ba9e26b9d1e539d3c2764e99ca"
+    },
+    "audit.json": {
+      "path": "target/wp992/native/audit.json",
+      "sha256": "813869faca94efdbc24b48bd0ffdf454b0c927fe18ab989f8039c2fe83092750"
+    },
+    "operational-summary.json": {
+      "path": "target/wp992/native/operational-summary.json",
+      "sha256": "7452b3971e8e7cab7c8f46aae890685676253364ea6c4ba3eac528ed29e59d03"
+    },
+    "successor-source.md": {
+      "path": "target/wp992/native/successor-source.md",
+      "sha256": "3b710c86b37d3d4756df6140d9c88052eb1006274689d19ce623f783975a3531"
+    },
+    "successor-evidence.md": {
+      "path": "target/wp992/native/successor-evidence.md",
+      "sha256": "a19d1534c7cc17454d41401a8f7a3629efdc1677761cc2f3399f59bfdf1ee371"
+    }
+  },
+  "normal_public_rustc_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "full_goal_active": true,
+  "started_at": "2026-10-07T21:58:58.759377+00:00",
+  "accepted_at": "2026-10-07T22:39:30.719241+00:00",
+  "elapsed_wall_seconds": 2431.959864,
+  "timing_scope": "Coupled source/design/implementation/gate/review wall time; no workflow speedup claimed.",
+  "continuation": "One bounded six-source CC private symbol cohort from actual first demand plus saved modern symbols literal loads, then reviewed conditional existing-role/metadata grant; no guessed source bodies/import recursion/providers or new diagnostic layer.",
+  "residuals": [
+    "Public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024\u21922021\u21922024/fullCLI/M7A/MVS/provenance/whole-workload fit remain required.",
+    "Current prefix fits runtime cap; aggregate/parent/compiler memory and complete graph fit remain separate.",
+    "Windows remains minimal stubs/unsupported until effectively testable."
+  ]
+}

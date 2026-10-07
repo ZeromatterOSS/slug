@@ -35,24 +35,26 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Generated-proxy source and materialization readiness
+Status: CC private symbol source readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP991](./slug-v2-subplans/wp991-finite-source-attempt-readiness-2026-10-07.json)
-clears the SourceAttempts64 barrier with a finite test/Linux opted-in profile128 while
-production/default64, default fixture16 and all byte/runtime/memory limits remain.
-All63 Rust+4 strict controls+1 changed native pass. The once public probe uses66 attempts
-with no source error, takes2.380s and peaks97,900KiB under256MiB; next original generated_kind
-refusal is the rules_cc compatibility-proxy repository. Its plan/output/mapping remain
-unobserved. A bounded inspection of the accepted7631B local rule definition is next, then
-reviewed source-derived original-owner materialization support through the normal pipeline.
-No cache, string/path mirrors, new diagnostic layer or automatic quota increase is selected.
+[WP992](./slug-v2-subplans/wp992-original-proxy-materialization-2026-10-07.json)
+admits the exact modern compatibility-proxy file plan through the original typed owner,
+borrowed static signatures, normal materializer and current-epoch namespace. No retained
+strings/containers/flags or production/Windows changes. All63 Rust+4 strict controls pass;
+the corrected native takes2.871s/98,060KiB under256MiB, source67/649,343 with no source error
+and counted Written5228. Next original demand is selected CC cc/private/cc_common.bzl
+HostLstat. Counted writes do not certify output; public Rustc/full graph fit remain open.
+A root outer-timeout invocation has preserved partial raw and zero terminal credit;
+corrected direct supervision keeps all inner caps. Next freeze one bounded six-source
+private-symbol cohort from the actual demand and saved literal loads, then review its
+conditional existing-role grant. No source recursion, cache or diagnostic layer is selected.
 Representative parsing/read-prefix allocation fits the cap, permitting broader readiness
-work; complete public producer and whole-workload fit remain open. Borrow/share storage and
-use existing scoped interners where repeated retained strings and cleanup fit.
+work. Borrow/share storage and use existing scoped interners where repeated retained
+strings and cleanup fit; complete public producer and whole-workload fit remain required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
