@@ -283,6 +283,7 @@ fn projection_matches(
         && bodies.nightly_channel_source
         && bodies.probe_package_source
         && bodies.rules_rust_defs_source
+        && bodies.rules_rust_defs_import_sources
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -362,7 +363,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+            .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_rules_rust_defs_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
     );
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -408,7 +413,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -424,7 +433,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -440,7 +453,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -456,7 +473,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -472,7 +493,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_probe_package_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -488,7 +513,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_build_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_channel_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_rust_defs_source(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -505,6 +534,19 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &nightly_overlay()
     ));
     Arc::get_mut(&mut bodies).unwrap().rules_rust_defs_source = true;
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .rules_rust_defs_import_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .rules_rust_defs_import_sources = true;
     request.lockfile_mode = LockfileMode::Update;
     assert!(!projection_matches(
         &inner,
@@ -969,6 +1011,181 @@ fn rules_rust_defs_source_need_is_opt_in_exact_import_only() {
         assert_eq!(denied.family, "path");
         assert_eq!(denied.operation, path_operation_code(&operation));
         assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+}
+#[test]
+fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
+    let operations = [
+        PathObservationOperation::Lstat,
+        PathObservationOperation::FileBytes,
+    ];
+    for relative in RULES_RUST_DEFS_IMPORTS {
+        let selected = Path::new("/rules").join(relative);
+        assert_exact_root_file_role(
+            relative,
+            &operations,
+            Bodies::with_rules_rust_defs_import_sources,
+            |b| b.rules_rust_defs_import_sources,
+            &[],
+            selected.to_str().unwrap(),
+            Some("/rules"),
+        );
+    }
+    assert_exact_root_file_role(
+        "rust/private",
+        &[PathObservationOperation::Lstat],
+        Bodies::with_rules_rust_defs_import_sources,
+        |b| b.rules_rust_defs_import_sources,
+        &[
+            "/rules/rust/private/child",
+            "/rules/RUST/private",
+            "/rules/rust/private-extra",
+            "/rules-other/rust/private",
+        ],
+        "/rules/rust/private",
+        Some("/rules"),
+    );
+    let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    let need = |p: &Path, operation| {
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(p).unwrap(),
+            operation,
+        )))
+    };
+    let mut all = need(
+        Path::new("/rules/rust/private"),
+        PathObservationOperation::Lstat,
+    );
+    for relative in RULES_RUST_DEFS_IMPORTS {
+        let selected = Path::new("/rules").join(relative);
+        for operation in &operations {
+            all = all.try_union(&need(&selected, operation.dupe())).unwrap();
+        }
+    }
+    assert_eq!(all.path_observations().unwrap().demands().len(), 23);
+    assert!(bodies.admit(&all).is_ok());
+    for (excluded, operation) in [
+        (
+            "/rules/rust/private/providers.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/private/rust.bzl.extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/RUST.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/RUST/private/rust.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/rust.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/private/rust.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/rules/rust/private", PathObservationOperation::FileBytes),
+        (
+            "/rules/rust/private/BUILD.bazel",
+            PathObservationOperation::Lstat,
+        ),
+    ] {
+        let mixed = all
+            .try_union(&need(Path::new(excluded), operation.dupe()))
+            .unwrap();
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert_eq!(denied.family, "path");
+        assert_eq!(denied.operation, path_operation_code(&operation));
+        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+    }
+}
+#[test]
+fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
+    use crate::runtime::dice::source_service::SourceCounter;
+    let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
+    let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let baseline = SourceServiceLimits {
+        allow_network: false,
+        registry_object_bytes: 1 << 20,
+        registry_attempts: 128,
+        registry_admitted_bytes: 16 << 20,
+        source_attempts: 16,
+        transferred_bytes: 16 << 20,
+        decoded_bytes: 16 << 20,
+        written_bytes: 16 << 20,
+        live_buffer_bytes: 16 << 20,
+        blocking_threads: Some(2),
+    };
+    assert_eq!(make().source_limits(RegistryChoice::PreparedFile), baseline);
+    assert_eq!(SourceServiceLimits::default().source_attempts, 64);
+    for (registry, command, attempts) in [
+        (RegistryChoice::DefaultBcr, CommandChoice::Modules, 16),
+        (RegistryChoice::DefaultBcr, CommandChoice::PublicProbe, 16),
+        (RegistryChoice::PreparedFile, CommandChoice::Modules, 16),
+        (RegistryChoice::PreparedFile, CommandChoice::PublicProbe, 64),
+    ] {
+        let bodies = make().with_rules_rust_defs_import_sources(registry, command);
+        let limits = bodies.source_limits(registry);
+        assert_eq!(
+            limits,
+            SourceServiceLimits {
+                registry_attempts: registry.registry_attempts(),
+                source_attempts: attempts,
+                ..baseline
+            }
+        );
+        for (counter, maximum) in [
+            (SourceCounter::SourceAttempts, attempts),
+            (SourceCounter::DecodedBytes, 16 << 20),
+        ] {
+            let start = Instant::now();
+            let scope = SourceServiceScope::new_for_test(
+                path("/fixture"),
+                start + Duration::from_secs(2),
+                start + Duration::from_secs(3),
+                limits,
+            )
+            .unwrap();
+            assert_eq!(scope.limits(), limits);
+            scope.charge(counter, maximum).unwrap();
+            assert_eq!(
+                scope.charge(counter, 1),
+                Err(SourceServiceError::Limit(counter))
+            );
+            let snapshot = scope.snapshot();
+            assert_eq!(
+                snapshot.source_attempts,
+                if counter == SourceCounter::SourceAttempts {
+                    attempts
+                } else {
+                    0
+                }
+            );
+            assert_eq!(
+                snapshot.decoded_bytes,
+                if counter == SourceCounter::DecodedBytes {
+                    16 << 20
+                } else {
+                    0
+                }
+            );
+        }
     }
 }
 #[test]

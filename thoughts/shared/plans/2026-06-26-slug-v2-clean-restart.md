@@ -35,7 +35,7 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Normal public probe reaches rules_rust private import-directory prerequisite
+Status: Normal public probe reaches analyzer toolchain import source prerequisite
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
@@ -149,29 +149,28 @@ in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global
 or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
 fixture bundle independently grounds the completed bounded corpus below; source/memory
 caps and genuine provider/public Rustc gates stay intact.
-[WP969](./slug-v2-subplans/wp969-rules-rust-defs-source-readiness-2026-10-07.json)
-accepts private exact rules_rust rust/defs.bzl Host Lstat/FileBytes admission only for
-PreparedFile+PublicProbe.94net private/test lines, zero production/retained string/cache/
-interner/source copy or DICE change; original whole-Need/source/parser/epoch owners remain.
-24Core ordinary+4synthetic+1native pass with currentCore/CLI preparation; unchanged
-Loading23/Bzlmod3qualifiedreuse0fresh. Static ownership/polarity correction was resolved
-before compilation; no failed current operation. Once0.580s/82,760KiB/305nativepins/
-318current union pins and189parent290970B leases/581940B brackets reach exact200B
-rules_rust rust/private HostLstat Need. Publicnative_refusal/computation/prepcomplete/
-singleton/policytrue still has unavailable certificate/observations/actions/Rustc;
-packagecause none/unavailable. SourceNone105registry235521B is unchanged;16Host19029Decoded
-is aggregate+1/6092, not a native per-file identity/hash/Weak proof. Parent128KiB scratch
-and individually bracketed/noninherited leases stay separate from child semantic bytes.
-Scope/recorder/credits retire with no all-DICE Arc/page release or whole-workload fit claim.
-Next: cohesive finite authentic direct-import table and explicitly reviewed
-source-attempt choice from target/wp969/native/successor-source.md, before any operation.
-Current16attempts exhausted; actual refusal is path guard, not source-budget error.
-All memory/byte/RSS/runtime caps, fixture/support/data/normal selected owners remain;
-publicRustc/provider/toolchain/runfiles/oracle/restoration/MVS/fullCLI/M7A/wholefit open.
-Immediate [WP968](./slug-v2-subplans/wp968-root-build-command-local-readiness-2026-10-07.json),
-at8199046d2100700d82e31d4d4ef152f7dcc16399, accepted narrow RootBuild command Local
-input/mapping/epoch ownership and cleared package Unsupported; its historical correction
-records and earlier readiness receipts remain immutable reference evidence.
+[WP970](./slug-v2-subplans/wp970-rules-rust-defs-direct-import-readiness-2026-10-07.json)
+accepts the finite11 direct-import borrowed table plus exactprivateHostLstat, coupledleaf
+Lstat/FileBytes and defaultfalse PreparedFilePublicProbe. PrivateBodieslimitfactory uses
+explicitselected64/default16 sourceattempt scalar; all byte/memory/RSS/timecaps unchanged.
+262net private/test/zero production/DICE/reader changes,176Bstaticdescriptors/fixedliterals/
+zeroheapstrings/cache/interner/sourcecopy.28Coreordinary+4synthetic+1native pass with
+currentCoreCLI preparation;149line public/Hostdecoder functionfork validates unaltered
+raw16/64 while historicalhelpers stayunchanged. Loading23/Bzlmod3qualifiedreuse0fresh.
+Once0.654s/81,456KiB/325runtimepins/338unionmaterials/200leases605945B1211890brackets
+reaches exact220B rust/rust_analyzer_toolchain.bzl HostLstatNeed. SourceNone105registry
+235521B unchanged,17Host20052Decoded aggregate+1/1023; actualselectedlimits64/Host64.
+Publicnative_refusal/computation/prepcomplete/singletonpolicytrue/nullcertificatecounts/
+packagecause none; privatebodyhash/Weak/freshnessunobserved/vacuous, finalcreditsnotallDICE
+Arc/page release. Parent128KiB/non-atomic/noninherited brackets notnativecertificates.
+Next cohesive four-sibling local toolchain availability/admission from
+target/wp970/native/successor-source.md requires frozen reviewed contract beforeoperation;
+known directtable isnotfullclosure/unknownbodyauthenticity, no speculativegrant orlimit
+increase. OriginalpublicRustc/support/data/provider/toolchain/runfiles/oracle/restoration/
+MVS/provenance/fullCLI/M7A/wholefit remainopen. Immediate
+[WP969](./slug-v2-subplans/wp969-rules-rust-defs-source-readiness-2026-10-07.json), at
+5c50389f6d70309d49112717a2d0de330e429f7d, reachedprivateLstat at82,760KiB; its static
+correction and excluded6092B review-onlyread/history remainqualified predecessor evidence.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

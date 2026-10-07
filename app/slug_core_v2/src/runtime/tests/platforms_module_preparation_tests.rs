@@ -232,6 +232,19 @@ struct AdditionalModule {
     root: NormalizedAbsolutePath,
     file: NormalizedAbsolutePath,
 }
+const RULES_RUST_DEFS_IMPORTS: [&str; 11] = [
+    "rust/toolchain.bzl",
+    "rust/private/clippy.bzl",
+    "rust/private/common.bzl",
+    "rust/private/lints.bzl",
+    "rust/private/rust.bzl",
+    "rust/private/rust_analyzer.bzl",
+    "rust/private/rustc.bzl",
+    "rust/private/rustdoc.bzl",
+    "rust/private/rustdoc_test.bzl",
+    "rust/private/rustfmt.bzl",
+    "rust/private/unpretty.bzl",
+];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -245,6 +258,7 @@ struct Bodies {
     nightly_channel_source: bool,
     probe_package_source: bool,
     rules_rust_defs_source: bool,
+    rules_rust_defs_import_sources: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -282,6 +296,7 @@ impl Bodies {
             nightly_channel_source: false,
             probe_package_source: false,
             rules_rust_defs_source: false,
+            rules_rust_defs_import_sources: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -386,6 +401,44 @@ impl Bodies {
             && path
                 .strip_prefix(self.roots[1].as_path())
                 .is_ok_and(|relative| relative == Path::new("rust/defs.bzl"))
+    }
+    fn with_rules_rust_defs_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.rules_rust_defs_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_rules_rust_defs_import_source(&self, path: &Path, metadata: bool) -> bool {
+        self.rules_rust_defs_import_sources
+            && path
+                .strip_prefix(self.roots[1].as_path())
+                .is_ok_and(|relative| {
+                    (metadata && relative == Path::new("rust/private"))
+                        || RULES_RUST_DEFS_IMPORTS
+                            .iter()
+                            .any(|file| relative == Path::new(file))
+                })
+    }
+    fn source_limits(&self, registry: RegistryChoice) -> SourceServiceLimits {
+        SourceServiceLimits {
+            allow_network: false,
+            registry_object_bytes: 1 << 20,
+            registry_attempts: registry.registry_attempts(),
+            registry_admitted_bytes: 16 << 20,
+            source_attempts: if self.rules_rust_defs_import_sources {
+                64
+            } else {
+                16
+            },
+            transferred_bytes: 16 << 20,
+            decoded_bytes: 16 << 20,
+            written_bytes: 16 << 20,
+            live_buffer_bytes: 16 << 20,
+            blocking_threads: Some(2),
+        }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
         let file = NormalizedAbsolutePath::new(root.as_path().join("MODULE.bazel")).unwrap();
@@ -560,7 +613,8 @@ impl Bodies {
                                 && (self.admits_nightly_build_source(path)
                                     || self.admits_nightly_channel_source(path)
                                     || self.admits_probe_package_source(path, false)
-                                    || self.admits_rules_rust_defs_source(path)))
+                                    || self.admits_rules_rust_defs_source(path)
+                                    || self.admits_rules_rust_defs_import_source(path, false)))
                             || (self.ignore_file_bytes
                                 && operation == PathObservationOperation::FileBytes
                                 && path.file_name().is_some_and(|name| name == ".bazelignore")
@@ -574,6 +628,7 @@ impl Bodies {
                             || self.admits_nightly_channel_source(path)
                             || self.admits_probe_package_source(path, true)
                             || self.admits_rules_rust_defs_source(path)
+                            || self.admits_rules_rust_defs_import_source(path, true)
                             || (self.visible_lockfile_metadata
                                 && path.parent() == Some(self.roots[0].as_path())
                                 && path
@@ -1731,7 +1786,8 @@ fn observe_native_command(
     .with_nightly_build_source(registry_choice, command)
     .with_nightly_channel_source(registry_choice, command)
     .with_probe_package_source(registry_choice, command)
-    .with_rules_rust_defs_source(registry_choice, command);
+    .with_rules_rust_defs_source(registry_choice, command)
+    .with_rules_rust_defs_import_sources(registry_choice, command);
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
@@ -1766,18 +1822,7 @@ fn observe_native_command(
     );
     let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
     let start = Instant::now();
-    let limits = SourceServiceLimits {
-        allow_network: false,
-        registry_object_bytes: 1 << 20,
-        registry_attempts: registry_choice.registry_attempts(),
-        registry_admitted_bytes: 16 << 20,
-        source_attempts: 16,
-        transferred_bytes: 16 << 20,
-        decoded_bytes: 16 << 20,
-        written_bytes: 16 << 20,
-        live_buffer_bytes: 16 << 20,
-        blocking_threads: Some(2),
-    };
+    let limits = bodies.source_limits(registry_choice);
     let scope = SourceServiceScope::new_for_test(
         workspace.clone(),
         start + Duration::from_secs(5),
