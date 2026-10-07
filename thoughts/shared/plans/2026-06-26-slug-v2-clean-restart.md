@@ -143,6 +143,11 @@ native0.239s/67,448KiB pass;11parentbindings10938B/originalroot/Weak/credits che
 Observed extra sources: none. Unseen extra sources: bazel_features, bazel_skylib, rules_cc, rules_license, rules_shell, apple_support, package_metadata, buildozer. Unseen bytes/hash/evaluation remain unavailable and their Weak expiry is vacuous. Next: actual zlib 1.3.1.bcr.5 prerequisite.
 Continue the actual normal owner under borrowing/scoped interning and unchanged caps;
 public Rustc/provenance/whole-workload fit remains open.
+[WP953](./slug-v2-subplans/wp953-zlib-alias-unavailable-2026-10-07.json) closes the one conditional zlib lookup unavailable
+in0.032s/17,504KiB with38current pins/zero body/zero fresh Rust tests; no global absence
+or retry follows. Exact237B zlib metadata is indexed in the owned177-entry/409600B
+fixture bundle. Next separately review bounded offline corpus preparation through normal
+file-registry owners, preserving source/memory caps and genuine provider/public Rustc gates.
 [WP931](./slug-v2-subplans/wp931-generated-compiler-env-files-2026-10-06.json)
 accepts446 current generated env-file reads (190,700B) and466 ordered bindings to411
 saved consumers.13 controls, a2.233s observation and two FINAL reviews pass. Shared

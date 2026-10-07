@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: bounded native memory/lifecycle gates pass; actual zlib 1.3.1.bcr.5 prerequisite
+Status: zlib conditional lookup unavailable; owned offline registry metadata continuation
 
 ## Observable and source basis
 
@@ -41,6 +41,34 @@ deferred/native ActionKey allowance and preserve all accepted exact projections.
 fixture's opaque key restoration is not exact cross-system fingerprint admission.
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
+
+## Selected continuation
+
+[WP953](wp953-zlib-alias-unavailable-2026-10-07.json) closes the sole conditional external/zlib+ lookup as
+unavailable FileNotFoundError/errno2:0.032s/17,504KiB,38stable current pins,
+one completed observation/passnull/zero bodies. The missing component and global absence
+are unproved.15named availability controls reused0runs; no MODULE/Twelfth/Rust/native
+activation, alternate alias/output base/census or identical retry.
+
+Positive repository-owned source: configured-cli-authentic registry-metadata.json
+explicitly indexes modules/zlib/1.3.1.bcr.5/MODULE.bazel,237B/fullSHAeec517b5…;
+fixture manifest pins177metadata entries/409600B tar/fullSHA60b023fc… and273940
+advertised member bytes. Archive/member bytes have not been read or verified here.
+Continue [the source-owner decision](../../../../target/wp953/successor-decision.md)
+with separately reviewed bounded owned-metadata corpus preparation and existing normal
+file-registry ownership. Reuse exact fixture inventory/verifier invariants and retire
+per-file scratch; no new source strings/global pool or copied whole fixture harness.
+The six direct metadata objects and absent registry policy JSON are explicit gaps to
+freeze if actually required. Inventory membership is not current runtime demand.
+
+No full fixture assemble/prove/F3, payload archive, network/acquisition or spent-source
+retry follows. Freeze exact inputs/counts/aggregate budget, normal request projection,
+DICE source/equality/freshness/retention and lifetime/certificate coverage before native.
+Keep registry1MiB/source-image-scratch16MiB/attempt16/threads2/work5cleanup8 and runtime
+caps; any attempt-policy change needs an explicit independent design with its user-limit
+basis, never a silent increase. Preserve all eleven prior Local source rows/versions/
+repo_name facts and first semantic-error precedence. Full public Rustc and whole-fit
+remain the intended outcome; source metadata preparation alone cannot close them.
 
 ## Current source-readiness checkpoint
 

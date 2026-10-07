@@ -1,0 +1,163 @@
+{
+  "checkpoint": "WP953 closed conditional zlib alias; owned metadata successor grounded",
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "8b1ecdbfb06f9fcda162f1bc1ff2b35c65b6f426",
+  "previous_goal_turn": "progress",
+  "outcome": "progress: unavailable lookup closes one hypothesis; exact owned registry metadata provides a different source owner",
+  "compatibility": {
+    "exact": "recorded conditional lookup outcome and unchanged helper controls",
+    "slug_native": "bounded physical availability observation",
+    "deferred": "actual zlib source bytes/evaluation, complete mapping/providers/public Rustc and whole-workload fit"
+  },
+  "metadata": {
+    "input": {
+      "path": "target/wp953/metadata/input.json",
+      "sha256": "2fe84dcbf80ab60a99eb7fd888493dda5e1c5b14625712bdf61dbc54e4088553"
+    },
+    "operation": {
+      "path": "target/wp953/metadata/operation.json",
+      "sha256": "8c741c062f89f99a940f8d17fef0dae89f71caaa3ae3b67662d049dbf5509651"
+    },
+    "result": {
+      "path": "target/wp953/metadata/result.json",
+      "sha256": "342279a7e15cc5fbd215623bd4df5542ac4465e851b97d1ede12725a493e67c7"
+    },
+    "stdout": {
+      "path": "target/wp953/metadata/stdout",
+      "sha256": "ddf61a830c88d56962820a9625fae44ab67eca3a0a2cc1f8222b2a1443a333a6"
+    },
+    "stderr": {
+      "path": "target/wp953/metadata/stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 0.03204837907105684,
+    "conservative_rss_kib": 17504,
+    "current_pin_count": 38,
+    "current_pins_raw_verified": true,
+    "exit_code": 0,
+    "completed_observation_count": 1,
+    "test_pass_count": null,
+    "status": "unavailable",
+    "refusal": "FileNotFoundError",
+    "errno": 2,
+    "missing_component_located": false,
+    "source_body_bytes": 0,
+    "target_witness": false,
+    "normal_source_certificate": false,
+    "trace": {
+      "loaded_current": 1189586,
+      "loaded_peak": 1195091,
+      "retained": 1182652,
+      "peak": 1201925,
+      "tracing_excludes_encoding": true
+    },
+    "qualification": "Exact frozen candidate lookup unavailable; missing component/global absence unproved. No target witness, MODULE/body/native read, alternative alias/output-base/census/identical retry. Trace excludes encoding and is not Slug savings."
+  },
+  "contracts": [
+    {
+      "path": "target/wp953/design.md",
+      "sha256": "752fe23a6faa09b5bb3ffdba52b862acd29558a6ec3a1141f931289269c88de7"
+    },
+    {
+      "path": "target/wp953/run.py",
+      "sha256": "c23f37928270ee5ab42199bea054c79e3d247412b42ba801e9d4eab2a038d7b7"
+    },
+    {
+      "path": "target/wp953/observe.py",
+      "sha256": "15f3b29d698dd745013712d5b2e2d222cf3c409196fa4dc58369b689101ea1f2"
+    }
+  ],
+  "reviews": [
+    {
+      "path": "target/wp953/launch-metadata-source.md",
+      "sha256": "89c195b75741cc6382750067fadaa54de49b81ccc0265e6a63e2ffe2f1a0534d"
+    },
+    {
+      "path": "target/wp953/launch-metadata-evidence.md",
+      "sha256": "348974da01adff07b94f4f44179b6027cc3142a7a322443c3388f22f8a184eb3"
+    },
+    {
+      "path": "target/wp953/final-metadata-source.md",
+      "sha256": "45dfeb7f2645a2e1ef9d5c5e2002ea31c53d900bd1a52838759a4110cb1fb913"
+    },
+    {
+      "path": "target/wp953/final-metadata-evidence.md",
+      "sha256": "268802c939807a6d54ffa7d0867ed9afe950f7c6c4cac93575c2a54332265219"
+    }
+  ],
+  "counts": {
+    "fresh_rust_tests": 0,
+    "fresh_native_runs": 0,
+    "physical_observations": 1,
+    "reused_availability_controls": 15,
+    "new_control_runs": 0,
+    "module_reads": 0
+  },
+  "implementation": {
+    "production_changes": 0,
+    "rust_changes": 0,
+    "dependency_changes": 0,
+    "fixture_changes": 0,
+    "conditional_basis_not_activated": {
+      "path": "target/wp953/native-basis-draft.md",
+      "sha256": "99d5e6f4328c5c2ccea0697015195feb904c65e05b798fb71e11f85f6674f470"
+    }
+  },
+  "preserved_native_checkpoint": {
+    "path": "thoughts/shared/plans/slug-v2-subplans/wp952-native-buildozer-source-readiness-2026-10-07.json",
+    "sha256": "cf9faafd9d0921192c9e3e6dacb839c8137af87d1426adbe857a7739ac9e84ab"
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": {
+    "recommendation": {
+      "path": "target/wp953/successor-decision.md",
+      "sha256": "f01d88616d5e17238b2d4cf4a91293c543ae70645c90609a2b3f6ce64eda8bf3"
+    },
+    "owned_inputs": [
+      {
+        "path": "tests/v2_oracle/fixtures/configured-cli-authentic/fixture.toml",
+        "sha256": "297aaa00d8efff4f09bf2905a8c21d633a562670be0ffb979180746e6c134bd1"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/configured-cli-authentic/registry-metadata.json",
+        "sha256": "e2bb961d35545679f8dc74299478d65231fa11cf00c399c3d021350099559433"
+      },
+      {
+        "path": "tests/v2_oracle/fixtures/configured-cli-authentic/NOTICE",
+        "sha256": "8b10fa96039410bbe2bb9b55120430a9f6cb362149a48b652fe524b412a9748c"
+      }
+    ],
+    "existing_verifier": {
+      "path": "tools/v2_oracle/configured_cli_fixture.py",
+      "sha256": "93db3bea0110582e37eeef31b71ccf4080f3dcb50a2e9c07c3cbfb25765c6336"
+    },
+    "member": "modules/zlib/1.3.1.bcr.5/MODULE.bazel",
+    "expected_member_bytes": 237,
+    "expected_member_sha256": "eec517b5bbe5492629466e11dae908d043364302283de25581e3eb944326c4ca",
+    "expected_archive_bytes": 409600,
+    "expected_archive_sha256": "60b023fc3b3abc4dee63beafc5cc563747bc7d4c3c0d34649886d0e3d7c89212",
+    "archive_body_read_or_hash": false,
+    "registry_bundle_entries": 177,
+    "advertised_member_bytes": 273940,
+    "decision": "Separately review bounded owned metadata corpus preparation and normal file-registry ownership, rather than retry failed alias or extend the shared harness for each dependency. Exact source verification precedes any native continuation.",
+    "qualification": "Inventory and fixture provenance are positive source grounding, not current archive/member bytes or runtime demand. Six direct objects and absent registry policy JSON remain separate. No archive payload/full fixture assembly/F3/network/acquisition activated."
+  },
+  "checks": {
+    "plan_status": "passed",
+    "archive": "passed",
+    "diff": "passed",
+    "current_receipt_references": "passed"
+  },
+  "recorded_utc": "2026-10-07T01:32:38.616300+00:00",
+  "packet_elapsed_seconds": 638.516744
+}
