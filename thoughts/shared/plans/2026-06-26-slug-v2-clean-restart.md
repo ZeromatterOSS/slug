@@ -34,28 +34,27 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-245-m7a-normal-rustc-rules-shell-source-readiness-r1
-Status: Accepted bounded Rules Shell readiness; next typed sh_executable source readiness selected
+Packet: WP-7-246-m7a-normal-rustc-shell-executable-source-readiness-r1
+Status: Accepted Shell executable readiness; next typed CC toolchains package selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1021](./slug-v2-subplans/wp1021-rules-shell-source-readiness-2026-10-08.json)
-accepts original additional[4] Rules Shell metadata8/source4 after two bounded captures
-(6decisions/4usable/2missing/3477B, zero test credit). Core92/themes4/native1 and independent
-FINAL accepted:97 names/99 native gate records plus2captures=101 current supervised
-records. Two root note-binding invocations rejected before child/operation/test credit
-are qualified separately. Native3.981374367s/209792KiB under262144; Source121/decoded
-6162849/SourceErrorNone, writes39599/peakbank11679531/end0. Same291ordered signatures/
-two64KiB contexts;855native/868auditunion pins. Shell directory refusal gone; actual
-next219B Host Lstat is same-root shell/private/sh_executable.bzl, grounded by captured
-literal17:0. Next bounded availability/direct frontier and conditional existing-role
-readiness advance normal Rustc prerequisites. Source285net (main50/child235), static
-paths/oneinlinebool, no retained runtime string/path copies; borrow/transfer/share and
-scoped interners where repetition/lifetime fit. Prefix fits; whole producer/workload,
-individual native source bodies and full heap retirement remain open. Caps unchanged.
-Windows remains minimal stubs/deferred until effectively testable.
+[WP1022](./slug-v2-subplans/wp1022-shell-executable-source-readiness-2026-10-08.json)
+accepts sole captured sh_executable8497B append to borrowed original Rules Shell role,
+metadata9/source5/sameflag; no new retained runtime strings/paths. Core92/themes4/native1
+and independent FINAL accepted:97 names/99 native gates plus1capture=100 current supervised
+records; no failed gate/note rejection/retry/second activation. Native3.934274847s/208828KiB
+under262144; Source122/decoded6171346/SourceErrorNone/writes39599/peakbank11679531/end0.
+Same292 ordered signatures/two64KiB188+104;880native/893auditunion pins. Previous source
+refusal advances to current original additional[2] Rules CC cc/toolchains Host Lstat201B.
+Next bounded package markers/declared utility availability and conditional existing-role
+readiness toward normal Rustc. Source11net(main2/child9),32static descriptors/62literal bytes,
+no new runtime owned strings/cache/flag. Borrow/transfer/share and scoped interners where
+repetition/lifetime fit. Prefix fits; whole producer/workload, native bodies/heap retirement
+remain open. Source128 has6 numeric headroom only; all caps unchanged. Windows remains
+minimal stubs/deferred until effectively testable.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

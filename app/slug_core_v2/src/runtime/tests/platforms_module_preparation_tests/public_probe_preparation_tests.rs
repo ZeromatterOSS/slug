@@ -5875,6 +5875,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/BUILD.bazel",
         "/shell/shell/private/BUILD",
         "/shell/shell/private/sh_binary.bzl",
+        "/shell/shell/private/sh_executable.bzl",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -5926,7 +5927,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 12);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 14);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
         (
@@ -5938,8 +5939,16 @@ pub(super) fn rules_shell_import_sources_matrix() {
             PathObservationOperation::FileBytes,
         ),
         (
-            "/shell/shell/private/sh_executable.bzl",
+            "/shell/shell/private/sh_executable.bzl/child",
             PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/SH_EXECUTABLE.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/sh_executable.bzl.bak",
+            PathObservationOperation::FileBytes,
         ),
         (
             "/shell/shell/SH_BINARY.bzl",
