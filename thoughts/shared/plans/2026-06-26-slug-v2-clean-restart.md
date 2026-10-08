@@ -34,28 +34,30 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-253-m7a-normal-rustc-linux-winsdk-package-metadata-r1
-Status: Accepted finite winsdk package metadata; Skylib toolchains metadata decision selected
+Packet: WP-7-254-m7a-normal-rustc-skylib-toolchains-readiness-r1
+Status: Accepted finite Skylib toolchains metadata; unittest package readiness decision selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1029](./slug-v2-subplans/wp1029-linux-winsdk-package-metadata-2026-10-08.json)
-accepts exact original winsdk BUILD.bazel package-candidate Lstat under full current-epoch
-request/Spec/ownplan/generated+checked CC authority. Candidate is metadata-only and outside
-the owned output plan; BUILD/repo/ignore behavior remains unchanged. Core98/fourthemes/
-native1/independent FINAL pass:103 names/105 supervised records/no capture. Native4.197113559s/
-210224KiB<262144/direct928/audit941; Source124/decoded6172507/ErrorNone/Written39690/
-peakbank11679531/end0, same294 ordered188+106/two64KiB. Child58net/12helpers54net/same98
-selectors/four configs and policies; zero new native retained strings/paths/Arc/request/Spec/
-plan copies/fields/cache/interner/pool. No failed supervised operations/runtime retry/capraise.
-The next saved Lstat exactly matches configured Skylib root/toolchains, with namespace,
-materialization and environment association unavailable. Next finite package metadata decision
-uses natural tracked lookup and checked source-root authority; no target scan or speculative
-body/availability/caller claim. Source128 remaining4 numeric only. Borrow storage/use scoped
-interners for retained repetition; representative prefix fits, full producer/compiler/wholegraph/
-heapWeak/aggregate memory still open. Windows deferred.
+[WP1030](./slug-v2-subplans/wp1030-skylib-toolchains-metadata-2026-10-08.json)
+accepts exact selected Skylib toolchains and both normal BUILD candidates Lstat under the
+existing paired role/original root/whole Need. Sole strict2 capture has two genuine leafENOENT,
+0body/hash/facts/bytes/0testcredit, no frontier or new source-package/body eligibility. Body4
+unchanged/meta5/uniqueNeed13; full4 checkedroot/table before qualified3 interface/private
+metadata tuple only. Core98/fourthemes/native1/FINAL:103 names/105 native gates+1capture=
+106 supervised records/0failed supervised operations. Native4.176704224s/210452KiB<262144/
+direct953/audit966; source124/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0
+unchanged, same294188+106/two64KiB/zero newrows. Source85net/twelvehelpers72net/static48+
+48bytes/all98/fourconfigs and policies exact/zero new native retained strings or owners.
+One root precondition omitted required review copies before gate supervisor, rawpreserved/
+0gateartifacts/0compiler-native-testchildren; corrected API before missing gates with no second
+activation/runtime retry/capraise. Next exact savedSkylib root/toolchains/unittest207B Lstat
+selects finite child package readiness, no caller/kind/availability/body/provider claim or
+future activation. Source128 remaining4 numeric only; representative prefix fits, full
+producer/compiler/wholegraph/certificates/heapWeak/aggregate memory open. Borrow storage/use
+scoped interners for retained repetition, Windows deferred.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

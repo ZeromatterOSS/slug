@@ -5969,7 +5969,11 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         let selected = Path::new("/skylib").join(relative);
         assert_exact_root_file_role(
             relative,
-            &[PathObservationOperation::Lstat],
+            &operations[..if BAZEL_SKYLIB_IMPORTS.contains(&relative) {
+                2
+            } else {
+                1
+            }],
             Bodies::with_bazel_skylib_import_sources,
             |b| b.bazel_skylib_import_sources,
             &[],
@@ -5991,19 +5995,21 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         .with_fifth(path("/skylib"))
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let mut all = need(Path::new("/skylib/lib"), PathObservationOperation::Lstat);
-    all = all
-        .try_union(&need(
-            Path::new("/skylib/rules"),
-            PathObservationOperation::Lstat,
-        ))
-        .unwrap();
+    for relative in &BAZEL_SKYLIB_IMPORT_METADATA[1..] {
+        all = all
+            .try_union(&need(
+                &Path::new("/skylib").join(relative),
+                PathObservationOperation::Lstat,
+            ))
+            .unwrap();
+    }
     for relative in BAZEL_SKYLIB_IMPORTS {
         let selected = Path::new("/skylib").join(relative);
         for operation in &operations {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 10);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 13);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6014,6 +6020,28 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
     for (excluded, operation) in [
         ("/skylib/lib", PathObservationOperation::FileBytes),
         ("/skylib/rules", PathObservationOperation::FileBytes),
+        ("/skylib/toolchains", PathObservationOperation::FileBytes),
+        (
+            "/skylib/toolchains/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/toolchains/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/skylib/Toolchains/BUILD", PathObservationOperation::Lstat),
+        (
+            "/skylib/toolchains/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/toolchains/BUILD.bazel.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/toolchains/BUILD",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/skylib/lib/paths.bzl/child",
             PathObservationOperation::Lstat,
@@ -6050,20 +6078,32 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileDigest,
         ),
     ] {
-        let mixed = all
-            .try_union(&need(Path::new(excluded), operation.dupe()))
-            .unwrap();
-        let mut progress = 0;
-        if bodies.admit(&mixed).is_ok() {
-            progress += 1;
+        let bad = need(Path::new(excluded), operation.dupe());
+        for mixed in [all.try_union(&bad).unwrap(), bad.try_union(&all).unwrap()] {
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(
+                (denied.family, denied.operation),
+                ("path", path_operation_code(&operation))
+            );
+            assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+            let original = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| d.path().as_path() == Path::new(excluded) && d.operation() == operation)
+                .unwrap();
+            let first = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+                .unwrap()
+                .0;
+            assert!(std::ptr::eq(first, original));
         }
-        assert_eq!(progress, 0);
-        let denied = bodies.admit(&mixed).unwrap_err();
-        assert_eq!(
-            (denied.family, denied.operation),
-            ("path", path_operation_code(&operation))
-        );
-        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
     }
     let selected = Path::new("/skylib/lib/modules.bzl");
     for (excluded, operation) in [
@@ -6112,6 +6152,45 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         .with_fifth(path("/other"))
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(wrong_slot.admit(&all).is_err());
+    let mut restored = bodies;
+    let selected = restored.additional[1].take();
+    assert!(restored.bazel_skylib_import_sources && restored.admit(&all).is_err());
+    restored.additional[1] = selected;
+    assert!(restored.admit(&all).is_ok());
+    let local = SourcePreparationNeeds::repository(
+        Arc::into_inner(local_native_request(
+            &restored.roots[0],
+            "unknown+",
+            "/skylib",
+        ))
+        .unwrap(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    for mixed in [
+        all.try_union(&local).unwrap(),
+        local.try_union(&all).unwrap(),
+    ] {
+        assert!(Arc::ptr_eq(
+            original,
+            mixed.repository_materializations().values().next().unwrap()
+        ));
+        let (first, reason) = restored
+            .first_denied_materialization_with_plan_matcher(
+                &mixed,
+                &generated_features_plan_matches,
+            )
+            .unwrap();
+        assert!(std::ptr::eq(first, original.as_ref()));
+        assert_eq!(reason, "binding");
+        let mut progress = 0;
+        if restored.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+    }
+    drop(local);
+    assert!(weak.upgrade().is_none());
 }
 #[test]
 fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {

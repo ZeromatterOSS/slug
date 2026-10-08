@@ -296,7 +296,13 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "rules/common_settings.bzl",
     "lib/modules.bzl",
 ];
-const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
+const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 5] = [
+    "lib",
+    "rules",
+    "toolchains",
+    "toolchains/BUILD.bazel",
+    "toolchains/BUILD",
+];
 const RULES_CC_ENVIRONMENT_NAMES: [&str; 13] = [
     "BAZEL_VC",
     "BAZEL_VC_FULL_VERSION",
