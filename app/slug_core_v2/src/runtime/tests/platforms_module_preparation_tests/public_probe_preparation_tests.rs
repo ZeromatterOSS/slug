@@ -408,6 +408,9 @@ impl GuardedSingleton {
         needs: &SourcePreparationNeeds,
         denied: Denied,
     ) -> NativeDemandSessionError {
+        if let Some(diagnostic) = self.bodies.environment_diagnostic(needs, &denied) {
+            println!("{diagnostic}");
+        }
         if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
             println!("{diagnostic}");
             if let Some(plan) = self.bodies.generated_plan_diagnostic(needs, &denied) {
@@ -870,18 +873,200 @@ fn materialization_refusal_projection_preserves_kind_checks_and_precedence() {
         .unwrap(),
     );
     for (earlier, family) in [(bootstrap, "bootstrap"), (environment, "environment")] {
-        let rejected = mixed.try_union(&earlier).unwrap();
-        let denied = bodies.admit(&rejected).unwrap_err();
-        assert_eq!(denied.family, family);
-        assert!(
-            bodies
-                .materialization_diagnostic(&rejected, &denied)
-                .is_none()
-        );
+        for rejected in [
+            mixed.try_union(&earlier).unwrap(),
+            earlier.try_union(&mixed).unwrap(),
+        ] {
+            let denied = bodies.admit(&rejected).unwrap_err();
+            assert_eq!(denied.family, family);
+            let diagnostic = bodies.environment_diagnostic(&rejected, &denied);
+            assert_eq!(diagnostic.is_some(), family == "environment");
+            if let Some(view) = diagnostic {
+                assert!(std::ptr::eq(
+                    view.request,
+                    rejected.repository_environment().unwrap()
+                ));
+                assert!(std::ptr::eq(
+                    view.request.names().iter().next().unwrap().as_ptr(),
+                    earlier
+                        .repository_environment()
+                        .unwrap()
+                        .names()
+                        .iter()
+                        .next()
+                        .unwrap()
+                        .as_ptr(),
+                ));
+                let with_bootstrap = rejected
+                    .try_union(&SourcePreparationNeeds::root_module_bootstrap(
+                        slug_bzlmod_v2::RootModuleBootstrapRequest {
+                            workspace: path("/foreign"),
+                        },
+                    ))
+                    .unwrap();
+                let earlier = bodies.admit(&with_bootstrap).unwrap_err();
+                assert_eq!(earlier.family, "bootstrap");
+                assert!(
+                    bodies
+                        .environment_diagnostic(&with_bootstrap, &earlier)
+                        .is_none()
+                );
+            }
+            assert!(
+                bodies
+                    .materialization_diagnostic(&rejected, &denied)
+                    .is_none()
+            );
+        }
     }
     let denied = bodies.admit(&mixed).unwrap_err();
     assert!(bodies.materialization_diagnostic(&mixed, &denied).is_some());
     assert!(bodies.admit(&body).is_ok());
+}
+#[test]
+fn environment_refusal_projection_is_bounded_and_borrowed() {
+    use fmt::Write;
+    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let make = |workspace: &str, names: &[&str]| {
+        SourcePreparationNeeds::environment(
+            NeedRepositoryEnvironmentNames::new(
+                path(workspace),
+                RepositoryEnvironmentNameFrontier::from_unsorted(
+                    names
+                        .iter()
+                        .map(|name| compact_str::CompactString::new(name)),
+                ),
+            )
+            .unwrap(),
+        )
+    };
+    let left = make("/fixture", &["Z", "", "\0\né"]);
+    let right = make("/fixture", &["A", "Z"]);
+    let needs = left.try_union(&right).unwrap();
+    let denied = bodies.admit(&needs).unwrap_err();
+    let view = bodies.environment_diagnostic(&needs, &denied).unwrap();
+    assert!(std::ptr::eq(
+        view.request,
+        needs.repository_environment().unwrap()
+    ));
+    assert_eq!(view.bounds(), (true, Some(6)));
+    let encoded = view.to_string();
+    assert_eq!(
+        encoded,
+        "WP1024_ENVIRONMENT capture=captured workspace_matches=true workspace_len=8 workspace_hex=2f66697874757265 names_count=4 names_bytes=6\nWP1024_ENVIRONMENT_NAME ordinal=1 name_len=0 name_hex=-\nWP1024_ENVIRONMENT_NAME ordinal=2 name_len=4 name_hex=000ac3a9\nWP1024_ENVIRONMENT_NAME ordinal=3 name_len=1 name_hex=41\nWP1024_ENVIRONMENT_NAME ordinal=4 name_len=1 name_hex=5a"
+    );
+    assert!(encoded.is_ascii() && !encoded.contains("value="));
+    let foreign = make("/foreign", &["A"]);
+    let foreign_denied = bodies.admit(&foreign).unwrap_err();
+    assert!(
+        bodies
+            .environment_diagnostic(&foreign, &foreign_denied)
+            .unwrap()
+            .to_string()
+            .contains("workspace_matches=false workspace_len=8 workspace_hex=2f666f726569676e")
+    );
+    let exact = "x".repeat(ENVIRONMENT_FIELD_BYTES);
+    let too_long = "x".repeat(ENVIRONMENT_FIELD_BYTES + 1);
+    for (name, captured) in [(&exact, true), (&too_long, false)] {
+        let need = make("/fixture", &[name]);
+        let denied = bodies.admit(&need).unwrap_err();
+        let view = bodies.environment_diagnostic(&need, &denied).unwrap();
+        assert_eq!(view.bounds(), (captured, Some(name.len())));
+        let output = view.to_string();
+        assert_eq!(output.contains("\nWP1024_ENVIRONMENT_NAME"), captured);
+        if !captured {
+            assert!(output.contains("workspace_hex=none names_count=1 names_bytes=1025"));
+        }
+    }
+    let workspace = format!("/{}", "w".repeat(ENVIRONMENT_FIELD_BYTES - 1));
+    let workspace_over = format!("{workspace}w");
+    for (workspace, captured) in [(&workspace, true), (&workspace_over, false)] {
+        let need = make(workspace, &[""]);
+        let denied = bodies.admit(&need).unwrap_err();
+        assert_eq!(
+            bodies
+                .environment_diagnostic(&need, &denied)
+                .unwrap()
+                .bounds(),
+            (captured, Some(0))
+        );
+    }
+    let names = (0..ENVIRONMENT_NAME_LIMIT + 1)
+        .map(|i| format!("N{i:02}"))
+        .collect::<Vec<_>>();
+    for (count, captured) in [
+        (ENVIRONMENT_NAME_LIMIT, true),
+        (ENVIRONMENT_NAME_LIMIT + 1, false),
+    ] {
+        let borrowed = names[..count]
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        let need = make("/fixture", &borrowed);
+        let denied = bodies.admit(&need).unwrap_err();
+        let view = bodies.environment_diagnostic(&need, &denied).unwrap();
+        assert_eq!(view.bounds(), (captured, captured.then_some(count * 3)));
+        let output = view.to_string();
+        assert_eq!(output.lines().count(), if captured { count + 1 } else { 1 });
+        if !captured {
+            assert!(output.ends_with("names_count=33 names_bytes=none"));
+        }
+    }
+    // Four distinct fields exactly fill the aggregate after the original workspace.
+    let a = "a".repeat(1024);
+    let b = "b".repeat(1024);
+    let c = "c".repeat(1024);
+    let d = "d".repeat(1016);
+    let over = "d".repeat(1017);
+    for (last, captured) in [(&d, true), (&over, false)] {
+        let need = make("/fixture", &[&a, &b, &c, last]);
+        let denied = bodies.admit(&need).unwrap_err();
+        let view = bodies.environment_diagnostic(&need, &denied).unwrap();
+        assert_eq!(view.bounds(), (captured, Some(3072 + last.len())));
+        let output = view.to_string();
+        assert!(output.len() + 1 <= ENVIRONMENT_MARKER_BYTES);
+        assert_eq!(output.lines().count(), if captured { 5 } else { 1 });
+    }
+    // Maximum row count and aggregate together exercise actual encoded framing.
+    let maximum = (0..ENVIRONMENT_NAME_LIMIT)
+        .map(|i| format!("{i:02}{}", "x".repeat(if i < 24 { 126 } else { 125 })))
+        .collect::<Vec<_>>();
+    let borrowed = maximum.iter().map(String::as_str).collect::<Vec<_>>();
+    let need = make("/fixture", &borrowed);
+    let denied = bodies.admit(&need).unwrap_err();
+    let view = bodies.environment_diagnostic(&need, &denied).unwrap();
+    assert_eq!(view.bounds(), (true, Some(ENVIRONMENT_AGGREGATE_BYTES - 8)));
+    let maximum_encoded = view.to_string();
+    assert_eq!(maximum_encoded.lines().count(), ENVIRONMENT_NAME_LIMIT + 1);
+    assert_eq!(maximum_encoded.len() + 1, 10161);
+    assert!(maximum_encoded.len() + 1 <= ENVIRONMENT_MARKER_BYTES);
+    let mut output = String::new();
+    let mut writer = MaterializationWriter {
+        writer: &mut output,
+        bytes: ENVIRONMENT_MARKER_BYTES - 2,
+        limit: ENVIRONMENT_MARKER_BYTES,
+    };
+    writer.write_str("x").unwrap(); // The final println LF fits exactly.
+    assert!(writer.write_str("y").is_err());
+    assert_eq!(output, "x");
+    let path_need =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/closed"),
+            PathObservationOperation::FileBytes,
+        )));
+    let other = bodies.admit(&path_need).unwrap_err();
+    assert!(bodies.environment_diagnostic(&path_need, &other).is_none());
+    assert!(
+        NeedRepositoryEnvironmentNames::new(
+            path("/fixture"),
+            RepositoryEnvironmentNameFrontier::empty()
+        )
+        .is_err()
+    );
 }
 #[test]
 fn materialization_refusal_projection_is_bounded_and_borrowed() {

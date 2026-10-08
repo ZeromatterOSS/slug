@@ -18,6 +18,7 @@ use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::ObservedPathFrontierError;
 
 use super::*;
+use crate::runtime::materialization_diagnostic::BorrowedHex;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_AGGREGATE_BYTES;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_FIELD_BYTES;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_MARKER_BYTES;
@@ -884,6 +885,23 @@ impl Bodies {
         }
         None
     }
+    fn environment_diagnostic<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+        denied: &Denied,
+    ) -> Option<EnvironmentDiagnostic<'a>> {
+        if denied.family != "environment" {
+            return None;
+        }
+        let request = needs
+            .repository_environment()
+            .expect("environment refusal preserves its original typed Need");
+        assert!(!request.names().is_empty());
+        Some(EnvironmentDiagnostic {
+            request,
+            workspace_matches: request.workspace() == &self.roots[0],
+        })
+    }
     fn materialization_diagnostic<'a>(
         &self,
         needs: &'a SourcePreparationNeeds,
@@ -1640,6 +1658,73 @@ struct Milestones {
     refusal: Option<SelectedSourceRefusal>,
     denied: Option<Denied>,
 }
+const ENVIRONMENT_NAME_LIMIT: usize = 32;
+const ENVIRONMENT_FIELD_BYTES: usize = 1024;
+const ENVIRONMENT_AGGREGATE_BYTES: usize = 4096;
+const ENVIRONMENT_MARKER_BYTES: usize = 16384;
+struct EnvironmentDiagnostic<'a> {
+    request: &'a slug_bzlmod_v2::NeedRepositoryEnvironmentNames,
+    workspace_matches: bool,
+}
+impl EnvironmentDiagnostic<'_> {
+    fn bounds(&self) -> (bool, Option<usize>) {
+        if self.request.names().len() > ENVIRONMENT_NAME_LIMIT {
+            return (false, None);
+        }
+        let workspace = self.request.workspace().as_path().as_os_str().as_bytes();
+        let mut fields_fit = workspace.len() <= ENVIRONMENT_FIELD_BYTES;
+        let names_bytes = self.request.names().iter().fold(Some(0usize), |sum, name| {
+            fields_fit &= name.len() <= ENVIRONMENT_FIELD_BYTES;
+            sum.and_then(|sum| sum.checked_add(name.len()))
+        });
+        let aggregate_fits = names_bytes
+            .and_then(|sum| sum.checked_add(workspace.len()))
+            .is_some_and(|sum| sum <= ENVIRONMENT_AGGREGATE_BYTES);
+        (fields_fit && aggregate_fits, names_bytes)
+    }
+}
+impl fmt::Display for EnvironmentDiagnostic<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use fmt::Write;
+        // All bounded field checks precede any output; no clipped rows are emitted.
+        let (captured, names_bytes) = self.bounds();
+        let workspace = self.request.workspace().as_path().as_os_str().as_bytes();
+        let mut writer = MaterializationWriter {
+            writer: formatter,
+            bytes: 0,
+            limit: ENVIRONMENT_MARKER_BYTES,
+        };
+        write!(
+            writer,
+            "WP1024_ENVIRONMENT capture={} workspace_matches={} workspace_len={} workspace_hex={} names_count={} names_bytes=",
+            if captured {
+                "captured"
+            } else {
+                "bounds_refused"
+            },
+            self.workspace_matches,
+            workspace.len(),
+            BorrowedHex(captured.then_some(workspace)),
+            self.request.names().len()
+        )?;
+        match names_bytes {
+            Some(bytes) => write!(writer, "{bytes}")?,
+            None => writer.write_str("none")?,
+        }
+        if captured {
+            for (index, name) in self.request.names().iter().enumerate() {
+                write!(
+                    writer,
+                    "\nWP1024_ENVIRONMENT_NAME ordinal={} name_len={} name_hex={}",
+                    index + 1,
+                    name.len(),
+                    BorrowedHex(Some(name.as_bytes()))
+                )?;
+            }
+        }
+        Ok(())
+    }
+}
 #[derive(Clone)]
 struct ModuleRoot {
     bodies: Arc<Bodies>,
@@ -1661,6 +1746,9 @@ impl ModuleRoot {
         needs: SourcePreparationNeeds,
     ) -> Result<SourcePreparationOutcome<ModuleTerminal>, NativeDemandSessionError> {
         if let Err(denied) = self.bodies.admit(&needs) {
+            if let Some(diagnostic) = self.bodies.environment_diagnostic(&needs, &denied) {
+                println!("{diagnostic}");
+            }
             self.milestones.lock().unwrap().denied = Some(denied);
             return Err(refusal());
         }

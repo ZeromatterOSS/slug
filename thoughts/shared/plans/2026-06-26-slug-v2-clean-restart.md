@@ -34,30 +34,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-247-m7a-normal-rustc-cc-toolchains-source-readiness-r1
-Status: Accepted CC toolchains readiness; next borrowed environment-name diagnostic selected
+Packet: WP-7-248-m7a-normal-rustc-environment-name-diagnostic-r1
+Status: Accepted borrowed environment-name diagnostic; finite snapshot readiness design selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1023](./slug-v2-subplans/wp1023-cc-toolchains-source-readiness-2026-10-08.json)
-accepts borrowed existing Rules CC body50/metadata12/unique110 readiness from two captured
-sources2754B; missing BUILD.bazel metadata-only. Core92/themes4/native1 and independent FINAL
-accepted:97 names/99 final native-gate records plus1capture=100 final current records. Two
-narrow compiler/control corrections preserve100 earlier failed/superseded records separately,
-200actual checkpoint records total with zero duplicate credit; no native rerun/capraise/
-stale resolver/second activation. Native3.981883607s/209744KiB<262144;Source123/decoded6172507/
-ErrorNone/writes39599/peakbank11679531/end0. Same294ordered signatures/original292+2END/
-two64KiB188+106;912native/925auditunion pins. Source91net(main6/child85),96staticdescriptor/
-156literal bytes;12helpers76net. No new native retained strings/paths/flags/cache/interner;
-Local fixture transfers sole-owned request. Borrow/transfer/share, and use existing scoped
-interners where retained repetition and cleanup fit. Bounded prefix fits; full producer,
-body certificate, native heap retirement and whole-workload fit remain open. Source128 has5
-numeric headroom only; all caps unchanged. Prior CC path refusal advances to environment
-family with name/owner unavailable. Next bounded borrowed name diagnostic before permission
-selection toward normal Rustc; no environment values/permission/activation inferred. Windows
-minimal stubs/deferred until effectively testable.
+[WP1024](./slug-v2-subplans/wp1024-environment-name-diagnostic-2026-10-08.json)
+accepts a phase-only borrowed environment-name diagnostic with unchanged admission. Core93/
+fourthemes/native1 and independent FINAL pass:98 names/100 current records/zero captures.
+Native4.057432486s/209448KiB<262144,914 direct/927auditunion pins, same294ordered188+106/
+two64KiB. Source123/decoded6172507/ErrorNone/writes39599/peakbank11679531/end0 unchanged.
+Zero retained fields/strings/paths/request/frontier/Arc copies/new interner/cache/pool;
+Rust273net growth reviewed as coherent formatter/boundary tests;12helpers107net/fourpolicies
+exact. One decoder-carrier gap corrected before activation/operations with original REVISE
+preserved, no runtime failure/retry/capraise. Actual13 original environment names166B and101B
+workspace match captured, no values/repository owner/caller/Windows dispatch proved. Next
+finite readiness design through original command snapshot/workspace/revision/certificate/
+absence/revocation/progress, no blanket permission or process reads. Bounded prefix fits;
+full normal producer/whole graph/certificate/native heap Weak still open, source128 remaining5
+numeric only. Borrow/transfer/share and existing scoped interners where retained repetition
+and cleanup fit; Windows minimal stubs/deferred until effectively testable.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
