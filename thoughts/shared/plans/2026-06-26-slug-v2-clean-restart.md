@@ -35,23 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing platforms host extension source
+Status: Preparing platforms host generated plan attribution
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1002](./slug-v2-subplans/wp1002-platforms-host-source-readiness-2026-10-08.json)
-accepts exact two captured platforms host sources with Lstat/FileBytes, preserving the
-separate three-candidate metadata role and original request/whole-Need/48CC8metadata contracts.
-One strict capture gives two eligible files816B and genuine unavailable BUILD.bazel; no body
-grant for the unavailable marker. Borrowed literals/one Boolean add no retained string copies
-or containers. Fresh compile/check/65Rust/four controls and one native pass; native5.045s peaks
-121,924KiB under256MiB. SourceNone/108attempts/1,255,888decoded now reaches exact206B HostLstat
-platforms_root/host/extension.bzl.279 ordered leases/endingcredits check;72allphase records,
-71native gates/70named passes. Complete public producer and whole-workload fit remain required.
-Next review one fixed source-grounded extension capture and conditional append to the existing
-finite source role; keep current caps/identities/ownership and allocation discipline.
+[WP1003](./slug-v2-subplans/wp1003-platforms-host-source-readiness-2026-10-08.json)
+accepts exact eligible2620B extension append to existing borrowed source table3/same flag,
+metadata/default/request/whole-Need/48CC8metadata unchanged. No retained string copies or new
+flag/container/production/DICE changes; formattednet22. Fresh compile/check/65Rust/four controls
+and one native pass5.223s/121084KiB under256MiB. SourceNone109/1258508decoded; actual next
+materialization generated_file_effects/generated_kind captures exact182B host_platform_repo
+owner, logicalrootNone; no complete output plan/mapping/hostbranch/causalchain or public Rustc.
+280brackets/endingcredits match;72allphase/71nativegate/70named, capture1eligible0tests separately.
+Next extend the EXISTING bounded borrowed-plan diagnostic for this exact owner while admission
+stays unchanged; actual original plan must ground a later coupled finite matcher/namespace grant.
+No new source capture or guessed generated body. All budgets and allocation discipline persist;
+normal public producer and complete workload fit remain required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

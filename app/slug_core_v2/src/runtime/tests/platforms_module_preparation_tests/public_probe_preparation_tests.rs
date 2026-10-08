@@ -3652,6 +3652,15 @@ fn platforms_host_import_sources_need_is_opt_in_exact_captured_rows_only() {
                 "/platforms/host/BUILD.bazel",
             ][..],
         ),
+        (
+            "host/extension.bzl",
+            "/platforms/host/extension.bzl",
+            &[
+                "/platforms/host/EXTENSION.bzl",
+                "/platforms/host/extension.bzl.other",
+                "/platforms/host/extension.bzl/child",
+            ][..],
+        ),
     ] {
         assert_exact_root_file_role(
             name,
@@ -3696,30 +3705,42 @@ fn platforms_host_import_sources_need_is_opt_in_exact_captured_rows_only() {
         "/platforms/host/BUILD",
         PathObservationOperation::FileBytes,
     ))
+    .unwrap()
+    .try_union(&need(
+        "/platforms/host/extension.bzl",
+        PathObservationOperation::Lstat,
+    ))
+    .unwrap()
+    .try_union(&need(
+        "/platforms/host/extension.bzl",
+        PathObservationOperation::FileBytes,
+    ))
     .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 4);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 6);
     assert!(bodies.admit(&allowed).is_ok());
-    let excluded = need(
+    for excluded_path in [
         "/platforms/host/constraints.bzl",
-        PathObservationOperation::FileDigest,
-    );
-    for mixed in [
-        allowed.try_union(&excluded).unwrap(),
-        excluded.try_union(&allowed).unwrap(),
+        "/platforms/host/extension.bzl",
     ] {
-        let first = bodies
-            .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
-            .unwrap()
-            .0;
-        let expected = mixed
-            .path_observations()
-            .unwrap()
-            .demands()
-            .iter()
-            .find(|d| d.operation() == PathObservationOperation::FileDigest)
-            .unwrap();
-        assert!(std::ptr::eq(first, expected));
-        assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+        let excluded = need(excluded_path, PathObservationOperation::FileDigest);
+        for mixed in [
+            allowed.try_union(&excluded).unwrap(),
+            excluded.try_union(&allowed).unwrap(),
+        ] {
+            let first = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+                .unwrap()
+                .0;
+            let expected = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| d.operation() == PathObservationOperation::FileDigest)
+                .unwrap();
+            assert!(std::ptr::eq(first, expected));
+            assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+        }
     }
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "unknown+", "/platforms")).clone(),

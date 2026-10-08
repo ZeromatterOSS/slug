@@ -347,7 +347,8 @@ const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc/private/link",
     "cc/private/rules_impl",
 ];
-const PLATFORMS_HOST_IMPORTS: [&str; 2] = ["host/constraints.bzl", "host/BUILD"];
+const PLATFORMS_HOST_IMPORTS: [&str; 3] =
+    ["host/constraints.bzl", "host/BUILD", "host/extension.bzl"];
 const PLATFORMS_HOST_METADATA: [&str; 3] = ["host", "host/BUILD.bazel", "host/BUILD"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
@@ -2687,7 +2688,7 @@ fn observe_native_command(
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
         println!(
-            "WP1002_PLATFORMS_HOST_IMPORT_SOURCES enabled={} policy_checked={} root_slot=2 operations=lstat,file_bytes source_count=2 cohort=host/constraints.bzl,host/BUILD kind=unobserved body=unobserved",
+            "WP1003_PLATFORMS_HOST_IMPORT_SOURCES enabled={} policy_checked={} root_slot=2 operations=lstat,file_bytes source_count=3 cohort=host/constraints.bzl,host/BUILD,host/extension.bzl kind=unobserved body=unobserved",
             platforms_host_import_sources,
             probe_report.policy_checked()
         );
