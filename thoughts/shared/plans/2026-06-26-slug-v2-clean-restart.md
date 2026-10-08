@@ -34,26 +34,27 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-243-m7a-normal-rustc-toolchain-hub-file-readiness-r1
-Status: Accepted finite hub files; repository-marker namespace metadata next
+Packet: WP-7-244-m7a-normal-rustc-hub-marker-metadata-r1
+Status: Accepted exact hub marker metadata; selected rules_shell source readiness follows
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1019](./slug-v2-subplans/wp1019-toolchain-hub-file-readiness-2026-10-08.json)
-admits the original exact hub two-file plan through existing generated/RulesRust
-roles and couples selected-file namespace access to the same original current epoch.
-Core92/themes4/native1/independent FINAL accepted,99passingrecords/97names/no failures.
-Native3.925883924s/210200KiB under262144KiB; written39599 and bankpeak11679531/end0,
-SourceErrorNone/source118/decoded6126320. Original generated_kind refusal advances
-to original hub current-epoch REPO.bazel Lstat, uniqueinstance5/ownplanallowedtrue/
-pathclassother. Next finite marker metadata needs the same owner/epoch guards;
-counted writes alone do not prove complete output/fullSpec attributes/certificate.
-Current prefix fits; full producer/whole-fit remain open. Borrow/transfer/share and
-existing scoped interners where repetition/lifetime fit; no owned plaintext mirror,
-transient unique data pool or cap raise. Source/native limits unchanged; blind retries
-closed. Rust117net/twoexistingcfgtestowners, no new retainedstrings/cache/flags.
+[WP1020](./slug-v2-subplans/wp1020-hub-marker-metadata-2026-10-08.json)
+accepts exact borrowed hub REPO.bazel/.bazelignore Lstat metadata through existing
+independent roles/original own-plan/current epoch. Core92/themes4/native1 and independent
+FINAL accepted;99current records/97names plus98 preserved zero-credit initial records
+=197actual. One adjacency-fixture correction required fresh current helper qualification;
+no stale resolver/second activation/native rerun. Native3.997410301s/209072KiB under262144,
+Source119/decoded6160419/SourceErrorNone, writes39599/peakbank11679531/end0. Prior hub
+namespace refusal advances to exact selected rules_shell_root/shell Host Lstat.
+Next integrate bounded prospective source availability and conditional finite readiness;
+directory demand proves no leaf body/caller/output/certificate. Existing child151net
+(12policy/139tests), no retained strings/cache/flags; borrow/transfer/share and scoped
+interners where repetition/lifetime fit. Prefix fits, whole producer/workload remains
+open. Caps unchanged; preserve typed failures without identical retries or invented
+providers. Windows remains minimal stubs/deferred until effectively testable.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

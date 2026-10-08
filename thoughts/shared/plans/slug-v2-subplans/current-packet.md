@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-243-m7a-normal-rustc-toolchain-hub-file-readiness-r1
-Status: Accepted finite hub files; repository-marker namespace metadata next
+Packet: WP-7-244-m7a-normal-rustc-hub-marker-metadata-r1
+Status: Accepted exact hub marker metadata; selected rules_shell source readiness follows
 
 ## Observable and source basis
 
@@ -42,63 +42,97 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Accepted bounded checkpoint
+## Immediate accepted checkpoint
 
-[WP1019](wp1019-toolchain-hub-file-readiness-2026-10-08.json), baseline
-5d4b6c1ac2b02f4fea41189f347c1d79b0d80579, admits the original hub twoFile plan
-through the natural scoped writer and couples finite namespace access to its own
-plan and current epoch. Existing generated opt-in AND RulesRust import readiness,
-original workspace/atomic tuple/mappingNone and complete ordered signatures are
-mandatory. WORKSPACE.bazel52B then BUILD.bazel34099B, both executable; no archive,
-symlink, extra/crossed/reordered files or generic grant. Full original RepoSpec is
-structurally preserved; attributes6 is metadata, not identity authority.
+[WP1020](wp1020-hub-marker-metadata-2026-10-08.json) accepts exact borrowed hub
+REPO.bazel/.bazelignore Lstat-only classes under independent existing marker roles,
+original own-plan/epoch/atomic owner. One existing Rust child151net (12policy/139tests),
+no retained strings/paths/plans/clones/cache/flags. Core92/themes4/native1 pass;
+99current records/97names, initial97 superseded successes plus1 failed fixture batch
+zero current credit:197 actual records. One adjacency fixture correction preserves
+parser/assertions, separately reviewed; all current gates requalified without stale
+resolver or second activation. Independent actual FINAL accepted.
+Native3.997410301s/209072KiB under262144; Source119/decoded6160419/Registry105235521,
+writes39599/peakbank11679531/end0/SourceErrorNone. Same287orderedFD signatures/two64KiB
+and815native/828auditunion pins. Prior hub namespace refusal gone; actual next is
+Host path193B Lstat exact selected rules_shell_root/shell. Counterdelta34099 is aggregate
+only. Public Rustc/certificate/caller/output/bodyWeak/whole-workload fit remain open.
 
-Two existing cfgtest Rust owners117net/static signature descriptors/cohort4/borrowed
-small file paths, no new retained String/path/Vec/Arcclone/interner/cache/flag or
-plaintext mirror. Production/DICE/Windows behavior unchanged. Current-epoch lookup
-borrows unique original request/generation root, bounded32 entries; selected files
-Lstat/FileBytes and finite root/ancestor Lstat only. Existing92 tests cover roles,
-all atomic crossings, own-plan order/content/length/executable/EOF, both mixed-Need
-orders before progress, pointer/Weak and current-transaction A/B/A. Tiny test plans
-prove the seam only; native matching uses the original complete signatures.
+## Active integrated decision
 
-Core92/four decoder themes/native1 and independent DESIGN/STATIC/prelaunch/FINAL
-accepted.99 passing current records/97names/no failures/currentcapture0; fresh
-helpers remove all prior97-record ledger exceptions. Strict current pins815native/
-828auditedunion and fresh CargoJSONCore37df1b1e verified. Threepreps0.1274/9.8782/
-7.2631s, Rust runtime sum19.1628s and themes2.0139s. Native3.925883924s/conservative
-210200KiB under262144, SourceErrorNone/source118/decoded6126320, Registry105235521,
-transfer0/written39599, bankpeak11679531/beforeDrop2114151/end0. Same287ordered
-source signatures/two64KiB188+99/6395771physical/12791542bracket stable. Prior source
-captures/oracle/owner/Workspace facts remain qualified0fresh; no old executable
-traversal. Actual Scope/recorderWeak expire; large Source/plan/bodyWeak unavailable.
+Choose a closed metadata extension for exact hub generation-root-relative REPO.bazel
+and .bazelignore, each Lstat-only. This is Slug-native cfgtest Linux readiness;
+accepted exact projections remain unchanged. Actual REPO demand and prospective
+ignore demand are grounded by [the saved successor](../../../../target/wp1019/next-source.md),
+repo_file::drive_route_repo_source and repository_ignore::drive_route_ignore_source
+through original route source_observation_key/source_observation_epoch_key. This
+proves demand ownership, not current marker existence/body/freshness. No new capture.
 
-Original generated_kind refusal is gone. Actual next refusal is namespace Lstat
-/tmp/.tmphTlWSV/REPO.bazel, unique current Materialization instance5, exact original
-hub owner, owner_plan_allowedtrue/pathclassother. Borrowed lookup reaches successful
-immutable entries, but aggregate writes/scalar identity do not independently prove
-full Spec attributes, complete files/output freshness/public certificate or producer.
-Public preparationcomplete/singleton/policychecked still ends native computation
-refusal, with certificate/analyses/actions/Rustc unavailable. Prefix memory fits;
-whole-workload fit and full producer remain open.
+Use existing borrowed unique current epoch/request/valid generation-root/nonzero
+instance/max32 lookup and existing exacthub selector/own-plan signatures. Full original
+RepoSpec stays structurally owned; attributes6/count/digest is not permission identity.
+Compare borrowed strip_prefix(root) to static Paths; no join/string/root reconstruction.
+Select repo_marker only for REPO.bazel plus existing repo_marker_metadata readiness;
+ignore_marker only for .bazelignore plus existing ignore_file_bytes readiness. Require
+true static hub descriptor selected through original workspace/atomic tuple/mappingNone/
+generated AND RulesRust roles. Other owners and marker paths remain other. Both new
+classes admit only Lstat; fixed_file remains its separate Lstat/FileBytes class.
+A wrong own-plan may classify the path but owner_plan_allowedfalse denies everything.
+Preserve natural Missing/Regular/unsupported-kind/IO outcomes. Future marker FileBytes
+requires actual evidence; metadata permission proves no body/output/certificate.
 
-## Next selected implementation
+Rust allowlist: existing public_probe_preparation_tests.rs child only; parent remains
+unchanged. Existing cohesive owner is appropriate; estimate50–100netlines including
+existing finite/mixed/current transaction A/B/A controls. Same92 selectors; no new
+fixture suite/factory or DICE key. Require each marker role independently, exact root/
+relative/owner/plan/currentepoch; preserve both own output file permissions. Deny
+FileBytes/Digest/DirectoryEntries/ReadLink/InputImage, case/child/suffix/unknown/sibling/
+oldroot paths, missing/wrong/ambiguous/invalid epoch/context and every other owner.
+Mixed valid files+bothmarkers positive, mixedinvalid bothorders refuses beforeprogress
+with original firstoffender/pointer/Weak semantics. Protected Host marker tests unchanged.
+Runtime retained String/path/Vec/Arc/request/plan/epoch clones, flags/cache/interner0;
+new storage is static relative/class literals only. Borrow/transfer/share existing
+storage; scoped interners for repeated retained strings only where lifetime fits.
 
-[Actual source recommendation](../../../../target/wp1019/next-source.md) grounds
-finite repository-marker metadata through the original generation-root/current
-epoch/own-plan association. Independent integrated design precedes a functional
-marker extension. Preserve original request/fullSpec, role readiness and whole-Need
-pre-IO refusal; no path repair, generic namespace/prefix permission, physical-root
-reconstruction, provider fabrication or new retained strings. Marker metadata does
-not authorize marker FileBytes, listing/digest/readlink or unrelated owners.
+Minimum twelve fresh WP1019 private helper counterparts; unchanged configs/92selectors/
+287bindings/9profiles/caps and strictcurrentpins. Private wp988 PATH_CLASSES union with
+repo_marker/ignore_marker plus outer current operation-specific validation preserves
+its entire original parser and old contradictions. Never normalize to fixed_file or
+rewrite historical helper source/raw. Each newtag requires actual original hub owner/
+uniqueepoch/effective roles and respective existing flag/publicchecked projection;
+allowedfalse plan is legitimate denial, allowedtrue Lstat contradiction rejects.
+False correspondingrole cannot emit the tag. Ignore flag lacks independent raw witness:
+existing public projection ANDs bothflags and wp974 requires ignoretrue; retain that
+strictness, don't add disabled-context shims. Ordinary Rust proves independent role
+semantics. Extend same4themes for metadata Lstat contradiction, allotherops legitimate,
+falseplan/malformedclass/order/adjacency/crossowner/context and existing limits/lifetime.
+No body mirror, pool, dynamic callback registry or marker schema growth.
 
-Retain work5/lifetime8/native10/absolute cleanup3/RSS256MiB/AS512MiB/source128/
+Independent DESIGN precedes edits; disjoint source/helper edits then one independent
+actual STATIC authorizes the two sole False→True activations and unchanged supervisor.
+Root qualifies fresh successful98pre-native records/currentstrictpins/profiles/executable
+and exact caps before atmostone changednative; a duplicate independent prelaunch census
+is unnecessary for this unchanged launcher. Actual independent FINAL checks current
+native resources/next typed owner and savedgateaudit. Serialize pinnedCargoJSON offline
+jobs1 dependency/compile/Loading-Core-CLIcheck preparations<=60s, one92preflight/list,
+Core92/4strictdecoder themes/native1 =99passingrecords/97names; failuresseparate0credit.
+Prior captures/oracle/owner/Workspace/oldfailure facts0fresh, no oldexe traversal.
+
+Preserve work5/lifetime8/native10/absolute cleanup3/RSS256MiB/AS512MiB/source128/
 default16/production64/defaultHostRegistry1MiB/selectedknown4749878/eachbank16MiB/
-log1MiB/report4MiB/FSIZE16MiB and nine compiler profiles. Selector76 alone retains
-priorMALLOC_ARENA_MAX2; nativeenvironment unchanged. Borrow/transfer/share existing
-strings; use scoped interners for repeated retained values when owner lifetime fits,
-not a global pool for unique transient strings. Preserve failures and diagnose a
-changed hypothesis; no identical retry/cap raise. New effect owner, unavailable
-prerequisite or resource contradiction requires root reassessment. Normal public
-Rustc/support/data/provider/actions/runfiles/same-DICEedition2024→2021→2024/fullCLI/
-compilerexecution/certificate/bodyWeak/wholefit gates remain unchanged and open.
+log1MiB/report4MiB/FSIZE16MiB/ninecompilerprofiles/two64KiB/287FD6395771physical/
+12791542bracket. Selector76alone priorMALLOC_ARENA_MAX2; nativeenv unchanged. Any new
+owner/body/resource contradiction requires reassessment; preserve failures/noidentical
+retry/capraise. New metadata availability, output inventory/fullSpec projection/public
+certificate, normalRustc/support/data/provider/runfiles/sameDICEedition2024→2021→2024/
+fullCLI/compilerexecution/nativebodyWeak/wholeworkloadfit remain open until verified.
+
+## Selected successor
+
+[Current source recommendation](../../../../target/wp1020/next-source.md) grounds
+one integrated rules_shell availability/readiness decision. Exactly shell/BUILD.bazel,
+shell/BUILD and shell/sh_binary.bzl are prospective candidates from package lookup and
+the builtin test BUILD literal load, not inferred from the directory or observed as
+bodies. Preserve additional[4]/original mappings. Freeze strict bounded source capture
+and conditional only-eligible file permission before edits; finite Lstat metadata is
+separate. No generic root grant, invented providers, new body mirrors or cap raises.

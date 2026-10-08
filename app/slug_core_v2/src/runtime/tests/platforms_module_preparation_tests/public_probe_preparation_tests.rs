@@ -239,7 +239,9 @@ impl NamespacePolicy {
     fn admits(self, operation: &PathObservationOperation) -> bool {
         self.owner_plan_allowed
             && match self.path_class {
-                "ancestor" | "root" => operation == &PathObservationOperation::Lstat,
+                "ancestor" | "root" | "repo_marker" | "ignore_marker" => {
+                    operation == &PathObservationOperation::Lstat
+                }
                 "fixed_file" => matches!(
                     operation,
                     PathObservationOperation::Lstat | PathObservationOperation::FileBytes
@@ -296,6 +298,16 @@ fn namespace_policy(
     } else if let Ok(relative) = path.strip_prefix(root) {
         if files.iter().any(|file| relative == Path::new(file.0)) {
             "fixed_file"
+        } else if std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+            && bodies.repo_marker_metadata
+            && relative == Path::new("REPO.bazel")
+        {
+            "repo_marker"
+        } else if std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+            && bodies.ignore_file_bytes
+            && relative == Path::new(".bazelignore")
+        {
+            "ignore_marker"
         } else if files
             .iter()
             .any(|file| Path::new(file.0).starts_with(relative))
@@ -1072,7 +1084,9 @@ fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
 #[tokio::test]
 async fn namespace_owner_read_uses_current_transaction() {
     for owner in [0, 2, 3] {
-        let bodies = namespace_test_bodies();
+        let bodies = namespace_test_bodies()
+            .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
         let a = Arc::new(generated_test_owner_request(
             &bodies,
             owner,
@@ -1153,6 +1167,23 @@ async fn namespace_owner_read_uses_current_transaction() {
                 .admits(&demand.operation()),
                 index != 1
             );
+            for path in ["/generation/REPO.bazel", "/generation/.bazelignore"] {
+                let marker = PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(instance),
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                );
+                assert_eq!(
+                    namespace_policy(
+                        &bodies,
+                        &marker,
+                        Some(&current),
+                        &small_namespace_plan_matches
+                    )
+                    .admits(&marker.operation()),
+                    owner == 3 && index != 1
+                );
+            }
             if index == 0 {
                 old = Some(current);
             }
@@ -1365,7 +1396,9 @@ fn namespace_test_request(
 }
 #[test]
 fn generated_features_namespace_is_finite_and_exact() {
-    let bodies = namespace_test_bodies();
+    let bodies = namespace_test_bodies()
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
     let demand = |path, operation| {
         PathObservationDemand::new(
@@ -1403,6 +1436,14 @@ fn generated_features_namespace_is_finite_and_exact() {
             ("/parent/generation", "root"),
             (first, "fixed_file"),
             (fixed, "fixed_file"),
+            (
+                "/parent/generation/REPO.bazel",
+                if owner == 3 { "repo_marker" } else { "other" },
+            ),
+            (
+                "/parent/generation/.bazelignore",
+                if owner == 3 { "ignore_marker" } else { "other" },
+            ),
         ] {
             for operation in [
                 PathObservationOperation::Lstat,
@@ -1418,9 +1459,10 @@ fn generated_features_namespace_is_finite_and_exact() {
                 assert_eq!(policy.path_class, class);
                 assert_eq!(
                     policy.admits(&operation),
-                    operation == PathObservationOperation::Lstat
-                        || class == "fixed_file"
-                            && operation == PathObservationOperation::FileBytes
+                    class != "other"
+                        && (operation == PathObservationOperation::Lstat
+                            || class == "fixed_file"
+                                && operation == PathObservationOperation::FileBytes)
                 );
                 // The normal seam uses fixed captured signatures, never the tiny test signatures.
                 assert!(
@@ -1439,6 +1481,12 @@ fn generated_features_namespace_is_finite_and_exact() {
             "/parent/generation/WORKSPACE.bazel/child",
             "/parent/generation/workspace.bazel",
             "/parent/generation/WORKSPACE.bazel.bak",
+            "/parent/generation/repo.bazel",
+            "/parent/generation/REPO.bazel.bak",
+            "/parent/generation/REPO.bazel/child",
+            "/parent/generation/.BAZELIGNORE",
+            "/parent/generation/.bazelignore.bak",
+            "/parent/generation/.bazelignore/child",
             if owner == 1 {
                 "/parent/generation/globals.bzl"
             } else {
@@ -1459,6 +1507,55 @@ fn generated_features_namespace_is_finite_and_exact() {
                     .admits(&operation)
                 );
             }
+        }
+        if owner == 3 {
+            for repo_enabled in [false, true] {
+                for ignore_enabled in [false, true] {
+                    let mut roles = namespace_test_bodies();
+                    roles.repo_marker_metadata = repo_enabled;
+                    roles.ignore_file_bytes = ignore_enabled;
+                    for (path, tag, enabled) in [
+                        ("/parent/generation/REPO.bazel", "repo_marker", repo_enabled),
+                        (
+                            "/parent/generation/.bazelignore",
+                            "ignore_marker",
+                            ignore_enabled,
+                        ),
+                    ] {
+                        let marker = demand(path, PathObservationOperation::Lstat);
+                        let policy = namespace_policy(
+                            &roles,
+                            &marker,
+                            Some(&epoch),
+                            &small_namespace_plan_matches,
+                        );
+                        assert_eq!(policy.path_class, if enabled { tag } else { "other" });
+                        assert_eq!(policy.admits(&marker.operation()), enabled);
+                    }
+                }
+            }
+            let wrong = namespace_test_epoch_at(
+                &bodies,
+                [Arc::new(generated_test_owner_request(
+                    &bodies,
+                    owner,
+                    small_generated_plan(&[]),
+                ))],
+                instance,
+                "/parent/generation",
+            );
+            let marker = demand(
+                "/parent/generation/REPO.bazel",
+                PathObservationOperation::Lstat,
+            );
+            let policy = namespace_policy(
+                &bodies,
+                &marker,
+                Some(&wrong),
+                &small_namespace_plan_matches,
+            );
+            assert_eq!(policy.path_class, "repo_marker");
+            assert!(!policy.owner_plan_allowed && !policy.admits(&marker.operation()));
         }
         let d = demand(fixed, PathObservationOperation::FileBytes);
         let budget = slug_workspace_v2::ImageDescriptorBudget::new(4096);
@@ -1627,18 +1724,21 @@ fn generated_features_namespace_is_finite_and_exact() {
 }
 #[test]
 fn generated_features_namespace_refuses_mixed_need_before_progress() {
-    let bodies = namespace_test_bodies();
+    let bodies = namespace_test_bodies()
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
     let a = Arc::new(namespace_test_request(&bodies, false));
     let b = Arc::new(namespace_test_request(&bodies, true));
     let epoch = namespace_test_epoch(&bodies, [a.clone()], instance);
-    let need = |namespace, path| {
+    let request = |namespace, path, operation| {
         SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
             namespace,
             NormalizedAbsolutePath::new(path).unwrap(),
-            PathObservationOperation::Lstat,
+            operation,
         )))
     };
+    let need = |namespace, path| request(namespace, path, PathObservationOperation::Lstat);
     let valid = need(
         PathObservationNamespace::Materialization(instance),
         "/generation/BUILD.bazel",
@@ -1690,30 +1790,81 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
         let host_instance = slug_workspace_v2::PathObservationInstanceId::new(19);
         let host_epoch =
             namespace_test_epoch_at(&bodies, [host.clone()], host_instance, generation);
-        let host_need = need(
+        let mut host_need = need(
             PathObservationNamespace::Materialization(host_instance),
             fixed,
         )
         .try_union(&SourcePreparationNeeds::repository(host.as_ref().clone()))
         .unwrap();
+        if owner == 3 {
+            for path in ["/hub-generation/REPO.bazel", "/hub-generation/.bazelignore"] {
+                host_need = host_need
+                    .try_union(&need(
+                        PathObservationNamespace::Materialization(host_instance),
+                        path,
+                    ))
+                    .unwrap();
+            }
+        }
         assert!(admits(&host_need, Some(&host_epoch)).is_ok());
         let crossed = need(
             PathObservationNamespace::Materialization(host_instance),
             "/version-generation/version.bzl",
         );
-        for crossed_host in [
-            host_need.try_union(&crossed).unwrap(),
-            crossed.try_union(&host_need).unwrap(),
+        for excluded in [
+            crossed,
+            request(
+                PathObservationNamespace::Materialization(host_instance),
+                "/hub-generation/REPO.bazel",
+                PathObservationOperation::FileBytes,
+            ),
+            need(
+                PathObservationNamespace::Materialization(host_instance),
+                "/hub-generation/unknown",
+            ),
+            need(
+                PathObservationNamespace::Materialization(host_instance),
+                "/old-generation/REPO.bazel",
+            ),
+            need(
+                PathObservationNamespace::Materialization(instance),
+                "/hub-generation/.bazelignore",
+            ),
         ] {
-            let mut host_progress = 0;
-            if admits(&crossed_host, Some(&host_epoch)).is_ok() {
-                host_progress += 1;
+            for crossed_host in [
+                host_need.try_union(&excluded).unwrap(),
+                excluded.try_union(&host_need).unwrap(),
+            ] {
+                let mut host_progress = 0;
+                if admits(&crossed_host, Some(&host_epoch)).is_ok() {
+                    host_progress += 1;
+                }
+                assert_eq!(host_progress, 0);
+                let denied = admits(&crossed_host, Some(&host_epoch)).unwrap_err();
+                assert_eq!(denied.family, "namespace");
+                let (first, _) = bodies
+                    .first_denied_path_with_namespace_matcher(&crossed_host, &|demand| {
+                        namespace_policy(
+                            &bodies,
+                            demand,
+                            Some(&host_epoch),
+                            &small_namespace_plan_matches,
+                        )
+                        .admits(&demand.operation())
+                    })
+                    .unwrap();
+                assert_eq!(denied.path.as_ref(), Some(first.path()));
+                assert_eq!(
+                    first.path(),
+                    excluded
+                        .path_observations()
+                        .unwrap()
+                        .demands()
+                        .first()
+                        .unwrap()
+                        .path()
+                );
             }
-            assert_eq!(host_progress, 0);
-            assert_eq!(
-                admits(&crossed_host, Some(&host_epoch)).unwrap_err().family,
-                "namespace"
-            );
         }
         assert!(std::ptr::eq(
             host_epoch
