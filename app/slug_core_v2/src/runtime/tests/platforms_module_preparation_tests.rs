@@ -24,6 +24,10 @@ use crate::runtime::materialization_diagnostic::MATERIALIZATION_MARKER_BYTES;
 use crate::runtime::materialization_diagnostic::MaterializationDiagnostic;
 use crate::runtime::materialization_diagnostic::MaterializationWriter;
 
+#[cfg(feature = "native-probe-observer")]
+#[path = "platforms_module_preparation_tests/runtime_activity.rs"]
+mod runtime_activity;
+
 mod public_probe_preparation_tests {
     include!("platforms_module_preparation_tests/public_probe_preparation_tests.rs");
 }
@@ -2599,6 +2603,10 @@ fn observe_native_command(
         Err(e) => (None, Some(e)),
     };
     let recorder_weak = recorder.as_ref().map(Arc::downgrade);
+    #[cfg(feature = "native-probe-observer")]
+    let activity = runtime_activity::RuntimeActivity::install();
+    #[cfg(feature = "native-probe-observer")]
+    let construction = activity.construction();
     let (mut runtime, constructor_error) = if arm_error.is_none() {
         match WorkspaceRuntime::new_with_source_services(
             workspace.as_path(),
@@ -2611,6 +2619,12 @@ fn observe_native_command(
     } else {
         (None, None)
     };
+    #[cfg(feature = "native-probe-observer")]
+    construction.finish();
+    #[cfg(feature = "native-probe-observer")]
+    if let Some(runtime) = &mut runtime {
+        activity.attach(runtime);
+    }
     let budgets = runtime.as_mut().map(|runtime| {
         let descriptor = slug_workspace_v2::ImageDescriptorBudget::new(16 << 20);
         runtime.image_resources =
@@ -2852,6 +2866,8 @@ fn observe_native_command(
         println!("WP940_ASSOCIATION unavailable");
         println!("WP940_FIRST_ROW unavailable");
     }
+    #[cfg(feature = "native-probe-observer")]
+    runtime_activity::report_timeout(recorder.as_deref());
     resources("after_command", budgets.as_ref());
     drop(outcome);
     drop(constructor_error);
@@ -2862,6 +2878,10 @@ fn observe_native_command(
     resources("after_runtime_drop", budgets.as_ref());
     drop(recorder);
     let deadline = Instant::now() + Duration::from_secs(2);
+    #[cfg(feature = "native-probe-observer")]
+    let activity_pending = || !activity.listeners_released();
+    #[cfg(not(feature = "native-probe-observer"))]
+    let activity_pending = || false;
     while (budgets.as_ref().is_some_and(|(image, scratch)| {
         image.descriptor_budget().used_bytes() != 0
             || image.logical_bytes_used() != 0
@@ -2876,7 +2896,8 @@ fn observe_native_command(
             .any(|weak| weak.upgrade().is_some())
         || recorder_weak
             .as_ref()
-            .is_some_and(|weak| weak.upgrade().is_some()))
+            .is_some_and(|weak| weak.upgrade().is_some())
+        || activity_pending())
         && Instant::now() < deadline
     {
         thread::sleep(Duration::from_millis(1));
@@ -2908,6 +2929,8 @@ fn observe_native_command(
         thread::sleep(Duration::from_millis(1));
     }
     assert!(scope_weak.upgrade().is_none());
+    #[cfg(feature = "native-probe-observer")]
+    activity.report_and_retire();
     phase("after_scope_drop");
     println!(
         "WP942_RETIREMENT source_weak_seen={} source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",

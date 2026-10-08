@@ -1,0 +1,152 @@
+{
+  "packet": "WP-7-232-m7a-normal-rustc-runtime-activity-observation-r1",
+  "checkpoint": "WP1008",
+  "baseline": "61c805120beea183e3cc828d5ea822d5e0986a79",
+  "outcome": "accepted bounded runtime activity and first timeout observation; normal producer remains open",
+  "compatibility": "Slug-native cfgtest-only diagnostic; accepted exact compatibility surfaces unchanged",
+  "source": {
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "7da8d2a8127f61c4f909a640972ba480c74b6883d424999e49de8b91f14cf023",
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/runtime_activity.rs": "8e8e33aaf58f4be8a822918e9347f470e932f58bb4d25c1f1c6bac026e81375d",
+    "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "fc0028065b4ef8954a21c56abf1f55ec513ca727ef7d874897970880371068dd"
+  },
+  "growth": {
+    "Rust_net_lines": 135,
+    "Rust_changed_lines": 137,
+    "production_lines": 0,
+    "new_retained_strings_or_interners": 0,
+    "diagnostic_mapping_bytes": 512
+  },
+  "gates": {
+    "current_preparations": 3,
+    "preparation_seconds": [
+      0.133820928982459,
+      8.203678583959118,
+      7.328091628965922
+    ],
+    "ordinary_selected_passed": 77,
+    "ordinary_seconds": 15.41049873852171,
+    "protocol_themes_selected_passed": 4,
+    "protocol_seconds": 1.368094668025151,
+    "native_selected_passed": 1,
+    "current_named_passes": 82,
+    "current_supervised_records": 84,
+    "archived_first_wave_records": 80,
+    "total_candidate_supervised_records": 164,
+    "archived_first_wave_current_credit": 0
+  },
+  "failed_wave": "Original missing deferred-cycle binding in an existing observer fixture; two bindings corrected, assertions preserved. Rebuilt executable invalidated old preflight and ordinary gates. All 77 current ordinary gates passed; archived 74 internal passes and failed attempt carry zero current credit.",
+  "launcher_qualification": "One pre-child root pin-note omission corrected without changing code/artifact/caps. Root bookkeeping is not a supervised operation or raw invocation proof and lies outside the164-record census.",
+  "native": {
+    "operation": {
+      "path": "target/wp1008/native/native-operation.json",
+      "sha256": "ba08df8ee99ea3c17a78c4770bad145bb720242eba6a6c267a1ba3984462f0e6"
+    },
+    "result": {
+      "path": "target/wp1008/native/result.json",
+      "sha256": "ebf3b7a0e59f06fe100bc60bae927ef1599c9e0d0dab65fc329e61bdc170f688"
+    },
+    "stdout": {
+      "path": "target/wp1008/native/native.stdout",
+      "sha256": "0e7097b9b9119de89c86eaf0ef977d396e196be137798950315178a5eb6413db"
+    },
+    "stderr": {
+      "path": "target/wp1008/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 5.273375200922601,
+    "conservative_peak_kib": 119548,
+    "runtime_pins": 661,
+    "source_leases": 280,
+    "physical_bytes": 1528789,
+    "before_after_hash_bytes": 3057578
+  },
+  "timeout": {
+    "available": true,
+    "armed": true,
+    "first_work": true,
+    "origin": true,
+    "site": "GenericScope",
+    "domain": "Common",
+    "phase": "ScopeCheck",
+    "return": "Deadline",
+    "overflow": false,
+    "sticky": false
+  },
+  "activity": {
+    "Started_Finished_each": 57143,
+    "CheckDeps_each": 53119,
+    "Compute_each": 4055,
+    "overflow": 0,
+    "dropped": 0,
+    "latest_phase": "RootCompute Exit",
+    "latest_sampled_type": "ModuleSourcePreparationObservationKey",
+    "qualification": "Lossy static type sampling and nonexclusive process CPU; no key-instance, paired duration, causal hotspot or output proof."
+  },
+  "source_counters": {
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "source_attempts": 109,
+    "decoded_bytes": 1258508,
+    "written_bytes": 5448,
+    "transferred_bytes": 0
+  },
+  "cleanup": "Actual observer, recorder and scope Weak expiry and zero ending credits; private body Weak unseen is vacuous. Full DICE/interner/body lifetime unproved.",
+  "caps": {
+    "native_seconds": 10,
+    "cleanup_seconds": 3,
+    "RSS_KiB": 262144,
+    "AS_KiB": 524288,
+    "source_work_seconds": 5,
+    "source_lifetime_seconds": 8,
+    "source_selected_attempts": 128,
+    "production_source_attempts": 64,
+    "object_bytes": 1048576,
+    "each_bank_bytes": 16777216,
+    "log_each_bytes": 1048576,
+    "report_bytes": 4194304,
+    "FSIZE_bytes": 16777216
+  },
+  "provenance": "280 unchanged ordered source leases,188+92; two64KiB parent contexts. No fresh capture/acquisition or new source permission. Parent correspondence is not native source certification.",
+  "reviews": {
+    "implementation-source": {
+      "path": "target/wp1008/native/implementation-source.md",
+      "sha256": "c6e07df14dff66a34585dfabc03ccca0acecda3b9f577262f84c9074e9054fad"
+    },
+    "implementation-evidence": {
+      "path": "target/wp1008/native/implementation-evidence.md",
+      "sha256": "669e3883f498aa2756713d81dee74d6f027d73eef7c3356fad5440f7d02cded1"
+    },
+    "preflight-source": {
+      "path": "target/wp1008/native/preflight-source.md",
+      "sha256": "434b29cd46a26494281baad3448f336d4b040b2d58de7c20c44ecd7b8f7578d6"
+    },
+    "preflight-evidence": {
+      "path": "target/wp1008/native/preflight-evidence.md",
+      "sha256": "a92a26b5bd2a4283a38c3c8e01197edab020acb2e4e060fdb9ad83c3f0271721"
+    },
+    "final-source": {
+      "path": "target/wp1008/native/final-source.md",
+      "sha256": "841c03bcdde7d7b36334b094aa7c8ce88719ad7beb65dd816d422b4acad1dbe2"
+    },
+    "final-evidence": {
+      "path": "target/wp1008/native/final-evidence.md",
+      "sha256": "21256969d6cb2c224760e1812cb36ceefb8cb2885b19211265fdd7cf4dd3fa9a"
+    }
+  },
+  "references": {
+    "target/wp1008/native/operational-summary.json": "24288169d33a244a43ee34320c47a5bcfa67ff77bd1d2e4cd28b2ea1e48b50ad",
+    "target/wp1008/native/audit-result.json": "f07e0bf823ad3a40b256e25fa4df8155efdca3bbd0cf9a33fb3b8f36c9ea6578",
+    "target/wp1008/native/design.md": "942f0af91e28ddf832146e4442367dd27f9c9a6bf234aa545e415e336190f663",
+    "target/wp1008/native/design-review.md": "3d17aa8647ff3702555b0ac52ef1e9977e6cfa0857b59fc64f23c75874785dcc",
+    "target/wp1008/native/static-source-review.md": "badeed2fea063e228d9b2f73bb8f4e463476ca5625aafce6ac4dd4749d06d3f9",
+    "target/wp1008/native/prelaunch-summary.json": "4ead78dec1810e3c5c378a97a6069a10680a8d42af3ac3d1fb8b274166cb6470",
+    "target/wp1008/native/pre-cycle-fixture-correction/qualification.json": "178b25789f85f2fd3acb329d4c6c4fa5e59e5b046dcd108e25aa1c978ff4192e",
+    "target/wp1008/native/native-launch-refusal.json": "e002f75838ae07565dc110368deb0ed95d84ed07069f900d633f14cc9c4e887c",
+    "target/wp1008/native/successor-source.md": "ac66e879f3ea9c6cde1071c313567403989e9f49dd2629ba02f59d1c3ebe5c45",
+    "target/wp1008/native/successor-evidence.md": "21d6e917baa8a9445982ab3a34537ece9873e047aed31fd5f7169631ef6429d3"
+  },
+  "prior_rejected_experiment": "wp1007-bzlmod-profile-preparation-2026-10-08.json; two failed compiler preparations, zero current credit; no third blind profile retry",
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "next": "One existing same-DICE path publication regression extension distinguishes mode-projection evaluations from complete leaf reuse. No production invalidation change or unchanged native retry."
+}

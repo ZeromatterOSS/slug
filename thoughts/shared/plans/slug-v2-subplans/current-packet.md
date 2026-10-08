@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing optimized Bzlmod normal loading observation
+Packet: WP-7-233-m7a-normal-rustc-path-mode-replay-r1
+Status: Implementing reviewed same-DICE replay discriminator
 
 ## Observable and source basis
 
@@ -42,69 +42,55 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Current accepted checkpoint
+## Immediate accepted checkpoint
 
-[WP1006](wp1006-exact-host-file-admission-2026-10-08.json) accepts the exact original host owner
-own two-file plan and borrowed same-current-epoch finite namespace cohort through existing cfgtest
-policy.119net lines/static descriptors only/no retained strings/storage/interners/production change.
-Three compiler preparations/69Rust/four controls/native pass; one inconsistent synthetic fixture
-failure preserved0credit and narrowly corrected, original74source gates retain exact snapshot
-provenance.76acceptedrecords/77attempts/74named. Native5.253022s/118804KiB conservative peak fits
-256MiB; Written5448(+220 aggregate accounting) but WorkDeadline yields NO nextNeed/owner/plan/
-output/epoch/certificate/Rustc.280ordered leases/two64KiB contexts/endcredits0 match. Currentcapture0,
-prior12captures50decisions zero fresh; public producer and whole-workload fit remain open.
+[WP1008](wp1008-bounded-runtime-activity-observation-2026-10-08.json) accepts cfgtest-only
+fixed512-byte runtime activity and finite first-timeout diagnostics.77 ordinary/four strict
+controls/one native pass;84 current supervised records,80 archived first-wave records0current
+credit. Actual native5.273s/119548KiB fits256MiB at the observed prefix. WorkDeadline remains;
+53119 dependency checks/4055 computes and a sampled source-preparation type do not prove a
+causal hotspot or public producer. Actual observer/recorder/scope retire, private body Weak
+unseen remains vacuous. Full producer/whole-workload fit remain open. The separate
+[WP1007](wp1007-bzlmod-profile-preparation-2026-10-08.json) rejected two bounded compiler
+profile attempts; no third blind retry. Allocation discipline remains borrowing/transfer,
+shared immutable carriers and existing scoped interners where their retention fits.
 
-## Active continuation contract
+## Active contract
 
-Continue under target/wp1007 with ONE preparation-only changed-artifact reduced-work hypothesis.
-[Source recommendation](../../../../target/wp1006/native/successor-source.md),
-SHA256cc25aba40d5626d5ae47c7190f55774dcff432fb34005d63a15aa7e0759d0e2e,
-and [actual evidence](../../../../target/wp1006/native/successor-evidence.md),
-SHA256fde5e25691543e6e7275e819959a422ad85dfba1643e14b073b3f3a380528732,
-ground Bzlmod's ordinary module discovery/evaluation/repository routes and selected extension owner
-inputs before already optimized Loading. Absolute Source WorkDeadline does NOT identify a measured
-hotspot, exact phase, owner or next Need. Optimize ONLY slug_bzlmod_v2 opt0→opt1/debug0 in private
-compiler preparation. Retain Loading1/debug0, otherfour protected Slug0/debug0, interpreter3existing
-1/debug2, assertions/overflowtrue. Cargo.toml devopt1/testinheritance is source anchor. No Rust/
-Cargo.toml/lock/features/production/DICE/Windows change, no promised speedup or completion.
+Slug-native deterministic regression evidence, initially test-only. Natural owner is
+app/slug_workspace_v2/src/path_observation.rs: current per-demand input publisher,
+PathObservationInputModeProjectionKey and PathObservationKey. Existing manual projection
+dirtiness preserves first installation after absent raw mode; never remove it from aggregate
+activity counts. [Source basis](../../../../target/wp1008/native/successor-source.md) and
+[evidence limits](../../../../target/wp1008/native/successor-evidence.md) identify this seam;
+[design ACCEPT](../../../../target/wp1009/design-review.md) freezes the discriminators.
+Reuse docs/developers/dice.md and current DICE dependency recording/equality-cutoff behavior.
 
-Root owns design/configs/qualification/gates/docs/receipt/commit. Evidence worker forks ONLY nine
-current helpers minimum path/census/profile witness changes. Source worker supplies bounded compiler
-context readiness note. Reuse byte-identical input/69selectors/owners/four strict themes/currenthost
-signatures/roles/namespace/rawdecoders; no new diagnostic/flag/signature/source permission/bodymirror/
-source acquisition/reference reader operation. Original280bindings/staticowners/lifecyclecontrols
-unchanged. Prior captures/reference1/reader11/Bzlmod5/compilerfailures/metadata/failedcontrols zero
-fresh. Rust/test growth0; retained storage/owned strings/interner growth0. Borrow/transfer/share;
-use existing scoped interners for repeated retained immutable strings with suitable cleanup, no global
-pool for unique temporary paths. Exact claims remain named source/owner bytes; semantic generation
-identity remains Slug-native; public/fullCLI/fullfit unsupported pending genuine evidence.
+Extend ONLY the existing partitioned_epoch_add_change_remove_and_restore_preserve_exact_path_values
+fixture and its typed activation tracker in that one workspace file. Preserve all legacy shard
+assertions/counts. Add one fixed AtomicUsize for exact mode projection Evaluated activations.
+On the same DICE engine, discriminate absent raw mode→first PerDemand using a value differing
+from still-installed legacy state; repeated publication/unrelated append must distinguish
+mode computes from unchanged complete leaf evaluation/pointer reuse. Measure own demand before
+activating sibling; own A→B→A restores exact values. Revoke a known sibling with conflicting
+legacy value, require Need, then reinsert and recover on the same engine. No new test selector,
+trace/event table/strings/global pool/payload history, production key/equality/dirty change,
+source acquisition/permission/profile/cap change. Two local atomic counters retire with fixture.
+This is an investigation; test results must not be represented as CPU dominance or an accepted
+optimization. If no avoidable publication work is observed, reject that hypothesis. Any production
+correction requires root-frozen source-grounded design and consequential review first.
 
-ONE independent design checkpoint before helpers activate, then actual static/prelaunch/FINAL. Root
-role qualifiers not extra reviewers. Pinned4toolchainpaths; serializedoffline jobs1 compiler stages
-<=60s each. Preserve Core-library same-effective unwind context, then Core test no-run/direct
-Loading/Core/CLI check. Freeze current feature/target/dependency context. New Bzlmod codegen may
-invalidate downstream Loading filenames; never force oldWP1006 artifact identity or credit old
-executable. Strict9raw CargoJSON library/profile rows require Bzlmod1/Loading1/fourSlug0/interpreter3
-unchanged, exact expected tests/executable bits. Within NEW graph require staged/final Loading and
-Bzlmod artifact identity/freshness; initialstage may compile affected dependencies. Unique current
-CargoJSON Core digest must differ WP1006 and is sole authority. Compiler metadata context comparison
-if required is source-compilation/test0, compiler information probes uninstrumented; failures0credit
-preserved. No source/runtimewarming, clockreset/prework/wholeworkspaceoptimization or identical retry.
+Root owns gates/receipts/scheduling/commit; source worker owns the one workspace test edit;
+evidence worker identifies protected existing selectors and checks allocation/source invariants;
+independent reviewer owns design/final. Estimated40–100 test-only lines; >2000-line file remains
+a cohesive path observation owner, no adjacent cleanup. Serialize pinned offline jobs1 preparations
+<=60s, fresh CargoJSON Workspace test executable, batched ordinary preflight, existing focused
+path input/Need/legacy/per-demand controls, and one direct Core compile dependent. No native in
+this packet: it changes no runtime behavior and another unchanged deadline replay proves nothing.
+Record selected/pass counts and preserved failures; no identical failed compiler retry.
 
-One current69selection preflight/list/all69ordinary/four controls then ONE changed direct native after
-prelaunch. Three preparation0test records/76acceptedgate records/74named prospective only; actual
-failures counted separately, qualifying narrowly preserved raw evidence without map rewriting. No
-arbitrary outer native timeout. Native10s/absolutecleanup3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/
-FSIZE16MiB unchanged; source5swork/8slifetime starts before runtime construction, source128/default
-probe16/production64, registry128/default16, object1MiB/every16MiBbank unchanged. Same280original
-ordered leases188+92/1528789physical/3057578brackets, two64KiB parentcontexts. Actual child conservative
-RSS/counters/retirement measured; compiler or parent memory not runtime/wholefit proof. Source Weak
-unseen remains vacuous, endcredits0/scope-recorder expiry checked.
-
-New actual typed prerequisite alone governs continuation. If WorkDeadline remains, preserve it and
-reassess bounded original timeout-owner/phase evidence before another artifact/permission choice;
-no repeated unchanged probe, capraise or guessed nextowner/branch/foreign-root/output. Normal
-publicRustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/
-M7A/MVS/provenance/whole-workloadmemory remain required. Linux priority/Windowsminimalstubs; goal
-active. REPLAN only for new semantic ownership decision/unavailable exact source prerequisite;
-authorized routine compiler/invocation/fixture corrections remain scoped and preserve failures0credit.
+All prior source/native limits remain: work5s/lifetime8s/native10s/cleanup3s/RSS256MiB/AS512MiB,
+280 ordered leases/two64KiB contexts and byte/attempt caps. Compatibility admissions, normal
+Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE edition restoration,
+fullCLI/M7A/MVS/provenance/whole-workload fit stay open. Linux priority; Windows minimal stubs.
+Goal remains active; proceed to source-supported implementation once this discriminator settles.

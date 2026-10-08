@@ -34,22 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing optimized Bzlmod normal loading observation
+Packet: WP-7-233-m7a-normal-rustc-path-mode-replay-r1
+Status: Implementing reviewed same-DICE replay discriminator
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1006](./slug-v2-subplans/wp1006-exact-host-file-admission-2026-10-08.json)
-accepts exact host own-plan/current-epoch cfgtest admission with119net static-descriptor lines,
-no retained strings/storage/interners or production change.69Rust/four controls/native pass;
-one synthetic fixture failure corrected and preserved0credit, originalsourcegateprovenance qualified.
-Native5.253s/118804KiB fits256MiB, accounts+220writes but WorkDeadline leaves nextNeed/output/epoch/
-producer unproved. Next optimize ONLY private Bzlmod compiler profile0→1/debug0, preserving Loading1,
-allotherprofiles and original source5s/8slifetime/native10s/allbankcaps. This is a source-grounded
-reduced-work hypothesis, not a measured hotspot or promised speedup. Actualchangedartifact/fullgates
-required; no oldartifact forcing, clockreset or capraise. Whole-workload fit and public producer open.
+[WP1008](./slug-v2-subplans/wp1008-bounded-runtime-activity-observation-2026-10-08.json)
+accepts the bounded existing runtime observer and first timeout diagnostics:77 ordinary/four
+controls/native pass. Actual prefix5.273s/119548KiB fits256MiB; WorkDeadline and normal producer
+remain open. Lossy activity does not prove a causal hotspot. Next discriminate current per-demand
+path publication replay in one existing same-DICE test before choosing a production correction.
+[WP1007](./slug-v2-subplans/wp1007-bzlmod-profile-preparation-2026-10-08.json) preserves two
+failed compiler profile stages, zero runtime credit; stop blind profile retries. Borrow/transfer/share
+values and use existing scoped interners where retention fits. All source/native memory/time/
+permission limits remain unchanged; whole-workload fit remains open.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

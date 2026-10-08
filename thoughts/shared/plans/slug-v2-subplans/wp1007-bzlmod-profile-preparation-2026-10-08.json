@@ -1,0 +1,58 @@
+{
+  "packet": "WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1",
+  "baseline": "61c805120beea183e3cc828d5ea822d5e0986a79",
+  "outcome": "rejected preparation-only Bzlmod profile experiment; stopped after two bounded stages",
+  "compatibility": "Slug-native private compiler configuration; no changed runtime or semantic surface",
+  "attempts": [
+    {
+      "operation": "target/wp1007/native/dependency-attempt1/dependency.json",
+      "elapsed_seconds": 60.06062825093977,
+      "selected": 0,
+      "passed": 0,
+      "Core_artifact": false,
+      "tests": 0,
+      "native": 0
+    },
+    {
+      "operation": "target/wp1007/native/dependency-attempt2/dependency.json",
+      "elapsed_seconds": 60.104087156942114,
+      "selected": 0,
+      "passed": 0,
+      "Core_artifact": false,
+      "tests": 0,
+      "native": 0
+    }
+  ],
+  "observations": [
+    "First stage completed Bzlmodopt1 but Loading did not complete before60s.",
+    "Second exact-context guarded stage reused completed Bzlmod freshly, stable two library digests; Loading alone did not complete before60s.",
+    "No successful dependency/compile/check, Core executable, runtime speedup or changed memory measurement. Stop third blind profile retry."
+  ],
+  "accepted_prior": "wp1006-exact-host-file-admission-2026-10-08.json",
+  "prior_prefix_peak_KiB": 118804,
+  "memory_cap_KiB": 262144,
+  "whole_workload_fit": false,
+  "Rust_change": 0,
+  "retained_string_growth": 0,
+  "source_operations": 0,
+  "fresh_gate_records": 0,
+  "actual_failed_compiler_operations": 2,
+  "next": "Bounded existing timeout/activity observation under prior accepted Bzlmod0/Loading1 profiles; all runtime limits unchanged.",
+  "references": {
+    "target/wp1007/native/design.md": "54d864b1b3ba1ecd4288f6d36bcb71e36f91aff8f7722d0840ea9f765b53e853",
+    "target/wp1007/native/design-review.md": "653335b80316031f08610d9e4430498ca118f0a69015e8a3c220c56181dbef80",
+    "target/wp1007/native/compiler-reassessment-evidence.md": "33b77156b1b0544c5af431dcd2b0e3bd9d66d9ec4879642b4e816cb2627c10a0",
+    "target/wp1007/native/compiler-preparation-source.md": "e9bbda2859ead4f1df3f7aa552d6528dd96b7801ae5ebcb74b71fa16273ae69a",
+    "target/wp1007/native/compiler-preparation-evidence.md": "f969eeb446ecf42936e704c1891efe5eaaa72a7ba4f5e5689259856e58df133a",
+    "target/wp1007/native/compiler-prefix-artifacts.json": "156b13d5b9d1d398bcb2b68bb24d87023510239b4c1c1092978327e804e722ee",
+    "target/wp1007/native/dependency-attempt1/dependency.json": "60b80270d82de9597b82d88115b2adc3b872067a7f38906fa7aec3351031139a",
+    "target/wp1007/native/dependency-attempt1/dependency.stdout": "685febc68beb4f383a3f88f299ff866de88f8d819795b85e282fb55afbce7dc3",
+    "target/wp1007/native/dependency-attempt1/dependency.stderr": "ffe6ba0b8f21a234b850b51c2a45e28384bd01f6bea6cd4914921590a448c1b8",
+    "target/wp1007/native/dependency-attempt1/qualification.json": "6f7dd9096b26ebdd6da5597a7710badd38c51cb5edb0f6bf78b7423e2252cc22",
+    "target/wp1007/native/dependency-attempt2/dependency.json": "1a3c4b81ce1ea0ee568366d3d9ca40d3eadc718c2c9fdd5ad50989e15ec535c9",
+    "target/wp1007/native/dependency-attempt2/dependency.stdout": "d14f98656b0a0bc057d2bd55bb2b04ccd756558a96252daae930ea9dd37e3849",
+    "target/wp1007/native/dependency-attempt2/dependency.stderr": "a934e2dbf7a98c8f9e0691471b2486e5263fb4964b3887e4f12c1f2d36ea654c",
+    "target/wp1007/native/dependency-attempt2/qualification.json": "921b91ce231ef76e157b9c0bad2de9f585651e1bde32352d7c8965291baf3763",
+    "target/wp1007/native/compiler-reassessment-source.md": "26c587e9d54d35c9c253731dc42abdc1fcae9158eb2d95f50f2d9ff70da16e81"
+  }
+}

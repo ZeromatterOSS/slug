@@ -388,6 +388,7 @@ fn thread_local_installations_are_isolated_and_preserve_activation_tracker() {
         let mut updater = runtime.dice.updater_with_data(data);
         updater.changed_to(vec![(ProbeInjected, 1)]).unwrap();
         let mut transaction = updater.commit().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         assert_eq!(transaction.compute(&ProbeComputed).await.unwrap(), 1);
         drop(transaction);
 
@@ -396,6 +397,7 @@ fn thread_local_installations_are_isolated_and_preserve_activation_tracker() {
         let mut updater = runtime.dice.updater_with_data(data);
         updater.changed_to(vec![(ProbeInjected, 2)]).unwrap();
         let mut transaction = updater.commit().await;
+        runtime.request_revision.bind_cycle_detector(&transaction);
         assert_eq!(transaction.compute(&ProbeComputed).await.unwrap(), 2);
     });
     let counters = observer.words_for_test()[8..14]
