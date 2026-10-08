@@ -1,0 +1,141 @@
+{
+  "packet": "WP-7-234-m7a-normal-rustc-path-mode-publication-r1",
+  "checkpoint": "WP1010",
+  "baseline": "58bcc3a7ad6cb3564d47437baea3221a717747dd",
+  "outcome": "accepted direct projection publication; capped native reaches new computation refusal without source timeout",
+  "compatibility": "Slug-native internal DICE transport; exact admissions unchanged",
+  "source": {
+    "app/slug_workspace_v2/src/path_observation.rs": "beabf6c995dbac58147f1bdfc23ce69df4730410026d10659d20b43a317b4927",
+    "app/slug_workspace_v2/src/path_observation/memory_tests.rs": "ff454aefc0c1041ead78bc262e8a702adabb76e54b87f595ce3edc066ec2c45d"
+  },
+  "growth": {
+    "production_net": 4,
+    "test_net": 92,
+    "total_net": 96,
+    "changed_lines": 136,
+    "new_retained_strings_maps_or_interners": 0
+  },
+  "semantics": "Versioned raw InjectedMode and projection compute unchanged. Publisher supplies the same mode scalar to projection in one updater instead of forcing dirty. Cold historical raw/projected mode and original Arc/Need recover after genuine Legacy/PerDemand reversal. Same-mode equality cuts off redundant compute.",
+  "rejected_design": "Ordinary ModeKey replacement rejected BEFORE implementation because normal storage loses unread historical input. Independent REPLAN preserved; zero compilation/test/native operations for that representation.",
+  "tests": {
+    "Workspace_ordinary_passed": 87,
+    "Workspace_ignored_not_executed": 2,
+    "Core_ordinary_passed": 80,
+    "strict_themes_passed": 4,
+    "native_passed": 1,
+    "total_current_named_passes": 172,
+    "Workspace_current_records": 4,
+    "native_gate_current_records": 87,
+    "total_current_records": 91,
+    "total_supervised_candidate_records": 93,
+    "zero_credit_Workspace_records": 2
+  },
+  "compiler_seconds": {
+    "Workspace": 5.657177338027395,
+    "Core_dependency": 8.971525675035082,
+    "Core_test": 7.49059702293016,
+    "direct_Loading_Core_CLI_check": 8.260491243912838
+  },
+  "ordinary_seconds": {
+    "Workspace": 0.09225633798632771,
+    "Core80": 16.04262407810893,
+    "protocol": 1.3532617390155792
+  },
+  "deterministic_metric": {
+    "baseline_projection_Evaluated": 8,
+    "candidate_projection_Evaluated": 1,
+    "leaf_values_counts_Arcs_Need_unchanged": true,
+    "CPU_or_wall_speedup_claim": false
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp1010/native/native-operation.json",
+      "sha256": "db951a4b45d951e85680c004e00697d25813064bb45dd2affc66d9fe228ea769"
+    },
+    "result": {
+      "path": "target/wp1010/native/result.json",
+      "sha256": "9d515b9ed2474e1822fee36c88f4b66b7b67b0d942cf335de08250407c9fcfd2"
+    },
+    "stdout": {
+      "path": "target/wp1010/native/native.stdout",
+      "sha256": "694461ceab36d85e23660713365d56e412d1bf4b3368cc0c7ddade38cf4a586a"
+    },
+    "stderr": {
+      "path": "target/wp1010/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 3.2955046630231664,
+    "conservative_peak_kib": 117984,
+    "runtime_pins": 669,
+    "source_leases": 280,
+    "physical_bytes": 1528789,
+    "before_after_hash_bytes": 3057578
+  },
+  "observed_native": {
+    "source_error": "None",
+    "source_attempts": 111,
+    "decoded_bytes": 1259338,
+    "registry_attempts": 105,
+    "registry_admitted_bytes": 235521,
+    "written_bytes": 5448,
+    "transferred_bytes": 0,
+    "event_pairs": [
+      5147,
+      1107,
+      4071
+    ],
+    "first_work_timeout": false,
+    "timeout_origin": false,
+    "public_outcome": "native_refusal/computation",
+    "denied_family": "operation",
+    "denied_path": "original platforms_root/host (192 bytes)",
+    "operation_kind_or_caller_owner_proved": false,
+    "full_Need_proved": false,
+    "certificate_or_Rustc_proved": false
+  },
+  "qualification": "Path-only denied observation does not prove actual operation kind, glob/subtree/BUILD caller, owner, availability, or authorize a source grant. Static directory route is a successor hypothesis. Event counts differ from the earlier sample but are not a controlled performance benchmark. Source/root/private body Weak unseen remains vacuous; actual observer/recorder/scope retire/end credits zero. Same280 ordered leases/two64KiB contexts/1528789physical/3057578brackets. Parent correspondence/compilation RSS are not native certificates or whole-workload fit.",
+  "selection_correction": {
+    "reason": "Initial all89 selection included two ignored RSS probes. Root launcher continued to owner before checking preflight exit. Preserve failed preflight and earlier87-pass owner as zero-current-credit; fresh87 preflight then owner required.",
+    "original_preflight": "preflight.json",
+    "original_owner": "owner.json",
+    "ignored": [
+      "path_observation::memory_tests::supervised_equal_path_payload_history_rss_probe",
+      "path_observation::memory_tests::supervised_path_input_history_rss_probe"
+    ],
+    "current_credit": 0
+  },
+  "root_launcher_qualification": "Two failed root bookkeeping/activation invocations before child/context; no supervised operation or source credit. Original helper/config bytes preserved and exactly two reviewed activation switches applied.",
+  "caps": {
+    "native_seconds": 10,
+    "cleanup_seconds": 3,
+    "source_work_seconds": 5,
+    "source_lifetime_seconds": 8,
+    "RSS_KiB": 262144,
+    "AS_KiB": 524288,
+    "source_selected_attempts": 128,
+    "production_source_attempts": 64,
+    "registry_attempts": 128,
+    "object_bytes": 1048576,
+    "each_bank_bytes": 16777216,
+    "log_each_bytes": 1048576,
+    "report_bytes": 4194304,
+    "FSIZE_bytes": 16777216
+  },
+  "source_capture_operations": 0,
+  "normal_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "references": {
+    "target/wp1010/native/operational-summary.json": "9f0d0f5f76364776aaf9b56f006a095c0389d30ce9b40bb14feea53d1fe20467",
+    "target/wp1010/native/native-summary.json": "0dfa64725b750c027292a5c9d82d3da884201578d7ed7eb4295e04c691853033",
+    "target/wp1010/native/audit-result.json": "48bb7dd23a70584d6a032c18028240f7dab24874217988059562fe8f5678c185",
+    "target/wp1010/native/semantic-source-review.md": "fc30357c77a1b8cacde60bcdd4609387e053fe9214c582243e2207e975d4bfb0",
+    "target/wp1010/native/preflight-evidence.md": "3c8dd5d0e376266c96e418ab8859e17dcf721cc91268d3e4946025a26882bdef",
+    "target/wp1010/native/final-evidence.md": "515f5ba308156aa30fc2e5c18a4c68a0bc3ffa79fbd8840255c8a8b2dc8f8f92",
+    "target/wp1010/design-review.md": "4af2b6a0f514d8af88ec32cfee595ba51b7664ac46c97bafc362b0e88e282bc3",
+    "target/wp1010/design-review-revised.md": "9252be41e2315c0df9db8040ff0d236255e346c2de745f94984c399f590a4021",
+    "target/wp1010/source-reassessment.md": "b4dfbde878d9983d7869a969d60086685ce79bd2ea50f6867eab50f15663151a",
+    "target/wp1010/source-handoff.md": "4668d143ae6b7d68df4f919a901ac0e591203298efd21fc272925713cffecf26",
+    "target/wp1010/workspace/validation-summary.json": "b85ed9394b7f9b17c88028f08e75a3e95579f4bc09c82a7c4d585353cf751486"
+  },
+  "next": "Source-ground the exact original host DirectoryEntries prerequisite and add per-entry count/name-byte/time bounds before any exact-directory cfgtest admission; preserve closed child-body and recursive permissions."
+}

@@ -34,22 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-234-m7a-normal-rustc-path-mode-publication-r1
-Status: Design review of direct DICE mode publication
+Packet: WP-7-235-m7a-normal-rustc-bounded-host-directory-r1
+Status: Design review before bounded functional directory admission
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1009](./slug-v2-subplans/wp1009-path-mode-replay-2026-10-08.json) accepts the same-DICE
-replay discriminator, five focused tests and two bounded preparations. Repeated path publication
-reevaluates the mode projection while exact own leaves stay cached. Next review a single ordinary
-ModeKey/default LegacyEpoch and atomic per-demand mode publication, preserving first install,
-legacy reuse, revocation and old-live transport. No runtime speedup claimed.
-[WP1008](./slug-v2-subplans/wp1008-bounded-runtime-activity-observation-2026-10-08.json) holds
-observed prefix119548KiB under256MiB; WorkDeadline/public producer/whole-workload fit remain open.
-Borrow/transfer/share values and use existing scoped interners where retention fits. All source/
-native memory/time/permission limits remain unchanged; blind compiler profile retries stay closed.
+[WP1010](./slug-v2-subplans/wp1010-path-mode-publication-2026-10-08.json) accepts atomic
+mode projection publication with historical recovery: Workspace87/Core80/themes4/native1
+pass and independent FINAL ACCEPT. The bounded native prefix ends in3.30s at117984KiB/
+256MiB without source timeout, reaching a path-only operation refusal at platforms_root/host.
+Next implement exact host DirectoryEntries admission coupled with entry/name-byte/time
+bounds through the existing directory owner. Actual operation/caller, normal public Rustc
+and whole-workload fit remain open. Borrow/transfer/share values and use existing scoped
+interners where retention fits; no global pool for unique temporary names. Source/native
+caps remain unchanged and blind compiler profile retries stay closed.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

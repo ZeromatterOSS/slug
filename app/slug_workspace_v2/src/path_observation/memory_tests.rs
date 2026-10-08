@@ -294,10 +294,108 @@ async fn per_demand_revoked_and_unknown_inputs_never_resurrect_legacy_maps() {
     let mut per_demand = updater.commit().await;
     assert!(matches!(
         per_demand
-            .compute(&PathObservationKey::new(known))
+            .compute(&PathObservationKey::new(known.dupe()))
             .await
             .unwrap(),
         PathOutcome::Need(_)
+    ));
+
+    let cold_value = bytes(b"cold-original");
+    let mut updater = dice.updater();
+    inject_path_observation_inputs(
+        &mut updater,
+        &epoch([(known.dupe(), cold_value.dupe())]),
+        [known.dupe(), unknown.dupe()],
+    )
+    .unwrap();
+    // Do not compute mode, projection or paths anywhere at this version: live
+    // cache sharing with another transaction would hide lost historical values.
+    let mut cold = updater.commit().await;
+    let mut updater = dice.updater();
+    updater
+        .changed_to([(
+            PathObservationInputModeKey,
+            PathObservationInputMode::LegacyEpoch,
+        )])
+        .unwrap();
+    updater
+        .changed([PathObservationInputModeProjectionKey])
+        .unwrap();
+    let mut later_legacy = updater.commit().await;
+    assert_eq!(
+        later_legacy
+            .compute(&PathObservationInputModeProjectionKey)
+            .await
+            .unwrap(),
+        PathObservationInputMode::LegacyEpoch,
+    );
+    assert!(Arc::ptr_eq(
+        &complete(
+            later_legacy
+                .compute(&PathObservationKey::new(known.dupe()))
+                .await
+                .unwrap()
+        ),
+        &stale,
+    ));
+    let mut updater = dice.updater();
+    inject_path_observation_inputs(
+        &mut updater,
+        &PathObservationEpoch::empty(),
+        [known.dupe(), unknown.dupe()],
+    )
+    .unwrap();
+    let mut later_per_demand = updater.commit().await;
+    assert_eq!(
+        later_per_demand
+            .compute(&PathObservationInputModeProjectionKey)
+            .await
+            .unwrap(),
+        PathObservationInputMode::PerDemand,
+    );
+    assert!(matches!(
+        later_per_demand
+            .compute(&PathObservationKey::new(known.dupe()))
+            .await
+            .unwrap(),
+        PathOutcome::Need(_),
+    ));
+
+    assert_eq!(
+        cold.compute(&PathObservationInputModeKey).await.unwrap(),
+        PathObservationInputMode::PerDemand
+    );
+    assert_eq!(
+        cold.compute(&PathObservationInputModeProjectionKey)
+            .await
+            .unwrap(),
+        PathObservationInputMode::PerDemand
+    );
+    let original_cell = cold
+        .compute(&PathObservationInputKey::new(known.dupe()))
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(Arc::ptr_eq(&original_cell, &cold_value));
+    assert!(Arc::ptr_eq(
+        &complete(cold.compute(&PathObservationKey::new(known)).await.unwrap()),
+        &cold_value,
+    ));
+    assert!(
+        cold.compute(&PathObservationInputKey::new(unknown.dupe()))
+            .await
+            .unwrap()
+            .is_none()
+    );
+    let historical_need = cold
+        .compute(&PathObservationKey::new(unknown.dupe()))
+        .await
+        .unwrap();
+    assert!(matches!(historical_need, PathOutcome::Need(ref need) if need.demands() == &[unknown]));
+    assert!(!PathObservationKey::validity(&historical_need));
+    assert!(!PathObservationKey::equality(
+        &historical_need,
+        &historical_need
     ));
 }
 

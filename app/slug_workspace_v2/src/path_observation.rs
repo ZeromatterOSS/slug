@@ -960,8 +960,9 @@ impl InjectedKey for PathObservationInputModeKey {
     }
 }
 // A successful ordinary dependency even when the raw injected mode has not
-// been installed. Every publisher dirties this projection: a missing injected
-// input has no dependency to invalidate when it is first installed later.
+// been installed. Publishers supply their mode here too, so first installation
+// invalidates absent-mode fallback and equal publications need no forced compute.
+// Historical recomputation still reads the original versioned injected mode.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
 struct PathObservationInputModeProjectionKey;
 impl fmt::Display for PathObservationInputModeProjectionKey {
@@ -1081,7 +1082,10 @@ pub fn inject_path_observation_inputs(
         )])
         .map_err(|_| PathObservationInputInjectionError::Injection)?;
     updater
-        .changed([PathObservationInputModeProjectionKey])
+        .changed_to([(
+            PathObservationInputModeProjectionKey,
+            PathObservationInputMode::PerDemand,
+        )])
         .map_err(|_| PathObservationInputInjectionError::Injection)
 }
 
@@ -1969,16 +1973,16 @@ mod tests {
             .unwrap();
         assert!(matches!(value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a)));
         assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 6);
-        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 2);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
 
-        // Identical publication and unrelated append evaluate the mode projection
-        // separately, but neither may evaluate the retained complete path again.
+        // Identical publication and unrelated append reuse the mode projection
+        // and neither may evaluate the retained complete path again.
         let appended = PathObservationEpoch::from_shared([
             (retained.dupe(), own_a.dupe()),
             (added.dupe(), sibling.dupe()),
         ])
         .unwrap();
-        for (epoch, expected_mode) in [(&first, 3), (&appended, 4)] {
+        for epoch in [&first, &appended] {
             let mut updater = transaction.into_updater();
             super::inject_path_observation_inputs(
                 &mut updater,
@@ -1995,10 +1999,7 @@ mod tests {
                 matches!(again, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a))
             );
             assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 6);
-            assert_eq!(
-                tracker.mode_evaluations.load(Ordering::SeqCst),
-                expected_mode
-            );
+            assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
         }
         let added_value = transaction
             .compute(&PathObservationKey::new(added.dupe()))
@@ -2008,9 +2009,9 @@ mod tests {
             matches!(added_value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &sibling))
         );
         assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 7);
-        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 4);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
 
-        for (own, expected_leaf, expected_mode) in [(&own_b, 8, 5), (&own_a, 9, 6)] {
+        for (own, expected_leaf) in [(&own_b, 8), (&own_a, 9)] {
             let epoch = PathObservationEpoch::from_shared([
                 (retained.dupe(), own.dupe()),
                 (added.dupe(), sibling.dupe()),
@@ -2030,10 +2031,7 @@ mod tests {
                 .unwrap();
             assert!(matches!(value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, own)));
             assert_eq!(tracker.evaluations.load(Ordering::SeqCst), expected_leaf);
-            assert_eq!(
-                tracker.mode_evaluations.load(Ordering::SeqCst),
-                expected_mode
-            );
+            assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
         }
         let mut updater = transaction.into_updater();
         super::inject_path_observation_inputs(
@@ -2049,7 +2047,7 @@ mod tests {
             .unwrap();
         assert!(matches!(own, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a)));
         assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 9);
-        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 7);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
         let revoked = transaction
             .compute(&PathObservationKey::new(added.dupe()))
             .await
@@ -2076,7 +2074,7 @@ mod tests {
             matches!(recovered, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &sibling))
         );
         assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 11);
-        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 8);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]

@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-234-m7a-normal-rustc-path-mode-publication-r1
-Status: Design review of direct DICE mode publication
+Packet: WP-7-235-m7a-normal-rustc-bounded-host-directory-r1
+Status: Design review before bounded functional directory admission
 
 ## Observable and source basis
 
@@ -44,56 +44,81 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1009](wp1009-path-mode-replay-2026-10-08.json) accepts the deterministic same-DICE
-replay discriminator: five existing tests pass, two <=60s pinned offline compiler stages pass.
-147net test-only lines preserve legacy/first-install/ownA→B→A/sibling Need/recovery controls.
-Identical/unrelated per-demand publication reevaluates the mode projection while complete
-own leaves remain reused. This proves redundant projection work, not CPU dominance or native
-speedup. [WP1008](wp1008-bounded-runtime-activity-observation-2026-10-08.json) holds the latest
-observed-prefix memory result119548KiB/256MiB; WorkDeadline and whole-workload fit remain open.
+[WP1010](wp1010-path-mode-publication-2026-10-08.json) accepts atomic direct mode
+projection publication while retaining historical injected mode/cells. Workspace87,
+Core80, strict themes4 and native1 pass with independent FINAL ACCEPT. The native
+probe ends in3.30s at117984KiB/256MiB, without source timeout; its path-only operation
+refusal identifies original platforms_root/host. No actual operation kind/caller or
+normal Rustc producer is proved. Deterministic mode evaluations8→1 preserve leaf/Arc/
+Need semantics; event counts are not a controlled speedup benchmark. Whole-workload fit
+remains open. The probe prefix now permits continued broader functional implementation.
 
 ## Active decision and ownership
 
-Slug-native internal DICE transport simplification; admitted exact fields unchanged. Natural
-owner is Workspace path observation's transport mode and exact per-demand input publisher.
-[Current design](../../../../target/wp1010/design.md) chooses an ordinary PathObservationInputModeKey
-with complete default LegacyEpoch instead of an absent raw injected input plus private projection.
-DICE's changed_to accepts ordinary Key values without computing them and preserves later compute
-behavior (dice/dice/src/api/transaction.rs51–64, impls/transaction.rs71–85 and general update tests).
-The same publisher atomically sets exact demand cells, revocations and PerDemand mode. Its stable
-same-mode equality must cut off invalidation; first Legacy→PerDemand must invalidate actual default
-mode dependency. Direct consumers read this one key; remove duplicate projection and manual dirty.
-No Option/transient-default workaround, side cache, external mode flag, request-generation bypass,
-source/certificate/IO/permission/profile/cap change. First installation and legacy default remain
-complete, existing Need stays transient and authoritative, old live transactions retain their mode.
-Read docs/developers/dice.md before implementing; independent design ACCEPT required.
+Compatibility: Slug-native internal bounded observation/test admission. Existing exact
+Bazel9.2/rules_rust0.73 surfaces and unsupported boundaries remain unchanged. Source
+basis: [successor recommendation](../../../../target/wp1010/successor-source.md), SHA256
+c0b3b910bd12a98b0094cd84c3e6898916151e17dddaf8544f586ef3cf40f60b.
+Existing Workspace PathDirectoryListingKey/ObservationKey resolves directories and emits
+DirectoryEntries; Bzlmod drive_host_repository_directory_listing owns repository route/
+namespace and Loading host_glob/subtree callers consume its exact Arc/Need/error. The
+actual denied path does not establish which caller/operation emitted that Need; admission
+must inspect and borrow the actual demand, never infer permission from the basename.
 
-Allowlist app/slug_workspace_v2/src/path_observation.rs (mode key/publisher/leaf dependency and
-existing typed mode counter/expectations), path_observation/memory_tests.rs (remove obsolete explicit
-projection dirtiness in existing reverse-mode control). Production estimate <=15added/40removed
-lines; no new storage/strings/Arcs/interner/map/history or locks. Existing transport enum identity/
-equality unchanged; no evaluator heap or command scratch retained. File remains cohesive path
-observation owner despite >2000lines; no adjacent cleanup. Existing result/demand carriers borrowed/
-duped; continue allocation discipline and scoped interner reuse when repeated string owners fit.
+Choose a default-false PreparedFile AND PublicProbe host-directory role, independently
+required by readiness. Permit only actual Host DirectoryEntries at selected roots[2],
+exact relative host. Borrow root/relative components; no retained joined path, prefix,
+recursive, other root/namespace, child metadata/body or generated-repository grant.
+Existing metadata3 remains Lstat-only and source3 remains exact Lstat/FileBytes. Whole
+mixed Need is refused before progress, retaining original first offender and order.
+Symlink-resolved paths independently require this exact permission. Native unknown-kind
+classification remains part of directory semantics, not a zero-IO claim.
 
-Root owns design/integration/gates/receipt/scheduling/commit; source worker owns those two Rust
-files; evidence worker owns minimal current native invocation/preparation evidence; independent
-reviewer owns design/final. Required regression retains WP1009 first-install distinct legacy/identical/
-unrelated/ownABA/known revocation+reinsertion and default legacy counts. Mode counter targets actual
-ordinary ModeKey and remains1 after the initial default compute, vs prior projection8; every leaf
-value/count/pointer/Need assertion preserved. Reuse existing revoked/unknown+held old transaction,
-namespaceABA, unrelated-addition and Need/Missing tests. Run full Workspace owner tests serially
-if bounded; one current CargoJSON/preflight per executable. Core direct lib compile plus existing
-path ledger discard/revoke and request retry controls protect production wrappers. Compile only
-pinned offline/jobs1 stages<=60s; no concurrent Cargo. Review semantic correction before one changed
-current-artifact native using original WP1008 public probe/source context. No identical timing retry.
+Couple admission with a cfgtest Linux scoped enumeration owner. Bounds:128 non-dot
+entries,1024 bytes per name,16KiB total name bytes; enforce before retaining/pushing or
+classification, including pre-copy native d_name checks. Check existing source scope on
+open/read retries and metadata fallback retries. Over-limit is a typed operational kernel
+refusal, never Missing/Io/success or a partial epoch; existing FileBytes counters must not
+be claimed to account for directory names. Preserve ordinary production/non-scoped API;
+Windows remains unsupported. Native handle closes once on every terminal path/drop.
+Retained names/kinds are normal independently owned semantic output, bounded by these
+limits and released with rejected observation/epoch/history owner. Borrow/transfer existing
+name storage, share existing Arc carriers; no new cache/interner/lock/global pool or DICE
+representation change. Existing compact names/slices are reused, unique directory names
+are not globally interned. No lock spans DICE compute. Existing request revision/source
+revalidation and final publication route stay intact; mutable FS is not historical IO.
 
-Acceptance is semantic equivalence plus eliminated projection computations under the exact finite
-regression; runtime speedup unclaimed without controlled measurement. Keep representative child
-memory <=256MiB with unchanged AS512MiB, sourcework5s/lifetime8s/native10s/cleanup3s, source128/
-production64, registry128, object1MiB/everybank16MiB/log1MiBeach/report4MiB/FSIZE16MiB and original
-280 ordered leases/two64KiB contexts. Preserve actual failures zero current credit. If default mode
-publication cannot preserve first-install/reverse mode/old-live/Need semantics, revise within this
-owner or reject the correction; never weaken tests. Any new ownership/source grant needs root-frozen
-review first. Public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE edition
-restoration/fullCLI/M7A/MVS/provenance/whole-workload fit remain open. Linux priority; Windows stubs.
+Rust allowlist: app/slug_core_v2/src/runtime/path_observation.rs and a small child
+path_observation/scoped_directory.rs with child tests; existing platforms_module_preparation_tests.rs
+and its public_probe_preparation_tests.rs/child policy tests. Kernel and test-policy writers
+are disjoint. Both large parent owners get only cohesive dispatch/role seams; new bounded
+enumeration/tests stay in the child. Estimate60–150 functional lines plus discriminating
+tests, trigger for reassessment rather than permission. No Loading/Bzlmod/Workspace semantic
+changes, source capture/acquisition, profile/cap increase or guessed provider/body closure.
+Root owns ignored target/wp1011 minimal native helper/config changes and activation.
+Independent design ACCEPT before implementation, semantic/final reviews before native.
+
+## Validation and resource contract
+
+Reuse WP1010's eighty protected Core selectors and strict themes; add only cohesive new
+kernel/policy tests. Batch current CargoJSON/preflight after pinned offline/jobs1 <=60s
+preparations; no concurrent shared-target Cargo. Reuse unchanged Workspace controls only
+with their unchanged executable/source pins, and fresh Loading directory adapter control
+when needed. Required directory tests: inclusive128/1024/16KiB and EOF, overflow before
+retain/classification, skipped dot entries, EINTR/EIO scope expiry, metadata fallback retry,
+close/refusal/drop, no partial epoch and exact existing error polarity. Policy matrix covers
+all11roots/4modes/8operations and namespaces, default/source/metadata-only, wrong slot,
+case/child/suffix/foreign-root negatives; mixed Need preserves original first offender and
+zero progress. Existing Workspace observed listing Arc/error controls and Core repository
+names/kinds change/A→B→A protect carriers. Freeze exact selectors before execution.
+
+Only after focused checks and independent prelaunch ACCEPT, ONE changed normal native
+operation may perform exact host listing through existing owners and revalidation. Keep
+280 source leases/two64KiB contexts and all source/time/RSS permissions unchanged: work5s,
+lifetime8s,native10s,cleanup3s,RSS256MiB,AS512MiB,source128,production64,registry128,
+object1MiB,each bank16MiB,each log1MiB,report4MiB,FSIZE16MiB. Actual listing overhead
+is separately bounded semantic allocation; prior source captures do not certify complete
+directory inventory. No manual listing/capture or identical retry. Correct invocation/
+implementation errors within accepted contract; REPLAN only if bounds/ownership/operation
+cannot be preserved. Full normal Rustc/support/data/toolchain/runfiles/edition restoration,
+fullCLI, M7A and whole-workload fit remain active.
