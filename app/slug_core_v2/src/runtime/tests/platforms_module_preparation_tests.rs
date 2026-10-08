@@ -591,6 +591,28 @@ static GENERATED_FEATURES_VERSION_FILES: [GeneratedFileSignature; 2] = [
         ],
     ),
 ];
+static GENERATED_PLATFORMS_HOST_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "BUILD.bazel",
+        86,
+        true,
+        [
+            0xd2, 0xd2, 0xd0, 0x73, 0x87, 0x3f, 0xac, 0x52, 0x40, 0x0b, 0x05, 0xa5, 0x6a, 0x0a,
+            0xa2, 0x0f, 0xe8, 0x17, 0xbe, 0x45, 0x9a, 0x9c, 0xc9, 0x35, 0xff, 0x46, 0xf5, 0xd8,
+            0x0a, 0x19, 0xd9, 0xd5,
+        ],
+    ),
+    (
+        "constraints.bzl",
+        134,
+        true,
+        [
+            0x63, 0x36, 0x45, 0xe0, 0x95, 0x27, 0xe5, 0x09, 0xd9, 0xde, 0x5d, 0x33, 0xb4, 0x2b,
+            0x85, 0xe5, 0x08, 0xc6, 0x7f, 0x42, 0xeb, 0xbb, 0xb5, 0x0e, 0xc8, 0xb0, 0xb9, 0x53,
+            0xcb, 0x8d, 0x4b, 0x44,
+        ],
+    ),
+];
 static GENERATED_CC_PROXY_FILES: [GeneratedFileSignature; 3] = [
     (
         "BUILD",
@@ -698,6 +720,15 @@ impl Bodies {
                 "version_repo",
             ) if self.bazel_features_import_sources && self.additional[0].is_some() => {
                 Some(&GENERATED_FEATURES_VERSION_FILES)
+            }
+            (
+                "platforms+host_platform+host_platform",
+                "platforms",
+                "host",
+                "extension.bzl",
+                "host_platform_repo",
+            ) if self.platforms_host_import_sources && request.repo_spec.attributes.is_empty() => {
+                Some(&GENERATED_PLATFORMS_HOST_FILES)
             }
             (
                 "rules_cc++compatibility_proxy+cc_compatibility_proxy",

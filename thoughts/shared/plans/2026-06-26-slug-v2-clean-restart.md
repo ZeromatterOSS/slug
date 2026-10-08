@@ -35,20 +35,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Implementing exact platforms host file admission
+Status: Preparing optimized Bzlmod normal loading observation
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1005](./slug-v2-subplans/wp1005-optimized-host-plan-observation-2026-10-08.json)
-observes the complete original host-platform two-file plan in4.992s/118452KiB under unchanged
-256MiB/5s source/8s lifetime/10s native limits. Loading-only optimized compiler profile adds no
-Rust/storage/interners or retained string copies;65Rust/four controls/native pass. Two failed
-compiler preparations preserved0credit; four metadata-only plans separate. Original280bindings
-and retirement match. Continue with one cohesive exact host-plan matcher/current-epoch namespace
-admission using borrowed original values and existing policy owners. Public producer and complete
-workload fit remain open.
+[WP1006](./slug-v2-subplans/wp1006-exact-host-file-admission-2026-10-08.json)
+accepts exact host own-plan/current-epoch cfgtest admission with119net static-descriptor lines,
+no retained strings/storage/interners or production change.69Rust/four controls/native pass;
+one synthetic fixture failure corrected and preserved0credit, originalsourcegateprovenance qualified.
+Native5.253s/118804KiB fits256MiB, accounts+220writes but WorkDeadline leaves nextNeed/output/epoch/
+producer unproved. Next optimize ONLY private Bzlmod compiler profile0→1/debug0, preserving Loading1,
+allotherprofiles and original source5s/8slifetime/native10s/allbankcaps. This is a source-grounded
+reduced-work hypothesis, not a measured hotspot or promised speedup. Actualchangedartifact/fullgates
+required; no oldartifact forcing, clockreset or capraise. Whole-workload fit and public producer open.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
