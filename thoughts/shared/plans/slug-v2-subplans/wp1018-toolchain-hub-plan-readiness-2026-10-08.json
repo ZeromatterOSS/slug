@@ -1,0 +1,330 @@
+{
+  "schema": 1,
+  "packet": "WP-7-242-m7a-normal-rustc-toolchain-hub-plan-readiness-r1",
+  "checkpoint": "WP1018",
+  "baseline": "db055648cc55ee93b750491e2fe2c4f12da7a17b",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest Linux diagnostic readiness; existing exact projections unchanged",
+  "change": "Exact atomic toolchain_repository_hub owner becomes eligible for the existing bounded borrowed original plan formatter; grants/roles/namespace/materializer/production/DICE unchanged",
+  "growth": {
+    "Rust_net": 41,
+    "parent_net": 6,
+    "child_net": 35,
+    "initial_helpers_net": 64,
+    "resolver_correction_net": 20,
+    "fixture_correction": true
+  },
+  "allocation": {
+    "new_runtime_owned_strings": 0,
+    "new_runtime_containers": 0,
+    "new_runtime_Arc_clones": 0,
+    "new_flags_keys_global_interner_cache_mirrors": 0,
+    "method": "Borrow original request/plan/path/content; hash and emit immediately through existing formatter",
+    "existing_interned_shared_carriers": true,
+    "static_literal_layout_unmeasured": true
+  },
+  "validation": {
+    "Core": 92,
+    "changed_existing_selectors": [
+      33,
+      34
+    ],
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 97,
+    "passing_gate_records": 99,
+    "current_allphase_records": 100,
+    "preserved_failed_control_records": 1,
+    "failed_control_pass_credit": 0,
+    "Rust_or_preparation_repeats": 0,
+    "current_capture_operations": 0,
+    "qualified_prior_source_fresh_credit": 0,
+    "qualified_prior_Workspace": 87,
+    "qualified_prior_Bzlmod": 5,
+    "preparation_seconds": {
+      "dependency": 0.1275258829118684,
+      "compile": 10.719766653026454,
+      "check": 7.304874707013369
+    },
+    "direct_compile": [
+      "Core",
+      "Loading",
+      "CLI"
+    ],
+    "ordinary_seconds": 19.264581708353944,
+    "ordinary_peak_kib": 68920,
+    "strict_theme_seconds": 1.9950035779038444,
+    "strict_theme_peak_kib": 25396,
+    "direct_material_union": 833,
+    "selector76_only_allocator_override": "MALLOC_ARENA_MAX=2; caps/assertions/native environment unchanged"
+  },
+  "native": {
+    "seconds": 3.7016972589772195,
+    "conservative_peak_kib": 210136,
+    "rss_cap_kib": 262144,
+    "as_cap_bytes": 536870912,
+    "runtime_pins": 820,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 118,
+      "transferred_bytes": 0,
+      "decoded_bytes": 6126320,
+      "written_bytes": 5448,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 11679531
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "timeout": {
+      "status": "available",
+      "armed": true,
+      "first_work": false,
+      "origin": false,
+      "overflow": false,
+      "sticky": false,
+      "site": 0,
+      "domain": 0,
+      "phase": 0,
+      "return": 0,
+      "origin_available": false,
+      "observer_frame_causal_pair_proved": false
+    },
+    "balanced_event_counters": [
+      5634,
+      5634,
+      1107,
+      1107,
+      4558,
+      4558
+    ],
+    "original_owner": {
+      "capture": "captured",
+      "kind": "generated_file_effects",
+      "reason": "generated_kind",
+      "identities": {
+        "workspace": {
+          "length": 101,
+          "raw_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+        },
+        "canonical": {
+          "length": 32,
+          "raw_hex": "72756c65735f727573742b2b727573742b727573745f746f6f6c636861696e73"
+        },
+        "rule_repo": {
+          "length": 11,
+          "raw_hex": "72756c65735f727573742b"
+        },
+        "rule_package": {
+          "length": 12,
+          "raw_hex": "727573742f70726976617465"
+        },
+        "rule_target": {
+          "length": 20,
+          "raw_hex": "7265706f7369746f72795f7574696c732e627a6c"
+        },
+        "rule_name": {
+          "length": 24,
+          "raw_hex": "746f6f6c636861696e5f7265706f7369746f72795f687562"
+        },
+        "logical_root": {
+          "length": null,
+          "raw_hex": null
+        }
+      },
+      "raw_bytes_sum": 200,
+      "complete_identity_captured": true,
+      "first_offender_only": true,
+      "semantic_cause_chain_proved": false,
+      "source_availability_proved": false
+    },
+    "original_plan": {
+      "capture": "captured",
+      "counts_complete": true,
+      "ordered_rows": 2,
+      "ordered_rows_is_lower_bound": false,
+      "kind_counts": {
+        "file": 2,
+        "archive": 0,
+        "symlink": 0
+      },
+      "path_bytes": 26,
+      "content_bytes": 34151,
+      "mapping_len": null,
+      "mapping_hex": null,
+      "attribute_count": 6,
+      "effects": [
+        {
+          "ordinal": 0,
+          "kind": "file",
+          "path_len": 15,
+          "path_hex": "574f524b53504143452e62617a656c",
+          "content_len": 52,
+          "content_sha256": "262cb82e4ad0636465787941be9289d6a7016d2030b89bb712fa65a4308b74f9",
+          "executable": true
+        },
+        {
+          "ordinal": 1,
+          "kind": "file",
+          "path_len": 11,
+          "path_hex": "4255494c442e62617a656c",
+          "content_len": 34099,
+          "content_sha256": "8437353871c6e34d650ff265d31437de104601ec5501c8a308d80c1a398d6998",
+          "executable": true
+        }
+      ],
+      "original_order_preserved": true,
+      "repeated_original_paths_preserved": true,
+      "archive_symlink_payload_proved": false,
+      "full_repo_spec_proved": false,
+      "source_availability_proved": false,
+      "materialization_admission_proved": false,
+      "bounds_failure_reason_proved": false
+    },
+    "full_producer_proved": false,
+    "whole_workload_fit_proved": false
+  },
+  "leases": {
+    "count": 287,
+    "original_ordered_prefix": 285,
+    "appended_at_END": 2,
+    "same_context_counts": [
+      188,
+      99
+    ],
+    "scratch_bytes_each": 65536,
+    "physical_bytes": 6395771,
+    "bracket_bytes": 12791542,
+    "current_signatures_stable": true,
+    "immutable_historical_filesystem": false,
+    "documented_fd_opens": 4435
+  },
+  "corrections": {
+    "RulesRust_role_test_strengthening": "Existing role enabled/asserted before compilation; source handoff initial bytes preserved, zero extra gate credit",
+    "fixture": "Inherited nonLocal builder erased logical-root negative; corrected raw0/- rejection with/withoutplan, decoder unchanged",
+    "preserved_failure": {
+      "path": "target/wp1018/native/protocol-controls-initial/operation.json",
+      "sha256": "dc060e26581e2c4e85275daa8151f44d06300c918af4a831cf1847ec614a4c8e"
+    },
+    "preserved_failure_stdout": {
+      "path": "target/wp1018/native/protocol-controls-initial/stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "preserved_failure_stderr": {
+      "path": "target/wp1018/native/protocol-controls-initial/stderr",
+      "sha256": "ecbf6711466fcc132ede6bd0fbf105c074abb7d8e9058189086c0e168135a499"
+    },
+    "finite_provenance": "Exact97 successful operation/raw triples map only oldprepare+oldcontrols pins to immutable snapshots; savedmaps unchanged/allotherpins and newrecords strictcurrent",
+    "ledger": {
+      "path": "target/wp1018/correction/gate-ledger.json",
+      "sha256": "f54f247e4d4a18b0e0a2af41aaf4fbce824a960406e10d6a0545bb311c6c78d3"
+    },
+    "review": {
+      "path": "target/wp1018/correction/correction-review.md",
+      "sha256": "567365735e9558bb9547e52abb661dc4344c6f56e955204a2a3e865a54a5bcd7"
+    },
+    "original_prepare": {
+      "path": "target/wp1018/correction/prepare.py.original",
+      "sha256": "fb1514478b952ad396d282ed57d65fe5b8c36d5c0b6ce88c13acb1d9f232ed51"
+    },
+    "original_controls": {
+      "path": "target/wp1018/correction/protocol_controls.py.original",
+      "sha256": "8977b46f5dfe1d315c364cd0f88c599366c7ca47a8d925b2631b505f5ce727cc"
+    }
+  },
+  "evidence": {
+    "design.md": {
+      "path": "target/wp1018/native/design.md",
+      "sha256": "1cbcd4518a047578826460884df58768b220205db0c1488754c3e49734c4230e"
+    },
+    "inputs.json": {
+      "path": "target/wp1018/native/inputs.json",
+      "sha256": "6d67f85ee4a6c2632df87b280c775fb3603b9fa78ba7f85287914f52d9d40c60"
+    },
+    "selectors.json": {
+      "path": "target/wp1018/native/selectors.json",
+      "sha256": "904ed9ba028c7103dd5f60eaaded9b627769e5e071548aee20594d8703118f0f"
+    },
+    "implementation-source.md": {
+      "path": "target/wp1018/native/implementation-source.md",
+      "sha256": "9972370af86f45829b89ca7c451e091fad20323fdc9e00c815a6d72e22e70598"
+    },
+    "semantic-source-review.md": {
+      "path": "target/wp1018/native/semantic-source-review.md",
+      "sha256": "32156b3e4632f240d503be131c1b1e2697f71246ae9d6c8a5c71d4d2997ea043"
+    },
+    "static-evidence-review.md": {
+      "path": "target/wp1018/native/static-evidence-review.md",
+      "sha256": "07a4e66d8a563c014d71a365dbea014f41e805c215431c2ebb18193a39f1aefd"
+    },
+    "preflight-source.md": {
+      "path": "target/wp1018/native/preflight-source.md",
+      "sha256": "48a2caacd8f94ff22948da98e2019bab787852cbb3e247905c0a8042160c6d6e"
+    },
+    "preflight-evidence.md": {
+      "path": "target/wp1018/native/preflight-evidence.md",
+      "sha256": "c1c0279c03c8ac3b26e5d5f834506d65d0048410f9e33242228e487dca6347ab"
+    },
+    "final-source.md": {
+      "path": "target/wp1018/native/final-source.md",
+      "sha256": "8ba3f5956037584088771c3c0f97cab09c9953b82458ad98fe7e2ce2f990518f"
+    },
+    "native-summary.json": {
+      "path": "target/wp1018/native/native-summary.json",
+      "sha256": "e056b17938d2290a2d8ed6d8b234f594766680f3c5ec2e16c2f77789ce350f5f"
+    },
+    "native-operation.json": {
+      "path": "target/wp1018/native/native-operation.json",
+      "sha256": "0b6ae7fbf0ed252c6fc35f8672a4c94dbc6192ccb4f38560ef30112a7d8f9956"
+    },
+    "native.stdout": {
+      "path": "target/wp1018/native/native.stdout",
+      "sha256": "d0033d4e5b3f874c712e432ad01866d7bbedbeff45b46059c6aa549484542c93"
+    },
+    "result.json": {
+      "path": "target/wp1018/native/result.json",
+      "sha256": "c9359f236decc2f5c80c7d8ad7b6fa9631bc4eff5200e1b5be6ee002a1420720"
+    },
+    "protocol-controls/operation.json": {
+      "path": "target/wp1018/native/protocol-controls/operation.json",
+      "sha256": "689686bfc6506abdc670fbbeb30d8313f63f222f75b574a7b4fc7bbce8545025"
+    },
+    "final-evidence.md": {
+      "path": "target/wp1018/native/final-evidence.md",
+      "sha256": "4fec4c8f68b1d3aa5261b5aa9ab4701590ba3c694155b1368f994370050d9ff2"
+    },
+    "operational-summary.json": {
+      "path": "target/wp1018/native/operational-summary.json",
+      "sha256": "1156e4960e8b2d849865ffce54edbdb1929795e38fae3d9a202dd1b61b47d5cc"
+    },
+    "audit-result.json": {
+      "path": "target/wp1018/native/audit-result.json",
+      "sha256": "1a5c5244d68be37188dfc9ad12170d32affdce9924838c4c29356dd8f786c83e"
+    }
+  },
+  "source_handoff": {
+    "path": "target/wp1018/source-handoff.md",
+    "sha256": "fc821338c087f82408476e60464a72b811b42b3fa82364487a5f9a96e495808e"
+  },
+  "successor": {
+    "path": "target/wp1018/next-source.md",
+    "sha256": "bb31b304bedcd6457bf51c50e3797be5427abc3932af877bdd633c19e5120c85"
+  },
+  "limits_unchanged": true,
+  "residuals": [
+    "Finite natural exact hub2-file materialization and matching same-current-epoch namespace/full originalRepoSpec association",
+    "Normal public Rustc/support/data/toolchain/action/runfiles and same-DICE2024\u21922021\u21922024",
+    "Source/body/parser/registry/plan Weak and caller/certificate/whole-workload fit"
+  ],
+  "timing": {
+    "artifact_span_seconds": 2134.4146795272827,
+    "includes_review_scheduling_gaps": true,
+    "independent_review_elapsed_not_measured": true
+  }
+}

@@ -34,21 +34,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-241-m7a-normal-rustc-repository-data-source-readiness-r1
-Status: Accepted bounded Rust repository data readiness; next hub plan projection
+Packet: WP-7-242-m7a-normal-rustc-toolchain-hub-plan-readiness-r1
+Status: Accepted bounded original hub plan; finite materialization next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1017](./slug-v2-subplans/wp1017-repository-data-readiness-2026-10-08.json) cohort33 and exact scoped known_shas Host allowance pass Core92/themes4/
-native1 under unchanged caps. Native3.766744373s/conservative209600KiB of262144KiB,
-SourceErrorNone/source118/6126320decoded reaches original generated toolchain hub
-file effects. Independent actual FINAL accepts the bounded checkpoint. Next borrow its exact
-ordered plan before finite materialization/namespace admission. Current prefix fits;
-full producer/whole-fit remain open. Borrow/transfer/share strings and use existing
-scoped interners where repetition/lifetime fit; no unique transient data pool or cap
-raise. Source/native limits unchanged; blind retries closed.
+[WP1018](./slug-v2-subplans/wp1018-toolchain-hub-plan-readiness-2026-10-08.json)
+captures the borrowed original toolchain hub plan: two ordered executable files,
+WORKSPACE.bazel52B andBUILD.bazel34099B, mappingNone/attributes6, no grant.
+Core92/themes4/native1/independent FINAL accept; native3.701697259s/210136KiB under
+262144KiB, SourceErrorNone/source118/6126320decoded. One truthful decoder-fixture
+correction preserved its failed record/0credit and97prior passing records' exact
+original-helper provenance. Next finite natural2-file materialization and matching
+same-epoch namespace must preserve full original RepoSpec, not attributes count.
+Current prefix fits; full producer/whole-fit remain open. Borrow/transfer/share and
+existing scoped interners where repetition/lifetime fit; no transient unique data
+pool or cap raise. Source/native limits unchanged; blind retries closed.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

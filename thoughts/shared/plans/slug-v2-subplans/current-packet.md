@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-241-m7a-normal-rustc-repository-data-source-readiness-r1
-Status: Accepted bounded Rust repository data readiness; next hub plan projection
+Packet: WP-7-242-m7a-normal-rustc-toolchain-hub-plan-readiness-r1
+Status: Accepted bounded original hub plan; finite materialization next
 
 ## Observable and source basis
 
@@ -44,33 +44,52 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1017](wp1017-repository-data-readiness-2026-10-08.json) source/service delta passes Core92, four strict decoder themes and one
-normal native replay. Current exact nightly1033B and known_shas4749878B signatures
-admit cohort33/meta3/union69. Construction-only selected-root Host FileBytes allowance
-4749878 uses existing credited reader, shared normalized root and original demand;
-every unrelated Host/Registry default remains1MiB. No retained owned strings, body
-mirror or global pool. Original1MiB capture refusal remains preserved; bounded64KiB
-fullEOF/SHA/UTF8 observation independently accepted the exact large candidate.
+[WP1018](wp1018-toolchain-hub-plan-readiness-2026-10-08.json) captures the original
+hub plan through the borrowed formatter: complete ordered WORKSPACE.bazel52B then
+BUILD.bazel34099B, both executable, no archive/symlink, mappingNone/attributes6.
+No functional or namespace grant. Independent FINAL accepts Core92/themes4/native1,
+99passinggate records/97names plus1preservedfailedfixturebatch/0credit=100actual.
+Corrected logical-root fixture and exact97operation/helper-snapshot provenance retain
+passing Rust/preparation evidence without replay. Current native3.701697259s/210136KiB
+of262144, SourceErrorNone/source118/6126320decoded, bankpeak11679531/end0. ActualScope/
+recorderWeak expire; Source/plan/bodyWeak unavailable. Same287 signatures/two64KiB
+188+99/6395771physical/12791542bracket, no currentcapture; prior source facts0fresh.
+Runtime added no retainedString/container/Arcclone/interner/cache/flag. Prefix fits;
+full producer/whole-workload fit remain open. Exact selectedknown4749878/defaultHost
+andRegistry1MiB remain unchanged.
 
-Native3.766744373s/conservative209600KiB under262144KiB, SourceErrorNone,
-source118/6126320decoded and bankpeak11679531/end0. SourceWeak unseen; actual Scope/
-recorderWeak expire. All287 ordered source signatures remain stable, original285
-prefix+2END in SAMEtwo64KiB188+99/6395771physical/12791542bracket. Current99nativegate/
-101allphase records/97names; zero failed current children. Historical parser samehash,
-Workspace87/Bzlmod5 and saved reader proofs are qualified0fresh, not current wholefit.
+## Accepted contract and boundary
 
-The exact typed frontier is GeneratedFileEffects/generated_kind for original
-rules_rust++rust+rust_toolchains, rule @rules_rust+//rust/private:repository_utils.bzl
-%toolchain_repository_hub. Original mapping/attributes/ordered plan are unreported.
-Next project that already-owned plan through the existing borrowed bounded formatter
-before deciding finite materialization and same-epoch namespace permission. No new
-source capture or recursive grant is grounded. Normal public Rustc/support/data/
-action/runfiles/same-DICE edition restoration, body/caller/certificate and full-fit
-remain open. Independent actual FINAL accepts this bounded checkpoint; normal-producer milestone remains open.
+Only the exact atomic hub tuple was added to generated_plan_diagnostic, retaining
+first-denied family/reason/workspace/original request and plan pointers. The existing
+formatter/pre-Mutex site and all8rows/9visits/path512+2048/content1MiB+4MiB/encoded16KiB
+bounds remain intact. Shared admitted3owner table, roles/readiness/known allowance,
+namespace matcher, materializer, production/DICE and Windows behavior are unchanged.
+Two existing formatter tests add the hub with crossed owners/order/pointer/Weak/bounds
+and explicit refusal under enabled RulesRust role/permissive shape matcher. Rust41net;
+no new runtime storage or fixture suite. Source/design/helper/correction/prelaunch and
+actual FINAL are bound by the receipt, including current9profiles and compiler artifact.
+
+The actual2-file shape proves bounded original plan presentation only. Full original
+RepoSpec/output/source availability/epoch/namespace/certificate/publicRustc and wholefit
+remain open. Original1MiB refusal and accepted4749878 exact source observation stay
+qualified prior evidence; no currentcapture or old executable traversal. Source/plan/
+registry Weak and post-drop heap attribution are unavailable, despite zero final credits.
 
 Work5/lifetime8/native10/absolutecleanup3/RSS256MiB/AS512MiB/source128/default16/
 production64/Registry1MiB/eachbank16MiB/log1MiB/report4MiB/FSIZE16MiB unchanged.
-Prefix memory fits; broader source-grounded work may continue with borrow/transfer/
-share and existing scoped interners when repetition/lifetime fit. Unknown plan shape
-is an implementation prerequisite, not a grant. Preserve any changed native refusal
-once; no identical retry or resource-ceiling raise.
+Borrow or transfer string storage; use existing scoped interners when repeated retained
+strings and lifetime fit. No global pool for unique transient data. Preserve any failed
+operation once and diagnose a changed bounded hypothesis; no identical replay/cap raise.
+
+## Next selected implementation
+
+[Actual source recommendation](../../../../target/wp1018/next-source.md) grounds a
+finite exact two-file hub admission through the existing natural materializer and
+same-current-epoch own-plan namespace. Preserve original full RepoSpec structurally;
+attributes6/count/digest alone supplies no authority. Use existing generated opt-in
+AND RulesRust import role, mappingNone, exact order/path/content/executable signatures,
+whole-Need pre-IO refusal and current request/owner association. Borrow/transfer/share;
+no retained output plaintext mirror, new flag or general GeneratedFileEffects grant.
+Independent integrated design must precede this functional decision. All caps and
+normal-producer/edition-restoration/certificate/full-fit gates remain unchanged.

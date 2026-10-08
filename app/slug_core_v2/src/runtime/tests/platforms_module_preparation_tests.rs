@@ -879,6 +879,12 @@ impl Bodies {
                 "host",
                 "extension.bzl",
                 "host_platform_repo"
+            ) | (
+                "rules_rust++rust+rust_toolchains",
+                "rules_rust+",
+                "rust/private",
+                "repository_utils.bzl",
+                "toolchain_repository_hub"
             )
         );
         if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {

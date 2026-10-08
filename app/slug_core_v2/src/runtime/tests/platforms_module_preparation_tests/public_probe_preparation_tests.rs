@@ -2544,14 +2544,33 @@ const GENERATED_DIAGNOSTIC_TEST_OWNERS: [(&str, &str, &str); 3] = [
         "host_platform_repo",
     ),
 ];
+const GENERATED_HUB_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
+    "rules_rust++rust+rust_toolchains",
+    "@@rules_rust+//rust/private:repository_utils.bzl",
+    "toolchain_repository_hub",
+);
 
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for (owner, &(canonical, _, _)) in GENERATED_DIAGNOSTIC_TEST_OWNERS.iter().enumerate() {
+    for (owner, &(canonical, defining_label, rule_name)) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+        .iter()
+        .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
+        .enumerate()
+    {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
-        let request_for_plan = |plan: Plan| generated_test_owner_request(&bodies, owner, plan);
+        let request_for_plan = |plan: Plan| {
+            let mut request = generated_globals_request(&bodies, plan);
+            request.id.canonical_repo =
+                slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
+            request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(defining_label).unwrap();
+            request.repo_spec.rule_id.rule_name = rule_name.into();
+            if owner == 2 {
+                request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+            }
+            request
+        };
         let content: Arc<[u8]> = Arc::from(&b"abc"[..]);
         let content_weak = Arc::downgrade(&content);
         let plan = Plan::build([
@@ -2578,16 +2597,26 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             )
+            .with_rules_rust_defs_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_generated_features_file_effects(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             );
+        assert!(enabled.rules_rust_defs_import_sources);
         // The permissive phase seam still requires the complete typed owner and source roles.
-        assert!(
-            enabled
-                .admit_with_plan_matcher(&needs, &|_, _| true)
-                .is_ok()
-        );
+        let permissive = enabled.admit_with_plan_matcher(&needs, &|_, _| true);
+        if owner == 3 {
+            assert_eq!(permissive.unwrap_err().family, "materialization");
+            assert_eq!(
+                enabled.first_denied_materialization(&needs).unwrap().1,
+                "generated_kind"
+            );
+        } else {
+            assert!(permissive.is_ok());
+        }
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);
         let denied = bodies.admit(&needs).unwrap_err();
@@ -2714,7 +2743,10 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             );
         }
         // Every component cross between otherwise eligible atomic owners stays closed.
-        for &(other_canonical, other_label, other_rule) in &GENERATED_DIAGNOSTIC_TEST_OWNERS {
+        for &(other_canonical, other_label, other_rule) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+            .iter()
+            .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
+        {
             if other_canonical == canonical {
                 continue;
             }
@@ -2865,7 +2897,10 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
 #[test]
 fn generated_plan_refusal_projection_is_bounded() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for &(canonical, defining_label, rule_name) in &GENERATED_DIAGNOSTIC_TEST_OWNERS {
+    for &(canonical, defining_label, rule_name) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+        .iter()
+        .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
+    {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
         let request_for_plan = |plan: Plan| {
