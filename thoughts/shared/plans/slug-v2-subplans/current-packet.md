@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-233-m7a-normal-rustc-path-mode-replay-r1
-Status: Implementing reviewed same-DICE replay discriminator
+Packet: WP-7-234-m7a-normal-rustc-path-mode-publication-r1
+Status: Design review of direct DICE mode publication
 
 ## Observable and source basis
 
@@ -44,53 +44,56 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1008](wp1008-bounded-runtime-activity-observation-2026-10-08.json) accepts cfgtest-only
-fixed512-byte runtime activity and finite first-timeout diagnostics.77 ordinary/four strict
-controls/one native pass;84 current supervised records,80 archived first-wave records0current
-credit. Actual native5.273s/119548KiB fits256MiB at the observed prefix. WorkDeadline remains;
-53119 dependency checks/4055 computes and a sampled source-preparation type do not prove a
-causal hotspot or public producer. Actual observer/recorder/scope retire, private body Weak
-unseen remains vacuous. Full producer/whole-workload fit remain open. The separate
-[WP1007](wp1007-bzlmod-profile-preparation-2026-10-08.json) rejected two bounded compiler
-profile attempts; no third blind retry. Allocation discipline remains borrowing/transfer,
-shared immutable carriers and existing scoped interners where their retention fits.
+[WP1009](wp1009-path-mode-replay-2026-10-08.json) accepts the deterministic same-DICE
+replay discriminator: five existing tests pass, two <=60s pinned offline compiler stages pass.
+147net test-only lines preserve legacy/first-install/ownA→B→A/sibling Need/recovery controls.
+Identical/unrelated per-demand publication reevaluates the mode projection while complete
+own leaves remain reused. This proves redundant projection work, not CPU dominance or native
+speedup. [WP1008](wp1008-bounded-runtime-activity-observation-2026-10-08.json) holds the latest
+observed-prefix memory result119548KiB/256MiB; WorkDeadline and whole-workload fit remain open.
 
-## Active contract
+## Active decision and ownership
 
-Slug-native deterministic regression evidence, initially test-only. Natural owner is
-app/slug_workspace_v2/src/path_observation.rs: current per-demand input publisher,
-PathObservationInputModeProjectionKey and PathObservationKey. Existing manual projection
-dirtiness preserves first installation after absent raw mode; never remove it from aggregate
-activity counts. [Source basis](../../../../target/wp1008/native/successor-source.md) and
-[evidence limits](../../../../target/wp1008/native/successor-evidence.md) identify this seam;
-[design ACCEPT](../../../../target/wp1009/design-review.md) freezes the discriminators.
-Reuse docs/developers/dice.md and current DICE dependency recording/equality-cutoff behavior.
+Slug-native internal DICE transport simplification; admitted exact fields unchanged. Natural
+owner is Workspace path observation's transport mode and exact per-demand input publisher.
+[Current design](../../../../target/wp1010/design.md) chooses an ordinary PathObservationInputModeKey
+with complete default LegacyEpoch instead of an absent raw injected input plus private projection.
+DICE's changed_to accepts ordinary Key values without computing them and preserves later compute
+behavior (dice/dice/src/api/transaction.rs51–64, impls/transaction.rs71–85 and general update tests).
+The same publisher atomically sets exact demand cells, revocations and PerDemand mode. Its stable
+same-mode equality must cut off invalidation; first Legacy→PerDemand must invalidate actual default
+mode dependency. Direct consumers read this one key; remove duplicate projection and manual dirty.
+No Option/transient-default workaround, side cache, external mode flag, request-generation bypass,
+source/certificate/IO/permission/profile/cap change. First installation and legacy default remain
+complete, existing Need stays transient and authoritative, old live transactions retain their mode.
+Read docs/developers/dice.md before implementing; independent design ACCEPT required.
 
-Extend ONLY the existing partitioned_epoch_add_change_remove_and_restore_preserve_exact_path_values
-fixture and its typed activation tracker in that one workspace file. Preserve all legacy shard
-assertions/counts. Add one fixed AtomicUsize for exact mode projection Evaluated activations.
-On the same DICE engine, discriminate absent raw mode→first PerDemand using a value differing
-from still-installed legacy state; repeated publication/unrelated append must distinguish
-mode computes from unchanged complete leaf evaluation/pointer reuse. Measure own demand before
-activating sibling; own A→B→A restores exact values. Revoke a known sibling with conflicting
-legacy value, require Need, then reinsert and recover on the same engine. No new test selector,
-trace/event table/strings/global pool/payload history, production key/equality/dirty change,
-source acquisition/permission/profile/cap change. Two local atomic counters retire with fixture.
-This is an investigation; test results must not be represented as CPU dominance or an accepted
-optimization. If no avoidable publication work is observed, reject that hypothesis. Any production
-correction requires root-frozen source-grounded design and consequential review first.
+Allowlist app/slug_workspace_v2/src/path_observation.rs (mode key/publisher/leaf dependency and
+existing typed mode counter/expectations), path_observation/memory_tests.rs (remove obsolete explicit
+projection dirtiness in existing reverse-mode control). Production estimate <=15added/40removed
+lines; no new storage/strings/Arcs/interner/map/history or locks. Existing transport enum identity/
+equality unchanged; no evaluator heap or command scratch retained. File remains cohesive path
+observation owner despite >2000lines; no adjacent cleanup. Existing result/demand carriers borrowed/
+duped; continue allocation discipline and scoped interner reuse when repeated string owners fit.
 
-Root owns gates/receipts/scheduling/commit; source worker owns the one workspace test edit;
-evidence worker identifies protected existing selectors and checks allocation/source invariants;
-independent reviewer owns design/final. Estimated40–100 test-only lines; >2000-line file remains
-a cohesive path observation owner, no adjacent cleanup. Serialize pinned offline jobs1 preparations
-<=60s, fresh CargoJSON Workspace test executable, batched ordinary preflight, existing focused
-path input/Need/legacy/per-demand controls, and one direct Core compile dependent. No native in
-this packet: it changes no runtime behavior and another unchanged deadline replay proves nothing.
-Record selected/pass counts and preserved failures; no identical failed compiler retry.
+Root owns design/integration/gates/receipt/scheduling/commit; source worker owns those two Rust
+files; evidence worker owns minimal current native invocation/preparation evidence; independent
+reviewer owns design/final. Required regression retains WP1009 first-install distinct legacy/identical/
+unrelated/ownABA/known revocation+reinsertion and default legacy counts. Mode counter targets actual
+ordinary ModeKey and remains1 after the initial default compute, vs prior projection8; every leaf
+value/count/pointer/Need assertion preserved. Reuse existing revoked/unknown+held old transaction,
+namespaceABA, unrelated-addition and Need/Missing tests. Run full Workspace owner tests serially
+if bounded; one current CargoJSON/preflight per executable. Core direct lib compile plus existing
+path ledger discard/revoke and request retry controls protect production wrappers. Compile only
+pinned offline/jobs1 stages<=60s; no concurrent Cargo. Review semantic correction before one changed
+current-artifact native using original WP1008 public probe/source context. No identical timing retry.
 
-All prior source/native limits remain: work5s/lifetime8s/native10s/cleanup3s/RSS256MiB/AS512MiB,
-280 ordered leases/two64KiB contexts and byte/attempt caps. Compatibility admissions, normal
-Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE edition restoration,
-fullCLI/M7A/MVS/provenance/whole-workload fit stay open. Linux priority; Windows minimal stubs.
-Goal remains active; proceed to source-supported implementation once this discriminator settles.
+Acceptance is semantic equivalence plus eliminated projection computations under the exact finite
+regression; runtime speedup unclaimed without controlled measurement. Keep representative child
+memory <=256MiB with unchanged AS512MiB, sourcework5s/lifetime8s/native10s/cleanup3s, source128/
+production64, registry128, object1MiB/everybank16MiB/log1MiBeach/report4MiB/FSIZE16MiB and original
+280 ordered leases/two64KiB contexts. Preserve actual failures zero current credit. If default mode
+publication cannot preserve first-install/reverse mode/old-live/Need semantics, revise within this
+owner or reject the correction; never weaken tests. Any new ownership/source grant needs root-frozen
+review first. Public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE edition
+restoration/fullCLI/M7A/MVS/provenance/whole-workload fit remain open. Linux priority; Windows stubs.

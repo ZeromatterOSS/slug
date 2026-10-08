@@ -1790,6 +1790,7 @@ mod tests {
     #[derive(Default)]
     struct PathObservationEvaluationTracker {
         evaluations: AtomicUsize,
+        mode_evaluations: AtomicUsize,
     }
 
     impl ActivationTracker for PathObservationEvaluationTracker {
@@ -1803,6 +1804,13 @@ mod tests {
                 && matches!(activation, ActivationData::Evaluated(_))
             {
                 self.evaluations.fetch_add(1, Ordering::SeqCst);
+            }
+            if key
+                .downcast_ref::<super::PathObservationInputModeProjectionKey>()
+                .is_some()
+                && matches!(activation, ActivationData::Evaluated(_))
+            {
+                self.mode_evaluations.fetch_add(1, Ordering::SeqCst);
             }
         }
     }
@@ -1917,7 +1925,7 @@ mod tests {
             .unwrap();
         let mut transaction = updater.commit().await;
         let restored = transaction
-            .compute(&PathObservationKey::new(retained))
+            .compute(&PathObservationKey::new(retained.dupe()))
             .await
             .unwrap();
         assert!(matches!(
@@ -1925,11 +1933,150 @@ mod tests {
             PathOutcome::Complete(result) if result.as_ref() == &retained_result
         ));
         let removed = transaction
-            .compute(&PathObservationKey::new(added))
+            .compute(&PathObservationKey::new(added.dupe()))
             .await
             .unwrap();
         assert!(matches!(removed, PathOutcome::Need(_)));
         assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 5);
+
+        // Retain conflicting legacy state while the first real mode publication
+        // replaces it. Equal bytes would conceal a missed first-install invalidation.
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 1);
+        let stale = PathObservationEpoch::new([
+            (retained.dupe(), retained_result),
+            (added.dupe(), added_result.clone()),
+        ])
+        .unwrap();
+        let own_a = Arc::new(file_bytes(b"per-demand-a"));
+        let own_b = Arc::new(file_bytes(b"per-demand-b"));
+        let sibling = Arc::new(added_result);
+        let first = PathObservationEpoch::from_shared([(retained.dupe(), own_a.dupe())]).unwrap();
+        let mut updater = transaction.into_updater();
+        updater.changed_to(path_observation_shards(&stale)).unwrap();
+        updater
+            .changed_to([(PathObservationEpochKey, stale)])
+            .unwrap();
+        super::inject_path_observation_inputs(
+            &mut updater,
+            &first,
+            [retained.dupe(), added.dupe()],
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let value = transaction
+            .compute(&PathObservationKey::new(retained.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a)));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 6);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 2);
+
+        // Identical publication and unrelated append evaluate the mode projection
+        // separately, but neither may evaluate the retained complete path again.
+        let appended = PathObservationEpoch::from_shared([
+            (retained.dupe(), own_a.dupe()),
+            (added.dupe(), sibling.dupe()),
+        ])
+        .unwrap();
+        for (epoch, expected_mode) in [(&first, 3), (&appended, 4)] {
+            let mut updater = transaction.into_updater();
+            super::inject_path_observation_inputs(
+                &mut updater,
+                epoch,
+                [retained.dupe(), added.dupe()],
+            )
+            .unwrap();
+            transaction = updater.commit().await;
+            let again = transaction
+                .compute(&PathObservationKey::new(retained.dupe()))
+                .await
+                .unwrap();
+            assert!(
+                matches!(again, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a))
+            );
+            assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 6);
+            assert_eq!(
+                tracker.mode_evaluations.load(Ordering::SeqCst),
+                expected_mode
+            );
+        }
+        let added_value = transaction
+            .compute(&PathObservationKey::new(added.dupe()))
+            .await
+            .unwrap();
+        assert!(
+            matches!(added_value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &sibling))
+        );
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 7);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 4);
+
+        for (own, expected_leaf, expected_mode) in [(&own_b, 8, 5), (&own_a, 9, 6)] {
+            let epoch = PathObservationEpoch::from_shared([
+                (retained.dupe(), own.dupe()),
+                (added.dupe(), sibling.dupe()),
+            ])
+            .unwrap();
+            let mut updater = transaction.into_updater();
+            super::inject_path_observation_inputs(
+                &mut updater,
+                &epoch,
+                [retained.dupe(), added.dupe()],
+            )
+            .unwrap();
+            transaction = updater.commit().await;
+            let value = transaction
+                .compute(&PathObservationKey::new(retained.dupe()))
+                .await
+                .unwrap();
+            assert!(matches!(value, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, own)));
+            assert_eq!(tracker.evaluations.load(Ordering::SeqCst), expected_leaf);
+            assert_eq!(
+                tracker.mode_evaluations.load(Ordering::SeqCst),
+                expected_mode
+            );
+        }
+        let mut updater = transaction.into_updater();
+        super::inject_path_observation_inputs(
+            &mut updater,
+            &first,
+            [retained.dupe(), added.dupe()],
+        )
+        .unwrap();
+        transaction = updater.commit().await;
+        let own = transaction
+            .compute(&PathObservationKey::new(retained.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(own, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &own_a)));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 9);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 7);
+        let revoked = transaction
+            .compute(&PathObservationKey::new(added.dupe()))
+            .await
+            .unwrap();
+        assert!(
+            matches!(revoked, PathOutcome::Need(ref need) if need.demands() == &[added.dupe()])
+        );
+        assert!(!PathObservationKey::validity(&revoked));
+        assert!(!PathObservationKey::equality(&revoked, &revoked));
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 10);
+        let mut updater = transaction.into_updater();
+        super::inject_path_observation_inputs(
+            &mut updater,
+            &appended,
+            [retained.dupe(), added.dupe()],
+        )
+        .unwrap();
+        transaction = updater.commit().await;
+        let recovered = transaction
+            .compute(&PathObservationKey::new(added.dupe()))
+            .await
+            .unwrap();
+        assert!(
+            matches!(recovered, PathOutcome::Complete(ref result) if Arc::ptr_eq(result, &sibling))
+        );
+        assert_eq!(tracker.evaluations.load(Ordering::SeqCst), 11);
+        assert_eq!(tracker.mode_evaluations.load(Ordering::SeqCst), 8);
     }
 
     #[tokio::test]

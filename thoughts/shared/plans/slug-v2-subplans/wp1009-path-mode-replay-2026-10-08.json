@@ -1,0 +1,138 @@
+{
+  "packet": "WP-7-233-m7a-normal-rustc-path-mode-replay-r1",
+  "checkpoint": "WP1009",
+  "baseline": "dd9fa8a8f5d0336ef8c3f170924f2e0793e79c5c",
+  "outcome": "accepted deterministic replay discriminator; unnecessary mode projection evaluations demonstrated, no production correction",
+  "compatibility": "Slug-native cfgtest evidence; production unchanged",
+  "source_sha256": "a5b417a3677b258fe3a7a8757784f0b9a8801c5a800e63696b454bf127780dfe",
+  "growth": {
+    "test_net_lines": 147,
+    "test_changed_lines": 151,
+    "production_lines": 0,
+    "new_scalar_counter_words": 1,
+    "new_retained_production_strings": 0
+  },
+  "gates": [
+    {
+      "stem": "compile",
+      "elapsed_seconds": 12.61140982399229,
+      "selected": 0,
+      "passed": 0,
+      "raw_ref": "target/wp1009/compile.json",
+      "raw_sha256": "2bad9d9b54cd6637bd122f156b21142b952d3954f2045efa5587d11a718be24f",
+      "peak_KiB": 541136
+    },
+    {
+      "stem": "check",
+      "elapsed_seconds": 37.203337396960706,
+      "selected": 0,
+      "passed": 0,
+      "raw_ref": "target/wp1009/check.json",
+      "raw_sha256": "9f3eb026998e11ed13c19a1e7f376d17be65866949395a8a94ad13a5b77f0859",
+      "peak_KiB": 954876
+    },
+    {
+      "stem": "preflight",
+      "elapsed_seconds": 0.021576592000201344,
+      "selected": 0,
+      "passed": 0,
+      "raw_ref": "target/wp1009/preflight.json",
+      "raw_sha256": "5efc7543317bf2f6c472ae170a03becc649bcceb2199bf0e513f217765eb6b7d",
+      "peak_KiB": 13724
+    },
+    {
+      "stem": "ordinary-0",
+      "elapsed_seconds": 0.011208762996830046,
+      "selected": 1,
+      "passed": 1,
+      "raw_ref": "target/wp1009/ordinary-0.json",
+      "raw_sha256": "09a4fa071149127ef772aa90e9ac936c9fc360edf57438c0944c180507b77096",
+      "peak_KiB": 102932
+    },
+    {
+      "stem": "ordinary-1",
+      "elapsed_seconds": 0.011422504903748631,
+      "selected": 1,
+      "passed": 1,
+      "raw_ref": "target/wp1009/ordinary-1.json",
+      "raw_sha256": "b495f27669ee75a680fc0b38201112cb1695c26c6a34b7bea500905741ec06d4",
+      "peak_KiB": 10140
+    },
+    {
+      "stem": "ordinary-2",
+      "elapsed_seconds": 0.011093391920439899,
+      "selected": 1,
+      "passed": 1,
+      "raw_ref": "target/wp1009/ordinary-2.json",
+      "raw_sha256": "7fb92912aefeaa459ebac357dcea7b30b5ea1bdec15081863b4189a877e457b2",
+      "peak_KiB": 10148
+    },
+    {
+      "stem": "ordinary-3",
+      "elapsed_seconds": 0.011001641978509724,
+      "selected": 1,
+      "passed": 1,
+      "raw_ref": "target/wp1009/ordinary-3.json",
+      "raw_sha256": "48f64aa8fde4ae6992a70ba5c0adf3f16aebd0eed676d892f15e152929ac1145",
+      "peak_KiB": 10172
+    },
+    {
+      "stem": "ordinary-4",
+      "elapsed_seconds": 0.01109005301259458,
+      "selected": 1,
+      "passed": 1,
+      "raw_ref": "target/wp1009/ordinary-4.json",
+      "raw_sha256": "d16fca8a3f10e02e4e3f7f8960578bc3ea3f2ad1d4ed9ddcd4778d27012fd7d0",
+      "peak_KiB": 10188
+    }
+  ],
+  "ordinary_selected_passed": 5,
+  "preflight_verified_no_execution": 5,
+  "fresh_preparations": 2,
+  "fresh_supervised_records": 8,
+  "measurements": {
+    "mode_Evaluated_by_stage": [
+      1,
+      2,
+      3,
+      4,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "path_Evaluated_by_stage": [
+      5,
+      6,
+      6,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
+    "interpretation": "Per-demand identical/unrelated publication reevaluates mode projection while own complete path is reused; no runtime causal or performance claim."
+  },
+  "invariants": [
+    "All legacy shard assertions/counts preserved.",
+    "First real PerDemand overrides distinct cached legacy value.",
+    "Identical and unrelated publication preserves exact own Arc and leaf evaluation count while mode evaluates.",
+    "Own A/B/A exact, known sibling revocation Need invalid/unequal despite legacy value; same-engine reinsertion recovers.",
+    "Current per-demand publisher and original DICE engine used; no IO/trace/history/interner/production state change."
+  ],
+  "compiler_memory_not_runtime_fit": true,
+  "runtime_native_operations": 0,
+  "whole_workload_fit_proved": false,
+  "normal_producer_proved": false,
+  "qualifications": "Compiler/check used preserved run-pre-cleanup-correction.py bytes (original pins keyed run.py); future runner catches cleanup races under the same3s deadline. Successful previous stages unchanged; compiler memory separate from runtime. Child source memory_tests.rs/lib.rs pinned only by current ordinary/preflight records; no compilation pin coverage claim for those files.",
+  "references": {
+    "target/wp1009/design-review.md": "419c57cdc975b8f386a2e6c5f972c0b2c374aa91032fe8b244e4b42362deda82",
+    "target/wp1009/source-handoff.md": "0da244f1e393ca65ae2ac33f8156db1b83d6de28c80b435ad6d9053e82041bd8",
+    "target/wp1009/evidence-handoff.md": "970d471146722a3c9f9a7e3e29034cfd9eb46951eb6ba0e5676f15176e4f67cc",
+    "target/wp1009/validation-summary.json": "fcfe57d55229be79004a3f3a02ac80bf1d8d7945947fa1a0f55abed7adb5d484",
+    "target/wp1009/final-review.md": "a0bdeb1ceb3f3dbc56643fe5f5df093338e16eb50c13e97add4571c5b28f479d"
+  },
+  "next": "Review ordinary default-computed ModeKey with atomic changed_to publication as a smaller DICE-native replacement for duplicate missing-raw projection; prove first install, default legacy reuse, old-live transport and precise revocation before production change."
+}
