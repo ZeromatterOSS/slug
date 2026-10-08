@@ -1,0 +1,178 @@
+{
+  "packet": "WP-7-235-m7a-normal-rustc-bounded-host-directory-r1",
+  "checkpoint": "WP1011",
+  "baseline": "db0cf1eebb910403a592606667733ed25463454c",
+  "outcome": "accepted bounded cfgtest Linux directory observation and exact host directory role; capped normal native advances to CPU Lstat prerequisite",
+  "compatibility": "Slug-native internal observation/test admission; accepted exact surfaces unchanged",
+  "source": {
+    "app/slug_core_v2/src/runtime/path_observation.rs": "cc49c986ee4de46dc8d8fe70b22229ee07419aeccb75d8d1546770906024e7b9",
+    "app/slug_core_v2/src/runtime/path_observation/scoped_directory.rs": "f9c0ed8553a963102a6fbd692cf52d055cf0a1efee57de83525c6aa7e1d990ee",
+    "app/slug_core_v2/src/runtime/path_observation/scoped_directory/tests.rs": "8f922912cb3e433c2ceb5772b41cdffec9ef7813d73f903b1a99d1435ff1bb27",
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "2e3c5218d9633486ca96eda7a2f2c38ed9252b5c3d6744f8eeaab304e26e1171",
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "ba4eef89cd8fe527a475fd39d6897439f112b147761734819813fcfd4b54cd72",
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/platforms_host_directory_tests.rs": "e3b9bc16d5ed4eb236530ebf29463f61e0447aa7a76fd15f515b270c02a5d14e"
+  },
+  "semantics": "Defaultfalse PreparedFile+PublicProbe role independently readiness required. Exact Host roots[2]/host DirectoryEntries only. Borrow raw native names before inclusive128entries/1024pername/16384sum caps and ownership transfer. Scope checks on open/read/unknownkind and refinement metadata retries. One-close RAII, typed operational DirectoryLimit/SourceService, no partial epoch. Original ordinary/prod/Windows/DICE/path identities unchanged.",
+  "allocation": "Existing OS-native Name/OsString and shared Arc slice retained; name storage transfers once after bounds. Descriptor/vector overlap and libc DIR buffering qualified separately from FileBytes credits; unique names not globally interned. No new interner/cache/lock/retained mirror. Actual nativeprefix118576KiB under256MiB; whole workload fit open.",
+  "growth": {
+    "kernel_functional": 276,
+    "kernel_tests": 411,
+    "policy_net": 301,
+    "production_semantic_lines": 0,
+    "estimate_overrun": "disclosed/independently accepted cohesive cfgtest child plus retry/FFI/tests"
+  },
+  "tests": {
+    "Core_ordinary": 89,
+    "protected_prefix": 80,
+    "new_kernel": 4,
+    "new_policy": 2,
+    "new_existing_directory": 3,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 94,
+    "reused_Workspace": 87,
+    "reused_Workspace_fresh_credit": 0,
+    "direct_Loading_Core_CLI_compile": true,
+    "fresh_Loading_test_credit": 0,
+    "current_records": 96,
+    "total_supervised_records": 98,
+    "preserved_preparations_zero_current": 2
+  },
+  "preparations": {
+    "target/wp1011/native/dependency.json": 0.12539965193718672,
+    "target/wp1011/native/compile.json": 42.249064547009766,
+    "target/wp1011/native/check.json": 7.581541114952415
+  },
+  "correction": "First dependency1.3304s passed and compile19.7466s failed two E0618 test helper shadowing errors; preserved initial-compile-failure2records0current. Rename only scope() helper/calls to test_scope(), retain assertions. Corrected current compile42.249s <=60. source-correction preformat test949529... is historical; current formatted8f9229... compiler/test pins authoritative. Raw prelaunch union596 including themes;579 retained qualified Core-resolved set. Frozen audit/receipt zero-archive constants not authoritative for total attempts; this actual census98 includes both.",
+  "native": {
+    "current_native_selected_passed": 1,
+    "elapsed_seconds": 3.345979313016869,
+    "conservative_peak_kib": 118576,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 111,
+      "transferred_bytes": 0,
+      "decoded_bytes": 1259338,
+      "written_bytes": 5448,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "public": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "denied": {
+      "family": "path",
+      "operation": "lstat",
+      "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0/cpu"
+    },
+    "directory_role": {
+      "enabled": true,
+      "policy_checked": true,
+      "root_slot": 2,
+      "operation": "directory_entries",
+      "admitted_relatives": [
+        "host"
+      ],
+      "entry_limit": 128,
+      "name_limit": 1024,
+      "names_limit": 16384,
+      "kind": "unobserved",
+      "body": "unobserved",
+      "availability_proved": false,
+      "native_listing_proved": false
+    },
+    "source_timeout": {
+      "status": "available",
+      "armed": true,
+      "first_work": false,
+      "origin": false,
+      "overflow": false,
+      "sticky": false,
+      "site": 0,
+      "domain": 0,
+      "phase": 0,
+      "return": 0,
+      "origin_available": false,
+      "observer_frame_causal_pair_proved": false
+    },
+    "event_counters": [
+      5167,
+      5167,
+      1107,
+      1107,
+      4091,
+      4091
+    ],
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "source_leases": 280,
+    "current_records": 96,
+    "total_supervised_records_including_preserved": 98,
+    "current_named_passes": 94,
+    "qualified_reused_Workspace87_fresh_credit": 0,
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false,
+    "qualification": "Directory role bounds are actual declared config, not listing/caller/availability proof; no per-directory allocation attribution or performance claim. Path Lstat refusal at originalplatforms_root/cpu observed; no body/package/CPUtarget inference. SourceErrorNone/time/RSSprefixfit; whole workload open. Original280 sourceleases/physical hashes unchanged; actual scope/recorder/observer retire, sourcebodyWeak unseen qualified. Frozen audit/receipt zero archived-operation constants not authoritative; preserved2 compiler records explicitly included98 attempts.",
+    "refs": {
+      "target/wp1011/native/native-operation.json": "63b2f5c6ba91472a28beabd49e4f9f4e2d52adfb971465f452f5e3e3f3142a5c",
+      "target/wp1011/native/result.json": "71bac999910b0b377c4799c8b1030ce6ec6689f08fd7297055670a93f7b9b4f7",
+      "target/wp1011/native/native.stdout": "22ef5e754eb14fb14f62c8132ee1ed475516c68445c556fd951db0e0713fc85b",
+      "target/wp1011/native/native.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target/wp1011/native/preflight-evidence.md": "d2a99f9fe64032431e2ae000f490ae3759aec8056d507047861e90d62c44bd46",
+      "target/wp1011/native/prelaunch-summary.json": "eb151381def55400e7e72923a405fc6afd7ef91b5c28c24eb868c171d30f7f45"
+    }
+  },
+  "source_correspondence": {
+    "ordered_leases": 280,
+    "physical_bytes": 1528789,
+    "before_after_hash_bytes": 3057578,
+    "parent_buffers_bytes": 131072,
+    "documented_parent_FD_opens": 4312,
+    "direct_native_pins": 682,
+    "combined_current_pins": 695,
+    "source_capture_operations": 0
+  },
+  "caps": {
+    "native_seconds": 10,
+    "cleanup_seconds": 3,
+    "source_work_seconds": 5,
+    "source_lifetime_seconds": 8,
+    "RSS_KiB": 262144,
+    "AS_KiB": 524288,
+    "source_selected_attempts": 128,
+    "production_source_attempts": 64,
+    "registry_attempts": 128,
+    "object_bytes": 1048576,
+    "each_bank_bytes": 16777216,
+    "log_each_bytes": 1048576,
+    "report_bytes": 4194304,
+    "FSIZE_bytes": 16777216
+  },
+  "refs": {
+    "target/wp1011/native/prelaunch-summary.json": "eb151381def55400e7e72923a405fc6afd7ef91b5c28c24eb868c171d30f7f45",
+    "target/wp1011/native/semantic-source-review.md": "ac2a418c2571a637f32470dfa66bc593d4222f8669ecb81ce3fe087aa6a8ebbd",
+    "target/wp1011/native/static-evidence-review.md": "ec80e6d17fb212bba8e0a81c3ceb4651dd5d1144eda34e9c20a5b3e883f29b36",
+    "target/wp1011/native/preflight-evidence.md": "d2a99f9fe64032431e2ae000f490ae3759aec8056d507047861e90d62c44bd46",
+    "target/wp1011/native/final-source.md": "2aba8857a685473b47770f73b21740036ad1f128c2114698c862ca7509cd2ebd",
+    "target/wp1011/native/final-evidence.md": "457f9efe83d3eadbaa56e5d7553edbe76eacb5d66213a4169898ceb647224ab8",
+    "target/wp1011/native/activation.json": "bdffcf0ba452fd06422f777fc9b3537404d2bbff4488a13727f4b4902faf2eb2"
+  },
+  "qualification": "Declared directory role/limits and changed first denial do not prove actual inventory, glob caller, package availability or outputs. Actual CPU Lstat191B frontier is local observation only. Scope/recorder/observer retirement and zero end credits hold; unseen sourcebody Weak stays vacuous. SourceErrorNone, source111/decoded1259338/registry105admitted235521/Written5448 are aggregates, not owner/output certificates. No native speedup, Rustc producer/certificate or whole workload fit claim.",
+  "next": "One integrated CPU package source/readiness/metadata admission packet, normal BUILD.bazel then BUILD selection; keep OS closed absent an independently demanded source-proved closure."
+}

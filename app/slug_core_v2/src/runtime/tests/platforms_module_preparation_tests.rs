@@ -363,6 +363,7 @@ struct Bodies {
     ignore_file_bytes: bool,
     rust_package_metadata: bool,
     platforms_host_metadata: bool,
+    platforms_host_directory: bool,
     platforms_host_import_sources: bool,
     nightly_package_metadata: bool,
     nightly_build_source: bool,
@@ -888,6 +889,7 @@ impl Bodies {
             ignore_file_bytes: false,
             rust_package_metadata: false,
             platforms_host_metadata: false,
+            platforms_host_directory: false,
             platforms_host_import_sources: false,
             nightly_package_metadata: false,
             nightly_build_source: false,
@@ -946,6 +948,21 @@ impl Bodies {
                         .iter()
                         .any(|name| relative == Path::new(name))
                 })
+    }
+    fn with_platforms_host_directory(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.platforms_host_directory = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_platforms_host_directory(&self, path: &Path) -> bool {
+        self.platforms_host_directory
+            && path
+                .strip_prefix(self.roots[2].as_path())
+                .is_ok_and(|relative| relative == Path::new("host"))
     }
     fn with_platforms_host_import_sources(
         mut self,
@@ -1407,6 +1424,11 @@ impl Bodies {
                                         Some(".bazelignore" | "BUILD" | "BUILD.bazel")
                                     )
                             })
+                    }
+                    PathObservationOperation::DirectoryEntries
+                        if self.admits_platforms_host_directory(path) =>
+                    {
+                        true
                     }
                     _ => return Some((demand, "operation")),
                 };
@@ -2497,6 +2519,12 @@ fn observe_native_command(
     command: CommandChoice,
 ) {
     phase("baseline");
+    let host_directory_requested = match std::env::var("SLUG_NATIVE_PLATFORMS_HOST_DIRECTORY") {
+        Ok(value) if value == "true" => true,
+        Ok(value) if value == "false" => false,
+        Err(std::env::VarError::NotPresent) => false,
+        _ => panic!("host directory opt-in must be exactly true or false"),
+    };
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace"),
@@ -2545,6 +2573,9 @@ fn observe_native_command(
     .with_generated_features_file_effects(registry_choice, command)
     .with_bazel_skylib_import_sources(registry_choice, command)
     .with_rules_cc_import_sources(registry_choice, command);
+    if host_directory_requested {
+        bodies = bodies.with_platforms_host_directory(registry_choice, command);
+    }
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
@@ -2579,6 +2610,7 @@ fn observe_native_command(
     );
     let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
     let platforms_host_metadata = bodies.platforms_host_metadata;
+    let platforms_host_directory = bodies.platforms_host_directory;
     let platforms_host_import_sources = bodies.platforms_host_import_sources;
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
@@ -2739,6 +2771,14 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP1011_PLATFORMS_HOST_DIRECTORY enabled={} policy_checked={} root_slot=2 operation=directory_entries cohort=host entry_limit={} name_limit={} names_limit={} kind=unobserved body=unobserved",
+            platforms_host_directory,
+            probe_report.policy_checked(),
+            crate::runtime::path_observation::scoped_directory::ENTRY_LIMIT,
+            crate::runtime::path_observation::scoped_directory::NAME_LIMIT,
+            crate::runtime::path_observation::scoped_directory::NAMES_LIMIT,
+        );
         println!(
             "WP1003_PLATFORMS_HOST_IMPORT_SOURCES enabled={} policy_checked={} root_slot=2 operations=lstat,file_bytes source_count=3 cohort=host/constraints.bzl,host/BUILD,host/extension.bzl kind=unobserved body=unobserved",
             platforms_host_import_sources,

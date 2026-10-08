@@ -1,5 +1,9 @@
 use super::*;
 
+mod platforms_host_directory_tests {
+    include!("public_probe_preparation_tests/platforms_host_directory_tests.rs");
+}
+
 mod source_attempt_context_tests {
     include!("public_probe_preparation_tests/source_attempt_context_tests.rs");
 }
@@ -498,6 +502,7 @@ fn projection_matches(
         && bodies.ignore_file_bytes
         && bodies.rust_package_metadata
         && bodies.platforms_host_metadata
+        && bodies.platforms_host_directory
         && bodies.platforms_host_import_sources
         && bodies.nightly_package_metadata
         && bodies.nightly_build_source
@@ -3011,6 +3016,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
                 CommandChoice::PublicProbe,
             )
             .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+            .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_platforms_host_import_sources(
                 RegistryChoice::PreparedFile,
@@ -3055,6 +3061,22 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     .unwrap();
     request.lockfile_mode = LockfileMode::Off;
     request.registry_urls = registry.dupe();
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().platforms_host_directory = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().platforms_host_directory = true;
     assert!(projection_matches(
         &inner,
         &request,
@@ -3112,6 +3134,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3139,6 +3162,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3177,6 +3201,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3215,6 +3240,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3253,6 +3279,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3291,6 +3318,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -3329,6 +3357,7 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
+        .with_platforms_host_directory(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_platforms_host_import_sources(
             RegistryChoice::PreparedFile,
@@ -5380,7 +5409,14 @@ fn assert_exact_root_file_role(
                     let denied = bodies.admit(&demand).unwrap_err();
                     assert_eq!(
                         (denied.family, denied.operation),
-                        ("path", path_operation_code(&admitted_operation))
+                        (
+                            if admitted_operation == &PathObservationOperation::DirectoryEntries {
+                                "operation"
+                            } else {
+                                "path"
+                            },
+                            path_operation_code(&admitted_operation),
+                        )
                     );
                     assert_eq!(denied.path.as_ref(), Some(&marker));
                 }
@@ -5450,7 +5486,14 @@ fn assert_exact_root_file_role(
                 .unwrap_err();
             assert_eq!(
                 (denied.family, denied.operation),
-                ("path", path_operation_code(&admitted_operation))
+                (
+                    if admitted_operation == &PathObservationOperation::DirectoryEntries {
+                        "operation"
+                    } else {
+                        "path"
+                    },
+                    path_operation_code(&admitted_operation),
+                )
             );
             assert_eq!(denied.path.unwrap().as_path(), Path::new(spelling));
         }

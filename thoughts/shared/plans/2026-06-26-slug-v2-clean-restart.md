@@ -34,22 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-235-m7a-normal-rustc-bounded-host-directory-r1
-Status: Design review before bounded functional directory admission
+Packet: WP-7-236-m7a-normal-rustc-cpu-package-readiness-r1
+Status: Design review of integrated bounded CPU package readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1010](./slug-v2-subplans/wp1010-path-mode-publication-2026-10-08.json) accepts atomic
-mode projection publication with historical recovery: Workspace87/Core80/themes4/native1
-pass and independent FINAL ACCEPT. The bounded native prefix ends in3.30s at117984KiB/
-256MiB without source timeout, reaching a path-only operation refusal at platforms_root/host.
-Next implement exact host DirectoryEntries admission coupled with entry/name-byte/time
-bounds through the existing directory owner. Actual operation/caller, normal public Rustc
-and whole-workload fit remain open. Borrow/transfer/share values and use existing scoped
+[WP1011](./slug-v2-subplans/wp1011-bounded-host-directory-2026-10-08.json) accepts bounded
+host DirectoryEntries and exact cfgtest admission: Core89/themes4/native1 and independent
+FINAL ACCEPT. Normal probe3.35s/118576KiB under256MiB/SourceErrorNone reaches CPU Lstat
+prerequisite. Next integrate strict two-marker CPU package source readiness and finite
+metadata/eligible-body admission through existing normal package owners; OS remains closed
+without independently demanded source evidence. Actual inventory/caller/public Rustc and
+whole-workload fit remain open. Borrow/transfer/share values and use existing scoped
 interners where retention fits; no global pool for unique temporary names. Source/native
-caps remain unchanged and blind compiler profile retries stay closed.
+caps stay unchanged; blind compiler profile retries remain closed.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

@@ -12,6 +12,8 @@
 
 mod file_digest;
 #[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) mod scoped_directory;
+#[cfg(all(test, target_os = "linux"))]
 mod scoped_file_tests;
 #[cfg(all(test, target_os = "linux"))]
 mod source_attempt_diagnostic;
@@ -71,6 +73,8 @@ pub(super) enum PathObservationKernelError {
     UnauthorizedInputImage(PathObservationDemand),
     Epoch(PathObservationEpochError),
     SourceService(SourceServiceError),
+    #[cfg(all(test, target_os = "linux"))]
+    DirectoryLimit(scoped_directory::DirectoryLimit),
 }
 
 pub(super) fn observe_native<T>(
@@ -91,6 +95,7 @@ pub(super) fn observe_native<T>(
 
 /// The scoped path shares demand validation with the ordinary kernel. Only
 /// FileBytes uses the bounded source reader; operational refusal is not an epoch.
+/// Linux test scopes also bound DirectoryEntries before copying native names.
 pub(super) fn observe_native_scoped<T>(
     owner: &T,
     roots: impl IntoIterator<Item = (PathObservationInstanceId, NormalizedAbsolutePath)>,
@@ -283,6 +288,13 @@ fn observe_with_scoped(
     check_scope(scope)?;
     for demand in demands {
         check_scope(scope)?;
+        #[cfg(all(test, target_os = "linux"))]
+        if demand.operation() == PathObservationOperation::DirectoryEntries {
+            let result = scoped_directory::observe(&demand, scope.expect("scoped observation"))?;
+            check_scope(scope)?;
+            observations.push((demand, result));
+            continue;
+        }
         let result = if demand.operation() == PathObservationOperation::FileBytes {
             match scope {
                 Some(scope) => {
