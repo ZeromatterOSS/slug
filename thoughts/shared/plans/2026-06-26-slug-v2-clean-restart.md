@@ -35,25 +35,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Correcting the exact platforms local binding
+Status: Preparing exact platforms host metadata
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP998](./slug-v2-subplans/wp998-remaining-cc-import-source-readiness-2026-10-07.json)
-admits two exact CC link collection sources through48 borrowed bodies/8metadata/matrix104,
-with no retained allocation or production/Windows change. Capture38,903B and actual FINAL,
-fresh compile/check/63Rust+four controls pass. One native4.664s peaks122,092KiB under256MiB;
-SourceErrorNone/source107/1,255,768/Written5228,277 ordered leases and ending credits checked.
-Actual next local materialization binding refuses canonical platforms at the selected root.
-Natural production canonical_repo deliberately spells platforms; the cfgtest guard expects
-platforms+. Continue a reviewed exact single-spelling fixture-policy correction, preserving
-all nine Local checks and whole-Need precedence. No alias, production identity rewrite,
-extra mode or new source capture is selected. Certificate/actions/Rustc/fullSpec/output and
-whole-workload fit remain open. Representative prefix allocation permits broader readiness;
-borrow/share storage and use existing scoped interners where retained repetition/lifetime/
-cleanup fit. Complete public producer and whole-workload fit remain required.
+[WP1000](./slug-v2-subplans/wp1000-platforms-constructor-coverage-2026-10-08.json)
+preserves both source-proved platforms request IDs at the exact bound Local root, all nine
+checks and the original11 override bindings. The failed single-name candidate is preserved
+unaccepted; revised design/static/prelaunch/final accepted. No normalization, retained string
+storage, production/DICE/Windows change. Fresh compile/check/63Rust+four controls pass;
+native4.716s peaks121,888KiB under256MiB with SourceErrorNone/source107/1,255,768/Written5228.
+277 ordered leases/ending credits checked. Actual next192B HostLstat is platforms_root/host.
+Continue reviewed metadata-only default-false PreparedFile/PublicProbe role borrowing the
+existing root; no body/capture/descendant/foreign grant or directory-kind preclaim. All caps
+and whole-Need checks stay fixed. Certificate/actions/Rustc/fullSpec/output/whole-workload fit
+remain open. Representative allocation permits broader readiness; borrow/share and existing
+scoped interners where retained repetition/lifetime/cleanup fit. Complete producer/fit required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

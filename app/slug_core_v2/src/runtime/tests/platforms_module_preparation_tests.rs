@@ -742,8 +742,11 @@ impl Bodies {
             let checks = [
                 (request.id.workspace == self.roots[0], "workspace"),
                 (
-                    self.bindings().any(|(_, canonical, root)| {
-                        request.id.canonical_repo.as_str() == canonical && logical_root == root
+                    self.bindings().any(|(name, canonical, root)| {
+                        logical_root == root
+                            && (request.id.canonical_repo.as_str() == canonical
+                                || (name == "platforms"
+                                    && request.id.canonical_repo.as_str() == "platforms"))
                     }),
                     "binding",
                 ),
@@ -1803,13 +1806,13 @@ fn complete_need_admission_refuses_mixed_and_wrong_operation_before_progress() {
         }
         assert!(bodies.admit(&mixed).is_err());
     }
-    let mut local = (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone();
+    let mut local = (*local_native_request(&bodies.roots[0], "platforms", "/platforms")).clone();
     assert!(
         bodies
             .admit(&SourcePreparationNeeds::repository(local.clone()))
             .is_ok()
     );
-    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms").unwrap();
+    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms++").unwrap();
     assert!(
         bodies
             .admit(
@@ -1819,7 +1822,7 @@ fn complete_need_admission_refuses_mixed_and_wrong_operation_before_progress() {
             )
             .is_err()
     );
-    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms+").unwrap();
+    local.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("platforms").unwrap();
     local.kind = RepositoryMaterializationKind::Immutable;
     assert!(
         bodies
