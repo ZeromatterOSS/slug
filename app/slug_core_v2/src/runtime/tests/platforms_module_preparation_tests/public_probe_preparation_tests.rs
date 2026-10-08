@@ -5489,9 +5489,15 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     }
     for relative in RULES_CC_IMPORT_METADATA {
         let selected = Path::new("/cc").join(relative);
+        // Captured files can also be declared metadata candidates.
+        let admitted_operations = &operations[..if RULES_CC_IMPORTS.contains(&relative) {
+            2
+        } else {
+            1
+        }];
         assert_exact_root_file_role(
             relative,
-            &[PathObservationOperation::Lstat],
+            admitted_operations,
             Bodies::with_rules_cc_import_sources,
             |b| b.rules_cc_import_sources,
             &[],
@@ -5532,7 +5538,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 104);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 110);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -5541,6 +5547,47 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/toolchains/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/cc/cc/toolchains", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/toolchains/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/toolchains/BUILD.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/toolchains/build",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/cc/toolchains/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/toolchains/toolchain_config_utils.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/toolchains/toolchain_config_utils.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/toolchains/Toolchain_config_utils.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/toolchains/unknown.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/toolchains/toolchain_config_utils.bzl",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/cc/cc/private/link/collect_solib_dirs.bzl/child",
             PathObservationOperation::Lstat,
@@ -5831,20 +5878,28 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileDigest,
         ),
     ] {
-        let mixed = all
-            .try_union(&need(Path::new(excluded), operation.dupe()))
-            .unwrap();
-        let mut progress = 0;
-        if bodies.admit(&mixed).is_ok() {
-            progress += 1;
+        let bad = need(Path::new(excluded), operation.dupe());
+        for mixed in [all.try_union(&bad).unwrap(), bad.try_union(&all).unwrap()] {
+            assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(
+                (denied.family, denied.operation),
+                ("path", path_operation_code(&operation))
+            );
+            assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+            let first = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+                .unwrap()
+                .0;
+            let original = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| d.path().as_path() == Path::new(excluded) && d.operation() == operation)
+                .unwrap();
+            assert!(std::ptr::eq(first, original));
         }
-        assert_eq!(progress, 0);
-        let denied = bodies.admit(&mixed).unwrap_err();
-        assert_eq!(
-            (denied.family, denied.operation),
-            ("path", path_operation_code(&operation))
-        );
-        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
     }
     for sparse in [
         make(),
@@ -5864,6 +5919,36 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         .with_sixth(path("/other"))
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(wrong_slot.admit(&all).is_err());
+    let mut restored = bodies;
+    let selected = restored.additional[2].take();
+    assert!(restored.rules_cc_import_sources && restored.admit(&all).is_err());
+    restored.additional[2] = selected;
+    assert!(restored.admit(&all).is_ok());
+    let local = SourcePreparationNeeds::repository(
+        Arc::into_inner(local_native_request(&restored.roots[0], "unknown+", "/cc")).unwrap(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    for mixed in [
+        all.try_union(&local).unwrap(),
+        local.try_union(&all).unwrap(),
+    ] {
+        assert!(Arc::ptr_eq(
+            original,
+            mixed.repository_materializations().values().next().unwrap()
+        ));
+        let (first, reason) = restored
+            .first_denied_materialization_with_plan_matcher(
+                &mixed,
+                &generated_features_plan_matches,
+            )
+            .unwrap();
+        assert!(std::ptr::eq(first, original.as_ref()));
+        assert_eq!(reason, "binding");
+        assert_eq!(usize::from(restored.admit(&mixed).is_ok()), 0);
+    }
+    drop(local);
+    assert!(weak.upgrade().is_none());
 }
 pub(super) fn rules_shell_import_sources_matrix() {
     for (name, selected) in RULES_SHELL_IMPORT_METADATA.into_iter().zip([

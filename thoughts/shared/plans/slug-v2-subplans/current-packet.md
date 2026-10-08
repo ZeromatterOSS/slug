@@ -1,112 +1,122 @@
 # Slug V2 current work packet
 
-Packet: WP-7-246-m7a-normal-rustc-shell-executable-source-readiness-r1
-Status: Accepted Shell executable readiness; next typed CC toolchains package selected
+Packet: WP-7-247-m7a-normal-rustc-cc-toolchains-source-readiness-r1
+Status: Accepted CC toolchains readiness; next borrowed environment-name diagnostic selected
 
-## Outcome and current evidence
+## Outcome and immediate accepted evidence
 
-Continue canonical normal retained Rustc producer priority using the unchanged Bazel9.2/
-rules_rust0.73 fixture: //pkg:probe with support/data, registered extension toolchains,
-edition2024/nightly2025-09-14/platforms1.1.0, eleven saved oracle commands and same-engine
-2024→2021→2024 gate. Accepted exact oracle fields remain exact; this cfgtest Linux finite
-readiness change is Slug-native. Windows remains minimal stubs/deferred.
+Continue canonical normal retained Rustc producer priority using unchanged Bazel9.2/
+rules_rust0.73 public fixture //pkg:probe with support/data, registered extension toolchains,
+edition2024/nightly2025-09-14/platforms1.1.0, eleven saved oracle commands and same-DICE
+2024→2021→2024 gate. Accepted exact source/oracle fields stay exact; this finite cfgtest
+Linux source readiness is Slug-native. Windows stays minimal stubs/deferred.
 
-[WP1022](wp1022-shell-executable-source-readiness-2026-10-08.json) appends sole strict
-captured sh_executable8497B to existing Rules Shell role:metadata9/body5, same flag,
-no new runtime string/path storage. Core92/themes4/native1 and independent FINAL accepted:
-97 names/99 native gates plus1capture=100 current supervised records, no failed gates,
-note rejections/retries/second activation. Native3.934274847s/208828KiB under262144;
-Source122/decoded6171346/SourceErrorNone, writes39599/peakbank11679531/end0. Original291+1
-ordered signatures/two64KiB188+104;880native/893auditunion pins. Source11net/main2/child9,
-32static descriptors/62literal bytes; full body/heap/producer/wholefit unproved.
+[WP1023](wp1023-cc-toolchains-source-readiness-2026-10-08.json) accepts two captured
+CC toolchains sources2754B under the existing borrowed additional[2] role:body50/metadata12/
+unique110 Needs. Missing BUILD.bazel stays Lstat-only. No new native retained string/path/
+flag/cache/interner; test request transfers ownership with Arc::into_inner. Rust91net(main6/
+child85),96static descriptor/156literal occurrence bytes;12helpers76net/fourpoliciesunchanged.
+Core92/themes4/native1/independent FINAL accepted:97 names/99 final native-gate records plus
+one zero-test capture=100 final current records. One failed compile and one failed decoder
+batch narrowly corrected;100 earlier failed/superseded records preserved (200checkpoint
+records total), zero duplicate pass credit. No native rerun/capraise/stale-pin resolver.
+Native3.981883607s/209744KiB<262144,Source123/decoded6172507/ErrorNone/writes39599/
+peakbank11679531/end0. Aggregate +1/+1161 is not per-file body proof. Original292+2END
+stable signatures/two64KiB188+106;912native/925auditunion pins. Full producer/body certificate/
+heap retirement/whole-workload fit open; source128 remaining5 is numeric only.
 
-[Current next-source](../../../../target/wp1022/next-source.md) grounds actual201B Host
-Lstat current original additional[2] rules_cc_root/cc/toolchains and checked-in bazel_tools
-literal @rules_cc//cc/toolchains:toolchain_config_utils.bzl. Next bounded package markers
-BUILD.bazel/BUILD plus declared utility availability, then at most one separately frozen
-same-root direct literal frontier and conditional existing CC role extension. Physical
-root/declaration proves no body/current caller/source certificate. No successor activation.
+[Actual next-source](../../../../target/wp1023/next-source.md) records environment denial
+with name/owner unavailable after the prior CC path refusal advanced. Select a bounded
+borrowed original environment-name diagnostic before a new permission decision. No process
+value acquisition, environment admission or successor activation is implied. Same normal
+Rustc public fixture and exact source/oracle fields remain priority; Windows minimal/deferred.
 
-## Integrated choice and owner
+## Integrated choice, ownership and allocation
 
-Freeze one strict capture of shell/private/sh_executable.bzl, component3, exact original
-selected root; native_need_relative equals this leaf, unlike the previous directory Need.
-Availability/kind/bytes/hash/facts remain unknown. Reuse unchanged WP933 regular/nonfollow/
-anchored ancestor identity/exactEOF/fullSHA/strictUTF8/facts/Budget/retirement primitive
-through two minimal inactive capture counterparts. Preserve1MiB/object/16MiBaggregate/
-256KiBfacts/64KiBscratch/10s/sharedabsolute3scleanup/RSS256/AS512. Release body/text/AST
-per row; retain compact facts only. Capture is preparation, zero tests, individually
-bracketed/non-atomic diagnostic availability, no native source certificate or body proof.
-Root owns inputs/config/design/activation/run. No manual target reads or inventory/eval.
+Freeze exact THREE initial strict source candidates in order cc/toolchains/BUILD.bazel,
+cc/toolchains/BUILD, cc/toolchains/toolchain_config_utils.bzl (components3/3/3). Actual
+native_need_relative=cc/toolchains is a separate directory Need, never leaf/index0.
+Availability/kind/bytes/hash/facts are unknown. Reuse unchanged WP933 controlled regular/
+nonfollow/anchored ancestor+leaf identity/fullEOF/SHA/strictUTF8/facts/Budget/retirement
+through two minimal inactive capture counterparts. One64KiB scratch/1MiBobject/16MiBaggregate/
+256KiBfacts/10s/sharedabsolute3scleanup/RSS256AS512/log1/report4/FSIZE16. Body/text/AST retire
+per row; compact facts only. Honest usable/genuine absent/refused/changed/bounds outcomes,
+passNone/zero tests; no forced positives or semantic certificate/atomic snapshot/closure.
+Root owns frozen inputs/readiness/notes/activation/run; no manual target reads/inventory/eval.
+Functional package/source eligibility needs usable utility and at least one usable normal
+package marker; missing marker remains exact Lstat-only. Old CC48/eight metadata and prior
+source facts/signatures stay qualified0fresh, not recaptured.
 
-If saved usable initial facts ground unselected literal :file or //package:file loads,
-freeze at most ONE supplemental exact same-root frontier. Total new prospective rows
-across BOTH captures <=32, including initial leaf and newly declared package markers.
-Root freezes exact deterministic first-encounter order/components/provenance and initial
-actual debit before independent narrow review/sole activation. Combined actual <=16MiB;
-second remaining budget=16MiB−initial actual charge. Skip existing current body members
-and package markers already qualified. New packages require normal original host_package
-BUILD.bazel-then-BUILD candidates and exact source-defined ancestors. Individual missing
-markers remain metadata-only; eligible source needs usable package evidence. No @/@@
-rebinding, foreign/dynamic inference, recursive supplemental expansion, filesystem search,
-listing, source body mirror or provider fabrication. No supplement if none is grounded.
-Unknown/refused/contradictory facts remain typed and select a changed hypothesis.
+At most ONE separately frozen supplemental frontier from ACTUAL saved usable initial
+literal-load facts, <=32 TOTAL new prospective rows INCLUDING initial3 and grounded new
+package markers. Resolve only original same-root :file or //package:file, preserve first
+encounter/duplicate provenance/deduplicated capture order/components. Skip already qualified
+CC bodies/package evidence. New packages add only exact normal BUILD.bazel-then-BUILD and
+source-defined ancestors/leaf; usable marker+source before body grant. Freeze exact frontier
+inputs/provenance/design/narrow review before activation; aggregate across both <=16MiB,
+second budget16MiB−initial actual debit. No supplement if none grounded; no @/@@ rebind,
+foreign/dynamic inference, recursive supplemental expansion/search/listing/eval/provider
+fabrication. Insufficient/contradictory owner/facts/eligibility selects explicit changed
+hypothesis; no speculative permission or identical retry/capraise.
 
-Actual capture FINAL(s) must qualify initial leaf and optional members before one frozen
-native cohort. Source allowlist existing platforms_module_preparation_tests.rs and child
-public_probe_preparation_tests.rs only. Append metadata exact leaves/needed ancestors/
-package markers and FileBytes only individually usable qualified sources. Reuse existing
-rules_shell_import_sources flag/defaultfalse/PreparedFile AND PublicProbe/projection and
-borrowed additional[4] strip_prefix/static Paths. No new flag/owner/global pool/cache/
-ownedString/path/Vec/Arcclone/interner/body mirror. Borrow/transfer existing carriers;
-use scoped existing interners for repeated retained strings where owner lifetime fits.
-Static descriptor/literal growth disclosed after actual cohort; runtime layout unchanged.
+Actual capture FINAL(s) precede ONE combined frozen eligible table/signature union. Allow
+Rust only existing platforms_module_preparation_tests.rs and child public_probe_preparation_tests.rs.
+Reuse rules_cc_import_sources/defaultfalse/PreparedFile AND PublicProbe/projection and
+borrowed original additional[2] strip_prefix/staticPath matching; no new flag or identity.
+Append exact source-derived directory/declared candidate/ancestor metadata, FileBytes only
+individually strict usable rows. Metadata candidate/body overlap must use unique path+op
+Need counts; do not assume2*bodyN+metadataM when classes overlap. Current CC48body/eight
+metadata/union104 unchanged prefix; new counts/bytes/eligible paths UNKNOWN until actual
+FINALs. Preserve closed FileDigest/ReadLink/DirectoryEntries/InputImage/other namespaces/
+roots/slots/case/suffix/child/parent, whole Need before IO/progress/original first offender/
+request pointer/Weak, generated hub own-plan/currentepoch and all existing independent roles.
+Current Shell9/5/SAME WP1021_RULES_SHELL_SOURCES raw line stays unchanged.
 
-Preserve other operations/namespaces/roots/slots/case/child/suffix/parent closed, whole
-Need admission/refusal before IO/progress, original first-offender/request pointer/Weak,
-generated hub own-plan/current epoch and all old independent role/projection negatives.
-Existing 3215/6226-line cfgtest owners and matrix remain cohesive finite role/test seams;
-no production/DICE/Windows edits or new suite/factory/test attributes. Sole-leaf estimate
-10–40 net lines; >100 net/new retained nonstatic owner is review trigger, not cap/approval.
-Extend existing eighth-module helper and same92 selectors, exact operation/root/mode/
-namespace matrix, missing marker body deny, next ungranted generation, case/suffix/child/
-wrongslot, valid+invalid both orders/first offender pointer/zero admission progress/Local
-ArcWeak. Keep old readiness restoration discriminators.
+No production/DICE/Windows edits, owned runtimeString/path/Vec/Arc/request/plan clone/body
+mirror/cache/interner/pool/newBoolean. Static descriptor/literal growth disclosed after
+actual cohort. Borrow/transfer/share existing storage; owner-scoped existing interners for
+repeated retained strings when cleanup fits, never temporary global pools. Large cfgtest
+parents remain cohesive finite owner/matrix seam: no new suite/factory/key/test attributes.
+Estimate initial-only25–70net; >100net/new nonstatic owner triggers review, not approval/cap.
+Extend existing CC allmember11root/fourmode/eightop/namespace matrix and grouped newmember
+case/suffix/child/unknown/wrongslot/metadata-only missing bodies, mixed bothorder/original
+first offender pointer/zero admission progress/LocalArcWeak, same92selectors/projection
+restoration. Replace only old negatives whose exact path becomes newly admitted.
 
-## Evidence, validation and boundaries
+## Evidence and validation
 
-Independent integrated DESIGN before capture helper edits. One combined actual capture
-STATIC/prelaunch review and root sole False→True per frozen capture, actual FINAL before
-eligible tables. Fresh twelve minimum native helper counterparts; four policy modules
-unchanged unless actual evidence exposes a natural seam. Full frozen Shell table/input
-validated before legacy projections; strict current resolved pins, no historical ledger
-waivers or old executable target traversal. Shell checks stay only in protocol(), retain
-prior static correction. Reuse one existing WP1021_RULES_SHELL_SOURCES marker with frozen
-new counts, slot4/cohort and kind/body unobserved; do not add/normalize redundant raw lines.
-Full table is input-projected, not per-file native proof. Extend same four Python themes
-for missing/duplicate/nonASCII/nonLF/order/count/slot/cohort/table/signature/readiness tamper,
-admitted exact HostLstat/FileBytes denial contradiction, and metadata-only nongrants.
+Integrated independent DESIGN before capture-helper edits; one combined actual capture
+STATIC/prelaunch plus root sole False→True per frozen operation, actual capture FINALs
+before code. Twelve minimum fresh native helper counterparts; four policy modules unchanged
+unless actual evidence exposes a natural seam. Full frozen CC root/order/path/relative/
+bytes/SHA/cohort validated BEFORE explicit immutable legacy8 interface projection; current
+strict resolved pins/no historical ledger waiver/old executable traversal. Reuse existing
+CC actual role declaration and input projection; no new raw diagnostic-only marker.
+Extend same four themes for actual eligible member/tuple/signature/table/count tamper,
+admitted checked HostLstat/FileBytes denial contradiction and missing marker body nongrant;
+preserve malformed raw/old role/host/hub/marker/namespace/accounting/error controls. Do not
+normalize any old raw rows/limits or fabricate table/body witnesses.
 
-Append each eligible new signature once at END of original291 prefix in same second
-context, two64KiB scratches. Conditional minimum sole eligible leaf:metadata9/body5/
-union14/292 signatures188+104; optional counts/bytes unknown until actual cohort frozen.
-No per-leaf contexts/payloads or parent+child aggregate memory proof. Qualified old captures
-zero fresh; existing private marker bodies not reread. No historical snapshot/cert claim.
+Native original292 ordered signature prefix188+104/6407745physical/12815490brackets remains
+exact; append actual eligible rows once at END in same second context/two64KiB scratches.
+New counts/physical/hash bytes unknown until eligibility. No per-leaf context/body retention
+or parent+child aggregate fit/historical snapshot/native certificate proof. Prior21captures/
+67decisions61observed zero fresh; new capture count/decisions are actual only, always0tests.
 
-One combined actual Rust/helper STATIC, root sole prepare/protocol activations, serialized
-pinned-toolchain CargoJSON offline/jobs1 dependency/compile/direct Loading-Core-CLI check
-<=60s with nine profiles unchanged. Fresh current92preflight/list/Core92/fourthemes/one
-changednative; root prelaunch census and COMPLETE wrapper/leaf note API bindings checked
-before child. Audit once, independent actual FINAL and compact receipt/commit. Do not
-rerun passing gates absent changed inputs or an evidence gap. Report preparation/captures/
-prelaunch invocation failures separately from tests. Resource refusal preserves evidence;
-reassess changed demand/hypothesis, no capraise or identical retry.
+One actual combined source/helper STATIC then root sole prepare/protocol activations;
+serialized pinned-toolchain CargoJSON offline/jobs1 dependency/compile/direct Loading-Core-CLI
+check<=60s with unchanged nine profiles. One fresh92preflight/list/Core92/fourthemes/ONE
+changednative, root prelaunch census and complete wrapper/leaf note API before child,
+strict current audit once/independent actual FINAL/compact receipt/commit. Native gates
+99records/97names only after actual pass; allphase99+actual captures, preparation/captures/
+invocation failures separate from tests. No rerun of passing gates without changed inputs
+or evidence gap. Resource failure preserves evidence and selects changed hypothesis.
 
-Retain work5/lifetime8/native10/absolute sharedcleanup3/RSS256MiB/AS512MiB/source128/
-defaultprobe16/production64/defaultHostRegistry1MiB/exactknown4749878/eachbank16MiB/
-log1MiBeach/report4MiB/FSIZE16MiB/ninecompilerprofiles. Selector76 alone priorMALLOC_ARENA_MAX2,
-native env unchanged. Source121 leaves7 numeric headroom, never closure assurance.
-Normal BuildCommandRootKey/loading/bzlmod/configured producer, real ConfiguredSpawnActionView/
-query, support/data/registeredplatform/providers/runfiles/actions/public certificate,
-same-DICE edition restoration, fullCLI compiler execution and whole-workload fit stay
-open until actual evidence. Source/readiness alone does not close them.
+Retain work5/lifetime8/native10/sharedabsolutecleanup3/RSS256MiB/AS512MiB/source128/default16/
+production64/defaultHostRegistry1MiB/exactknown4749878/eachbank16MiB/log1MiBeach/report4MiB/
+FSIZE16MiB/nine profiles; selector76 alone priorMALLOC_ARENA_MAX2/nativeenv unchanged.
+Source122 leaves6 numeric headroom, never source closure/unique-demand/future fit assurance.
+Normal BuildCommandRootKey/loading/bzlmod/configured producer/real ConfiguredSpawnActionView/
+query/support/data/registeredplatform/providers/runfiles/actions/public certificate/
+same-DICE edition restoration/fullCLI compiler execution/native body+plan+registry Weak/
+whole-workload fit remain open until actual evidence; readiness alone does not close them.

@@ -296,7 +296,7 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "lib/modules.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
-const RULES_CC_IMPORTS: [&str; 48] = [
+const RULES_CC_IMPORTS: [&str; 50] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
@@ -345,8 +345,10 @@ const RULES_CC_IMPORTS: [&str; 48] = [
     "cc/private/link/finalize_link_action.bzl",
     "cc/private/link/collect_solib_dirs.bzl",
     "cc/private/link/create_libraries_to_link_values.bzl",
+    "cc/toolchains/BUILD",
+    "cc/toolchains/toolchain_config_utils.bzl",
 ];
-const RULES_CC_IMPORT_METADATA: [&str; 8] = [
+const RULES_CC_IMPORT_METADATA: [&str; 12] = [
     "cc",
     "cc/common",
     "cc/private",
@@ -355,6 +357,10 @@ const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc/private/compile",
     "cc/private/link",
     "cc/private/rules_impl",
+    "cc/toolchains",
+    "cc/toolchains/BUILD.bazel",
+    "cc/toolchains/BUILD",
+    "cc/toolchains/toolchain_config_utils.bzl",
 ];
 const PLATFORMS_HOST_IMPORTS: [&str; 3] =
     ["host/constraints.bzl", "host/BUILD", "host/extension.bzl"];

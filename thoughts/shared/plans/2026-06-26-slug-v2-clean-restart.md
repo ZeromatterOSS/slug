@@ -34,26 +34,29 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-246-m7a-normal-rustc-shell-executable-source-readiness-r1
-Status: Accepted Shell executable readiness; next typed CC toolchains package selected
+Packet: WP-7-247-m7a-normal-rustc-cc-toolchains-source-readiness-r1
+Status: Accepted CC toolchains readiness; next borrowed environment-name diagnostic selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1022](./slug-v2-subplans/wp1022-shell-executable-source-readiness-2026-10-08.json)
-accepts sole captured sh_executable8497B append to borrowed original Rules Shell role,
-metadata9/source5/sameflag; no new retained runtime strings/paths. Core92/themes4/native1
-and independent FINAL accepted:97 names/99 native gates plus1capture=100 current supervised
-records; no failed gate/note rejection/retry/second activation. Native3.934274847s/208828KiB
-under262144; Source122/decoded6171346/SourceErrorNone/writes39599/peakbank11679531/end0.
-Same292 ordered signatures/two64KiB188+104;880native/893auditunion pins. Previous source
-refusal advances to current original additional[2] Rules CC cc/toolchains Host Lstat201B.
-Next bounded package markers/declared utility availability and conditional existing-role
-readiness toward normal Rustc. Source11net(main2/child9),32static descriptors/62literal bytes,
-no new runtime owned strings/cache/flag. Borrow/transfer/share and scoped interners where
-repetition/lifetime fit. Prefix fits; whole producer/workload, native bodies/heap retirement
-remain open. Source128 has6 numeric headroom only; all caps unchanged. Windows remains
+[WP1023](./slug-v2-subplans/wp1023-cc-toolchains-source-readiness-2026-10-08.json)
+accepts borrowed existing Rules CC body50/metadata12/unique110 readiness from two captured
+sources2754B; missing BUILD.bazel metadata-only. Core92/themes4/native1 and independent FINAL
+accepted:97 names/99 final native-gate records plus1capture=100 final current records. Two
+narrow compiler/control corrections preserve100 earlier failed/superseded records separately,
+200actual checkpoint records total with zero duplicate credit; no native rerun/capraise/
+stale resolver/second activation. Native3.981883607s/209744KiB<262144;Source123/decoded6172507/
+ErrorNone/writes39599/peakbank11679531/end0. Same294ordered signatures/original292+2END/
+two64KiB188+106;912native/925auditunion pins. Source91net(main6/child85),96staticdescriptor/
+156literal bytes;12helpers76net. No new native retained strings/paths/flags/cache/interner;
+Local fixture transfers sole-owned request. Borrow/transfer/share, and use existing scoped
+interners where retained repetition and cleanup fit. Bounded prefix fits; full producer,
+body certificate, native heap retirement and whole-workload fit remain open. Source128 has5
+numeric headroom only; all caps unchanged. Prior CC path refusal advances to environment
+family with name/owner unavailable. Next bounded borrowed name diagnostic before permission
+selection toward normal Rustc; no environment values/permission/activation inferred. Windows
 minimal stubs/deferred until effectively testable.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
