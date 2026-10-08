@@ -347,6 +347,7 @@ const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc/private/link",
     "cc/private/rules_impl",
 ];
+const PLATFORMS_HOST_IMPORTS: [&str; 2] = ["host/constraints.bzl", "host/BUILD"];
 const PLATFORMS_HOST_METADATA: [&str; 3] = ["host", "host/BUILD.bazel", "host/BUILD"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
@@ -357,6 +358,7 @@ struct Bodies {
     ignore_file_bytes: bool,
     rust_package_metadata: bool,
     platforms_host_metadata: bool,
+    platforms_host_import_sources: bool,
     nightly_package_metadata: bool,
     nightly_build_source: bool,
     nightly_channel_source: bool,
@@ -843,6 +845,7 @@ impl Bodies {
             ignore_file_bytes: false,
             rust_package_metadata: false,
             platforms_host_metadata: false,
+            platforms_host_import_sources: false,
             nightly_package_metadata: false,
             nightly_build_source: false,
             nightly_channel_source: false,
@@ -897,6 +900,25 @@ impl Bodies {
                 .strip_prefix(self.roots[2].as_path())
                 .is_ok_and(|relative| {
                     PLATFORMS_HOST_METADATA
+                        .iter()
+                        .any(|name| relative == Path::new(name))
+                })
+    }
+    fn with_platforms_host_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.platforms_host_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_platforms_host_import_source(&self, path: &Path) -> bool {
+        self.platforms_host_import_sources
+            && path
+                .strip_prefix(self.roots[2].as_path())
+                .is_ok_and(|relative| {
+                    PLATFORMS_HOST_IMPORTS
                         .iter()
                         .any(|name| relative == Path::new(name))
                 })
@@ -1294,7 +1316,8 @@ impl Bodies {
                                     || self.admits_rules_rust_defs_import_source(path, false)
                                     || self.admits_bazel_features_import_source(path, false)
                                     || self.admits_bazel_skylib_import_source(path, false)
-                                    || self.admits_rules_cc_import_source(path, false)))
+                                    || self.admits_rules_cc_import_source(path, false)
+                                    || self.admits_platforms_host_import_source(path)))
                             || (self.ignore_file_bytes
                                 && operation == PathObservationOperation::FileBytes
                                 && path.file_name().is_some_and(|name| name == ".bazelignore")
@@ -1322,6 +1345,7 @@ impl Bodies {
                                 && self
                                     .roots()
                                     .any(|root| path.parent() == Some(root.as_path())))
+                            || self.admits_platforms_host_import_source(path)
                             || self.admits_platforms_host_metadata(path)
                             || (self.rust_package_metadata
                                 && path.parent() == Some(self.roots[1].as_path())
@@ -2467,6 +2491,7 @@ fn observe_native_command(
     .with_ignore_file_bytes(registry_choice, command)
     .with_rust_package_metadata(registry_choice, command)
     .with_platforms_host_metadata(registry_choice, command)
+    .with_platforms_host_import_sources(registry_choice, command)
     .with_nightly_package_metadata(registry_choice, command)
     .with_nightly_build_source(registry_choice, command)
     .with_nightly_channel_source(registry_choice, command)
@@ -2511,6 +2536,7 @@ fn observe_native_command(
     );
     let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
     let platforms_host_metadata = bodies.platforms_host_metadata;
+    let platforms_host_import_sources = bodies.platforms_host_import_sources;
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
@@ -2660,6 +2686,11 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP1002_PLATFORMS_HOST_IMPORT_SOURCES enabled={} policy_checked={} root_slot=2 operations=lstat,file_bytes source_count=2 cohort=host/constraints.bzl,host/BUILD kind=unobserved body=unobserved",
+            platforms_host_import_sources,
+            probe_report.policy_checked()
+        );
         println!(
             "WP1001_PLATFORMS_HOST_METADATA enabled={} policy_checked={} root_slot=2 operation=lstat cohort=host,host/BUILD.bazel,host/BUILD kind=unobserved body=unobserved",
             platforms_host_metadata,

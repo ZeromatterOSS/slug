@@ -498,6 +498,7 @@ fn projection_matches(
         && bodies.ignore_file_bytes
         && bodies.rust_package_metadata
         && bodies.platforms_host_metadata
+        && bodies.platforms_host_import_sources
         && bodies.nightly_package_metadata
         && bodies.nightly_build_source
         && bodies.nightly_channel_source
@@ -2858,6 +2859,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             )
             .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
             .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_platforms_host_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -2904,6 +2909,19 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &registry,
         &nightly_overlay()
     ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .platforms_host_import_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .platforms_host_import_sources = true;
     Arc::get_mut(&mut bodies).unwrap().platforms_host_metadata = false;
     assert!(!projection_matches(
         &inner,
@@ -2941,7 +2959,11 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
-        .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     assert!(!projection_matches(
         &inner,
         &request,
@@ -2965,6 +2987,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -2999,6 +3025,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_nightly_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3033,6 +3063,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3067,6 +3101,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3101,6 +3139,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3135,6 +3177,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_bazel_skylib_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_visible_lockfile_metadata(RegistryChoice::PreparedFile)
         .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3582,6 +3628,135 @@ fn platforms_host_metadata_need_is_opt_in_exact_slot_two_lstat_only() {
     drop(mixed);
     drop(local);
     assert!(weak.upgrade().is_none());
+}
+
+#[test]
+fn platforms_host_import_sources_need_is_opt_in_exact_captured_rows_only() {
+    for (name, selected, spellings) in [
+        (
+            "host/constraints.bzl",
+            "/platforms/host/constraints.bzl",
+            &[
+                "/platforms/host/CONSTRAINTS.bzl",
+                "/platforms/host/constraints.bzl.other",
+                "/platforms/host/constraints.bzl/child",
+            ][..],
+        ),
+        (
+            "host/BUILD",
+            "/platforms/host/BUILD",
+            &[
+                "/platforms/host/build",
+                "/platforms/host/BUILD.other",
+                "/platforms/host/BUILD/child",
+                "/platforms/host/BUILD.bazel",
+            ][..],
+        ),
+    ] {
+        assert_exact_root_file_role(
+            name,
+            &[
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ],
+            Bodies::with_platforms_host_import_sources,
+            |b| b.platforms_host_import_sources,
+            spellings,
+            selected,
+            Some("/platforms"),
+        );
+    }
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+        .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+    let need =
+        |p, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let allowed = need(
+        "/platforms/host/constraints.bzl",
+        PathObservationOperation::Lstat,
+    )
+    .try_union(&need(
+        "/platforms/host/constraints.bzl",
+        PathObservationOperation::FileBytes,
+    ))
+    .unwrap()
+    .try_union(&need(
+        "/platforms/host/BUILD",
+        PathObservationOperation::Lstat,
+    ))
+    .unwrap()
+    .try_union(&need(
+        "/platforms/host/BUILD",
+        PathObservationOperation::FileBytes,
+    ))
+    .unwrap();
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 4);
+    assert!(bodies.admit(&allowed).is_ok());
+    let excluded = need(
+        "/platforms/host/constraints.bzl",
+        PathObservationOperation::FileDigest,
+    );
+    for mixed in [
+        allowed.try_union(&excluded).unwrap(),
+        excluded.try_union(&allowed).unwrap(),
+    ] {
+        let first = bodies
+            .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+            .unwrap()
+            .0;
+        let expected = mixed
+            .path_observations()
+            .unwrap()
+            .demands()
+            .iter()
+            .find(|d| d.operation() == PathObservationOperation::FileDigest)
+            .unwrap();
+        assert!(std::ptr::eq(first, expected));
+        assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+    }
+    let local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "unknown+", "/platforms")).clone(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    let mixed = allowed.try_union(&local).unwrap();
+    assert!(Arc::ptr_eq(
+        original,
+        mixed.repository_materializations().values().next().unwrap()
+    ));
+    let (first, reason) = bodies.first_denied_materialization(&mixed).unwrap();
+    assert!(std::ptr::eq(first, original.as_ref()));
+    assert_eq!(reason, "binding");
+    assert_eq!(bodies.admit(&mixed).unwrap_err().family, "materialization");
+    assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+    drop(mixed);
+    drop(local);
+    assert!(weak.upgrade().is_none());
+    let metadata_and_sources = bodies
+        .with_platforms_host_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(
+        metadata_and_sources
+            .admit(&need(
+                "/platforms/host/BUILD.bazel",
+                PathObservationOperation::Lstat
+            ))
+            .is_ok()
+    );
+    assert!(
+        metadata_and_sources
+            .admit(&need(
+                "/platforms/host/BUILD.bazel",
+                PathObservationOperation::FileBytes
+            ))
+            .is_err()
+    );
 }
 
 #[test]

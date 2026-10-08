@@ -35,25 +35,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing platforms host constraint sources
+Status: Preparing platforms host extension source
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1001](./slug-v2-subplans/wp1001-platforms-host-metadata-2026-10-08.json)
-accepts exact root2 three-candidate Host Lstat metadata, preserving both platforms request IDs,
-original11 bindings/nine Local checks/whole-Need/48CC8metadata. Borrowed static paths and one
-Boolean add no retained owned strings or containers; production/DICE/Windows unchanged.
-Fresh compile/check/64Rust+four controls pass; one fixture correction preserves unchanged
-Rust proofs with explicit original helper snapshots, failed control zero credit. One native
-4.872s peaks122,388KiB under256MiB; actual next208B HostLstat platforms_root/host/constraints.bzl.
-277 source brackets/endingcredits checked;70 accepted records/71 actual attempts/69named passes.
-No current capture or full public certificate/actions/Rustc/whole-fit claim. Next review one
-fixed three-leaf host capture/conditional finite source role from the manifest's static owner
-basis; unavailable markers stay unavailable, metadata role remains Lstat-only and bodies require
-individual eligible signatures. All caps and identities remain. Borrow/share and scoped string
-interners where retained repetition/lifetime/cleanup fit; complete producer/fit still required.
+[WP1002](./slug-v2-subplans/wp1002-platforms-host-source-readiness-2026-10-08.json)
+accepts exact two captured platforms host sources with Lstat/FileBytes, preserving the
+separate three-candidate metadata role and original request/whole-Need/48CC8metadata contracts.
+One strict capture gives two eligible files816B and genuine unavailable BUILD.bazel; no body
+grant for the unavailable marker. Borrowed literals/one Boolean add no retained string copies
+or containers. Fresh compile/check/65Rust/four controls and one native pass; native5.045s peaks
+121,924KiB under256MiB. SourceNone/108attempts/1,255,888decoded now reaches exact206B HostLstat
+platforms_root/host/extension.bzl.279 ordered leases/endingcredits check;72allphase records,
+71native gates/70named passes. Complete public producer and whole-workload fit remain required.
+Next review one fixed source-grounded extension capture and conditional append to the existing
+finite source role; keep current caps/identities/ownership and allocation discipline.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
