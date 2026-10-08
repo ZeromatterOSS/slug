@@ -26,7 +26,6 @@
     "current_named_passes": 95,
     "reused_Workspace": 87,
     "reused_Workspace_fresh": 0,
-    "unchanged_kernel_fresh": 0,
     "direct_compile": [
       "slug_loading_v2",
       "slug_core_v2",
@@ -34,7 +33,9 @@
     ],
     "compile_seconds": 9.656882953946479,
     "check_seconds": 7.270319564966485,
-    "current_gate_elapsed_sum_seconds": 40.5024083374301
+    "current_gate_elapsed_sum_seconds": 40.5024083374301,
+    "directory_kernel_controls_in_current_Core": 4,
+    "additional_kernel_gates_outside_Core": 0
   },
   "native": {
     "checkpoint": "WP1013",
@@ -88,5 +89,6 @@
   "observable_advanced": "CPU DirectoryEntries denial changed to original Hostroot2/os190B Lstat",
   "next": "Strict orderedOS BUILDmarker capture and finiteeligible metadata/body role; OSdirectorylisting staysclosed because normalinventory isnotalwaysalistconsumer.",
   "remaining": "Normal publicRustc/support/data/providers/toolchains/runfiles/sameDICEeditionrestoration/fullCLI/M7A/MVS/provenance/wholefit",
-  "receipt_elapsed_seconds_since_frozen_design": 1073.2058057785034
+  "receipt_elapsed_seconds_since_frozen_design": 1073.2058057785034,
+  "kernel_count_clarification": "Four unchanged scoped_directory tests are actually executed within the recorded current Core selector set (80\u201383). Historical kernel proof is reused; zero additional kernel gates means no separate run beyond Core, not zero fresh execution."
 }

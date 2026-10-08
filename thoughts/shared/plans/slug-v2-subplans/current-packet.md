@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-239-m7a-normal-rustc-os-directory-readiness-r1
-Status: Design review of bounded OS directory continuation
+Packet: WP-7-240-m7a-normal-rustc-extension-source-readiness-r1
+Status: Integrated design and bounded Rust extension source readiness
 
 ## Observable and source basis
 
@@ -44,86 +44,89 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1014](wp1014-os-package-readiness-2026-10-08.json) accepts OS metadata3 and only
-strictly captured os/BUILD2495B. BUILD.bazel genuine ENOENT stays body nongrant. One independent
-defaultfalse PreparedFile AND PublicProbe OS role/readiness, borrowed static literals and whole
-Need zero-progress/pointer/ArcWeak controls pass Core91/themes4/native1 plus one strict two-marker
-capture/passNone0tests with independent FINAL. Sole normal probe3.3126s/conservative118788KiB
-under256MiB/SourceErrorNone reaches original root2/os190B DirectoryEntries operation refusal.
-Source113/1266909 aggregate+1/+2495 correspondence is not native per-body/caller proof.
-Current98nativegate/99allphase/96named passes, no currentfailedchild/refusal. All282 ordered
-FDsignatureprefix/SAMEtwo64KiB preserved. UnchangedWorkspace87/kernel/owners0fresh; only
-unchanged selector76 keeps documented MALLOC_ARENA_MAX2 invocation under identicalcaps.
-Nativeenvironment unchanged. Inventory/producer/certificate/wholefit remain open.
+[WP1015](wp1015-os-directory-readiness-2026-10-08.json) accepts only originalHostroot2/os
+DirectoryEntries through existing OSbool and unchanged128/1024/16384 Linuxreader. Existing
+metadata3/BUILD-onlybody/readiness/oldroles unchanged. Core91(including4kernelcontrols)/themes4/
+native1 pass with independentFINAL. Sole normalprobe3.37043s/conservative118572KiB under256MiB/
+SourceErrorNone reaches originalHostroot1/rust/extensions.bzl207B Lstat. Source113/1266909
+unchanged. Current98records/96names/no capture/failedchild, all282source signatures/SAMEtwo64KiB.
+Fourkernelcontrols insideCore, no additionalkernelruns; previousreceiptlabels corrected with
+independent countreview. One root-only summary predecessor-reference correction had nochild/
+operationcredit. Body/caller/inventory/producer/certificate/wholefit remain open. Workspace87/
+otherhistoricalproofs0fresh, onlyselector76documentedallocatorinvocation/caps unchanged.
 
 ## Active integrated decision
 
-Continue the actual OS directory prerequisite with exact bounded Host roots[2]/os
-DirectoryEntries through accepted WP1011 scoped Linux reader. Reuse EXISTING OS package
-Boolean, defaultfalse/PreparedFile AND PublicProbe/already independently required by exact
-readiness. Source basis [WP1014 successor](../../../../target/wp1014/successor-source.md), SHA256
-c920a0d3500100382ea48999eb1bc283554576d600dcf82034c628c156fbed40, actual result/raw operation,
-root final-source and independent FINAL. No new capture, source acquisition, hand-authored
-inventory, per-operation flag, environment selector or body grant. Prior OS Lstat did not prove
-listing; this normal probe now demands that exact operation. Highercaller/fullinventory remain
-unobserved. HostPackageInventory/RepositoryPackageInventory evaluate normal source/children,
-Pending glob/subtree consumers own listing. Ordinary external package marker lookup still
-does not unconditionally enumerate. Natural Loading/Bzlmod observations retain original route,
-mapping, Need/certificate/epoch/promotion/revalidation; mutable FS is not a historical snapshot.
-Both platforms/platforms+ constructor identities stay exact, no normalization/target inference.
+Continue the actual Rust extension source prerequisite. Source basis
+[WP1015 successor](../../../../target/wp1015/successor-source.md), SHA256
+b5660b7af1a405ba9a978177e6a1948581d92f19fbd04d17ad3a969c8f15158d, actualresult/rawoperation,
+rootfinal-source and independentFINAL. First strictly capture ONLY rust/extensions.bzl
+(two components) at original rules_rust_root/root1. Availability/kind/hash/size/imports unknown;
+no matching current282lease. Original Lstat need207B motivates exact leaf, not highercaller.
+Reuse unchanged WP933 anchoredregular reader/fullEOF+streamingSHA/allancestorbrackets/strictUTF8/
+partialbzl facts/64KiBscratch, factbody<=256KiB/object1MiB/aggregate16MiB/perrowbodytextASTretirement.
+One terminal decision/passNone0tests; distinguish stricteligibleobserved/genuineunavailable/
+rejectedunknown. Actual independent captureFINAL must accepteligibility before code or append.
+No BUILDmarkers/listing/sourceacquisition/directimports/provider/root/closure fabricated.
+Captured import facts onlyground a later finite contract, not recursive permission now.
 
-Compatibility: Slug-native cfgtest Linux finite readiness. Existing Bazel9.2 exact projections
-and unsupported/deferred scopes unchanged. Existing OS metadata3/BUILD-onlyFileBytes,
-CPUmetadata3/body1/exactcpuDirectory, hostmetadata/source/exacthostDirectory, CC48+8metadata,
-FeaturesProxy/nineLocal/11roots/namespace permission remain independent. Directorygrant ONLY
-originalHostroot2/os; wrongroot/child/suffix/case/foreignnamespace/CPU/BUILDmarkers stay closed.
-ReadLink/Digest/prefix/recursive/unavailablemarker/sourceavailability remain closed. No fabricated
-mapping/provider/inventory/sourcecertificate/producer. Actual next Need chooses successor.
+After eligibility append ONE borrowed static rust/extensions.bzl to EXISTING finite
+rules_rust_defs_import_sources role28→29; preserve original28order and metadata3(private/
+platform/settings). Existing defaultfalse PreparedFile AND PublicProbe builder/independent
+readiness/source128 profile unchanged, no newflag/rename/redundantsuite. Exact Hostroot1 file
+Lstat+FileBytes, wrongroot/namespace/digest/readlink/prefix/recursive/listing/sibling/child/case/
+suffix remain closed. Natural selected_repo_spec resolves originalusage label/mapping/canonical
+definition; Loading module_extension uses request.parts definition label/selected route and
+original ExternalBzlModuleEval/ObservationKey, owner_invocation retains source/certificate/
+effects ownership before/after projection. Preserve typedrequest/mapping/Need/epoch/promotion/
+revalidation; physicalpath not sourceversion/extensionname/registrationoutput/caller proof.
+Mutablefilesystem not historicalsnapshot; both platforms identities/11bindings/nineLocal and
+all priorroles stay independent. Compatibility Slug-native cfgtest finiteLinuxreadiness;
+existing Bazel9.2 exactclassfields and unsupported/deferred boundaries unchanged.
 
-Existing kernel bounds inclusive128 nondot entries/1024 nativebytes/name/16384 total native
-namebytes BEFORE owned copy/classification/retention,1025 bounded d_reclen scan, skips dot/dotdot.
-RAIIcloseonce/CheckScope/EINTR/error/refinement and sorted ArcSlice transfer/no partialEpoch
-on operational failure remain. Reuse accepted kernel discriminators; no kernel edit or repeat
-solely for policy extension. NativeDirbuffer/FD/overlap memory separately qualified, not FileBytes
-bank or zero-totalallocation. Borrow/transfer/share existing paths and scoped/shared carriers;
-no new String/path/container/map/interner/cache/flag/lock. No DICE lock spans compute.
+Rust allowlist ONLY app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
+and its public_probe_preparation_tests.rs. Existing largeparents retain cohesive borrowed
+cohort/raw/policy matrix ownership, no production/kernel/Workspace/Loading/Bzlmod/DICE/Windows
+change. Existing rules_rust_defs_import_sources_need_is_opt_in_exact_table_only selector
+covers appendedmember in shared11roots/4modes/8ops/namespaces matrix; positiveunion59→61.
+Add focusedextension suffix/case/child/digest/crossroot/unknownsibling negative/mixedbothorders
+originaloffender/requestArc/zeroProgress/Weak seams, preservealloldcases. Protected91selector
+prefix byteidentical/no newselector. Estimate5–20policyparent +10–50cohesivepublicmatrixdelta,
+reviewtriggers notceilings. No DICElock spanscompute. Additional16Bborroweddescriptor/19literalB
+pooling/layoutqualified; no newownedpath/String/container/cache/interner/plan/outputmirror or
+retainedowner. Existing scoped/shared/interned carriers preserve release boundaries.
 
-Rust allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs,
-its public_probe_preparation_tests.rs and existing small platforms_os_package_tests.rs child.
-Only cohesive matcher/DirectoryEntries/rawdiagnostic/test seams. Public parent may be unchanged.
-No production/Corekernel/Workspace/Loading/Bzlmod/DICE/Windows change. Reuse OS Boolean/no
-padding change; estimate10–50parent net plus focusedmatrixdelta, review trigger not ceiling.
-Old WP1014 OS package marker/every legacyCPU/host marker unchanged. Add one complete strict
-ASCII LF<=512B WP1015_PLATFORMS_OS_DIRECTORY using actualOS Boolean/publicchecked and existing
-kernel128/1024/16384constants, root_slot2/operationdirectory_entries/cohortos/kind/bodyunobserved.
-Configuredpermission is not inventory/caller/listing/body/availabilityproof.
-Root owns minimal ignored target/wp1015 nativehelper/config fork/parser/control/freeze, input
-values identical to acceptedWP1014, all282ordered sourceFD signatures/SAMEtwo64KiB contexts.
-No thirdcontext/bodymirror/newlease/capture/originaltargetlisting before one normalprobe.
+Root owns minimum ignored target/wp1016 capture/native helper/config/parser/control/freeze.
+Frozen existing RulesRustraw cohort/count updates28→29 follow actualeligible row only;
+every unrelatedOS/CPU/host/legacyfield unchanged. Strictparser requires actualinputtable/order/
+count/mode/readiness and rejects forgedadmitteddenials without rawnormalization or private
+semanticcache. Keep fourstrict themes, exactsource/permission/default/oldroles/malformed/
+field/count/cohort/readiness and bothnormalconstructoridentities. Current282orderedFDsignature
+prefix/SAMEtwo64KiBcontexts preserved; appendeligibleone at END (prospective283/bytesunknown),
+no thirdcontext/bodymirror. Separate original28inputprefix from finalleaseappend order.
 
 ## Gates, caps and decision boundaries
 
-Independent consequential integrateddesign before Rust; same reviewer actualsource/helper/
-prelaunch/final. Existing OS matrix selector extends os member to Lstat+DirectoryEntries;
-markers retain Lstat/eligiblebytes only, positiveunion4→5. Shared11roots/4modes/8ops/namespaces,
-default/CPU-only/host-only/wrongslot isolation. Replace obsolete admittedoslisting negative
-with marker/child/CPUlisting, preserve every unrelated control. WholemixedNeeds invalidpath/
-Local bothorders beforeprogress, originaloffender/request pointers/Arc/Weak, scopedlocks.
-Protected91 selectorprefix unchanged/no redundantselector. Fourstrictthemes newmarker/forged
-granteddenial/malformed/cohort/pairedreadiness/disabledrole and allprior controls.
+Freeze integrateddesign/inactivecapturehelpers; independentconsequentialDESIGN/helper/prelaunch
+before targetIO/helperexecution. Rootsole reviewedactivation/one bounded10s capture withshared
+absolute3scleanup and all inheritedcaps. Actualsource/evidenceFINAL precedes conditionalRust/
+config/bodyleaseappend; same reviewer actualsource/helper/prelaunch/nativeFINAL. Reusequalified
+reader11/oldcaptures0fresh, no historicalexecutable/maptarget traversal. Scope remainsone
+sourceprerequisite; no separate cause/observerpacket or ungrounded sibling expansion.
 
-Resolve pinnedrustup tools; serialofflinejobs1 preparation<=60s, current uniqueCargoJSON Core
-artifact/batchedpreflight/list/all91ordinary. Focusedowner/protectedgate set plus directLoading/
-CoreCLIcompile; unchangedkernel/Workspace87/otherowners0fresh. At most one changednormalnative
-only after currentgates/independentprelaunch. No ignoredordinarycredit/no new capture; compiler
-RSSnotruntimefit. Preserve failurehistory; routineinvocation/compiler/test corrections stay
-withinacceptedcontract without identicalretries/broadsuite repeat. Existingselector76 allocator
-invocation narrowlyattributed/capsassertionsunchanged; nativeenv unchanged.
+Resolve pinnedrustup tools; serialofflinejobs1 preparation<=60s, currentuniqueCargoJSONCore/
+batchedpreflight/list/all91ordinary and fourstrictthemes, directLoadingCoreCLIcompile. Four
+unchangeddirectorykernelcontrols insideCore91/noextras; unchangedWorkspace87/otherownerproofs
+qualified0fresh. At most one changednormalnative after currentgates and independentprelaunch,
+no ignoredordinary/capturetestcredit. CompilerRSS not runtimefit. Preservecorrection/failure
+history; fixaffectedgatewithinacceptedcontract without identicalretries/broadsuites. Existing
+selector76onlydocumentedMALLOC_ARENA_MAX2 samecaps/assertions; nativeenvironment unchanged.
 
-Allcaps unchanged: work5s/lifetime8s/native10s/sharedabsolutecleanup3s/RSS256MiB/AS512MiB/
-source128/defaultprobe16/production64/registry128/object1MiB/eachbank16MiB/log1MiBeach/report4MiB/
-FSIZE16MiB; SAMEtwo64KiB282FDrows1536360physical3072720bracket. Fifteenremaining sourceattempts
-notuniquefile/closureproof. FullnormalRustc/support/data/provider/toolchain/action/runfiles/
-sameDICEedition2024→2021→2024/fullCLI/compilerexecution/M7A/MVS/provenance/wholefit remain active.
-REPLAN only if bounded normalrole/readerownership cannot hold; preserve typedrefusal with no
-inferredsource/provider/raisedceilings. No separate cause/observerpacket.
+Allcaps unchanged: work5s/lifetime8s/native10s/sharedcleanup3s/RSS256MiB/AS512MiB/source128/
+defaultprobe16/production64/registry128/object1MiB/eachbank16MiB/log1MiBeach/report4MiB/FSIZE16MiB.
+Source113 leaves15attemptheadroom, notunique-file/closure sufficiency; no quota/profilechange.
+FullnormalRustc/support/data/provider/toolchain/action/runfiles/sameDICEedition2024→2021→2024/
+fullCLI/compilerexecution/M7A/MVS/provenance/wholefit remain active. REPLAN only if stricteligible
+source unavailable or boundednormalrole/reader contract cannot hold; preserve typedunknown/
+limits without guessedprovider/source or raisedceiling. Prefixfit permits broader functional
+continuation undercaps, not fullmemoryacceptance.

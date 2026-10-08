@@ -46,7 +46,6 @@
     "current_named_passes": 96,
     "reused_Workspace": 87,
     "reused_Workspace_fresh": 0,
-    "kernel_fresh": 0,
     "direct_compile": [
       "slug_loading_v2",
       "slug_core_v2",
@@ -54,7 +53,9 @@
     ],
     "compile_seconds": 12.012902035028674,
     "check_seconds": 7.304164532921277,
-    "current_gate_elapsed_sum_seconds": 43.520298633840866
+    "current_gate_elapsed_sum_seconds": 43.520298633840866,
+    "directory_kernel_controls_in_current_Core": 4,
+    "additional_kernel_gates_outside_Core": 0
   },
   "native": {
     "checkpoint": "WP1014",
@@ -118,5 +119,6 @@
   "qualification": "Configured role doesnot prove availability/nativebody/inventory/caller/certificate/publicRustc. CaptureBUILD.bazel genuineENOENT, BUILD2495/UTF8syntaxpartial loads[]27unsupported not importclosure. All282 stable currentorderedleases/SAMEtwo64KiB, historicalancestorstamps notimmutable. Livecredits endzero Scope/recorderWeakexpire; sourcebodyWeakunseen/expiryvacuous. Only unchanged lifecycle76 uses separatelydocumentedMALLOC_ARENA_MAX2 underidenticalcaps; nativeenvunchanged. Prefixfitonly; no fullworkloadmemoryclaim.",
   "next": "Exact originalHostroot2/os DirectoryEntries using sameOSrole and unchangedboundedLinuxreader; no newcapture/flags or wildcard",
   "remaining": "NormalpublicRustc/support/data/providers/toolchains/runfiles/sameDICEeditionrestoration/fullCLI/M7A/MVS/provenance/wholefit",
-  "receipt_elapsed_seconds_since_frozen_design": 1433.9391112327576
+  "receipt_elapsed_seconds_since_frozen_design": 1433.9391112327576,
+  "kernel_count_clarification": "Four unchanged scoped_directory tests are actually executed within the recorded current Core selector set (80\u201383). Historical kernel proof is reused; zero additional kernel gates means no separate run beyond Core, not zero fresh execution."
 }

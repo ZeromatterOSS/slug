@@ -1,0 +1,106 @@
+{
+  "schema": 1,
+  "packet": "WP-7-239-m7a-normal-rustc-os-directory-readiness-r1",
+  "checkpoint": "WP1015",
+  "baseline": "0f15f0311657dde89c8d5e602a7b3508f469ffa4",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtestLinux boundedreadiness; existingexactBazel9.2projections unchanged",
+  "change": "ExistingOSbool admits ONLYoriginalHostroot2/osDirectoryEntries via unchanged128entry1024name16384names Linuxkernel; metadata3/BUILD-onlybytes unchanged",
+  "growth": {
+    "parent_net": 15,
+    "existing_child_net": 16,
+    "total_net": 31
+  },
+  "allocation": {
+    "new_flags": 0,
+    "new_retained_owned_strings": 0,
+    "new_heap_containers": 0,
+    "new_source_capture": 0,
+    "new_interner_cache_mirror": 0,
+    "borrowed_existing_root_static_literal": true,
+    "existing_kernel_ArcName_transfer_scoped_interning_retained": true
+  },
+  "validation": {
+    "Core": 91,
+    "directory_kernel_controls_in_current_Core": 4,
+    "additional_kernel_gates_outside_Core": 0,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 96,
+    "reused_Workspace": 87,
+    "reused_Workspace_fresh": 0,
+    "direct_compile": [
+      "slug_loading_v2",
+      "slug_core_v2",
+      "slug_cli_v2"
+    ],
+    "compile_seconds": 9.565824105986394,
+    "check_seconds": 7.3014888420002535,
+    "current_gate_elapsed_sum_seconds": 41.035330384853296
+  },
+  "native": {
+    "checkpoint": "WP1015",
+    "baseline": "0f15f0311657dde89c8d5e602a7b3508f469ffa4",
+    "current_native_gate_records": 98,
+    "current_allphase_records": 98,
+    "preserved_zero_credit_records": 0,
+    "total_supervised_records": 98,
+    "zero_child_launch_refusals": 0,
+    "current_named_passes": 96,
+    "Core": 91,
+    "Python": 4,
+    "native": 1,
+    "current_capture_operations": 0,
+    "capture_test_credit": 0,
+    "elapsed_seconds": 3.3704306909348816,
+    "conservative_peak_kib": 118572,
+    "native_direct_pins": 749,
+    "combined_current_direct_union": 762,
+    "source_leases": 282,
+    "physical_bytes": 1536360,
+    "bracket_bytes": 3072720,
+    "documented_fd_opens": 4346,
+    "root_note_sha256": "61e4743662134cd4434d2d8ce7e99a792e56df0163dbfb419e6d3b767f5c067f",
+    "result_sha256": "14d057e552377c68fc7b48ba16fda8599d2a230e56046f6edda965ff56735a09",
+    "operation_sha256": "662562fc9dde854473b2fd4f2b10b98f8537c56e1c30c641651418d5d21f5c49",
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false
+  },
+  "reviews": {
+    "semantic-source-review.md": {
+      "path": "target/wp1015/native/semantic-source-review.md",
+      "sha256": "5d2753d8c14247b5b01d782b204e0aaad5bc43addd6780f04fee4dc6fcec6051"
+    },
+    "static-evidence-review.md": {
+      "path": "target/wp1015/native/static-evidence-review.md",
+      "sha256": "4264bef8f8153e9ec32699cef73a6eed5b2f1a3a3c618035b9c94ba21b99a68c"
+    },
+    "preflight-evidence.md": {
+      "path": "target/wp1015/native/preflight-evidence.md",
+      "sha256": "1c6ac6546bd894dc6f2c8eb3ce11cdc3cf58e2cbaae06354df0bb8a8e6aaaeda"
+    },
+    "final-evidence.md": {
+      "path": "target/wp1015/native/final-evidence.md",
+      "sha256": "f71f0dad5dfa84168a6f34edd50d98840d991b23bdef187c396641c561067fda"
+    }
+  },
+  "receipt_count_clarification_review": {
+    "path": "target/wp1015/receipt-count-review.md",
+    "sha256": "e1b9f1c32f9ca014b3c4e46151f7ace499519a9183dae89c370062e682b4b7b1"
+  },
+  "root_summary_correction": {
+    "path": "target/wp1015/native/root-summary-correction.md",
+    "sha256": "a078d7fd226cde27da10791c478a7dc54bf92a2846d8164fd7ed5a68eedcdd52",
+    "child_operations": 0,
+    "credit": 0
+  },
+  "successor_source": {
+    "path": "target/wp1015/successor-source.md",
+    "sha256": "b5660b7af1a405ba9a978177e6a1948581d92f19fbd04d17ad3a969c8f15158d"
+  },
+  "observable_advanced": "OriginalHostroot2/osDirectoryEntries refusal advances to originalHostroot1/rust/extensions.bzl207B Lstat; source1131266909 unchanged",
+  "qualification": "Configuredlisting doesnot prove inventory/caller/nativebody/output/cert/publicRustc. All282orderedpathsignaturebrackets stable/SAMEtwo64KiB/currentancestorchecks notimmutablehistory. Scope/recorderWeakexpire/creditsendzero; bodyWeakunseen/expiryvacuous. Onlyselector76 documentedMALLOC_ARENA_MAX2sameassertionscaps/nativeenvunchanged. Four unchangedkernelcontrols actuallyinsidecurrentCore91; zeroextraoutside. Sourceprofile128/allcaps unchanged, prefixfitonly. One read-only root summary usedolder281rowreference; assertrefusedbeforewrites/nochild then immediateWP1014referencecorrected, no native/test rerun.",
+  "next": "Strictsingle rust/extensions.bzl capture then eligible-only appendexistingRulesRustfinite28\u219229role/staticname; no newflag/recursiveimports/quota",
+  "remaining": "NormalpublicRustc/support/data/providers/toolchains/runfiles/sameDICEeditionrestoration/fullCLI/M7A/MVS/provenance/wholefit",
+  "receipt_elapsed_seconds_since_frozen_design": 1301.0332486629486
+}
