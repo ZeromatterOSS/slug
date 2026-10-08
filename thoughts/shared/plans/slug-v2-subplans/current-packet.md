@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-236-m7a-normal-rustc-cpu-package-readiness-r1
-Status: Design review of integrated bounded CPU package readiness
+Packet: WP-7-237-m7a-normal-rustc-cpu-directory-readiness-r1
+Status: Design review of bounded CPU directory continuation
 
 ## Observable and source basis
 
@@ -44,83 +44,94 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1011](wp1011-bounded-host-directory-2026-10-08.json) accepts bounded cfgtest Linux
-host DirectoryEntries and independently required exact directory role. Core89/themes4/
-native1 pass with independent FINAL ACCEPT. The once normal probe ends3.35s at118576KiB/
-256MiB without source timeout, advancing to original platforms_root/cpu Lstat191B. Actual
-directory inventory/caller, normal Rustc producer and whole workload fit remain unproved.
-Current96 records/94 names plus two preserved preparations0current =98 attempts; unchanged
-Workspace87 reused0fresh. Historical audit/receipt archive counters are not authoritative.
-Borrow/transfer/share existing storage and scoped interning where repetition/lifetime fit.
+[WP1012](wp1012-cpu-package-readiness-2026-10-08.json) accepts CPU package metadata3 and
+only strictly captured cpu/BUILD5076B body. BUILD.bazel genuine ENOENT remains body nongrant.
+Defaultfalse PreparedFile AND PublicProbe role, exact readiness, borrowed static paths and
+whole-Need zero-progress/pointer/Weak controls pass Core90/themes4/native1 with independent
+FINAL. Sole normal probe3.304825721s/conservative118896KiB under256MiB/SourceErrorNone reaches
+original root2/cpu191B DirectoryEntries operation refusal. Aggregate +1/+5076 sourcecounter
+correspondence is not per-body/caller proof. Current97 nativegate/95named +capture1/passNone
+=98currentallphase; five preserved0credit records give103 supervised, one zero-child readiness
+launcher refusal separate. Only unchanged lifecycle selector76 used MALLOC_ARENA_MAX=2;
+normal native environment/caps unchanged. Unchanged Workspace87 qualified0fresh. Fullproducer,
+certificate/actions/inventory and wholefit remain open; no repeated unchanged gates now.
 
-## Active integrated decision and source basis
+## Active integrated decision
 
-Source basis [successor recommendation](../../../../target/wp1011/successor-source.md), SHA
-691d874d0e760db694cd277358aa7fd54326ca4bd494f1c7679aef38f5f88909. Actual LstatCPU
-is a local first-offender path, not full caller/mapping/target provenance. Slug-native
-internal test/source readiness; existing Bazel9.2 exact projections and unsupported
-boundaries unchanged. The natural Bzlmod ExternalRepositoryPackageLookupKey requires
-original package.repo()==source route canonical_repo; marker lookup tries BUILD.bazel
-then BUILD and dispatches selected source through original Host/canonical observation
-keys. Retain both platforms/platforms+ identities, original route/certificate/Need/epoch
-and marker preference. No basename inference, plus normalization, cachedir scan or fake
-provider. This packet covers one functional CPU package prerequisite, not separate marker
-or cause diagnostics. OS stays closed absent an independently demanded source-proved
-closure; a digest-only generated host plan or authored callback does not provide it.
+Continue the actual normal CPU package prerequisite with exact bounded Host roots[2]/cpu
+DirectoryEntries through the accepted WP1011 scoped Linux directory reader. Reuse the
+EXISTING platforms_cpu_package_sources Boolean: defaultfalse/PreparedFile AND PublicProbe,
+already independently required by exact readiness. No per-operation flag or environment
+selector, no new source capture, no source acquisition or hand-authored directory inventory.
+Natural Loading/Bzlmod package/glob observations retain original route/mapping/Need/certificate/
+epoch and source promotion/revalidation owners; mutable FS is not a historical snapshot.
+Actual operation/path is source correspondence, not independently observed full caller/target.
+Retain both platforms/platforms+ identities without normalization, no filename/target inference.
+Source basis [WP1012 successor](../../../../target/wp1012/successor-source.md), SHA256
+8f511d2a3a0e7b20b0938b4a14e3080c07a393a403b6ca6771aba095e3d93cd1, plus actual native/result,
+raw operation, root final-source and independent FINAL. Workspace path_resolution owns exact
+logical resolution/DirectoryEntries demand, Bzlmod source_preparation owns original route listing,
+Loading glob/subtree keys are legitimate consumers. The particular higher caller is unobserved;
+ordinary external package lookup uses marker stats, listing package lookup is builtin-only.
 
-First freeze source readiness: strict capture of ONLY cpu/BUILD.bazel and cpu/BUILD from
-existing selected platforms_root. Both are prospective marker names grounded in normal
-package lookup, not availability claims. Reuse accepted strict FD/Budget/facts reader with
-1MiB object,16MiB aggregate,64KiB scratch, all-ancestor identities/EOF/full SHA/strictUTF8,
-per-row body/text/AST retirement. Two independent decisions, passNone; unavailable,
-nonregular/changed/refused rows never become bodies. At least one eligible marker needed
-for package source role; neither eligible preserves typed unavailable boundary. No manual
-directory listing/inventory, source acquisition or unrelated capture. Root freezes ignored
-target/wp1012/capture inputs/helpers/caps and obtains independent design/prelaunch/actual
-capture FINAL before dependent source role implementation. One fixed two-marker operation
-only; no identical retry or guessed fixture. Imported load facts can ground a later cohort,
-not recursive permission now. Unknown sizes/hashes/native count remain unknown until capture.
+Compatibility: Slug-native cfgtest Linux finite readiness. Existing Bazel9.2 exact projections
+and unsupported/deferred scopes unchanged. Existing CPU metadata3 and BUILD-only FileBytes,
+host metadata/source/exacthostDirectory, CC48+8metadata, Features/Proxy/all9Local/11roots and
+namespace owner permission remain independent. Directory grant only exact originalHost root2
+cpu; wrongroot/child/suffix/case/foreignnamespace/OS/BUILD marker directories remain closed.
+Digest/ReadLink/prefix/recursive/OS/body availability grants remain closed. No fabricated
+provider, repository mapping, inventory, source certificate, or producer. The actual next
+normal Need governs successor; no separate cause/observer packets.
 
-After actual capture FINAL, one default-false PreparedFile AND PublicProbe CPU-package
-role, independently required by exact readiness, admits ONLY Host roots[2] exact metadata
-cpu/cpu/BUILD.bazel/cpu/BUILD Lstat and eligible marker FileBytes. Borrow exact components;
-no DirectoryEntries, child source, Digest/ReadLink/generated/foreign/prefix grant. Preserve
-existing host metadata3/source3/exacthostDirectory,48CC8metadata/Features/Proxy/all9Local
-checks/11roots, whole mixed Need refusal before progress, original offender pointer/order.
-Absent captured rows grant no body. Symlink-resolved demands independently require exact
-admission. Source read/revalidation/promotion retain original owners, provisional cleanup
-and source certificate behavior; mutable FS is not a historical snapshot.
+The existing scoped directory kernel enforces inclusive128 non-dot entries/1024 bytes/name/
+16384 total native namebytes BEFORE owned copy/classification/retention. Dot/dotdot skipped,
+1025 bounded native d_reclen scan; RAII closeonce and CheckScope/EINTR/error/refinement polarity,
+normal sortedArcSlice transfer and no partialEpoch operational failure remain. Inherit all
+accepted kernel/discriminator evidence; do not edit kernel or rerun its unchanged gates solely
+for a policy extension. Native Dir buffer/FD/overlap memory separately qualified, no FileBytes
+bank or zero-totalallocation claim. No string/path copy, container/mirror/map/interner/cache/
+lock; borrow/transfer/share existingstorage and scopedinterners where lifetime/repetition fit.
 
-Rust allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs and
-its public_probe_preparation_tests.rs with small child platforms_cpu_package_tests.rs.
-Large parents retain only cohesive bool/matcher/readiness seams; new test matrix in child.
-No kernel/Bzlmod/Loading/Workspace production or DICE/key/lock/Windows edit. No new owned
-path/String/container/mirror/cache/interner; existing borrowed/transfer/Arc source carriers
-retain independent ownership, release on epoch/history/lastDrop. One bool has qualified
-layout/padding, not a zero-total-allocation claim. Estimate40–100 cohesive lines plus
-focused matrix; review trigger not hard ceiling. No lock spans DICE compute. Root owns
-ignored minimal capture/native helper/config changes; preserve passed unchanged evidence.
+Rust allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs,
+its public_probe_preparation_tests.rs and existing small platforms_cpu_package_tests.rs child.
+Only cohesive matcher/DirectoryEntries branch/raw diagnostic/test seams; no production/Core
+kernel/Bzlmod/Loading/Workspace/DICE/Windows changes. Reuse exactCPU Boolean; no padding change.
+Estimate10–50 parent netlines plus focused matrix delta, review trigger not ceiling. No DICE
+lock spans compute. Source/body independent ownership/certificate/history/Drop remain untouched.
+
+Raw prior WP1012 CPU package marker and every legacy field remain unchanged. Add one complete
+strict ASCII LF WP1013_PLATFORMS_CPU_DIRECTORY marker using actualCPU Boolean/readiness and
+root_slot2/operationdirectory_entries/cohortcpu/128/1024/16384 from existing kernel constants,
+kind/body unobserved. New finite diagnostic/profile is configured permission, not inventory/
+caller/availability/native listing/bodyread proof. Root owns minimum ignored target/wp1013
+native helper/config forks, strict parser/control/freeze, keeping prior input values identical,
+all281 ordered accepted FDlease signatures and SAME two64KiB contexts. No thirdcontext/body
+mirror; no fresh source capture or original target listing before the one normal probe.
 
 ## Gates, caps and decision boundaries
 
-Independent design before capture or source edit; actual capture eligibility/source FINAL
-before conditional code. Combined actual source/helper semantic review before changednative.
-Preserve current89 Core selector prefix/four strict themes; add cohesive CPU role matrix
-covering all11roots/4modes/8ops/namespaces, directory and markers independently, default/
-host-role-only/unavailable-marker-body negatives, wrongslot/root/case/suffix/child/Digest,
-mixedLocal/invalidpath zero progress and original pointer/order/Weak. Update valid readiness
-builders only as required; preserve negative flag independence. Pinned offline/jobs1 compiler
-preparations<=60s and currentCargoJSON/batchedpreflight before tests. Unchanged natural
-Bzlmod/Workspace/Loading package/Arc/error gates qualified0fresh; direct Loading/Core/CLI
-compile. At most one changed normal native after focused gates and independent prelaunch.
-Keep old280 lease prefix/two64KiB contexts; append only actual eligible rows in reviewed
-order/count/hash, source correspondence is not a source certificate or inventory proof.
+Freeze root integrated design/helper contract and obtain independent consequential design
+before Rust edits; same reviewer for actual source/helper/final. Existing matrix selector
+extends cpu operations to Lstat+DirectoryEntries while markers retain Lstat/body-only eligible.
+Positive union cardinality5 (3metadata+1body+1directory), shared11roots/4modes/8ops/namespaces,
+host-role-only/default/isolation; wrongroot/BUILDmarkers/CPUchild/OS/foreign/Digest/ReadLink
+negative, mixed invalidpath/Local bothorders beforeprogress, original pointer/order/Arc/Weak.
+Preserve current90 selector prefix/no redundantselector; four strictthemes cover new marker,
+forged granted-denial and malformed/cohort/readiness plus unchanged old discriminators.
 
-Native caps work5s/lifetime8s/native10s/cleanup3s/RSS256MiB/AS512MiB/source128/defaultprobe16/
-production64/registry128/object1MiB/each bank16MiB/each log1MiB/report4MiB/FSIZE16MiB unchanged.
-Seventeen remaining source attempts are not unique-file/closure proof. Memory fit verified
-only for observed prefix; continue broader implementation under caps, never silently raise
-limits. Correct invocation/compiler/test issues within accepted scope with preserved0current
-failure records. REPLAN only if bounded capture/marker/route/source authority cannot hold;
-no role activation without eligibility. Full normal Rustc/support/data/toolchain/runfiles/
-same-DICE edition restoration/fullCLI/M7A and whole workload remain active.
+Pinned rustup-resolved offline/jobs1 compiler preparation<=60s; unique current CargoJSON
+Core artifact and batched preflight/list before execution. Private cfgtest scope: focused
+changed owner and protected gate set; directLoading/Core/CLI compilation. Unchanged kernel/
+Workspace/Bzlmod/Loading evidence qualified0fresh; no ignoredtest ordinarycredit. At most one
+changed normal native after current gates and independent prelaunch. CompilerRSS notnativefit.
+Preserve failedhistory0current; routine invocation/compiler/test corrections stay within scope
+without identical failure retries. MALLOC_ARENA_MAX=2 only when explicitly justified for the
+unchanged lifecycle selector; native environment unchanged unless reviewed deliberate change.
+
+All inherited caps unchanged: work5s/lifetime8s/native10s/shared absolutecleanup3s/RSS256MiB/
+AS512MiB/source128/defaultprobe16/production64/registry128/object1MiB/eachbank16MiB/log1MiBeach/
+report4MiB/FSIZE16MiB; two64KiB parent contexts281FDrows/1533865physical/3067730brackets.
+Sixteen remaining sourceattempts are not unique-file/closure proof. FullnormalRustc/support/
+data/provider/toolchain/action/runfiles/sameDICEedition2024→2021→2024/fullCLI/compilerexecution/
+M7A/MVS/provenance/wholefit remain active. REPLAN only if bounded normal route/role/reader
+contract cannot hold; typed unavailability is preserved without guessed source/provider.

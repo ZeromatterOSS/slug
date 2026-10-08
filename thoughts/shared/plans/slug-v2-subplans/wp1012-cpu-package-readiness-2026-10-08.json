@@ -1,0 +1,121 @@
+{
+  "schema": 1,
+  "packet": "WP-7-236-m7a-normal-rustc-cpu-package-readiness-r1",
+  "checkpoint": "WP1012",
+  "baseline": "799bff8a9f990fe3abaae797692b7766d9df530c",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest Linux readiness; existing exact Bazel projections unchanged",
+  "change": "Default-false PreparedFile AND PublicProbe CPU package role: exact Host original root2 metadata cpu/cpuBUILD.bazel/cpuBUILD Lstat, eligible cpu/BUILD only FileBytes; independent readiness; borrowed static paths and inline Boolean",
+  "growth": {
+    "parent_seams_net": 58,
+    "focused_child_lines": 222,
+    "total_net": 280
+  },
+  "allocation": {
+    "retained_strings_added": 0,
+    "heap_guard_containers_added": 0,
+    "inline_bool": true,
+    "static_descriptors_nominal_bytes": 64,
+    "static_literal_nominal_bytes": 36,
+    "layout_pooling_qualified": true,
+    "existing_scoped_interners_retained": true
+  },
+  "capture": {
+    "operations": 1,
+    "decisions": 2,
+    "observed": 1,
+    "unavailable": 1,
+    "pass_count": null
+  },
+  "validation": {
+    "Core": 90,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 95,
+    "reused_Workspace": 87,
+    "reused_Workspace_fresh": 0,
+    "direct_compile": [
+      "slug_loading_v2",
+      "slug_core_v2",
+      "slug_cli_v2"
+    ],
+    "compile_seconds": 12.455223742988892,
+    "check_seconds": 7.459201757912524,
+    "current_gate_elapsed_sum_seconds": 43.5253220096929
+  },
+  "native": {
+    "checkpoint": "WP1012",
+    "baseline": "799bff8a9f990fe3abaae797692b7766d9df530c",
+    "current_native_gate_records": 97,
+    "current_allphase_records": 98,
+    "preserved_zero_credit_records": 5,
+    "total_supervised_records": 103,
+    "zero_child_launch_refusals": 1,
+    "current_named_passes": 95,
+    "Core": 90,
+    "Python": 4,
+    "native": 1,
+    "capture": {
+      "operations": 1,
+      "decisions": 2,
+      "observed": 1,
+      "unavailable": 1,
+      "pass_count": null
+    },
+    "elapsed_seconds": 3.3048257210757583,
+    "conservative_peak_kib": 118896,
+    "native_direct_pins": 720,
+    "combined_current_direct_union": 733,
+    "source_leases": 281,
+    "physical_bytes": 1533865,
+    "bracket_bytes": 3067730,
+    "root_note_sha256": "8126802eccc798f72d134e89c57e4ba86e48ae76772da4474067fad487c58178",
+    "result_sha256": "5dec3baf69baa1ee65be8654b4c704cef89e861fea898c76232d6f7ea83b335b",
+    "operation_sha256": "e14150c4ee073540a51b22672139a6fbb9d20deb4d0dd11522c62f0e5296f273",
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false,
+    "summary": {
+      "path": "target/wp1012/native/native-summary.json",
+      "sha256": "ee7da4ba2e7d2fbd975a7fa8b65df4979575ac4d313cbd6a1d2b529447da9512"
+    },
+    "result": {
+      "path": "target/wp1012/native/result.json",
+      "sha256": "5dec3baf69baa1ee65be8654b4c704cef89e861fea898c76232d6f7ea83b335b"
+    },
+    "operation": {
+      "path": "target/wp1012/native/native-operation.json",
+      "sha256": "e14150c4ee073540a51b22672139a6fbb9d20deb4d0dd11522c62f0e5296f273"
+    }
+  },
+  "reviews": {
+    "semantic-source-review": {
+      "path": "target/wp1012/native/semantic-source-review.md",
+      "sha256": "632581a2459d2bbb4d44e682bf7896e66d2aa969ffdfd80f391044b3321b13ea"
+    },
+    "static-evidence-review": {
+      "path": "target/wp1012/native/static-evidence-review.md",
+      "sha256": "246bc566f9893b87f53474f48894a61fe50351c010c81692d335c714e96a9990"
+    },
+    "preflight-evidence": {
+      "path": "target/wp1012/native/preflight-evidence.md",
+      "sha256": "e32e8bc31e720e41fb241bc444e51241008d1a6a11d2d594ef344eebb896107c"
+    },
+    "final-evidence": {
+      "path": "target/wp1012/native/final-evidence.md",
+      "sha256": "725b34dafd0ec2affb48f22c33e6aeb5a1af4fd3f4cce629037b3d3eb14c9d76"
+    },
+    "capture-final": {
+      "path": "target/wp1012/capture/final-evidence.md",
+      "sha256": "5c1f28fd0a67df5dac501033c2ac9269646cb6921984b9d3c160582bcc144616"
+    }
+  },
+  "qualification": "Capture2 terminal decisions is0 tests; unavailable BUILD.bazel body nongrant. Sourcecounter+1/+5076 correspondence not per-source proof. Native field kind/body/inventory/caller/sourcecertificate/publicRustc unobserved; prefix memory fits, fullgoal not complete. Endscope/recorder/livecredits retire; bodyWeak unseen vacuous. Five preserved zero-credit child records, one zero-child launch refusal separate; only lifecycle selector76 MALLOC_ARENA_MAX=2 invocation, caps/assertions unchanged; normal native environment unchanged. Two borrowed closure annotations only testcompiler correction.",
+  "observable_advanced": "First missing CPU Lstat changed to exact CPU DirectoryEntries operation; normalproducer/certificates/actions remain unproved",
+  "remaining": "Normal public Rustc/support/data/toolchains/providers/runfiles; same-DICE edition2024\u21922021\u21922024; fullCLI/M7A/MVS/provenance/whole-workload fit",
+  "receipt_elapsed_seconds_since_frozen_design": 1821.9501550197601,
+  "next": "Extend existing CPU role to exact bounded Host root2/cpu DirectoryEntries under existing kernel guard; no new Boolean/sourcecapture or OS permission, consequential design review before edit.",
+  "successor_source": {
+    "path": "target/wp1012/successor-source.md",
+    "sha256": "8f511d2a3a0e7b20b0938b4a14e3080c07a393a403b6ca6771aba095e3d93cd1"
+  }
+}

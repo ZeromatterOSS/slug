@@ -354,6 +354,9 @@ const RULES_CC_IMPORT_METADATA: [&str; 8] = [
 const PLATFORMS_HOST_IMPORTS: [&str; 3] =
     ["host/constraints.bzl", "host/BUILD", "host/extension.bzl"];
 const PLATFORMS_HOST_METADATA: [&str; 3] = ["host", "host/BUILD.bazel", "host/BUILD"];
+const PLATFORMS_CPU_METADATA: [&str; 3] = ["cpu", "cpu/BUILD.bazel", "cpu/BUILD"];
+// Only the regular, captured marker is eligible for body observations.
+const PLATFORMS_CPU_SOURCES: [&str; 1] = ["cpu/BUILD"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -365,6 +368,7 @@ struct Bodies {
     platforms_host_metadata: bool,
     platforms_host_directory: bool,
     platforms_host_import_sources: bool,
+    platforms_cpu_package_sources: bool,
     nightly_package_metadata: bool,
     nightly_build_source: bool,
     nightly_channel_source: bool,
@@ -891,6 +895,7 @@ impl Bodies {
             platforms_host_metadata: false,
             platforms_host_directory: false,
             platforms_host_import_sources: false,
+            platforms_cpu_package_sources: false,
             nightly_package_metadata: false,
             nightly_build_source: false,
             nightly_channel_source: false,
@@ -981,6 +986,28 @@ impl Bodies {
                     PLATFORMS_HOST_IMPORTS
                         .iter()
                         .any(|name| relative == Path::new(name))
+                })
+    }
+    fn with_platforms_cpu_package_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.platforms_cpu_package_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_platforms_cpu_package(&self, path: &Path, metadata: bool) -> bool {
+        self.platforms_cpu_package_sources
+            && path
+                .strip_prefix(self.roots[2].as_path())
+                .is_ok_and(|relative| {
+                    let names = if metadata {
+                        PLATFORMS_CPU_METADATA.as_slice()
+                    } else {
+                        PLATFORMS_CPU_SOURCES.as_slice()
+                    };
+                    names.iter().any(|name| relative == Path::new(name))
                 })
     }
     fn with_nightly_package_metadata(
@@ -1377,7 +1404,8 @@ impl Bodies {
                                     || self.admits_bazel_features_import_source(path, false)
                                     || self.admits_bazel_skylib_import_source(path, false)
                                     || self.admits_rules_cc_import_source(path, false)
-                                    || self.admits_platforms_host_import_source(path)))
+                                    || self.admits_platforms_host_import_source(path)
+                                    || self.admits_platforms_cpu_package(path, false)))
                             || (self.ignore_file_bytes
                                 && operation == PathObservationOperation::FileBytes
                                 && path.file_name().is_some_and(|name| name == ".bazelignore")
@@ -1407,6 +1435,7 @@ impl Bodies {
                                     .any(|root| path.parent() == Some(root.as_path())))
                             || self.admits_platforms_host_import_source(path)
                             || self.admits_platforms_host_metadata(path)
+                            || self.admits_platforms_cpu_package(path, true)
                             || (self.rust_package_metadata
                                 && path.parent() == Some(self.roots[1].as_path())
                                 && path.file_name().is_some_and(|name| name == "rust"))
@@ -2563,6 +2592,7 @@ fn observe_native_command(
     .with_rust_package_metadata(registry_choice, command)
     .with_platforms_host_metadata(registry_choice, command)
     .with_platforms_host_import_sources(registry_choice, command)
+    .with_platforms_cpu_package_sources(registry_choice, command)
     .with_nightly_package_metadata(registry_choice, command)
     .with_nightly_build_source(registry_choice, command)
     .with_nightly_channel_source(registry_choice, command)
@@ -2612,6 +2642,7 @@ fn observe_native_command(
     let platforms_host_metadata = bodies.platforms_host_metadata;
     let platforms_host_directory = bodies.platforms_host_directory;
     let platforms_host_import_sources = bodies.platforms_host_import_sources;
+    let platforms_cpu_package_sources = bodies.platforms_cpu_package_sources;
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
@@ -2771,6 +2802,11 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP1012_PLATFORMS_CPU_PACKAGE enabled={} policy_checked={} root_slot=2 metadata_operation=lstat metadata_count=3 source_operation=file_bytes source_count=1 metadata_cohort=cpu,cpu/BUILD.bazel,cpu/BUILD source_cohort=cpu/BUILD kind=unobserved body=unobserved",
+            platforms_cpu_package_sources,
+            probe_report.policy_checked()
+        );
         println!(
             "WP1011_PLATFORMS_HOST_DIRECTORY enabled={} policy_checked={} root_slot=2 operation=directory_entries cohort=host entry_limit={} name_limit={} names_limit={} kind=unobserved body=unobserved",
             platforms_host_directory,
