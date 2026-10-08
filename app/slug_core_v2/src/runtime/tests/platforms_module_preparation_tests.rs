@@ -242,7 +242,7 @@ struct AdditionalModule {
     file: NormalizedAbsolutePath,
 }
 // Finite imports declared by the observed defs/toolchain dependency family.
-const RULES_RUST_DEFS_IMPORTS: [&str; 28] = [
+const RULES_RUST_DEFS_IMPORTS: [&str; 31] = [
     "rust/toolchain.bzl",
     "rust/private/clippy.bzl",
     "rust/private/common.bzl",
@@ -271,6 +271,9 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 28] = [
     "rust/private/semver.bzl",
     "rust/private/rustc_resource_set.bzl",
     "rust/private/stamp.bzl",
+    "rust/extensions.bzl",
+    "rust/private/repositories.bzl",
+    "rust/private/repository_utils.bzl",
 ];
 const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
 const BAZEL_FEATURES_IMPORTS: [&str; 8] = [

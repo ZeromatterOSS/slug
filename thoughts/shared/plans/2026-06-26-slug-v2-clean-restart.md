@@ -34,21 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-240-m7a-normal-rustc-extension-source-readiness-r1
-Status: Integrated design and bounded Rust extension source readiness
+Packet: WP-7-241-m7a-normal-rustc-repository-data-source-readiness-r1
+Status: Integrated design and bounded Rust repository data readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1015](./slug-v2-subplans/wp1015-os-directory-readiness-2026-10-08.json) accepts exact
-OS DirectoryEntries through existing OSbool/boundedLinuxreader: Core91/themes4/native1,
-independentFINAL. Normal probe3.37043s/118572KiB under256MiB/SourceErrorNone now reaches
-originalHostroot1/rust/extensions.bzl Lstat. Strictly capture this one file, then append an
-eligible borrowed name to existing RulesRustfinitecohort28→29; no newflag/recursiveimports.
-Actual inventory/caller/publicRustc and whole-fit remain open. Borrow/transfer/share values
-and use existing scoped interners where retention fits; no global pool for temporary names.
-Source/native caps unchanged; blind profile retries closed.
+[WP1016](./slug-v2-subplans/wp1016-extension-source-readiness-2026-10-08.json) admits the
+captured extension and its two direct local sources through the existing finite role31:
+Core91/themes4/native1, independentFINAL. Normal replay3.54542s/144472KiB under256MiB/
+SourceErrorNone reaches originalHostroot1/rust/private/known_shas.bzl Lstat. Strictly
+capture the fixed declared nightly_versions/known_shas pair; admit only eligible rows
+through the existing role33 after review. No recursive grant or raised cap. Current
+prefix fits; full producer/whole-fit remain open. Borrow/transfer/share strings and use
+existing scoped interners when lifetime and repetition fit; unique generated data needs
+bounded retention checks. Source/native caps unchanged; blind profile retries closed.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

@@ -4360,11 +4360,13 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
         );
     }
     let path = |p: &str| NormalizedAbsolutePath::new(p).unwrap();
-    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
-        .with_rules_rust_defs_import_sources(
-            RegistryChoice::PreparedFile,
-            CommandChoice::PublicProbe,
-        );
+    let bodies = Arc::new(
+        Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+            .with_rules_rust_defs_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            ),
+    );
     let need = |p: &Path, operation| {
         SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
             PathObservationNamespace::Host,
@@ -4388,8 +4390,22 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 59);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 65);
     assert!(bodies.admit(&all).is_ok());
+    let root = BuildCommandRootKey::new_with_overlay(
+        path("/fixture"),
+        &[TargetPattern::parse("//pkg:probe").unwrap()],
+        build_test_configuration("rust-import-whole-need"),
+        nightly_overlay(),
+    )
+    .unwrap();
+    let milestones = Arc::new(Mutex::new(Milestones::default()));
+    let guarded = GuardedSingleton {
+        inner: SingletonRootSingleBuildCommandKey::new(root).unwrap(),
+        bodies: bodies.clone(),
+        milestones: milestones.clone(),
+    };
+    assert!(guarded.check_need(&all).is_ok());
     for (excluded, operation) in [
         (
             "/rules/rust/private/unknown.bzl",
@@ -4430,20 +4446,100 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             "/rules/rust/private/BUILD.bazel",
             PathObservationOperation::Lstat,
         ),
+        (
+            "/rules/rust/extensions.bzl.extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/EXTENSIONS.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/repositories.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/private/repositories.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/other/rust/private/repository_utils.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/repository_utils_unknown.bzl",
+            PathObservationOperation::FileBytes,
+        ),
     ] {
-        let mixed = all
-            .try_union(&need(Path::new(excluded), operation.dupe()))
-            .unwrap();
-        let mut progress = 0;
-        if bodies.admit(&mixed).is_ok() {
-            progress += 1;
+        let excluded_need = need(Path::new(excluded), operation.dupe());
+        for mixed in [
+            all.try_union(&excluded_need).unwrap(),
+            excluded_need.try_union(&all).unwrap(),
+        ] {
+            let expected = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| **d == excluded_need.path_observations().unwrap().demands()[0])
+                .unwrap();
+            let (first, family) = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+                .unwrap();
+            assert!(std::ptr::eq(first, expected));
+            assert_eq!(family, "path");
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            progress += usize::from(guarded.check_need(&mixed).is_ok());
+            assert_eq!(progress, 0);
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(denied.family, "path");
+            assert_eq!(denied.operation, path_operation_code(&operation));
+            assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
+            let recorded = milestones.lock().unwrap();
+            let recorded_denied = recorded.denied.as_ref().unwrap();
+            assert_eq!(recorded_denied.path.as_ref(), Some(expected.path()));
+            assert_eq!((recorded.calls, recorded.preparations), (0, 0));
         }
-        assert_eq!(progress, 0);
-        let denied = bodies.admit(&mixed).unwrap_err();
-        assert_eq!(denied.family, "path");
-        assert_eq!(denied.operation, path_operation_code(&operation));
-        assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
     }
+    let local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "unknown+", "/rules")).clone(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let held = original.clone();
+    let request_weak = Arc::downgrade(original);
+    for mixed in [
+        all.try_union(&local).unwrap(),
+        local.try_union(&all).unwrap(),
+    ] {
+        let (first, reason) = bodies
+            .first_denied_materialization_with_plan_matcher(
+                &mixed,
+                &generated_features_plan_matches,
+            )
+            .unwrap();
+        assert!(std::ptr::eq(first, original.as_ref()));
+        assert!(Arc::ptr_eq(
+            original,
+            mixed.repository_materializations().values().next().unwrap()
+        ));
+        assert_eq!(reason, "binding");
+        assert_eq!(bodies.admit(&mixed).unwrap_err().family, "materialization");
+        assert!(guarded.check_need(&mixed).is_err());
+        let recorded = milestones.lock().unwrap();
+        assert_eq!((recorded.calls, recorded.preparations), (0, 0));
+    }
+    drop(local);
+    assert!(request_weak.upgrade().is_some());
+    drop(held);
+    assert!(request_weak.upgrade().is_none());
+    let bodies_weak = Arc::downgrade(&bodies);
+    drop(guarded);
+    assert!(bodies_weak.upgrade().is_some());
+    drop(bodies);
+    assert!(bodies_weak.upgrade().is_none());
 }
 #[test]
 fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
