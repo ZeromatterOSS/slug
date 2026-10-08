@@ -242,7 +242,7 @@ struct AdditionalModule {
     file: NormalizedAbsolutePath,
 }
 // Finite imports declared by the observed defs/toolchain dependency family.
-const RULES_RUST_DEFS_IMPORTS: [&str; 31] = [
+const RULES_RUST_DEFS_IMPORTS: [&str; 33] = [
     "rust/toolchain.bzl",
     "rust/private/clippy.bzl",
     "rust/private/common.bzl",
@@ -274,6 +274,8 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 31] = [
     "rust/extensions.bzl",
     "rust/private/repositories.bzl",
     "rust/private/repository_utils.bzl",
+    "rust/private/nightly_versions.bzl",
+    "rust/private/known_shas.bzl",
 ];
 const RULES_RUST_IMPORT_METADATA: [&str; 3] = ["rust/private", "rust/platform", "rust/settings"];
 const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
@@ -1248,6 +1250,25 @@ impl Bodies {
             written_bytes: 16 << 20,
             live_buffer_bytes: 16 << 20,
             blocking_threads: Some(2),
+        }
+    }
+    fn source_scope(
+        &self,
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+    ) -> Result<Arc<SourceServiceScope>, SourceServiceError> {
+        if self.rules_rust_defs_import_sources {
+            SourceServiceScope::new_for_test_with_known_shas_allowance(
+                workspace,
+                work_deadline,
+                cleanup_deadline,
+                limits,
+                self.roots[1].dupe(),
+            )
+        } else {
+            SourceServiceScope::new_for_test(workspace, work_deadline, cleanup_deadline, limits)
         }
     }
     fn with_fourth(mut self, root: NormalizedAbsolutePath) -> Self {
@@ -2695,13 +2716,28 @@ fn observe_native_command(
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
     let limits = bodies.source_limits(registry_choice);
-    let scope = SourceServiceScope::new_for_test(
-        workspace.clone(),
-        start + Duration::from_secs(5),
-        start + Duration::from_secs(8),
-        limits,
-    )
-    .unwrap();
+    let scope = bodies
+        .source_scope(
+            workspace.clone(),
+            start + Duration::from_secs(5),
+            start + Duration::from_secs(8),
+            limits,
+        )
+        .unwrap();
+    let allowance = scope.known_shas_allowance_for_test();
+    assert_eq!(allowance.is_some(), bodies.rules_rust_defs_import_sources);
+    if let Some((selected_root, _)) = allowance {
+        assert_eq!(selected_root, &bodies.roots[1]);
+        assert!(std::ptr::eq(
+            selected_root.as_path(),
+            bodies.roots[1].as_path()
+        ));
+    }
+    println!(
+        "WP1017_HOST_OBJECT default_bytes=1048576 selected_bytes={} root_slot=1 relative=rust/private/known_shas.bzl enabled={}",
+        allowance.map_or(1 << 20, |(_, maximum)| maximum),
+        allowance.is_some(),
+    );
     if matches!(registry_choice, RegistryChoice::PreparedFile) {
         println!(
             "WP955_LIMITS registry_attempts={} source_attempts={} live_buffer_bytes={}",

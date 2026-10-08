@@ -338,9 +338,9 @@ fn scoped_file_bytes(
 
     let path = demand.path();
     #[cfg(test)]
-    let read = super::dice::source_service::read_host_file_with_charge_origin(
+    let read = super::dice::source_service::read_host_file_with_known_shas_allowance(
         scope,
-        path.as_path(),
+        demand,
         || {
             source_attempt_diagnostic::report(demand);
             on_first_refusal(demand);

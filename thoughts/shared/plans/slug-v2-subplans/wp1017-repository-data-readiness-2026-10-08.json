@@ -1,0 +1,291 @@
+{
+  "schema": 1,
+  "packet": "WP-7-241-m7a-normal-rustc-repository-data-source-readiness-r1",
+  "checkpoint": "WP1017",
+  "baseline": "b5e6b538efb37e5653bbd71236741b5e20c2267e",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest Linux exact finite readiness; existing Bazel9.2 projections unchanged",
+  "change": "RulesRust source role31\u219233 appends exact current nightly_versions/known_shas; construction-only selected-root Host FileBytes allowance4749878 retains every other Host/Registry1MiB bound and shared credited reader",
+  "allocation": {
+    "new_retained_owned_strings": 0,
+    "new_runtime_body_mirrors": 0,
+    "new_interner_cache_global_pool": 0,
+    "static_borrowed_descriptors": 2,
+    "selected_root": "Shared existing normalized root Arc/Dupe; original demand borrowed without joined path allocation",
+    "reader": "Pinned actual file length; full Vec\u2192Arc overlap reserved in existing bank",
+    "interner_discipline": "Use existing scoped interners for repeated retained strings; unique temporary table chunks are streamed/released, not pooled",
+    "native_retention_cause_unattributed": true
+  },
+  "validation": {
+    "Core": 92,
+    "directory_kernel_controls_in_Core": 4,
+    "file_kernel_controls_in_Core": 4,
+    "additional_kernel_runs": 0,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 97,
+    "qualified_prior_Workspace": 87,
+    "qualified_prior_Bzlmod": 5,
+    "qualified_prior_fresh_runs": 0,
+    "direct_compile": [
+      "Core",
+      "Loading",
+      "CLI"
+    ],
+    "preparation_seconds": {
+      "dependency": 2.2724782810546458,
+      "compile": 15.041472543030977,
+      "check": 7.602523962967098
+    },
+    "ordinary_seconds": 19.209875642089173,
+    "ordinary_peak_kib": 70448,
+    "strict_theme_seconds": 1.990646063000895,
+    "native_gate_records": 99,
+    "current_allphase_records": 101,
+    "current_failed_child_records": 0,
+    "current_capture_operations": 2,
+    "current_capture_decisions": 3,
+    "current_capture_observed": 2,
+    "current_capture_unavailable": 1,
+    "capture_test_credit": 0,
+    "direct_material_union": 825,
+    "selector76_only_allocator_override": "MALLOC_ARENA_MAX=2; caps/assertions/native environment unchanged"
+  },
+  "native": {
+    "seconds": 3.7667443730169907,
+    "conservative_peak_kib": 209600,
+    "rss_cap_kib": 262144,
+    "as_cap_bytes": 536870912,
+    "source_error": "None",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 118,
+      "transferred_bytes": 0,
+      "decoded_bytes": 6126320,
+      "written_bytes": 5448,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 11679531
+    },
+    "next_frontier": {
+      "capture": "captured",
+      "kind": "generated_file_effects",
+      "reason": "generated_kind",
+      "identities": {
+        "workspace": {
+          "length": 101,
+          "raw_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+        },
+        "canonical": {
+          "length": 32,
+          "raw_hex": "72756c65735f727573742b2b727573742b727573745f746f6f6c636861696e73"
+        },
+        "rule_repo": {
+          "length": 11,
+          "raw_hex": "72756c65735f727573742b"
+        },
+        "rule_package": {
+          "length": 12,
+          "raw_hex": "727573742f70726976617465"
+        },
+        "rule_target": {
+          "length": 20,
+          "raw_hex": "7265706f7369746f72795f7574696c732e627a6c"
+        },
+        "rule_name": {
+          "length": 24,
+          "raw_hex": "746f6f6c636861696e5f7265706f7369746f72795f687562"
+        },
+        "logical_root": {
+          "length": null,
+          "raw_hex": null
+        }
+      },
+      "raw_bytes_sum": 200,
+      "complete_identity_captured": true,
+      "first_offender_only": true,
+      "semantic_cause_chain_proved": false,
+      "source_availability_proved": false
+    },
+    "selected_host_object": {
+      "default_object_bytes": 1048576,
+      "selected_bytes": 4749878,
+      "root_slot": 1,
+      "relative": "rust/private/known_shas.bzl",
+      "enabled": true,
+      "scope_selection_reported": true,
+      "native_body_read_proved": false
+    },
+    "default_host_registry_object_bytes": 1048576,
+    "input_projected_cohort": 33,
+    "metadata_count": 3,
+    "source_limit": 128,
+    "full_producer_proved": false,
+    "whole_workload_fit_proved": false,
+    "body_witness": "unobserved",
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "timeout": {
+      "status": "available",
+      "armed": true,
+      "first_work": false,
+      "origin": false,
+      "overflow": false,
+      "sticky": false,
+      "site": 0,
+      "domain": 0,
+      "phase": 0,
+      "return": 0,
+      "origin_available": false,
+      "observer_frame_causal_pair_proved": false
+    },
+    "balanced_event_counters": [
+      5634,
+      5634,
+      1107,
+      1107,
+      4558,
+      4558
+    ],
+    "runtime_pins": 812
+  },
+  "source_capture_rows": [
+    {
+      "path": "rust/private/nightly_versions.bzl",
+      "bytes": 1033,
+      "sha256": "2a6a17ea96d50535fc1315556c2c48fd0adebecc4b5d6d20cbfafe1f9fc03f8a"
+    },
+    {
+      "path": "rust/private/known_shas.bzl",
+      "bytes": 4749878,
+      "sha256": "f35c95378eb10fd57f719e42fd88fea2b1c15b5049556daf8cdc18ef385ff446"
+    }
+  ],
+  "original_size_refusal_preserved": "Original1MiB capture refused before known_shas body; original pair FINAL rejects pair admission. Revised exact large stream independently accepted, no memory/time ceiling raise",
+  "leases": {
+    "count": 287,
+    "original_ordered_prefix": 285,
+    "appended_at_END": 2,
+    "same_context_counts": [
+      188,
+      99
+    ],
+    "scratch_bytes_each": 65536,
+    "physical_bytes": 6395771,
+    "bracket_bytes": 12791542,
+    "current_signatures_stable": true,
+    "immutable_historical_filesystem": false,
+    "documented_fd_opens": 4435
+  },
+  "root_only_corrections": {
+    "selector_census": "95\u219292: all prior file kernel controls already in91; one new selector only",
+    "record_census": "102\u219299 native gate records: four themes are one operation",
+    "prelaunch_note": "Missing legacy SOURCES[0] digest appended before launch; no source/helper change or gate rerun",
+    "author_handoff": "Moved concurrently overwritten author note to disjoint service-source-handoff path; Rust unaffected",
+    "reviewer_scheduling": "Completed reviewer required followup_task; send_message alone did not restart turn",
+    "extra_test_credit": 0,
+    "review_note_freeze": "Independent FINAL note added receipt/scheduling delta before final notification; root direct refs refreshed, no gate changes"
+  },
+  "evidence": {
+    "design.md": {
+      "path": "target/wp1017/native/design.md",
+      "sha256": "0abcd1e64cfcea5a68343afc516124d557daad6f2e18335d5c77eadc9e2e1fa4"
+    },
+    "inputs.json": {
+      "path": "target/wp1017/native/inputs.json",
+      "sha256": "6d67f85ee4a6c2632df87b280c775fb3603b9fa78ba7f85287914f52d9d40c60"
+    },
+    "selectors.json": {
+      "path": "target/wp1017/native/selectors.json",
+      "sha256": "904ed9ba028c7103dd5f60eaaded9b627769e5e071548aee20594d8703118f0f"
+    },
+    "implementation-source.md": {
+      "path": "target/wp1017/native/implementation-source.md",
+      "sha256": "ff1b4a2951e33e92d8704431bbb8c54f3d47a7c7777cab4de64035a84ca4a1a3"
+    },
+    "semantic-source-review.md": {
+      "path": "target/wp1017/native/semantic-source-review.md",
+      "sha256": "d53e6f42c43c3481049bd3405e436f6567421201dab622d1a6021e1949a7507d"
+    },
+    "static-evidence-review.md": {
+      "path": "target/wp1017/native/static-evidence-review.md",
+      "sha256": "03a40a4c86769e791aaa9e951a4843c3663843463cde1c1f8b780a2745c5a54d"
+    },
+    "preflight-source.md": {
+      "path": "target/wp1017/native/preflight-source.md",
+      "sha256": "291d57029b4f4cda8b787adad682c5f733ca52768a89e03ede90f20102949016"
+    },
+    "preflight-evidence.md": {
+      "path": "target/wp1017/native/preflight-evidence.md",
+      "sha256": "1b1b8d24b987cdfd2ffee4289ceb975823d35789a44d55e8b522c24a37aa4d80"
+    },
+    "final-source.md": {
+      "path": "target/wp1017/native/final-source.md",
+      "sha256": "84b505489be89c3f5ba61119e69befab4fca1a5ec13556bb1d7daef104f5372e"
+    },
+    "native-summary.json": {
+      "path": "target/wp1017/native/native-summary.json",
+      "sha256": "6de2edc399542f425298b0f3d87642a74004966732d39c5a319679af300ccbe0"
+    },
+    "native-operation.json": {
+      "path": "target/wp1017/native/native-operation.json",
+      "sha256": "fd7d35e054416cba4826dce3c6d3caee0e14372e3690ad2200d508940c4c4700"
+    },
+    "result.json": {
+      "path": "target/wp1017/native/result.json",
+      "sha256": "150b3a1e54d11a4ad28408e708341c508e3485bc39b3be02c7fddf80a96f523e"
+    },
+    "native.stdout": {
+      "path": "target/wp1017/native/native.stdout",
+      "sha256": "ab4d46b2020f1824b6ebaf943244a6a424752863ae2b9383955cb497eb6e0eef"
+    },
+    "activation.json": {
+      "path": "target/wp1017/native/activation.json",
+      "sha256": "e707a2696fa1e2fabb72421e5d9e1fee1b15984478dc2b8fd6418b728eb07938"
+    },
+    "final-evidence.md": {
+      "path": "target/wp1017/native/final-evidence.md",
+      "sha256": "92614ee5c20135bd528841063aae7c7e7453ec7c019c7acf07ba6f71afde1be9"
+    },
+    "operational-summary.json": {
+      "path": "target/wp1017/native/operational-summary.json",
+      "sha256": "779dedaab0cb48ff98af8be8964208816f3f75edef7db94ff16df3902f8b1122"
+    }
+  },
+  "source_reviews": {
+    "capture": {
+      "path": "target/wp1017/capture/final-evidence.md",
+      "sha256": "2b9809046952d1282ff92748c72e143b72c28430268424f00be42d0752c58ac7"
+    },
+    "large-capture": {
+      "path": "target/wp1017/large-capture/final-evidence.md",
+      "sha256": "894710183ada5f4b69e68eb00974c225d346acc41089a45fb130197dffd84ef1"
+    }
+  },
+  "successor": {
+    "path": "target/wp1017/next-source.md",
+    "sha256": "aea58f602a02b39770a419f0b1bccf20a8efa7d708d0a955f524b813c7b1f74e"
+  },
+  "limits_unchanged": true,
+  "residuals": [
+    "Exact ordered generated toolchain_repository_hub plan/RepoSpec and bounded natural materialization/same-epoch namespace readiness",
+    "Normal public Rustc/support/data/provider/action/runfiles and same-DICE2024\u21922021\u21922024",
+    "Source certificate/caller/body Weak/evaluation retention and full workload fit"
+  ],
+  "timing": {
+    "artifact_span_seconds": 4253.121406555176,
+    "artifact_span_includes_review_scheduling_gaps": true,
+    "independent_review_elapsed_not_measured": true
+  },
+  "growth": {
+    "Rust_net": 364,
+    "service_and_service_tests_net": 297,
+    "existing_cfgtest_parents_net": 67,
+    "cohesive_reader_lifecycle_review_accepted": true
+  }
+}

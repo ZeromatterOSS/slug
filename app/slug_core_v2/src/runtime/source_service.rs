@@ -49,11 +49,15 @@ pub(in crate::runtime) use registry_association::RegistryLimitRelation;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use registry_association::RegistryRequestAssociation;
 pub(in crate::runtime) use regular_file::HOST_FILE_OBJECT_BYTES;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use regular_file::KNOWN_SHAS_OBJECT_BYTES;
 pub(in crate::runtime) use regular_file::RegularFileError;
 pub(in crate::runtime) use regular_file::RegularFileStage;
 pub(in crate::runtime) use regular_file::read_host_file;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use regular_file::read_host_file_with_charge_origin;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceServiceCounters;

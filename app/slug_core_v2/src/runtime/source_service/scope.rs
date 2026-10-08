@@ -190,6 +190,8 @@ pub(in crate::runtime) struct SourceServiceScope {
     state: Mutex<ScopeState>,
     #[cfg(all(test, target_os = "linux"))]
     registry_association: std::sync::OnceLock<std::sync::Weak<super::RegistryRequestAssociation>>,
+    #[cfg(all(test, target_os = "linux"))]
+    known_shas_root: Option<NormalizedAbsolutePath>,
 }
 impl SourceServiceScope {
     pub(super) fn new(
@@ -219,6 +221,8 @@ impl SourceServiceScope {
             state: Mutex::new(ScopeState::default()),
             #[cfg(all(test, target_os = "linux"))]
             registry_association: std::sync::OnceLock::new(),
+            #[cfg(all(test, target_os = "linux"))]
+            known_shas_root: None,
         }))
     }
     #[cfg(test)]
@@ -229,6 +233,48 @@ impl SourceServiceScope {
         limits: SourceServiceLimits,
     ) -> Result<Arc<Self>, SourceServiceError> {
         Self::new(workspace, work_deadline, cleanup_deadline, limits)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn new_for_test_with_known_shas_allowance(
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+        selected_rules_rust_root: NormalizedAbsolutePath,
+    ) -> Result<Arc<Self>, SourceServiceError> {
+        let mut scope = Self::new(workspace, work_deadline, cleanup_deadline, limits)?;
+        // Construction owns the sole Arc. No allowance setter survives publication.
+        Arc::get_mut(&mut scope)
+            .expect("new source scope is uniquely owned")
+            .known_shas_root = Some(selected_rules_rust_root);
+        Ok(scope)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn known_shas_allowance_for_test(
+        &self,
+    ) -> Option<(&NormalizedAbsolutePath, usize)> {
+        self.known_shas_root
+            .as_ref()
+            .map(|root| (root, super::regular_file::KNOWN_SHAS_OBJECT_BYTES))
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn known_shas_object_bytes_for_test(
+        &self,
+        demand: &slug_workspace_v2::PathObservationDemand,
+    ) -> Option<usize> {
+        use slug_workspace_v2::PathObservationNamespace;
+        use slug_workspace_v2::PathObservationOperation;
+        let (root, maximum) = self.known_shas_allowance_for_test()?;
+        (demand.namespace() == PathObservationNamespace::Host
+            && demand.operation() == PathObservationOperation::FileBytes
+            && demand
+                .path()
+                .as_path()
+                .strip_prefix(root.as_path())
+                .is_ok_and(|relative| {
+                    relative == std::path::Path::new("rust/private/known_shas.bzl")
+                }))
+        .then_some(maximum)
     }
     pub(in crate::runtime) fn workspace(&self) -> &NormalizedAbsolutePath {
         &self.workspace

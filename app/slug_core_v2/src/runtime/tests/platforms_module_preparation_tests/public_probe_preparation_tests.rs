@@ -4390,7 +4390,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 65);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 69);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -4464,6 +4464,26 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
         ),
         (
             "/other/rust/private/repository_utils.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/NIGHTLY_versions.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/nightly_versions.bzl.extra",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/rust/private/known_shas.bzl/child",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/rust/private/known_shas.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/other/rust/private/known_shas.bzl",
             PathObservationOperation::FileBytes,
         ),
         (
@@ -4585,14 +4605,25 @@ fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
             (SourceCounter::DecodedBytes, 16 << 20),
         ] {
             let start = Instant::now();
-            let scope = SourceServiceScope::new_for_test(
-                path("/fixture"),
-                start + Duration::from_secs(2),
-                start + Duration::from_secs(3),
-                limits,
-            )
-            .unwrap();
+            let scope = bodies
+                .source_scope(
+                    path("/fixture"),
+                    start + Duration::from_secs(2),
+                    start + Duration::from_secs(3),
+                    limits,
+                )
+                .unwrap();
             assert_eq!(scope.limits(), limits);
+            let allowance = scope.known_shas_allowance_for_test();
+            assert_eq!(allowance.is_some(), attempts == 128);
+            if let Some((selected_root, maximum)) = allowance {
+                assert_eq!(maximum, 4_749_878);
+                assert_eq!(selected_root, &bodies.roots[1]);
+                assert!(std::ptr::eq(
+                    selected_root.as_path(),
+                    bodies.roots[1].as_path()
+                ));
+            }
             scope.charge(counter, maximum).unwrap();
             assert_eq!(
                 scope.charge(counter, 1),

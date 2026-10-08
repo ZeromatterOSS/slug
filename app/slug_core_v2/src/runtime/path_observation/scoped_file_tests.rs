@@ -227,3 +227,177 @@ fn source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal()
     );
     assert_eq!(calls.get(), 1);
 }
+
+#[test]
+fn known_shas_host_object_allowance_is_exact_and_scoped() {
+    use crate::runtime::dice::source_service::KNOWN_SHAS_OBJECT_BYTES;
+
+    let directory = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(directory.path().to_path_buf()).unwrap();
+    let root = NormalizedAbsolutePath::new(directory.path().join("rules")).unwrap();
+    let file = root.as_path().join("rust/private/known_shas.bzl");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let input = std::fs::File::create(&file).unwrap();
+    input.set_len(KNOWN_SHAS_OBJECT_BYTES as u64).unwrap();
+    drop(input);
+    let selected = |limits| {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        SourceServiceScope::new_for_test_with_known_shas_allowance(
+            workspace.clone(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            limits,
+            root.clone(),
+        )
+        .unwrap()
+    };
+    let demand = bytes_demand(&file);
+    let default = scope(&workspace);
+    assert!(default.known_shas_allowance_for_test().is_none());
+    assert!(default.known_shas_object_bytes_for_test(&demand).is_none());
+    assert_eq!(
+        observe_native_scoped(&directory, [], [demand.clone()], Some(&default)),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Limit(SourceCounter::DecodedBytes,)
+        ))
+    );
+    assert_eq!(default.snapshot().decoded_bytes, 0);
+
+    let owner = selected(SourceServiceLimits::default());
+    let (borrowed_root, maximum) = owner.known_shas_allowance_for_test().unwrap();
+    assert_eq!(borrowed_root, &root);
+    assert!(std::ptr::eq(borrowed_root.as_path(), root.as_path()));
+    assert_eq!(maximum, KNOWN_SHAS_OBJECT_BYTES);
+    assert_eq!(owner.limits().registry_object_bytes, 1 << 20);
+    assert_eq!(
+        owner.known_shas_object_bytes_for_test(&demand),
+        Some(maximum)
+    );
+    for operation in [
+        PathObservationOperation::Lstat,
+        PathObservationOperation::FileDigest,
+        PathObservationOperation::DirectoryEntries,
+        PathObservationOperation::ReadLink,
+    ] {
+        let invalid = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            demand.path().clone(),
+            operation,
+        );
+        assert!(owner.known_shas_object_bytes_for_test(&invalid).is_none());
+    }
+    for relative in [
+        "rust/private/known_shas.bzl/child",
+        "rust/private/known_shas.bzl.extra",
+        "rust/private/KNOWN_SHAS.bzl",
+        "rust/private/nightly_versions.bzl",
+    ] {
+        assert!(
+            owner
+                .known_shas_object_bytes_for_test(&bytes_demand(&root.as_path().join(relative)))
+                .is_none()
+        );
+    }
+    let wrong_root = bytes_demand(
+        &directory
+            .path()
+            .join("rules-other/rust/private/known_shas.bzl"),
+    );
+    assert!(
+        owner
+            .known_shas_object_bytes_for_test(&wrong_root)
+            .is_none()
+    );
+    let materialized = PathObservationDemand::new(
+        PathObservationNamespace::Materialization(PathObservationInstanceId::new(1)),
+        demand.path().clone(),
+        PathObservationOperation::FileBytes,
+    );
+    assert!(
+        owner
+            .known_shas_object_bytes_for_test(&materialized)
+            .is_none()
+    );
+    // This instance is known. Refusal must come from the default object cap,
+    // not from the whole-set unknown-instance check.
+    let isolated = selected(SourceServiceLimits::default());
+    assert_eq!(
+        observe_native_scoped(
+            &directory,
+            [(PathObservationInstanceId::new(1), root.clone())],
+            [materialized],
+            Some(&isolated),
+        ),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Limit(SourceCounter::DecodedBytes,)
+        ))
+    );
+    assert_eq!(isolated.snapshot().decoded_bytes, 0);
+
+    let epoch = observe_native_scoped(&directory, [], [demand.clone()], Some(&owner)).unwrap();
+    let PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) =
+        epoch.get(&demand).unwrap().as_ref()
+    else {
+        panic!("selected Host source did not produce bytes");
+    };
+    assert_eq!(bytes.len(), maximum);
+    assert!(bytes.iter().all(|byte| *byte == 0));
+    let held = bytes.clone();
+    assert!(Arc::ptr_eq(bytes, &held));
+    let weak = Arc::downgrade(bytes);
+    assert_eq!(owner.snapshot().decoded_bytes, maximum as u64);
+    assert_eq!(owner.snapshot().source_attempts, 1);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    drop(epoch);
+    assert!(weak.upgrade().is_some());
+    let scope_weak = Arc::downgrade(&owner);
+    drop(owner);
+    assert!(scope_weak.upgrade().is_none());
+    assert_eq!(held.len(), maximum);
+    drop(held);
+    assert!(weak.upgrade().is_none());
+
+    // The selected maximum does not supersede cumulative byte history.
+    let limited = selected(SourceServiceLimits {
+        decoded_bytes: 1,
+        ..SourceServiceLimits::default()
+    });
+    assert_eq!(
+        observe_native_scoped(&directory, [], [demand.clone()], Some(&limited)),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Limit(SourceCounter::DecodedBytes,)
+        ))
+    );
+    assert_eq!(limited.snapshot().decoded_bytes, 0);
+    assert_eq!(limited.snapshot().live_buffer_bytes, 0);
+
+    // One oversized selected member aborts the original whole-set operation;
+    // it cannot return an epoch containing the other successfully read member.
+    let other = root.as_path().join("a");
+    std::fs::write(&other, b"x").unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_len(KNOWN_SHAS_OBJECT_BYTES as u64 + 1)
+        .unwrap();
+    let oversized = selected(SourceServiceLimits::default());
+    assert_eq!(
+        observe_native_scoped(
+            &directory,
+            [],
+            [bytes_demand(&other), demand],
+            Some(&oversized)
+        ),
+        Err(PathObservationKernelError::SourceService(
+            SourceServiceError::Limit(SourceCounter::DecodedBytes,)
+        ))
+    );
+    assert_eq!(oversized.snapshot().source_attempts, 2);
+    assert_eq!(oversized.snapshot().decoded_bytes, 1);
+    assert_eq!(oversized.snapshot().live_buffer_bytes, 0);
+    assert_eq!(
+        oversized.check(),
+        Err(SourceServiceError::Limit(SourceCounter::DecodedBytes))
+    );
+}

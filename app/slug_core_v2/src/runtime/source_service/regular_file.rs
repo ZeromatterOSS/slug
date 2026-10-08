@@ -12,6 +12,8 @@ use super::SourceServiceError;
 use super::SourceServiceScope;
 
 pub(in crate::runtime) const HOST_FILE_OBJECT_BYTES: usize = 1 << 20;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) const KNOWN_SHAS_OBJECT_BYTES: usize = 4_749_878;
 const CHUNK_BYTES: usize = 64 << 10;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -48,36 +50,52 @@ impl From<SourceServiceError> for RegularFileError {
 pub(super) enum ReadPolicy {
     Registry,
     Host,
+    #[cfg(all(test, target_os = "linux"))]
+    KnownShas,
 }
 impl ReadPolicy {
+    fn is_host(self) -> bool {
+        match self {
+            Self::Registry => false,
+            Self::Host => true,
+            #[cfg(all(test, target_os = "linux"))]
+            Self::KnownShas => true,
+        }
+    }
     fn maximum(self, scope: &SourceServiceScope) -> usize {
         match self {
             Self::Registry => scope.limits().registry_object_bytes as usize,
             Self::Host => HOST_FILE_OBJECT_BYTES,
+            #[cfg(all(test, target_os = "linux"))]
+            Self::KnownShas => KNOWN_SHAS_OBJECT_BYTES,
         }
     }
     fn counter(self) -> SourceCounter {
-        match self {
-            Self::Registry => SourceCounter::RegistryBytes,
-            Self::Host => SourceCounter::DecodedBytes,
+        if self.is_host() {
+            SourceCounter::DecodedBytes
+        } else {
+            SourceCounter::RegistryBytes
         }
     }
     fn capture_site(self) -> SourceBufferSite {
-        match self {
-            Self::Registry => SourceBufferSite::RegistryCapture,
-            Self::Host => SourceBufferSite::HostCapture,
+        if self.is_host() {
+            SourceBufferSite::HostCapture
+        } else {
+            SourceBufferSite::RegistryCapture
         }
     }
     fn arc_site(self) -> SourceBufferSite {
-        match self {
-            Self::Registry => SourceBufferSite::RegistryArc,
-            Self::Host => SourceBufferSite::HostArc,
+        if self.is_host() {
+            SourceBufferSite::HostArc
+        } else {
+            SourceBufferSite::RegistryArc
         }
     }
     fn read_site(self) -> SourceBufferSite {
-        match self {
-            Self::Registry => SourceBufferSite::RegistryFileRead,
-            Self::Host => SourceBufferSite::HostFileRead,
+        if self.is_host() {
+            SourceBufferSite::HostFileRead
+        } else {
+            SourceBufferSite::RegistryFileRead
         }
     }
 }
@@ -112,7 +130,7 @@ impl Capture {
         if bytes.capacity() > maximum {
             return Err(scope.poison(SourceServiceError::Allocation));
         }
-        if matches!(policy, ReadPolicy::Host) {
+        if policy.is_host() {
             scope.check()?;
         }
         Ok(Self {
@@ -169,6 +187,30 @@ pub(in crate::runtime) fn read_host_file_with_charge_origin(
     path: &Path,
     on_first_refusal: impl FnOnce(),
 ) -> Result<Arc<[u8]>, RegularFileError> {
+    read_host_with_charge_origin(scope, path, ReadPolicy::Host, on_first_refusal)
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) fn read_host_file_with_known_shas_allowance(
+    scope: &Arc<SourceServiceScope>,
+    demand: &slug_workspace_v2::PathObservationDemand,
+    on_first_refusal: impl FnOnce(),
+) -> Result<Arc<[u8]>, RegularFileError> {
+    let policy = if scope.known_shas_object_bytes_for_test(demand).is_some() {
+        ReadPolicy::KnownShas
+    } else {
+        ReadPolicy::Host
+    };
+    read_host_with_charge_origin(scope, demand.path().as_path(), policy, on_first_refusal)
+}
+
+#[cfg(all(test, target_os = "linux"))]
+fn read_host_with_charge_origin(
+    scope: &Arc<SourceServiceScope>,
+    path: &Path,
+    policy: ReadPolicy,
+    on_first_refusal: impl FnOnce(),
+) -> Result<Arc<[u8]>, RegularFileError> {
     let (admission, created) = scope.charge_source_attempt_with_origin();
     if let Err(error) = admission {
         if created {
@@ -176,7 +218,7 @@ pub(in crate::runtime) fn read_host_file_with_charge_origin(
         }
         return Err(RegularFileError::Scope(error));
     }
-    read_regular(scope, path, ReadPolicy::Host)
+    read_regular(scope, path, policy)
 }
 
 #[cfg(target_os = "linux")]
@@ -212,11 +254,11 @@ fn checked_io<T>(
     message: &'static str,
     operation: impl FnOnce() -> io::Result<T>,
 ) -> Result<T, RegularFileError> {
-    if matches!(policy, ReadPolicy::Host) {
+    if policy.is_host() {
         scope.check()?;
     }
     let result = operation();
-    if matches!(policy, ReadPolicy::Host) {
+    if policy.is_host() {
         scope.check()?;
     }
     result.map_err(|error| RegularFileError::Io {
@@ -308,9 +350,10 @@ fn read_regular_with(
     if identity(&reopened) != identity(&before) {
         return Err(RegularFileError::Changed { before_read: true });
     }
-    let capacity = match policy {
-        ReadPolicy::Host => before.len() as usize,
-        ReadPolicy::Registry => policy.maximum(scope),
+    let capacity = if policy.is_host() {
+        before.len() as usize
+    } else {
+        policy.maximum(scope)
     };
     let mut buffer = Capture::with_capacity(scope, policy, capacity)?;
     let _read_credit = scope.reserve_buffer_at(CHUNK_BYTES, policy.read_site())?;
@@ -321,19 +364,19 @@ fn read_regular_with(
         // Registry keeps its original full chunk, including overflow rejection
         // before any charge. Host reads its pinned length plus one EOF probe.
         let remaining = capacity - buffer.bytes.len();
-        let requested = match policy {
-            ReadPolicy::Registry => CHUNK_BYTES,
-            ReadPolicy::Host if remaining == 0 => 1,
-            ReadPolicy::Host => remaining.min(CHUNK_BYTES),
+        let requested = if !policy.is_host() {
+            CHUNK_BYTES
+        } else if remaining == 0 {
+            1
+        } else {
+            remaining.min(CHUNK_BYTES)
         };
         let result = read(&mut input, &mut chunk[..requested]);
-        if matches!(policy, ReadPolicy::Host) || result.is_ok() {
+        if policy.is_host() || result.is_ok() {
             scope.check()?;
         }
         let count = match result {
-            Err(e)
-                if matches!(policy, ReadPolicy::Host) && e.kind() == io::ErrorKind::Interrupted =>
-            {
+            Err(e) if policy.is_host() && e.kind() == io::ErrorKind::Interrupted => {
                 continue;
             }
             other => other.map_err(|error| RegularFileError::Io {
@@ -343,13 +386,13 @@ fn read_regular_with(
             })?,
         };
         hook(ReadPoint::AfterRead, &input);
-        if matches!(policy, ReadPolicy::Host) {
+        if policy.is_host() {
             scope.check()?;
         }
         if count == 0 {
             break;
         }
-        if matches!(policy, ReadPolicy::Host) && count > remaining {
+        if policy.is_host() && count > remaining {
             return Err(RegularFileError::Changed { before_read: false });
         }
         buffer.append(scope, &chunk[..count])?;
@@ -365,7 +408,7 @@ fn read_regular_with(
         return Err(RegularFileError::Changed { before_read: false });
     }
     hook(ReadPoint::BeforeConversion, &input);
-    if matches!(policy, ReadPolicy::Host) {
+    if policy.is_host() {
         let named = match checked_io(
             scope,
             policy,
@@ -388,7 +431,7 @@ fn read_regular_with(
         }
     }
     let result = buffer.finish(scope)?;
-    if matches!(policy, ReadPolicy::Host) {
+    if policy.is_host() {
         scope.check()?;
     }
     Ok(result)

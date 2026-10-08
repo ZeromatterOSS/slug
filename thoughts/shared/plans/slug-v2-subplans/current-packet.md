@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-241-m7a-normal-rustc-repository-data-source-readiness-r1
-Status: Integrated design and bounded Rust repository data readiness
+Status: Accepted bounded Rust repository data readiness; next hub plan projection
 
 ## Observable and source basis
 
@@ -44,99 +44,33 @@ REAPI and M7A/full-root remain open.
 
 ## Immediate accepted checkpoint
 
-[WP1016](wp1016-extension-source-readiness-2026-10-08.json) admits exactly the three
-strictly captured extension/repositories/repository_utils leaves through the existing
-RulesRust role28→31; metadata3 and default/role/readiness unchanged. Independent
-FINAL accepts Core91 (including4kernelcontrols), four decoder themes and one normal
-native replay. Native3.54542s/conservative144472KiB under256MiB, SourceErrorNone,
-source116/1375409decoded, advances to originalHostroot1/rust/private/known_shas.bzl
-215B Lstat. All285 source brackets are current/stable, original282literalprefix+3END,
-SAMEtwo64KiB188+97/1644860physical/3289720bracket. Two capture operations/three eligible
-observations have zero test credit;100allphase records/96names/no failed child.
-Missing cohort note was resolved/reviewed before activation; two root diagnostic
-corrections had no extra gate credit. Body/caller/certificate/producer/whole-fit remain
-open. Newstatic3borroweddescriptors/no retainedString/path/cache/interner. Prefixfit
-permits continued bounded work, not whole-workload memory acceptance.
+[WP1017](wp1017-repository-data-readiness-2026-10-08.json) source/service delta passes Core92, four strict decoder themes and one
+normal native replay. Current exact nightly1033B and known_shas4749878B signatures
+admit cohort33/meta3/union69. Construction-only selected-root Host FileBytes allowance
+4749878 uses existing credited reader, shared normalized root and original demand;
+every unrelated Host/Registry default remains1MiB. No retained owned strings, body
+mirror or global pool. Original1MiB capture refusal remains preserved; bounded64KiB
+fullEOF/SHA/UTF8 observation independently accepted the exact large candidate.
 
-## Active integrated decision
+Native3.766744373s/conservative209600KiB under262144KiB, SourceErrorNone,
+source118/6126320decoded and bankpeak11679531/end0. SourceWeak unseen; actual Scope/
+recorderWeak expire. All287 ordered source signatures remain stable, original285
+prefix+2END in SAMEtwo64KiB188+99/6395771physical/12791542bracket. Current99nativegate/
+101allphase records/97names; zero failed current children. Historical parser samehash,
+Workspace87/Bzlmod5 and saved reader proofs are qualified0fresh, not current wholefit.
 
-Continue the two generated repository-data source prerequisites as one finite cohort.
-[The source recommendation](../../../../target/wp1016/successor-source.md), SHA256
-bdfaeabfaeab2005cb8970c9506c604669d0823fd426ec30d9b384ff75711931,
-binds actual result/rawoperation/root source qualification plus saved strict partial
-load declarations. First freeze the ordered exact pair in saved first-appearance order:
-`rust/private/nightly_versions.bzl` (repositories.bzl:7), then
-`rust/private/known_shas.bzl` (repository_utils.bzl:16), three components each.
-The actual Need matches member/index1; declaration order is not evaluation order.
-Current availability/kind/size/SHA/string cardinality are unknown. Both must have actual
-strict usable eligibility and independent capture FINAL before code/config grants.
+The exact typed frontier is GeneratedFileEffects/generated_kind for original
+rules_rust++rust+rust_toolchains, rule @rules_rust+//rust/private:repository_utils.bzl
+%toolchain_repository_hub. Original mapping/attributes/ordered plan are unreported.
+Next project that already-owned plan through the existing borrowed bounded formatter
+before deciding finite materialization and same-epoch namespace permission. No new
+source capture or recursive grant is grounded. Normal public Rustc/support/data/
+action/runfiles/same-DICE edition restoration, body/caller/certificate and full-fit
+remain open. Independent actual FINAL accepts this bounded checkpoint; normal-producer milestone remains open.
 
-Reuse unchanged anchored regular reader/fullEOF/SHA/ancestor brackets/strictUTF8,
-object1MiB/aggregate16MiB/facts256KiB/one64KiB scratch/per-row body/text/AST retirement.
-Distinguish usable observed/genuine unavailable/bounds/refused/changed/unknown decisions;
-passNone/zero tests. No scan, recursive imports, foreign acquisition, download, generated
-provider/registration, cache/output fabrication, or current caller claim. Distinct
-@bazel_tools mapped/Builtin authority remains separate. A bound or unsupported source
-cannot be silently treated as usable. Capture10s/sharedabsolute3scleanup/AS512MiB/
-RSS256MiB/log/report/FSIZE and all native/source caps remain unchanged.
-
-Conditional existing source role31→33 appends borrowed static literals in pair order;
-first31 literal and full signature order stays unchanged, metadata3 unchanged. Same
-defaultfalse PreparedFile AND PublicProbe flag/independentreadiness/exactHostroot1
-Lstat+FileBytes/source128/default16/production64; no newflag or prefix grant.
-Original selected/canonical ExternalBzl typed mapping, Need/request/certificate/epoch,
-EvalObservation and promotion owners remain authoritative. Mutable filesystem is not
-historical snapshot; eventual native validates all current hashes/ancestor brackets.
-Compatibility remains Slug-native cfgtest Linux readiness; accepted Bazel9.2 exact class
-fields and unsupported/deferred boundaries stay unchanged.
-
-Rust allowlist ONLY the two existing Core cfgtest parents:
-`app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs` and
-`app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs`.
-Existing allmember11roots/4modes/8ops/namespaces matrix naturally covers33; union65→69,
-all91 selectors unchanged. Preserve all previous negatives/pointers/Weak/zero-progress,
-add only demonstrated new spelling/child/digest/wrongroot gaps in the existing selector.
-Existing large parents retain cohesive static cohort/matrix ownership; no new test suite.
-Estimate parent2–5/public10–40 lines, review triggers not ceilings. No production/kernel/
-DICE/Workspace/Loading/Bzlmod/Windows edit, retainedString/path/container/cache/interner/
-plan/body/output mirror, new Boolean, or borrowed scratch escape. Nominal additional
-2*16B static descriptors/literal storage are qualified for pooling/layout.
-
-Root owns minimum ignored target/wp1017 capture/native helpers/configs. Current private
-natural decoder validates exact ordered33 root/path/bytes/SHA signatures before input-
-projected RulesRust cohort/count and forged-denial checks. No standalone raw table
-marker, stdout rewrite, historical file mutation, or private semantic cache. Other
-CPU/OS/host/legacy fields stay unchanged. Preserve four strict decoder themes.
-Original285 FD signature order is a literal prefix; append eligible pair ONLY at END
-for287=188+99 in SAMEtwo64KiB contexts. Actual byte totals remain unknown until capture.
-
-Unknown generated tables may retain many distinct strings/interpreted values. Before
-activation, inspect captured sizes/facts within the existing budget; preserve borrowed/
-transferred/shared values and use existing scoped interners when repetition/lifetime
-fit. A global pool of unique transient data is unsuitable. Actual141MiB prefix leaves
-memory headroom but does not prove next tables/fullproducer fit. Source116/128 leaves
-12 numeric attempts, not12 unique files or closure sufficiency. Do not raise ceilings
-or repeat an identical failed replay. Unsupported size/owner/facts or resource refusal
-requires an explicit bounded correction/REPLAN within existing authorization.
-
-## Gates, caps and decision boundaries
-
-Freeze integrated design/inactive capture helper package; independent consequential
-DESIGN/helper/prelaunch before targetIO/helper execution. Root sole reviewed activation
-and one fixed2 capture. Actual capture FINAL precedes atomic code/signature activation.
-Reuse qualifiedreader11/oldcaptures0fresh; no old executable/map-target traversal.
-Same reviewer actual source/helper/current prelaunch/FINAL; root notes have no independent
-review credit. One cohesive cohort, no separate observer/cause packet.
-
-Resolve pinned rustup tools. Serial offline/jobs1 preparation<=60s, current unique
-CargoJSON Core/batched91 preflight/list/all91 ordinary+4 decoder themes/directLoading/
-CoreCLIcompile. Four kernel controls insideCore91/zeroextra; Workspace87/other historical
-owner proofs qualified0fresh. Existing selector76-only MALLOC_ARENA_MAX2/caps/assertions
-unchanged, nativeenvironment unchanged. At most one changed normal native after all
-current gates and independent prelaunch. Preserve failure/correction history; rerun
-only affected gates. CompilerRSS is not runtime fit.
-
-Work5s/lifetime8s/native10s/sharedcleanup3s/RSS256MiB/AS512MiB/source128/default16/
-production64/registry128/object1MiB/eachbank16MiB/log1MiBeach/report4MiB/FSIZE16MiB.
-Full normal Rustc/support/data/provider/toolchain/action/runfiles/sameDICE edition
-2024→2021→2024/fullCLI/compilerexecution/M7A/MVS/provenance/wholefit remain active.
+Work5/lifetime8/native10/absolutecleanup3/RSS256MiB/AS512MiB/source128/default16/
+production64/Registry1MiB/eachbank16MiB/log1MiB/report4MiB/FSIZE16MiB unchanged.
+Prefix memory fits; broader source-grounded work may continue with borrow/transfer/
+share and existing scoped interners when repetition/lifetime fit. Unknown plan shape
+is an implementation prerequisite, not a grant. Preserve any changed native refusal
+once; no identical retry or resource-ceiling raise.

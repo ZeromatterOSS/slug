@@ -22,6 +22,16 @@ fn scope(limits: SourceServiceLimits) -> Arc<SourceServiceScope> {
 fn host_with(
     owner: &Arc<SourceServiceScope>,
     path: &Path,
+    hook: impl FnMut(ReadPoint, &std::fs::File),
+    read: impl FnMut(&mut std::fs::File, &mut [u8]) -> io::Result<usize>,
+) -> Result<Arc<[u8]>, RegularFileError> {
+    host_with_policy(owner, path, ReadPolicy::Host, hook, read)
+}
+
+fn host_with_policy(
+    owner: &Arc<SourceServiceScope>,
+    path: &Path,
+    policy: ReadPolicy,
     mut hook: impl FnMut(ReadPoint, &std::fs::File),
     read: impl FnMut(&mut std::fs::File, &mut [u8]) -> io::Result<usize>,
 ) -> Result<Arc<[u8]>, RegularFileError> {
@@ -30,7 +40,7 @@ fn host_with(
     let result = read_regular_with(
         owner,
         path,
-        ReadPolicy::Host,
+        policy,
         |point, file| {
             if point == ReadPoint::Pinned {
                 fds[0] = Some(file.as_raw_fd());
@@ -55,11 +65,23 @@ fn host_with(
 fn scoped_host_regular_bytes_empty_and_maximum_keep_accounting_and_owner_domains() {
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join(".bazelignore");
-    for length in [0, 257, HOST_FILE_OBJECT_BYTES] {
+    for (policy, length) in [
+        (ReadPolicy::Host, 0),
+        (ReadPolicy::Host, 257),
+        (ReadPolicy::Host, HOST_FILE_OBJECT_BYTES),
+        (ReadPolicy::KnownShas, KNOWN_SHAS_OBJECT_BYTES),
+    ] {
         let bytes = (0..length).map(|i| (i % 251) as u8).collect::<Vec<_>>();
         std::fs::write(&path, &bytes).unwrap();
         let owner = scope(SourceServiceLimits::default());
-        let value = host_with(&owner, &path, |_, _| {}, |file, bytes| file.read(bytes)).unwrap();
+        let value = host_with_policy(
+            &owner,
+            &path,
+            policy,
+            |_, _| {},
+            |file, bytes| file.read(bytes),
+        )
+        .unwrap();
         assert_eq!(value.as_ref(), bytes.as_slice());
         let counters = owner.snapshot();
         assert_eq!(
@@ -319,21 +341,29 @@ fn scoped_host_conversion_overlap_and_cumulative_history_are_bounded() {
     assert_eq!(owner.snapshot().registry_attempts, 0);
     let length = 4096;
     std::fs::write(&path, vec![0x5a; length]).unwrap();
-    let ceiling = length * 2 + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES + 63;
-    let owner = scope(SourceServiceLimits {
-        live_buffer_bytes: ceiling,
-        ..SourceServiceLimits::default()
-    });
-    assert!(matches!(
-        host_with(&owner, &path, |_, _| {}, |file, bytes| file.read(bytes)),
-        Err(RegularFileError::Scope(SourceServiceError::BufferLimit))
-    ));
-    assert_eq!(owner.snapshot().decoded_bytes, length as u64);
-    assert_eq!(
-        owner.snapshot().peak_buffer_bytes,
-        length + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES
-    );
-    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    for policy in [ReadPolicy::Host, ReadPolicy::KnownShas] {
+        let ceiling = length * 2 + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES + 63;
+        let owner = scope(SourceServiceLimits {
+            live_buffer_bytes: ceiling,
+            ..SourceServiceLimits::default()
+        });
+        assert!(matches!(
+            host_with_policy(
+                &owner,
+                &path,
+                policy,
+                |_, _| {},
+                |file, bytes| file.read(bytes)
+            ),
+            Err(RegularFileError::Scope(SourceServiceError::BufferLimit))
+        ));
+        assert_eq!(owner.snapshot().decoded_bytes, length as u64);
+        assert_eq!(
+            owner.snapshot().peak_buffer_bytes,
+            length + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES
+        );
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
 }
 
 #[test]
