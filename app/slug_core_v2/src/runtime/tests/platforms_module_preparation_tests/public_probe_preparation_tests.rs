@@ -239,7 +239,7 @@ impl NamespacePolicy {
     fn admits(self, operation: &PathObservationOperation) -> bool {
         self.owner_plan_allowed
             && match self.path_class {
-                "ancestor" | "root" | "repo_marker" | "ignore_marker" => {
+                "ancestor" | "root" | "repo_marker" | "ignore_marker" | "package_marker" => {
                     operation == &PathObservationOperation::Lstat
                 }
                 "fixed_file" => matches!(
@@ -310,6 +310,10 @@ fn namespace_policy(
             && relative == Path::new(".bazelignore")
         {
             "ignore_marker"
+        } else if std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
+            && relative == Path::new("BUILD.bazel")
+        {
+            "package_marker"
         } else if files
             .iter()
             .any(|file| Path::new(file.0).starts_with(relative))
@@ -1551,6 +1555,23 @@ async fn namespace_owner_read_uses_current_transaction() {
                     matches!(owner, 3 | 4) && index != 1
                 );
             }
+            if owner == 4 {
+                let candidate = PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(instance),
+                    NormalizedAbsolutePath::new("/generation/BUILD.bazel").unwrap(),
+                    PathObservationOperation::Lstat,
+                );
+                assert_eq!(
+                    namespace_policy(
+                        &bodies,
+                        &candidate,
+                        Some(&current),
+                        &small_namespace_plan_matches
+                    )
+                    .admits(&candidate.operation()),
+                    index != 1
+                );
+            }
             if index == 0 {
                 old = Some(current);
             }
@@ -1826,7 +1847,10 @@ fn generated_features_namespace_is_finite_and_exact() {
                     "other"
                 },
             ),
-        ] {
+        ]
+        .into_iter()
+        .chain((owner == 4).then_some(("/parent/generation/BUILD.bazel", "package_marker")))
+        {
             for operation in [
                 PathObservationOperation::Lstat,
                 PathObservationOperation::FileBytes,
@@ -1935,7 +1959,10 @@ fn generated_features_namespace_is_finite_and_exact() {
             for (path, tag) in [
                 ("/parent/generation/REPO.bazel", "repo_marker"),
                 ("/parent/generation/.bazelignore", "ignore_marker"),
-            ] {
+            ]
+            .into_iter()
+            .chain((owner == 4).then_some(("/parent/generation/BUILD.bazel", "package_marker")))
+            {
                 let marker = demand(path, PathObservationOperation::Lstat);
                 let policy = namespace_policy(
                     &bodies,
@@ -1983,6 +2010,18 @@ fn generated_features_namespace_is_finite_and_exact() {
             assert!(
                 !namespace_policy(&closed, &d, Some(&epoch), &|_, _| true).admits(&d.operation())
             );
+            if owner == 4 {
+                let candidate = demand(
+                    "/parent/generation/BUILD.bazel",
+                    PathObservationOperation::Lstat,
+                );
+                let policy = namespace_policy(&closed, &candidate, Some(&epoch), &|_, _| true);
+                assert_eq!(
+                    policy.path_class,
+                    if index == 3 { "unavailable" } else { "other" }
+                );
+                assert!(!policy.admits(&candidate.operation()));
+            }
         }
         for index in 0..if owner == 4 { 6 } else { 4 } {
             let mut wrong = request.as_ref().clone();
@@ -2028,7 +2067,10 @@ fn generated_features_namespace_is_finite_and_exact() {
                 for path in [
                     "/parent/generation/REPO.bazel",
                     "/parent/generation/.bazelignore",
-                ] {
+                ]
+                .into_iter()
+                .chain((owner == 4).then_some("/parent/generation/BUILD.bazel"))
+                {
                     let marker = demand(path, PathObservationOperation::Lstat);
                     assert!(
                         !namespace_policy(
@@ -2254,6 +2296,14 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
                 ))
                 .unwrap();
         }
+        if owner == 4 {
+            host_need = host_need
+                .try_union(&need(
+                    PathObservationNamespace::Materialization(host_instance),
+                    "/winsdk-generation/BUILD.bazel",
+                ))
+                .unwrap();
+        }
         assert!(admits(&host_need, Some(&host_epoch)).is_ok());
         let crossed = need(
             PathObservationNamespace::Materialization(host_instance),
@@ -2287,7 +2337,15 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
                 PathObservationNamespace::Materialization(instance),
                 "/hub-generation/.bazelignore",
             ),
-        ] {
+        ]
+        .into_iter()
+        .chain((owner == 4).then(|| {
+            request(
+                PathObservationNamespace::Materialization(host_instance),
+                "/winsdk-generation/BUILD.bazel",
+                PathObservationOperation::FileBytes,
+            )
+        })) {
             for crossed_host in [
                 host_need.try_union(&excluded).unwrap(),
                 excluded.try_union(&host_need).unwrap(),
