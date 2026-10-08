@@ -726,6 +726,28 @@ static GENERATED_CC_PROXY_FILES: [GeneratedFileSignature; 3] = [
         ],
     ),
 ];
+static GENERATED_WINSDK_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "BUILD",
+        0,
+        false,
+        [
+            0xe3, 0xb0, 0xc4, 0x42, 0x98, 0xfc, 0x1c, 0x14, 0x9a, 0xfb, 0xf4, 0xc8, 0x99, 0x6f,
+            0xb9, 0x24, 0x27, 0xae, 0x41, 0xe4, 0x64, 0x9b, 0x93, 0x4c, 0xa4, 0x95, 0x99, 0x1b,
+            0x78, 0x52, 0xb8, 0x55,
+        ],
+    ),
+    (
+        "toolchains.bzl",
+        91,
+        false,
+        [
+            0x40, 0x0a, 0x13, 0xe7, 0x5d, 0x46, 0x6f, 0x43, 0xbe, 0xe6, 0x43, 0xea, 0x12, 0x53,
+            0x07, 0x6d, 0x1f, 0x5b, 0x1f, 0x51, 0x15, 0xd6, 0x7a, 0x68, 0x19, 0x2c, 0xdb, 0xaa,
+            0x83, 0x68, 0xca, 0x7f,
+        ],
+    ),
+];
 fn generated_features_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     expected: &[GeneratedFileSignature],
@@ -830,6 +852,18 @@ impl Bodies {
                 "repository_utils.bzl",
                 "toolchain_repository_hub",
             ) if self.rules_rust_defs_import_sources => Some(&GENERATED_RUST_TOOLCHAIN_HUB_FILES),
+            (
+                "bazel_tools+winsdk_configure+local_config_winsdk",
+                "bazel_tools",
+                "tools/res",
+                "winsdk_configure.bzl",
+                "winsdk_configure",
+            ) if self.rules_cc_import_sources
+                && self.additional[2].is_some()
+                && request.repo_spec.attributes.is_empty() =>
+            {
+                Some(&GENERATED_WINSDK_FILES)
+            }
             _ => None,
         }
     }
@@ -986,6 +1020,12 @@ impl Bodies {
                 "rust/private",
                 "repository_utils.bzl",
                 "toolchain_repository_hub"
+            ) | (
+                "bazel_tools+winsdk_configure+local_config_winsdk",
+                "bazel_tools",
+                "tools/res",
+                "winsdk_configure.bzl",
+                "winsdk_configure"
             )
         );
         if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {

@@ -1,143 +1,152 @@
 # Slug V2 current work packet
 
-Packet: WP-7-249-m7a-normal-rustc-environment-snapshot-readiness-r1
-Status: Accepted finite environment snapshot readiness; bounded Linux own-plan design selected
+Packet: WP-7-250-m7a-normal-rustc-linux-winsdk-own-plan-readiness-r1
+Status: Accepted finite Linux winsdk own-plan readiness; exact marker metadata design selected
 
 ## Outcome and accepted basis
 
-Advance the original environment Need through the normal command snapshot/frontier owner
-in the same normal Rustc public fixture //pkg:probe with support/data/registered extension
-toolchains, Bazel9.2/rules_rust0.73/edition2024/nightly2025-09-14/platforms1.1.0, eleven saved
-oracle commands and same-DICE 2024→2021→2024 priority. Exact source/oracle fields remain
-exact; finite cfgtest Linux readiness is Slug-native, Windows minimal stubs/deferred.
+Advance the original Linux winsdk GeneratedFileEffects Need in the unchanged normal public
+Rustc //pkg:probe fixture with support/data/registered toolchains, Bazel9.2/rules_rust0.73/
+edition2024/nightly2025-09-14/platforms1.1.0 and eleven saved oracle commands. Normal producer,
+same-DICE2024→2021→2024 restoration and full graph remain the broader priority. Accepted exact
+source/oracle bytes stay exact; finite cfgtest readiness is Slug-native. Windows is deferred.
 
-[WP1025](wp1025-environment-snapshot-readiness-2026-10-08.json) accepts finite original
-environment-name readiness through the existing command snapshot/frontier owner. Core98/
-themes4/native1/independent FINAL pass:103 names/105 current records/no capture. Native
-4.047630027s/209140KiB<262144/922 direct/935 audit union pins; environment refusal absent,
-source123/decoded6172507/ErrorNone/writes39599/peakbank11679531/end0 unchanged. Same294
-ordered188+106 source brackets/two64KiB/6410499physical12820998bracket bytes. Zero new
-native retained fields/strings/paths/request/frontier/Arc copies/cache/interner/pool;
-borrow original names and use existing scoped interning where retained repetition fits.
-Rust228net (parent32/child196) growth reviewed as cohesive guard/projection and focused
-functional control; twelve helpers44net/fourpolicies exact. Four existing snapshot lifecycle
-selectors now fresh, all old93 protected plus one meaningful admission selector. No failure,
-retry/capraise/stale-pin waiver/secondactivation. Bounded prefix fits; whole producer/graph/
-certificate/native heap Weak remain open. Windows minimal/deferred.
+[WP1026](wp1026-linux-winsdk-own-plan-readiness-2026-10-08.json) accepts original Linux
+winsdk owned-plan readiness. Core98/themes4/native1/independent FINAL pass:103 names/
+105 current records/no capture. Native4.190360542s/209584KiB<262144/927direct/940auditpins.
+Original full empty Spec/mappingNone/workspace/atomic owner and exact ordered two-file
+signatures are checked under existing generated+CC roles before progress. Materialization
+and environment refusals absent; Written39690 is +91 versus predecessor. Source123/
+decoded6172507/ErrorNone/peakbank11679531/end0 unchanged. Same294 ordered188+106 source
+brackets/two64KiB/6410499physical12820998bracket bytes. Zero new native retained fields/
+strings/paths/Arc/request/plan/Spec copies/cache/interner/pool. Borrow original storage and
+use existing scoped interning for repeated retained strings with suitable cleanup.
+Rust169net/216insertions47deletions in two existing cfgtest owners; actual STATIC reviewed
+cohesive seven test extensions. Twelve helpers89net/fourpolicies exact; all98 selectors
+preserved. No failure/retry/capraise/stale-pin waiver/secondactivation. Bounded prefix fits;
+full producer/whole graph/certificate/native body-plan-registry Weak remain open. Windows
+minimal/deferred.
 
-[Actual next-source](../../../../target/wp1025/next-source.md) binds the next original
-GeneratedFileEffects/generated_kind refusal: canonical
-bazel_tools+winsdk_configure+local_config_winsdk, original rule bazel_tools/tools/res:
-winsdk_configure.bzl % winsdk_configure, original workspace, complete205B identity. Actual
-plan/mapping/attributes/caller chain remain unobserved. Next consequential design may admit
-only the original Linux owned plan after source-derived exact ordered signatures and
-original owner/Spec/mapping/context checks; otherwise preserve honest refusal and bounded
-borrowed plan diagnosis. No tuple-only effect grant, Windows implementation or successor
-activation. Source128 leaves5 numeric headroom only; all caps fixed.
+[Actual next-source](../../../../target/wp1026/next-source.md) and
+[next-evidence](../../../../target/wp1026/next-evidence.md) bind the next namespace Lstat
+of exact REPO.bazel under the original winsdk generation root. Saved original association
+is unique/materialization/instance6; owner_plan_allowedtrue/path_classother. The26B raw
+temporary path is opaque, never a reconstructed root. Next design extends only the existing
+repo_marker class under checked repo_marker_metadata/current epoch/full original own-plan
+and Spec/context, Lstat only. ignore_marker stays hub-only; no marker body/listing/generic
+namespace/Windows grant. Own-plan scalar and +91 writes do not independently establish
+completed outputs/full Spec/caller chain. Source128 remaining5 is numeric headroom only.
+Successor proposals are prospective, unactivated; all caps fixed.
 
-## Finite decision and owners
+## Decision, natural owners and original context
 
-Reuse existing rules_cc_import_sources flag, set only for PreparedFile AND PublicProbe,
-plus selected additional[2] presence and exact original roots[0] workspace. A borrowed pure
-Bodies predicate admits only a positive nonempty subset (count<=13) of the static sorted
-names BAZEL_VC, BAZEL_VC_FULL_VERSION, BAZEL_VS, BAZEL_WINSDK_FULL_VERSION, TEMP, TMP,
-VS100COMNTOOLS, VS110COMNTOOLS, VS120COMNTOOLS, VS140COMNTOOLS, VS150COMNTOOLS,
-VS160COMNTOOLS, VS90COMNTOOLS. Every original name must match exact bytes/case, no arbitrary/
-empty/suffix name, normalization or owner inference. These names are finite command input
-readiness, not rule identity or proof of a Windows caller. No new environment flag/state.
+Choose cohesive own-plan authentication before IO, with existing bounded borrowed diagnostic
+on exact-owner mismatches. A separate diagnostic-only native is unnecessary: the matcher must
+prove the ORIGINAL owned plan matches source-derived ordered signatures before admission;
+unknown or changed shape/Spec remains refused. Names/tuple/scalars alone grant nothing.
 
-Replace only unconditional environment refusal in Bodies::admit_with_matchers with refusal
-when this predicate fails. Preserve scratch/foreign bootstrap earlier priority and later
-download/execute/materialization/path branches. Admit the entire original Need before normal
-progress, no partial frontier publication/IO/request rewrite or extra effect grant. Keep
-WP1024 borrowed diagnostic/grammar/bounds unchanged for actual environment refusal; admitted
-environment and other first families emit no environment marker.
+Checked-in verbatim Bazel builtin tools/res/winsdk_configure.bzl has non-Windows empty rc_exes
+and _impl writes exactly BUILD empty/executableFalse, then toolchains.bzl91B/False with the
+no-op registration text. builtin MODULE.bazel46–48 declares only legacy name; instantiation
+converted_attributes628–680 excludes it. Existing Loading
+exact_builtin_winsdk_reaches_generic_environment_retry4960–5120 asserts the exact Linux
+ordered bytes after tracked empty-snapshot13-name retry. This is source feasibility, not
+an actual WP1025 plan observation or new Windows algorithm/dispatch. No fresh Loading test
+executable is needed: Core original-plan discrimination and actual native progression cover
+this private guard; the pinned source regression is qualified, zero current execution credit.
 
-Bind the public fixture to its original immutable input by checking
-request.repository_environment.is_empty() in projection_matches before drive. The fixture
-already supplies RepositoryEnvironmentSnapshot::empty(); nonempty synthetic snapshot must
-fail dispatch projection. No snapshot copy into Bodies or retained Boolean mirror. Normal
-NativeDemandSession remains the semantic owner: exact workspace, no-new-name nonprogress
-guard, original-name frontier union; repository_host_input stages complete tracked snapshot
-and Observed(None) for authorized absence, distinct from Unauthorized/revocation. Existing
-request/revision/certificate/selection/restoration/cancellation owners remain unchanged.
+Add only one branch to Bodies::generated_features_owner_signatures under existing
+generated_features_file_effects AND rules_cc_import_sources (set only PreparedFile AND
+PublicProbe), selected additional[2], original roots[0] workspace, exact five-field tuple,
+label.mapping_idNone and FULL original RepoSpec.attributes.is_empty(). Preserve original
+Spec/request/plan; no reduced copied Spec or attrs-count identity repair. Expected signatures:
+BUILD0/SHAe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/False;
+toolchains.bzl91/SHA400a13e75d466f43bee643ea1253076d1f5b1f5115d67a68192cdbaa8368ca7f/False.
+Return static borrowed signatures; existing matcher checks complete bounded File-only
+shape/path/length/exec/order/end before hashing borrowed original content. Extra/reordered/
+changed/Archive/Symlink/mapping/nonempty attrs/crossed identity/workspace/roles remain closed.
+Shared admission still validates entire original Need before any progress/publication/IO;
+scratch/bootstrap/environment/download/execute/materialization/path priority is unchanged.
 
-Source anchors: runtime/dice.rs environment branch7842–7868/discard8050/acceptance8240;
-runtime/repository_host_input.rs39–87 full snapshot/cells; Loading
-module_extension_repository_file_effect.rs525–555 original transaction verification and
-declared-name retry1878 before Windows unsupported1896. Existing Linux
-exact_builtin_winsdk_reaches_generic_environment_retry source test reaches these13 with empty
-snapshot, source feasibility only, no current caller/output inference. No fresh Loading
-executable required: fresh Core lifecycle gates below and actual native advance discriminate
-this guard; no new exact Bazel algorithm/surface claimed. DICE ownership guide unchanged.
+Native Loading DICE produces evaluated owned plan with tracked platform/snapshot/cells and
+original route/certificate dependencies. canonical_repository_source100–113 stages ORIGINAL
+RepoSpec alongside workspace/canonical request id and plan. Normal runtime/materializer owns
+revision/certificate/materialization epoch/credit/WrittenBytes/preflight/revalidation,
+cancellation/join/acceptance/retirement. Public projection retains actual empty immutable
+snapshot check from WP1025. No production/DICE key/lock/provider/request repair or ambient IO.
+Windows execution already unsupported after declared environment retry; keep that boundary.
 
-## Scope and allocation
+Existing current-epoch namespace policy reuses same signatures only for unique<=32 original
+epoch request/current immutable success generation root/revalidated FULL own plan/Spec.
+Exact two files permit only Lstat/FileBytes; root/component ancestors only Lstat. No physical
+root invention, any-known-owner/prefix-recursive/listing/marker/alias/effect grant. Existing
+actual A-B-A/stale epoch/unknown/mixed/zero-progress controls remain. Diagnostic eligibility
+adds exact five-field tuple/original workspace/GeneratedFileEffects/first generated_kind only;
+it borrows original request/plan through unchanged WP983 bounds/grammar, regardless of role or
+mapping/attrs failure, without turning diagnostic eligibility into permission.
 
-Rust allowlist ONLY existing platforms_module_preparation_tests.rs and child
-public_probe_preparation_tests.rs. No production/DICE key/locking/source acquisition/Windows
-implementation edits, values/process getenv, owner mapping repair, fallback or fake cells.
-Borrow original workspace/NameFrontier; count first then <=13 fixed membership checks. Static
-13 [&str;13] descriptors208B plus166 literal bytes on this64-bit target; no native retained
-field/String/Vec/Path/Arc/request/frontier clone/cache/new interner/global pool. Existing normal
-session union/cell allocations are legitimate tracked semantic ownership for at most13
-newly authorized names, not an exact retained-byte measurement. Use existing owner-scoped
-interners for repeated retained strings where lifetime/cleanup fit; no diagnostic name pool.
+## Scope, allocation and discriminators
 
-Large cfgtest parents remain cohesive finite readiness/public-projection owners. Estimate
-60–130 net Rust lines; >150/new retained owner triggers reassessment, not automatic replan.
-No benchmark claim for unchanged representations/borrowed predicate; remeasure actual native
-prefix against original caps after progression. Preserve failures and choose changed hypothesis
-if actual evidence contradicts snapshot/role/prerequisite assumptions; no capraise/identical
-retry. Routine invocation/compiler/test corrections remain within accepted owner/scope.
+Rust allowlist only existing platforms_module_preparation_tests.rs and child
+public_probe_preparation_tests.rs. Cohesive existing static signature/admission/namespace/
+formatter controls, no new module/suite/factory/publicAPI/builtin/source table/production owner.
+Borrow existing strings/paths/content/Spec; transfer normal owned plan unchanged. Static pair
+estimated128 descriptor bytes plus19 path literal bytes on64-bit target, layout qualified;
+no91B plaintext mirror/new retained field/String/Vec/Path/Arc/request/plan/Spec clone/cache/
+interner/global pool. Existing normal writer storage/credit is legitimate semantic ownership,
+precise retained delta unmeasured. Scoped interning remains appropriate for repeated retained
+strings whose lifetime/cleanup fits; no diagnostic name pool. Estimate40–100 net Rust plus
+cohesive test rows; >150/new retained owner triggers actual STATIC reassessment. No benchmark
+claim for unchanged representations; actual prefix remeasured against unchanged memory caps.
 
-## Discriminating evidence and gates
+Preserve all98 selectors and original assertions; extend existing generated materialization
+opt-in/exact and mixed-before-progress, finite namespace/mixed and two formatter tests. Exact
+two-file content positive; both files length/digest/exec/path/order/extra mutations; all four
+registry-command modes and independent generated/CC role disabling, missing selected slot,
+foreign/crossed five fields, mappingSome and nonempty attrs. Check full context before shape
+closure using existing tiny-byte seam; no false test arithmetic as actual progress. Mixed
+unknown siblings both orders preserve original request/plan pointers and actual zero progress
+before standalone recovery/Weak retirement. Namespace own-plan revalidation/request/root/
+instance A-B-A/stale/other files/DirectoryEntries/ReadLink/FileDigest/unknown owner stay closed.
+Formatter exact-owner mismatch captures original mapping/attrs/order/counts; wrong tuple/
+workspace/earlier first family has no plan marker. Retain all inclusive/+1 count/path/content/
+mapping/encoded bounds and malformed cases. Prefer existing selectors; at most one meaningful
+new selector only if source author shows existing theme cannot contain cohesive controls,
+then root freezes99 before review.
 
-Protect all93 existing selectors, LocalArcWeak/whole Need/path/mixed/zero-progress controls.
-Extend same role/guard fixture or at most ONE meaningful new functional selector: all13 and
-subsets, role disabled/four registry-command combinations/selected slot absent/wrong workspace,
-case/suffix/unknown/empty name, allowed+unknown union both orders. Earlier foreign bootstrap
-suppression; scratch/download/execute priority unchanged and statically qualified where no
-in-scope factory exists. Allowed environment plus excluded Local/path sibling rejects original
-first offender before actual progress/IO; preserve original request/name pointer, standalone
-recovery and existing Weak owners. Add nonempty-snapshot projection negative to existing
-projection test, retain all previous role/root/config/target mutations.
+## Evidence, activation and validation
 
-Append FOUR existing Core repository_host_input_tests selectors:
-repository_environment_cells_cut_off_unrelated_changes_and_track_all_states,
-repository_environment_snapshot_tracks_full_a_b_a_and_empty_revisions,
-repository_environment_need_retry_and_rejection_restore_the_accepted_snapshot,
-cancelled_command_revokes_a_current_only_present_name. Prove authorized absence vs unauthorized,
-unrelated cutoff/present-absence-present/full A/B/A-empty, workspace/nonprogress, rejected
-restoration and cancellation revocation. No new lifecycle harness or duplicated selector credit.
-Root freezes actual97-or98 ordinary census after source selector choice.
+Twelve minimum WP1025 counterparts; four policy modules/input/owners/toolchain byte-exact.
+Compose exact owner into invocation-private WP983 plan decoder and WP988 known namespace
+owner predicates only; legacy raw/files/constants remain unchanged. Validate full CC50/meta12
+before explicit legacy8 projection, same narrow metadata-only base fixture view/Shell9/5.
+Pure effective winsdk permission requires checked generated role plus exact selected CC root/
+full table/checked source role/public policy, original workspace/atomic tuple, captured exact
+ordered plan/mappingNone/attribute_count0. Zero attributes proves empty, not full nonempty
+Spec association; declared names/identity alone never proves permission. Exact plan denial
+under full conjunction is contradiction; disabled role/foreign/crossed/mapped/nonempty attrs/
+changed/bounds-refused plans remain honest. Namespace known owner requires effective CC
+role/table context and validated existing owner_plan_allowed/current unique association;
+scalar own-plan marker is source-bound projection, not independent full plan evidence.
+No raw markers/normalization of raw values/clocks/roles/caps/counters/legacy helper rewrite.
+Same four themes extend exact-match contradictions/changed-plan-role-owner negatives,
+diagnostic presence/eligibility/strict framing/mapping/attrs/bounds and finite namespace
+conditions. Isolate role-disabled pure predicates, no forged checked public transcript.
 
-Independent consequential DESIGN before source/helpers, one combined actual STATIC before
-sole prepare/protocol False→True activations. Twelve minimal current WP1024 counterparts,
-four policy modules byte-exact. Strict current resolved pins/opaque prior executable metadata,
-no historical ledger waiver/target traversal. New pure environment permission discriminator
-requires effective checked existing CC source role+selected root/table and public policy,
-original matching workspace and every captured name exact subset. Public checked projection
-now proves fixture snapshot emptiness; names alone never confer permission or values. Under
-that conjunction, original environment refusal with captured all-allowed names is a
-contradiction. Honest disabled-role/foreign/unknown/mixed/bounds-refused diagnostics remain
-valid refusals; nonprogress is a normal session error, never a manufactured denied family.
-Validate WP1024 ordered ASCII/LF/positive count/UTF8/hex/bounds/carrier before projecting ONLY
-valid new lines to unchanged legacy parser. No raw normalization, new marker or policy rewrite.
-Preserve narrow inherited metadata-only fixture view and full CC50/meta12 legacy8 projection.
-Same four themes extend admitted-denial contradictions/effective-role and unknown/workspace/
-subset/mixed negatives plus all old malformed/carrier/resource/certificate guards.
+Consequential DESIGN before Rust/helpers; ONE combined actual STATIC before root sole
+prepare/protocol False→True inverses; serial fresh pinned-toolchain dependency/compile/direct
+Loading-Core-CLI check offline/jobs1/CargoJSON under60s/nine profiles. Fresh preflight/list/
+Core98(or approved99)/four themes, complete root current wrapper/leaf prelaunch notes,
+ONE changed native, audit once/independent actual FINAL/compact receipt/commit. Planned98Core
+means105 current records/103 names, not future pass credit. No fresh capture: prior22/70/63,
+reader/owner/Bzlmod/reference/Workspace zero fresh. Preserve actual failures; changed hypothesis
+before retry, no identical retry/capraise/stale-map waiver/old executable target traversal.
 
-Inputs byte-exact WP1024:294 ordered188+106 signatures/6410499physical12820998brackets/two64KiB.
-No current capture; prior22captures/70decisions63observed/owner/reference/Workspace zero fresh.
-Serial pinned-toolchain offline/jobs1 CargoJSON dependency/compile/direct Loading-Core-CLI
-check<=60s/nine profiles, one fresh preflight/list/Core97-or98/four themes/ONE changed native,
-root prelaunch complete wrapper/leaf note API/census, audit once/independent actual FINAL/
-compact receipt/commit. Preparations/captures/failures separate from tests, zero future credit.
-
-Retain work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/source128/default16/
+Inputs/signatures same294 ordered188+106/6410499physical12820998brackets/two64KiB;
+work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/source128/default16/
 production64/defaultHostRegistry1MiB/exactknown_shas4749878/eachbank16MiB/log1MiBeach/report4MiB/
-FSIZE16MiB/nine profiles; selector76 alone MALLOC_ARENA_MAX2, native environment unchanged.
-Source123 leaves5 numeric headroom only; no closure/body/certificate/heap Weak/parent+child
-aggregate memory/full normal Rustc/provider/action/runfiles/compiler/whole fit claim until
-actual evidence. Next genuine typed refusal requires its natural owner decision, no speculative
-future plan/effect/source grant. Full broader goal remains active.
+FSIZE16MiB/nine profiles unchanged. Selector76 alone existing MALLOC_ARENA_MAX2; nativeenv
+unchanged. Source headroom is numeric, not import closure/fit. Actual next genuine typed
+refusal selects natural owner decision; no speculative future grants. Full normal public
+Rustc/providers/runfiles/actions/edition reversal/compiler/certificate/body-plan-registry heap
+Weak/parent+child aggregate memory and whole graph fit remain open. Overall goal stays active.

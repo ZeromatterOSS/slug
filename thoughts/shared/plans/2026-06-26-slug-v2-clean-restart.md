@@ -34,31 +34,30 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-249-m7a-normal-rustc-environment-snapshot-readiness-r1
-Status: Accepted finite environment snapshot readiness; bounded Linux own-plan design selected
+Packet: WP-7-250-m7a-normal-rustc-linux-winsdk-own-plan-readiness-r1
+Status: Accepted finite Linux winsdk own-plan readiness; exact marker metadata design selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1025](./slug-v2-subplans/wp1025-environment-snapshot-readiness-2026-10-08.json)
-accepts finite original13-name snapshot readiness using existing tracked command/frontier
-owners and paired CC source role/selected slot/workspace. Core98/fourthemes/native1/FINAL
-pass:103 names/105 current records/no capture. Native4.047630027s/209140KiB<262144,
-922direct/935auditunion pins; environment refusal absent. Same294ordered188+106/two64KiB,
-Source123/decoded6172507/ErrorNone/writes39599/peakbank11679531/end0 unchanged. Zero new
-native retained fields/strings/paths/request/frontier/Arc copies/cache/interner/pool;
-Rust228net growth reviewed as coherent guard/projection/functional tests;12helpers44net/
-fourpolicies exact. Four existing snapshot lifecycle gates fresh, all old93 protected,
-one new admission selector; no runtime failure/retry/capraise/secondactivation.
-Next original GeneratedFileEffects/generated_kind owner is
-bazel_tools+winsdk_configure+local_config_winsdk with rule bazel_tools/tools/res:
-winsdk_configure.bzl % winsdk_configure,205B complete identity. Actual plan/mapping/attrs
-unobserved; next consequential design matches the owned Linux plan against exact source
-signatures and original owner/Spec/context before any grant, or preserves typed refusal.
-No Windows scope expansion. Bounded prefix fits; full normal producer/whole graph/
-certificate/native heap Weak still open, source128 remaining5 numeric only. Borrow/transfer/
-share and existing scoped interners for retained repetition with suitable cleanup.
+[WP1026](./slug-v2-subplans/wp1026-linux-winsdk-own-plan-readiness-2026-10-08.json)
+accepts finite original Linux winsdk plan readiness through exact source-defined two-file
+signatures and original full empty Spec/mappingNone/workspace/atomic owner under existing
+generated+CC roles. Core98/fourthemes/native1/FINAL pass:103 names/105 records/no capture.
+Native4.190360542s/209584KiB<262144/927direct/940auditunion pins; materialization/environment
+refusals absent, Written39690 (+91). Same294ordered188+106/two64KiB; Source123/decoded6172507/
+ErrorNone/peakbank11679531/end0 unchanged. Zero new native retained strings/fields/paths/
+Arc/request/plan/Spec copies/cache/interner/pool. Rust169net and twelve helpers89net reviewed;
+seven existing themes extended/all98 selectors preserved/fourpolicies exact. No failure/
+retry/capraise/secondactivation. Next exact REPO.bazel Lstat has original winsdk unique
+materialization instance6 association/own-plan true/path_classother. Prospective design
+extends existing repo_marker under checked marker role/current epoch/original full own-plan
+and generation root only; ignore marker stays hub-only, no body/listing/generic grant.
+Opaque temporary root is never reconstructed. Writes/own-plan scalar are not independent
+completed output/fullSpec/caller proof. Bounded prefix fits; full normal producer/whole graph/
+certificate/native heap Weak remain open. Windows deferred; source128 remaining5 numeric only.
+Borrow/transfer existing storage and use scoped interners where retained repetition fits.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
