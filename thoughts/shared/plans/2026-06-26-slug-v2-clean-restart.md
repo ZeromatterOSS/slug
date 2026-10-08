@@ -35,21 +35,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing optimized platforms host plan observation
+Status: Implementing exact platforms host file admission
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1004](./slug-v2-subplans/wp1004-platforms-host-generated-plan-2026-10-08.json)
-accepts borrowed exact host owner diagnostic/net72 with65Rust/four controls; no retained string
-copies or functional/source/namespace/production change. Corrected build/check pass; one preserved
-compiler fixture failure has zero credit. Native5.305s/122704KiB fits256MiB but WorkDeadline makes
-host plan evidence unavailable.71acceptedrecords/70diagnostic outcomes+one failed compile attempt;
-original280brackets/retirement match. Next optimize ONLY Loading preparation opt0→opt1/debug0,
-new artifact/current gates, preserving5s work/8s lifetime/10s native and all byte caps. No clock reset,
-cache warming or guessed output signatures. Actual original plan must ground a later cohesive
-functional matcher/namespace grant. Normal public producer and complete workload fit remain open.
+[WP1005](./slug-v2-subplans/wp1005-optimized-host-plan-observation-2026-10-08.json)
+observes the complete original host-platform two-file plan in4.992s/118452KiB under unchanged
+256MiB/5s source/8s lifetime/10s native limits. Loading-only optimized compiler profile adds no
+Rust/storage/interners or retained string copies;65Rust/four controls/native pass. Two failed
+compiler preparations preserved0credit; four metadata-only plans separate. Original280bindings
+and retirement match. Continue with one cohesive exact host-plan matcher/current-epoch namespace
+admission using borrowed original values and existing policy owners. Public producer and complete
+workload fit remain open.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
