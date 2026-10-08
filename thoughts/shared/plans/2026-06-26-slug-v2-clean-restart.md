@@ -34,19 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-238-m7a-normal-rustc-os-package-readiness-r1
-Status: Integrated design and bounded OS package source readiness
+Packet: WP-7-239-m7a-normal-rustc-os-directory-readiness-r1
+Status: Design review of bounded OS directory continuation
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1013](./slug-v2-subplans/wp1013-cpu-directory-readiness-2026-10-08.json) accepts exact
-CPU DirectoryEntries through the existing bounded Linux reader: Core90/themes4/native1,
-independent FINAL. Normal probe3.322s/118508KiB under256MiB/SourceErrorNone reaches original
-Host root2/os Lstat. Capture the two ordered OS BUILD markers under unchanged bounds, then
-admit metadata and actual eligible bodies through an independent defaultfalse role. OS
-listing stays closed: normal package inventory does not require it unconditionally.
+[WP1014](./slug-v2-subplans/wp1014-os-package-readiness-2026-10-08.json) accepts OS
+metadata3/capturedBUILD2495B-onlybody through independent borrowed static readiness:
+Core91/themes4/native1 and two-marker capture, independent FINAL. Normal probe3.3126s/
+118788KiB under256MiB/SourceErrorNone reaches originalHostroot2/os DirectoryEntries.
+Extend existing OS Boolean to this exact directory through the accepted128entry/1024name/
+16384names Linux reader after integrated review; no new capture/flag/recursive grant.
 Actual inventory/caller/publicRustc and whole-fit remain open. Borrow/transfer/share values
 and use existing scoped interners where retention fits; no global pool for temporary names.
 Source/native caps unchanged; blind profile retries closed.

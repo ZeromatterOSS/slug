@@ -1,0 +1,122 @@
+{
+  "schema": 1,
+  "packet": "WP-7-238-m7a-normal-rustc-os-package-readiness-r1",
+  "checkpoint": "WP1014",
+  "baseline": "bcf88202589d05c31595eb34cb8acba21756d254",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest Linux finite readiness; prior exact Bazel9.2 projections unchanged",
+  "change": "Independent defaultfalse PreparedFile AND PublicProbe OS package role/readiness, exact Hostroot2 metadata3Lstat and captured os/BUILD-onlyFileBytes; OSDirectoryEntries staysclosed",
+  "growth": {
+    "policy_parent_net": 36,
+    "public_parent_net": 22,
+    "new_focused_child": 250,
+    "total_net": 308
+  },
+  "allocation": {
+    "new_inline_booleans": 1,
+    "new_retained_owned_strings": 0,
+    "new_guard_heap_containers": 0,
+    "new_interner_cache_mirror": 0,
+    "borrowed_static_path_tables": true,
+    "existing_scoped_shared_carriers_retained": true,
+    "guard_layout_delta_unmeasured": true
+  },
+  "capture": {
+    "elapsed_seconds": 0.04226664605084807,
+    "monitored_rss_kib": 19008,
+    "child_rusage_peak_kib": 18576,
+    "conservative_peak_kib": 19008,
+    "completed": 2,
+    "observed": 1,
+    "unavailable": 1,
+    "pass_count": null,
+    "fresh_controls": 0,
+    "reused_controls": 11,
+    "eligible_relatives": [
+      "os/BUILD"
+    ],
+    "eligible_bytes": 2495,
+    "source_certificate": false,
+    "whole_workload_fit": false
+  },
+  "validation": {
+    "Core": 91,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 96,
+    "reused_Workspace": 87,
+    "reused_Workspace_fresh": 0,
+    "kernel_fresh": 0,
+    "direct_compile": [
+      "slug_loading_v2",
+      "slug_core_v2",
+      "slug_cli_v2"
+    ],
+    "compile_seconds": 12.012902035028674,
+    "check_seconds": 7.304164532921277,
+    "current_gate_elapsed_sum_seconds": 43.520298633840866
+  },
+  "native": {
+    "checkpoint": "WP1014",
+    "baseline": "bcf88202589d05c31595eb34cb8acba21756d254",
+    "current_native_gate_records": 98,
+    "current_allphase_records": 99,
+    "preserved_zero_credit_records": 0,
+    "total_supervised_records": 99,
+    "zero_child_launch_refusals": 0,
+    "current_named_passes": 96,
+    "Core": 91,
+    "Python": 4,
+    "native": 1,
+    "current_capture_operations": 1,
+    "capture_test_credit": 0,
+    "elapsed_seconds": 3.31260497297626,
+    "conservative_peak_kib": 118788,
+    "native_direct_pins": 748,
+    "combined_current_direct_union": 761,
+    "source_leases": 282,
+    "physical_bytes": 1536360,
+    "bracket_bytes": 3072720,
+    "documented_fd_opens": 4346,
+    "root_note_sha256": "6c56e374f114db8f21b66f4a6202988577bd2ecf46c612b8527135b983baaec8",
+    "result_sha256": "2fabf7ecd9b852137df83416e2bb375d492abc33e7767cea2573fe9c397cb8a6",
+    "operation_sha256": "5f53f0f0efcd3c809a7931b52658965520fe77fc3cf0e771676b4fc7a177d41c",
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false
+  },
+  "reviews": {
+    "semantic-source-review.md": {
+      "path": "target/wp1014/native/semantic-source-review.md",
+      "sha256": "777dc4cc37cd889103f2b642079b277d9d7c212ff5ff01d6ab42c9b23f18f9da"
+    },
+    "static-evidence-review.md": {
+      "path": "target/wp1014/native/static-evidence-review.md",
+      "sha256": "cf3c5e05446b624759a9be20518d7cc114046fffa8af51962fd0c586163318c3"
+    },
+    "preflight-evidence.md": {
+      "path": "target/wp1014/native/preflight-evidence.md",
+      "sha256": "ec976449a8ee9d8c04c4d8c70852d5f25285360b6773671e932262bf6262e485"
+    },
+    "final-evidence.md": {
+      "path": "target/wp1014/native/final-evidence.md",
+      "sha256": "9636a216fed10502cea47671e7ff34f4d6998b7819280abcf560e29210808f76"
+    }
+  },
+  "capture_FINAL": {
+    "path": "target/wp1014/capture/final-evidence.md",
+    "sha256": "498bcda1cc07237b455d58cb4b032dff99ce489a54c4f866e146701799184f22"
+  },
+  "source_result": {
+    "path": "target/wp1014/capture/result.json",
+    "sha256": "1670c85a6c8842ffefc34f1800fa7d4174496905d0c2ce66705daefbdc45f79e"
+  },
+  "successor_source": {
+    "path": "target/wp1014/successor-source.md",
+    "sha256": "c920a0d3500100382ea48999eb1bc283554576d600dcf82034c628c156fbed40"
+  },
+  "observable_advanced": "Original Hostroot2/os190B Lstat refusal changed to DirectoryEntries operationfamily; source113/1266909 aggregate+1/+2495 only",
+  "qualification": "Configured role doesnot prove availability/nativebody/inventory/caller/certificate/publicRustc. CaptureBUILD.bazel genuineENOENT, BUILD2495/UTF8syntaxpartial loads[]27unsupported not importclosure. All282 stable currentorderedleases/SAMEtwo64KiB, historicalancestorstamps notimmutable. Livecredits endzero Scope/recorderWeakexpire; sourcebodyWeakunseen/expiryvacuous. Only unchanged lifecycle76 uses separatelydocumentedMALLOC_ARENA_MAX2 underidenticalcaps; nativeenvunchanged. Prefixfitonly; no fullworkloadmemoryclaim.",
+  "next": "Exact originalHostroot2/os DirectoryEntries using sameOSrole and unchangedboundedLinuxreader; no newcapture/flags or wildcard",
+  "remaining": "NormalpublicRustc/support/data/providers/toolchains/runfiles/sameDICEeditionrestoration/fullCLI/M7A/MVS/provenance/wholefit",
+  "receipt_elapsed_seconds_since_frozen_design": 1433.9391112327576
+}

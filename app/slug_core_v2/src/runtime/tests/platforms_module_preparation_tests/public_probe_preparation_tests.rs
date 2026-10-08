@@ -1,5 +1,9 @@
 use super::*;
 
+mod platforms_os_package_tests {
+    include!("public_probe_preparation_tests/platforms_os_package_tests.rs");
+}
+
 mod platforms_cpu_package_tests {
     include!("public_probe_preparation_tests/platforms_cpu_package_tests.rs");
 }
@@ -509,6 +513,7 @@ fn projection_matches(
         && bodies.platforms_host_directory
         && bodies.platforms_host_import_sources
         && bodies.platforms_cpu_package_sources
+        && bodies.platforms_os_package_sources
         && bodies.nightly_package_metadata
         && bodies.nightly_build_source
         && bodies.nightly_channel_source
@@ -3031,6 +3036,10 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             )
+            .with_platforms_os_package_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_rust_package_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
@@ -3077,6 +3086,19 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &registry,
         &nightly_overlay()
     ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .platforms_os_package_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .platforms_os_package_sources = true;
     Arc::get_mut(&mut bodies)
         .unwrap()
         .platforms_cpu_package_sources = false;
