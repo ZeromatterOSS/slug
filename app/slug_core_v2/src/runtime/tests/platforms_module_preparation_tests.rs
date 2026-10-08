@@ -1010,6 +1010,12 @@ impl Bodies {
                     names.iter().any(|name| relative == Path::new(name))
                 })
     }
+    fn admits_platforms_cpu_directory(&self, path: &Path) -> bool {
+        self.platforms_cpu_package_sources
+            && path
+                .strip_prefix(self.roots[2].as_path())
+                .is_ok_and(|relative| relative == Path::new("cpu"))
+    }
     fn with_nightly_package_metadata(
         mut self,
         registry: RegistryChoice,
@@ -1455,7 +1461,8 @@ impl Bodies {
                             })
                     }
                     PathObservationOperation::DirectoryEntries
-                        if self.admits_platforms_host_directory(path) =>
+                        if self.admits_platforms_host_directory(path)
+                            || self.admits_platforms_cpu_directory(path) =>
                     {
                         true
                     }
@@ -2806,6 +2813,14 @@ fn observe_native_command(
             "WP1012_PLATFORMS_CPU_PACKAGE enabled={} policy_checked={} root_slot=2 metadata_operation=lstat metadata_count=3 source_operation=file_bytes source_count=1 metadata_cohort=cpu,cpu/BUILD.bazel,cpu/BUILD source_cohort=cpu/BUILD kind=unobserved body=unobserved",
             platforms_cpu_package_sources,
             probe_report.policy_checked()
+        );
+        println!(
+            "WP1013_PLATFORMS_CPU_DIRECTORY enabled={} policy_checked={} root_slot=2 operation=directory_entries cohort=cpu entry_limit={} name_limit={} names_limit={} kind=unobserved body=unobserved",
+            platforms_cpu_package_sources,
+            probe_report.policy_checked(),
+            crate::runtime::path_observation::scoped_directory::ENTRY_LIMIT,
+            crate::runtime::path_observation::scoped_directory::NAME_LIMIT,
+            crate::runtime::path_observation::scoped_directory::NAMES_LIMIT,
         );
         println!(
             "WP1011_PLATFORMS_HOST_DIRECTORY enabled={} policy_checked={} root_slot=2 operation=directory_entries cohort=host entry_limit={} name_limit={} names_limit={} kind=unobserved body=unobserved",

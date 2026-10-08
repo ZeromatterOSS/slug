@@ -34,21 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-237-m7a-normal-rustc-cpu-directory-readiness-r1
-Status: Design review of bounded CPU directory continuation
+Packet: WP-7-238-m7a-normal-rustc-os-package-readiness-r1
+Status: Integrated design and bounded OS package source readiness
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1012](./slug-v2-subplans/wp1012-cpu-package-readiness-2026-10-08.json) accepts CPU
-metadata3/capturedBUILD-onlybody1 through borrowed static permission: Core90/themes4/native1,
-independentFINAL. Normal probe3.30s/118896KiB under256MiB/SourceErrorNone now reaches exactCPU
-DirectoryEntries. Extend the existing CPU role to this one directory using the accepted
-128entry/1024name/16384names Linux reader, after integrated design review; no new Boolean,
-sourcecapture or OS grant. Actualinventory/caller/publicRustc and wholefit remain open.
-Borrow/transfer/share values and existing scopedinterners where retention fits; no global
-pool for unique temporary names. Source/native caps unchanged; blind profile retries closed.
+[WP1013](./slug-v2-subplans/wp1013-cpu-directory-readiness-2026-10-08.json) accepts exact
+CPU DirectoryEntries through the existing bounded Linux reader: Core90/themes4/native1,
+independent FINAL. Normal probe3.322s/118508KiB under256MiB/SourceErrorNone reaches original
+Host root2/os Lstat. Capture the two ordered OS BUILD markers under unchanged bounds, then
+admit metadata and actual eligible bodies through an independent defaultfalse role. OS
+listing stays closed: normal package inventory does not require it unconditionally.
+Actual inventory/caller/publicRustc and whole-fit remain open. Borrow/transfer/share values
+and use existing scoped interners where retention fits; no global pool for temporary names.
+Source/native caps unchanged; blind profile retries closed.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

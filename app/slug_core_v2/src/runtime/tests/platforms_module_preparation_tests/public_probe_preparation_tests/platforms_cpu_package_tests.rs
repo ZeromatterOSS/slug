@@ -3,7 +3,12 @@ use super::*;
 #[test]
 fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() {
     for relative in PLATFORMS_CPU_METADATA {
-        let operations: &[PathObservationOperation] = if PLATFORMS_CPU_SOURCES.contains(&relative) {
+        let operations: &[PathObservationOperation] = if relative == "cpu" {
+            &[
+                PathObservationOperation::Lstat,
+                PathObservationOperation::DirectoryEntries,
+            ]
+        } else if PLATFORMS_CPU_SOURCES.contains(&relative) {
             &[
                 PathObservationOperation::Lstat,
                 PathObservationOperation::FileBytes,
@@ -46,6 +51,11 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
         "/platforms/cpu/BUILD",
         PathObservationOperation::FileBytes,
     );
+    let directory = need(
+        host,
+        "/platforms/cpu",
+        PathObservationOperation::DirectoryEntries,
+    );
     for isolated in [
         make(),
         make()
@@ -61,6 +71,7 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
     ] {
         assert!(!isolated.platforms_cpu_package_sources);
         assert_eq!(isolated.admit(&body).unwrap_err().family, "path");
+        assert_eq!(isolated.admit(&directory).unwrap_err().family, "operation");
     }
     let wrong_slot = Bodies::new([path("/fixture"), path("/platforms"), path("/rules")])
         .with_platforms_cpu_package_sources(
@@ -68,6 +79,10 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
             CommandChoice::PublicProbe,
         );
     assert_eq!(wrong_slot.admit(&body).unwrap_err().family, "path");
+    assert_eq!(
+        wrong_slot.admit(&directory).unwrap_err().family,
+        "operation"
+    );
     let bodies = Arc::new(make().with_platforms_cpu_package_sources(
         RegistryChoice::PreparedFile,
         CommandChoice::PublicProbe,
@@ -79,7 +94,7 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
             .source_attempts,
         16
     );
-    let mut allowed = body;
+    let mut allowed = body.try_union(&directory).unwrap();
     for relative in PLATFORMS_CPU_METADATA {
         allowed = allowed
             .try_union(&need(
@@ -89,7 +104,7 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
             ))
             .unwrap();
     }
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 4);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 5);
     assert!(bodies.admit(&allowed).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -131,7 +146,31 @@ fn platforms_cpu_package_need_is_opt_in_exact_slot_two_and_captured_rows_only() 
         (
             need(
                 host,
-                "/platforms/cpu",
+                "/platforms/cpu/BUILD",
+                PathObservationOperation::DirectoryEntries,
+            ),
+            "operation",
+        ),
+        (
+            need(
+                host,
+                "/platforms/cpu/BUILD.bazel",
+                PathObservationOperation::DirectoryEntries,
+            ),
+            "operation",
+        ),
+        (
+            need(
+                host,
+                "/platforms/cpu/child",
+                PathObservationOperation::DirectoryEntries,
+            ),
+            "operation",
+        ),
+        (
+            need(
+                host,
+                "/platforms/os",
                 PathObservationOperation::DirectoryEntries,
             ),
             "operation",

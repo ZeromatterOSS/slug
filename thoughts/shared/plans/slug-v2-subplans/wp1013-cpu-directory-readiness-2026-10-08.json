@@ -1,0 +1,92 @@
+{
+  "schema": 1,
+  "packet": "WP-7-237-m7a-normal-rustc-cpu-directory-readiness-r1",
+  "checkpoint": "WP1013",
+  "baseline": "e9a2efb6ec7e56c684dd7251e40ddaadaa1cb08f",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest Linux readiness; existing exact Bazel projections unchanged",
+  "change": "Existing CPU Boolean admits only originalHostroot2/cpu DirectoryEntries through unchanged scoped128entry/1024pername/16384names kernel; metadata3/BUILD-only FileBytes unchanged",
+  "growth": {
+    "parent_net": 15,
+    "existing_child_net": 39,
+    "total_net": 54
+  },
+  "allocation": {
+    "retained_owned_strings_added": 0,
+    "new_guard_fields": 0,
+    "new_heap_containers": 0,
+    "new_source_capture": 0,
+    "borrowed_existing_root_and_static_literal": true,
+    "existing_ArcName_transfer_and_scoped_interning_retained": true
+  },
+  "validation": {
+    "Core": 90,
+    "strict_themes": 4,
+    "native": 1,
+    "current_named_passes": 95,
+    "reused_Workspace": 87,
+    "reused_Workspace_fresh": 0,
+    "unchanged_kernel_fresh": 0,
+    "direct_compile": [
+      "slug_loading_v2",
+      "slug_core_v2",
+      "slug_cli_v2"
+    ],
+    "compile_seconds": 9.656882953946479,
+    "check_seconds": 7.270319564966485,
+    "current_gate_elapsed_sum_seconds": 40.5024083374301
+  },
+  "native": {
+    "checkpoint": "WP1013",
+    "baseline": "e9a2efb6ec7e56c684dd7251e40ddaadaa1cb08f",
+    "current_native_gate_records": 97,
+    "current_allphase_records": 97,
+    "preserved_zero_credit_records": 0,
+    "total_supervised_records": 97,
+    "zero_child_launch_refusals": 0,
+    "current_named_passes": 95,
+    "Core": 90,
+    "Python": 4,
+    "native": 1,
+    "fresh_capture_operations": 0,
+    "elapsed_seconds": 3.321947363903746,
+    "conservative_peak_kib": 118508,
+    "native_direct_pins": 721,
+    "combined_current_direct_union": 734,
+    "source_leases": 281,
+    "physical_bytes": 1533865,
+    "bracket_bytes": 3067730,
+    "root_note_sha256": "c9c95868a8e9fffac5418217b97cd16663a893e1446549e3fdfb5076c7ba68b1",
+    "result_sha256": "f0615c7f61997779d84dca06a390523c26d8e71f12f618d844d92a2340ad5bad",
+    "operation_sha256": "8dd5481d5b2223586d31b00caaf5b54b9395517c798d1a6d206c925528b87fb7",
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false
+  },
+  "reviews": {
+    "semantic-source-review": {
+      "path": "target/wp1013/native/semantic-source-review.md",
+      "sha256": "4ae57b94b611f8fb89268f03c47bfda120594523c37239792ac3b4c2669435b0"
+    },
+    "static-evidence-review": {
+      "path": "target/wp1013/native/static-evidence-review.md",
+      "sha256": "2fa9d201e39e0b40032082471661c07962642e03b587b3fb04c8518a23b720fa"
+    },
+    "preflight-evidence": {
+      "path": "target/wp1013/native/preflight-evidence.md",
+      "sha256": "7c8bd6411e10b2121802633436bc4328c9fded4cdc8025b26df18efa60afaaed"
+    },
+    "final-evidence": {
+      "path": "target/wp1013/native/final-evidence.md",
+      "sha256": "d753a1994c593cea7467d9e78d64163d2a6cd282c2d8df4f0f0fc0d1fcedd7eb"
+    }
+  },
+  "successor_source": {
+    "path": "target/wp1013/successor-source.md",
+    "sha256": "aaef45408528fa57e6382e5713d6dfff9590def87e1676c30e2b595d9c278db8"
+  },
+  "qualification": "Configuredlistingmarker doesnot prove inventory/caller/body/certificate/publicRustc. Current all281 path/signatureorder/brackets retained, currentancestorchecks not immutablehistory. Source112/1264414 unchanged; livecredits retire, bodyWeakunseen/expiryvacuous. Scoped directory OSnativeName allocations separately bound beforecopy/retain/classification, not FileBytes bank. Only unchanged lifecycle selector76 uses separatelydocumentedMALLOC_ARENA_MAX=2 invocation underidenticalcaps; nativeenvironment unchanged. Memoryfitsobservedprefixonly.",
+  "observable_advanced": "CPU DirectoryEntries denial changed to original Hostroot2/os190B Lstat",
+  "next": "Strict orderedOS BUILDmarker capture and finiteeligible metadata/body role; OSdirectorylisting staysclosed because normalinventory isnotalwaysalistconsumer.",
+  "remaining": "Normal publicRustc/support/data/providers/toolchains/runfiles/sameDICEeditionrestoration/fullCLI/M7A/MVS/provenance/wholefit",
+  "receipt_elapsed_seconds_since_frozen_design": 1073.2058057785034
+}
