@@ -35,24 +35,25 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing exact platforms host metadata
+Status: Preparing platforms host constraint sources
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1000](./slug-v2-subplans/wp1000-platforms-constructor-coverage-2026-10-08.json)
-preserves both source-proved platforms request IDs at the exact bound Local root, all nine
-checks and the original11 override bindings. The failed single-name candidate is preserved
-unaccepted; revised design/static/prelaunch/final accepted. No normalization, retained string
-storage, production/DICE/Windows change. Fresh compile/check/63Rust+four controls pass;
-native4.716s peaks121,888KiB under256MiB with SourceErrorNone/source107/1,255,768/Written5228.
-277 ordered leases/ending credits checked. Actual next192B HostLstat is platforms_root/host.
-Continue reviewed metadata-only default-false PreparedFile/PublicProbe role borrowing the
-existing root; no body/capture/descendant/foreign grant or directory-kind preclaim. All caps
-and whole-Need checks stay fixed. Certificate/actions/Rustc/fullSpec/output/whole-workload fit
-remain open. Representative allocation permits broader readiness; borrow/share and existing
-scoped interners where retained repetition/lifetime/cleanup fit. Complete producer/fit required.
+[WP1001](./slug-v2-subplans/wp1001-platforms-host-metadata-2026-10-08.json)
+accepts exact root2 three-candidate Host Lstat metadata, preserving both platforms request IDs,
+original11 bindings/nine Local checks/whole-Need/48CC8metadata. Borrowed static paths and one
+Boolean add no retained owned strings or containers; production/DICE/Windows unchanged.
+Fresh compile/check/64Rust+four controls pass; one fixture correction preserves unchanged
+Rust proofs with explicit original helper snapshots, failed control zero credit. One native
+4.872s peaks122,388KiB under256MiB; actual next208B HostLstat platforms_root/host/constraints.bzl.
+277 source brackets/endingcredits checked;70 accepted records/71 actual attempts/69named passes.
+No current capture or full public certificate/actions/Rustc/whole-fit claim. Next review one
+fixed three-leaf host capture/conditional finite source role from the manifest's static owner
+basis; unavailable markers stay unavailable, metadata role remains Lstat-only and bodies require
+individual eligible signatures. All caps and identities remain. Borrow/share and scoped string
+interners where retained repetition/lifetime/cleanup fit; complete producer/fit still required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

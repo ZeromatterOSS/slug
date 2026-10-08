@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing exact platforms host metadata
+Status: Preparing platforms host constraint sources
 
 ## Observable and source basis
 
@@ -44,81 +44,90 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint
 
-[WP1000](wp1000-platforms-constructor-coverage-2026-10-08.json) preserves the original11
-bindings iterator and both original platforms+ Root DirectLocal/bare platforms selected
-request IDs. Only the same named Local root guard extends; all nine checks/whole-Need and
-production identities remain unchanged. Two-request union/pointers/Weak retirement and
-both nine-check matrices plus lookalike/unknown/cross-root negatives pass. FormattedRust
-136insertions/76deletions/net60 was reassessed as cohesive existing-matrix wrapping; no
-new retained string/container/flag/storage/production/Windows surface. Frozen revised design,
-actual static/prelaunch/final are accepted by one independent reviewer. The unaccepted
-WP999 single-name candidate and early355B plus refusal remain preserved in the receipt.
+[WP1001](wp1001-platforms-host-metadata-2026-10-08.json) accepts a separate default-false
+PreparedFile/PublicProbe metadata role for exact root2 host, host/BUILD.bazel and host/BUILD
+Host Lstat only. Borrowed static paths/one Boolean introduce no retained owned strings or
+containers; original11 bindings/two request IDs/nine Local checks/whole-Need and48CC/8metadata
+remain unchanged. Shared11-root/four-mode/eight-operation/namespace matrix, union3 and mixed
+zero-progress/pointer/Weak controls pass. Formatted154insertions/1deletion/net153 was reviewed
+as cohesive shared-matrix wrapping (author net82); layout/pooling remain unmeasured. One
+independent design/static/correction/prelaunch/FINAL chain is accepted.
 
-Fresh compile8.869s/check7.281s/63Rust+four controls pass. Native4.716s peaks121,888KiB under
-256MiB, SourceErrorNone/source107/1,255,768decoded/registry105/235,521/Written5228. Actual
-materialization_refusal null; next original192B HostLstat exactly platforms_root/host.
-Unchanged aggregate counters are not phase/output proof; this is finite guard progress,
-not full materialization or producer completion.277 ordered leases1,525,353physical/
-3,050,706brackets match/two64KiB buffers; ending creditszero/scope-recorder Weak expire.
-BodyWeak unseen/vacuous/registry/freshness/DICE/fullSpec/output/fullfit remain open. Current69
-native operations/68named passes/611material union/598runtime pins; no current capture;
-prior10captures/46observations/reference/reader/Bzlmod and unacceptedWP999 have zero fresh
-credit. Full publicRustc/certificate/actions/whole-workload fit remain required.
+Fresh compile11.650s/check7.347s/64ordinary12.908s+four controls1.037s pass. One synthetic
+non-grant fixture initially used the wrong refusal family; exact one-expression correction
+and68-record/two-snapshot pin qualification preserve original helper provenance for unaffected
+Rust/artifact proofs. Failed control is preserved with zero credit; corrected controls/native
+have current pins. A mkdir retry stopped before child/operation and has zero credit.
+Native4.872s peaks122,388KiB under256MiB; metadata enabled/checked root2/exact3/Lstat has no
+kind/body preclaim. SourceErrorNone/source107/1,255,768decoded/registry105/235,521/Written5228
+are unchanged aggregate counters, not phase/output proof. Actual next208B HostLstat exactly
+platforms_root/host/constraints.bzl; materialization_refusal null, no public certificate/actions/
+Rustc.277 ordered leases1,525,353physical/3,050,706brackets/two64KiB buffers/4261sequential
+opens match; endingcreditszero/scope-recorder Weak expire. Source/bodyWeak unseen-vacuous,
+registry/freshness/DICE/fullSpec/output/fullfit remain open.70 accepted operation records,
+71 actual attempts including failed control/69 named passes/618material union/605runtimepins;
+no current capture. Prior10captures/46observations/reference1/reader11/Bzlmod5/unacceptedWP999
+remain qualified history with zero fresh credit. Full public producer/wholefit remain required.
 
 ## Active continuation contract
 
-Continue exact metadata-only readiness under target/wp1001/native.
-[Source recommendation](../../../../target/wp1000/native/successor-source.md) and
-[evidence constraints](../../../../target/wp1000/native/successor-evidence.md) ground the
-original HostLstat192B and input root2 correspondence. Normal repository package lookup/
-parent-first resolution owns the metadata Need; the path alone proves no complete host
-platform/extension causal chain, directory kind/body/source availability or next child.
-No source capture, DirectoryEntries, FileBytes, body/descendant/prefix/foreign grant is selected.
+Continue under target/wp1002 with ONE integrated consequential capture/conditional source-role
+design reviewed before any source IO or Rust implementation. Current
+[source recommendation](../../../../target/wp1001/native/successor-source.md), SHA256
+acec1144586f68fac2c92e92439e9c46efdb0b5fe7592f5f8fc73f24f6c6fbeb, and
+[evidence constraints](../../../../target/wp1001/native/successor-evidence.md), SHA256
+56756434cd9d307488f1e0b056e889aa0a8a6519e1433be0ed22a6c509613be4, ground
+only the actual constraints HostLstat/root correspondence and a source-defined finite host
+package cohort. Checked-in builtin tools/build_defs.bzl:17 and protected normal Loading
+host-platform load ground the literal; existing ordered package marker protocol grounds the
+other two candidates. The current path is not a complete caller stack, kind/availability/
+content/import closure or identity grant.
 
-Review a bounded consequential design before code: separate default-false platforms_host_metadata
-Boolean on existing cfgtest Bodies; enabled only PreparedFile/PublicProbe and required by its
-exact readiness projection. Reuse roots[2], borrowing path.parent()/basename equality with
-exact host; admit only existing Host namespace Lstat, no owned new path or identity inference.
-Original11 bindings/two distinct constructor identities/all nine Local checks/whole-Need,
-48CC/8metadata/FeaturesProxy/defaults/source caps stay. Existing rust/nightly/probe/import
-metadata roles have different owners and are not broadened. One Boolean/new literal/static
-comparison has no new retained owned String/map/plan/cache/interner; layout/padding unmeasured.
-Class is cfgtest/Linux Slug-native readiness, public producer/fullfit deferred; production/
-DICE/Windows remain unchanged. Existing cohesive two Core cfgtest files only, estimate40–90net
-Rustlines for setup/native flag/readiness and one shared discriminator; bounded function
-split within child only if readability requires, no unrelated cleanup or fixture copy.
+Freeze exactly three prospective capture leaves under unchanged platforms_root:
+host/constraints.bzl (actual Need), host/BUILD.bazel and host/BUILD (prospective markers).
+One bounded FD-backed strict capture records each original eligible byte-count/hash and genuine
+unavailable outcome separately; no directory enumeration, recursive scanner, foreign source,
+network/acquisition, extension.bzl/import sibling or repeated spent original target reads.
+Retire per-row source text/AST and use one64KiB scratch context under inherited caps. Capture
+is a source observation, not a test/native certificate. If required source is unavailable,
+preserve the result and resolve its natural owner before any permission/body fabrication.
 
-Add one ordinary selector (63→64, original63prefix), using shared11-root/four-mode/eight-op/
-namespace tests for disabled/enabled exact root+host Lstat and wrong root/name/case/child/
-suffix/operation/namespace. Mixed valid+invalid families/path/Local requests refuse before
-progress and preserve borrowed first-offender/pointer/order/Weak. Native current input changes
-solely enable this one Boolean; all source bindings/toolchain/owners/caps and body tables
-unchanged. Minimal nine inactive native helper forks must extend only natural metadata/readiness
-flag delegates and required-field parsing/negative controls. Preserve raw/artifact/flags/
-limits/counters; no normalization or legacy permission exemption. Complete48-first constants
-before accepted legacy8, all old negatives/fourthemes/private128 three natural delegates and
-unrelated public_policy stay unless an actual required-field owner change is proven/reviewed.
-No wholesale decoder graph or historical executable traversal.
+Conditional on individually eligible captured rows and independent capture FINAL, add one
+separate default-false finite platforms host source role to existing cfgtest Bodies using
+PreparedFile/PublicProbe and exact root2 original-relative equality. Existing accepted metadata
+role stays Lstat-only. Grant FileBytes/Lstat only for captured eligible rows with frozen source
+bindings; genuine unavailable markers never become usable body rows. New body/import facts may
+recommend a future bounded cohort; they cannot widen this frozen capture. Native current input
+must bind actual signatures without normalization; required natural raw/profile and strict
+contradiction/negative controls preserve old fields/caps/counters and complete48-first/legacy8.
+No owned path mirrors/strings/maps/cache/global interner/production/DICE/Windows changes.
+Reuse the existing shared matrix and helper owners, estimate40–100net Rust lines; actual growth
+is reviewed for cohesion. Existing64 selectors remain exact prefix; freeze any added focused
+selector before compile/runtime. Original11 bindings/two IDs/all9checks/whole-Need, current
+FeaturesProxy/48CC8metadata and default roles remain. Update277 parent leases only by actual
+eligible captured signature rows inside SAME existing two64KiB contexts; do not preclaim counts,
+kind, availability, source certificate or whole-workload fit.
 
-Same277 leases188+89/1,525,353physical/3,050,706brackets/two64KiB contexts128KiB. Prior10captures/
-46observations/reference1/reader11/Bzlmod5 and preserved unacceptedWP999 zero fresh; no current
-capture. Planned70current native-gate operations/69named passes=64ordinary+fourthemes+native1,
-not future credit. Root pinnedrustupwhich/offline/jobs1 serial Core no-run/directLoading/Core/
-CLI checks<=60s; current unique CargoJSON sole executable authority, one64preflight/list64
-ordinary/four strict themes/current combined prelaunch then ONE changed directnative. Actual
-static review before sole two inverse activations. Native10s/oneabsoluteTERM3s/AS512MiB/
-RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB/source128/defaultprobe16/production64/registry128/
-default16/object1MiB/every16MiBbank fixed. No cap raise/outer timeout/identical retry. Parent
-verification precedes child clock; metadata is an original native observation, not parent
-body certificate or kind preclaim. Actual outcome selects next natural owner; no forced
-capture/provider fabrication. ActualFINAL/audit/coupled receipt/status/archive/diffcheck/local
-accepted commit. Borrow/transfer/share storage and existing scoped interners for retained
-repetition when lifetime/cleanup fit; no global temporary unique path pool. PublicRustc/
-support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/M7A/
-MVS/provenance/whole-workload fit remain required; full goal active/Linux priority/Windows stubs.
+Inherit caps/ownership/lifecycle/provenance from
+[the accepted metadata design](../../../../target/wp1001/native/design.md) and current receipt.
+Pinned rustupwhich/offline/jobs1 serial Core no-run and direct Loading/Core/CLI checks<=60s;
+actual current CargoJSON sole executable/one full preflight/list/all selected ordinary/four
+strict themes/one independent combined prelaunch/ONE changed direct native/FINAL. Native10s,
+absoluteTERM3s, AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB, source128/defaultprobe16/
+production64, registry128/default16, object1MiB/every16MiBbank unchanged. Parent verification
+precedes child clock; no arbitrary outertimeout/cap raise/identical failure repeat. Correct
+routine invocation/fixture/compiler issues within scope and preserve unaffected proofs with
+honest original provenance. No historical executable traversal or redundant source/evidence
+reviewer pair. Root accepts audited receipt, reconciles scheduling, plan-status/archive/diff
+checks and local commit before rollover. Prior captures/reference/reader/Bzlmod/unaccepted
+WP999 remain zero fresh. Borrow/transfer/share storage; existing scoped interners for repeated
+retained immutable strings where lifetime and cleanup fit. Public Rustc/support/data/providers/
+toolchains/actions/runfiles/oracle/same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/wholefit
+remain required; goal active/Linux priority/Windows minimal stubs.
 
 ## Immediate predecessor
 
-[WP998](wp998-remaining-cc-import-source-readiness-2026-10-07.json), acceptedc5b42091b,
-admitted two link collection files/static48/8/matrix104;63+four+one/native4.664s122,092KiB
-reached the late bare platforms binding refusal. Source/provenance/caps remain in its receipt.
+[WP1000](wp1000-platforms-constructor-coverage-2026-10-08.json), accepted06b48fe79,
+preserves both original platforms constructors and observes the earlier host metadata frontier.
+Original source/caps/request identity and the preserved unacceptedWP999 correction remain in
+that receipt. Older chronology is reference evidence, not current scheduling.

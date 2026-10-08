@@ -347,6 +347,7 @@ const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc/private/link",
     "cc/private/rules_impl",
 ];
+const PLATFORMS_HOST_METADATA: [&str; 3] = ["host", "host/BUILD.bazel", "host/BUILD"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -355,6 +356,7 @@ struct Bodies {
     repo_marker_metadata: bool,
     ignore_file_bytes: bool,
     rust_package_metadata: bool,
+    platforms_host_metadata: bool,
     nightly_package_metadata: bool,
     nightly_build_source: bool,
     nightly_channel_source: bool,
@@ -840,6 +842,7 @@ impl Bodies {
             repo_marker_metadata: false,
             ignore_file_bytes: false,
             rust_package_metadata: false,
+            platforms_host_metadata: false,
             nightly_package_metadata: false,
             nightly_build_source: false,
             nightly_channel_source: false,
@@ -878,6 +881,25 @@ impl Bodies {
         self.rust_package_metadata = matches!(registry, RegistryChoice::PreparedFile)
             && matches!(command, CommandChoice::PublicProbe);
         self
+    }
+    fn with_platforms_host_metadata(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.platforms_host_metadata = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_platforms_host_metadata(&self, path: &Path) -> bool {
+        self.platforms_host_metadata
+            && path
+                .strip_prefix(self.roots[2].as_path())
+                .is_ok_and(|relative| {
+                    PLATFORMS_HOST_METADATA
+                        .iter()
+                        .any(|name| relative == Path::new(name))
+                })
     }
     fn with_nightly_package_metadata(
         mut self,
@@ -1300,6 +1322,7 @@ impl Bodies {
                                 && self
                                     .roots()
                                     .any(|root| path.parent() == Some(root.as_path())))
+                            || self.admits_platforms_host_metadata(path)
                             || (self.rust_package_metadata
                                 && path.parent() == Some(self.roots[1].as_path())
                                 && path.file_name().is_some_and(|name| name == "rust"))
@@ -2443,6 +2466,7 @@ fn observe_native_command(
     .with_repo_marker_metadata(registry_choice, command)
     .with_ignore_file_bytes(registry_choice, command)
     .with_rust_package_metadata(registry_choice, command)
+    .with_platforms_host_metadata(registry_choice, command)
     .with_nightly_package_metadata(registry_choice, command)
     .with_nightly_build_source(registry_choice, command)
     .with_nightly_channel_source(registry_choice, command)
@@ -2486,6 +2510,7 @@ fn observe_native_command(
         request_registry
     );
     let visible_lockfile_metadata = bodies.visible_lockfile_metadata;
+    let platforms_host_metadata = bodies.platforms_host_metadata;
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
@@ -2635,6 +2660,11 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP1001_PLATFORMS_HOST_METADATA enabled={} policy_checked={} root_slot=2 operation=lstat cohort=host,host/BUILD.bazel,host/BUILD kind=unobserved body=unobserved",
+            platforms_host_metadata,
+            probe_report.policy_checked()
+        );
         println!(
             "WP980_FEATURES_IMPORT_SOURCES enabled={} policy_checked={} additional0_present={} source_attempt_limit={} bodies_size={}",
             features_import_sources,
