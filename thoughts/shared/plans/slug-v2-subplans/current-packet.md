@@ -1,118 +1,113 @@
 # Slug V2 current work packet
 
-Packet: WP-7-251-m7a-normal-rustc-linux-winsdk-marker-metadata-r1
-Status: Accepted finite winsdk marker metadata; exact ignore metadata design selected
+Packet: WP-7-252-m7a-normal-rustc-linux-winsdk-ignore-metadata-r1
+Status: Accepted finite winsdk ignore metadata; package candidate metadata decision selected
 
 ## Outcome and accepted basis
 
-Advance the observed exact winsdk REPO.bazel Lstat in the unchanged normal public Rustc
-//pkg:probe fixture, preserving all limits. This is finite Slug-native cfgtest readiness;
-accepted Bazel9.2 source/oracle bytes remain exact. Full normal producer, same-DICE edition
-2024→2021→2024 restoration and compiler execution remain the broader priority; Windows deferred.
+Advance the observed exact winsdk .bazelignore Lstat in the unchanged normal public Rustc
+//pkg:probe fixture. Finite cfgtest readiness is Slug-native; accepted Bazel9.2 source/oracle
+bytes stay exact. Full normal producer/providers/runfiles/actions/compiler and same-DICE
+2024→2021→2024 restoration remain the broader priority. Windows stays deferred.
 
-[WP1027](wp1027-linux-winsdk-marker-metadata-2026-10-08.json) accepts exact original
-winsdk generation-root-relative REPO.bazel Lstat under existing independent marker role,
-full original Spec/context/current epoch/own ordered plan. Ignore remains hub-only in this
-accepted checkpoint. Core98/themes4/native1/independent FINAL pass:103 names/105 supervised
-records/no capture. Native4.222622315s/210136KiB<262144/927direct/940auditunion pins;
-source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0 unchanged. Same294
-ordered188+106/two64KiB/6410499physical12820998bracket bytes. Child57net/three existing
-finite/mixed/A-B-A themes/all98 selectors unchanged; twelve helpers50net/fourconfigs and
-fourpolicies exact. Zero new native retained strings/fields/paths/Arc/request/Spec/plan
-copies/cache/interner/pool. Borrow storage and use existing scoped interners for retained
-repetition with suitable cleanup. No supervised failures/runtime retry/capraise/stale waiver/
-secondactivation. One root launcher precondition error started no child; verbatim tool-output
-stderr/cause retained and corrected by joining original prelaunch before the sole native.
-Full producer/whole graph/certificate/native body-plan-registry heap Weak remain open;
-Windows minimal/deferred.
+[WP1028](wp1028-linux-winsdk-ignore-metadata-2026-10-08.json) accepts original
+winsdk generation-root-relative .bazelignore Lstat under independent ignore Boolean+checked
+public policy/full original Spec-context-ownplan/current epoch. Accepted repo marker behavior
+is preserved; no ignore raw/profile record invented. Core98/themes4/native1/independent FINAL
+pass:103 names/105 supervised records/no capture. Native4.168898359s/210080KiB<262144/
+927direct/940auditunion; Source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/
+end0 unchanged. Same294 ordered188+106/two64KiB/6410499physical12820998bracket bytes.
+Child19net/three existing finite/mixed/A-B-A controls/all98 selectors unchanged; twelve
+helpers11net/fourconfigs and fourpolicies exact. Zero new native retained fields/strings/
+paths/Arc/request/Spec/plan copies/cache/interner/pool. Borrow storage and scoped interners
+for retained repetition with suitable cleanup. No supervised failures/runtime retry/capraise/
+stale waiver/secondactivation. One unsupervised root receipt precondition error, before the
+evidence note arrived, wrote no acceptance artifacts and launched no child; raw tool-output
+stderr/cause retained separately, corrected after both notes froze. Full producer/whole graph/
+certificate/native body-plan-registry heap Weak still open. Windows minimal/deferred.
 
-[Actual next-source](../../../../target/wp1027/next-source.md) and
-[next-evidence](../../../../target/wp1027/next-evidence.md) bind exact .bazelignore Lstat
-under the same original winsdk unique materialization instance6 association,205B exact owner/
-101B workspace/logical_rootNone/own-plan true/path_classother. Opaque28B temporary path never
-reconstructs a physical root. Prospective next design extends only existing ignore_marker
-under checked independent ignore_file_bytes/full current Spec/context/plan/original-root
-comparison, Lstat only. No body/listing/generic marker/other-owner/Windows grant. Marker
-progression/current source scalar are not availability/kind/completed output/fullSpec/caller
-proof. Source128 remaining5 is numeric headroom only. Successor remains unactivated; caps fixed.
+[Actual next-source](../../../../target/wp1028/next-source.md) and
+[next-evidence](../../../../target/wp1028/next-evidence.md) bind exact BUILD.bazel Lstat
+under original winsdk unique materialization instance6/205B owner/workspace101/rootNone/
+own-plantrue/path_classother. Opaque27B temporary path never configures a physical root.
+Next design may add one closed package_marker class for exact borrowed original-root-relative
+BUILD.bazel metadata only under existing full generated+checked CC ownplan context. No new
+flag or repo/ignore role reuse. BUILD remains an original fixed output; BUILD.bazel is outside
+the owned two-file plan and must never inherit fixed_file FileBytes permission. Private current
+WP988 PATH_CLASSES union/outer winsdk validation needs consequential review; historical decoder
+immutable. No body/listing/kind/availability/output/caller/Windows proof or successor activation.
+Source128 remaining5 numeric only; all caps unchanged.
 
-## Decision, semantic owner and unchanged invariants
+## Decision, authority and allocation
 
-Reuse existing repo_marker classification for both hub and the exact selected static
-GENERATED_WINSDK_FILES slice, under the independent existing repo_marker_metadata flag.
-namespace_policy borrows the original unique<=32 current-epoch request/immutable success
-view/generation root; generated_features_owner_signatures retains original workspace/atomic
-five-field owner, selected CC slot+role/generated role/mappingNone/full empty Spec and own
-ordered two-file signature revalidation. Compare only demand.path.strip_prefix(original root)
-== Path("REPO.bazel"). NamespacePolicy::admits still requires owner_plan_allowed and Lstat.
-No basename/prefix/root reconstruction, recursive/listing/ReadLink/FileDigest/FileBytes grant,
-marker body/output invention, new role or Windows algorithm. .bazelignore stays hub-only
-under existing independent ignore flag; all other owner marker classifications stay closed.
-A shape mismatch may classify repo_marker but remains denied by own-plan false; role-off
-classifies other. Validate the entire original Need before publication/progress/IO.
+Extend only existing namespace_policy ignore_marker classification from stable hub signature
+slice to hub OR exact selected static GENERATED_WINSDK_FILES slice, under independent existing
+ignore_file_bytes. Compare borrowed demand.path.strip_prefix(ORIGINAL current immutable
+success generation root) exactly to Path(".bazelignore"). NamespacePolicy::admits remains
+owner_plan_allowed AND Lstat. Flag name grants no FileBytes/digest/listing/readlink/recursive
+prefix/child/suffix/case/other-marker/owner/Windows permission. Keep accepted repo_marker
+behavior unchanged; each corresponding flag is independent. Role-off returnsother; failed
+own-plan may retain valid tag but admits nothing. Whole original Need before any progress/IO.
 
-Pinned source authority is inherited WP1026 verbatim Bazel winsdk_configure.bzl (Linux empty
-BUILD then91B toolchains.bzl), MODULE legacy-name conversion, Loading plan and canonical
-original-Spec staging. app/slug_bzlmod_v2/src/repo_file.rs HostRepoFileKey830–890 constructs
-REPO.bazel as a tracked path, Missing→empty semantic value and Present→tracked bytes/evaluation.
-This establishes the marker category, not exact native higher caller or availability/kind.
-Original DICE request projections/platform/snapshot/revision/certificate/materialization
-success epoch/invalidation/cleanup remain natural production owners; no keys/locks/side cache/
-ambient IO/identity repair. Current source projection/own-plan scalar is not independent full
-Spec/output/certificate proof. Existing stale epoch/A-B-A/mixed Need pointer/Weak recovery
-controls remain required. Public command retains original empty immutable snapshot.
+Original unique<=32 epoch request/nonzero instance/workspace/atomic five-field winsdk owner/
+selected CC slot+generated role/mappingNone/full empty Spec and own ordered2File signatures
+remain source-defined authority; no copied/reduced Spec/root inference/name-only repair.
+Verbatim Bazel winsdk Linux empty BUILD+91B toolchains.bzl and Loading/canonical plan owners
+are inherited from accepted WP1026. repository_ignore.rs1127–1158 constructs tracked exact
+.bazelignore: Missing contributes no prefixes, Present parses observed bytes;1318–1323 uses
+original repository source request. These ground category, not actual higher caller/body/kind.
+Production DICE owners/keys/locks/request projections/platform/snapshot/certificate/success
+revision/invalidation/cleanup stay unchanged. Public actual immutable empty snapshot retained.
 
-## Scope, allocation and discriminating evidence
+Rust allowlist ONLY existing public_probe_preparation_tests.rs. Borrow original paths/plan/
+Spec/request and static signatures; zero new native retained fields/String/Path/Arc/plan/Spec
+copies/cache/interner/pool. Existing materializer semantic storage, precise retained delta
+unmeasured. Use existing scoped interners for retained repetition when lifetime/cleanup fits;
+avoid interning temporary diagnostics. Estimate5–40net plus focused controls; >100 or new
+retained owner triggers actual STATIC reassessment. Existing large cfgtest owner stays cohesive
+to finite namespace policy/three current controls; no new module/suite/factory/selector.
 
-Rust allowlist: existing public_probe_preparation_tests.rs only; parent only for demonstrated
-necessary obligation and root review. No production files/new modules/suite/factory/selectors.
-Extend existing finite namespace/mixed/current-epoch tests for winsdk exact marker positive,
-all five operations, independent repo/ignore flags, wrong root/owner/Spec/mapping/plan/current
-instance and case/child/suffix negatives. Preserve all hub controls/all98 selectors/assertions.
-Use tiny plan seam for policy closure plus existing real91B matcher positive/mutation; seam
-is not normal runtime proof. Mixed accepted marker+unknown siblings both orders must preserve
-original demand/request pointers, zero progress before recovery and Weak retirement.
+## Discriminators and evidence
 
-Reuse static slice identity and borrowed paths/requests/Spec/content. Zero new native fields,
-String/Path/Arc/plan/Spec copies/interner/cache/pool. Existing materializer semantic storage
-unchanged, precise retained delta unmeasured. Use scoped interners where retained repetition
-and cleanup fit; avoid interning temporary diagnostic strings. Estimate10–60net Rust plus
-focused controls; >100/new retained owner triggers STATIC reassessment. Existing large cfgtest
-child stays cohesive to finite namespace policy and its existing tests; no unrelated cleanup.
-No performance claim for unchanged representation; representative prefix is remeasured.
+Extend existing finite namespace/mixed/current-epoch A-B-A tests, all98 names/assertions
+preserved. Exact winsdk ignore Lstat positive only with independent ignore flag/ownplan;
+five-operation matrix denies body/digest/list/readlink. Hub+win repo/ignore Boolean matrix
+checks each independently; failed-plan/foreign owner/workspace/mapping/full Spec/current
+root/missing/stale/ambiguous instance/path spelling negatives remain. Mixed marker+unknown
+both orders preserve original request/demand pointers, zero progress and Weak recovery.
+Existing real91B matcher positive/mutation remains; tiny seam tests policy, not native proof.
 
-Twelve minimal current WP1026 helper counterparts; four policies/inputs/owners/toolchain and
-all294 ordered188+106 external source bindings remain byte-exact. Add known repo_file.rs
-source pin only if helper authors ground the new current authority; not a new external lease.
-Reuse closed repo_marker tag and strict existing decoder grammar. Extend hub_marker_policy
-with exact winsdk repo-marker branch under winsdk_effective checked generated/public/CC/root/
-FULL50 context plus marker role and unique original namespace owner. Keep validated legacy8
-callback explicitly8 after full50 verification; no pretending8is50. Rust original-root
-comparison supplies authority; decoder raw basename check is transport coherence only.
-Own-plan true+Lstat repo_marker denial is contradiction; false own-plan honest refusal;
-non-Lstat denied, disabled marker role must classifyother. ignore marker remains hub-only.
-Four themes cover admitted contradiction/false plan/other ops/foreign workspace+owner/role/
-root+class/malformed adjacency/duplicate/missing framing; role-off tests pure predicate isolation,
-no fabricated checked disabled public transcript. Preserve old capture files/constants/raw.
-No current capture; qualified prior22/70/63 and reader/owner/Bzlmod/reference zero fresh credit.
+Twelve minimal WP1027 helper counterparts; four policies/configs/98selectors/294sourceleases
+byteexact. Add known repository_ignore.rs source authority pin only, no external lease or
+source-body acquisition. Generalize existing winsdk marker context to corresponding repo or
+ignore role only; full checked50/CCroot/generated+CC/public policy/original unique namespace
+owner remain required before qualified legacy8 callback. repo_marker keeps checked enabled
+repo-marker record; ignore_marker uses existing Boolean input plus checked full public policy
+(no ignore profile/raw marker exists; invent none). Raw basename coherence is transport only;
+Rust original-root comparison is authority. True own-plan+exact marker Lstat denial contradicts;
+false-plan honest refusal, non-Lstat closed. Four existing themes adapt only obsolete winsdk
+ignore nongrant, test exact contradiction/falseplan/operation/role/owner/case/child/suffix/class/
+adjacency/duplicate/missing/malformed framing. Role-off tests pure predicate isolation, never
+fabricate disabled checked public transcript. Historical capture literals/files/raw immutable.
+No current capture; prior22/70/63/reference/owner/Bzlmod/Workspace zero fresh credit.
 
-## Review, execution and genuine decision boundaries
+## Reviews, gates and boundaries
 
-Consequential DESIGN before source/helper edits; ONE combined actual STATIC before root sole
-prepare/protocol False→True switches. Serial fresh pinned nightly2025-09-14 cargo/rustc/rustdoc/
-rustfmt; dependency/compile/direct Loading-Core-CLI check offline/jobs1/CargoJSON<=60s/nine
-profiles. Current executable preflight/list/Core98/fourthemes, root complete wrapper+leaf
-prelaunch notes, ONE changed native, audit once/actual independent FINAL/compact receipt/commit.
-Planned105 records/103 names are not future pass credit. Preserve any failed operation/raw/
-pins; changed hypothesis before retry, no identical repeat/capraise/stale waiver/old executable
-traversal. Capture tables and accepted historical evidence remain immutable.
+Consequential DESIGN before edits; one combined actual STATIC before sole root prepare and
+protocol False→True switches. Serial fresh nightly2025-09-14 cargo/rustc/rustdoc/rustfmt;
+offline/jobs1 dependency/compile/CargoJSON/direct Loading-Core-CLI check<=60s/nine unchanged
+profiles. Fresh current Core preflight/list/98tests/fourthemes, complete current root wrapper
+and leaf notes joined before ONE changed native, audit once/actual independent FINAL/receipt/
+commit. Planned105records/103names are no future credit. Preserve failures/raw/pins and correct
+invocation before missing gate; no identical failed retry/capraise/stale waiver/old executable
+source traversal. Accepted prior evidence immutable.
 
-Inherited caps: work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/source128/
-defaultprobe16/production64/defaultHostRegistry1MiB/exactknown_shas4749878/eachbank16MiB/log1MiB
-per stream/report4MiB/FSIZE16MiB; unchanged294/two64KiB/6410499physical12820998bracket bytes.
-Nine profiles unchanged; selector76 only MALLOC_ARENA_MAX2/native environment unchanged.
-No acquisition or speculative successor grant. Actual next typed refusal selects the next
-natural owner decision; REPLAN only for contradictory prerequisite/ownership/class, not a
-routine invocation correction. Full producer/providers/runfiles/actions/compiler/edition
-restoration/certificate/native body-plan-registry heap Weak/parent+child aggregate and whole
-workload fit remain open. Overall goal stays active.
+All inherited caps fixed: work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/
+source128/defaultprobe16/production64/defaultHostRegistry1MiB/exactknown_shas4749878/banks16MiB/
+log1MiBperstream/report4MiB/FSIZE16MiB/nineprofiles;294ordered188+106/6410499physical12820998
+brackets/two64KiB. Selector76 only MALLOC_ARENA_MAX2/nativeenvironment unchanged. Source123
+remaining5 numeric only, not closure/futurefit. Actual next typed refusal selects natural
+owner decision; no speculative successor grant/acquisition. REPLAN only contradictory owner/
+compatibility/prerequisite, not routine invocation correction. Full producer/output/caller/
+certificate/native body-plan-registry heap Weak/parent+child aggregate/wholefit remain open.
+Overall goal active.

@@ -304,7 +304,8 @@ fn namespace_policy(
             && relative == Path::new("REPO.bazel")
         {
             "repo_marker"
-        } else if std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+        } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..]))
             && bodies.ignore_file_bytes
             && relative == Path::new(".bazelignore")
         {
@@ -1547,7 +1548,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    (owner == 3 || owner == 4 && path == "/generation/REPO.bazel") && index != 1
+                    matches!(owner, 3 | 4) && index != 1
                 );
             }
             if index == 0 {
@@ -1819,7 +1820,11 @@ fn generated_features_namespace_is_finite_and_exact() {
             ),
             (
                 "/parent/generation/.bazelignore",
-                if owner == 3 { "ignore_marker" } else { "other" },
+                if matches!(owner, 3 | 4) {
+                    "ignore_marker"
+                } else {
+                    "other"
+                },
             ),
         ] {
             for operation in [
@@ -1902,7 +1907,7 @@ fn generated_features_namespace_is_finite_and_exact() {
                         (
                             "/parent/generation/.bazelignore",
                             "ignore_marker",
-                            ignore_enabled && owner == 3,
+                            ignore_enabled,
                         ),
                     ] {
                         let marker = demand(path, PathObservationOperation::Lstat);
@@ -1927,18 +1932,20 @@ fn generated_features_namespace_is_finite_and_exact() {
                 instance,
                 "/parent/generation",
             );
-            let marker = demand(
-                "/parent/generation/REPO.bazel",
-                PathObservationOperation::Lstat,
-            );
-            let policy = namespace_policy(
-                &bodies,
-                &marker,
-                Some(&wrong),
-                &small_namespace_plan_matches,
-            );
-            assert_eq!(policy.path_class, "repo_marker");
-            assert!(!policy.owner_plan_allowed && !policy.admits(&marker.operation()));
+            for (path, tag) in [
+                ("/parent/generation/REPO.bazel", "repo_marker"),
+                ("/parent/generation/.bazelignore", "ignore_marker"),
+            ] {
+                let marker = demand(path, PathObservationOperation::Lstat);
+                let policy = namespace_policy(
+                    &bodies,
+                    &marker,
+                    Some(&wrong),
+                    &small_namespace_plan_matches,
+                );
+                assert_eq!(policy.path_class, tag);
+                assert!(!policy.owner_plan_allowed && !policy.admits(&marker.operation()));
+            }
         }
         let d = demand(fixed, PathObservationOperation::FileBytes);
         let budget = slug_workspace_v2::ImageDescriptorBudget::new(4096);
@@ -2018,19 +2025,21 @@ fn generated_features_namespace_is_finite_and_exact() {
                     .admits(&d.operation())
             );
             if matches!(owner, 3 | 4) {
-                let marker = demand(
+                for path in [
                     "/parent/generation/REPO.bazel",
-                    PathObservationOperation::Lstat,
-                );
-                assert!(
-                    !namespace_policy(
-                        &bodies,
-                        &marker,
-                        Some(&wrong),
-                        &small_namespace_plan_matches
-                    )
-                    .admits(&marker.operation())
-                );
+                    "/parent/generation/.bazelignore",
+                ] {
+                    let marker = demand(path, PathObservationOperation::Lstat);
+                    assert!(
+                        !namespace_policy(
+                            &bodies,
+                            &marker,
+                            Some(&wrong),
+                            &small_namespace_plan_matches
+                        )
+                        .admits(&marker.operation())
+                    );
+                }
             }
         }
         assert_eq!(Arc::strong_count(&request), count);
@@ -2232,11 +2241,16 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
                 ))
                 .unwrap();
         }
-        if owner == 3 {
+        let ignore_marker = if owner == 4 {
+            "/winsdk-generation/.bazelignore"
+        } else {
+            "/hub-generation/.bazelignore"
+        };
+        if matches!(owner, 3 | 4) {
             host_need = host_need
                 .try_union(&need(
                     PathObservationNamespace::Materialization(host_instance),
-                    "/hub-generation/.bazelignore",
+                    ignore_marker,
                 ))
                 .unwrap();
         }
@@ -2250,6 +2264,11 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
             request(
                 PathObservationNamespace::Materialization(host_instance),
                 repo_marker,
+                PathObservationOperation::FileBytes,
+            ),
+            request(
+                PathObservationNamespace::Materialization(host_instance),
+                ignore_marker,
                 PathObservationOperation::FileBytes,
             ),
             need(

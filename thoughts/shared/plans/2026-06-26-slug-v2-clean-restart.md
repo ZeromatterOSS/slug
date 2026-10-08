@@ -34,30 +34,30 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-251-m7a-normal-rustc-linux-winsdk-marker-metadata-r1
-Status: Accepted finite winsdk marker metadata; exact ignore metadata design selected
+Packet: WP-7-252-m7a-normal-rustc-linux-winsdk-ignore-metadata-r1
+Status: Accepted finite winsdk ignore metadata; package candidate metadata decision selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1027](./slug-v2-subplans/wp1027-linux-winsdk-marker-metadata-2026-10-08.json)
-accepts exact original generation-root-relative winsdk REPO.bazel Lstat under independent
-marker role/full original Spec/context/current epoch/own plan. Core98/fourthemes/native1/
-FINAL pass:103 names/105 supervised records/no capture. Native4.222622315s/210136KiB<262144/
-927direct/940auditunion; Source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0
-unchanged, same294ordered188+106/two64KiB/6410499physical12820998brackets. Child57net/three
-existing finite/mixed/A-B-A themes/all98 selectors preserved;12helpers50net/four policies and
-configs exact. Zero new native retained fields/strings/paths/Arc/request/Spec/plan copies/
-cache/interner/pool; no supervised failures/runtime retry/capraise/secondactivation. One root
-launcher precondition error started no child, preserved and corrected by joining prelaunch
-before sole native. Next exact .bazelignore Lstat is same original winsdk unique instance6/
-own-plantrue/path_classother; next design extends existing ignore_marker/checked ignore role/
-originalroot/full Spec-context-ownplan, Lstat only. Opaque root not reconstructed; no body/
-listing/newowner/Windows grant. Current source scalar/progression not independent output/
-fullSpec/caller/availability proof. Bounded prefix fits; full producer/whole graph/certificate/
-native heap Weak remain open; source128 remaining5 numeric only. Borrow existing storage and
-use scoped interners for retained repetition when lifetime/cleanup fits. Windows deferred.
+[WP1028](./slug-v2-subplans/wp1028-linux-winsdk-ignore-metadata-2026-10-08.json)
+accepts exact original-root-relative winsdk .bazelignore Lstat under independent ignore Boolean/
+checked public policy/full original Spec-context-ownplan/current epoch; accepted repo marker
+preserved, no invented ignore record. Core98/fourthemes/native1/FINAL pass:103 names/105
+supervised records/no capture. Native4.168898359s/210080KiB<262144/927direct/940auditunion;
+Source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0 unchanged, same294
+ordered188+106/two64KiB/6410499physical12820998brackets. Child19net/three existing controls/
+all98 selectors;12helpers11net/fourpolicies and configs exact. Zero new native retainedfields/
+strings/paths/Arc/request/Spec/plan copies/cache/interner/pool; no runtime failures/retry/
+capraise. One root receipt precondition failure wrote no artifacts/launched no child, preserved
+and corrected after both frozen notes. Next exact winsdk BUILD.bazel Lstat is unique instance6/
+ownplantrue/classother. Proposed closed package_marker under existing full generated+CC
+context admits metadata only; BUILD.bazel outside own outputs never fixed_file/body grant,
+BUILD remains fixed original output. Private decoder class extension needs next review; no
+new flag or repo/ignore reuse/physical-root inference/availability/kind/output/caller proof.
+Full producer/wholegraph/certificate/nativeheapWeak remain open; source128 remaining5 numeric
+only. Borrow existing storage/scoped interners for retained repetition; Windows deferred.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
