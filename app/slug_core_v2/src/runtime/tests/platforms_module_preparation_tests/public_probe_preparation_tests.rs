@@ -517,6 +517,7 @@ fn projection_matches(
     overlay: &CommandConfigurationOverlay,
 ) -> bool {
     request.registry_urls == *registry
+        && request.repository_environment.is_empty()
         && request.lockfile_mode == LockfileMode::Off
         && inner.0.workspace == bodies.roots[0]
         && matches!(inner.0.targets.as_ref(), [pattern] if pattern.as_ref() == "//pkg:probe")
@@ -923,6 +924,181 @@ fn materialization_refusal_projection_preserves_kind_checks_and_precedence() {
     assert!(bodies.materialization_diagnostic(&mixed, &denied).is_some());
     assert!(bodies.admit(&body).is_ok());
 }
+#[test]
+fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
+    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let selected = || {
+        make()
+            .with_fourth(path("/features"))
+            .with_fifth(path("/skylib"))
+            .with_sixth(path("/cc"))
+    };
+    let need = |workspace: &str, names: &[&str]| {
+        SourcePreparationNeeds::environment(
+            NeedRepositoryEnvironmentNames::new(
+                path(workspace),
+                RepositoryEnvironmentNameFrontier::from_unsorted(
+                    names
+                        .iter()
+                        .map(|name| compact_str::CompactString::new(name)),
+                ),
+            )
+            .unwrap(),
+        )
+    };
+    let all = need("/fixture", &RULES_CC_ENVIRONMENT_NAMES);
+    assert_eq!(all.repository_environment().unwrap().names().len(), 13);
+    assert!(selected().admit(&all).is_err());
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let bodies = selected().with_rules_cc_import_sources(registry, command);
+            let enabled = matches!(registry, RegistryChoice::PreparedFile)
+                && matches!(command, CommandChoice::PublicProbe);
+            assert_eq!(bodies.rules_cc_import_sources, enabled);
+            assert_eq!(bodies.admit(&all).is_ok(), enabled);
+        }
+    }
+    let bodies = selected()
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    for name in RULES_CC_ENVIRONMENT_NAMES {
+        assert!(bodies.admit(&need("/fixture", &[name])).is_ok());
+    }
+    assert!(
+        bodies
+            .admit(&need("/fixture", &["TEMP", "BAZEL_VC"]))
+            .is_ok()
+    );
+    let sparse = make()
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(sparse.rules_cc_import_sources && sparse.admit(&all).is_err());
+    for names in [["temp"], ["TEMP_suffix"], ["UNKNOWN"], [""]] {
+        let bad = need("/fixture", &names);
+        for mixed in [all.try_union(&bad).unwrap(), bad.try_union(&all).unwrap()] {
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(denied.family, "environment");
+            assert!(std::ptr::eq(
+                bodies
+                    .environment_diagnostic(&mixed, &denied)
+                    .unwrap()
+                    .request,
+                mixed.repository_environment().unwrap(),
+            ));
+        }
+    }
+    let mut too_many = RULES_CC_ENVIRONMENT_NAMES.to_vec();
+    too_many.push("UNKNOWN");
+    assert!(bodies.admit(&need("/fixture", &too_many)).is_err());
+    let foreign = need("/foreign", &RULES_CC_ENVIRONMENT_NAMES);
+    assert_eq!(bodies.admit(&foreign).unwrap_err().family, "environment");
+    assert!(all.try_union(&foreign).is_err());
+
+    let local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "unknown+", "/platforms")).clone(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    let excluded_path =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/fixture/unknown"),
+            PathObservationOperation::FileBytes,
+        )));
+    let bootstrap =
+        SourcePreparationNeeds::root_module_bootstrap(slug_bzlmod_v2::RootModuleBootstrapRequest {
+            workspace: path("/foreign"),
+        });
+    let milestones = Arc::new(Mutex::new(Milestones::default()));
+    let root = ModuleRoot {
+        bodies: Arc::new(bodies),
+        expected_registry: None,
+        milestones: milestones.clone(),
+    };
+    let first_name = all
+        .repository_environment()
+        .unwrap()
+        .names()
+        .iter()
+        .next()
+        .unwrap()
+        .as_ptr();
+    let mut progress = 0;
+    for (excluded, family) in [
+        (&local, "materialization"),
+        (&excluded_path, "path"),
+        (&bootstrap, "bootstrap"),
+    ] {
+        for mixed in [
+            all.try_union(excluded).unwrap(),
+            excluded.try_union(&all).unwrap(),
+        ] {
+            assert!(std::ptr::eq(
+                mixed
+                    .repository_environment()
+                    .unwrap()
+                    .names()
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .as_ptr(),
+                all.repository_environment()
+                    .unwrap()
+                    .names()
+                    .iter()
+                    .next()
+                    .unwrap()
+                    .as_ptr(),
+            ));
+            let denied = root.bodies.admit(&mixed).unwrap_err();
+            assert_eq!(denied.family, family);
+            assert!(
+                root.bodies
+                    .environment_diagnostic(&mixed, &denied)
+                    .is_none()
+            );
+            if family == "materialization" {
+                assert!(Arc::ptr_eq(
+                    mixed.repository_materializations().values().next().unwrap(),
+                    original,
+                ));
+            }
+            if let Ok(SourcePreparationOutcome::Need(_)) = root.need(mixed) {
+                progress += 1;
+            }
+            assert_eq!(
+                milestones.lock().unwrap().denied.as_ref().unwrap().family,
+                family
+            );
+        }
+    }
+    assert_eq!(progress, 0);
+    let SourcePreparationOutcome::Need(recovered) = root.need(all).unwrap() else {
+        panic!("authorized names must return their original Need for normal progress");
+    };
+    assert_eq!(
+        recovered.repository_environment().unwrap().names().len(),
+        13
+    );
+    assert!(std::ptr::eq(
+        recovered
+            .repository_environment()
+            .unwrap()
+            .names()
+            .iter()
+            .next()
+            .unwrap()
+            .as_ptr(),
+        first_name,
+    ));
+    drop(recovered);
+    drop(local);
+    assert!(weak.upgrade().is_none());
+    drop(root);
+    assert_eq!(Arc::strong_count(&milestones), 1);
+}
+
 #[test]
 fn environment_refusal_projection_is_bounded_and_borrowed() {
     use fmt::Write;
@@ -3548,6 +3724,26 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
     .unwrap();
     request.lockfile_mode = LockfileMode::Off;
     request.registry_urls = registry.dupe();
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    request.repository_environment =
+        slug_bzlmod_v2::RepositoryEnvironmentSnapshot::from_canonical([
+            slug_bzlmod_v2::RepositoryEnvironmentEntry::new("TEMP", "fixture-only"),
+        ])
+        .unwrap();
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    request.repository_environment = slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty();
     assert!(projection_matches(
         &inner,
         &request,

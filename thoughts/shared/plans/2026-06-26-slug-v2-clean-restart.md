@@ -34,28 +34,31 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-248-m7a-normal-rustc-environment-name-diagnostic-r1
-Status: Accepted borrowed environment-name diagnostic; finite snapshot readiness design selected
+Packet: WP-7-249-m7a-normal-rustc-environment-snapshot-readiness-r1
+Status: Accepted finite environment snapshot readiness; bounded Linux own-plan design selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1024](./slug-v2-subplans/wp1024-environment-name-diagnostic-2026-10-08.json)
-accepts a phase-only borrowed environment-name diagnostic with unchanged admission. Core93/
-fourthemes/native1 and independent FINAL pass:98 names/100 current records/zero captures.
-Native4.057432486s/209448KiB<262144,914 direct/927auditunion pins, same294ordered188+106/
-two64KiB. Source123/decoded6172507/ErrorNone/writes39599/peakbank11679531/end0 unchanged.
-Zero retained fields/strings/paths/request/frontier/Arc copies/new interner/cache/pool;
-Rust273net growth reviewed as coherent formatter/boundary tests;12helpers107net/fourpolicies
-exact. One decoder-carrier gap corrected before activation/operations with original REVISE
-preserved, no runtime failure/retry/capraise. Actual13 original environment names166B and101B
-workspace match captured, no values/repository owner/caller/Windows dispatch proved. Next
-finite readiness design through original command snapshot/workspace/revision/certificate/
-absence/revocation/progress, no blanket permission or process reads. Bounded prefix fits;
-full normal producer/whole graph/certificate/native heap Weak still open, source128 remaining5
-numeric only. Borrow/transfer/share and existing scoped interners where retained repetition
-and cleanup fit; Windows minimal stubs/deferred until effectively testable.
+[WP1025](./slug-v2-subplans/wp1025-environment-snapshot-readiness-2026-10-08.json)
+accepts finite original13-name snapshot readiness using existing tracked command/frontier
+owners and paired CC source role/selected slot/workspace. Core98/fourthemes/native1/FINAL
+pass:103 names/105 current records/no capture. Native4.047630027s/209140KiB<262144,
+922direct/935auditunion pins; environment refusal absent. Same294ordered188+106/two64KiB,
+Source123/decoded6172507/ErrorNone/writes39599/peakbank11679531/end0 unchanged. Zero new
+native retained fields/strings/paths/request/frontier/Arc copies/cache/interner/pool;
+Rust228net growth reviewed as coherent guard/projection/functional tests;12helpers44net/
+fourpolicies exact. Four existing snapshot lifecycle gates fresh, all old93 protected,
+one new admission selector; no runtime failure/retry/capraise/secondactivation.
+Next original GeneratedFileEffects/generated_kind owner is
+bazel_tools+winsdk_configure+local_config_winsdk with rule bazel_tools/tools/res:
+winsdk_configure.bzl % winsdk_configure,205B complete identity. Actual plan/mapping/attrs
+unobserved; next consequential design matches the owned Linux plan against exact source
+signatures and original owner/Spec/context before any grant, or preserves typed refusal.
+No Windows scope expansion. Bounded prefix fits; full normal producer/whole graph/
+certificate/native heap Weak still open, source128 remaining5 numeric only. Borrow/transfer/
+share and existing scoped interners for retained repetition with suitable cleanup.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

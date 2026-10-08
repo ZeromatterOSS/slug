@@ -297,6 +297,21 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "lib/modules.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
+const RULES_CC_ENVIRONMENT_NAMES: [&str; 13] = [
+    "BAZEL_VC",
+    "BAZEL_VC_FULL_VERSION",
+    "BAZEL_VS",
+    "BAZEL_WINSDK_FULL_VERSION",
+    "TEMP",
+    "TMP",
+    "VS100COMNTOOLS",
+    "VS110COMNTOOLS",
+    "VS120COMNTOOLS",
+    "VS140COMNTOOLS",
+    "VS150COMNTOOLS",
+    "VS160COMNTOOLS",
+    "VS90COMNTOOLS",
+];
 const RULES_CC_IMPORTS: [&str; 50] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
@@ -884,6 +899,20 @@ impl Bodies {
             }
         }
         None
+    }
+    fn admits_repository_environment(
+        &self,
+        request: &slug_bzlmod_v2::NeedRepositoryEnvironmentNames,
+    ) -> bool {
+        self.rules_cc_import_sources
+            && self.additional[2].is_some()
+            && request.workspace() == &self.roots[0]
+            && !request.names().is_empty()
+            && request.names().len() <= RULES_CC_ENVIRONMENT_NAMES.len()
+            && request
+                .names()
+                .iter()
+                .all(|name| RULES_CC_ENVIRONMENT_NAMES.contains(&name.as_str()))
     }
     fn environment_diagnostic<'a>(
         &self,
@@ -1515,7 +1544,10 @@ impl Bodies {
         {
             return Err(refusal("bootstrap"));
         }
-        if needs.repository_environment().is_some() {
+        if needs
+            .repository_environment()
+            .is_some_and(|request| !self.admits_repository_environment(request))
+        {
             return Err(refusal("environment"));
         }
         if !needs.selected_extension_downloads().is_empty() {
