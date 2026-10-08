@@ -1,152 +1,118 @@
 # Slug V2 current work packet
 
-Packet: WP-7-250-m7a-normal-rustc-linux-winsdk-own-plan-readiness-r1
-Status: Accepted finite Linux winsdk own-plan readiness; exact marker metadata design selected
+Packet: WP-7-251-m7a-normal-rustc-linux-winsdk-marker-metadata-r1
+Status: Accepted finite winsdk marker metadata; exact ignore metadata design selected
 
 ## Outcome and accepted basis
 
-Advance the original Linux winsdk GeneratedFileEffects Need in the unchanged normal public
-Rustc //pkg:probe fixture with support/data/registered toolchains, Bazel9.2/rules_rust0.73/
-edition2024/nightly2025-09-14/platforms1.1.0 and eleven saved oracle commands. Normal producer,
-same-DICE2024→2021→2024 restoration and full graph remain the broader priority. Accepted exact
-source/oracle bytes stay exact; finite cfgtest readiness is Slug-native. Windows is deferred.
+Advance the observed exact winsdk REPO.bazel Lstat in the unchanged normal public Rustc
+//pkg:probe fixture, preserving all limits. This is finite Slug-native cfgtest readiness;
+accepted Bazel9.2 source/oracle bytes remain exact. Full normal producer, same-DICE edition
+2024→2021→2024 restoration and compiler execution remain the broader priority; Windows deferred.
 
-[WP1026](wp1026-linux-winsdk-own-plan-readiness-2026-10-08.json) accepts original Linux
-winsdk owned-plan readiness. Core98/themes4/native1/independent FINAL pass:103 names/
-105 current records/no capture. Native4.190360542s/209584KiB<262144/927direct/940auditpins.
-Original full empty Spec/mappingNone/workspace/atomic owner and exact ordered two-file
-signatures are checked under existing generated+CC roles before progress. Materialization
-and environment refusals absent; Written39690 is +91 versus predecessor. Source123/
-decoded6172507/ErrorNone/peakbank11679531/end0 unchanged. Same294 ordered188+106 source
-brackets/two64KiB/6410499physical12820998bracket bytes. Zero new native retained fields/
-strings/paths/Arc/request/plan/Spec copies/cache/interner/pool. Borrow original storage and
-use existing scoped interning for repeated retained strings with suitable cleanup.
-Rust169net/216insertions47deletions in two existing cfgtest owners; actual STATIC reviewed
-cohesive seven test extensions. Twelve helpers89net/fourpolicies exact; all98 selectors
-preserved. No failure/retry/capraise/stale-pin waiver/secondactivation. Bounded prefix fits;
-full producer/whole graph/certificate/native body-plan-registry Weak remain open. Windows
-minimal/deferred.
+[WP1027](wp1027-linux-winsdk-marker-metadata-2026-10-08.json) accepts exact original
+winsdk generation-root-relative REPO.bazel Lstat under existing independent marker role,
+full original Spec/context/current epoch/own ordered plan. Ignore remains hub-only in this
+accepted checkpoint. Core98/themes4/native1/independent FINAL pass:103 names/105 supervised
+records/no capture. Native4.222622315s/210136KiB<262144/927direct/940auditunion pins;
+source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0 unchanged. Same294
+ordered188+106/two64KiB/6410499physical12820998bracket bytes. Child57net/three existing
+finite/mixed/A-B-A themes/all98 selectors unchanged; twelve helpers50net/fourconfigs and
+fourpolicies exact. Zero new native retained strings/fields/paths/Arc/request/Spec/plan
+copies/cache/interner/pool. Borrow storage and use existing scoped interners for retained
+repetition with suitable cleanup. No supervised failures/runtime retry/capraise/stale waiver/
+secondactivation. One root launcher precondition error started no child; verbatim tool-output
+stderr/cause retained and corrected by joining original prelaunch before the sole native.
+Full producer/whole graph/certificate/native body-plan-registry heap Weak remain open;
+Windows minimal/deferred.
 
-[Actual next-source](../../../../target/wp1026/next-source.md) and
-[next-evidence](../../../../target/wp1026/next-evidence.md) bind the next namespace Lstat
-of exact REPO.bazel under the original winsdk generation root. Saved original association
-is unique/materialization/instance6; owner_plan_allowedtrue/path_classother. The26B raw
-temporary path is opaque, never a reconstructed root. Next design extends only the existing
-repo_marker class under checked repo_marker_metadata/current epoch/full original own-plan
-and Spec/context, Lstat only. ignore_marker stays hub-only; no marker body/listing/generic
-namespace/Windows grant. Own-plan scalar and +91 writes do not independently establish
-completed outputs/full Spec/caller chain. Source128 remaining5 is numeric headroom only.
-Successor proposals are prospective, unactivated; all caps fixed.
+[Actual next-source](../../../../target/wp1027/next-source.md) and
+[next-evidence](../../../../target/wp1027/next-evidence.md) bind exact .bazelignore Lstat
+under the same original winsdk unique materialization instance6 association,205B exact owner/
+101B workspace/logical_rootNone/own-plan true/path_classother. Opaque28B temporary path never
+reconstructs a physical root. Prospective next design extends only existing ignore_marker
+under checked independent ignore_file_bytes/full current Spec/context/plan/original-root
+comparison, Lstat only. No body/listing/generic marker/other-owner/Windows grant. Marker
+progression/current source scalar are not availability/kind/completed output/fullSpec/caller
+proof. Source128 remaining5 is numeric headroom only. Successor remains unactivated; caps fixed.
 
-## Decision, natural owners and original context
+## Decision, semantic owner and unchanged invariants
 
-Choose cohesive own-plan authentication before IO, with existing bounded borrowed diagnostic
-on exact-owner mismatches. A separate diagnostic-only native is unnecessary: the matcher must
-prove the ORIGINAL owned plan matches source-derived ordered signatures before admission;
-unknown or changed shape/Spec remains refused. Names/tuple/scalars alone grant nothing.
+Reuse existing repo_marker classification for both hub and the exact selected static
+GENERATED_WINSDK_FILES slice, under the independent existing repo_marker_metadata flag.
+namespace_policy borrows the original unique<=32 current-epoch request/immutable success
+view/generation root; generated_features_owner_signatures retains original workspace/atomic
+five-field owner, selected CC slot+role/generated role/mappingNone/full empty Spec and own
+ordered two-file signature revalidation. Compare only demand.path.strip_prefix(original root)
+== Path("REPO.bazel"). NamespacePolicy::admits still requires owner_plan_allowed and Lstat.
+No basename/prefix/root reconstruction, recursive/listing/ReadLink/FileDigest/FileBytes grant,
+marker body/output invention, new role or Windows algorithm. .bazelignore stays hub-only
+under existing independent ignore flag; all other owner marker classifications stay closed.
+A shape mismatch may classify repo_marker but remains denied by own-plan false; role-off
+classifies other. Validate the entire original Need before publication/progress/IO.
 
-Checked-in verbatim Bazel builtin tools/res/winsdk_configure.bzl has non-Windows empty rc_exes
-and _impl writes exactly BUILD empty/executableFalse, then toolchains.bzl91B/False with the
-no-op registration text. builtin MODULE.bazel46–48 declares only legacy name; instantiation
-converted_attributes628–680 excludes it. Existing Loading
-exact_builtin_winsdk_reaches_generic_environment_retry4960–5120 asserts the exact Linux
-ordered bytes after tracked empty-snapshot13-name retry. This is source feasibility, not
-an actual WP1025 plan observation or new Windows algorithm/dispatch. No fresh Loading test
-executable is needed: Core original-plan discrimination and actual native progression cover
-this private guard; the pinned source regression is qualified, zero current execution credit.
+Pinned source authority is inherited WP1026 verbatim Bazel winsdk_configure.bzl (Linux empty
+BUILD then91B toolchains.bzl), MODULE legacy-name conversion, Loading plan and canonical
+original-Spec staging. app/slug_bzlmod_v2/src/repo_file.rs HostRepoFileKey830–890 constructs
+REPO.bazel as a tracked path, Missing→empty semantic value and Present→tracked bytes/evaluation.
+This establishes the marker category, not exact native higher caller or availability/kind.
+Original DICE request projections/platform/snapshot/revision/certificate/materialization
+success epoch/invalidation/cleanup remain natural production owners; no keys/locks/side cache/
+ambient IO/identity repair. Current source projection/own-plan scalar is not independent full
+Spec/output/certificate proof. Existing stale epoch/A-B-A/mixed Need pointer/Weak recovery
+controls remain required. Public command retains original empty immutable snapshot.
 
-Add only one branch to Bodies::generated_features_owner_signatures under existing
-generated_features_file_effects AND rules_cc_import_sources (set only PreparedFile AND
-PublicProbe), selected additional[2], original roots[0] workspace, exact five-field tuple,
-label.mapping_idNone and FULL original RepoSpec.attributes.is_empty(). Preserve original
-Spec/request/plan; no reduced copied Spec or attrs-count identity repair. Expected signatures:
-BUILD0/SHAe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855/False;
-toolchains.bzl91/SHA400a13e75d466f43bee643ea1253076d1f5b1f5115d67a68192cdbaa8368ca7f/False.
-Return static borrowed signatures; existing matcher checks complete bounded File-only
-shape/path/length/exec/order/end before hashing borrowed original content. Extra/reordered/
-changed/Archive/Symlink/mapping/nonempty attrs/crossed identity/workspace/roles remain closed.
-Shared admission still validates entire original Need before any progress/publication/IO;
-scratch/bootstrap/environment/download/execute/materialization/path priority is unchanged.
+## Scope, allocation and discriminating evidence
 
-Native Loading DICE produces evaluated owned plan with tracked platform/snapshot/cells and
-original route/certificate dependencies. canonical_repository_source100–113 stages ORIGINAL
-RepoSpec alongside workspace/canonical request id and plan. Normal runtime/materializer owns
-revision/certificate/materialization epoch/credit/WrittenBytes/preflight/revalidation,
-cancellation/join/acceptance/retirement. Public projection retains actual empty immutable
-snapshot check from WP1025. No production/DICE key/lock/provider/request repair or ambient IO.
-Windows execution already unsupported after declared environment retry; keep that boundary.
+Rust allowlist: existing public_probe_preparation_tests.rs only; parent only for demonstrated
+necessary obligation and root review. No production files/new modules/suite/factory/selectors.
+Extend existing finite namespace/mixed/current-epoch tests for winsdk exact marker positive,
+all five operations, independent repo/ignore flags, wrong root/owner/Spec/mapping/plan/current
+instance and case/child/suffix negatives. Preserve all hub controls/all98 selectors/assertions.
+Use tiny plan seam for policy closure plus existing real91B matcher positive/mutation; seam
+is not normal runtime proof. Mixed accepted marker+unknown siblings both orders must preserve
+original demand/request pointers, zero progress before recovery and Weak retirement.
 
-Existing current-epoch namespace policy reuses same signatures only for unique<=32 original
-epoch request/current immutable success generation root/revalidated FULL own plan/Spec.
-Exact two files permit only Lstat/FileBytes; root/component ancestors only Lstat. No physical
-root invention, any-known-owner/prefix-recursive/listing/marker/alias/effect grant. Existing
-actual A-B-A/stale epoch/unknown/mixed/zero-progress controls remain. Diagnostic eligibility
-adds exact five-field tuple/original workspace/GeneratedFileEffects/first generated_kind only;
-it borrows original request/plan through unchanged WP983 bounds/grammar, regardless of role or
-mapping/attrs failure, without turning diagnostic eligibility into permission.
+Reuse static slice identity and borrowed paths/requests/Spec/content. Zero new native fields,
+String/Path/Arc/plan/Spec copies/interner/cache/pool. Existing materializer semantic storage
+unchanged, precise retained delta unmeasured. Use scoped interners where retained repetition
+and cleanup fit; avoid interning temporary diagnostic strings. Estimate10–60net Rust plus
+focused controls; >100/new retained owner triggers STATIC reassessment. Existing large cfgtest
+child stays cohesive to finite namespace policy and its existing tests; no unrelated cleanup.
+No performance claim for unchanged representation; representative prefix is remeasured.
 
-## Scope, allocation and discriminators
+Twelve minimal current WP1026 helper counterparts; four policies/inputs/owners/toolchain and
+all294 ordered188+106 external source bindings remain byte-exact. Add known repo_file.rs
+source pin only if helper authors ground the new current authority; not a new external lease.
+Reuse closed repo_marker tag and strict existing decoder grammar. Extend hub_marker_policy
+with exact winsdk repo-marker branch under winsdk_effective checked generated/public/CC/root/
+FULL50 context plus marker role and unique original namespace owner. Keep validated legacy8
+callback explicitly8 after full50 verification; no pretending8is50. Rust original-root
+comparison supplies authority; decoder raw basename check is transport coherence only.
+Own-plan true+Lstat repo_marker denial is contradiction; false own-plan honest refusal;
+non-Lstat denied, disabled marker role must classifyother. ignore marker remains hub-only.
+Four themes cover admitted contradiction/false plan/other ops/foreign workspace+owner/role/
+root+class/malformed adjacency/duplicate/missing framing; role-off tests pure predicate isolation,
+no fabricated checked disabled public transcript. Preserve old capture files/constants/raw.
+No current capture; qualified prior22/70/63 and reader/owner/Bzlmod/reference zero fresh credit.
 
-Rust allowlist only existing platforms_module_preparation_tests.rs and child
-public_probe_preparation_tests.rs. Cohesive existing static signature/admission/namespace/
-formatter controls, no new module/suite/factory/publicAPI/builtin/source table/production owner.
-Borrow existing strings/paths/content/Spec; transfer normal owned plan unchanged. Static pair
-estimated128 descriptor bytes plus19 path literal bytes on64-bit target, layout qualified;
-no91B plaintext mirror/new retained field/String/Vec/Path/Arc/request/plan/Spec clone/cache/
-interner/global pool. Existing normal writer storage/credit is legitimate semantic ownership,
-precise retained delta unmeasured. Scoped interning remains appropriate for repeated retained
-strings whose lifetime/cleanup fits; no diagnostic name pool. Estimate40–100 net Rust plus
-cohesive test rows; >150/new retained owner triggers actual STATIC reassessment. No benchmark
-claim for unchanged representations; actual prefix remeasured against unchanged memory caps.
+## Review, execution and genuine decision boundaries
 
-Preserve all98 selectors and original assertions; extend existing generated materialization
-opt-in/exact and mixed-before-progress, finite namespace/mixed and two formatter tests. Exact
-two-file content positive; both files length/digest/exec/path/order/extra mutations; all four
-registry-command modes and independent generated/CC role disabling, missing selected slot,
-foreign/crossed five fields, mappingSome and nonempty attrs. Check full context before shape
-closure using existing tiny-byte seam; no false test arithmetic as actual progress. Mixed
-unknown siblings both orders preserve original request/plan pointers and actual zero progress
-before standalone recovery/Weak retirement. Namespace own-plan revalidation/request/root/
-instance A-B-A/stale/other files/DirectoryEntries/ReadLink/FileDigest/unknown owner stay closed.
-Formatter exact-owner mismatch captures original mapping/attrs/order/counts; wrong tuple/
-workspace/earlier first family has no plan marker. Retain all inclusive/+1 count/path/content/
-mapping/encoded bounds and malformed cases. Prefer existing selectors; at most one meaningful
-new selector only if source author shows existing theme cannot contain cohesive controls,
-then root freezes99 before review.
+Consequential DESIGN before source/helper edits; ONE combined actual STATIC before root sole
+prepare/protocol False→True switches. Serial fresh pinned nightly2025-09-14 cargo/rustc/rustdoc/
+rustfmt; dependency/compile/direct Loading-Core-CLI check offline/jobs1/CargoJSON<=60s/nine
+profiles. Current executable preflight/list/Core98/fourthemes, root complete wrapper+leaf
+prelaunch notes, ONE changed native, audit once/actual independent FINAL/compact receipt/commit.
+Planned105 records/103 names are not future pass credit. Preserve any failed operation/raw/
+pins; changed hypothesis before retry, no identical repeat/capraise/stale waiver/old executable
+traversal. Capture tables and accepted historical evidence remain immutable.
 
-## Evidence, activation and validation
-
-Twelve minimum WP1025 counterparts; four policy modules/input/owners/toolchain byte-exact.
-Compose exact owner into invocation-private WP983 plan decoder and WP988 known namespace
-owner predicates only; legacy raw/files/constants remain unchanged. Validate full CC50/meta12
-before explicit legacy8 projection, same narrow metadata-only base fixture view/Shell9/5.
-Pure effective winsdk permission requires checked generated role plus exact selected CC root/
-full table/checked source role/public policy, original workspace/atomic tuple, captured exact
-ordered plan/mappingNone/attribute_count0. Zero attributes proves empty, not full nonempty
-Spec association; declared names/identity alone never proves permission. Exact plan denial
-under full conjunction is contradiction; disabled role/foreign/crossed/mapped/nonempty attrs/
-changed/bounds-refused plans remain honest. Namespace known owner requires effective CC
-role/table context and validated existing owner_plan_allowed/current unique association;
-scalar own-plan marker is source-bound projection, not independent full plan evidence.
-No raw markers/normalization of raw values/clocks/roles/caps/counters/legacy helper rewrite.
-Same four themes extend exact-match contradictions/changed-plan-role-owner negatives,
-diagnostic presence/eligibility/strict framing/mapping/attrs/bounds and finite namespace
-conditions. Isolate role-disabled pure predicates, no forged checked public transcript.
-
-Consequential DESIGN before Rust/helpers; ONE combined actual STATIC before root sole
-prepare/protocol False→True inverses; serial fresh pinned-toolchain dependency/compile/direct
-Loading-Core-CLI check offline/jobs1/CargoJSON under60s/nine profiles. Fresh preflight/list/
-Core98(or approved99)/four themes, complete root current wrapper/leaf prelaunch notes,
-ONE changed native, audit once/independent actual FINAL/compact receipt/commit. Planned98Core
-means105 current records/103 names, not future pass credit. No fresh capture: prior22/70/63,
-reader/owner/Bzlmod/reference/Workspace zero fresh. Preserve actual failures; changed hypothesis
-before retry, no identical retry/capraise/stale-map waiver/old executable target traversal.
-
-Inputs/signatures same294 ordered188+106/6410499physical12820998brackets/two64KiB;
-work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/source128/default16/
-production64/defaultHostRegistry1MiB/exactknown_shas4749878/eachbank16MiB/log1MiBeach/report4MiB/
-FSIZE16MiB/nine profiles unchanged. Selector76 alone existing MALLOC_ARENA_MAX2; nativeenv
-unchanged. Source headroom is numeric, not import closure/fit. Actual next genuine typed
-refusal selects natural owner decision; no speculative future grants. Full normal public
-Rustc/providers/runfiles/actions/edition reversal/compiler/certificate/body-plan-registry heap
-Weak/parent+child aggregate memory and whole graph fit remain open. Overall goal stays active.
+Inherited caps: work5/lifetime8/native10/shared absolute cleanup3/RSS256MiB/AS512MiB/source128/
+defaultprobe16/production64/defaultHostRegistry1MiB/exactknown_shas4749878/eachbank16MiB/log1MiB
+per stream/report4MiB/FSIZE16MiB; unchanged294/two64KiB/6410499physical12820998bracket bytes.
+Nine profiles unchanged; selector76 only MALLOC_ARENA_MAX2/native environment unchanged.
+No acquisition or speculative successor grant. Actual next typed refusal selects the next
+natural owner decision; REPLAN only for contradictory prerequisite/ownership/class, not a
+routine invocation correction. Full producer/providers/runfiles/actions/compiler/edition
+restoration/certificate/native body-plan-registry heap Weak/parent+child aggregate and whole
+workload fit remain open. Overall goal stays active.

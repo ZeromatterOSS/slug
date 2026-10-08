@@ -34,30 +34,30 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-250-m7a-normal-rustc-linux-winsdk-own-plan-readiness-r1
-Status: Accepted finite Linux winsdk own-plan readiness; exact marker metadata design selected
+Packet: WP-7-251-m7a-normal-rustc-linux-winsdk-marker-metadata-r1
+Status: Accepted finite winsdk marker metadata; exact ignore metadata design selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1026](./slug-v2-subplans/wp1026-linux-winsdk-own-plan-readiness-2026-10-08.json)
-accepts finite original Linux winsdk plan readiness through exact source-defined two-file
-signatures and original full empty Spec/mappingNone/workspace/atomic owner under existing
-generated+CC roles. Core98/fourthemes/native1/FINAL pass:103 names/105 records/no capture.
-Native4.190360542s/209584KiB<262144/927direct/940auditunion pins; materialization/environment
-refusals absent, Written39690 (+91). Same294ordered188+106/two64KiB; Source123/decoded6172507/
-ErrorNone/peakbank11679531/end0 unchanged. Zero new native retained strings/fields/paths/
-Arc/request/plan/Spec copies/cache/interner/pool. Rust169net and twelve helpers89net reviewed;
-seven existing themes extended/all98 selectors preserved/fourpolicies exact. No failure/
-retry/capraise/secondactivation. Next exact REPO.bazel Lstat has original winsdk unique
-materialization instance6 association/own-plan true/path_classother. Prospective design
-extends existing repo_marker under checked marker role/current epoch/original full own-plan
-and generation root only; ignore marker stays hub-only, no body/listing/generic grant.
-Opaque temporary root is never reconstructed. Writes/own-plan scalar are not independent
-completed output/fullSpec/caller proof. Bounded prefix fits; full normal producer/whole graph/
-certificate/native heap Weak remain open. Windows deferred; source128 remaining5 numeric only.
-Borrow/transfer existing storage and use scoped interners where retained repetition fits.
+[WP1027](./slug-v2-subplans/wp1027-linux-winsdk-marker-metadata-2026-10-08.json)
+accepts exact original generation-root-relative winsdk REPO.bazel Lstat under independent
+marker role/full original Spec/context/current epoch/own plan. Core98/fourthemes/native1/
+FINAL pass:103 names/105 supervised records/no capture. Native4.222622315s/210136KiB<262144/
+927direct/940auditunion; Source123/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0
+unchanged, same294ordered188+106/two64KiB/6410499physical12820998brackets. Child57net/three
+existing finite/mixed/A-B-A themes/all98 selectors preserved;12helpers50net/four policies and
+configs exact. Zero new native retained fields/strings/paths/Arc/request/Spec/plan copies/
+cache/interner/pool; no supervised failures/runtime retry/capraise/secondactivation. One root
+launcher precondition error started no child, preserved and corrected by joining prelaunch
+before sole native. Next exact .bazelignore Lstat is same original winsdk unique instance6/
+own-plantrue/path_classother; next design extends existing ignore_marker/checked ignore role/
+originalroot/full Spec-context-ownplan, Lstat only. Opaque root not reconstructed; no body/
+listing/newowner/Windows grant. Current source scalar/progression not independent output/
+fullSpec/caller/availability proof. Bounded prefix fits; full producer/whole graph/certificate/
+native heap Weak remain open; source128 remaining5 numeric only. Borrow existing storage and
+use scoped interners for retained repetition when lifetime/cleanup fits. Windows deferred.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

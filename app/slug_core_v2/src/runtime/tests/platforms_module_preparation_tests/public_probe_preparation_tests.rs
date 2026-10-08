@@ -298,7 +298,8 @@ fn namespace_policy(
     } else if let Ok(relative) = path.strip_prefix(root) {
         if files.iter().any(|file| relative == Path::new(file.0)) {
             "fixed_file"
-        } else if std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+        } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
+            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..]))
             && bodies.repo_marker_metadata
             && relative == Path::new("REPO.bazel")
         {
@@ -1546,7 +1547,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    owner == 3 && index != 1
+                    (owner == 3 || owner == 4 && path == "/generation/REPO.bazel") && index != 1
                 );
             }
             if index == 0 {
@@ -1810,7 +1811,11 @@ fn generated_features_namespace_is_finite_and_exact() {
             (fixed, "fixed_file"),
             (
                 "/parent/generation/REPO.bazel",
-                if owner == 3 { "repo_marker" } else { "other" },
+                if matches!(owner, 3 | 4) {
+                    "repo_marker"
+                } else {
+                    "other"
+                },
             ),
             (
                 "/parent/generation/.bazelignore",
@@ -1886,7 +1891,7 @@ fn generated_features_namespace_is_finite_and_exact() {
                 );
             }
         }
-        if owner == 3 {
+        if matches!(owner, 3 | 4) {
             for repo_enabled in [false, true] {
                 for ignore_enabled in [false, true] {
                     let mut roles = namespace_test_bodies();
@@ -1897,7 +1902,7 @@ fn generated_features_namespace_is_finite_and_exact() {
                         (
                             "/parent/generation/.bazelignore",
                             "ignore_marker",
-                            ignore_enabled,
+                            ignore_enabled && owner == 3,
                         ),
                     ] {
                         let marker = demand(path, PathObservationOperation::Lstat);
@@ -1972,7 +1977,7 @@ fn generated_features_namespace_is_finite_and_exact() {
                 !namespace_policy(&closed, &d, Some(&epoch), &|_, _| true).admits(&d.operation())
             );
         }
-        for index in 0..4 {
+        for index in 0..if owner == 4 { 6 } else { 4 } {
             let mut wrong = request.as_ref().clone();
             match index {
                 0 => {
@@ -1982,6 +1987,28 @@ fn generated_features_namespace_is_finite_and_exact() {
                 1 => wrong.repo_spec.rule_id.rule_name = "other".into(),
                 2 => wrong.kind = RepositoryMaterializationKind::Immutable,
                 3 => wrong.kind = namespace_test_request(&bodies, owner != 1).kind,
+                4 => {
+                    let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                        slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                    );
+                    mapping.insert(
+                        slug_identity_v2::ApparentRepoName::new("tools").unwrap(),
+                        slug_identity_v2::CanonicalRepoName::new("bazel_tools").unwrap(),
+                    );
+                    wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                        "@tools//tools/res:winsdk_configure.bzl",
+                    )
+                    .unwrap()
+                    .resolve(&mapping);
+                }
+                5 => {
+                    let mut attributes = starlark_map::small_map::SmallMap::new();
+                    attributes.insert(
+                        compact_str::CompactString::new("unexpected"),
+                        slug_bzlmod_v2::OverrideAttributeValue::None,
+                    );
+                    wrong.repo_spec.attributes = Arc::new(attributes);
+                }
                 _ => unreachable!(),
             }
             let wrong =
@@ -1990,6 +2017,21 @@ fn generated_features_namespace_is_finite_and_exact() {
                 !namespace_policy(&bodies, &d, Some(&wrong), &small_namespace_plan_matches)
                     .admits(&d.operation())
             );
+            if matches!(owner, 3 | 4) {
+                let marker = demand(
+                    "/parent/generation/REPO.bazel",
+                    PathObservationOperation::Lstat,
+                );
+                assert!(
+                    !namespace_policy(
+                        &bodies,
+                        &marker,
+                        Some(&wrong),
+                        &small_namespace_plan_matches
+                    )
+                    .admits(&marker.operation())
+                );
+            }
         }
         assert_eq!(Arc::strong_count(&request), count);
         assert!(std::ptr::eq(
@@ -2177,15 +2219,26 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
         )
         .try_union(&SourcePreparationNeeds::repository(host.as_ref().clone()))
         .unwrap();
+        let repo_marker = if owner == 4 {
+            "/winsdk-generation/REPO.bazel"
+        } else {
+            "/hub-generation/REPO.bazel"
+        };
+        if matches!(owner, 3 | 4) {
+            host_need = host_need
+                .try_union(&need(
+                    PathObservationNamespace::Materialization(host_instance),
+                    repo_marker,
+                ))
+                .unwrap();
+        }
         if owner == 3 {
-            for path in ["/hub-generation/REPO.bazel", "/hub-generation/.bazelignore"] {
-                host_need = host_need
-                    .try_union(&need(
-                        PathObservationNamespace::Materialization(host_instance),
-                        path,
-                    ))
-                    .unwrap();
-            }
+            host_need = host_need
+                .try_union(&need(
+                    PathObservationNamespace::Materialization(host_instance),
+                    "/hub-generation/.bazelignore",
+                ))
+                .unwrap();
         }
         assert!(admits(&host_need, Some(&host_epoch)).is_ok());
         let crossed = need(
@@ -2196,12 +2249,16 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
             crossed,
             request(
                 PathObservationNamespace::Materialization(host_instance),
-                "/hub-generation/REPO.bazel",
+                repo_marker,
                 PathObservationOperation::FileBytes,
             ),
             need(
                 PathObservationNamespace::Materialization(host_instance),
-                "/hub-generation/unknown",
+                if owner == 4 {
+                    "/winsdk-generation/unknown"
+                } else {
+                    "/hub-generation/unknown"
+                },
             ),
             need(
                 PathObservationNamespace::Materialization(host_instance),
