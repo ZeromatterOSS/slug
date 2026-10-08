@@ -35,26 +35,25 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Capturing remaining CC link collection sources
+Status: Correcting the exact platforms local binding
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP997](./slug-v2-subplans/wp997-remaining-cc-import-source-readiness-2026-10-07.json)
-admits one exact finalize-link source via the borrowed static role:46bodies/8metadata/matrix100,
-no retained strings/containers/flags or production/Windows changes. Capture19,570B/0.042s/
-20,436KiB and actualFINAL pass; freshcompile/check/63Rust+4controls pass. One normalnative
-4.308s peaks108,596KiB under256MiB, SourceErrorNone/source105/1,216,865/Written5228; all275
-leases match/endingcredits/scope-recorder retire. Actual next226B HostLstat is selectedCC
-collect_solib_dirs.bzl, first of two direct declared link-collection imports. Continue one
-bounded pair capture and conditional48/8 extension; initial capture/design review freezes
-the same-owner functional decision, actualcaptureFINAL precedes code/static beforeactivation.
-Caps/owners/storage stay fixed; observed hash/byte data does not require another identical
-design decision. Certificate/actions/Rustc/fullSpec/output/whole-workloadfit remain open.
-Representative allocation fits the cap, permitting broader readiness. Borrow/share storage,
-use existing scopedinterners when repeated retainedstrings/lifetime/cleanup fit. Complete
-public producer and whole-workload fit remain required.
+[WP998](./slug-v2-subplans/wp998-remaining-cc-import-source-readiness-2026-10-07.json)
+admits two exact CC link collection sources through48 borrowed bodies/8metadata/matrix104,
+with no retained allocation or production/Windows change. Capture38,903B and actual FINAL,
+fresh compile/check/63Rust+four controls pass. One native4.664s peaks122,092KiB under256MiB;
+SourceErrorNone/source107/1,255,768/Written5228,277 ordered leases and ending credits checked.
+Actual next local materialization binding refuses canonical platforms at the selected root.
+Natural production canonical_repo deliberately spells platforms; the cfgtest guard expects
+platforms+. Continue a reviewed exact single-spelling fixture-policy correction, preserving
+all nine Local checks and whole-Need precedence. No alias, production identity rewrite,
+extra mode or new source capture is selected. Certificate/actions/Rustc/fullSpec/output and
+whole-workload fit remain open. Representative prefix allocation permits broader readiness;
+borrow/share storage and use existing scoped interners where retained repetition/lifetime/
+cleanup fit. Complete public producer and whole-workload fit remain required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

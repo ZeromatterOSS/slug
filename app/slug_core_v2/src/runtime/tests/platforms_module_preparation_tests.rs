@@ -287,7 +287,7 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
     "lib/modules.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 2] = ["lib", "rules"];
-const RULES_CC_IMPORTS: [&str; 46] = [
+const RULES_CC_IMPORTS: [&str; 48] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
@@ -334,6 +334,8 @@ const RULES_CC_IMPORTS: [&str; 46] = [
     "cc/private/link/cpp_link_action.bzl",
     "cc/private/link/lto_indexing_action.bzl",
     "cc/private/link/finalize_link_action.bzl",
+    "cc/private/link/collect_solib_dirs.bzl",
+    "cc/private/link/create_libraries_to_link_values.bzl",
 ];
 const RULES_CC_IMPORT_METADATA: [&str; 8] = [
     "cc",

@@ -4445,7 +4445,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 100);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 104);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -4454,6 +4454,30 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/link/collect_solib_dirs.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/link/collect_solib_dirs.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/link/Collect_solib_dirs.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/cc/private/link/collect_solib_dirs.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/link/create_libraries_to_link_values.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/link/create_libraries_to_link_values.bzl",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/cc/cc/private/link/finalize_link_action.bzl/child",
             PathObservationOperation::Lstat,
