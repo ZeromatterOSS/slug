@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Capturing remaining CC link finalization source
+Status: Capturing remaining CC link collection sources
 
 ## Observable and source basis
 
@@ -44,87 +44,105 @@ REAPI and M7A/full-root remain open.
 
 ## Current accepted checkpoint
 
-[WP996](wp996-remaining-cc-import-source-readiness-2026-10-07.json) admits the two
-observed direct CC link sources through the existing exact cfgtest/Linux owner.
-Borrowed static bodies43→45, metadata8 unchanged, coupled matrix94→98 and six mixed
-negatives preserve old roles/defaults/scopes/cases/Features/Proxy.28 insertions/2 deletions,
-net26; no new retained strings/containers/flags or production/Windows change. Complete45
-exact decoder validation precedes accepted legacy8 interface projection, with current45/8
-denial contradictions and original raw/limits/flags/counters unchanged.
+[WP997](wp997-remaining-cc-import-source-readiness-2026-10-07.json) admits the observed
+CC finalize-link source through the existing cfgtest/Linux owner. Borrowed static bodies
+45→46/meta8 unchanged/matrix98→100 and five mixed negatives preserve all old roles,
+defaults/scopes/cases/Features/Proxy.23insertions/2deletions/net21; no new retained strings,
+containers,flags or production/Windows change. Complete46 exact decoder validation precedes
+the accepted legacy8 interface projection/current46/8 denial contradictions, original raw/
+limits/flags/counters unchanged.
 
-One two-source capture24,503B/0.043s/19,500KiB uses38 sequential regular FD opens,
-one64KiB scratch/per-row body-text-AST retirement and32 stable pins; both rows received
-actual independent FINAL. Fresh compile5.585s and Loading/Core/CLI check7.337s pass with
-zero tests;63 Rust+4 strict controls pass. One normal native4.071s peaks108,524KiB under
-256MiB, SourceErrorNone/source104/1,197,295 decoded/registry105/235,521/Written5228.
-The aggregate increase is2 attempts/+24,503 decoded versus WP995; this is not per-file
-attribution or proof every captured byte was consumed. Public preparation/singleton/policy
-checked complete; certificate/actions/Rustc unavailable. Actual next original HostLstat228B
-is selectedCC cc/private/link/finalize_link_action.bzl, FIRST/index0 of one declared leaf.
+One capture19,570B/0.042s/20,436KiB uses19 sequential regular FD opens/one64KiB scratch/
+per-row body-text-AST retirement/32 stable pins; the row received independent actualFINAL.
+Fresh compile5.455s and Loading/Core/CLI check7.401s pass with zero tests;63Rust+4strict
+controls pass. One normal native4.308s peaks108,596KiB under256MiB, SourceErrorNone,
+source105/1,216,865 decoded/registry105/235,521/Written5228. The aggregate increase is1
+attempt/+19,570 decoded versusWP996; matching the captured size is not per-file attribution
+or proof every byte was consumed. Public preparation/singleton/policychecked complete;
+certificate/actions/Rustc unavailable. Next actual original226B HostLstat is selectedCC
+cc/private/link/collect_solib_dirs.bzl, FIRST/index0 of a saved two-leaf declared pair.
 
-All274 ordered leases1,466,880 physical/2,933,760 bracket bytes match in SAME second
-86-row context/two64KiB buffers. Ending FD/logical/scratch/live credits retire and scope/
-recorder Weak expire; source WeakSeenfalse/vacuous expiry/body/registry/DICE/page/freshness/
-fullSpec/output/whole-workload fit remain unproved. One independent design/static/prelaunch/
-final reviewer accepted the delta. Current70 operations=69 native gates+one fresh2-source
-capture; prior seven captures/41 observations/reference have0fresh credit.68 fresh named
-passes=63ordinary+4synthetic+1native; source observations passNone.
+All275 ordered leases1,486,450physical/2,972,900bracket bytes match in SAMEsecond87-row
+context/two64KiB buffers. EndingFD/logical/scratch/live credits retire/scope-recorder Weak
+expire; sourceWeakSeenfalse/vacuous expiry/body-registry/DICE/page/freshness/fullSpec/output/
+whole-fit remain unproved. One independent reviewer accepted design/static/prelaunch/final.
+Current70 operations=69nativegates+fresh1sourcecapture; prior8captures/43observations/reference
+have0fresh credit.68fresh named passes=63ordinary+4synthetic+1native; observations passNone.
 
 ## Active continuation contract
 
-Continue normal producer readiness with the one remaining direct declared link source:
+Continue normal producer readiness with the remaining declared link collection pair:
 
-- cc/private/link/finalize_link_action.bzl
+- cc/private/link/collect_solib_dirs.bzl
+- cc/private/link/create_libraries_to_link_values.bzl
 
-[Source recommendation](../../../../target/wp996/native/successor-source.md) and
-[evidence constraints](../../../../target/wp996/native/successor-evidence.md) ground the
-actual228B first Need and saved cpp_link_action/lto_indexing_action literal line19.
-Saved two facts have15 load occurrences/9 labels:7 currentCC,1 new same-root leaf and1
-foreign Skylib paths route retains its separate owner. Freeze exact order/components[4],
-explicit actual Need member/index0 and selected original root in target/wp997/capture/inputs.json.
-No recursive prefix/foreign acquisition or evaluation-order inference.
+[Source recommendation](../../../../target/wp997/native/successor-source.md) and
+[evidence constraints](../../../../target/wp997/native/successor-evidence.md) ground actual
+firstNeed226B and saved finalize_link_action literal lines19/20. Saved one fact has8 load
+occurrences/8labels:6currentCC/2new same-root leaves, no foreign declaration in those partial
+facts. Freeze exact order/components[4,4], selected originalCCroot and explicit actual Need
+member/index0 in target/wp998/capture/inputs.json. No recursive prefix/foreign acquisition,
+evaluation-order inference or closure claim.
 
-One once-only bounded capture reuses unchanged WP933 descriptor reader/facts and qualified
-prior11 controls: all-ancestor anchors/NOFOLLOW/regular/name/EOF/fullSHA/pre-post identity,
-1MiB/object/16MiB aggregate/one64KiB scratch/factbody256KiB/per-row body-text-AST retirement.
-Only two minimum helpers under target/wp997/capture and rootconfigs/reviews/ops may change.
-Direct13 saved currentWP996 native successor/result/op/raw/inputs/finals plus two capture
-result/op/finals; old maps opaque/no historical exe traversal or original target reopen.
-One combined independent unchanged-reader capture design/helper/prelaunch review, sole
-switch inverse and direct supervision. Root transparent role qualifications never claim
-another reviewer. Parent verification precedes child clock; no artificial outer timeout.
-Availability/fullbytes/hash/UTF8/dependencies unknown until observation; missing/mutation/
-growth/UTF8/oversize/deadline remain original refusal with no retry/cap increase. Observations
-passNone/0tests, non-atomic/noncertifying. Newly discovered edges remain unselected.
+One combined initial capture DESIGN/helper/prelaunch review also freezes the consequential
+conditional same-owner two-path extension BEFOREcapture. Put the complete natural owner,
+allowlist/invariants/compatibility/lifetime/gates below in capture/design.md; mirror those
+accepted bytes as native/design.md. Both exact names and cardinalities are known now; only
+eligible observed byte/hash values remain unknown. Actual captureFINAL is still required
+BEFOREcode. Instantiating the accepted signatures after eligible observations does not add
+an ownership/storage/cap decision; root transparent design/source qualifications refer to
+that ONE initial review, without claiming another independent reviewer. An unusable fact,
+changed owner/shape/cap/storage or contradictory observation requires reassessment before
+code; do not duplicate an identical functional design review for unchanged byte/hash data.
+Actual combined Rust/helper static review precedes two functional helper activations; current
+gates/prelaunch and actualnative FINAL remain required. This is a bounded same-owner extension,
+with no new representation or public production API.
 
-After one eligible fullhash/strictUTF8 usablefact row and actual capture FINAL, freeze
-consequential functional design before edits: sameCC45→46 body table/meta8 unchanged/union100;
-two existing cfgtest Rust owners and minimum nine current ignored native helpers. Preserve
-prefixes/defaultfalse/additional[2]/roles/scopes/roots/operations/namespaces/case/suffix/child/
-mixedWholeNeed negatives, Features/Proxy/current63selectors/four themes. No new flags/retained
-strings/container/map/cache/plan/DICE/production/Windows representation. Complete46 validation
-before accepted legacy8 interface projection/current46/8 denial contradictions; original raw/
-artifact/flags/limits/counters unchanged. Native274 prefix then only1eligibleappend275=(188+87)
-in SAMEsecond context/two64KiB128KiB scratch; bytes/native readiness unknown. Prior captures8/
-43observations/reference1/reader11/Bzlmod5 qualified0fresh; current1capture separate.
-Source104/128 headroom24 is a number, not acquisition authority, sufficiency or whole fit.
+One once-only source capture reuses unchangedWP933 descriptor reader/facts/qualifiedprior11
+controls: all-ancestor anchors/NOFOLLOW/regular/name/EOF/fullSHA/pre-postidentity/1MiBobject/
+16MiBaggregate/one64KiBscratch/factbody256KiB/per-rowbody-text-ASTretirement. Only two minimum
+helpers in target/wp998/capture plus rootconfigs/reviews/ops may change. Direct13 saved current
+WP997 native successor/result/op/raw/inputs/finals plus one capture result/op/finals; oldmaps
+opaque/no historicalexe target or uncontrolled original source reopen. Review sole switch
+inverse then directsupervision. Parentverification beforechildclock/no artificialoutertimeout.
+Unknown availability/fullbytes/hash/UTF8/dependencies remain actual observations. Missing,
+mutation,growth,UTF8,oversize/deadline are original refusals, no retry/cap increase. Observations
+passNone/0tests/non-atomic/noncertifying; newly discovered edges stay unselected.
 
-Pinnedrustupwhich/offline/jobs1 serial Core no-run/direct Loading/Core/CLI checks<=60s,
-actualCargoJSON authority/one63preflight/list/currentfocusedgates/combined prelaunch review
-thenONE changed direct native; preserve passes unless relevant inputs change. Native10s/
-oneabsoluteTERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB/source128/defaultprobe16/
-production64/registry128/default16/object1MiB/every16MiB bank fixed. No automatic quota/cap
-raise. ActualtypedNeed/semanticerror/counters/RSS/retirement/publicproducer govern continuation;
-semantic failure selects its normal owner instead of forcing another capture. Finalreview/
-coupledreceipt/planstatus/archive/diffcheck/acceptedlocalcommit. Borrow/transfer/share storage;
-existing scopedinterners for repeated retainedimmutables when lifetime/cleanup fit, no global
+The frozen conditional functional decision is CC46→48 bodies/meta8 unchanged/union104, exact
+two appended paths after the46 prefix. Existing PreparedFilePublicProbe/additional[2]/default
+false/roots/roles/operations/namespaces/guards remain; only exact HostLstat/FileBytes on48
+bodies and HostLstat on8metadata. Same shared11-root/four-mode/eight-operation/namespace matrix,
+all old negatives/FeaturesProxy/63selectors/four decoder themes. Add six focused child/suffix/
+case/cross-root/digest mixedWholeNeed cases retaining zero progress/original refusal assertions.
+Two borrowed descriptors32B+literal paths, no new retained owned strings/container/flags/map/
+cache/plan/Arcclone/interner/production/DICE/Windows. Two existing cfgtest Rust owners and
+minimum nine target/wp998/native helpers as WP997 forks only; estimate25–35netRustlines.
+Complete48 root/order/path/relative/bytes/SHA constants BEFOREaccepted legacy8 projection and
+current48/8denial contradictions, preserving originalraw/artifact/flags/limits/counters. Same
+private128 decoder graph's three natural delegates/public_policy unchanged. Original275leases
+then2eligibleappend277=(188+89) in SAMEsecond context/two64KiB128KiB scratch; physical bytes
+=1,486,450+sum(two eligible body sizes), brackets=twice physical, actualvalues unknown. Sole
+native input change is two exact captured CC rows; allotherfields/caps/bindings unchanged.
+Prior9captures/44observations/reference1/reader11/Bzlmod5 qualified0fresh; current2 separate.
+Source105/128 headroom23 is a number, not authority, sufficiency or whole-workload fit.
+
+Pinnedrustupwhich/offline/jobs1 serialCore no-run/directLoading/Core/CLI checks<=60s; unique
+actualCargoJSON executable/one63preflight/list1/63ordinary+4strictcontrols/currentcombined
+prelaunch review thenONE changed directnative. Preserve passes unless relevantinputschange.
+Native10s/oneabsoluteTERM3s/AS512MiB/RSS256MiB/log1MiBeach/report4MiB/FSIZE16MiB/source128/
+defaultprobe16/production64/registry128/default16/object1MiB/every16MiBbank remain fixed.
+No automatic quota/cap raise. ActualtypedNeed/semanticerror/counters/RSS/retirement/public
+producer govern successor; semantic failures select their natural owner. ActualFINAL/audit/
+coupledreceipt/planstatus/archive/diffcheck/localacceptedcommit. Borrow/transfer/share storage;
+existing scopedinterners for repeated retainedimmutables when lifetime/cleanupfit, no global
 pool for temporary unique paths. PublicRustc/support/data/providers/toolchains/actions/runfiles/
-oracle/same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/whole-workload fit remain required;
-fullgoal active. Linux focus, Windows minimal stubs remain.
+oracle/same-DICE2024→2021→2024/fullCLI/M7A/MVS/provenance/whole-workloadfit remain required;
+fullgoal active. Linux focus/Windows minimal stubs remain.
 
 ## Immediate predecessor
 
-[WP995](wp995-remaining-cc-import-source-readiness-2026-10-07.json), accepted86400a8d4,
-admitted8 files/static43/8/matrix94;63+4+1 passed, normal native3.781s/108,252KiB/source102/
-1,172,792 reached cpp_link_action. Its bounded capture/provenance/lifecycle/strict projection
-are reachable in the receipt. Historical chronology is not scheduling authority.
+[WP996](wp996-remaining-cc-import-source-readiness-2026-10-07.json), acceptedb07691bdb,
+admitted2files/static45/8/matrix98;63+4+1 passed/native4.071s/108,524KiB/source104/1,197,295
+reachedfinalize_link_action. Its bounded capture/provenance/lifecycle/currentstrict projection
+remain reachable in the receipt. Historical chronology is not scheduling authority.

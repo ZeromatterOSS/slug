@@ -35,23 +35,26 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Capturing remaining CC link finalization source
+Status: Capturing remaining CC link collection sources
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP996](./slug-v2-subplans/wp996-remaining-cc-import-source-readiness-2026-10-07.json)
-admits two exact CC link imports through the borrowed static role:45bodies/8metadata/matrix98,
-no retained strings/containers/flags or production/Windows changes. Capture24,503B/0.043s/
-19,500KiB and actualFINAL pass; fresh compile/check,63Rust+4controls pass. One normal native
-4.071s peaks108,524KiB under256MiB, SourceErrorNone/source104/1,197,295/Written5228; all274
-leases match and ending credits/scope/recorder retire. Actual next HostLstat228B is selectedCC
-cc/private/link/finalize_link_action.bzl, one declared source. Continue its bounded capture
-then conditional46/8 grant, without recursive permission or cap increases. Public certificate/
-actions/Rustc/fullSpec/output/whole-workload fit remain open. Representative allocation fits
-the cap, permitting broader readiness. Borrow/share storage and use existing scopedinterners
-for repeated retained strings when lifetime and cleanup fit. The complete public producer and whole-workload fit remain required.
+[WP997](./slug-v2-subplans/wp997-remaining-cc-import-source-readiness-2026-10-07.json)
+admits one exact finalize-link source via the borrowed static role:46bodies/8metadata/matrix100,
+no retained strings/containers/flags or production/Windows changes. Capture19,570B/0.042s/
+20,436KiB and actualFINAL pass; freshcompile/check/63Rust+4controls pass. One normalnative
+4.308s peaks108,596KiB under256MiB, SourceErrorNone/source105/1,216,865/Written5228; all275
+leases match/endingcredits/scope-recorder retire. Actual next226B HostLstat is selectedCC
+collect_solib_dirs.bzl, first of two direct declared link-collection imports. Continue one
+bounded pair capture and conditional48/8 extension; initial capture/design review freezes
+the same-owner functional decision, actualcaptureFINAL precedes code/static beforeactivation.
+Caps/owners/storage stay fixed; observed hash/byte data does not require another identical
+design decision. Certificate/actions/Rustc/fullSpec/output/whole-workloadfit remain open.
+Representative allocation fits the cap, permitting broader readiness. Borrow/share storage,
+use existing scopedinterners when repeated retainedstrings/lifetime/cleanup fit. Complete
+public producer and whole-workload fit remain required.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

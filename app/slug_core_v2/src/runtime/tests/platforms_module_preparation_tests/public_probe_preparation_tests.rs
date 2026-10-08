@@ -4445,7 +4445,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 98);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 100);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -4454,6 +4454,26 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/link/finalize_link_action.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/link/finalize_link_action.bzl-extra",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/link/Finalize_link_action.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/cc/private/link/finalize_link_action.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/link/finalize_link_action.bzl",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/cc/cc/private/link/cpp_link_action.bzl/child",
             PathObservationOperation::Lstat,
