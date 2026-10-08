@@ -539,6 +539,8 @@ fn projection_matches(
         && bodies.additional[1].is_some()
         && bodies.rules_cc_import_sources
         && bodies.additional[2].is_some()
+        && bodies.rules_shell_import_sources
+        && bodies.additional[4].is_some()
         && inner.0.configuration_overlay == *overlay
         && request.command_policy.module_overrides().count() == bodies.bindings().count()
         && bodies.bindings().all(|(name, _, root)| {
@@ -3286,6 +3288,12 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             .with_fourth(path("/features"))
             .with_fifth(path("/skylib"))
             .with_sixth(path("/cc"))
+            .with_seventh(path("/license"))
+            .with_eighth(path("/shell"))
+            .with_rules_shell_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_bazel_features_import_sources(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
@@ -3345,6 +3353,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         [
             "rules_rust=/rules",
             "platforms=/platforms",
+            "rules_license=/license",
+            "rules_shell=/shell",
             "bazel_features=/features",
             "bazel_skylib=/skylib",
             "rules_cc=/cc",
@@ -3441,6 +3451,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3469,6 +3482,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3508,6 +3524,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3547,6 +3566,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3586,6 +3608,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3625,6 +3650,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3664,6 +3692,9 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         .with_fourth(path("/features"))
         .with_fifth(path("/skylib"))
         .with_sixth(path("/cc"))
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_bazel_features_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -3744,6 +3775,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             [
                 "rules_rust=/rules",
                 "platforms=/platforms",
+                "rules_license=/license",
+                "rules_shell=/shell",
                 "bazel_features=/features",
                 "rules_cc=/cc",
             ],
@@ -3785,6 +3818,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             [
                 "rules_rust=/rules",
                 "platforms=/platforms",
+                "rules_license=/license",
+                "rules_shell=/shell",
                 "bazel_features=/features",
                 "bazel_skylib=/skylib",
             ],
@@ -3830,6 +3865,8 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
             [
                 "rules_rust=/rules",
                 "platforms=/platforms",
+                "rules_license=/license",
+                "rules_shell=/shell",
                 "bazel_skylib=/skylib",
                 "rules_cc=/cc",
             ],
@@ -3844,6 +3881,53 @@ fn guarded_singleton_preserves_dispatch_policy_and_whole_need() {
         &nightly_overlay()
     ));
     Arc::get_mut(&mut bodies).unwrap().additional[0] = selected;
+    request.command_policy = selected_policy;
+    assert!(projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .rules_shell_import_sources = false;
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies)
+        .unwrap()
+        .rules_shell_import_sources = true;
+    let selected = Arc::get_mut(&mut bodies).unwrap().additional[4].take();
+    let selected_policy = std::mem::replace(
+        &mut request.command_policy,
+        BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            Path::new("/fixture"),
+            [
+                "rules_rust=/rules",
+                "platforms=/platforms",
+                "bazel_features=/features",
+                "bazel_skylib=/skylib",
+                "rules_cc=/cc",
+                "rules_license=/license",
+            ],
+        )
+        .unwrap(),
+    );
+    assert!(!projection_matches(
+        &inner,
+        &request,
+        &bodies,
+        &registry,
+        &nightly_overlay()
+    ));
+    Arc::get_mut(&mut bodies).unwrap().additional[4] = selected;
     request.command_policy = selected_policy;
     assert!(projection_matches(
         &inner,
@@ -5781,6 +5865,157 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(wrong_slot.admit(&all).is_err());
 }
+pub(super) fn rules_shell_import_sources_matrix() {
+    for (name, selected) in RULES_SHELL_IMPORT_METADATA.into_iter().zip([
+        "/shell/shell",
+        "/shell/shell/BUILD.bazel",
+        "/shell/shell/BUILD",
+        "/shell/shell/sh_binary.bzl",
+        "/shell/shell/private",
+        "/shell/shell/private/BUILD.bazel",
+        "/shell/shell/private/BUILD",
+        "/shell/shell/private/sh_binary.bzl",
+    ]) {
+        let operations = [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ];
+        let operations = &operations[..if RULES_SHELL_IMPORTS.contains(&name) {
+            2
+        } else {
+            1
+        }];
+        assert_exact_root_file_role(
+            name,
+            operations,
+            Bodies::with_rules_shell_import_sources,
+            |b| b.rules_shell_import_sources,
+            &[],
+            selected,
+            Some("/shell"),
+        );
+    }
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let make = || {
+        Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+            .with_fourth(path("/features"))
+            .with_fifth(path("/skylib"))
+            .with_sixth(path("/cc"))
+            .with_seventh(path("/license"))
+            .with_eighth(path("/shell"))
+            .with_rules_shell_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
+    };
+    let need =
+        |p: &str, operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(PathObservationNamespace::Host, path(p), operation),
+            ))
+        };
+    let bodies = make();
+    let allowed = RULES_SHELL_IMPORT_METADATA
+        .into_iter()
+        .map(|name| need(&format!("/shell/{name}"), PathObservationOperation::Lstat))
+        .chain(RULES_SHELL_IMPORTS.into_iter().map(|name| {
+            need(
+                &format!("/shell/{name}"),
+                PathObservationOperation::FileBytes,
+            )
+        }))
+        .reduce(|a, b| a.try_union(&b).unwrap())
+        .unwrap();
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 12);
+    assert!(bodies.admit(&allowed).is_ok());
+    for (p, operation) in [
+        (
+            "/shell/shell/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/sh_executable.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/SH_BINARY.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/sh_binary.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/sh_binary.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/shell/sh_binary.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private",
+            PathObservationOperation::DirectoryEntries,
+        ),
+    ] {
+        let bad = need(p, operation);
+        for mixed in [
+            allowed.try_union(&bad).unwrap(),
+            bad.try_union(&allowed).unwrap(),
+        ] {
+            assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+            let first = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+                .unwrap()
+                .0;
+            let expected = bad.path_observations().unwrap().demands().first().unwrap();
+            let original = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| d.path() == expected.path() && d.operation() == expected.operation())
+                .unwrap();
+            assert!(std::ptr::eq(first, original));
+        }
+    }
+    let mut missing = make();
+    missing.additional[4] = None;
+    assert!(missing.rules_shell_import_sources && missing.admit(&allowed).is_err());
+    let mut wrong_slot = make();
+    wrong_slot.additional[3] = wrong_slot.additional[4].take();
+    assert!(wrong_slot.admit(&allowed).is_err());
+    let local = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "unknown+", "/shell")).clone(),
+    );
+    let original = local.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    for mixed in [
+        allowed.try_union(&local).unwrap(),
+        local.try_union(&allowed).unwrap(),
+    ] {
+        assert!(Arc::ptr_eq(
+            original,
+            mixed.repository_materializations().values().next().unwrap()
+        ));
+        let (first, reason) = bodies
+            .first_denied_materialization_with_plan_matcher(
+                &mixed,
+                &generated_features_plan_matches,
+            )
+            .unwrap();
+        assert!(std::ptr::eq(first, original.as_ref()));
+        assert_eq!(reason, "binding");
+        assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
+    }
+    drop(local);
+    assert!(weak.upgrade().is_none());
+}
+
 fn assert_exact_root_file_role(
     name: &str,
     admitted_operations: &[PathObservationOperation],

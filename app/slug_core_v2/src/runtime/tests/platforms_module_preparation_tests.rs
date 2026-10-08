@@ -365,6 +365,22 @@ const PLATFORMS_CPU_SOURCES: [&str; 1] = ["cpu/BUILD"];
 const PLATFORMS_OS_METADATA: [&str; 3] = ["os", "os/BUILD.bazel", "os/BUILD"];
 // Only the strictly eligible observed OS marker is a body source.
 const PLATFORMS_OS_SOURCES: [&str; 1] = ["os/BUILD"];
+const RULES_SHELL_IMPORT_METADATA: [&str; 8] = [
+    "shell",
+    "shell/BUILD.bazel",
+    "shell/BUILD",
+    "shell/sh_binary.bzl",
+    "shell/private",
+    "shell/private/BUILD.bazel",
+    "shell/private/BUILD",
+    "shell/private/sh_binary.bzl",
+];
+const RULES_SHELL_IMPORTS: [&str; 4] = [
+    "shell/BUILD",
+    "shell/sh_binary.bzl",
+    "shell/private/BUILD",
+    "shell/private/sh_binary.bzl",
+];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -388,6 +404,7 @@ struct Bodies {
     generated_features_file_effects: bool,
     bazel_skylib_import_sources: bool,
     rules_cc_import_sources: bool,
+    rules_shell_import_sources: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -951,6 +968,7 @@ impl Bodies {
             generated_features_file_effects: false,
             bazel_skylib_import_sources: false,
             rules_cc_import_sources: false,
+            rules_shell_import_sources: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1269,6 +1287,28 @@ impl Bodies {
                     })
             })
     }
+    fn with_rules_shell_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.rules_shell_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_rules_shell_import_source(&self, path: &Path, metadata: bool) -> bool {
+        self.rules_shell_import_sources
+            && self.additional[4].as_ref().is_some_and(|module| {
+                path.strip_prefix(module.root.as_path())
+                    .is_ok_and(|relative| {
+                        (metadata
+                            && RULES_SHELL_IMPORT_METADATA
+                                .iter()
+                                .any(|p| relative == Path::new(p)))
+                            || RULES_SHELL_IMPORTS.iter().any(|p| relative == Path::new(p))
+                    })
+            })
+    }
     fn source_limits(&self, registry: RegistryChoice) -> SourceServiceLimits {
         SourceServiceLimits {
             allow_network: false,
@@ -1502,6 +1542,7 @@ impl Bodies {
                                     || self.admits_bazel_features_import_source(path, false)
                                     || self.admits_bazel_skylib_import_source(path, false)
                                     || self.admits_rules_cc_import_source(path, false)
+                                    || self.admits_rules_shell_import_source(path, false)
                                     || self.admits_platforms_host_import_source(path)
                                     || self.admits_platforms_cpu_package(path, false)
                                     || self.admits_platforms_os_package(path, false)))
@@ -1522,6 +1563,7 @@ impl Bodies {
                             || self.admits_bazel_features_import_source(path, true)
                             || self.admits_bazel_skylib_import_source(path, true)
                             || self.admits_rules_cc_import_source(path, true)
+                            || self.admits_rules_shell_import_source(path, true)
                             || (self.visible_lockfile_metadata
                                 && path.parent() == Some(self.roots[0].as_path())
                                 && path
@@ -2274,6 +2316,7 @@ fn seventh_module_need_admission_is_opt_in_and_exact() {
 #[test]
 fn eighth_module_need_admission_is_opt_in_and_exact() {
     additional_module_need_admission(ModuleMode::Eight);
+    public_probe_preparation_tests::rules_shell_import_sources_matrix();
 }
 
 #[test]
@@ -2705,7 +2748,8 @@ fn observe_native_command(
     .with_bazel_features_import_sources(registry_choice, command)
     .with_generated_features_file_effects(registry_choice, command)
     .with_bazel_skylib_import_sources(registry_choice, command)
-    .with_rules_cc_import_sources(registry_choice, command);
+    .with_rules_cc_import_sources(registry_choice, command)
+    .with_rules_shell_import_sources(registry_choice, command);
     if host_directory_requested {
         bodies = bodies.with_platforms_host_directory(registry_choice, command);
     }
@@ -2745,6 +2789,7 @@ fn observe_native_command(
     let platforms_host_metadata = bodies.platforms_host_metadata;
     let platforms_host_directory = bodies.platforms_host_directory;
     let platforms_host_import_sources = bodies.platforms_host_import_sources;
+    let rules_shell_import_sources = bodies.rules_shell_import_sources;
     let platforms_cpu_package_sources = bodies.platforms_cpu_package_sources;
     let platforms_os_package_sources = bodies.platforms_os_package_sources;
     let features_import_sources = bodies.bazel_features_import_sources;
@@ -2921,6 +2966,11 @@ fn observe_native_command(
             "unavailable"
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
+        println!(
+            "WP1021_RULES_SHELL_SOURCES enabled={} policy_checked={} additional_slot=4 metadata_count=8 source_count=4 cohort=shell_package_imports kind=unobserved body=unobserved",
+            rules_shell_import_sources,
+            probe_report.policy_checked()
+        );
         println!(
             "WP1012_PLATFORMS_CPU_PACKAGE enabled={} policy_checked={} root_slot=2 metadata_operation=lstat metadata_count=3 source_operation=file_bytes source_count=1 metadata_cohort=cpu,cpu/BUILD.bazel,cpu/BUILD source_cohort=cpu/BUILD kind=unobserved body=unobserved",
             platforms_cpu_package_sources,

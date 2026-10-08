@@ -34,27 +34,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-244-m7a-normal-rustc-hub-marker-metadata-r1
-Status: Accepted exact hub marker metadata; selected rules_shell source readiness follows
+Packet: WP-7-245-m7a-normal-rustc-rules-shell-source-readiness-r1
+Status: Accepted bounded Rules Shell readiness; next typed sh_executable source readiness selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1020](./slug-v2-subplans/wp1020-hub-marker-metadata-2026-10-08.json)
-accepts exact borrowed hub REPO.bazel/.bazelignore Lstat metadata through existing
-independent roles/original own-plan/current epoch. Core92/themes4/native1 and independent
-FINAL accepted;99current records/97names plus98 preserved zero-credit initial records
-=197actual. One adjacency-fixture correction required fresh current helper qualification;
-no stale resolver/second activation/native rerun. Native3.997410301s/209072KiB under262144,
-Source119/decoded6160419/SourceErrorNone, writes39599/peakbank11679531/end0. Prior hub
-namespace refusal advances to exact selected rules_shell_root/shell Host Lstat.
-Next integrate bounded prospective source availability and conditional finite readiness;
-directory demand proves no leaf body/caller/output/certificate. Existing child151net
-(12policy/139tests), no retained strings/cache/flags; borrow/transfer/share and scoped
-interners where repetition/lifetime fit. Prefix fits, whole producer/workload remains
-open. Caps unchanged; preserve typed failures without identical retries or invented
-providers. Windows remains minimal stubs/deferred until effectively testable.
+[WP1021](./slug-v2-subplans/wp1021-rules-shell-source-readiness-2026-10-08.json)
+accepts original additional[4] Rules Shell metadata8/source4 after two bounded captures
+(6decisions/4usable/2missing/3477B, zero test credit). Core92/themes4/native1 and independent
+FINAL accepted:97 names/99 native gate records plus2captures=101 current supervised
+records. Two root note-binding invocations rejected before child/operation/test credit
+are qualified separately. Native3.981374367s/209792KiB under262144; Source121/decoded
+6162849/SourceErrorNone, writes39599/peakbank11679531/end0. Same291ordered signatures/
+two64KiB contexts;855native/868auditunion pins. Shell directory refusal gone; actual
+next219B Host Lstat is same-root shell/private/sh_executable.bzl, grounded by captured
+literal17:0. Next bounded availability/direct frontier and conditional existing-role
+readiness advance normal Rustc prerequisites. Source285net (main50/child235), static
+paths/oneinlinebool, no retained runtime string/path copies; borrow/transfer/share and
+scoped interners where repetition/lifetime fit. Prefix fits; whole producer/workload,
+individual native source bodies and full heap retirement remain open. Caps unchanged.
+Windows remains minimal stubs/deferred until effectively testable.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped
