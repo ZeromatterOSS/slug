@@ -807,25 +807,32 @@ impl Bodies {
         let exact_owner = matches!(
             (
                 request.id.canonical_repo.as_str(),
+                label.package().repo().as_str(),
+                label.package().package().as_str(),
                 label.target().as_str(),
                 request.repo_spec.rule_id.rule_name.as_str()
             ),
             (
                 "bazel_features++version_extension+bazel_features_globals",
+                "bazel_features+",
+                "private",
                 "globals_repo.bzl",
                 "globals_repo"
             ) | (
                 "bazel_features++version_extension+bazel_features_version",
+                "bazel_features+",
+                "private",
                 "version_repo.bzl",
                 "version_repo"
+            ) | (
+                "platforms+host_platform+host_platform",
+                "platforms",
+                "host",
+                "extension.bzl",
+                "host_platform_repo"
             )
         );
-        if reason != "generated_kind"
-            || request.id.workspace != self.roots[0]
-            || label.package().repo().as_str() != "bazel_features+"
-            || label.package().package().as_str() != "private"
-            || !exact_owner
-        {
+        if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {
             return None;
         }
         let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind else {

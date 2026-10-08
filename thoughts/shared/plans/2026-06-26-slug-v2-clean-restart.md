@@ -35,24 +35,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-231-m7a-normal-rustc-configured-producer-readiness-r1
-Status: Preparing platforms host generated plan attribution
+Status: Preparing optimized platforms host plan observation
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1003](./slug-v2-subplans/wp1003-platforms-host-source-readiness-2026-10-08.json)
-accepts exact eligible2620B extension append to existing borrowed source table3/same flag,
-metadata/default/request/whole-Need/48CC8metadata unchanged. No retained string copies or new
-flag/container/production/DICE changes; formattednet22. Fresh compile/check/65Rust/four controls
-and one native pass5.223s/121084KiB under256MiB. SourceNone109/1258508decoded; actual next
-materialization generated_file_effects/generated_kind captures exact182B host_platform_repo
-owner, logicalrootNone; no complete output plan/mapping/hostbranch/causalchain or public Rustc.
-280brackets/endingcredits match;72allphase/71nativegate/70named, capture1eligible0tests separately.
-Next extend the EXISTING bounded borrowed-plan diagnostic for this exact owner while admission
-stays unchanged; actual original plan must ground a later coupled finite matcher/namespace grant.
-No new source capture or guessed generated body. All budgets and allocation discipline persist;
-normal public producer and complete workload fit remain required.
+[WP1004](./slug-v2-subplans/wp1004-platforms-host-generated-plan-2026-10-08.json)
+accepts borrowed exact host owner diagnostic/net72 with65Rust/four controls; no retained string
+copies or functional/source/namespace/production change. Corrected build/check pass; one preserved
+compiler fixture failure has zero credit. Native5.305s/122704KiB fits256MiB but WorkDeadline makes
+host plan evidence unavailable.71acceptedrecords/70diagnostic outcomes+one failed compile attempt;
+original280brackets/retirement match. Next optimize ONLY Loading preparation opt0→opt1/debug0,
+new artifact/current gates, preserving5s work/8s lifetime/10s native and all byte caps. No clock reset,
+cache warming or guessed output signatures. Actual original plan must ground a later cohesive
+functional matcher/namespace grant. Normal public producer and complete workload fit remain open.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

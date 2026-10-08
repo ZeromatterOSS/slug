@@ -1,0 +1,263 @@
+{
+  "checkpoint": "WP1004",
+  "baseline": "d7f88090fb61b5c6400df34033c3dfb55872db99",
+  "accepted_at": "2026-10-08T03:22:14.280420+00:00",
+  "compatibility": "Exact atomic original owner discriminators and bounded diagnostic encoding; Slug-native Linux cfgtest original plan attribution; no functional/production admission change.",
+  "predecessor": {
+    "path": "thoughts/shared/plans/slug-v2-subplans/wp1003-platforms-host-source-readiness-2026-10-08.json",
+    "sha256": "ac0b9edc1702270ed749db67fd6ac1b2e832542f0bbd77a0c59e9b255f0856e0"
+  },
+  "implementation": {
+    "rust_files": [
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+        "sha256": "1cf62d2ca21cce34169784d9aaf27065efca894ccbd44af00e4db203c4b42874"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+        "sha256": "fa9e829a7df4f5a677a4080d0bc34cc1ad7fb9bf7856de5da62d45459d92eff6"
+      }
+    ],
+    "growth": {
+      "insertions": 166,
+      "deletions": 94,
+      "changed": 260,
+      "net": 72
+    },
+    "natural_owner": "Borrowed original GeneratedFileEffects request/spec/plan for exact host owner and original workspace, original generated_kind first offender; existing diagnostic formatter/decoder only.",
+    "functional_admission_changed": false,
+    "source_roles_changed": false,
+    "memory": {
+      "new_flags": 0,
+      "new_retained_owned_strings": 0,
+      "new_containers": 0,
+      "new_interners": 0,
+      "plan_or_file_body_clones": 0
+    },
+    "compiler_fixture_correction": "Mutate uniquely held attributes Arc via Arc::get_mut before request retention; no map clone."
+  },
+  "counts": {
+    "accepted_record_operations": 71,
+    "actual_operation_attempts": 72,
+    "fresh_core_ordinary": 65,
+    "fresh_python": 4,
+    "fresh_native": 1,
+    "fresh_named_passes": 70,
+    "fresh_capture_operations": 0,
+    "failed_compile_attempts": 1,
+    "failed_compile_test_credit": 0,
+    "failed_compile_artifact_credit": 0,
+    "current_material_pin_union": 647,
+    "native_runtime_pins": 634,
+    "qualified_prior_capture_operations": 12,
+    "qualified_prior_capture_decisions": 50,
+    "qualified_prior_reference_operations": 1,
+    "qualified_prior_reader_controls": 11,
+    "qualified_prior_bzlmod_passes": 5,
+    "prior_fresh_credit": 0
+  },
+  "preparation": {
+    "compile": {
+      "operation": {
+        "path": "target/wp1004/native/compile.json",
+        "sha256": "bd6b58f9675a16bde973f4643bf22105f8ba876931a6a028418ae59b2175f78e"
+      },
+      "seconds": 9.239720777026378,
+      "test_passes": 0
+    },
+    "check": {
+      "operation": {
+        "path": "target/wp1004/native/check.json",
+        "sha256": "02842439410f405413a1343927f7e578c215cddab8108d5bdc6944f38589d5e1"
+      },
+      "seconds": 7.420413309009746,
+      "test_passes": 0
+    }
+  },
+  "failed_compile": {
+    "operation": {
+      "path": "target/wp1004/native/compile-attempt1/compile.json",
+      "sha256": "e942679a971cfb523a4f49d260e451ba3e21c97cba94acb0aadb577b236846a3"
+    },
+    "stdout": {
+      "path": "target/wp1004/native/compile-attempt1/compile.stdout",
+      "sha256": "412b2e94b72386482a90a758dd6ce1d5875be0ef08fdf36707458034b9110c1a"
+    },
+    "stderr": {
+      "path": "target/wp1004/native/compile-attempt1/compile.stderr",
+      "sha256": "77a6314761ff4acb5634a6a6c0b3c265434e308056dfd29708696d5c647f6e88"
+    },
+    "original_source": {
+      "path": "target/wp1004/native/compile-attempt1/public_probe_preparation_tests.rs.original",
+      "sha256": "d54eb5461b2091c7cf446650bac1ddf6b9558dc678352e3d2d28e105da7428f2"
+    },
+    "qualification": {
+      "path": "target/wp1004/native/compile-attempt1/qualification.json",
+      "sha256": "998bfa1d4a0c78103d11b11842a3b91cff4f716d0db9d66d95f8619726c28b88"
+    },
+    "seconds": 1.961369388969615,
+    "reason": "E0596 test fixture mutation through Arc; preserved failed attempt, no tests/artifact authority.",
+    "fresh_credit": 0
+  },
+  "tests": {
+    "ordinary_seconds": 13.338445463683456,
+    "ordinary_peak_kib": 57876,
+    "controls_seconds": 1.1582352890400216,
+    "controls_peak_kib": 22284,
+    "selectors": {
+      "path": "target/wp1004/native/selectors.json",
+      "sha256": "0658c055dbe8f18296438dcedb87f181350f296ea0dcc8e9b2324d2ec107322b"
+    },
+    "actual_cargo_artifact": {
+      "path": "target/wp1004/native/executable.json",
+      "sha256": "d09aebeaf968725ce067101ee2a0913caceeb6ab43ea7cb13b967e96c8d4ea08"
+    }
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp1004/native/native-operation.json",
+      "sha256": "cda0fbbf258e49725ed4b2c6dfd0319efc154b8147bfacff4fb739f9391db597"
+    },
+    "result": {
+      "path": "target/wp1004/native/result.json",
+      "sha256": "2af93cb2dc53008bf9c32bcf753461a53a8595e3be9b26c768c9458e1a226c9c"
+    },
+    "stdout": {
+      "path": "target/wp1004/native/native.stdout",
+      "sha256": "39db77cd57f46706df91bbaad8d0ee35f64acf49052dc0c31ad73f29d49a200b"
+    },
+    "stderr": {
+      "path": "target/wp1004/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 5.305006725015119,
+    "conservative_peak_kib": 122704,
+    "source_error": "Some(WorkDeadline)",
+    "source_counters": {
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 108,
+      "transferred_bytes": 0,
+      "decoded_bytes": 1255888,
+      "written_bytes": 5228,
+      "live_buffer_bytes_before_drop": 2114151,
+      "peak_buffer_bytes": 3259456
+    },
+    "denied": {
+      "family": "none",
+      "path_len": null,
+      "path_hex": "none",
+      "capture": "missing"
+    },
+    "materialization_refusal": null,
+    "generated_plan_refusal": null,
+    "generated_plan_diagnostic_owner": null,
+    "public_probe": {
+      "stage": "native_refusal",
+      "kind": "source_service",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": true,
+      "certificate": null,
+      "observations": null,
+      "analyses": null,
+      "actions": null,
+      "rustc": null
+    },
+    "retirement": {
+      "source_weak_seen": false,
+      "source_weak_expired": true,
+      "live_buffer_zero": true,
+      "scope_weak_expired": true,
+      "recorder_weak_expired": true
+    },
+    "ending_resource_credits": {
+      "phase": "after_runtime_drop",
+      "descriptor_used": 0,
+      "descriptor_peak": 131496,
+      "logical_used": 0,
+      "scratch_used": 0
+    }
+  },
+  "source_bindings": {
+    "ordered_leases": 280,
+    "prefix": 188,
+    "additional": 92,
+    "physical_bytes": 1528789,
+    "before_after_hash_bytes": 3057578,
+    "sequential_parent_fd_opens": 4312,
+    "parent_buffers": 2,
+    "parent_buffer_bytes_each": 65536,
+    "collection_atomic": false,
+    "native_certificate": false
+  },
+  "caps": {
+    "seconds": 10,
+    "term_seconds": 3,
+    "as_bytes": 536870912,
+    "rss_bytes": 268435456,
+    "log_bytes_each": 1048576,
+    "report_bytes": 4194304,
+    "file_bytes": 16777216
+  },
+  "artifacts": {
+    "design": {
+      "path": "target/wp1004/native/design.md",
+      "sha256": "1ab5ed4745cc68658281b05a18d8993514d254984484ab25f0e2a7a8f40f7e09"
+    },
+    "design-review": {
+      "path": "target/wp1004/native/design-review.md",
+      "sha256": "71806ffaad6791c0c655c577e9614b4616f179801ec2b0dbfbd5bef1a58596f8"
+    },
+    "implementation-source": {
+      "path": "target/wp1004/native/implementation-source.md",
+      "sha256": "5f4d015b83abf31f6cbb4a4dfb0991898b99efdd8512a3d75b57e4ca1c7c75a1"
+    },
+    "implementation-evidence": {
+      "path": "target/wp1004/native/implementation-evidence.md",
+      "sha256": "4b9be7df35469ac29cd178ada71c886f29bd9f4ffcde8374d9168084c2742570"
+    },
+    "compiler-correction-source": {
+      "path": "target/wp1004/native/compiler-correction-source.md",
+      "sha256": "888a85a587ff3fbca36852482521712e79f035afbde7c95e21f70c60412c59c1"
+    },
+    "compiler-correction-evidence": {
+      "path": "target/wp1004/native/compiler-correction-evidence.md",
+      "sha256": "0c86e62d57f269c1620713cb30f50143ea1a8c5f17e9afc7619b2e093363ac89"
+    },
+    "preflight-source": {
+      "path": "target/wp1004/native/preflight-source.md",
+      "sha256": "bea3716a4fedfe426695bb11352261508471069975120d7d85fcf576178d79f3"
+    },
+    "preflight-evidence": {
+      "path": "target/wp1004/native/preflight-evidence.md",
+      "sha256": "e0173be33c8f1cea214901047dac87aa9fb0699424f63a61af3114105a1c87d8"
+    },
+    "final-source": {
+      "path": "target/wp1004/native/final-source.md",
+      "sha256": "5e1862067f420bf51533307c573dddbe5a6d78968c249e4544e0317fb99f2b55"
+    },
+    "final-evidence": {
+      "path": "target/wp1004/native/final-evidence.md",
+      "sha256": "78ce91aa431a1c49efe7be9d9cfe31ba1bc3744f981eeef5b14d166fd0db6612"
+    },
+    "successor-source": {
+      "path": "target/wp1004/native/successor-source.md",
+      "sha256": "6b3b21014b57d5efb56c46503859eec9d4e130df385e04a6aef084f1b1fcfffb"
+    },
+    "successor-evidence": {
+      "path": "target/wp1004/native/successor-evidence.md",
+      "sha256": "5c49c1d9704d4062fbc58436b7cf4d7542de92dd4e58580520b646670c8bc783"
+    }
+  },
+  "operational_summary": {
+    "path": "target/wp1004/native/operational-summary.json",
+    "sha256": "d0123a7fc284bf96681fb736fdffb940a977369ed33587b74eabb694738d8da8"
+  },
+  "qualification": "One independent integrated design/static/correction/prelaunch/actual FINAL chain; root role notes are qualifications, not additional reviewers. Diagnostic correspondence is not fullSpec, source certificate, completed output, freshness or namespace permission. Preparation memory is outside runtime fit. All historical captures and old executables have zero current credit; no historical target traversal. Cumulative charged history is not per-Arc live memory. Source Weak seen=false is vacuous; body/registry Weak and same-DICE lifetime unproved.",
+  "normal_public_rustc_producer_proved": false,
+  "whole_workload_fit_proved": false,
+  "full_goal_active": true,
+  "host_plan_observation_proved": false,
+  "continuation": "Host plan observation remains unavailable at WorkDeadline. Select a separately reviewed optimized changed-artifact hypothesis under unchanged scope and supervisor deadlines to obtain the original plan before any functional matcher/current-epoch namespace grant. Preserve borrowed storage, applicable scoped interning, resource caps and original source identities. Normal public Rustc/support/data/providers/toolchains/actions/runfiles/oracle/same-DICE2024\u21922021\u21922024/fullCLI/M7A/MVS/provenance/whole-fit remain open."
+}
