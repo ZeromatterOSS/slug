@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-242-m7a-normal-rustc-toolchain-hub-plan-readiness-r1
-Status: Accepted bounded original hub plan; finite materialization next
+Packet: WP-7-243-m7a-normal-rustc-toolchain-hub-file-readiness-r1
+Status: Accepted finite hub files; repository-marker namespace metadata next
 
 ## Observable and source basis
 
@@ -42,54 +42,63 @@ fixture's opaque key restoration is not exact cross-system fingerprint admission
 Current fullCLI compiler closure/execution, inherited environment/historical cwd, cache/
 REAPI and M7A/full-root remain open.
 
-## Immediate accepted checkpoint
+## Accepted bounded checkpoint
 
-[WP1018](wp1018-toolchain-hub-plan-readiness-2026-10-08.json) captures the original
-hub plan through the borrowed formatter: complete ordered WORKSPACE.bazel52B then
-BUILD.bazel34099B, both executable, no archive/symlink, mappingNone/attributes6.
-No functional or namespace grant. Independent FINAL accepts Core92/themes4/native1,
-99passinggate records/97names plus1preservedfailedfixturebatch/0credit=100actual.
-Corrected logical-root fixture and exact97operation/helper-snapshot provenance retain
-passing Rust/preparation evidence without replay. Current native3.701697259s/210136KiB
-of262144, SourceErrorNone/source118/6126320decoded, bankpeak11679531/end0. ActualScope/
-recorderWeak expire; Source/plan/bodyWeak unavailable. Same287 signatures/two64KiB
-188+99/6395771physical/12791542bracket, no currentcapture; prior source facts0fresh.
-Runtime added no retainedString/container/Arcclone/interner/cache/flag. Prefix fits;
-full producer/whole-workload fit remain open. Exact selectedknown4749878/defaultHost
-andRegistry1MiB remain unchanged.
+[WP1019](wp1019-toolchain-hub-file-readiness-2026-10-08.json), baseline
+5d4b6c1ac2b02f4fea41189f347c1d79b0d80579, admits the original hub twoFile plan
+through the natural scoped writer and couples finite namespace access to its own
+plan and current epoch. Existing generated opt-in AND RulesRust import readiness,
+original workspace/atomic tuple/mappingNone and complete ordered signatures are
+mandatory. WORKSPACE.bazel52B then BUILD.bazel34099B, both executable; no archive,
+symlink, extra/crossed/reordered files or generic grant. Full original RepoSpec is
+structurally preserved; attributes6 is metadata, not identity authority.
 
-## Accepted contract and boundary
+Two existing cfgtest Rust owners117net/static signature descriptors/cohort4/borrowed
+small file paths, no new retained String/path/Vec/Arcclone/interner/cache/flag or
+plaintext mirror. Production/DICE/Windows behavior unchanged. Current-epoch lookup
+borrows unique original request/generation root, bounded32 entries; selected files
+Lstat/FileBytes and finite root/ancestor Lstat only. Existing92 tests cover roles,
+all atomic crossings, own-plan order/content/length/executable/EOF, both mixed-Need
+orders before progress, pointer/Weak and current-transaction A/B/A. Tiny test plans
+prove the seam only; native matching uses the original complete signatures.
 
-Only the exact atomic hub tuple was added to generated_plan_diagnostic, retaining
-first-denied family/reason/workspace/original request and plan pointers. The existing
-formatter/pre-Mutex site and all8rows/9visits/path512+2048/content1MiB+4MiB/encoded16KiB
-bounds remain intact. Shared admitted3owner table, roles/readiness/known allowance,
-namespace matcher, materializer, production/DICE and Windows behavior are unchanged.
-Two existing formatter tests add the hub with crossed owners/order/pointer/Weak/bounds
-and explicit refusal under enabled RulesRust role/permissive shape matcher. Rust41net;
-no new runtime storage or fixture suite. Source/design/helper/correction/prelaunch and
-actual FINAL are bound by the receipt, including current9profiles and compiler artifact.
+Core92/four decoder themes/native1 and independent DESIGN/STATIC/prelaunch/FINAL
+accepted.99 passing current records/97names/no failures/currentcapture0; fresh
+helpers remove all prior97-record ledger exceptions. Strict current pins815native/
+828auditedunion and fresh CargoJSONCore37df1b1e verified. Threepreps0.1274/9.8782/
+7.2631s, Rust runtime sum19.1628s and themes2.0139s. Native3.925883924s/conservative
+210200KiB under262144, SourceErrorNone/source118/decoded6126320, Registry105235521,
+transfer0/written39599, bankpeak11679531/beforeDrop2114151/end0. Same287ordered
+source signatures/two64KiB188+99/6395771physical/12791542bracket stable. Prior source
+captures/oracle/owner/Workspace facts remain qualified0fresh; no old executable
+traversal. Actual Scope/recorderWeak expire; large Source/plan/bodyWeak unavailable.
 
-The actual2-file shape proves bounded original plan presentation only. Full original
-RepoSpec/output/source availability/epoch/namespace/certificate/publicRustc and wholefit
-remain open. Original1MiB refusal and accepted4749878 exact source observation stay
-qualified prior evidence; no currentcapture or old executable traversal. Source/plan/
-registry Weak and post-drop heap attribution are unavailable, despite zero final credits.
-
-Work5/lifetime8/native10/absolutecleanup3/RSS256MiB/AS512MiB/source128/default16/
-production64/Registry1MiB/eachbank16MiB/log1MiB/report4MiB/FSIZE16MiB unchanged.
-Borrow or transfer string storage; use existing scoped interners when repeated retained
-strings and lifetime fit. No global pool for unique transient data. Preserve any failed
-operation once and diagnose a changed bounded hypothesis; no identical replay/cap raise.
+Original generated_kind refusal is gone. Actual next refusal is namespace Lstat
+/tmp/.tmphTlWSV/REPO.bazel, unique current Materialization instance5, exact original
+hub owner, owner_plan_allowedtrue/pathclassother. Borrowed lookup reaches successful
+immutable entries, but aggregate writes/scalar identity do not independently prove
+full Spec attributes, complete files/output freshness/public certificate or producer.
+Public preparationcomplete/singleton/policychecked still ends native computation
+refusal, with certificate/analyses/actions/Rustc unavailable. Prefix memory fits;
+whole-workload fit and full producer remain open.
 
 ## Next selected implementation
 
-[Actual source recommendation](../../../../target/wp1018/next-source.md) grounds a
-finite exact two-file hub admission through the existing natural materializer and
-same-current-epoch own-plan namespace. Preserve original full RepoSpec structurally;
-attributes6/count/digest alone supplies no authority. Use existing generated opt-in
-AND RulesRust import role, mappingNone, exact order/path/content/executable signatures,
-whole-Need pre-IO refusal and current request/owner association. Borrow/transfer/share;
-no retained output plaintext mirror, new flag or general GeneratedFileEffects grant.
-Independent integrated design must precede this functional decision. All caps and
-normal-producer/edition-restoration/certificate/full-fit gates remain unchanged.
+[Actual source recommendation](../../../../target/wp1019/next-source.md) grounds
+finite repository-marker metadata through the original generation-root/current
+epoch/own-plan association. Independent integrated design precedes a functional
+marker extension. Preserve original request/fullSpec, role readiness and whole-Need
+pre-IO refusal; no path repair, generic namespace/prefix permission, physical-root
+reconstruction, provider fabrication or new retained strings. Marker metadata does
+not authorize marker FileBytes, listing/digest/readlink or unrelated owners.
+
+Retain work5/lifetime8/native10/absolute cleanup3/RSS256MiB/AS512MiB/source128/
+default16/production64/defaultHostRegistry1MiB/selectedknown4749878/eachbank16MiB/
+log1MiB/report4MiB/FSIZE16MiB and nine compiler profiles. Selector76 alone retains
+priorMALLOC_ARENA_MAX2; nativeenvironment unchanged. Borrow/transfer/share existing
+strings; use scoped interners for repeated retained values when owner lifetime fits,
+not a global pool for unique transient strings. Preserve failures and diagnose a
+changed hypothesis; no identical retry/cap raise. New effect owner, unavailable
+prerequisite or resource contradiction requires root reassessment. Normal public
+Rustc/support/data/provider/actions/runfiles/same-DICEedition2024→2021→2024/fullCLI/
+compilerexecution/certificate/bodyWeak/wholefit gates remain unchanged and open.

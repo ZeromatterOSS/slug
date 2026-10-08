@@ -34,24 +34,26 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-242-m7a-normal-rustc-toolchain-hub-plan-readiness-r1
-Status: Accepted bounded original hub plan; finite materialization next
+Packet: WP-7-243-m7a-normal-rustc-toolchain-hub-file-readiness-r1
+Status: Accepted finite hub files; repository-marker namespace metadata next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1018](./slug-v2-subplans/wp1018-toolchain-hub-plan-readiness-2026-10-08.json)
-captures the borrowed original toolchain hub plan: two ordered executable files,
-WORKSPACE.bazel52B andBUILD.bazel34099B, mappingNone/attributes6, no grant.
-Core92/themes4/native1/independent FINAL accept; native3.701697259s/210136KiB under
-262144KiB, SourceErrorNone/source118/6126320decoded. One truthful decoder-fixture
-correction preserved its failed record/0credit and97prior passing records' exact
-original-helper provenance. Next finite natural2-file materialization and matching
-same-epoch namespace must preserve full original RepoSpec, not attributes count.
+[WP1019](./slug-v2-subplans/wp1019-toolchain-hub-file-readiness-2026-10-08.json)
+admits the original exact hub two-file plan through existing generated/RulesRust
+roles and couples selected-file namespace access to the same original current epoch.
+Core92/themes4/native1/independent FINAL accepted,99passingrecords/97names/no failures.
+Native3.925883924s/210200KiB under262144KiB; written39599 and bankpeak11679531/end0,
+SourceErrorNone/source118/decoded6126320. Original generated_kind refusal advances
+to original hub current-epoch REPO.bazel Lstat, uniqueinstance5/ownplanallowedtrue/
+pathclassother. Next finite marker metadata needs the same owner/epoch guards;
+counted writes alone do not prove complete output/fullSpec attributes/certificate.
 Current prefix fits; full producer/whole-fit remain open. Borrow/transfer/share and
-existing scoped interners where repetition/lifetime fit; no transient unique data
-pool or cap raise. Source/native limits unchanged; blind retries closed.
+existing scoped interners where repetition/lifetime fit; no owned plaintext mirror,
+transient unique data pool or cap raise. Source/native limits unchanged; blind retries
+closed. Rust117net/twoexistingcfgtestowners, no new retainedstrings/cache/flags.
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

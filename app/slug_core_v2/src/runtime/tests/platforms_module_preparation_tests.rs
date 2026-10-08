@@ -631,6 +631,28 @@ static GENERATED_PLATFORMS_HOST_FILES: [GeneratedFileSignature; 2] = [
         ],
     ),
 ];
+static GENERATED_RUST_TOOLCHAIN_HUB_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "WORKSPACE.bazel",
+        52,
+        true,
+        [
+            0x26, 0x2c, 0xb8, 0x2e, 0x4a, 0xd0, 0x63, 0x64, 0x65, 0x78, 0x79, 0x41, 0xbe, 0x92,
+            0x89, 0xd6, 0xa7, 0x01, 0x6d, 0x20, 0x30, 0xb8, 0x9b, 0xb7, 0x12, 0xfa, 0x65, 0xa4,
+            0x30, 0x8b, 0x74, 0xf9,
+        ],
+    ),
+    (
+        "BUILD.bazel",
+        34099,
+        true,
+        [
+            0x84, 0x37, 0x35, 0x38, 0x71, 0xc6, 0xe3, 0x4d, 0x65, 0x0f, 0xf2, 0x65, 0xd3, 0x14,
+            0x37, 0xde, 0x10, 0x46, 0x01, 0xec, 0x55, 0x01, 0xc8, 0xa3, 0x08, 0xd8, 0x0c, 0x1a,
+            0x39, 0x8d, 0x69, 0x98,
+        ],
+    ),
+];
 static GENERATED_CC_PROXY_FILES: [GeneratedFileSignature; 3] = [
     (
         "BUILD",
@@ -760,6 +782,13 @@ impl Bodies {
             {
                 Some(&GENERATED_CC_PROXY_FILES)
             }
+            (
+                "rules_rust++rust+rust_toolchains",
+                "rules_rust+",
+                "rust/private",
+                "repository_utils.bzl",
+                "toolchain_repository_hub",
+            ) if self.rules_rust_defs_import_sources => Some(&GENERATED_RUST_TOOLCHAIN_HUB_FILES),
             _ => None,
         }
     }

@@ -1071,13 +1071,13 @@ fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
 }
 #[tokio::test]
 async fn namespace_owner_read_uses_current_transaction() {
-    for owner in [0, 2] {
+    for owner in [0, 2, 3] {
         let bodies = namespace_test_bodies();
         let a = Arc::new(generated_test_owner_request(
             &bodies,
             owner,
             small_generated_plan(&[
-                ("BUILD.bazel", b"a", true),
+                (small_owner_first(owner), b"a", true),
                 (small_owner_second(owner), b"b", true),
             ]),
         ));
@@ -1090,6 +1090,8 @@ async fn namespace_owner_read_uses_current_transaction() {
             PathObservationNamespace::Materialization(instance),
             NormalizedAbsolutePath::new(if owner == 2 {
                 "/generation/constraints.bzl"
+            } else if owner == 3 {
+                "/generation/BUILD.bazel"
             } else {
                 "/generation/globals.bzl"
             })
@@ -1280,26 +1282,50 @@ fn generated_test_owner_request(
     }
     request
 }
+fn small_owner_first(owner: usize) -> &'static str {
+    if owner == 3 {
+        "WORKSPACE.bazel"
+    } else {
+        "BUILD.bazel"
+    }
+}
 fn small_owner_second(owner: usize) -> &'static str {
-    ["globals.bzl", "version.bzl", "constraints.bzl"][owner]
+    [
+        "globals.bzl",
+        "version.bzl",
+        "constraints.bzl",
+        "BUILD.bazel",
+    ][owner]
 }
 fn small_namespace_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     selected: &[GeneratedFileSignature],
 ) -> bool {
-    let second = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
-        "globals.bzl"
+    let owner = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
+        0
     } else if std::ptr::eq(selected, &GENERATED_FEATURES_VERSION_FILES) {
-        "version.bzl"
+        1
+    } else if std::ptr::eq(selected, &GENERATED_PLATFORMS_HOST_FILES) {
+        2
     } else {
-        assert!(std::ptr::eq(selected, &GENERATED_PLATFORMS_HOST_FILES));
-        "constraints.bzl"
+        assert!(std::ptr::eq(selected, &GENERATED_RUST_TOOLCHAIN_HUB_FILES));
+        3
     };
     generated_features_plan_matches(
         plan,
         &[
-            ("BUILD.bazel", 1, true, sha2::Sha256::digest(b"a").into()),
-            (second, 1, true, sha2::Sha256::digest(b"b").into()),
+            (
+                small_owner_first(owner),
+                1,
+                true,
+                sha2::Sha256::digest(b"a").into(),
+            ),
+            (
+                small_owner_second(owner),
+                1,
+                true,
+                sha2::Sha256::digest(b"b").into(),
+            ),
         ],
     )
 }
@@ -1312,6 +1338,10 @@ fn namespace_test_bodies() -> Bodies {
             CommandChoice::PublicProbe,
         )
         .with_platforms_host_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
+        .with_rules_rust_defs_import_sources(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
@@ -1344,12 +1374,12 @@ fn generated_features_namespace_is_finite_and_exact() {
             operation,
         )
     };
-    for owner in 0..3 {
+    for owner in 0..4 {
         let request = Arc::new(generated_test_owner_request(
             &bodies,
             owner,
             small_generated_plan(&[
-                ("BUILD.bazel", b"a", true),
+                (small_owner_first(owner), b"a", true),
                 (small_owner_second(owner), b"b", true),
             ]),
         ));
@@ -1360,12 +1390,18 @@ fn generated_features_namespace_is_finite_and_exact() {
             "/parent/generation/globals.bzl",
             "/parent/generation/version.bzl",
             "/parent/generation/constraints.bzl",
+            "/parent/generation/BUILD.bazel",
         ][owner];
+        let first = if owner == 3 {
+            "/parent/generation/WORKSPACE.bazel"
+        } else {
+            "/parent/generation/BUILD.bazel"
+        };
         for (path, class) in [
             ("/", "ancestor"),
             ("/parent", "ancestor"),
             ("/parent/generation", "root"),
-            ("/parent/generation/BUILD.bazel", "fixed_file"),
+            (first, "fixed_file"),
             (fixed, "fixed_file"),
         ] {
             for operation in [
@@ -1400,6 +1436,9 @@ fn generated_features_namespace_is_finite_and_exact() {
             "/parent/generation/BUILD.bazel/child",
             "/parent/generation/build.bazel",
             "/parent/generation/BUILD.bazel.bak",
+            "/parent/generation/WORKSPACE.bazel/child",
+            "/parent/generation/workspace.bazel",
+            "/parent/generation/WORKSPACE.bazel.bak",
             if owner == 1 {
                 "/parent/generation/globals.bzl"
             } else {
@@ -1439,13 +1478,14 @@ fn generated_features_namespace_is_finite_and_exact() {
                 .admits(&image.operation())
         );
         for index in 0..4 {
-            if owner == 2 && index == 2 {
+            if owner >= 2 && index == 2 {
                 continue;
             }
             let mut closed = namespace_test_bodies();
             match index {
                 0 => closed.generated_features_file_effects = false,
                 1 if owner == 2 => closed.platforms_host_import_sources = false,
+                1 if owner == 3 => closed.rules_rust_defs_import_sources = false,
                 1 => closed.bazel_features_import_sources = false,
                 2 => closed.additional[0] = None,
                 3 => closed.roots[0] = NormalizedAbsolutePath::new("/wrong").unwrap(),
@@ -1634,48 +1674,59 @@ fn generated_features_namespace_refuses_mixed_need_before_progress() {
         }),
     )
     .unwrap();
-    let host = Arc::new(generated_test_owner_request(
-        &bodies,
-        2,
-        small_generated_plan(&[("BUILD.bazel", b"a", true), ("constraints.bzl", b"b", true)]),
-    ));
-    let host_weak = Arc::downgrade(&host);
-    let host_instance = slug_workspace_v2::PathObservationInstanceId::new(19);
-    let host_epoch =
-        namespace_test_epoch_at(&bodies, [host.clone()], host_instance, "/host-generation");
-    let host_need = need(
-        PathObservationNamespace::Materialization(host_instance),
-        "/host-generation/constraints.bzl",
-    )
-    .try_union(&SourcePreparationNeeds::repository(host.as_ref().clone()))
-    .unwrap();
-    assert!(admits(&host_need, Some(&host_epoch)).is_ok());
-    let crossed_host = host_need
-        .try_union(&need(
+    for (owner, generation, fixed) in [
+        (2, "/host-generation", "/host-generation/constraints.bzl"),
+        (3, "/hub-generation", "/hub-generation/BUILD.bazel"),
+    ] {
+        let host = Arc::new(generated_test_owner_request(
+            &bodies,
+            owner,
+            small_generated_plan(&[
+                (small_owner_first(owner), b"a", true),
+                (small_owner_second(owner), b"b", true),
+            ]),
+        ));
+        let host_weak = Arc::downgrade(&host);
+        let host_instance = slug_workspace_v2::PathObservationInstanceId::new(19);
+        let host_epoch =
+            namespace_test_epoch_at(&bodies, [host.clone()], host_instance, generation);
+        let host_need = need(
+            PathObservationNamespace::Materialization(host_instance),
+            fixed,
+        )
+        .try_union(&SourcePreparationNeeds::repository(host.as_ref().clone()))
+        .unwrap();
+        assert!(admits(&host_need, Some(&host_epoch)).is_ok());
+        let crossed = need(
             PathObservationNamespace::Materialization(host_instance),
             "/version-generation/version.bzl",
-        ))
-        .unwrap();
-    let mut host_progress = 0;
-    if admits(&crossed_host, Some(&host_epoch)).is_ok() {
-        host_progress += 1;
+        );
+        for crossed_host in [
+            host_need.try_union(&crossed).unwrap(),
+            crossed.try_union(&host_need).unwrap(),
+        ] {
+            let mut host_progress = 0;
+            if admits(&crossed_host, Some(&host_epoch)).is_ok() {
+                host_progress += 1;
+            }
+            assert_eq!(host_progress, 0);
+            assert_eq!(
+                admits(&crossed_host, Some(&host_epoch)).unwrap_err().family,
+                "namespace"
+            );
+        }
+        assert!(std::ptr::eq(
+            host_epoch
+                .borrowed_instance_for_namespace(&bodies.roots[0], host_instance, 32)
+                .unwrap()
+                .unwrap()
+                .request(),
+            host.as_ref()
+        ));
+        drop(host_epoch);
+        drop(host);
+        assert!(host_weak.upgrade().is_none());
     }
-    assert_eq!(host_progress, 0);
-    assert_eq!(
-        admits(&crossed_host, Some(&host_epoch)).unwrap_err().family,
-        "namespace"
-    );
-    assert!(std::ptr::eq(
-        host_epoch
-            .borrowed_instance_for_namespace(&bodies.roots[0], host_instance, 32)
-            .unwrap()
-            .unwrap()
-            .request(),
-        host.as_ref()
-    ));
-    drop(host_epoch);
-    drop(host);
-    assert!(host_weak.upgrade().is_none());
     let cohort = valid
         .try_union(&need(
             PathObservationNamespace::Materialization(sibling_instance),
@@ -1765,9 +1816,10 @@ fn generated_features_materialization_is_opt_in_and_exact() {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
     let matches = small_namespace_plan_matches;
-    for owner in 0..3 {
+    for owner in 0..4 {
+        let first = small_owner_first(owner);
         let second = small_owner_second(owner);
-        let rows: &[(&str, &[u8], bool)] = &[("BUILD.bazel", b"a", true), (second, b"b", true)];
+        let rows: &[(&str, &[u8], bool)] = &[(first, b"a", true), (second, b"b", true)];
         let request_for_plan =
             |bodies: &Bodies, plan| generated_test_owner_request(bodies, owner, plan);
         let bodies = make()
@@ -1777,6 +1829,10 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 CommandChoice::PublicProbe,
             )
             .with_platforms_host_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
+            .with_rules_rust_defs_import_sources(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             )
@@ -1796,6 +1852,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     .with_fourth(path("/features"))
                     .with_bazel_features_import_sources(registry, command)
                     .with_platforms_host_import_sources(registry, command)
+                    .with_rules_rust_defs_import_sources(registry, command)
                     .with_generated_features_file_effects(registry, command);
                 assert_eq!(
                     configured.admit_with_plan_matcher(&needs, &matches).is_ok(),
@@ -1804,11 +1861,12 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 );
             }
         }
-        if owner == 2 {
+        if owner >= 2 {
             for mask in 0..3 {
                 let mut closed = namespace_test_bodies();
                 match mask {
-                    0 => closed.platforms_host_import_sources = false,
+                    0 if owner == 2 => closed.platforms_host_import_sources = false,
+                    0 => closed.rules_rust_defs_import_sources = false,
                     1 => closed.generated_features_file_effects = false,
                     2 => closed.roots[0] = path("/other"),
                     _ => unreachable!(),
@@ -1846,7 +1904,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     .is_err()
             );
         }
-        if owner != 2 {
+        if owner < 2 {
             let mut wrong_slot = make()
                 .with_fourth(path("/other"))
                 .with_fifth(path("/features"))
@@ -1964,11 +2022,11 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 );
             }
         }
-        for other in (0..3).filter(|other| *other != owner) {
+        for other in (0..4).filter(|other| *other != owner) {
             let crossed_shape = request_for_plan(
                 &bodies,
                 small_generated_plan(&[
-                    ("BUILD.bazel", b"a", true),
+                    (small_owner_first(other), b"a", true),
                     (small_owner_second(other), b"b", true),
                 ]),
             );
@@ -1983,19 +2041,21 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         }
         let invalid: &[&[(&str, &[u8], bool)]] = &[
             &[],
-            &[("BUILD.bazel", b"a", true)],
+            &[(first, b"a", true)],
             &[
-                ("BUILD.bazel", b"a", true),
+                (first, b"a", true),
                 (second, b"b", true),
                 ("extra", b"", false),
             ],
-            &[(second, b"b", true), ("BUILD.bazel", b"a", true)],
+            &[(second, b"b", true), (first, b"a", true)],
             &[("BUILD", b"a", true), (second, b"b", true)],
-            &[("BUILD.bazel", b"aa", true), (second, b"b", true)],
-            &[("BUILD.bazel", b"x", true), (second, b"b", true)],
-            &[("BUILD.bazel", b"a", false), (second, b"b", true)],
-            &[("BUILD.bazel", b"a", true), (second, b"x", true)],
-            &[("BUILD.bazel", b"a", true), (second, b"b", false)],
+            &[(first, b"aa", true), (second, b"b", true)],
+            &[(first, b"x", true), (second, b"b", true)],
+            &[(first, b"a", false), (second, b"b", true)],
+            &[(first, b"a", true), (second, b"x", true)],
+            &[(first, b"a", true), (second, b"b", false)],
+            &[(first, b"a", true), (second, b"bb", true)],
+            &[(first, b"a", true), ("unknown.bzl", b"b", true)],
         ];
         for rows in invalid {
             let needs = SourcePreparationNeeds::repository(request_for_plan(
@@ -2236,6 +2296,10 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
         )
+        .with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        )
         .with_generated_features_file_effects(
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
@@ -2293,12 +2357,31 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
     let host_original = host.repository_materializations().values().next().unwrap();
     let host_weak = Arc::downgrade(host_original);
     let host_count = Arc::strong_count(host_original);
+    let hub = SourcePreparationNeeds::repository(generated_test_owner_request(
+        &bodies,
+        3,
+        small_generated_plan(&[("WORKSPACE.bazel", b"a", true), ("BUILD.bazel", b"b", true)]),
+    ));
+    let hub_original = hub.repository_materializations().values().next().unwrap();
+    let hub_weak = Arc::downgrade(hub_original);
+    let hub_count = Arc::strong_count(hub_original);
     for cohort in [
-        valid.try_union(&version).unwrap().try_union(&host).unwrap(),
-        host.try_union(&version).unwrap().try_union(&valid).unwrap(),
+        valid
+            .try_union(&version)
+            .unwrap()
+            .try_union(&host)
+            .unwrap()
+            .try_union(&hub)
+            .unwrap(),
+        hub.try_union(&host)
+            .unwrap()
+            .try_union(&version)
+            .unwrap()
+            .try_union(&valid)
+            .unwrap(),
     ] {
         assert!(bodies.admit_with_plan_matcher(&cohort, &matches).is_ok());
-        for held in [original, version_original, host_original] {
+        for held in [original, version_original, host_original, hub_original] {
             let present = cohort
                 .repository_materializations()
                 .values()
@@ -2310,7 +2393,14 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
     assert_eq!(Arc::strong_count(original), count);
     assert_eq!(Arc::strong_count(version_original), version_count);
     assert_eq!(Arc::strong_count(host_original), host_count);
-    let cohort = valid.try_union(&version).unwrap().try_union(&host).unwrap();
+    assert_eq!(Arc::strong_count(hub_original), hub_count);
+    let cohort = valid
+        .try_union(&version)
+        .unwrap()
+        .try_union(&host)
+        .unwrap()
+        .try_union(&hub)
+        .unwrap();
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "platforms", "/platforms")).clone(),
     );
@@ -2397,7 +2487,12 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         2,
         small_generated_plan(&[("BUILD.bazel", b"a", true), ("constraints.bzl", b"x", true)]),
     ));
-    for changed in [changed, changed_version, changed_host] {
+    let changed_hub = SourcePreparationNeeds::repository(generated_test_owner_request(
+        &bodies,
+        3,
+        small_generated_plan(&[("WORKSPACE.bazel", b"a", true), ("BUILD.bazel", b"x", true)]),
+    ));
+    for changed in [changed, changed_version, changed_host, changed_hub] {
         let accepted_sibling = if changed
             .repository_materializations()
             .values()
@@ -2448,7 +2543,13 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             matches(plan, signatures)
         }
     };
-    let features = valid.try_union(&version).unwrap().try_union(&host).unwrap();
+    let features = valid
+        .try_union(&version)
+        .unwrap()
+        .try_union(&host)
+        .unwrap()
+        .try_union(&hub)
+        .unwrap();
     for cohort in [
         features.try_union(&proxy).unwrap(),
         proxy.try_union(&features).unwrap(),
@@ -2519,6 +2620,8 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
     drop(proxy);
     assert!(proxy_weak.upgrade().is_none());
     drop(features);
+    drop(hub);
+    assert!(hub_weak.upgrade().is_none());
     drop(host);
     assert!(host_weak.upgrade().is_none());
     drop(version);
@@ -2527,7 +2630,7 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
     assert!(version_weak.upgrade().is_none());
 }
 
-const GENERATED_DIAGNOSTIC_TEST_OWNERS: [(&str, &str, &str); 3] = [
+const GENERATED_DIAGNOSTIC_TEST_OWNERS: [(&str, &str, &str); 4] = [
     (
         "bazel_features++version_extension+bazel_features_globals",
         "@@bazel_features+//private:globals_repo.bzl",
@@ -2543,6 +2646,7 @@ const GENERATED_DIAGNOSTIC_TEST_OWNERS: [(&str, &str, &str); 3] = [
         "@@platforms//host:extension.bzl",
         "host_platform_repo",
     ),
+    GENERATED_HUB_DIAGNOSTIC_TEST_OWNER,
 ];
 const GENERATED_HUB_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
     "rules_rust++rust+rust_toolchains",
@@ -2553,10 +2657,8 @@ const GENERATED_HUB_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for (owner, &(canonical, defining_label, rule_name)) in GENERATED_DIAGNOSTIC_TEST_OWNERS
-        .iter()
-        .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
-        .enumerate()
+    for (owner, &(canonical, defining_label, rule_name)) in
+        GENERATED_DIAGNOSTIC_TEST_OWNERS.iter().enumerate()
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
@@ -2608,15 +2710,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         assert!(enabled.rules_rust_defs_import_sources);
         // The permissive phase seam still requires the complete typed owner and source roles.
         let permissive = enabled.admit_with_plan_matcher(&needs, &|_, _| true);
-        if owner == 3 {
-            assert_eq!(permissive.unwrap_err().family, "materialization");
-            assert_eq!(
-                enabled.first_denied_materialization(&needs).unwrap().1,
-                "generated_kind"
-            );
-        } else {
-            assert!(permissive.is_ok());
-        }
+        assert!(permissive.is_ok());
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);
         let denied = bodies.admit(&needs).unwrap_err();
@@ -2743,10 +2837,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             );
         }
         // Every component cross between otherwise eligible atomic owners stays closed.
-        for &(other_canonical, other_label, other_rule) in GENERATED_DIAGNOSTIC_TEST_OWNERS
-            .iter()
-            .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
-        {
+        for &(other_canonical, other_label, other_rule) in GENERATED_DIAGNOSTIC_TEST_OWNERS.iter() {
             if other_canonical == canonical {
                 continue;
             }
@@ -2897,10 +2988,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
 #[test]
 fn generated_plan_refusal_projection_is_bounded() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for &(canonical, defining_label, rule_name) in GENERATED_DIAGNOSTIC_TEST_OWNERS
-        .iter()
-        .chain(std::iter::once(&GENERATED_HUB_DIAGNOSTIC_TEST_OWNER))
-    {
+    for &(canonical, defining_label, rule_name) in GENERATED_DIAGNOSTIC_TEST_OWNERS.iter() {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
         let request_for_plan = |plan: Plan| {
