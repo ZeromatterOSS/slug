@@ -1,151 +1,118 @@
 # Slug V2 current work packet
 
-Packet: WP-7-258-m7a-normal-rustc-fixture-source-workload-r1
-Status: Accepted finite native fixture workload; next tracked environment readiness selected
+Packet: WP-7-259-m7a-normal-rustc-cc-detection-environment-readiness-r1
+Status: Accepted finite tracked CC environment readiness; next package metadata selected
 
-Baseline:017d841aaa1c23bf0e36dcd3c5271bd81a28d446; predecessor WP1033 accepted.
-Frozen [design](../../../../target/wp1034/design.md)
-SHA2f388bba1e3c21893c75682b6a5c37cb01d48bed16ddaee694f34cc58e9054f9.
-Independent [DESIGN ACCEPT](../../../../target/wp1034/design-review.md)
-SHA62286055d500c83fc348180ff97b2c924e1c0e9be64b977b1f14192364c57402 clears bounded authorship; actual STATIC precedes activation/gates.
+Baseline:85b9a08da2cfb65f5ddcab7101b24ae4fe518517; predecessor WP1034 accepted.
+[Frozen design](../../../../target/wp1035/design.md)
+SHA0c7463307782a7c34152816f46b6b5cd66e0375e7e20f54d803376426c78727a.
+Independent DESIGN acceptance is required before source/helper authoring.
 
-The broader normal public Rustc producer continues on the same Bazel9.2/rules_rust0.73
-fixture, providers/support/data/toolchains, retained Spawn query and same-DICE edition
-2024→2021→2024 goal. This change is Slug-native cfgtest-Linux workload policy only;
-accepted source/oracle bytes remain exact. Windows remains deferred.
+The observable outcome is to admit the exact original one-name environment Need
+`BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN` through the existing finite native fixture
+policy and immutable command snapshot, then expose the next genuine normal
+public Rustc prerequisite. No completed producer outcome is predetermined.
+The change is Slug-native cfgtest-Linux readiness; accepted Bazel9.2/rules_rust0.73
+source/oracle bytes remain exact, with Windows deferred.
 
-The WP1033 census accounts for128 admitted and the129th refused SourceAttempts charge.
-All129 identities are distinct, domainHost/phaseNeedPaths, namespacesHost123 plus six
-Materialization instances. No exact repeated demand repair is supported. The actual
-memory prefix fits211688KiB<262144,4.334242525s; Source128 refusal precedes IO for the
-already eligible Skylib/lib/types.bzl. Accounting/identity are not successful IO,
-necessity, revision, certificate, total required workload or whole-fit evidence.
-Existing command progress filters covered demands; mandatory certificate observations
-remain required. Reuse both frozen next-source/evidence notes and actual accepted
-WP1033 evidence; no new capture, inventory, source grant or external scan is selected.
+## Owner and decision
 
-## Decision and owner
+Extend `RULES_CC_ENVIRONMENT_NAMES` from13 to14 static borrowed names. Preserve
+Bodies::admits_repository_environment's effective PreparedFile/PublicProbe
+rules_cc_import_sources, selected additional[2], original workspace and positive
+canonical whole-name subset checks. Public projection_matches independently
+requires the original command snapshot to be empty. Mixed unknown names refuse
+the complete Need before progress, regardless of construction order.
 
-Choose256 as an explicit finite native fixture continuation budget. It is a bounded
-workload hypothesis above the proven129 lower bound, not an estimate of total completion
-or authority to retry until success. The unchanged source roles and whole-Need validation
-still decide which observations are permitted; count capacity grants no path access.
-SourceServiceScope owns checked charging, first poison, cancellation/overflow and
-inclusive selected limit. Its cfg(test,Linux) validation maximum becomes256; production
-and other platforms retain64, Default/actual_root still64. charge_locked stays unchanged.
+NativeDemandSession owns the frontier, immutable request and normal injection.
+Repository host input injection stages Observed(snapshot.get(name)); the empty
+snapshot yields Observed(None), distinct from Unauthorized and a present empty
+value. Loading checks tracked cells against its current snapshot. Existing
+DICE structural identity/equality, revision, A→B→A, cancellation, rejection
+restoration and source certificates remain authoritative. No process environment
+read, snapshot reset, caller inference or production identity change is selected.
 
-Bodies::source_limits retains128 with the existing RulesRust role, otherwise16. Add one
-pure native_source_limits(registry,command) Copy-profile projection at the current
-native fixture construction. Select256 only PreparedFile AND PublicProbe AND existing
-effective rules_rust_defs_import_sources; all other cases preserve source_limits exactly.
-No new field, environment/CLI flag, retained profile, mutable scope, global policy or
-production override is introduced. Existing source allowance remains bound to the
-original RulesRust root/role, independent of the attempt number.
+## Scope and allocation
 
-Expand census event capacity129→257 to cover selected256 plus first refusal. Keep path
-1024B, aggregate raw131072B, encoded524288B including summary/LF and1024B summary reserve.
-All scalar fields/layout/borrowing/concurrency and default-off behavior remain unchanged.
-The257 event bound is global to this cfgtest census, independent of charged units or
-selected16/128/256 source limit; amount0 and sticky calls may consume rows without admissions.
-Do not condition parser capacity129 on an ordinary128 limit, since Rust uses the same
-257 scalar event capacity for every opted-in scope.
-A byte-boundary or event258 must produce honest incomplete coverage; never clip identity,
-reuse attempted partial-output budget or poison source semantics. No additional retained
-strings/paths/container/map/Arc/interner/cache/callback/lock is necessary. Borrow/transfer
-existing storage; use scoped interners for repeated retained immutable semantic strings
-only when lifetime and cleanup fit. Diagnostic temporary paths remain borrowed.
+Only two Rust cfgtest files: runtime/tests/platforms_module_preparation_tests.rs
+(static table) and its public_probe_preparation_tests.rs child (existing test).
+Expected1 table line plus15–40 net test lines. The large parent remains cohesive
+because the existing local constant owns this precise policy. No new owner,
+framework, retained field, owned runtime String/path/map/cache/interner or lock.
+Borrowed static comparison adds one literal/descriptor; normal shared snapshot
+and frontier storage keeps its existing lifetime and actual retention cost.
+Borrow or transfer strings where lifetime fits; scoped interners apply only to
+repeated retained strings with fitting cleanup. No donor/Stage9 utility import.
 
-## Minimal implementation and discriminators
+Extend repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only:
+all14, singleton new/mixed old+new positives, wrong case/suffix/unknown/empty/
+foreign workspace/disabled mode/missing selectedslot negatives; full15 including
+unknown rejected; both-order wholeNeed unsupported families, borrowed original
+request/name pointers, zero progress and Weak retirement preserved. Retain the
+bounded borrowed refusal formatter and four existing environment-cell lifecycle
+selectors for unrelated cutoffs, A→B→A/empty revisions, retry/rejection and
+cancelled current-only revocation. All99 selector names remain unchanged.
 
-Five Rust files: source_service/scope.rs (test maximum only), source_service/tests.rs
-(existing maximum/inclusive/sticky matrix), tests/platforms_module_preparation_tests.rs
-(pure projection/native construction), its public_probe_preparation_tests.rs child
-(existing source profile test), source_service/source_charge_census.rs (event bound and
-existing census test). No DICE key/locking, reader, request/revision, semantic permission,
-Windows, production retained representation or source body change. Current source owner
-proposal supplies exact anchors and tests. Expected40–90net; reassess material growth.
-Large existing parent remains cohesive for a small pure profile method and one call;
-no separate profile framework. No donor/Stage9 retained utility import is selected.
+Root authors twelve current private helper counterparts, preserving historical
+helpers/captures/constants/raw output. Protocol's exact environment tuple and
+bound become14; retain full50 CC root/order/signatures before qualified8 legacy
+interface and full original workspace/Need context. Original names-only decoder,
+closed carrier and ordering stay unchanged. Canonical test construction places
+the new name before BAZEL_VC; malformed raw ordering stays rejected.
+Extend the four existing themes with exactnew/full14/mixedold admissions-as-denial
+contradictions and unknown/mixed both-order/case/suffix/count15/context negatives.
+No fake successful transcript or role-disabled checked native is created.
 
-Extend existing source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling
-with1/64/65/128/129/256 inclusive/source first and sticky cross-counter refusal;0/257 remain
-invalid. Preserve default/actual-root/registry/thread/byte/network matrices. Extend
-rules_rust_defs_import_source_limits_preserve_byte_budgets over PreparedFile/DefaultBcr,
-PublicProbe/Modules, effective role on/off: ordinary128/16 unchanged, native256 only
-selected conjunction; compare complete Copy limit structs and normal scope256+first257.
-The existing census selector exercises257th/258th event with small empty-path amount0
-records and separately unchanged raw-path saturation, partial writer suppression,
-concurrency, overflow, disabled, original identity, lock-free/preIO/lifetime and layout.
-Preserve current99 selectors; no new suite or selector. Existing freshness/ABA/wholeNeed/
-both-order/zeroProgress/defaultslot/LocalWeak controls remain authority.
+## Validation and limits
 
-Root authors twelve current private native helper counterparts. Only current public
-source-limit policy and current input source_attempt_limit select256. Add the exact Boolean
-input native_source_workload (not an environment/CLI or Rust state flag): true selects the
-native256 fixture only under the exact role/file-registry conjunction; false retains128
-for the existing effective RulesRust ordinary context or16 without that role. Missing or
-non-Boolean current workload discriminator fails; current native input is true. Its meaning
-is authenticated by this frozen contract, strict full input equality/current cohort/source
-policy checks and the sole native construction method, not the requested number alone.
-Keep the discriminator through current private projections; never mutate prior input files. Require exact integer (not Boolean),
-256 mismatch/default/role-context negatives; read actual WP955_LIMITS/markers/counters as
-emitted. Preserve historical helpers, inputs, raw/output and capture authority unchanged.
-Keep the same three fresh private decoder graph bindings and installed bounded Host
-predicate. Current census parser uses257 IDs/emitted/skipped rules, same byte limits and
-strict summary/source counter/first-refusal joins. Do not normalize256→128, broaden closed
-enums, accept arbitrary selected numbers, mask genuine source/work failures, or weaken
-whole-Need/permission checks. Current prep/supervisor equality checks admit solely the
-explicit source_attempt_limit256 delta;301 ordered source lease rows, roles/roots/flags/
-metadata/body signatures and two parent64KiB contexts stay exact. Historical capture
-references remain qualified27operations/81decisions/70observations0fresh; no old executable
-target is opened. Fresh current source/helper pins and all required role APIs precede
-operations; combined actual STATIC before sole prepare/protocol activations.
+Inherit WP1034's complete gate/resource contract. Independent DESIGN before edits;
+complete source/config/nine-role API and combined STATIC before role copies then
+sole prepare/protocol activation. Three freshly resolved pinned nightly2025-09-14
+serial compiler preparations<=60s/offline/jobs1/nine profiles, current CargoJSON
+selection and exact preflight/list;99 ordinary tests/four decoder themes/independent
+prelaunch/one changed native/audit. Join each operation before dependent work.
+Both explicit frozen next-source/evidence notes precede final-source/draft;
+actual independent FINAL precedes receipt.py, which precedes acceptance assembly.
+No new acquisition/capture/source grant/inventory/scan or old target traversal.
 
-## Validation, limits and acceptance
-
-Independent DESIGN before edits and actual final diff review required for changed workload
-policy. Root serial three freshly resolved pinned nightly2025-09-14 compiler preparations
-<=60s/offlinejobs1/nine existing profiles/current CargoJSON;99 exact nonignored ordinary
-Rust gates, four existing Python themes, one actual changed native after independent
-prelaunch review, audit once. JOIN every operation before dependent launches. Preserve
-failures and correct only affected gates within this contract; no identical failure retry.
-This changed-workload probe follows a reviewed source change, not a repeat of WP1033.
-No new acquisition/capture/body grant. Explicit next-source and next-evidence notes precede
-final-source/receipt; actual independent FINAL then receipt.py before root acceptance.
-
-All user memory/time and byte constraints remain: work5s/lifetime8s/native10s/shared absolute
-cleanup3s/RSS256MiB=262144KiB/AS512MiB; registry128/defaultobject1MiB/sole exact RulesRust
-known_shas4749878 allowance; transfer/decoded/written/live banks16MiB; logs1MiB each/report4MiB/
-FSIZE16MiB; nine profiles unchanged. Selector76 alone MALLOC_ARENA_MAX2/nativeenvironment
-unchanged. Only selected fixture source count256 and cfgtest validation/census event capacity
-change. A new source, permission, work, memory or semantic boundary remains typed and grounds
-the next natural-owner step. Replan only if meeting this outcome needs another semantic
-owner/compatibility decision; ordinary invocation/compiler corrections stay within scope.
-No success is preselected. Whole producer/compiler/actions/edition restoration/source
-certificate/retained-body retirement/parent-child aggregate and wholegraph fit remain open
-until actual evidence establishes them. Goal remains active.
+Selected native256/ordinary128/probe16/production64/global257 census events and
+all byte/time/memory caps remain: work5/life8/native10/sharedcleanup3,
+RSS262144KiB/AS512MiB, registry128/default object1MiB/exact known_shas4749878,
+banks16MiB/log1each/report4/FSIZE16. Same301 ordered leases188+113 and two64KiB
+buffers; prior captures are qualified0fresh. Selector76 alone MALLOC_ARENA_MAX2;
+native environment unchanged. No forced success, identical failed retry, quota
+increase, source refund/newscope or freshness bypass. New genuine prerequisite
+is evidence for the next natural owner. Whole producer/compiler/actions/edition
+restoration/certificate/body retirement/aggregate/whole fit remain open.
 
 
 ## Immediate predecessor
 
-[WP1034](wp1034-fixture-source-workload-2026-10-09.json) accepts a finite
-cfgtest-Linux native256 source profile; ordinary128/default probe16/production64 remain.
-The native gate passed in 5.252331014s at 209920 KiB < 262144,
-with 130 admitted source charges, no source-service error and decoded 6215905 bytes.
-All 130 original charge identities are distinct; complete census accounting/identity
-has no loss, 26657 raw / 82547 encoded bytes. These are charge records, not per-file IO
-or certificates. The new original Need names BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN;
-public computation refuses before certificate/actions/Rustc. The prefix fits memory;
-full producer/compiler/edition restoration/wholegraph fit remain open.
-Current 99 Core / four themes / native 1 = 104 names / 106 passing records, three serial compiler
-preparations, independent FINAL and post-FINAL operative receipt pass; 0 failed,
-0 superseded, 0 fresh captures. Five Rust files 112 net / private helpers 65 net were reviewed;
-no new retained fields/owned runtime strings, production representation unchanged.
-Borrow/transfer storage; scoped interners for repeated retained strings with fitting
-lifetime/cleanup. All caps unchanged; 301 stable leases / two 64 KiB buffers.
-Review-role copy ordering is explicitly qualified before all helper imports/gates;
-no extra operation, test credit, retry or reactivation. Windows remains deferred.
-[Frozen next-source](../../../../target/wp1034/next-source.md) and
-[next-evidence](../../../../target/wp1034/next-evidence.md) select a separately reviewed
-finite environment-name readiness extension using existing tracked snapshot/cells.
-No successor grant or activation is implied by this acceptance.
+[WP1035](wp1035-cc-detection-environment-readiness-2026-10-09.json) accepts the
+exact CC detection environment name through the existing finite14-name fixture
+policy and immutable tracked snapshot/cells. Original role/mode/slot/workspace/
+whole-Need/empty-snapshot guards and revision/ABA/cancellation/restoration stay exact.
+Two cfgtest files20 net/private helpers13 net add one borrowed33B static literal
+and descriptor, with no new runtime owned strings or retained fields. Borrow/transfer;
+scoped interners for retained repetition only with fitting lifetime/cleanup.
+Native5.007664012s /208820KiB<262144, source131/no source error/decoded6215935.
+The complete131 charge identities are distinct (Host domain131, namespaceHost125
+plus6Materialization),26857raw/83173encoded; debit identity is not per-row IO,
+necessity, revision or certificate. Environment refusal is absent; next original
+220B CC cc/private/toolchain/BUILD.bazel offender is Lstat (WP957), without body/
+availability/caller proof. Public computation still refuses before certificate/
+actions/Rustc. Prefix fits memory; full producer/compiler/edition restoration/
+heap retirement/aggregate/whole-fit gates remain open.
+99Core/fourthemes/native1 =104 named passes /106 passing records, current three
+serial compiler preparations, strict pins1052 direct/1065 union, independent FINAL
+and post-FINAL operative receipt. Two outer/inner review-note preconditions stopped
+before any native test child,0test/operation credit; both original notes/failures
+preserved and complete10-ref API reassessed. Source/helpers/inputs/Core and105
+pre-native passing records stayed current, no reactivation or replay. Exactly one
+actual native ran. Same301 ordered stable leases/two64KiB buffers/all caps retained,
+prior27captures/81decisions/70observations0fresh. Windows remains deferred.
+[Frozen next-source](../../../../target/wp1035/next-source.md) and
+[next-evidence](../../../../target/wp1035/next-evidence.md) ground an exact CC package
+primary/fallback metadata continuation. Root selects metadata-only readiness at
+this Lstat frontier; any content request will require its own eligibility evidence.
+No successor grant or activation is implied by acceptance.

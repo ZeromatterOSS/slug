@@ -34,34 +34,41 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-258-m7a-normal-rustc-fixture-source-workload-r1
-Status: Accepted finite native fixture workload; next tracked environment readiness selected
+Packet: WP-7-259-m7a-normal-rustc-cc-detection-environment-readiness-r1
+Status: Accepted finite tracked CC environment readiness; next package metadata selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
-retained Slug Rustc producer on the unchanged Bazel9.2/rules_rust0.73 fixture.
-The bounded memory prefix fits 256 MiB; next use the existing tracked environment
-snapshot for its newly exposed finite prerequisite. Broader producer gates stay open.
-[WP1034](./slug-v2-subplans/wp1034-fixture-source-workload-2026-10-09.json) accepts a finite
-cfgtest-Linux native256 source profile; ordinary128/default probe16/production64 remain.
-The native gate passed in 5.252331014s at 209920 KiB < 262144,
-with 130 admitted source charges, no source-service error and decoded 6215905 bytes.
-All 130 original charge identities are distinct; complete census accounting/identity
-has no loss, 26657 raw / 82547 encoded bytes. These are charge records, not per-file IO
-or certificates. The new original Need names BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN;
-public computation refuses before certificate/actions/Rustc. The prefix fits memory;
-full producer/compiler/edition restoration/wholegraph fit remain open.
-Current 99 Core / four themes / native 1 = 104 names / 106 passing records, three serial compiler
-preparations, independent FINAL and post-FINAL operative receipt pass; 0 failed,
-0 superseded, 0 fresh captures. Five Rust files 112 net / private helpers 65 net were reviewed;
-no new retained fields/owned runtime strings, production representation unchanged.
-Borrow/transfer storage; scoped interners for repeated retained strings with fitting
-lifetime/cleanup. All caps unchanged; 301 stable leases / two 64 KiB buffers.
-Review-role copy ordering is explicitly qualified before all helper imports/gates;
-no extra operation, test credit, retry or reactivation. Windows remains deferred.
-[Frozen next-source](../../../target/wp1034/next-source.md) and
-[next-evidence](../../../target/wp1034/next-evidence.md) select a separately reviewed
-finite environment-name readiness extension using existing tracked snapshot/cells.
-No successor grant or activation is implied by this acceptance.
+retained Slug Rustc producer on the same Bazel9.2/rules_rust0.73 fixture. Memory
+remains within the256MiB child budget; next resolve its exact CC package-marker
+metadata prerequisite through the existing owner. Broader producer gates stay open.
+[WP1035](./slug-v2-subplans/wp1035-cc-detection-environment-readiness-2026-10-09.json) accepts the
+exact CC detection environment name through the existing finite14-name fixture
+policy and immutable tracked snapshot/cells. Original role/mode/slot/workspace/
+whole-Need/empty-snapshot guards and revision/ABA/cancellation/restoration stay exact.
+Two cfgtest files20 net/private helpers13 net add one borrowed33B static literal
+and descriptor, with no new runtime owned strings or retained fields. Borrow/transfer;
+scoped interners for retained repetition only with fitting lifetime/cleanup.
+Native5.007664012s /208820KiB<262144, source131/no source error/decoded6215935.
+The complete131 charge identities are distinct (Host domain131, namespaceHost125
+plus6Materialization),26857raw/83173encoded; debit identity is not per-row IO,
+necessity, revision or certificate. Environment refusal is absent; next original
+220B CC cc/private/toolchain/BUILD.bazel offender is Lstat (WP957), without body/
+availability/caller proof. Public computation still refuses before certificate/
+actions/Rustc. Prefix fits memory; full producer/compiler/edition restoration/
+heap retirement/aggregate/whole-fit gates remain open.
+99Core/fourthemes/native1 =104 named passes /106 passing records, current three
+serial compiler preparations, strict pins1052 direct/1065 union, independent FINAL
+and post-FINAL operative receipt. Two outer/inner review-note preconditions stopped
+before any native test child,0test/operation credit; both original notes/failures
+preserved and complete10-ref API reassessed. Source/helpers/inputs/Core and105
+pre-native passing records stayed current, no reactivation or replay. Exactly one
+actual native ran. Same301 ordered stable leases/two64KiB buffers/all caps retained,
+prior27captures/81decisions/70observations0fresh. Windows remains deferred.
+[Frozen next-source](../../../target/wp1035/next-source.md) and
+[next-evidence](../../../target/wp1035/next-evidence.md) ground an exact CC package
+primary/fallback metadata continuation. Root selects metadata-only readiness at
+this Lstat frontier; any content request will require its own eligibility evidence.
+No successor grant or activation is implied by acceptance.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

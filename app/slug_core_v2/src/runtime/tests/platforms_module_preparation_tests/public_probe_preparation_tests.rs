@@ -956,7 +956,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         )
     };
     let all = need("/fixture", &RULES_CC_ENVIRONMENT_NAMES);
-    assert_eq!(all.repository_environment().unwrap().names().len(), 13);
+    assert_eq!(all.repository_environment().unwrap().names().len(), 14);
     assert!(selected().admit(&all).is_err());
     for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
         for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
@@ -972,6 +972,16 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     for name in RULES_CC_ENVIRONMENT_NAMES {
         assert!(bodies.admit(&need("/fixture", &[name])).is_ok());
     }
+    let detection = need("/fixture", &["BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN"]);
+    assert!(bodies.admit(&detection).is_ok());
+    let old = need("/fixture", &["TEMP", "BAZEL_VC"]);
+    for mixed in [
+        old.try_union(&detection).unwrap(),
+        detection.try_union(&old).unwrap(),
+    ] {
+        assert_eq!(mixed.repository_environment().unwrap().names().len(), 3);
+        assert!(bodies.admit(&mixed).is_ok());
+    }
     assert!(
         bodies
             .admit(&need("/fixture", &["TEMP", "BAZEL_VC"]))
@@ -980,7 +990,14 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     let sparse = make()
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     assert!(sparse.rules_cc_import_sources && sparse.admit(&all).is_err());
-    for names in [["temp"], ["TEMP_suffix"], ["UNKNOWN"], [""]] {
+    for names in [
+        ["temp"],
+        ["TEMP_suffix"],
+        ["UNKNOWN"],
+        [""],
+        ["bazel_do_not_detect_cpp_toolchain"],
+        ["BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN_suffix"],
+    ] {
         let bad = need("/fixture", &names);
         for mixed in [all.try_union(&bad).unwrap(), bad.try_union(&all).unwrap()] {
             let denied = bodies.admit(&mixed).unwrap_err();
@@ -996,7 +1013,9 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     }
     let mut too_many = RULES_CC_ENVIRONMENT_NAMES.to_vec();
     too_many.push("UNKNOWN");
-    assert!(bodies.admit(&need("/fixture", &too_many)).is_err());
+    let too_many = need("/fixture", &too_many);
+    assert_eq!(too_many.repository_environment().unwrap().names().len(), 15);
+    assert!(bodies.admit(&too_many).is_err());
     let foreign = need("/foreign", &RULES_CC_ENVIRONMENT_NAMES);
     assert_eq!(bodies.admit(&foreign).unwrap_err().family, "environment");
     assert!(all.try_union(&foreign).is_err());
@@ -1085,7 +1104,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     };
     assert_eq!(
         recovered.repository_environment().unwrap().names().len(),
-        13
+        14
     );
     assert!(std::ptr::eq(
         recovered

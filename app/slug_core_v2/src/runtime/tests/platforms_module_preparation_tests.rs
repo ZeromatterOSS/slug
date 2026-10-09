@@ -315,7 +315,8 @@ const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 10] = [
     "lib/BUILD.bazel",
     "lib/BUILD",
 ];
-const RULES_CC_ENVIRONMENT_NAMES: [&str; 13] = [
+const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
+    "BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN",
     "BAZEL_VC",
     "BAZEL_VC_FULL_VERSION",
     "BAZEL_VS",
