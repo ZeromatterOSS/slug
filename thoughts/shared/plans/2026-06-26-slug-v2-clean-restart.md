@@ -34,37 +34,32 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-255-m7a-normal-rustc-skylib-unittest-readiness-r1
-Status: Accepted finite Skylib unittest readiness; next source readiness decision selected
+Packet: WP-7-256-m7a-normal-rustc-skylib-unittest-imports-readiness-r1
+Status: Accepted finite Skylib unittest imports readiness; next natural-owner decision selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1031](./slug-v2-subplans/wp1031-skylib-unittest-readiness-2026-10-08.json) accepts the exact original
-Skylib unittest package and one direct same-root literal frontier under existing defaultfalse
-PreparedFile AND PublicProbe/additional[1]/borrowed root/whole Need. Two strict captures:
-5 decisions/3 usable/2 genuine primary leafENOENT/27075B/passNone/zero tests. New bodies
-are toolchains/unittest/BUILD1380,lib/BUILD1853,lib/unittest.bzl23842; both BUILD.bazel
-primaries remain metadata-only. Body7/meta10/overlap2/Need22; full7 root/order/signatures
-before explicit qualified4then3 immutable interface/fresh private metadata tuple. Further
-captured load facts remain ungranted; no recursive frontier or source certificate.
-Core98/fourthemes/native1/independent FINAL:103 names/105 current native gates+2capture=
-107 passing current records. One initial fixture-category assertion failed;34 first-attempt
-records (33 superseded passes/1failure) and exact raw/source/roles preserved,0 currentcredit.
-One separate root post-FINAL receipt precondition omitted summary generation, before tracked
-writes/zero compiler-native-test children; raw preserved and missing summary generated once.
-Narrow reviewed expectation+classifier correction, fresh all affected gates/no reactivation
-or identical failed invocation/predicate/cap change. Total141 recorded packet operations.
-Native4.787070677s/209160KiB<262144/direct995/audit1008; source126/decoded6197729/
-ErrorNone, source128 fixed and remaining headroom numeric only. Physical
-294 prefix preserved/3 END append→297188+109/6437574physical12875148brackets/two64KiB.
-Source56net/twelvehelpers96net/all98/four policies exact/config sole binding-array append.
-Static128descriptor+149literal spelling bytes beforecompiler dedup/layout; native retained
-String/path/Vec/Arc/request/Spec/plan copies/fields/cache/interner/pool added0. Borrow or
-transfer existing storage; scopedinterners for retained repeated values when cleanup fits.
-Current bounded prefix fits, full producer/compiler/actions/certificates/wholegraph/heapWeak/
-parent+child aggregate memory remain open. Windows deferred.
+[WP1032](./slug-v2-subplans/wp1032-skylib-unittest-imports-readiness-2026-10-08.json) accepts four original
+Skylib source bodies: lib/new_sets.bzl6359,partial5587,types3820,dicts2410. Two strict
+captures/4decisions/4usable18176B/passNone/zeroTests; one direct literal frontier exhausted.
+Existing defaultfalse PreparedFile AND PublicProbe/additional[1]/borrowedroot/wholeNeed:
+body7→11/meta10 unchanged/O2/Need30. Both old absent primaryBUILD.bazelFileBytesclosed.
+Full11 signatures/order/root before actual immutable qualified4then3 interfaces/freshprivate
+metadata tuple; no recursive grants/sourcecertificate/caller/provider inference.
+Core98/fourthemes/native1/independentFINAL:103names/105nativegates+2capture=107current
+passingrecords/no supervised failure, superseded record, runtime retry/reactivation/stalepin/oldexe/capraise. One separate post-FINAL root Path conversion error before tracked writes/zero children was preserved and corrected; no runtime evidence changed. Complete
+roleAPI before firstprep and receipt summary after actualFINAL before acceptance assembly.
+Native4.927827092s/208604KiB<262144/direct1037/audit1050; Source128/decoded
+6209675/ErrorSome(Limit(SourceAttempts)). Actual typed refusal/phase preserved in receipt;
+Source128 fixed, no closure/futurefit claim or quota reset. Physical297prefix+4END→301188+113/
+6455750physical12911500brackets/two64KiB. Source30net/twelvehelpers24net,
+all98/fourpolicies exact/config solebindingarrayappend. Static64descriptor+57literal spelling
+bytes before compilerlayout/dedup; no newnative retainedString/path/Vec/Arc/request/Spec/plan
+copies/fields/cache/interner/pool. Borrow/transferstorage; scopedinterners for retainedrepetition
+fitting lifetime/cleanup. Current bounded prefixfits; fullproducer/compiler/actions/Rustc/
+editionrestoration/certificates/nativeheapWeak/aggregate/wholegraphfitopen. Windows deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

@@ -290,7 +290,7 @@ const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
     "private/version_repo.bzl",
 ];
 const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
-const BAZEL_SKYLIB_IMPORTS: [&str; 7] = [
+const BAZEL_SKYLIB_IMPORTS: [&str; 11] = [
     "lib/paths.bzl",
     "lib/structs.bzl",
     "rules/common_settings.bzl",
@@ -298,6 +298,10 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 7] = [
     "toolchains/unittest/BUILD",
     "lib/BUILD",
     "lib/unittest.bzl",
+    "lib/new_sets.bzl",
+    "lib/partial.bzl",
+    "lib/types.bzl",
+    "lib/dicts.bzl",
 ];
 const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 10] = [
     "lib",
