@@ -7441,6 +7441,12 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
 }
 pub(super) fn rules_shell_import_sources_matrix() {
     eprintln!(
+        "WP1053_SHELL_BODY_LAYOUT body={} row={} literal={}",
+        std::mem::size_of_val(&RULES_SHELL_IMPORTS),
+        std::mem::size_of::<&str>(),
+        RULES_SHELL_IMPORTS[6].len()
+    );
+    eprintln!(
         "WP1052_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
         std::mem::size_of::<&str>(),
@@ -7460,7 +7466,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "WP1050_SHELL_BODY_LAYOUT body={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORTS),
         std::mem::size_of::<&str>(),
-        RULES_SHELL_IMPORTS.last().unwrap().len()
+        RULES_SHELL_IMPORTS[5].len()
     );
     eprintln!(
         "WP1049_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
@@ -7547,11 +7553,11 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 23);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 24);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
         (
-            "/shell/shell/private/repositories/sh_config.bzl",
+            "/shell/shell/private/repositories/sh_config.bzl.disabled",
             PathObservationOperation::FileBytes,
         ),
         (

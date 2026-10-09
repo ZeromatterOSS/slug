@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-276-m7a-normal-rustc-shell-sh-config-metadata-r1
+Packet: WP-7-277-m7a-normal-rustc-shell-sh-config-source-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1052](./slug-v2-subplans/wp1052-shell-sh-config-metadata-2026-10-09.json) accepts exact selected Shell sh_config.bzl
-Lstat metadata under the
-existing checked Shell role, metadata17/body6/Need23. All305 ordered body
-signatures and CC53/19/120 remain exact.104 named checks and106 passing records;
-native4.591184445s/209628KiB below256MiB. One static reference adds16bytes
-and40 literal bytes before compiler pooling; no new retained production strings or fields.
+[WP1053](./slug-v2-subplans/wp1053-shell-sh-config-source-2026-10-09.json) accepts the measured4401-byte selected Shell sh_config.bzl
+source body under the
+existing checked Shell role, metadata17/body7/Need24. All305 predecessor body
+signatures plus the sole new END row and CC53/19/120 remain exact.104 named checks and106 native passing records plus one raw capture;
+native4.625568440s/210392KiB below256MiB. One static reference adds16bytes
+with an existing metadata literal reused before compiler pooling; no new retained production strings or fields.
 Borrow or transfer first; use existing scoped interners for repeated
 retained immutable strings when their lifetime and cleanup fit. Full Rustc,
 actions, certificates, producer and whole-workload fit remain open. The frozen
