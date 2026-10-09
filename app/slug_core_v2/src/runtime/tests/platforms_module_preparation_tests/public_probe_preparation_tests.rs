@@ -7441,11 +7441,18 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
 }
 pub(super) fn rules_shell_import_sources_matrix() {
     eprintln!(
+        "WP1049_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
+        std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
+        std::mem::size_of::<&str>(),
+        RULES_SHELL_IMPORT_METADATA.last().unwrap().len()
+    );
+    eprintln!(
         "WP1048_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
         std::mem::size_of::<&str>(),
         RULES_SHELL_IMPORT_METADATA[9..]
             .iter()
+            .take(3)
             .map(|relative| relative.len())
             .sum::<usize>()
     );
@@ -7462,6 +7469,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/extensions",
         "/shell/shell/private/extensions/BUILD.bazel",
         "/shell/shell/private/extensions/BUILD",
+        "/shell/shell/private/extensions/sh_configure.bzl",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -7513,9 +7521,37 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 17);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 18);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
+        (
+            "/shell/shell/private/extensions/sh_configure.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/extensions/Sh_configure.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions/sh_configure.bzl.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions/sh_configure.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/shell/private/extensions/sh_configure.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions/sh_configure.bzl",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/shell/shell/private/extensions/sh_configure.bzl",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/shell/shell/private/extensions",
             PathObservationOperation::FileBytes,
