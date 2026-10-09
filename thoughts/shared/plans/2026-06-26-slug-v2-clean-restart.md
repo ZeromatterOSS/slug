@@ -34,8 +34,8 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-260-m7a-normal-rustc-cc-package-marker-metadata-r1
-Status: Exact CC marker metadata accepted; next finite template prerequisite under selection
+Packet: WP-7-261-m7a-normal-rustc-cc-template-metadata-r1
+Status: Exact template metadata accepted; next finite source prerequisite under selection
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the same Bazel9.2/rules_rust0.73 fixture. Memory
