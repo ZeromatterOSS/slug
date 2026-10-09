@@ -385,7 +385,7 @@ const RULES_CC_IMPORTS: [&str; 52] = [
     "cc/private/toolchain/BUILD.toolchains.tpl",
     "cc/private/toolchain/test/BUILD",
 ];
-const RULES_CC_IMPORT_METADATA: [&str; 18] = [
+const RULES_CC_IMPORT_METADATA: [&str; 19] = [
     "cc",
     "cc/common",
     "cc/private",
@@ -404,6 +404,7 @@ const RULES_CC_IMPORT_METADATA: [&str; 18] = [
     "cc/private/toolchain/test",
     "cc/private/toolchain/test/BUILD.bazel",
     "cc/private/toolchain/test/BUILD",
+    "cc/private/toolchain/test/default_test_runner.bzl",
 ];
 const PLATFORMS_HOST_IMPORTS: [&str; 3] =
     ["host/constraints.bzl", "host/BUILD", "host/extension.bzl"];

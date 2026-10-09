@@ -6837,6 +6837,12 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
 #[test]
 fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     eprintln!(
+        "WP1046_CC_METADATA_LAYOUT metadata={} row={} literal={}",
+        std::mem::size_of_val(&RULES_CC_IMPORT_METADATA),
+        std::mem::size_of::<&str>(),
+        RULES_CC_IMPORT_METADATA.last().unwrap().len()
+    );
+    eprintln!(
         "WP1045_CC_BODY_LAYOUT body={} row={} literal={}",
         std::mem::size_of_val(&RULES_CC_IMPORTS),
         std::mem::size_of::<&str>(),
@@ -6848,6 +6854,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         std::mem::size_of::<&str>(),
         RULES_CC_IMPORT_METADATA[15..]
             .iter()
+            .take(3)
             .map(|relative| relative.len())
             .sum::<usize>()
     );
@@ -6918,7 +6925,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 118);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 119);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6927,6 +6934,26 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/toolchain/test/default_test_runner.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/Default_test_runner.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/default_test_runner.bzl.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/default_test_runner.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/private/toolchain/test/default_test_runner.bzl",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/cc/cc/private/toolchain/test",
             PathObservationOperation::FileBytes,

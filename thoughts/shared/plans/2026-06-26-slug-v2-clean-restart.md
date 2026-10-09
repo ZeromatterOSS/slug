@@ -34,17 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-269-m7a-normal-rustc-cc-test-build-source-r1
+Packet: WP-7-270-m7a-normal-rustc-cc-test-runner-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1045](./slug-v2-subplans/wp1045-cc-test-build-source-2026-10-09.json) accepts the exact independently captured567-byte selected CC test BUILD body
-under the existing checked source role, with body52/metadata18/Need118. 104 named checks
-and106 native gate records plus one raw capture; native4.584708459s/209632KiB below256MiB.
-The prior302 source signatures remain exact with one appended567-byte lease.
-Static body grows one16-byte reference, with its31-byte literal already present
-in metadata before compiler pooling; no new retained production strings or fields.
+[WP1046](./slug-v2-subplans/wp1046-cc-test-runner-metadata-2026-10-09.json) accepts one exact selected CC test runner
+Lstat metadata path under the existing checked source role, body52/metadata19/Need119.
+104 named checks and106 current passing records; native4.570338283s/211080KiB below256MiB.
+All303 ordered body signatures remain exact. One static metadata reference adds16bytes
+and49 literal bytes before compiler pooling; no new retained production strings or fields.
 Borrow or transfer first; use existing scoped interners for repeated
 retained immutable strings when their lifetime and cleanup fit. Full Rustc,
 actions, certificates, producer and whole-workload fit remain open. The frozen
