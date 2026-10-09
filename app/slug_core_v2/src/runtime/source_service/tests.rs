@@ -60,7 +60,7 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
         );
         assert_eq!(owner.snapshot().registry_attempts, limit);
     }
-    for limit in [1, 64, 65, 128] {
+    for limit in [1, 64, 65, 128, 129, 256] {
         let owner = scope(SourceServiceLimits {
             source_attempts: limit,
             ..defaults
@@ -69,6 +69,7 @@ fn source_scope_actual_root_profile_preserves_other_limits_and_finite_ceiling() 
         let refused = Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
         assert_eq!(owner.charge(SourceCounter::SourceAttempts, 1), refused);
         assert_eq!(owner.charge(SourceCounter::RegistryAttempts, 1), refused);
+        assert_eq!(owner.charge(SourceCounter::SourceAttempts, 1), refused);
         assert_eq!(owner.snapshot().source_attempts, limit);
         assert_eq!(owner.snapshot().registry_attempts, 0);
     }

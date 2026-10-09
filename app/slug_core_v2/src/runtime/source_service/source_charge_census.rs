@@ -11,7 +11,7 @@ use slug_workspace_v2::PathObservationOperation;
 use super::SourceCounter;
 use super::SourceServiceError;
 
-pub(super) const EVENT_LIMIT: u64 = 129;
+pub(super) const EVENT_LIMIT: u64 = 257;
 const PATH_LIMIT: usize = 1024;
 const RAW_LIMIT: u64 = 131072;
 const ENCODED_LIMIT: u64 = 524288;
@@ -648,10 +648,52 @@ mod tests {
                 summary.skipped,
                 summary.in_flight
             ),
-            (130, 128, 2, 0)
+            (
+                EVENT_LIMIT + 1,
+                128.min(EVENT_LIMIT),
+                EVENT_LIMIT + 1 - 128.min(EVENT_LIMIT),
+                0
+            )
         );
         assert!(!summary.accounting_complete && !summary.identity_complete);
         assert!(summary.encoded_bytes <= ENCODED_LIMIT);
+        // Event capacity is independent of charged units and selected limits.
+        let mut empty = CensusState::default();
+        for event in 1..=EVENT_LIMIT {
+            let record = empty
+                .record(0, SourceChargeDomain::Host, 0, 0, Ok(()), false)
+                .unwrap();
+            assert_eq!(record.event, event);
+            let row = Row::new(
+                record,
+                SourceChargePhase::Unassociated,
+                SourceChargeIdentity::HostPath(Path::new("")),
+            );
+            let bytes = encoded_len(&row).unwrap();
+            assert!(empty.reserve(&row, bytes));
+            empty.finish(&row, bytes, true);
+        }
+        let complete = empty.summary(16, 0).including_summary().unwrap();
+        assert_eq!(complete.emitted, 257);
+        assert_eq!(complete.raw_bytes, 0);
+        assert!(complete.accounting_complete && !complete.identity_complete);
+        assert!(complete.encoded_bytes <= ENCODED_LIMIT);
+        assert!(
+            empty
+                .record(0, SourceChargeDomain::Host, 0, 0, Ok(()), false)
+                .is_none()
+        );
+        let incomplete = empty.summary(16, 0);
+        assert_eq!(
+            (
+                incomplete.seen,
+                incomplete.emitted,
+                incomplete.skipped,
+                incomplete.in_flight
+            ),
+            (258, 257, 1, 0)
+        );
+        assert!(!incomplete.accounting_complete);
         let mut encoded_full = CensusState::default();
         encoded_full
             .record(0, SourceChargeDomain::Host, 0, 0, Ok(()), false)

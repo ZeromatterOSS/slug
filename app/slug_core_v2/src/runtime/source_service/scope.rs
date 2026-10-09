@@ -72,7 +72,7 @@ impl SourceServiceLimits {
     pub(super) const MAX_REGISTRY_ATTEMPTS: u64 = 256;
 
     #[cfg(all(test, target_os = "linux"))]
-    pub(super) const MAX_SOURCE_ATTEMPTS: u64 = 128;
+    pub(super) const MAX_SOURCE_ATTEMPTS: u64 = 256;
     #[cfg(not(all(test, target_os = "linux")))]
     pub(super) const MAX_SOURCE_ATTEMPTS: u64 = 64;
 

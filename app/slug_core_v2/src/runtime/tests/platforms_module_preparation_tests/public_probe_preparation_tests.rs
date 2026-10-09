@@ -5602,6 +5602,60 @@ fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
                 ..baseline
             }
         );
+        assert_eq!(
+            make().native_source_limits(registry, command),
+            SourceServiceLimits {
+                registry_attempts: registry.registry_attempts(),
+                ..baseline
+            }
+        );
+        let native = bodies.native_source_limits(registry, command);
+        assert_eq!(
+            native,
+            SourceServiceLimits {
+                source_attempts: if attempts == 128 { 256 } else { attempts },
+                ..limits
+            }
+        );
+        if attempts == 128 {
+            let start = Instant::now();
+            let scope = bodies
+                .source_scope(
+                    path("/fixture"),
+                    start + Duration::from_secs(2),
+                    start + Duration::from_secs(3),
+                    native,
+                )
+                .unwrap();
+            assert_eq!(scope.limits(), native);
+            let (root, maximum) = scope.known_shas_allowance_for_test().unwrap();
+            assert_eq!(maximum, 4_749_878);
+            assert!(std::ptr::eq(root.as_path(), bodies.roots[1].as_path()));
+            scope.charge(SourceCounter::SourceAttempts, 256).unwrap();
+            let refused = Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+            assert_eq!(scope.charge(SourceCounter::SourceAttempts, 1), refused);
+            assert_eq!(scope.charge(SourceCounter::RegistryAttempts, 1), refused);
+            assert_eq!(scope.charge(SourceCounter::SourceAttempts, 1), refused);
+            assert_eq!(scope.snapshot().source_attempts, 256);
+            assert_eq!(scope.snapshot().registry_attempts, 0);
+        }
+        // Pure projection remains guarded even with an explicitly inconsistent
+        // test-only role bit; ordinary128 does not imply native256 in other modes.
+        let mut forced = make();
+        forced.rules_rust_defs_import_sources = true;
+        assert_eq!(
+            forced.native_source_limits(registry, command),
+            SourceServiceLimits {
+                source_attempts: if matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+                {
+                    256
+                } else {
+                    128
+                },
+                ..forced.source_limits(registry)
+            }
+        );
         for (counter, maximum) in [
             (SourceCounter::SourceAttempts, attempts),
             (SourceCounter::DecodedBytes, 16 << 20),

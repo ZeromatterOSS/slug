@@ -1440,6 +1440,21 @@ impl Bodies {
             blocking_threads: Some(2),
         }
     }
+    // This explicit native continuation does not alter ordinary role profiles.
+    fn native_source_limits(
+        &self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> SourceServiceLimits {
+        let mut limits = self.source_limits(registry);
+        if matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe)
+            && self.rules_rust_defs_import_sources
+        {
+            limits.source_attempts = 256;
+        }
+        limits
+    }
     fn source_scope(
         &self,
         workspace: NormalizedAbsolutePath,
@@ -2981,7 +2996,7 @@ fn observe_native_command(
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
-    let limits = bodies.source_limits(registry_choice);
+    let limits = bodies.native_source_limits(registry_choice, command);
     let scope = SourceServiceScope::new_for_test_with_source_charge_census(
         workspace.clone(),
         start + Duration::from_secs(5),
