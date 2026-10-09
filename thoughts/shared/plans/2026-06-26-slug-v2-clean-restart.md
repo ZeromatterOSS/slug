@@ -34,21 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-263-m7a-normal-rustc-cc-toolchains-plan-diagnostic-r1
-Status: Accepted after actual FINAL and post-FINAL operative receipt; successor selection pending
+Packet: WP-7-264-m7a-normal-rustc-cc-toolchains-original-plan-readiness-r1
+Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1039](./slug-v2-subplans/wp1039-cc-toolchains-plan-diagnostic-2026-10-09.json)
-accepts the bounded original CC toolchain plan diagnostic: one executable BUILD,
-641B, with its original ordered SHA association. Admission and functional owner
-cohorts remain unchanged.104 named checks/106 passing records, native4.920981668s
-and208408KiB below256MiB;302 source signatures remain exact. No new retained
-strings, fields or interface. Borrow/transfer first; existing scoped interners for
-retained repetition only with fitting lifetime and cleanup. Full Rustc, actions,
-certificates, producer and whole-workload fit remain open. The frozen successor
-proposes an exact original-plan matcher and current-epoch namespace after review;
-no grant or activation is implied. Windows remains minimal/deferred.
+[WP1040](./slug-v2-subplans/wp1040-cc-toolchains-original-plan-readiness-2026-10-09.json) accepts the exact original
+one-file CC toolchain plan under original empty attributes, mapping and checked
+source roles, with finite current-epoch namespace access.104 named checks and106
+current passing records; native4.565411131s/210044KiB below256MiB. All302
+source signatures remain exact. The added static signature measures64B; the
+matcher reuses its three stack slots, with no new retained production strings or
+fields. Borrow or transfer first; use existing scoped interners for repeated
+retained immutable strings when their lifetime and cleanup fit. Full Rustc,
+actions, certificates, producer and whole-workload fit remain open. The frozen
+successor notes ground the next observed boundary. Windows remains minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

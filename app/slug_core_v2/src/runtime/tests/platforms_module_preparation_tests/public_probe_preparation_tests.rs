@@ -1471,18 +1471,31 @@ fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
 }
 #[tokio::test]
 async fn namespace_owner_read_uses_current_transaction() {
-    for owner in [0, 2, 3, 4] {
+    for owner in [0, 2, 3, 4, 5] {
         let bodies = namespace_test_bodies()
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-        let a = Arc::new(generated_test_owner_request(
-            &bodies,
-            owner,
-            small_generated_plan(&[
-                (small_owner_first(owner), b"a", true),
-                (small_owner_second(owner), b"b", true),
-            ]),
-        ));
+        let request = if owner == 5 {
+            let (canonical, label, rule) = GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER;
+            let mut request =
+                generated_globals_request(&bodies, small_generated_plan(&[("BUILD", b"a", true)]));
+            request.id.canonical_repo =
+                slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
+            request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(label).unwrap();
+            request.repo_spec.rule_id.rule_name = rule.into();
+            request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+            request
+        } else {
+            generated_test_owner_request(
+                &bodies,
+                owner,
+                small_generated_plan(&[
+                    (small_owner_first(owner), b"a", true),
+                    (small_owner_second(owner), b"b", true),
+                ]),
+            )
+        };
+        let a = Arc::new(request);
         let mut b = a.as_ref().clone();
         b.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
         let b = Arc::new(b);
@@ -1494,6 +1507,8 @@ async fn namespace_owner_read_uses_current_transaction() {
                 "/generation/constraints.bzl"
             } else if owner == 3 {
                 "/generation/BUILD.bazel"
+            } else if owner == 5 {
+                "/generation/BUILD"
             } else if owner == 4 {
                 "/generation/toolchains.bzl"
             } else {
@@ -1740,6 +1755,12 @@ fn small_namespace_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     selected: &[GeneratedFileSignature],
 ) -> bool {
+    if std::ptr::eq(selected, &GENERATED_CC_TOOLCHAINS_FILES[..]) {
+        return generated_features_plan_matches(
+            plan,
+            &[("BUILD", 1, true, sha2::Sha256::digest(b"a").into())],
+        );
+    }
     let owner = if std::ptr::eq(selected, &GENERATED_FEATURES_FILES) {
         0
     } else if std::ptr::eq(selected, &GENERATED_FEATURES_VERSION_FILES) {
@@ -2501,6 +2522,358 @@ fn generated_features_materialization_is_opt_in_and_exact() {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
     let matches = small_namespace_plan_matches;
+    eprintln!(
+        "WP1040_SIGNATURE_LAYOUT signature={} cc={}",
+        std::mem::size_of::<GeneratedFileSignature>(),
+        std::mem::size_of_val(&GENERATED_CC_TOOLCHAINS_FILES)
+    );
+    {
+        let bodies = namespace_test_bodies()
+            .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert!(bodies.repo_marker_metadata);
+        assert!(bodies.ignore_file_bytes);
+        let request_for_plan = |plan| {
+            let (canonical, label, rule) = GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER;
+            let mut request = generated_globals_request(&bodies, plan);
+            request.id.canonical_repo =
+                slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
+            request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(label).unwrap();
+            request.repo_spec.rule_id.rule_name = rule.into();
+            request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+            request
+        };
+        let tiny: &[(&str, &[u8], bool)] = &[("BUILD", b"a", true)];
+        let valid =
+            SourcePreparationNeeds::repository(request_for_plan(small_generated_plan(tiny)));
+        let original = valid.repository_materializations().values().next().unwrap();
+        let weak = Arc::downgrade(original);
+        assert!(std::ptr::eq(
+            bodies
+                .generated_features_owner_signatures(original)
+                .unwrap(),
+            &GENERATED_CC_TOOLCHAINS_FILES[..]
+        ));
+        assert!(bodies.admit_with_plan_matcher(&valid, &matches).is_ok());
+        assert!(bodies.admit(&valid).is_err());
+        for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+            for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+                let configured = make()
+                    .with_fourth(path("/features"))
+                    .with_fifth(path("/skylib"))
+                    .with_sixth(path("/cc"))
+                    .with_rules_cc_import_sources(registry, command)
+                    .with_generated_features_file_effects(registry, command);
+                assert_eq!(
+                    configured.admit_with_plan_matcher(&valid, &matches).is_ok(),
+                    matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe)
+                );
+            }
+        }
+        for index in 0..4 {
+            let mut closed = namespace_test_bodies();
+            match index {
+                0 => closed.generated_features_file_effects = false,
+                1 => closed.rules_cc_import_sources = false,
+                2 => closed.additional[2] = None,
+                3 => closed.roots[0] = path("/other"),
+                _ => unreachable!(),
+            }
+            let calls = std::cell::Cell::new(0);
+            assert!(
+                closed
+                    .admit_with_plan_matcher(&valid, &|_, _| {
+                        calls.set(calls.get() + 1);
+                        true
+                    })
+                    .is_err()
+            );
+            assert_eq!(calls.get(), 0);
+        }
+        for index in 0..8 {
+            let mut wrong = request_for_plan(small_generated_plan(tiny));
+            match index {
+                0 => wrong.id.workspace = path("/other"),
+                1 => {
+                    wrong.id.canonical_repo =
+                        slug_identity_v2::CanonicalRepoName::new("other+").unwrap()
+                }
+                2 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@other+//cc/private/toolchain:cc_configure.bzl")
+                            .unwrap()
+                }
+                3 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@rules_cc+//cc/private:cc_configure.bzl").unwrap()
+                }
+                4 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@rules_cc+//cc/private/toolchain:other.bzl")
+                            .unwrap()
+                }
+                5 => wrong.repo_spec.rule_id.rule_name = "other".into(),
+                6 => {
+                    let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                        slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                    );
+                    mapping.insert(
+                        slug_identity_v2::ApparentRepoName::new("cc").unwrap(),
+                        slug_identity_v2::CanonicalRepoName::new("rules_cc+").unwrap(),
+                    );
+                    wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                        "@cc//cc/private/toolchain:cc_configure.bzl",
+                    )
+                    .unwrap()
+                    .resolve(&mapping);
+                }
+                7 => {
+                    Arc::get_mut(&mut wrong.repo_spec.attributes)
+                        .unwrap()
+                        .insert("unexpected".into(), OverrideAttributeValue::None);
+                }
+                _ => unreachable!(),
+            }
+            let calls = std::cell::Cell::new(0);
+            assert!(
+                bodies
+                    .admit_with_plan_matcher(&SourcePreparationNeeds::repository(wrong), &|_, _| {
+                        calls.set(calls.get() + 1);
+                        true
+                    })
+                    .is_err()
+            );
+            assert_eq!(calls.get(), 0);
+        }
+        let one = [("BUILD", 1, true, sha2::Sha256::digest(b"a").into())];
+        assert!(generated_features_plan_matches(
+            &small_generated_plan(tiny),
+            &one
+        ));
+        for unsupported in [&one[..0], &[one[0]; 4][..]] {
+            assert!(!generated_features_plan_matches(
+                &small_generated_plan(tiny),
+                unsupported
+            ));
+        }
+        let invalid: &[&[(&str, &[u8], bool)]] = &[
+            &[],
+            &[("BUILD", b"x", true)],
+            &[("BUILD", b"aa", true)],
+            &[("BUILD", b"a", false)],
+            &[("build", b"a", true)],
+            &[("BUILD.bak", b"a", true)],
+            &[("BUILD/child", b"a", true)],
+            &[("BUILD", b"a", true), ("extra", b"", true)],
+        ];
+        for rows in invalid {
+            assert!(!generated_features_plan_matches(
+                &small_generated_plan(rows),
+                &one
+            ));
+        }
+        for symlink in [false, true] {
+            let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+            if symlink {
+                builder
+                    .push_symlink(
+                        "BUILD".into(),
+                        slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                            path("/source"),
+                            PathObservationNamespace::Host,
+                        )
+                        .unwrap(),
+                        Arc::from(&b"a"[..]),
+                    )
+                    .unwrap();
+            } else {
+                builder
+                    .push_archive(
+                        Arc::from([compact_str::CompactString::new("https://example.invalid/a.tar.xz")]),
+                        [0; 32],
+                        "prefix".into(),
+                    )
+                    .unwrap();
+            }
+            assert!(!generated_features_plan_matches(&builder.finish(), &one));
+        }
+        let instance = slug_workspace_v2::PathObservationInstanceId::new(23);
+        let epoch =
+            namespace_test_epoch_at(&bodies, [original.clone()], instance, "/parent/generation");
+        let need = |p, op| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                match op {
+                    PathObservationOperation::WindowsLongPath =>
+                        PathObservationDemand::windows_long_path(path(p), Arc::from([b'x' as u16])),
+                    PathObservationOperation::WindowsOptionPathLongName =>
+                        PathObservationDemand::windows_option_path_long_name(path(p), Arc::from([b'x' as u16])),
+                    _ => PathObservationDemand::new(
+                        PathObservationNamespace::Materialization(instance),
+                        path(p),
+                        op,
+                    ),
+                },
+            ))
+        };
+        let admit = |n: &SourcePreparationNeeds, e| {
+            bodies.admit_with_matchers(n, &matches, &|d| {
+                namespace_policy(&bodies, d, e, &matches).admits(&d.operation())
+            })
+        };
+        for p in [
+            "/",
+            "/parent",
+            "/parent/generation",
+            "/parent/generation/BUILD",
+            "/parent/generation/BUILD.bazel",
+            "/parent/generation/REPO.bazel",
+            "/parent/generation/.bazelignore",
+            "/parent/generation/BUILD/child",
+            "/other/BUILD",
+        ] {
+            for op in [
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+                PathObservationOperation::FileDigest,
+                PathObservationOperation::DirectoryEntries,
+                PathObservationOperation::ReadLink,
+                PathObservationOperation::WindowsLongPath,
+                PathObservationOperation::WindowsOptionPathLongName,
+            ] {
+                assert_eq!(
+                    admit(&need(p, op.dupe()), Some(&epoch)).is_ok(),
+                    (op == PathObservationOperation::Lstat
+                        && [
+                            "/",
+                            "/parent",
+                            "/parent/generation",
+                            "/parent/generation/BUILD"
+                        ]
+                        .contains(&p))
+                        || (op == PathObservationOperation::FileBytes
+                            && p == "/parent/generation/BUILD")
+                );
+            }
+        }
+        let leaf = need(
+            "/parent/generation/BUILD",
+            PathObservationOperation::FileBytes,
+        );
+        let features = SourcePreparationNeeds::repository(namespace_test_request(&bodies, false));
+        let own = valid
+            .try_union(&leaf)
+            .unwrap()
+            .try_union(&features)
+            .unwrap();
+        for cohort in [
+            own.try_union(&features).unwrap(),
+            features.try_union(&own).unwrap(),
+        ] {
+            assert!(admit(&cohort, Some(&epoch)).is_ok());
+        }
+        let mut ambiguous = request_for_plan(small_generated_plan(tiny));
+        ambiguous.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+        let unavailable_epochs = [
+            None,
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [original.clone()],
+                instance,
+                "/stale",
+            )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [original.clone(), Arc::new(ambiguous)],
+                instance,
+                "/parent/generation",
+            )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [Arc::new(request_for_plan(small_generated_plan(&[(
+                    "BUILD", b"x", true,
+                )])))],
+                instance,
+                "/parent/generation",
+            )),
+        ];
+        for unavailable in &unavailable_epochs {
+            assert!(admit(&leaf, unavailable.as_ref()).is_err());
+        }
+        for namespace in [
+            PathObservationNamespace::Host,
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(24),
+            ),
+        ] {
+            let demand = PathObservationDemand::new(
+                namespace,
+                path("/parent/generation/BUILD"),
+                PathObservationOperation::FileBytes,
+            );
+            assert!(
+                !namespace_policy(&bodies, &demand, Some(&epoch), &matches)
+                    .admits(&demand.operation())
+            );
+        }
+        let mut unknown = request_for_plan(small_generated_plan(tiny));
+        unknown.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("unknown+").unwrap();
+        for bad in [
+            SourcePreparationNeeds::repository(unknown),
+            need(
+                "/parent/generation/unknown",
+                PathObservationOperation::Lstat,
+            ),
+        ] {
+            for mixed in [own.try_union(&bad).unwrap(), bad.try_union(&own).unwrap()] {
+                let mut progress = 0;
+                if admit(&mixed, Some(&epoch)).is_ok() {
+                    progress += 1;
+                }
+                assert_eq!(progress, 0);
+                assert!(
+                    mixed
+                        .repository_materializations()
+                        .values()
+                        .any(|r| Arc::ptr_eq(r, original))
+                );
+                if bad.repository_materializations().is_empty() {
+                    let (first, _) = bodies
+                        .first_denied_path_with_namespace_matcher(&mixed, &|d| {
+                            namespace_policy(&bodies, d, Some(&epoch), &matches)
+                                .admits(&d.operation())
+                        })
+                        .unwrap();
+                    assert!(std::ptr::eq(
+                        first,
+                        mixed
+                            .path_observations()
+                            .unwrap()
+                            .demands()
+                            .iter()
+                            .find(|d| d.path() == &path("/parent/generation/unknown"))
+                            .unwrap()
+                    ));
+                } else {
+                    let (first, _) = bodies
+                        .first_denied_materialization_with_plan_matcher(&mixed, &matches)
+                        .unwrap();
+                    assert!(
+                        mixed
+                            .repository_materializations()
+                            .values()
+                            .any(|r| std::ptr::eq(r.as_ref(), first))
+                    );
+                }
+            }
+        }
+        drop(unavailable_epochs);
+        drop(own);
+        drop(epoch);
+        assert_eq!(Arc::strong_count(original), 1);
+        drop(valid);
+        assert!(weak.upgrade().is_none());
+    }
     for owner in 0..GENERATED_DIAGNOSTIC_TEST_OWNERS.len() {
         let first = small_owner_first(owner);
         let second = small_owner_second(owner);

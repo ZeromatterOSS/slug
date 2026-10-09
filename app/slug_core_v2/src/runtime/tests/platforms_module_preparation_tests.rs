@@ -771,12 +771,22 @@ static GENERATED_WINSDK_FILES: [GeneratedFileSignature; 2] = [
         ],
     ),
 ];
+static GENERATED_CC_TOOLCHAINS_FILES: [GeneratedFileSignature; 1] = [(
+    "BUILD",
+    641,
+    true,
+    [
+        0xd5, 0x75, 0x8b, 0x82, 0xb9, 0x35, 0x6a, 0xe3, 0xc8, 0x51, 0x60, 0x67, 0xd8, 0xfb, 0xd8,
+        0xa7, 0x39, 0xeb, 0x93, 0x6f, 0xc2, 0xaf, 0x37, 0x23, 0x9c, 0x9b, 0x83, 0x48, 0xa3, 0xc3,
+        0x14, 0x43,
+    ],
+)];
 fn generated_features_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     expected: &[GeneratedFileSignature],
 ) -> bool {
     use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
-    if !matches!(expected.len(), 2 | 3) {
+    if !matches!(expected.len(), 1 | 2 | 3) {
         return false;
     }
     let mut ordered = plan.ordered_effects();
@@ -886,6 +896,18 @@ impl Bodies {
                 && request.repo_spec.attributes.is_empty() =>
             {
                 Some(&GENERATED_WINSDK_FILES)
+            }
+            (
+                "rules_cc++cc_configure_extension+local_config_cc_toolchains",
+                "rules_cc+",
+                "cc/private/toolchain",
+                "cc_configure.bzl",
+                "cc_autoconf_toolchains",
+            ) if self.rules_cc_import_sources
+                && self.additional[2].is_some()
+                && request.repo_spec.attributes.is_empty() =>
+            {
+                Some(&GENERATED_CC_TOOLCHAINS_FILES)
             }
             _ => None,
         }
