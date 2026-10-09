@@ -34,42 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-262-m7a-normal-rustc-cc-template-byte-source-r1
-Status: Exact template byte source accepted; next original CC toolchain plan under selection
+Packet: WP-7-263-m7a-normal-rustc-cc-toolchains-plan-diagnostic-r1
+Status: Accepted after actual FINAL and post-FINAL operative receipt; successor selection pending
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
-retained Slug Rustc producer on the same Bazel9.2/rules_rust0.73 fixture. Memory
-remains within the256MiB child budget for the measured prefix; next observe and
-admit the exact CC template byte prerequisite through its existing owner. Broader
-producer gates and whole-workload memory fit stay open.
-[WP1035](./slug-v2-subplans/wp1035-cc-detection-environment-readiness-2026-10-09.json) accepts the
-exact CC detection environment name through the existing finite14-name fixture
-policy and immutable tracked snapshot/cells. Original role/mode/slot/workspace/
-whole-Need/empty-snapshot guards and revision/ABA/cancellation/restoration stay exact.
-Two cfgtest files20 net/private helpers13 net add one borrowed33B static literal
-and descriptor, with no new runtime owned strings or retained fields. Borrow/transfer;
-scoped interners for retained repetition only with fitting lifetime/cleanup.
-Native5.007664012s /208820KiB<262144, source131/no source error/decoded6215935.
-The complete131 charge identities are distinct (Host domain131, namespaceHost125
-plus6Materialization),26857raw/83173encoded; debit identity is not per-row IO,
-necessity, revision or certificate. Environment refusal is absent; next original
-220B CC cc/private/toolchain/BUILD.bazel offender is Lstat (WP957), without body/
-availability/caller proof. Public computation still refuses before certificate/
-actions/Rustc. Prefix fits memory; full producer/compiler/edition restoration/
-heap retirement/aggregate/whole-fit gates remain open.
-99Core/fourthemes/native1 =104 named passes /106 passing records, current three
-serial compiler preparations, strict pins1052 direct/1065 union, independent FINAL
-and post-FINAL operative receipt. Two outer/inner review-note preconditions stopped
-before any native test child,0test/operation credit; both original notes/failures
-preserved and complete10-ref API reassessed. Source/helpers/inputs/Core and105
-pre-native passing records stayed current, no reactivation or replay. Exactly one
-actual native ran. Same301 ordered stable leases/two64KiB buffers/all caps retained,
-prior27captures/81decisions/70observations0fresh. Windows remains deferred.
-[Frozen next-source](../../../target/wp1035/next-source.md) and
-[next-evidence](../../../target/wp1035/next-evidence.md) ground an exact CC package
-primary/fallback metadata continuation. Root selects metadata-only readiness at
-this Lstat frontier; any content request will require its own eligibility evidence.
-No successor grant or activation is implied by acceptance.
+retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
+[WP1039](./slug-v2-subplans/wp1039-cc-toolchains-plan-diagnostic-2026-10-09.json)
+accepts the bounded original CC toolchain plan diagnostic: one executable BUILD,
+641B, with its original ordered SHA association. Admission and functional owner
+cohorts remain unchanged.104 named checks/106 passing records, native4.920981668s
+and208408KiB below256MiB;302 source signatures remain exact. No new retained
+strings, fields or interface. Borrow/transfer first; existing scoped interners for
+retained repetition only with fitting lifetime and cleanup. Full Rustc, actions,
+certificates, producer and whole-workload fit remain open. The frozen successor
+proposes an exact original-plan matcher and current-epoch namespace after review;
+no grant or activation is implied. Windows remains minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

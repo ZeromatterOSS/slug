@@ -1049,6 +1049,12 @@ impl Bodies {
                 "tools/res",
                 "winsdk_configure.bzl",
                 "winsdk_configure"
+            ) | (
+                "rules_cc++cc_configure_extension+local_config_cc_toolchains",
+                "rules_cc+",
+                "cc/private/toolchain",
+                "cc_configure.bzl",
+                "cc_autoconf_toolchains"
             )
         );
         if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {

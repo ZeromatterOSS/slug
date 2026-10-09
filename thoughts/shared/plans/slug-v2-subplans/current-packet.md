@@ -1,120 +1,48 @@
 # Slug V2 current work packet
 
-Packet: WP-7-262-m7a-normal-rustc-cc-template-byte-source-r1
-Status: Exact template byte source accepted; next original CC toolchain plan under selection
+Packet: WP-7-263-m7a-normal-rustc-cc-toolchains-plan-diagnostic-r1
+Status: Accepted after actual FINAL and post-FINAL operative receipt; successor selection pending
 
-Baseline:cd474d4fb0b06d1167a7d17de7994af40a384e5c, accepted WP1037 after actualFINAL/post-FINAL operative receipt.
-Continue normal public Rustc on unchanged Bazel9.2/rules_rust0.73 fixture.
-Compatibility: Slug-native cfgtest-Linux readiness; captured source bytes/signatures
-exact. Windows minimal/deferred. Goal active; full producer remains open.
+Baseline:cfc9d87d4e12af4988ba9f03450b4c446348ea95, accepted WP1038 after actualFINAL/post-FINAL operative receipt. Continue normal public Rustc on unchanged Bazel9.2/rules_rust0.73 fixture. Compatibility: Slug-native cfgtest-Linux diagnostic; existing exact source signatures/bytes preserved. Windows minimal/deferred. Goalactive; fullproducer/wholefit remainopen.
 
 ## Decision and owners
 
-Actual WP1037 original229B path is CCroot+/cc/private/toolchain/BUILD.toolchains.tpl,
-now FileBytes from rawWP957 rather than suffix/historicalroot_lockfile field.
-Metadata15 includes exactleaf; body50 excludes it. Select one bounded original-leaf
-availability/eligibility observation, then body admission ONLY after actual eligible
-independent captureFINAL. No source/availability/size/hash/caller/output is inferred.
-Loading repository_rule_context.rs972–1025 distinguishes LabelPathNeed then
-RepositorySourceNeed; template uses raw source bytes and ordered Latin1 replacement.
-Bzlmod source_preparation.rs6348–6401 owns resolved-namespace FileBytes, typed
-Present/missing/errors and observed epoch provenance/shared bytes. Preserve normal
-DICE equality/structural identity/invalidation/restoration/cancellation/revision/
-certificate and native current-scope validation; no direct-fs discovery bypass.
+Actual GeneratedFileEffects/generated_kind firstoffender has complete227B atomic identity: canonical rules_cc++cc_configure_extension+local_config_cc_toolchains; rule repository rules_cc+; package cc/private/toolchain; target cc_configure.bzl; rule cc_autoconf_toolchains; originalfixtureworkspace101B/logical_rootNone. No generatedplan/namespace/environment projection. Tuple is not fullSpec/attributes/mapping/evaluated branch/output/certificate proof;651B template capture is no output signature.
 
-## Exact one-leaf evidence before code
+Bzlmod source_preparation.rs5399–5424 constructs original request and owns RepoSpec/workspace/canonical/generated plan. Loading module_extension_repository_file_effect.rs1516–1650 owns normal label/source Needs and observations,1995 transfers invocation plan; its separate1813–1821 Homebrew cc_autoconf branch does not match captured owner. Repository template raw/Latin1 semantic carrier and normal source certificates stay unchanged. No production constructor/source acquisition correction is selected.
 
-Fresh private capture reader/supervisor under target/wp1038/capture only; input
-original accepted CCroot+literal41B/fourcomponents. Reuse unchanged target/wp933/read.py
-observe with facts=False: no retained body/text/AST and no Starlark syntax eligibility
-gate. Template bytes need not be UTF8/Starlark; no manufactured syntax_ok, decoded
-body, load frontier or output text. Stream fullSHA/EOF through64KiB scratch, regular
-nonfollowing leaf/ancestors with descriptor/named before/after identity brackets,
-<=1MiB object/16MiB aggregate. Semantic2MiBtemplate max never raises current cap.
-Genuine missing/nonregular/symlink/changed/bounds/read outcomes remain unavailable;
-record one attempted/completed decision, observed0or1, no test-pass credit. No scan,
-sibling/frontier/recursion/newpermission/foreignroot/network acquisition.
+Append only this atomic five-field tuple to existing Bodies::generated_plan_diagnostic at parent1004–1062, after all old owners. Keep materializationfamily/actualfirst_denied generated_kind/originalworkspace guards and borrow originalrequest/originalplan directly. Admission and first_denied_materialization_with_plan_matcher896–920 remain byte-unchanged: no functional permission, namespace, source role, speculative signature or output is admitted. Normal DICE identity/equality/invalidation/revision/restoration/cancellation/certificates and same-current-epoch owners unchanged.
 
-Root freezes current captureinput/source-readiness/reader API and provenance;
-independent DESIGN then captureSTATIC/PRELAUNCH before sole activation/IO. Reuse
-accepted eleven unchanged strict reader controls with current source pins,0fresh
-credit; rerun only stale/suspect/missing discriminators. Capture supervisor bounds
-10s/sharedabsolutecleanup3/RSS256MiB/AS512MiB/log1each/report4/FSIZE16; joined child/
-emptyownedgroup/equalpins/raw/result reviewed in actual captureFINAL before code.
-Capture is non-atomic diagnostic eligibility, never a normal source certificate.
-If unavailable, no body grant/cohort append and no identical native failure retry;
-freeze actual outcome and resolve its natural prerequisite within user scope.
+Use existing bounded formatter: at most9 visits/8 capturedrows, encoded16384B including LF, honest incomplete/bounds-refused states, originalorder/path-contentSHA/executable/mapping/attribute-count association. No payload/plaintext, copied Spec/request/plan, new retained String/path/Arc/container/field/interner/cache/reporter/flag/key/lock. Five static str descriptors80B and126 literal bytes beforelayout/dedup, no zero-cost guarantee. Existing plan/fixture scratch has real costs; borrow/transfer first and scopedinterners only for repeated retained immutable strings with fitting semantic lifetime/cleanup, no global temporary pool.
 
-## Conditional minimal implementation
+## Scope, complexity and discrimination
 
-Only if actual eligible captureFINAL: append one exact body/signature row to existing
-CCbody50→51, metadata15 unchanged/O2→3/union63/Need114=51FileBytes+63Lstat. Same
-original defaultfalse PreparedFile AND PublicProbe CCrole/additional[2]/root/workspace/
-borrowedrelative/wholeNeed before-progress predicate. Preserve original signature
-ordering and raw context, namespaces/currentepoch/certificates/Localownplan/Weak/
-originalpointer/firstoffender/zero-progress/mode/slot-restoration/alloldassertions.
-Metadata-only package-marker FileBytes still closed. Existing shared matrix covers
-newbodypositive; replace solely the newly obsolete exacttemplate FileBytes negative
-with focused nongrants/case/suffix/child/foreignroot/mixedunknown as appropriate.
-No new test name/framework/flag/DICE/production representation/interface/lock.
+Two existing cfgtest parents platforms_module_preparation_tests.rs and public_probe_preparation_tests.rs only. Existing owner remains cohesive: one bounded tuple arm and two existing projection tests, no production split or adjacentcleanup. Expected<=60net Rust is reassessment trigger. Retain all99names and alloldassertions; extend generated_plan_refusal_projection_preserves_original_order_and_owner and generated_plan_refusal_projection_is_bounded for atomicfield crossing, wrongworkspace/case/suffix/sibling, wrongkind/reason/earlierfamily/earlieroffender, original pointer/Weak/order/mapping/attrs/bounds/zero-progress. No new fixture/framework/selector/capture/body IO.
 
-Only two Rust cfgtest parents platforms_module_preparation_tests.rs and
-public_probe_preparation_tests.rs; expected<=50net trigger cohesive reassessment.
-One static descriptor16B and reused literal41B beforelayout/dedup, no new runtime
-retained String/path/Arc/Spec/request/plan/map/cache/interner/field/callback/lock.
-Existing source-body/output ownership has actual transfer/retention costs, measured
-under existing banks/RSS. Borrow/transfer first; existing scoped interners only for
-repeated retained immutable strings with fitting semantic lifetime/cleanup.
+Twelve fresh private native helpers only; minimum current invocation-private WP983 exact_owner composition, historical helpers/constants immutable. Strict presence iff eligible originalfirstoffender; genuine captured/incomplete/bounds outcomes, never forcedpositive. Extend samefourthemes for tuple/workspace/framing duplication/missing/malformed/order/path-SHA association/mapping/attrs/clipping/firstoffender. No static output signatures/mappingNone/empty fullSpec inferred from count/identity. Actual bounded original plan/context/signatures must be observed and frozen before a later functional matcher/namespace design.
 
-Twelve fresh private native helpers only. Full51 ordered originalroot/signatures
-BEFORE qualified8 legacy projection, metadata15/union63/114Need. Controls adapt actual
-metadata-minus-body view and exactadmitted Lstat/FileBytes denial contradictions;
-Digest/Link/List/namespace/case/child/root/context/role still closed. No fakepositive/
-checkeddisabled/native transcript/rawnormalization/stale waiver. Historical helpers/
-captures/constants immutable. Conditional actual observedB bytes appends one lease
-at END of existing301:302=[188,114], same two64KiB buffers, physical6455750+B and
-brackets12911500+2B. No inventedB or cohort/signature before eligibleFINAL.
+## Inherited evidence and fixed execution contract
 
-## Native validation and fixed resource contract
+Accepted WP1038 native5.265403377s/214952KiB<262144/source132ErrorNone/decoded6216586/census132distinctcomplete,104names106nativegaterecords plus1rawcapture. No currentcapture; prior28captures82decisions71observed0fresh, qualifiedreference/Bzlmod0fresh. Input/table/cohort byteexactWP1038: body51/meta15/O3/union63/Need114/full51 root/order/signatures BEFORE qualified8;302ENDleases188+114/two64KiB/6456401physical12912802brackets. Environment14/emptytrackedcommand snapshot unchanged. Last full99/fourthemes are prior evidence only until current gates.
 
-After captureFINAL/source/helperfreeze: combinedSTATIC/copyactualreviewroles BEFORE
-sole two nativeactivation literals/import/API/gates. Three serial pinned fresh
-nightly2025-09-14preps<=60s/offline/jobs1/nineprofiles/currentCargoJSON, exact99
-preflight/list/99Rust/fourthemes/independentPRELAUNCH/onechangednative/actualaudit.
-BOTHnotes complete10refs prepare/leaf/controls/supervise/protocol/design/inputs/
-installedSOURCES0,1/currentCore BEFOREchild. JOIN all operations; bothFROZENnextnotes
-beforefinalsource/draft; actualindependentFINAL thenreceipt.py BEFOREassembly/commit.
-Preserve failures/noidenticalfailedretry/noextra credit/reactivation/forcedpositive.
+Actual independent DESIGN before implementation. Rootsource/helperfreeze/actualcombinedSTATIC copies requiredroles BEFORE sole two nativeflags/import/API/gates. Three serial fresh pinned nightly2025-09-14preps<=60s/offlinejobs1/nineprofiles, exact99preflight/list/99Rust/fourthemes; complete10ref installedSOURCES0,1/currentCore in BOTHnotes before independentPRELAUNCH/onechangednative/actualaudit. JOINall; bothFROZENnextnotes beforefinalsource/draft; actualFINALthenreceipt beforeassembly/commit. Preserve all failures/qualifiedcredit; no identicalfailedretry/stalewaiver/reactivation/rawnormalization/forcedsuccess.
 
-Inherit accepted WP1037 caps: nativework5/life8/operation10/sharedcleanup3/RSS262144KiB/
-AS512MiB/registry128/defaultobject1MiB/exactknown_shas4749878/banks16MiB/log1each/
-report4/FSIZE16; native256/ordinary128/probe16/production64/global257/path1024/
-raw131072/encoded524288/summary1024. Selector76onlyMALLOC_ARENA_MAX2/nativeenvunchanged.
-Environment14/emptycommand snapshot/trackedcells unchanged. Prior27captures81decisions/
-70observations0fresh; this packet permits only one additional exact eligibility
-decision, separate from native test-pass credit. WP1037 native4.869926328s/209180KiB,
-source131None/census131distinctcomplete/noloss, current104names106passingrecords/
-1053direct1066union. Numeric identity is not IO/necessity/revision/certificate/
-chronology proof. Prefix fits, full producer/compiler/actions/editionrestoration/
-certificate/native body/plan/registry heap retirement/aggregate/whole fit remain open.
-Another owner/compatibility/ceiling decision needs review before expansion; routine
-invocation/compiler correction stays inside accepted contract.
+Caps byteexactWP1038: work5/life8/native10/sharedabsolutecleanup3/RSS262144KiB/AS512MiB/registry128/defaultobject1MiB/soleexactknown_shas4749878/banks16MiB/log1each/report4/FSIZE16; native256/ordinary128/probe16/production64/global257/path1024/raw131072/encoded524288/summary1024. Planformatter caps above unchanged. Selector76onlyMALLOC_ARENA_MAX2/nativeenv unchanged. Scope/recorder/endcredits narrow, unseenSourceWeak expiryvacuous; native body/plan/registry/interner heapretirement/parent+childaggregate/wholefit open. Full normalproducer/compiler/actions/editionrestoration/certificates/Windowsexecution open. New retention/interface/ceiling/owner or functionalgrant needs review; routine invocation/compiler corrections remain inside contract.
 
-Frozen research/accepted basis:
-{"path": "target/wp1037/next-source.md", "sha256": "543288f558f29b454f1d317cc1a84ceb4a38754bc13a12a8b44925acfb8b99ab"}
-{"path": "target/wp1037/next-evidence.md", "sha256": "e796e5e1497daaf13498b34080315ee4f544b4c7b5a4631bc1cadb97197346cd"}
-{"path": "target/wp1037/native/final-evidence.md", "sha256": "609bf9dca5534130ac98c426465f05280e48c21c7f226f08e3cfe16c4f4d1580"}
-{"path": "target/wp1037/native/operational-summary.json", "sha256": "423becdbdb78c9261e1d9b391d43beb9d90585ff5ee33166868dd734910fcbda"}
-{"path": "target/wp1037/native/result.json", "sha256": "12fc0769c107efa1bdd3e000035992bb0068d2dc9e44486a80d970a97f4b55f5"}
-{"path": "target/wp1037/native/native-operation.json", "sha256": "cf19fe649cad65f54d1bf8c5a9ecf908ff6852f3c1f05c8b819524619ac00724"}
-{"path": "target/wp1037/native/inputs.json", "sha256": "8d4dcd8f810dabb58325ff8d2a5199dbe277af25676973eee8b61df18e46c62f"}
-{"path": "thoughts/shared/plans/slug-v2-subplans/wp1037-cc-template-metadata-2026-10-09.json", "sha256": "99ad922b5a73d746f542707e38ac05637c0d9f21f7551af4eef67e60450526a2"}
-{"path": "target/wp933/read.py", "sha256": "b1449695dce5f24f7fa34db8131b4ad4dd8cf67776c36753d57d365d0c943b13"}
-{"path": "target/wp933/preflight.json", "sha256": "838be3abe7438e253611135d2ad4f10163a9c0da2ce224864993800eb7f3b8df"}
-{"path": "target/wp933/controls-operation.json", "sha256": "7fa9fba9b5d51be74c8b7604987f35629aaef219e0092912e0584186ddfe4d84"}
-{"path": "app/slug_loading_v2/src/repository_rule_context.rs", "sha256": "fef2ea126dac9004b6000ee0f6dd7d2c66c694ca8c9aa2a2f12df3a12c13a3d0"}
-{"path": "app/slug_bzlmod_v2/src/source_preparation.rs", "sha256": "821df86b5f4c729162f08b14907faf949e652d7da0eb426752ad02c62c64716a"}
+Accepted/frozen direct authority:
+{"path": "target/wp1038/next-source.md", "sha256": "219b1e486fb99ac6d0715e8527894e6da80bf37d19186ca603b06ec9410efafc"}
+{"path": "target/wp1038/next-evidence.md", "sha256": "7c08624ca56e0a4de599d1a054e6158e99454485b4ec71ce590dfc5873dc29bd"}
+{"path": "target/wp1038/native/final-evidence.md", "sha256": "514cebf2ba6fa145f72a87ce1b48a67d96f3081a31fcee9e4265be588f08ff6e"}
+{"path": "target/wp1038/native/operational-summary.json", "sha256": "187e9a4322d5c57803c2fdec41a908ccdc12deddb2c22d55a033df6a750b2f60"}
+{"path": "target/wp1038/native/result.json", "sha256": "d2cc47c27d046dd3f7e819b41920fba74f0c26955c769db513d4b870da0446d0"}
+{"path": "target/wp1038/native/native-operation.json", "sha256": "751a913efcaae29a60b4a0a1770e1d88e892dc0f1bf2b9cde43dfff715106b62"}
+{"path": "target/wp1038/native/audit-result.json", "sha256": "a371742f9b975301d82d6d966918b00f3eaf4675901276cb7da17ab9544885a3"}
+{"path": "target/wp1038/native/inputs.json", "sha256": "b26e4b1af20222295f7643056ad9c5ca054e39dc7b30392cff4ecf9456b9d1fa"}
+{"path": "target/wp1038/cohort.json", "sha256": "57c4d7569bde5ac0954c45debddd0a1aeb7679094161207063b144850f251dba"}
+{"path": "thoughts/shared/plans/slug-v2-subplans/wp1038-cc-template-byte-source-2026-10-09.json", "sha256": "2fae2dbd8118f0c8bd195365ff65b754c08fc6af8479717425e89365b2ddbd84"}
 
-Immediate predecessor: [WP1037](wp1037-cc-template-metadata-2026-10-09.json) accepted exactmetadata15/body50/Need113,104namedpasses106passingrecords; native4.869926328s/209180KiB/source131None. Next original229B exacttemplate FileBytes, no body/caller/certificate proof. No newruntimeownedstrings/fields/currentcaptures; actualFINAL/operative/commit complete. Frozen nextnotes ground strict oneleaf byte eligibility before body grant.
+Immediate predecessor: WP1038 accepted651B raw template body51/meta15/O3/Need114;104names/107all-phase records, native5.265403377s/214952KiB. Newcomplete227B cc_autoconf_toolchains generated_kind firstoffender, originalplan/fullSpec/output unobserved. ActualFINAL/operative/commit complete.
 
-Accepted WP1038: exact observed651B template ENDbody51/meta15/O3/Need114; unchanged256MiB ceiling, native5.265403377s/214952KiB,104namedpasses106nativegaterecords plus1rawcapture0testcredit. ActualFINAL and post-FINAL operative receipt precede this acceptance. Next captured227B cc_autoconf_toolchains generated_kind; original plan/fullSpec/output remain unobserved. Both frozen successor notes select diagnostic-only original-plan observation, no functional grant. Goalactive; fullproducer/wholefit open.
+Test-owner isolation: keep shared GENERATED_DIAGNOSTIC_TEST_OWNERS and functional owner-index factories unchanged. Add new tuple as local chained row only in the two projection selectors; retain old permissive-matcher admission positives, assert newowner refusal even with permissive matcher. No functional owner-signature expansion. Frozen refinement: target/wp1039/design-isolation.md.
+
+Accepted outcome: complete original one-file BUILD/641B/SHA d5758b82b9356ae3c8516067d8fbd8a739eb936fc2af37239c9b8348a3c31443/executabletrue diagnostic. Same generated_kind refusal, no functional grant.104named passes/106records, native4.920981668s/208408KiB under256MiB;1092direct/1105union pins,302stable signatures. Fullproducer/Rustc/wholefit remainopen. Receipt: thoughts/shared/plans/slug-v2-subplans/wp1039-cc-toolchains-plan-diagnostic-2026-10-09.json.

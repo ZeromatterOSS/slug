@@ -3446,12 +3446,21 @@ const GENERATED_HUB_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
     "@@rules_rust+//rust/private:repository_utils.bzl",
     "toolchain_repository_hub",
 );
+const GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
+    "rules_cc++cc_configure_extension+local_config_cc_toolchains",
+    "@@rules_cc+//cc/private/toolchain:cc_configure.bzl",
+    "cc_autoconf_toolchains",
+);
 
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for (owner, &(canonical, defining_label, rule_name)) in
-        GENERATED_DIAGNOSTIC_TEST_OWNERS.iter().enumerate()
+    for (owner, &(canonical, defining_label, rule_name)) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+        .iter()
+        .chain(std::iter::once(
+            &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
+        ))
+        .enumerate()
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
@@ -3504,9 +3513,18 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 CommandChoice::PublicProbe,
             );
         assert!(enabled.rules_rust_defs_import_sources);
+        assert!(enabled.rules_cc_import_sources);
         // The permissive phase seam still requires the complete typed owner and source roles.
         let permissive = enabled.admit_with_plan_matcher(&needs, &|_, _| true);
-        assert!(permissive.is_ok());
+        if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() {
+            assert_eq!(permissive.unwrap_err().family, "materialization");
+            assert_eq!(
+                enabled.first_denied_materialization(&needs).unwrap().1,
+                "generated_kind"
+            );
+        } else {
+            assert!(permissive.is_ok());
+        }
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);
         let denied = bodies.admit(&needs).unwrap_err();
@@ -3633,7 +3651,12 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             );
         }
         // Every component cross between otherwise eligible atomic owners stays closed.
-        for &(other_canonical, other_label, other_rule) in GENERATED_DIAGNOSTIC_TEST_OWNERS.iter() {
+        for &(other_canonical, other_label, other_rule) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+            .iter()
+            .chain(std::iter::once(
+                &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
+            ))
+        {
             if other_canonical == canonical {
                 continue;
             }
@@ -3784,7 +3807,13 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
 #[test]
 fn generated_plan_refusal_projection_is_bounded() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for &(canonical, defining_label, rule_name) in GENERATED_DIAGNOSTIC_TEST_OWNERS.iter() {
+    for &(canonical, defining_label, rule_name) in
+        GENERATED_DIAGNOSTIC_TEST_OWNERS
+            .iter()
+            .chain(std::iter::once(
+                &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
+            ))
+    {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
         let request_for_plan = |plan: Plan| {
