@@ -6009,7 +6009,7 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 13);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 22);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6030,6 +6030,49 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileBytes,
         ),
         ("/skylib/Toolchains/BUILD", PathObservationOperation::Lstat),
+        (
+            "/skylib/toolchains/unittest/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/toolchains/unittest",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/skylib/toolchains/unittest/Build",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/toolchains/unittest/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/toolchains/unittest/BUILD.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/skylib/lib/BUILD/child", PathObservationOperation::Lstat),
+        ("/skylib/lib/Build", PathObservationOperation::FileBytes),
+        ("/skylib/lib/BUILD.bak", PathObservationOperation::FileBytes),
+        (
+            "/skylib/lib/unittest.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/lib/unittest.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/lib/Unittest.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/features/lib/unittest.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/lib/unittest.bzl",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/skylib/toolchains/BUILD/child",
             PathObservationOperation::Lstat,
@@ -6086,9 +6129,14 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             }
             assert_eq!(progress, 0);
             let denied = bodies.admit(&mixed).unwrap_err();
+            let expected_family = if operation == PathObservationOperation::DirectoryEntries {
+                "operation"
+            } else {
+                "path"
+            };
             assert_eq!(
                 (denied.family, denied.operation),
-                ("path", path_operation_code(&operation))
+                (expected_family, path_operation_code(&operation))
             );
             assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
             let original = mixed
@@ -6098,10 +6146,10 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
                 .iter()
                 .find(|d| d.path().as_path() == Path::new(excluded) && d.operation() == operation)
                 .unwrap();
-            let first = bodies
+            let (first, family) = bodies
                 .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
-                .unwrap()
-                .0;
+                .unwrap();
+            assert_eq!(family, expected_family);
             assert!(std::ptr::eq(first, original));
         }
     }

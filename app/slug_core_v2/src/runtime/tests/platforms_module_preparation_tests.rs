@@ -290,18 +290,26 @@ const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
     "private/version_repo.bzl",
 ];
 const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
-const BAZEL_SKYLIB_IMPORTS: [&str; 4] = [
+const BAZEL_SKYLIB_IMPORTS: [&str; 7] = [
     "lib/paths.bzl",
     "lib/structs.bzl",
     "rules/common_settings.bzl",
     "lib/modules.bzl",
+    "toolchains/unittest/BUILD",
+    "lib/BUILD",
+    "lib/unittest.bzl",
 ];
-const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 5] = [
+const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 10] = [
     "lib",
     "rules",
     "toolchains",
     "toolchains/BUILD.bazel",
     "toolchains/BUILD",
+    "toolchains/unittest",
+    "toolchains/unittest/BUILD.bazel",
+    "toolchains/unittest/BUILD",
+    "lib/BUILD.bazel",
+    "lib/BUILD",
 ];
 const RULES_CC_ENVIRONMENT_NAMES: [&str; 13] = [
     "BAZEL_VC",

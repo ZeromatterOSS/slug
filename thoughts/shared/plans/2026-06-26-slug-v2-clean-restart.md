@@ -34,30 +34,38 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-254-m7a-normal-rustc-skylib-toolchains-readiness-r1
-Status: Accepted finite Skylib toolchains metadata; unittest package readiness decision selected
+Packet: WP-7-255-m7a-normal-rustc-skylib-unittest-readiness-r1
+Status: Accepted finite Skylib unittest readiness; next source readiness decision selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1030](./slug-v2-subplans/wp1030-skylib-toolchains-metadata-2026-10-08.json)
-accepts exact selected Skylib toolchains and both normal BUILD candidates Lstat under the
-existing paired role/original root/whole Need. Sole strict2 capture has two genuine leafENOENT,
-0body/hash/facts/bytes/0testcredit, no frontier or new source-package/body eligibility. Body4
-unchanged/meta5/uniqueNeed13; full4 checkedroot/table before qualified3 interface/private
-metadata tuple only. Core98/fourthemes/native1/FINAL:103 names/105 native gates+1capture=
-106 supervised records/0failed supervised operations. Native4.176704224s/210452KiB<262144/
-direct953/audit966; source124/decoded6172507/ErrorNone/Written39690/peakbank11679531/end0
-unchanged, same294188+106/two64KiB/zero newrows. Source85net/twelvehelpers72net/static48+
-48bytes/all98/fourconfigs and policies exact/zero new native retained strings or owners.
-One root precondition omitted required review copies before gate supervisor, rawpreserved/
-0gateartifacts/0compiler-native-testchildren; corrected API before missing gates with no second
-activation/runtime retry/capraise. Next exact savedSkylib root/toolchains/unittest207B Lstat
-selects finite child package readiness, no caller/kind/availability/body/provider claim or
-future activation. Source128 remaining4 numeric only; representative prefix fits, full
-producer/compiler/wholegraph/certificates/heapWeak/aggregate memory open. Borrow storage/use
-scoped interners for retained repetition, Windows deferred.
+[WP1031](./slug-v2-subplans/wp1031-skylib-unittest-readiness-2026-10-08.json) accepts the exact original
+Skylib unittest package and one direct same-root literal frontier under existing defaultfalse
+PreparedFile AND PublicProbe/additional[1]/borrowed root/whole Need. Two strict captures:
+5 decisions/3 usable/2 genuine primary leafENOENT/27075B/passNone/zero tests. New bodies
+are toolchains/unittest/BUILD1380,lib/BUILD1853,lib/unittest.bzl23842; both BUILD.bazel
+primaries remain metadata-only. Body7/meta10/overlap2/Need22; full7 root/order/signatures
+before explicit qualified4then3 immutable interface/fresh private metadata tuple. Further
+captured load facts remain ungranted; no recursive frontier or source certificate.
+Core98/fourthemes/native1/independent FINAL:103 names/105 current native gates+2capture=
+107 passing current records. One initial fixture-category assertion failed;34 first-attempt
+records (33 superseded passes/1failure) and exact raw/source/roles preserved,0 currentcredit.
+One separate root post-FINAL receipt precondition omitted summary generation, before tracked
+writes/zero compiler-native-test children; raw preserved and missing summary generated once.
+Narrow reviewed expectation+classifier correction, fresh all affected gates/no reactivation
+or identical failed invocation/predicate/cap change. Total141 recorded packet operations.
+Native4.787070677s/209160KiB<262144/direct995/audit1008; source126/decoded6197729/
+ErrorNone, source128 fixed and remaining headroom numeric only. Physical
+294 prefix preserved/3 END append→297188+109/6437574physical12875148brackets/two64KiB.
+Source56net/twelvehelpers96net/all98/four policies exact/config sole binding-array append.
+Static128descriptor+149literal spelling bytes beforecompiler dedup/layout; native retained
+String/path/Vec/Arc/request/Spec/plan copies/fields/cache/interner/pool added0. Borrow or
+transfer existing storage; scopedinterners for retained repeated values when cleanup fits.
+Current bounded prefix fits, full producer/compiler/actions/certificates/wholegraph/heapWeak/
+parent+child aggregate memory remain open. Windows deferred.
+
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
 Accepted source prerequisites are indexed in the current manifest: the scoped

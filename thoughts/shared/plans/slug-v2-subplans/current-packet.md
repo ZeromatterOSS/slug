@@ -1,7 +1,7 @@
 # Slug V2 current work packet
 
-Packet: WP-7-254-m7a-normal-rustc-skylib-toolchains-readiness-r1
-Status: Accepted finite Skylib toolchains metadata; unittest package readiness decision selected
+Packet: WP-7-255-m7a-normal-rustc-skylib-unittest-readiness-r1
+Status: Accepted finite Skylib unittest readiness; next source readiness decision selected
 
 ## Outcome and accepted basis
 
@@ -10,42 +10,41 @@ rules_rust0.73 fixture, support/data, registered extension toolchains, retained 
 query and same-DICE edition2024→2021→2024 restoration. This finite cfgtest source readiness
 is Slug-native; accepted pinned-source/oracle bytes remain exact. Windows is deferred.
 
-[WP1030](wp1030-skylib-toolchains-metadata-2026-10-08.json) accepts exact original
-selected Skylib toolchains and ordered BUILD.bazel/BUILD candidates Lstat under existing
-defaultfalse PreparedFile AND PublicProbe role/additional[1]/borrowed root/whole Need.
-Sole strict2 capture reports both genuine leafENOENT/0observed/0bytes/no body/hash/facts;
-no new source-package/body eligibility or frontier. Old body4 signatures retained, metadata5/
-uniqueNeed13. Current full4/root/table checked before explicit qualified3 interface; only
-fresh private metadata tuple grows. CCfull50-qualified8/winsdk/marker/context guards retained.
-Core98/fourthemes/native1/independent FINAL:103 names/105 native gates plus1capture=106
-supervised records/0failed supervised operations/0capturetestcredit. Native4.176704224s/
-210452KiB<262144/direct953/audit966; source124/decoded6172507/ErrorNone/Written39690/
-peakbank11679531/end0 unchanged. Same294 ordered188+106/two64KiB/6410499physical12820998
-bracket bytes; zero new physical rows. Source85net/twelvehelpers72net/all98/fourconfigs and
-policies byteexact. Static48descriptor+48literal bytes, zero new native retained String/path/
-Vec/Arc/request/Spec/plan copies/fields/cache/interner/pool. Borrow storage/use scoped interners
-for repeated retained values where cleanup fits. Native/capture limits and nine profiles fixed.
-One root preparation precondition failed before supervisor due omitted review-role copies;
-verbatim tooloutput/originaldriverhash/null uninstrumented maps preserved separately,0gate
-artifacts/0compiler-native-testchildren. Completed byteexact required copies and fullAPI then
-ran missing gates, no repeatedactivation/identicalfailedinvocation/runtime retry/capraise.
-Current bounded prefix fits; full producer/compiler/wholegraph/certificates/heapWeak/aggregate
-memory remain open, Windows deferred.
+[WP1031](wp1031-skylib-unittest-readiness-2026-10-08.json) accepts the exact original
+Skylib unittest package and one direct same-root literal frontier under existing defaultfalse
+PreparedFile AND PublicProbe/additional[1]/borrowed root/whole Need. Two strict captures:
+5 decisions/3 usable/2 genuine primary leafENOENT/27075B/passNone/zero tests. New bodies
+are toolchains/unittest/BUILD1380,lib/BUILD1853,lib/unittest.bzl23842; both BUILD.bazel
+primaries remain metadata-only. Body7/meta10/overlap2/Need22; full7 root/order/signatures
+before explicit qualified4then3 immutable interface/fresh private metadata tuple. Further
+captured load facts remain ungranted; no recursive frontier or source certificate.
+Core98/fourthemes/native1/independent FINAL:103 names/105 current native gates+2capture=
+107 passing current records. One initial fixture-category assertion failed;34 first-attempt
+records (33 superseded passes/1failure) and exact raw/source/roles preserved,0 currentcredit.
+One separate root post-FINAL receipt precondition omitted summary generation, before tracked
+writes/zero compiler-native-test children; raw preserved and missing summary generated once.
+Narrow reviewed expectation+classifier correction, fresh all affected gates/no reactivation
+or identical failed invocation/predicate/cap change. Total141 recorded packet operations.
+Native4.787070677s/209160KiB<262144/direct995/audit1008; source126/decoded6197729/
+ErrorNone, source128 fixed and remaining headroom numeric only. Physical
+294 prefix preserved/3 END append→297188+109/6437574physical12875148brackets/two64KiB.
+Source56net/twelvehelpers96net/all98/four policies exact/config sole binding-array append.
+Static128descriptor+149literal spelling bytes beforecompiler dedup/layout; native retained
+String/path/Vec/Arc/request/Spec/plan copies/fields/cache/interner/pool added0. Borrow or
+transfer existing storage; scopedinterners for retained repeated values when cleanup fits.
+Current bounded prefix fits, full producer/compiler/actions/certificates/wholegraph/heapWeak/
+parent+child aggregate memory remain open. Windows deferred.
 
-[Actual next-source](../../../../target/wp1030/next-source.md) and
-[next-evidence](../../../../target/wp1030/next-evidence.md) ground actual207B PATHLstat by
-exact saved input-byte comparison to Skylib root/toolchains/unittest. Namespace/association/
-materialization/plan/environment/sourceattempt attribution null; spelling does not establish
-caller/kind/current candidate availability/body or provider. Select cohesive finite child
-package readiness, ordered normal markers and only source-grounded eligibility/frontier,
-preserving source128 and all caps. Four remaining attempts numeric only, not closure/futurefit.
-No successor activation/pass credit.
+[Actual next-source](../../../../target/wp1031/next-source.md) and
+[next-evidence](../../../../target/wp1031/next-evidence.md) select only the next actual
+source-grounded readiness decision; no successor activation/body/provider/caller/passcredit.
+Every object/source/bank/work/lifetime/native/cleanup/RSS/AS cap and nine profiles retained.
 
 ## Integrated bounded decision and natural owner
 
-Freeze exactly TWO initial prospective candidates, in order toolchains/BUILD.bazel then
-toolchains/BUILD, under the original saved selected Skylib root. native_need_relative is
-separate toolchains directory, not a leaf/index. Checked-in host_package.rs:755–819 normal
+Freeze exactly TWO initial prospective candidates, in order toolchains/unittest/BUILD.bazel then
+toolchains/unittest/BUILD, under the original saved selected Skylib root. native_need_relative is
+separate toolchains/unittest directory, not a leaf/index. Checked-in host_package.rs:755–819 normal
 external package marker lookup tries BUILD.bazel then BUILD via original tracked package/
 source observation keys; file_discovery.rs:15–16 and bzl_module ordered selection agree.
 These establish package lookup protocol, not current caller or current candidate presence.
@@ -61,7 +60,7 @@ retire per row, compact facts only. Honest usable/absent/nonregular/symlink/chan
 UTF8/bounds outcomes; captures passNone/zero tests and no semantic certificate/snapshot.
 Root owns inputs, notes, activation and execution; no manual target traversal/read/inventory.
 At least one actual usable marker is required for source package eligibility; unavailable
-candidates remain metadata-only. Existing qualified four Skylib sources/two metadata rows
+candidates remain metadata-only. Existing qualified four Skylib sources/five metadata rows
 stay unchanged and are not recaptured.
 
 At most ONE separately frozen same-root direct literal frontier from actual eligible initial
@@ -76,9 +75,9 @@ preserves actual facts and selects changed hypothesis, never speculative body gr
 
 Actual capture FINAL(s) precede ONE frozen eligible source/metadata/signature cohort. Reuse
 existing defaultfalse bazel_skylib_import_sources with PreparedFile AND PublicProbe and
-original additional[1] strip_prefix/static borrowed matching. Add exact toolchains directory
+original additional[1] strip_prefix/static borrowed matching. Add exact toolchains/unittest directory
 and both candidates Lstat metadata; FileBytes only actual usable regular/fullhash/UTF8 eligible
-rows. If both initial bodies usable, body4→6/meta2→5 with two overlaps gives union15, not17;
+rows. Initial-only metadata5→8/body4+U gives uniqueNeed16+U for U eligible markers0..2;
 all actual frontier counts remain unknown until eligibility. Preserve old table order/prefix,
 whole original Need before IO/progress/first offender pointers/LocalArcWeak, every independent
 role/generated winsdk/hub/CC/Shell guard. Wrong mode/slot/root/case/suffix/child/foreignnamespace/
@@ -118,8 +117,8 @@ role-off checks do not fabricate checked disabled public transcripts.
 
 Preserve exact original294 ordered signature prefix188+106/6410499physical12820998bracket
 bytes, append only actual eligible rows at END in same second context/two64KiB scratches.
-New counts/bytes/hash are conditional; no per-leaf retained body/context. Prior22captures/
-70decisions63observed/reference/reader/Bzlmod have0 fresh credit; current captures observations
+New counts/bytes/hash are conditional; no per-leaf retained body/context. Prior23captures/
+72decisions63observed/reference/reader/Bzlmod have0 fresh credit; current captures observations
 only/zero tests. One combined actual source/helper STATIC then root sole prepare/protocol
 activations. Serial fresh pinned nightly2025-09-14 rustup resolution/offlinejobs1 CargoJSON
 compile/dependency/direct Loading-Core-CLI check<=60s/nine profiles, currentpreflight/list98/
