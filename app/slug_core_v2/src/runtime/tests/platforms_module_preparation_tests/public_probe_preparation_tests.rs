@@ -1650,12 +1650,31 @@ fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
 }
 #[tokio::test]
 async fn namespace_owner_read_uses_current_transaction() {
-    for owner in [0, 2, 3, 4, 5] {
+    for owner in [0, 2, 3, 4, 5, 6] {
         let bodies = namespace_test_bodies()
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-        let request = if owner == 5 {
-            let (canonical, label, rule) = GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER;
+        let bodies = if owner == 6 {
+            bodies
+                .with_seventh(NormalizedAbsolutePath::new("/license").unwrap())
+                .with_eighth(NormalizedAbsolutePath::new("/shell").unwrap())
+                .with_rules_shell_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                )
+        } else {
+            bodies
+        };
+        let request = if matches!(owner, 5 | 6) {
+            let (canonical, label, rule) = if owner == 6 {
+                (
+                    "rules_shell++sh_configure+local_config_shell",
+                    "@@rules_shell+//shell/private/repositories:sh_config.bzl",
+                    "sh_config",
+                )
+            } else {
+                GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER
+            };
             let mut request =
                 generated_globals_request(&bodies, small_generated_plan(&[("BUILD", b"a", true)]));
             request.id.canonical_repo =
@@ -1686,7 +1705,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                 "/generation/constraints.bzl"
             } else if owner == 3 {
                 "/generation/BUILD.bazel"
-            } else if owner == 5 {
+            } else if matches!(owner, 5 | 6) {
                 "/generation/BUILD"
             } else if owner == 4 {
                 "/generation/toolchains.bzl"
@@ -1768,7 +1787,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                     matches!(owner, 3 | 4 | 5) && index != 1
                 );
             }
-            if matches!(owner, 4 | 5) {
+            if matches!(owner, 4 | 5 | 6) {
                 let candidate = PathObservationDemand::new(
                     PathObservationNamespace::Materialization(instance),
                     NormalizedAbsolutePath::new("/generation/BUILD.bazel").unwrap(),
@@ -1782,7 +1801,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&candidate.operation()),
-                    index != 1
+                    matches!(owner, 4 | 5) && index != 1
                 );
             }
             if index == 0 {
@@ -1934,7 +1953,9 @@ fn small_namespace_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     selected: &[GeneratedFileSignature],
 ) -> bool {
-    if std::ptr::eq(selected, &GENERATED_CC_TOOLCHAINS_FILES[..]) {
+    if std::ptr::eq(selected, &GENERATED_CC_TOOLCHAINS_FILES[..])
+        || std::ptr::eq(selected, &GENERATED_SHELL_CONFIG_FILES[..])
+    {
         return generated_features_plan_matches(
             plan,
             &[("BUILD", 1, true, sha2::Sha256::digest(b"a").into())],
@@ -2706,14 +2727,55 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         std::mem::size_of::<GeneratedFileSignature>(),
         std::mem::size_of_val(&GENERATED_CC_TOOLCHAINS_FILES)
     );
-    {
-        let bodies = namespace_test_bodies()
+    eprintln!(
+        "WP1056_SIGNATURE_LAYOUT signature={} shell={}",
+        std::mem::size_of::<GeneratedFileSignature>(),
+        std::mem::size_of_val(&GENERATED_SHELL_CONFIG_FILES)
+    );
+    for shell in [false, true] {
+        let configure = |bodies: Bodies| {
+            if shell {
+                bodies
+                    .with_seventh(path("/license"))
+                    .with_eighth(path("/shell"))
+                    .with_rules_shell_import_sources(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    )
+            } else {
+                bodies
+            }
+        };
+        let selected = if shell {
+            &GENERATED_SHELL_CONFIG_FILES[..]
+        } else {
+            &GENERATED_CC_TOOLCHAINS_FILES[..]
+        };
+        let slot = if shell { 4 } else { 2 };
+        let (canonical, label, rule) = if shell {
+            (
+                "rules_shell++sh_configure+local_config_shell",
+                "@@rules_shell+//shell/private/repositories:sh_config.bzl",
+                "sh_config",
+            )
+        } else {
+            GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER
+        };
+        let (repo, package, target) = if shell {
+            (
+                "rules_shell+",
+                "shell/private/repositories",
+                "sh_config.bzl",
+            )
+        } else {
+            ("rules_cc+", "cc/private/toolchain", "cc_configure.bzl")
+        };
+        let bodies = configure(namespace_test_bodies())
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
         assert!(bodies.repo_marker_metadata);
         assert!(bodies.ignore_file_bytes);
         let request_for_plan = |plan| {
-            let (canonical, label, rule) = GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER;
             let mut request = generated_globals_request(&bodies, plan);
             request.id.canonical_repo =
                 slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
@@ -2731,7 +2793,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             bodies
                 .generated_features_owner_signatures(original)
                 .unwrap(),
-            &GENERATED_CC_TOOLCHAINS_FILES[..]
+            selected
         ));
         assert!(bodies.admit_with_plan_matcher(&valid, &matches).is_ok());
         assert!(bodies.admit(&valid).is_err());
@@ -2741,6 +2803,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     .with_fourth(path("/features"))
                     .with_fifth(path("/skylib"))
                     .with_sixth(path("/cc"))
+                    .with_seventh(path("/license"))
+                    .with_eighth(path("/shell"))
+                    .with_rules_shell_import_sources(registry, command)
                     .with_rules_cc_import_sources(registry, command)
                     .with_generated_features_file_effects(registry, command);
                 assert_eq!(
@@ -2750,13 +2815,31 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 );
             }
         }
-        for index in 0..4 {
-            let mut closed = namespace_test_bodies();
+        let mut independent = configure(namespace_test_bodies());
+        if shell {
+            independent.rules_cc_import_sources = false;
+        } else {
+            independent.rules_shell_import_sources = false;
+        }
+        assert!(
+            independent
+                .admit_with_plan_matcher(&valid, &matches)
+                .is_ok()
+        );
+        for index in 0..5 {
+            let mut closed = configure(namespace_test_bodies());
             match index {
                 0 => closed.generated_features_file_effects = false,
-                1 => closed.rules_cc_import_sources = false,
-                2 => closed.additional[2] = None,
+                1 => {
+                    if shell {
+                        closed.rules_shell_import_sources = false;
+                    } else {
+                        closed.rules_cc_import_sources = false;
+                    }
+                }
+                2 => closed.additional[slot] = None,
                 3 => closed.roots[0] = path("/other"),
+                4 => closed.additional[5] = closed.additional[slot].take(),
                 _ => unreachable!(),
             }
             let calls = std::cell::Cell::new(0);
@@ -2769,6 +2852,10 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     .is_err()
             );
             assert_eq!(calls.get(), 0);
+            if index == 4 {
+                closed.additional[slot] = closed.additional[5].take();
+                assert!(closed.admit_with_plan_matcher(&valid, &matches).is_ok());
+            }
         }
         for index in 0..8 {
             let mut wrong = request_for_plan(small_generated_plan(tiny));
@@ -2780,17 +2867,18 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 }
                 2 => {
                     wrong.repo_spec.rule_id.bzl_file =
-                        CanonicalLabel::parse("@@other+//cc/private/toolchain:cc_configure.bzl")
-                            .unwrap()
+                        CanonicalLabel::parse(&format!("@@other+//{package}:{target}")).unwrap()
                 }
                 3 => {
-                    wrong.repo_spec.rule_id.bzl_file =
-                        CanonicalLabel::parse("@@rules_cc+//cc/private:cc_configure.bzl").unwrap()
+                    wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(&format!(
+                        "@@{repo}//{}:{target}",
+                        if shell { "shell/private" } else { "cc/private" }
+                    ))
+                    .unwrap()
                 }
                 4 => {
                     wrong.repo_spec.rule_id.bzl_file =
-                        CanonicalLabel::parse("@@rules_cc+//cc/private/toolchain:other.bzl")
-                            .unwrap()
+                        CanonicalLabel::parse(&format!("@@{repo}//{package}:other.bzl")).unwrap()
                 }
                 5 => wrong.repo_spec.rule_id.rule_name = "other".into(),
                 6 => {
@@ -2799,13 +2887,12 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     );
                     mapping.insert(
                         slug_identity_v2::ApparentRepoName::new("cc").unwrap(),
-                        slug_identity_v2::CanonicalRepoName::new("rules_cc+").unwrap(),
+                        slug_identity_v2::CanonicalRepoName::new(repo).unwrap(),
                     );
-                    wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
-                        "@cc//cc/private/toolchain:cc_configure.bzl",
-                    )
-                    .unwrap()
-                    .resolve(&mapping);
+                    wrong.repo_spec.rule_id.bzl_file =
+                        slug_identity_v2::ApparentLabel::parse(&format!("@cc//{package}:{target}"))
+                            .unwrap()
+                            .resolve(&mapping);
                 }
                 7 => {
                     Arc::get_mut(&mut wrong.repo_spec.attributes)
@@ -2923,6 +3010,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation/.bazelignore.bak",
             "/parent/generation/.bazelignore/child",
             "/parent/generation/BUILD/child",
+            "/parent/generation/build",
+            "/parent/generation/BUILD.bak",
             "/other/BUILD",
         ] {
             for op in [
@@ -2942,11 +3031,16 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent",
                             "/parent/generation",
                             "/parent/generation/BUILD",
-                            "/parent/generation/BUILD.bazel",
-                            "/parent/generation/REPO.bazel",
-                            "/parent/generation/.bazelignore"
                         ]
                         .contains(&p))
+                        || (!shell
+                            && op == PathObservationOperation::Lstat
+                            && [
+                                "/parent/generation/BUILD.bazel",
+                                "/parent/generation/REPO.bazel",
+                                "/parent/generation/.bazelignore"
+                            ]
+                            .contains(&p))
                         || (op == PathObservationOperation::FileBytes
                             && p == "/parent/generation/BUILD")
                 );
@@ -2969,17 +3063,21 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation/BUILD.bazel",
             PathObservationOperation::Lstat,
         );
-        let own = valid
-            .try_union(&leaf)
-            .unwrap()
-            .try_union(&marker)
-            .unwrap()
-            .try_union(&ignore)
-            .unwrap()
-            .try_union(&candidate)
-            .unwrap()
-            .try_union(&features)
-            .unwrap();
+        let base_own = valid.try_union(&leaf).unwrap();
+        let own = if shell {
+            base_own.try_union(&features).unwrap()
+        } else {
+            base_own
+                .try_union(&marker)
+                .unwrap()
+                .try_union(&ignore)
+                .unwrap()
+                .try_union(&candidate)
+                .unwrap()
+                .try_union(&features)
+                .unwrap()
+        };
+        drop(base_own);
         for cohort in [
             own.try_union(&features).unwrap(),
             features.try_union(&own).unwrap(),
@@ -2988,6 +3086,10 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         }
         let mut ambiguous = request_for_plan(small_generated_plan(tiny));
         ambiguous.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+        let mut nonempty = request_for_plan(small_generated_plan(tiny));
+        Arc::get_mut(&mut nonempty.repo_spec.attributes)
+            .unwrap()
+            .insert("unexpected".into(), OverrideAttributeValue::None);
         let unavailable_epochs = [
             None,
             Some(namespace_test_epoch_at(
@@ -3007,6 +3109,12 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 [Arc::new(request_for_plan(small_generated_plan(&[(
                     "BUILD", b"x", true,
                 )])))],
+                instance,
+                "/parent/generation",
+            )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [Arc::new(nonempty)],
                 instance,
                 "/parent/generation",
             )),
@@ -3037,7 +3145,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             .unwrap();
         for repo_enabled in [false, true] {
             for ignore_enabled in [false, true] {
-                let mut configured = namespace_test_bodies()
+                let mut configured = configure(namespace_test_bodies())
                     .with_repo_marker_metadata(
                         RegistryChoice::PreparedFile,
                         CommandChoice::PublicProbe,
@@ -3058,6 +3166,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
+                        let enabled = enabled && !shell;
                         assert_eq!(policy.path_class, if enabled { class } else { "other" });
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
@@ -3087,14 +3196,18 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         }
         let mut unknown = request_for_plan(small_generated_plan(tiny));
         unknown.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("unknown+").unwrap();
-        for bad in [
+        let bad = [
             SourcePreparationNeeds::repository(unknown),
             need(
                 "/parent/generation/unknown",
                 PathObservationOperation::Lstat,
             ),
-        ] {
-            for mixed in [own.try_union(&bad).unwrap(), bad.try_union(&own).unwrap()] {
+        ];
+        for bad in bad
+            .iter()
+            .chain([&marker, &ignore, &candidate].into_iter().filter(|_| shell))
+        {
+            for mixed in [own.try_union(bad).unwrap(), bad.try_union(&own).unwrap()] {
                 let mut progress = 0;
                 if admit(&mixed, Some(&epoch)).is_ok() {
                     progress += 1;
@@ -3120,7 +3233,14 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             .unwrap()
                             .demands()
                             .iter()
-                            .find(|d| d.path() == &path("/parent/generation/unknown"))
+                            .find(|d| d.path()
+                                == bad
+                                    .path_observations()
+                                    .unwrap()
+                                    .demands()
+                                    .first()
+                                    .unwrap()
+                                    .path())
                             .unwrap()
                     ));
                 } else {

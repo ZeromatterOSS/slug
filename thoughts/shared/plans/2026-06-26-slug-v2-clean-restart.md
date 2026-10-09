@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-279-m7a-normal-rustc-shell-generated-plan-diagnostic-r1
+Packet: WP-7-280-m7a-normal-rustc-shell-generated-own-plan-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1055](./slug-v2-subplans/wp1055-shell-generated-plan-diagnostic-2026-10-09.json) accepts the bounded borrowed original Shell
-generated-plan diagnostic for the exact observed tuple/workspace/first offender.
-Functional and namespace policies remain unchanged. All306 source signatures
-stay exact;104 named checks/106 passing native records/currentcapture0;
-native4.686929152s/210260KiB below256MiB. Five-&str type witness80bytes,
-104 tuple literal bytes before pooling, no retained descriptor table/owned strings/fields.
+[WP1056](./slug-v2-subplans/wp1056-shell-generated-own-plan-2026-10-09.json) accepts full original Shell request
+matching and its observed one-file generated plan, with independently current
+own-plan namespace restricted to owned BUILD/root/ancestors. All306 source
+signatures stay exact;104 named checks/106 current passing records/currentcapture0.
+The initial fixture failure and6 superseded successes remain recorded separately
+(113 total attempts); intermediate Need release preserved lifecycle assertions;
+native4.850526055s/210932KiB below256MiB. One static64B signature/inlineSHA32/reused
+BUILD5literal, no1586 plaintext mirror/new retained productionstrings/fields.
 Borrow or transfer first; scoped interners for retained immutable repetition
 when lifetime/cleanup fit. Full Rustc/actions/certificates/producer/wholefit
 remain open; frozen successor notes ground the next step. Windows minimal/deferred.

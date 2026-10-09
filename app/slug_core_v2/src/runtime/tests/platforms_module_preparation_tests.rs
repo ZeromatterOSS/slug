@@ -798,6 +798,16 @@ static GENERATED_CC_TOOLCHAINS_FILES: [GeneratedFileSignature; 1] = [(
         0x14, 0x43,
     ],
 )];
+static GENERATED_SHELL_CONFIG_FILES: [GeneratedFileSignature; 1] = [(
+    "BUILD",
+    1586,
+    true,
+    [
+        0x4f, 0x58, 0x31, 0x37, 0xfa, 0x3a, 0x5d, 0xb8, 0xea, 0x71, 0x60, 0xd5, 0xae, 0x07, 0xf8,
+        0x77, 0x31, 0x64, 0x29, 0xe0, 0x15, 0x13, 0x22, 0x2d, 0x93, 0xf3, 0xd7, 0x84, 0x41, 0x7b,
+        0x2e, 0x4e,
+    ],
+)];
 fn generated_features_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     expected: &[GeneratedFileSignature],
@@ -925,6 +935,18 @@ impl Bodies {
                 && request.repo_spec.attributes.is_empty() =>
             {
                 Some(&GENERATED_CC_TOOLCHAINS_FILES)
+            }
+            (
+                "rules_shell++sh_configure+local_config_shell",
+                "rules_shell+",
+                "shell/private/repositories",
+                "sh_config.bzl",
+                "sh_config",
+            ) if self.rules_shell_import_sources
+                && self.additional[4].is_some()
+                && request.repo_spec.attributes.is_empty() =>
+            {
+                Some(&GENERATED_SHELL_CONFIG_FILES)
             }
             _ => None,
         }
