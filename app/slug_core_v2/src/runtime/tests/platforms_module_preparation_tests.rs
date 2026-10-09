@@ -331,7 +331,7 @@ const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
     "VS160COMNTOOLS",
     "VS90COMNTOOLS",
 ];
-const RULES_CC_IMPORTS: [&str; 52] = [
+const RULES_CC_IMPORTS: [&str; 53] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
     "cc/common/cc_info.bzl",
@@ -384,6 +384,7 @@ const RULES_CC_IMPORTS: [&str; 52] = [
     "cc/toolchains/toolchain_config_utils.bzl",
     "cc/private/toolchain/BUILD.toolchains.tpl",
     "cc/private/toolchain/test/BUILD",
+    "cc/private/toolchain/test/default_test_runner.bzl",
 ];
 const RULES_CC_IMPORT_METADATA: [&str; 19] = [
     "cc",
