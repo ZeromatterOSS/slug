@@ -431,12 +431,13 @@ const RULES_SHELL_IMPORT_METADATA: [&str; 13] = [
     "shell/private/extensions/BUILD",
     "shell/private/extensions/sh_configure.bzl",
 ];
-const RULES_SHELL_IMPORTS: [&str; 5] = [
+const RULES_SHELL_IMPORTS: [&str; 6] = [
     "shell/BUILD",
     "shell/sh_binary.bzl",
     "shell/private/BUILD",
     "shell/private/sh_binary.bzl",
     "shell/private/sh_executable.bzl",
+    "shell/private/extensions/sh_configure.bzl",
 ];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
@@ -3213,7 +3214,7 @@ fn observe_native_command(
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
         println!(
-            "WP1021_RULES_SHELL_SOURCES enabled={} policy_checked={} additional_slot=4 metadata_count=13 source_count=5 cohort=shell_package_imports kind=unobserved body=unobserved",
+            "WP1021_RULES_SHELL_SOURCES enabled={} policy_checked={} additional_slot=4 metadata_count=13 source_count=6 cohort=shell_package_imports kind=unobserved body=unobserved",
             rules_shell_import_sources,
             probe_report.policy_checked()
         );
