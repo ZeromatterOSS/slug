@@ -7880,6 +7880,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/repositories/BUILD",
         "/shell/shell/private/repositories/sh_config.bzl",
         "/shell/shell/toolchains",
+        "/shell/shell/toolchains/sh_toolchain.bzl",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -7931,9 +7932,25 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 25);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 27);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
+        (
+            "/shell/shell/toolchains/Sh_toolchain.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/toolchains/sh_toolchain.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/toolchains/sh_toolchain.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/shell/toolchains/sh_toolchain.bzl",
+            PathObservationOperation::FileBytes,
+        ),
         (
             "/shell/shell/toolchains",
             PathObservationOperation::FileBytes,

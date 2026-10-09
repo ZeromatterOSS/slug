@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-284-m7a-normal-rustc-shell-toolchains-directory-metadata-r1
+Packet: WP-7-285-m7a-normal-rustc-shell-sh-toolchain-source-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the Bazel9.2/rules_rust0.73 fixture.
-[WP1060](./slug-v2-subplans/wp1060-shell-toolchains-directory-metadata-2026-10-09.json) accepts exact original-root Shell
-shell/toolchains Host Lstat under the existing checked selected Shell role/root.
-Metadata17→18/body7/O7/Need25; one16B target reference and16B literal before pooling. Existing namespace marker gates and roles remain unchanged; candidates/body operations remain
-closed. All306 source signatures stay exact;104 names/106 current passing records,
-currentcapture0; native4.852880376s/209932KiB below256MiB. Reused borrowed roots/paths/static membership; zero new retained productionfields/owned strings.
-Static table target size288B; whole binary pooling unmeasured.
+[WP1061](./slug-v2-subplans/wp1061-shell-sh-toolchain-source-2026-10-09.json) accepts exact original-root Shell
+sh_toolchain.bzl Host metadata/body under the existing checked selected Shell role/root.
+Metadata18→19/body7→8/O8/Need27; two16B target references andone33B literal before pooling. Existing namespace marker gates and roles remain unchanged; unselected candidates/other operations remain
+closed. Old306 signatures stay exact prefix plus measured1775B END307;104 names/106 native records,107allphase,
+currentcapture1 decision0tests; native4.889541096s/209584KiB below256MiB. Reused borrowed roots/paths/static membership; zero new retained productionfields/owned strings.
+Static tables metadata304B/body128B; whole binary pooling unmeasured.
 Borrow or transfer first; existing scoped interners when retained lifetime and
 cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
 frozen successor notes ground the next step. Windows minimal/deferred.

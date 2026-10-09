@@ -417,7 +417,7 @@ const PLATFORMS_CPU_SOURCES: [&str; 1] = ["cpu/BUILD"];
 const PLATFORMS_OS_METADATA: [&str; 3] = ["os", "os/BUILD.bazel", "os/BUILD"];
 // Only the strictly eligible observed OS marker is a body source.
 const PLATFORMS_OS_SOURCES: [&str; 1] = ["os/BUILD"];
-const RULES_SHELL_IMPORT_METADATA: [&str; 18] = [
+const RULES_SHELL_IMPORT_METADATA: [&str; 19] = [
     "shell",
     "shell/BUILD.bazel",
     "shell/BUILD",
@@ -436,8 +436,9 @@ const RULES_SHELL_IMPORT_METADATA: [&str; 18] = [
     "shell/private/repositories/BUILD",
     "shell/private/repositories/sh_config.bzl",
     "shell/toolchains",
+    "shell/toolchains/sh_toolchain.bzl",
 ];
-const RULES_SHELL_IMPORTS: [&str; 7] = [
+const RULES_SHELL_IMPORTS: [&str; 8] = [
     "shell/BUILD",
     "shell/sh_binary.bzl",
     "shell/private/BUILD",
@@ -445,6 +446,7 @@ const RULES_SHELL_IMPORTS: [&str; 7] = [
     "shell/private/sh_executable.bzl",
     "shell/private/extensions/sh_configure.bzl",
     "shell/private/repositories/sh_config.bzl",
+    RULES_SHELL_IMPORT_METADATA[18],
 ];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
@@ -3252,7 +3254,7 @@ fn observe_native_command(
         };
         probe_report.report(stage, early_kind, outcome.as_ref());
         println!(
-            "WP1021_RULES_SHELL_SOURCES enabled={} policy_checked={} additional_slot=4 metadata_count=18 source_count=7 cohort=shell_package_imports kind=unobserved body=unobserved",
+            "WP1021_RULES_SHELL_SOURCES enabled={} policy_checked={} additional_slot=4 metadata_count=19 source_count=8 cohort=shell_package_imports kind=unobserved body=unobserved",
             rules_shell_import_sources,
             probe_report.policy_checked()
         );
