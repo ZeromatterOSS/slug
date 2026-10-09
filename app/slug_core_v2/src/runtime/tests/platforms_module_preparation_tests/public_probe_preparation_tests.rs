@@ -312,7 +312,8 @@ fn namespace_policy(
             && relative == Path::new(".bazelignore")
         {
             "ignore_marker"
-        } else if std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
+        } else if (std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
             && relative == Path::new("BUILD.bazel")
         {
             "package_marker"
@@ -1591,7 +1592,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                     matches!(owner, 3 | 4 | 5) && index != 1
                 );
             }
-            if owner == 4 {
+            if matches!(owner, 4 | 5) {
                 let candidate = PathObservationDemand::new(
                     PathObservationNamespace::Materialization(instance),
                     NormalizedAbsolutePath::new("/generation/BUILD.bazel").unwrap(),
@@ -2734,6 +2735,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation",
             "/parent/generation/BUILD",
             "/parent/generation/BUILD.bazel",
+            "/parent/generation/build.bazel",
+            "/parent/generation/BUILD.bazel.bak",
+            "/parent/generation/BUILD.bazel/child",
             "/parent/generation/REPO.bazel",
             "/parent/generation/repo.bazel",
             "/parent/generation/REPO.bazel.bak",
@@ -2762,6 +2766,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent",
                             "/parent/generation",
                             "/parent/generation/BUILD",
+                            "/parent/generation/BUILD.bazel",
                             "/parent/generation/REPO.bazel",
                             "/parent/generation/.bazelignore"
                         ]
@@ -2784,12 +2789,18 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation/.bazelignore",
             PathObservationOperation::Lstat,
         );
+        let candidate = need(
+            "/parent/generation/BUILD.bazel",
+            PathObservationOperation::Lstat,
+        );
         let own = valid
             .try_union(&leaf)
             .unwrap()
             .try_union(&marker)
             .unwrap()
             .try_union(&ignore)
+            .unwrap()
+            .try_union(&candidate)
             .unwrap()
             .try_union(&features)
             .unwrap();
@@ -2828,6 +2839,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             assert!(admit(&leaf, unavailable.as_ref()).is_err());
             assert!(admit(&marker, unavailable.as_ref()).is_err());
             assert!(admit(&ignore, unavailable.as_ref()).is_err());
+            assert!(admit(&candidate, unavailable.as_ref()).is_err());
         }
         let original_marker = marker
             .path_observations()
@@ -2836,6 +2848,12 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             .first()
             .unwrap();
         let original_ignore = ignore
+            .path_observations()
+            .unwrap()
+            .demands()
+            .first()
+            .unwrap();
+        let original_candidate = candidate
             .path_observations()
             .unwrap()
             .demands()
@@ -2861,6 +2879,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     for (demand, enabled, class) in [
                         (original_marker, repo_enabled, "repo_marker"),
                         (original_ignore, ignore_enabled, "ignore_marker"),
+                        (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
                         assert_eq!(policy.path_class, if enabled { class } else { "other" });

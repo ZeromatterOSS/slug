@@ -1,0 +1,521 @@
+{
+  "schema": "slug-v2-bounded-acceptance-v1",
+  "packet": "WP-7-267-m7a-normal-rustc-cc-toolchains-package-marker-metadata-r1",
+  "checkpoint": "WP1043",
+  "baseline": "5834ae7fca63b22d4535a9e0cbf27da97eeac440",
+  "status": "accepted",
+  "compatibility": "Slug-native cfgtest-Linux original-owner metadata-only readiness; exact source signatures preserved; Windows deferred",
+  "change": "Exact CC descriptor permits only BUILD.bazel Lstat under existing checked generated+CC context and original typed owner/current epoch/generation root/own plan",
+  "growth": {
+    "rust_files": 1,
+    "insertions": 21,
+    "deletions": 2,
+    "net": 19,
+    "helper_files": 12,
+    "helper_net": 5,
+    "new_selectors": 0,
+    "new_suites": 0
+  },
+  "allocation": {
+    "layout": {
+      "state": 120,
+      "option": 120,
+      "old_state": 144,
+      "new_state": 264,
+      "old_scope": 312,
+      "new_scope": 432,
+      "state_delta": 120,
+      "scope_delta": 120,
+      "previous_field_list_mirrors_only": true,
+      "historical_compiler_layout_guaranteed": false,
+      "operation_path": "target/wp1043/native/ordinary-98-operation.json",
+      "current_layout_matches_accepted_wp1033": true,
+      "wp1043_retained_field_delta": 0,
+      "mirror_delta_is_not_wp1043_growth": true
+    },
+    "new_retained_fields": 0,
+    "new_owned_production_strings_paths_containers_callbacks_locks": 0,
+    "static_signature_layout": {
+      "signature_bytes": 64,
+      "cc_array_bytes": 64,
+      "existing_stack_reference_slots": 3,
+      "additional_stack_slots": 0,
+      "descriptor_contains_inline_digest32": true,
+      "path_literal_bytes": 5,
+      "path_literal_already_present": true,
+      "owner_literals_reused_bytes": 126,
+      "target_compiler_layout_only": true,
+      "zero_static_or_normal_runtime_cost_claimed": false,
+      "selector": "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::generated_features_materialization_is_opt_in_and_exact",
+      "operation": {
+        "path": "target/wp1043/native/ordinary-35-operation.json",
+        "sha256": "a772ebd57c50ef88329c4d30d8bf6d4f549fc6d8e9b335e1d4d8e5f4eaf4e0d3"
+      },
+      "stdout": {
+        "path": "target/wp1043/native/ordinary-35.stdout",
+        "sha256": "de0c885ae35444ab9ab02dad5606e7e92c567960c01ba631e97e8f9d49cbd0b5"
+      },
+      "stderr": {
+        "path": "target/wp1043/native/ordinary-35.stderr",
+        "sha256": "1242499bca2cdcc8df61cf611e9a4ede82a1fe6df579a6433744b629cf472d5d"
+      }
+    },
+    "added_static_signature_target_bytes": 0,
+    "existing_static_descriptor_reused": true,
+    "existing_stack_reference_slots": 3,
+    "additional_stack_slots": 0,
+    "production_representation_unchanged": true,
+    "normal_materializer_source_output_retention_not_free": true,
+    "discipline": "Borrow/transfer first; existing scoped interners for retained immutable repetition when lifecycle/cleanup fit. No temporary global pool."
+  },
+  "validation": {
+    "Core": 99,
+    "decoder_themes": 4,
+    "native": 1,
+    "named_passes": 104,
+    "current_passing_supervised_native_gate_records": 106,
+    "preserved_failed_operations": 0,
+    "superseded_operations": 0,
+    "actual_supervised_attempts": 106,
+    "current_capture_operations": 0,
+    "native_launcher_precondition_failures": 0,
+    "strict_current_pins": true,
+    "second_activation": false,
+    "role_copies_before_sole_switches_imports_gates": true,
+    "launch_driver": {
+      "path": "target/wp1043/root-prepare-driver.py",
+      "sha256": "7f8e29f2e04bc8a84f36f85d679215d2740d39e9e7e7fe1a6422b2df9df6e566"
+    },
+    "core_executable": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-c50d299f2267e28b",
+      "sha256": "95f52c3f4bc3edfe3ac2b6e856630498c035f06ac0908ee2d8bdf6d9362d56f1"
+    },
+    "audit": {
+      "path": "target/wp1043/native/audit-result.json",
+      "sha256": "ee2ab01b507ce3c11577270e826228ee8cd70d5a9507126d3c306421155c67fc"
+    }
+  },
+  "native": {
+    "operation": {
+      "path": "target/wp1043/native/native-operation.json",
+      "sha256": "dcff047ca2ed91d8bf11f5b3bdfe054ee7ae56b5ebd4ad04e780b240c8661b46"
+    },
+    "result": {
+      "path": "target/wp1043/native/result.json",
+      "sha256": "2d7c813a5f025ca0b7a5f921579ffc9076e33b013cb7ca0bbea12e950bba00af"
+    },
+    "stdout": {
+      "path": "target/wp1043/native/native.stdout",
+      "sha256": "2662615e22f11610c1c22471bb8409e9b1da7ea26657b9e8f8bc95b2459219a7"
+    },
+    "stderr": {
+      "path": "target/wp1043/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "elapsed_seconds": 4.6121793090133,
+    "conservative_rss_kib": 209580,
+    "rss_limit_kib": 262144,
+    "direct_pins": 1094,
+    "audited_union_pins": 1107,
+    "actual_fields": {
+      "source_counters": {
+        "registry_attempts": 105,
+        "registry_admitted_bytes": 235521,
+        "source_attempts": 133,
+        "transferred_bytes": 0,
+        "decoded_bytes": 6217227,
+        "written_bytes": 40331,
+        "live_buffer_bytes_before_drop": 2114151,
+        "peak_buffer_bytes": 11679531
+      },
+      "source_error": "None",
+      "retirement": {
+        "source_weak_seen": false,
+        "source_weak_expired": true,
+        "live_buffer_zero": true,
+        "scope_weak_expired": true,
+        "recorder_weak_expired": true
+      },
+      "denied": {
+        "family": "path",
+        "path_len": 213,
+        "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f623637396330323038313365623864363538393230343438613165383231383830633632643239336435366435363435323463386332353465323065343835662f64306534656261612d376666612d346133642d613735352d6335643239653964633738632f63632f707269766174652f746f6f6c636861696e2f74657374",
+        "capture": "captured"
+      },
+      "namespace_owner": null,
+      "namespace_association": null,
+      "namespace_policy": null,
+      "materialization_refusal": null,
+      "generated_plan_refusal": null,
+      "generated_plan_diagnostic_owner": null,
+      "environment_refusal": null,
+      "repository_environment_readiness": {
+        "effective_role_enabled": true,
+        "selected_root": "rules_cc_root",
+        "allowed_names": [
+          "BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN",
+          "BAZEL_VC",
+          "BAZEL_VC_FULL_VERSION",
+          "BAZEL_VS",
+          "BAZEL_WINSDK_FULL_VERSION",
+          "TEMP",
+          "TMP",
+          "VS100COMNTOOLS",
+          "VS110COMNTOOLS",
+          "VS120COMNTOOLS",
+          "VS140COMNTOOLS",
+          "VS150COMNTOOLS",
+          "VS160COMNTOOLS",
+          "VS90COMNTOOLS"
+        ],
+        "empty_command_snapshot_checked": true,
+        "environment_values_observed": false,
+        "snapshot_cells_observed": false,
+        "readiness_is_value_or_certificate_proof": false
+      },
+      "public_probe": {
+        "stage": "native_refusal",
+        "kind": "computation",
+        "preparation": "complete",
+        "dispatch": "singleton",
+        "policy_checked": true,
+        "certificate": null,
+        "observations": null,
+        "analyses": null,
+        "actions": null,
+        "rustc": null
+      },
+      "source_attempt_refusal": null,
+      "source_attempt_context": null,
+      "source_attempt_owner": null,
+      "source_timeout": {
+        "status": "available",
+        "armed": true,
+        "first_work": false,
+        "origin": false,
+        "overflow": false,
+        "sticky": false,
+        "site": 0,
+        "domain": 0,
+        "phase": 0,
+        "return": 0,
+        "origin_available": false,
+        "observer_frame_causal_pair_proved": false
+      },
+      "root_lockfile_metadata": {
+        "enabled": true,
+        "denied_operation": "lstat"
+      }
+    },
+    "census_summary": {
+      "enabled": true,
+      "limit": 256,
+      "source": 133,
+      "seen": 133,
+      "emitted": 133,
+      "admitted": 133,
+      "first_limit": null,
+      "in_flight": 0,
+      "skipped": 0,
+      "bounds": 0,
+      "writer_failed": 0,
+      "raw_bytes": 27107,
+      "encoded_bytes": 84132,
+      "accounting_complete": true,
+      "identity_complete": true
+    },
+    "exact_identity_interpretation": {
+      "result": {
+        "path": "target/wp1043/native/result.json",
+        "sha256": "2d7c813a5f025ca0b7a5f921579ffc9076e33b013cb7ca0bbea12e950bba00af"
+      },
+      "summary": {
+        "enabled": true,
+        "limit": 256,
+        "source": 133,
+        "seen": 133,
+        "emitted": 133,
+        "admitted": 133,
+        "first_limit": null,
+        "in_flight": 0,
+        "skipped": 0,
+        "bounds": 0,
+        "writer_failed": 0,
+        "raw_bytes": 27107,
+        "encoded_bytes": 84132,
+        "accounting_complete": true,
+        "identity_complete": true
+      },
+      "rows": 133,
+      "distinct_captured_identity_tuples": 133,
+      "recurrences": [],
+      "domain_counts": {
+        "host": 133
+      },
+      "phase_counts": {
+        "need_paths": 133
+      },
+      "namespace_counts": {
+        "host": 126,
+        "materialization": 7
+      },
+      "identity_is_io_necessity_revision_or_certificate_proof": false,
+      "emission_order_is_chronology": false,
+      "whole_fit_proved": false
+    },
+    "memory_prefix_fits": true,
+    "normal_producer_proved": false,
+    "whole_workload_fit_proved": false
+  },
+  "leases": {
+    "ordered_stable_sources": 302,
+    "contexts": [
+      188,
+      114
+    ],
+    "scratch_bytes_each": 65536,
+    "physical_bytes": 6456401,
+    "bracket_bytes": 12912802,
+    "documented_fd_opens": 4698,
+    "ordered_all302_signatures_immutable": true,
+    "non_atomic_diagnostic_not_certificate": true
+  },
+  "capture": {
+    "current_operations": 0,
+    "current_decisions": 0,
+    "current_observations": 0,
+    "qualified_prior_operations": 28,
+    "qualified_prior_decisions": 82,
+    "qualified_prior_observations": 71,
+    "qualified_prior_fresh_credit": 0
+  },
+  "timing": {
+    "checkpoint_seconds_since_design_freeze": 1361.7993035316467,
+    "current_preparation_seconds": {
+      "dependency": 0.15916997310705483,
+      "compile": 8.921944817062467,
+      "check": 7.394742093980312
+    },
+    "ordinary_seconds": 23.050872709602118,
+    "decoder_seconds": 3.071552354027517,
+    "native_seconds": 4.6121793090133
+  },
+  "fixed_memory_time_byte_caps_unchanged": true,
+  "evidence": [
+    {
+      "path": "target/wp1043/design.md",
+      "sha256": "ec1b925799241e62bc3b1f88a5c5fb3ba5807568269e9812c3d9925e1387059a"
+    },
+    {
+      "path": "target/wp1043/design-review.md",
+      "sha256": "aed7499f915a05de241b16ad6455700cb5ed4ce68d2c18bc91d0e9537c33cbf8"
+    },
+    {
+      "path": "target/wp1043/design-proposal-bindings.json",
+      "sha256": "87994637d786cf95e7ec1186eb0f67823b3ef916af64820a8a7519a71d0126d4"
+    },
+    {
+      "path": "target/wp1043/baseline.json",
+      "sha256": "c5247e85120a9b7c9b13db49d66bdc04b57e52cc59a72a215b62a2d7383f714a"
+    },
+    {
+      "path": "target/wp1043/implementation-baseline.json",
+      "sha256": "ae0cfa03fa427fff2c8ecea2da9f9f018dfede6ea918c0efcd844cac0ce60cba"
+    },
+    {
+      "path": "target/wp1043/source-design.md",
+      "sha256": "b387eeb12567dbd63374eb117f7d1c7962f01d0c07778bd27023593512b25a43"
+    },
+    {
+      "path": "target/wp1043/evidence-design.md",
+      "sha256": "b387eeb12567dbd63374eb117f7d1c7962f01d0c07778bd27023593512b25a43"
+    },
+    {
+      "path": "target/wp1043/source-handoff.md",
+      "sha256": "ec3d57669002917ca9f0b610cba612f0f31fafebfbaeea4ddc53de636a1fc3c8"
+    },
+    {
+      "path": "target/wp1043/source-freeze.json",
+      "sha256": "6af0ba695ed0fd81e222a443ae40504d69f2313ff4ec60ac854fd4c1656739ef"
+    },
+    {
+      "path": "target/wp1043/source-baseline.json",
+      "sha256": "e19bff9a409d6d9af6005f9481e373976a99311360e17db3e3e38d5061fffff8"
+    },
+    {
+      "path": "target/wp1043/cohort.json",
+      "sha256": "57c4d7569bde5ac0954c45debddd0a1aeb7679094161207063b144850f251dba"
+    },
+    {
+      "path": "target/wp1043/layout-measurement.json",
+      "sha256": "b7943865ebf3b693387a57144e7ebd5a6e436ad877ab711530732fe5aae977bd"
+    },
+    {
+      "path": "target/wp1043/signature-layout-measurement.json",
+      "sha256": "9cc4be1fcd0df02932f7be992c865a9fa3fa8b41abfef987c0f22c97da0b0aae"
+    },
+    {
+      "path": "target/wp1043/census-interpretation.json",
+      "sha256": "85ea51d938aaf405ca73517e8d26cd8d58e88891684f4d781983098392590f5a"
+    },
+    {
+      "path": "target/wp1043/root-prepare-driver.py",
+      "sha256": "7f8e29f2e04bc8a84f36f85d679215d2740d39e9e7e7fe1a6422b2df9df6e566"
+    },
+    {
+      "path": "target/wp1043/root-prelaunch-driver.py",
+      "sha256": "d8fc9aa66ea95bab6727e6f75d71812507bf38d7d2b7e0d4ac8e7a8016833916"
+    },
+    {
+      "path": "target/wp1043/next-source.md",
+      "sha256": "fe89c0a222e0a6bb838d9de21b42bb62f1250a07095b52e2576699e94468d5eb"
+    },
+    {
+      "path": "target/wp1043/next-evidence.md",
+      "sha256": "7308373c810f685a127c04a2483f602bab6191f2c5409872c9a2ccb618e944a3"
+    },
+    {
+      "path": "target/wp1043/launch-review-api.json",
+      "sha256": "fa1d81ffc480cb11bda5cc7b067f033f31bc7c3056501b6f86cb6734e558df39"
+    },
+    {
+      "path": "target/wp1043/repository-checks.json",
+      "sha256": "40b207175de7d6dc6469e60e1d6b6d38e51673101e9f553119859dee680fcdf3"
+    },
+    {
+      "path": "target/wp1043/native/design.md",
+      "sha256": "ec1b925799241e62bc3b1f88a5c5fb3ba5807568269e9812c3d9925e1387059a"
+    },
+    {
+      "path": "target/wp1043/native/design-review.md",
+      "sha256": "aed7499f915a05de241b16ad6455700cb5ed4ce68d2c18bc91d0e9537c33cbf8"
+    },
+    {
+      "path": "target/wp1043/native/design-source.md",
+      "sha256": "aed7499f915a05de241b16ad6455700cb5ed4ce68d2c18bc91d0e9537c33cbf8"
+    },
+    {
+      "path": "target/wp1043/native/design-evidence.md",
+      "sha256": "aed7499f915a05de241b16ad6455700cb5ed4ce68d2c18bc91d0e9537c33cbf8"
+    },
+    {
+      "path": "target/wp1043/native/helper-handoff.md",
+      "sha256": "420c38ed2dbde2d318ec506b6c0a43c80a178869cbf956a5d665aa51558bbe41"
+    },
+    {
+      "path": "target/wp1043/native/implementation-source.md",
+      "sha256": "b3f58a92b12c63fd598448924a2f84abd4f406da24827eb3e4eb85596290d29c"
+    },
+    {
+      "path": "target/wp1043/native/implementation-evidence.md",
+      "sha256": "98851b40f4420e05f6cb2997870cf3d661c8a5dd88dd914623fc691bf8024aee"
+    },
+    {
+      "path": "target/wp1043/native/source-readiness.md",
+      "sha256": "e2772003167af27a206dcb04a0b7db66a9e6b92aaaf63ea92c1097c5d66d0611"
+    },
+    {
+      "path": "target/wp1043/native/metadata-cohort-source.md",
+      "sha256": "e2772003167af27a206dcb04a0b7db66a9e6b92aaaf63ea92c1097c5d66d0611"
+    },
+    {
+      "path": "target/wp1043/native/semantic-source-review.md",
+      "sha256": "98851b40f4420e05f6cb2997870cf3d661c8a5dd88dd914623fc691bf8024aee"
+    },
+    {
+      "path": "target/wp1043/native/static-evidence-review.md",
+      "sha256": "98851b40f4420e05f6cb2997870cf3d661c8a5dd88dd914623fc691bf8024aee"
+    },
+    {
+      "path": "target/wp1043/native/activation.json",
+      "sha256": "25aa70879a13f5c5d76c13df70d5e5e1bad63420b2a46cadc03d1d3b5d2c11c9"
+    },
+    {
+      "path": "target/wp1043/native/inputs.json",
+      "sha256": "b26e4b1af20222295f7643056ad9c5ca054e39dc7b30392cff4ecf9456b9d1fa"
+    },
+    {
+      "path": "target/wp1043/native/selectors.json",
+      "sha256": "9154a28efc0f0defc882db8785d2a9a10cb921686e42c2e58fbccd143770bae6"
+    },
+    {
+      "path": "target/wp1043/native/executable.json",
+      "sha256": "8f7eea42c5f45586fd7b2f9479b676a872540821f9fc67118f742e8de11ef4a3"
+    },
+    {
+      "path": "target/wp1043/native/prelaunch-summary.json",
+      "sha256": "b0ec606e9f26a68e53bb4c4dc61ae04c2cea10bb6d673d12ae9bd34e1692e758"
+    },
+    {
+      "path": "target/wp1043/native/preflight-source.md",
+      "sha256": "1a8dda459f31ddd8b3f31d9c23bc74a8e7b5d1b88b1fbbf0d40f1c794ea6f46a"
+    },
+    {
+      "path": "target/wp1043/native/preflight-evidence.md",
+      "sha256": "8c5b7aef1e7abe72b273be3c2903d39ce455d4da2c2f90649421df82473e692b"
+    },
+    {
+      "path": "target/wp1043/native/preflight-source.initial.md",
+      "sha256": "361c19b7dc53140d47cd0b8a3807126455433cf6734866929c6123ad6705f9a3"
+    },
+    {
+      "path": "target/wp1043/native/prelaunch-note-correction.json",
+      "sha256": "54f700f2e9dbf60668e7e8b16eee205fc1f8250791b5b618b839215280cf0eba"
+    },
+    {
+      "path": "target/wp1043/native/audit-result.json",
+      "sha256": "ee2ab01b507ce3c11577270e826228ee8cd70d5a9507126d3c306421155c67fc"
+    },
+    {
+      "path": "target/wp1043/native/native-operation.json",
+      "sha256": "dcff047ca2ed91d8bf11f5b3bdfe054ee7ae56b5ebd4ad04e780b240c8661b46"
+    },
+    {
+      "path": "target/wp1043/native/result.json",
+      "sha256": "2d7c813a5f025ca0b7a5f921579ffc9076e33b013cb7ca0bbea12e950bba00af"
+    },
+    {
+      "path": "target/wp1043/native/native.stdout",
+      "sha256": "2662615e22f11610c1c22471bb8409e9b1da7ea26657b9e8f8bc95b2459219a7"
+    },
+    {
+      "path": "target/wp1043/native/native.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "sha256": "9a6957a44fed02f8890430c8a478de95053f139a223d8ad97126090bb446cdf1"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+      "sha256": "71b9aa2ed53f5bf8c32a7a727d915c21426fc9fc39579acbb2dcfa1ec64cfc86"
+    }
+  ],
+  "residuals": [
+    "Full normal public Rustc/compiler/actions/edition restoration/certificate/producer remain open",
+    "Metadata permission/accounted work is not marker availability, body IO, completed output or certificate proof",
+    "Accounting/charge identity completeness is not IO/necessity/revision/certificate/chronology",
+    "Narrow Weak/credit retirement; unseen SourceWeak expiry vacuous, body/registry/interner heap retirement, aggregate/history/whole fit unproved",
+    "Windows minimal/deferred"
+  ],
+  "successor": {
+    "activated": false,
+    "source": {
+      "path": "target/wp1043/next-source.md",
+      "sha256": "fe89c0a222e0a6bb838d9de21b42bb62f1250a07095b52e2576699e94468d5eb"
+    },
+    "evidence": {
+      "path": "target/wp1043/next-evidence.md",
+      "sha256": "7308373c810f685a127c04a2483f602bab6191f2c5409872c9a2ccb618e944a3"
+    }
+  },
+  "accepted_at": "2026-10-09T13:50:56.843189+00:00",
+  "independent_final": {
+    "path": "target/wp1043/native/final-evidence.md",
+    "sha256": "b86f6182a27cd1ebbbaf58c1b2c07f3bfa238ac98e2e59cd543fcb9b294cda7a"
+  },
+  "post_final_operative_summary": {
+    "path": "target/wp1043/native/operational-summary.json",
+    "sha256": "1ff4679eb5aa396cab5a147cb77803e942cbd91164768a195c62fc67365a4bab"
+  }
+}
