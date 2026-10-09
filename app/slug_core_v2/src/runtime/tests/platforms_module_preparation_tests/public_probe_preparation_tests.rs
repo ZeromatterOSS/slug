@@ -6837,6 +6837,12 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
 #[test]
 fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     eprintln!(
+        "WP1045_CC_BODY_LAYOUT body={} row={} literal={}",
+        std::mem::size_of_val(&RULES_CC_IMPORTS),
+        std::mem::size_of::<&str>(),
+        RULES_CC_IMPORTS.last().unwrap().len()
+    );
+    eprintln!(
         "WP1044_CC_METADATA_LAYOUT metadata={} row={} literal={}",
         std::mem::size_of_val(&RULES_CC_IMPORT_METADATA),
         std::mem::size_of::<&str>(),
@@ -6912,7 +6918,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 117);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 118);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6930,7 +6936,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileBytes,
         ),
         (
-            "/cc/cc/private/toolchain/test/BUILD",
+            "/cc/cc/private/toolchain/test/BUILD.disabled",
             PathObservationOperation::FileBytes,
         ),
         (
