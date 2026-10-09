@@ -300,7 +300,8 @@ fn namespace_policy(
             "fixed_file"
         } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
             || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
-            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..])
+            || std::ptr::eq(files, &GENERATED_SHELL_CONFIG_FILES[..]))
             && bodies.repo_marker_metadata
             && relative == Path::new("REPO.bazel")
         {
@@ -1784,7 +1785,9 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    matches!(owner, 3 | 4 | 5) && index != 1
+                    (matches!(owner, 3 | 4 | 5)
+                        || (owner == 6 && path == "/generation/REPO.bazel"))
+                        && index != 1
                 );
             }
             if matches!(owner, 4 | 5 | 6) {
@@ -3031,13 +3034,13 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent",
                             "/parent/generation",
                             "/parent/generation/BUILD",
+                            "/parent/generation/REPO.bazel",
                         ]
                         .contains(&p))
                         || (!shell
                             && op == PathObservationOperation::Lstat
                             && [
                                 "/parent/generation/BUILD.bazel",
-                                "/parent/generation/REPO.bazel",
                                 "/parent/generation/.bazelignore"
                             ]
                             .contains(&p))
@@ -3065,7 +3068,11 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         );
         let base_own = valid.try_union(&leaf).unwrap();
         let own = if shell {
-            base_own.try_union(&features).unwrap()
+            base_own
+                .try_union(&marker)
+                .unwrap()
+                .try_union(&features)
+                .unwrap()
         } else {
             base_own
                 .try_union(&marker)
@@ -3166,7 +3173,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
-                        let enabled = enabled && !shell;
+                        let enabled = enabled && (!shell || class == "repo_marker");
                         assert_eq!(policy.path_class, if enabled { class } else { "other" });
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
@@ -3174,6 +3181,45 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             enabled && own_plan
                         );
                         assert!(!policy.admits(&PathObservationOperation::FileBytes));
+                        if shell && class == "repo_marker" {
+                            for mixed in [
+                                valid.try_union(&marker).unwrap(),
+                                marker.try_union(&valid).unwrap(),
+                            ] {
+                                assert_eq!(
+                                    configured
+                                        .admit_with_matchers(&mixed, &matches, &|d| {
+                                            namespace_policy(&configured, d, e, &matches)
+                                                .admits(&d.operation())
+                                        })
+                                        .is_ok(),
+                                    enabled && own_plan
+                                );
+                                assert!(
+                                    mixed
+                                        .repository_materializations()
+                                        .values()
+                                        .any(|r| Arc::ptr_eq(r, original))
+                                );
+                                if !enabled || !own_plan {
+                                    let (first, _) = configured
+                                        .first_denied_path_with_namespace_matcher(&mixed, &|d| {
+                                            namespace_policy(&configured, d, e, &matches)
+                                                .admits(&d.operation())
+                                        })
+                                        .unwrap();
+                                    assert!(std::ptr::eq(
+                                        first,
+                                        mixed
+                                            .path_observations()
+                                            .unwrap()
+                                            .demands()
+                                            .first()
+                                            .unwrap()
+                                    ));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -3205,7 +3251,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         ];
         for bad in bad
             .iter()
-            .chain([&marker, &ignore, &candidate].into_iter().filter(|_| shell))
+            .chain([&ignore, &candidate].into_iter().filter(|_| shell))
         {
             for mixed in [own.try_union(bad).unwrap(), bad.try_union(&own).unwrap()] {
                 let mut progress = 0;

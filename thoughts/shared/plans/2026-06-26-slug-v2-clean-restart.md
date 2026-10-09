@@ -34,22 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-280-m7a-normal-rustc-shell-generated-own-plan-r1
+Packet: WP-7-281-m7a-normal-rustc-shell-repo-marker-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
-The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
-retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1056](./slug-v2-subplans/wp1056-shell-generated-own-plan-2026-10-09.json) accepts full original Shell request
-matching and its observed one-file generated plan, with independently current
-own-plan namespace restricted to owned BUILD/root/ancestors. All306 source
-signatures stay exact;104 named checks/106 current passing records/currentcapture0.
-The initial fixture failure and6 superseded successes remain recorded separately
-(113 total attempts); intermediate Need release preserved lifecycle assertions;
-native4.850526055s/210932KiB below256MiB. One static64B signature/inlineSHA32/reused
-BUILD5literal, no1586 plaintext mirror/new retained productionstrings/fields.
-Borrow or transfer first; scoped interners for retained immutable repetition
-when lifetime/cleanup fit. Full Rustc/actions/certificates/producer/wholefit
-remain open; frozen successor notes ground the next step. Windows minimal/deferred.
+The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
+retained Rustc readiness on the Bazel9.2/rules_rust0.73 fixture.
+[WP1057](./slug-v2-subplans/wp1057-shell-repo-marker-metadata-2026-10-09.json) accepts exact original-root Shell
+REPO.bazel Lstat under the existing checked repo-marker role and unique current
+original epoch/full Spec/own-plan. Other Shell markers and body operations remain
+closed. All306 source signatures stay exact;104 names/106 current passing records,
+currentcapture0; native4.831824988s/209276KiB below256MiB. Reused borrowed descriptor
+and literal; zero new retained productionfields/strings/staticreferences.
+Borrow or transfer first; existing scoped interners when retained lifetime and
+cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
+frozen successor notes ground the next step. Windows minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
