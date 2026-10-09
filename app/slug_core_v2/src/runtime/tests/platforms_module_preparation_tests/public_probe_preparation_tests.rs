@@ -308,7 +308,8 @@ fn namespace_policy(
             "repo_marker"
         } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
             || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
-            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..])
+            || std::ptr::eq(files, &GENERATED_SHELL_CONFIG_FILES[..]))
             && bodies.ignore_file_bytes
             && relative == Path::new(".bazelignore")
         {
@@ -1785,9 +1786,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    (matches!(owner, 3 | 4 | 5)
-                        || (owner == 6 && path == "/generation/REPO.bazel"))
-                        && index != 1
+                    matches!(owner, 3 | 4 | 5 | 6) && index != 1
                 );
             }
             if matches!(owner, 4 | 5 | 6) {
@@ -3035,15 +3034,12 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent/generation",
                             "/parent/generation/BUILD",
                             "/parent/generation/REPO.bazel",
+                            "/parent/generation/.bazelignore",
                         ]
                         .contains(&p))
                         || (!shell
                             && op == PathObservationOperation::Lstat
-                            && [
-                                "/parent/generation/BUILD.bazel",
-                                "/parent/generation/.bazelignore"
-                            ]
-                            .contains(&p))
+                            && p == "/parent/generation/BUILD.bazel")
                         || (op == PathObservationOperation::FileBytes
                             && p == "/parent/generation/BUILD")
                 );
@@ -3070,6 +3066,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         let own = if shell {
             base_own
                 .try_union(&marker)
+                .unwrap()
+                .try_union(&ignore)
                 .unwrap()
                 .try_union(&features)
                 .unwrap()
@@ -3173,7 +3171,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
-                        let enabled = enabled && (!shell || class == "repo_marker");
+                        let enabled = enabled && (!shell || class != "package_marker");
                         assert_eq!(policy.path_class, if enabled { class } else { "other" });
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
@@ -3181,10 +3179,15 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             enabled && own_plan
                         );
                         assert!(!policy.admits(&PathObservationOperation::FileBytes));
-                        if shell && class == "repo_marker" {
+                        if shell && class != "package_marker" {
+                            let marker_need = if class == "repo_marker" {
+                                &marker
+                            } else {
+                                &ignore
+                            };
                             for mixed in [
-                                valid.try_union(&marker).unwrap(),
-                                marker.try_union(&valid).unwrap(),
+                                valid.try_union(marker_need).unwrap(),
+                                marker_need.try_union(&valid).unwrap(),
                             ] {
                                 assert_eq!(
                                     configured
@@ -3249,10 +3252,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 PathObservationOperation::Lstat,
             ),
         ];
-        for bad in bad
-            .iter()
-            .chain([&ignore, &candidate].into_iter().filter(|_| shell))
-        {
+        for bad in bad.iter().chain([&candidate].into_iter().filter(|_| shell)) {
             for mixed in [own.try_union(bad).unwrap(), bad.try_union(&own).unwrap()] {
                 let mut progress = 0;
                 if admit(&mixed, Some(&epoch)).is_ok() {

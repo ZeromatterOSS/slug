@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-281-m7a-normal-rustc-shell-repo-marker-metadata-r1
+Packet: WP-7-282-m7a-normal-rustc-shell-ignore-marker-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the Bazel9.2/rules_rust0.73 fixture.
-[WP1057](./slug-v2-subplans/wp1057-shell-repo-marker-metadata-2026-10-09.json) accepts exact original-root Shell
-REPO.bazel Lstat under the existing checked repo-marker role and unique current
-original epoch/full Spec/own-plan. Other Shell markers and body operations remain
+[WP1058](./slug-v2-subplans/wp1058-shell-ignore-marker-metadata-2026-10-09.json) accepts exact original-root Shell
+.bazelignore Lstat under the existing independent ignore role and unique current
+original epoch/full Spec/own-plan. Existing repo metadata is preserved independently; package and body operations remain
 closed. All306 source signatures stay exact;104 names/106 current passing records,
-currentcapture0; native4.831824988s/209276KiB below256MiB. Reused borrowed descriptor
+currentcapture0; native4.840086725s/209384KiB below256MiB. Reused borrowed descriptor
 and literal; zero new retained productionfields/strings/staticreferences.
 Borrow or transfer first; existing scoped interners when retained lifetime and
 cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
