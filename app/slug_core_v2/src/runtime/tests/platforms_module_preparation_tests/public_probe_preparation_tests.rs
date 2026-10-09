@@ -7441,6 +7441,15 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
 }
 pub(super) fn rules_shell_import_sources_matrix() {
     eprintln!(
+        "WP1051_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
+        std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
+        std::mem::size_of::<&str>(),
+        RULES_SHELL_IMPORT_METADATA[13..]
+            .iter()
+            .map(|relative| relative.len())
+            .sum::<usize>()
+    );
+    eprintln!(
         "WP1050_SHELL_BODY_LAYOUT body={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORTS),
         std::mem::size_of::<&str>(),
@@ -7450,7 +7459,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "WP1049_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
         std::mem::size_of::<&str>(),
-        RULES_SHELL_IMPORT_METADATA.last().unwrap().len()
+        RULES_SHELL_IMPORT_METADATA[12].len()
     );
     eprintln!(
         "WP1048_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
@@ -7476,6 +7485,9 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/extensions/BUILD.bazel",
         "/shell/shell/private/extensions/BUILD",
         "/shell/shell/private/extensions/sh_configure.bzl",
+        "/shell/shell/private/repositories",
+        "/shell/shell/private/repositories/BUILD.bazel",
+        "/shell/shell/private/repositories/BUILD",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -7527,9 +7539,45 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 19);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 22);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
+        (
+            "/shell/shell/private/repositories",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/repositories/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/repositories/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/Repositories",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/repositories.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/repositories/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/shell/private/repositories",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/repositories",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/shell/shell/private/repositories/BUILD.bazel",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/shell/shell/private/extensions/sh_configure.bzl.disabled",
             PathObservationOperation::FileBytes,
