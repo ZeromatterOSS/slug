@@ -331,6 +331,7 @@ const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
     "VS160COMNTOOLS",
     "VS90COMNTOOLS",
 ];
+const RULES_SHELL_ENVIRONMENT_NAMES: [&str; 3] = ["BAZEL_SH", "PATH", "WINDIR"];
 const RULES_CC_IMPORTS: [&str; 53] = [
     "cc/find_cc_toolchain.bzl",
     "cc/common/cc_common.bzl",
@@ -999,15 +1000,18 @@ impl Bodies {
         &self,
         request: &slug_bzlmod_v2::NeedRepositoryEnvironmentNames,
     ) -> bool {
-        self.rules_cc_import_sources
-            && self.additional[2].is_some()
-            && request.workspace() == &self.roots[0]
+        request.workspace() == &self.roots[0]
             && !request.names().is_empty()
-            && request.names().len() <= RULES_CC_ENVIRONMENT_NAMES.len()
-            && request
-                .names()
-                .iter()
-                .all(|name| RULES_CC_ENVIRONMENT_NAMES.contains(&name.as_str()))
+            && request.names().len()
+                <= RULES_CC_ENVIRONMENT_NAMES.len() + RULES_SHELL_ENVIRONMENT_NAMES.len()
+            && request.names().iter().all(|name| {
+                (self.rules_cc_import_sources
+                    && self.additional[2].is_some()
+                    && RULES_CC_ENVIRONMENT_NAMES.contains(&name.as_str()))
+                    || (self.rules_shell_import_sources
+                        && self.additional[4].is_some()
+                        && RULES_SHELL_ENVIRONMENT_NAMES.contains(&name.as_str()))
+            })
     }
     fn environment_diagnostic<'a>(
         &self,

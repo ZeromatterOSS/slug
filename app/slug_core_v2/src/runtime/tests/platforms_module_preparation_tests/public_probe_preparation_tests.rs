@@ -937,6 +937,15 @@ fn materialization_refusal_projection_preserves_kind_checks_and_precedence() {
 fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
     use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    eprintln!(
+        "WP1054_SHELL_ENVIRONMENT_LAYOUT names={} row={} literal={}",
+        std::mem::size_of_val(&RULES_SHELL_ENVIRONMENT_NAMES),
+        std::mem::size_of::<&str>(),
+        RULES_SHELL_ENVIRONMENT_NAMES
+            .iter()
+            .map(|name| name.len())
+            .sum::<usize>()
+    );
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let make = || Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
     let selected = || {
@@ -944,6 +953,8 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
             .with_fourth(path("/features"))
             .with_fifth(path("/skylib"))
             .with_sixth(path("/cc"))
+            .with_seventh(path("/license"))
+            .with_eighth(path("/shell"))
     };
     let need = |workspace: &str, names: &[&str]| {
         SourcePreparationNeeds::environment(
@@ -968,6 +979,15 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
                 && matches!(command, CommandChoice::PublicProbe);
             assert_eq!(bodies.rules_cc_import_sources, enabled);
             assert_eq!(bodies.admit(&all).is_ok(), enabled);
+            let shell_bodies = selected().with_rules_shell_import_sources(registry, command);
+            assert_eq!(shell_bodies.rules_shell_import_sources, enabled);
+            assert_eq!(
+                shell_bodies
+                    .admit(&need("/fixture", &RULES_SHELL_ENVIRONMENT_NAMES))
+                    .is_ok(),
+                enabled
+            );
+            assert!(shell_bodies.admit(&all).is_err());
         }
     }
     let bodies = selected()
@@ -1023,6 +1043,100 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     assert_eq!(bodies.admit(&foreign).unwrap_err().family, "environment");
     assert!(all.try_union(&foreign).is_err());
 
+    let shell = need("/fixture", &RULES_SHELL_ENVIRONMENT_NAMES);
+    assert_eq!(shell.repository_environment().unwrap().names().len(), 3);
+    let both = all.try_union(&shell).unwrap();
+    assert_eq!(both.repository_environment().unwrap().names().len(), 17);
+    for cc_enabled in [false, true] {
+        for shell_enabled in [false, true] {
+            let mut candidate = selected();
+            if cc_enabled {
+                candidate = candidate.with_rules_cc_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                );
+            }
+            if shell_enabled {
+                candidate = candidate.with_rules_shell_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                );
+            }
+            assert_eq!(candidate.admit(&all).is_ok(), cc_enabled);
+            assert_eq!(candidate.admit(&shell).is_ok(), shell_enabled);
+            for name in RULES_SHELL_ENVIRONMENT_NAMES {
+                assert_eq!(
+                    candidate.admit(&need("/fixture", &[name])).is_ok(),
+                    shell_enabled
+                );
+            }
+            for mixed in [
+                all.try_union(&shell).unwrap(),
+                shell.try_union(&all).unwrap(),
+            ] {
+                assert_eq!(candidate.admit(&mixed).is_ok(), cc_enabled && shell_enabled);
+                if !(cc_enabled && shell_enabled) {
+                    let denied = candidate.admit(&mixed).unwrap_err();
+                    assert_eq!(denied.family, "environment");
+                    assert!(std::ptr::eq(
+                        candidate
+                            .environment_diagnostic(&mixed, &denied)
+                            .unwrap()
+                            .request,
+                        mixed.repository_environment().unwrap()
+                    ));
+                }
+            }
+        }
+    }
+    let mut both_bodies = selected()
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    for (slot, affected, unaffected) in [(2, &all, &shell), (4, &shell, &all)] {
+        both_bodies.additional[5] = both_bodies.additional[slot].take();
+        assert!(both_bodies.admit(affected).is_err());
+        assert!(both_bodies.admit(unaffected).is_ok());
+        assert!(both_bodies.admit(&both).is_err());
+        both_bodies.additional[slot] = both_bodies.additional[5].take();
+        assert!(both_bodies.admit(&both).is_ok());
+    }
+    for name in [
+        "bazel_sh",
+        "BAZEL_SH_suffix",
+        "path",
+        "WINDIR_suffix",
+        "UNKNOWN",
+        "",
+    ] {
+        let bad = need("/fixture", &[name]);
+        for authorized in [&shell, &both] {
+            for mixed in [
+                authorized.try_union(&bad).unwrap(),
+                bad.try_union(authorized).unwrap(),
+            ] {
+                assert_eq!(
+                    mixed.repository_environment().unwrap().names().len(),
+                    authorized.repository_environment().unwrap().names().len() + 1
+                );
+                let denied = both_bodies.admit(&mixed).unwrap_err();
+                assert_eq!(denied.family, "environment");
+                assert!(std::ptr::eq(
+                    both_bodies
+                        .environment_diagnostic(&mixed, &denied)
+                        .unwrap()
+                        .request,
+                    mixed.repository_environment().unwrap()
+                ));
+            }
+        }
+    }
+    let foreign_shell = need("/foreign", &RULES_SHELL_ENVIRONMENT_NAMES);
+    assert_eq!(
+        both_bodies.admit(&foreign_shell).unwrap_err().family,
+        "environment"
+    );
+    assert!(both.try_union(&foreign_shell).is_err());
+
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "unknown+", "/platforms")).clone(),
     );
@@ -1040,7 +1154,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         });
     let milestones = Arc::new(Mutex::new(Milestones::default()));
     let root = ModuleRoot {
-        bodies: Arc::new(bodies),
+        bodies: Arc::new(both_bodies),
         expected_registry: None,
         milestones: milestones.clone(),
     };
@@ -1053,55 +1167,117 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         .unwrap()
         .as_ptr();
     let mut progress = 0;
-    for (excluded, family) in [
-        (&local, "materialization"),
-        (&excluded_path, "path"),
-        (&bootstrap, "bootstrap"),
-    ] {
-        for mixed in [
-            all.try_union(excluded).unwrap(),
-            excluded.try_union(&all).unwrap(),
+    for environment in [&all, &both] {
+        for (excluded, family) in [
+            (&local, "materialization"),
+            (&excluded_path, "path"),
+            (&bootstrap, "bootstrap"),
         ] {
-            assert!(std::ptr::eq(
-                mixed
-                    .repository_environment()
-                    .unwrap()
-                    .names()
-                    .iter()
-                    .next()
-                    .unwrap()
-                    .as_ptr(),
-                all.repository_environment()
-                    .unwrap()
-                    .names()
-                    .iter()
-                    .next()
-                    .unwrap()
-                    .as_ptr(),
-            ));
-            let denied = root.bodies.admit(&mixed).unwrap_err();
-            assert_eq!(denied.family, family);
-            assert!(
-                root.bodies
-                    .environment_diagnostic(&mixed, &denied)
-                    .is_none()
-            );
-            if family == "materialization" {
-                assert!(Arc::ptr_eq(
-                    mixed.repository_materializations().values().next().unwrap(),
-                    original,
+            for mixed in [
+                environment.try_union(excluded).unwrap(),
+                excluded.try_union(environment).unwrap(),
+            ] {
+                assert!(std::ptr::eq(
+                    mixed
+                        .repository_environment()
+                        .unwrap()
+                        .names()
+                        .iter()
+                        .next()
+                        .unwrap()
+                        .as_ptr(),
+                    environment
+                        .repository_environment()
+                        .unwrap()
+                        .names()
+                        .iter()
+                        .next()
+                        .unwrap()
+                        .as_ptr(),
                 ));
+                let denied = root.bodies.admit(&mixed).unwrap_err();
+                assert_eq!(denied.family, family);
+                assert!(
+                    root.bodies
+                        .environment_diagnostic(&mixed, &denied)
+                        .is_none()
+                );
+                if family == "materialization" {
+                    assert!(Arc::ptr_eq(
+                        mixed.repository_materializations().values().next().unwrap(),
+                        original,
+                    ));
+                }
+                if let Ok(SourcePreparationOutcome::Need(_)) = root.need(mixed) {
+                    progress += 1;
+                }
+                assert_eq!(
+                    milestones.lock().unwrap().denied.as_ref().unwrap().family,
+                    family
+                );
             }
-            if let Ok(SourcePreparationOutcome::Need(_)) = root.need(mixed) {
-                progress += 1;
-            }
-            assert_eq!(
-                milestones.lock().unwrap().denied.as_ref().unwrap().family,
-                family
-            );
         }
     }
     assert_eq!(progress, 0);
+    let unknown = need("/fixture", &["UNKNOWN"]);
+    for mixed in [
+        both.try_union(&unknown).unwrap().try_union(&local).unwrap(),
+        local.try_union(&both).unwrap().try_union(&unknown).unwrap(),
+    ] {
+        let denied = root.bodies.admit(&mixed).unwrap_err();
+        assert_eq!(denied.family, "environment");
+        assert!(std::ptr::eq(
+            root.bodies
+                .environment_diagnostic(&mixed, &denied)
+                .unwrap()
+                .request,
+            mixed.repository_environment().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            mixed.repository_materializations().values().next().unwrap(),
+            original
+        ));
+        assert!(root.need(mixed).is_err());
+        assert_eq!(
+            milestones.lock().unwrap().denied.as_ref().unwrap().family,
+            "environment"
+        );
+    }
+    {
+        let observed = milestones.lock().unwrap();
+        assert_eq!((observed.calls, observed.preparations), (0, 0));
+    }
+    let both_first = both
+        .repository_environment()
+        .unwrap()
+        .names()
+        .iter()
+        .next()
+        .unwrap()
+        .as_ptr();
+    let SourcePreparationOutcome::Need(recovered_both) = root.need(both).unwrap() else {
+        panic!("both authorized role frontiers must preserve their original Need");
+    };
+    assert_eq!(
+        recovered_both
+            .repository_environment()
+            .unwrap()
+            .names()
+            .len(),
+        17
+    );
+    assert!(std::ptr::eq(
+        recovered_both
+            .repository_environment()
+            .unwrap()
+            .names()
+            .iter()
+            .next()
+            .unwrap()
+            .as_ptr(),
+        both_first
+    ));
+    drop(recovered_both);
     let SourcePreparationOutcome::Need(recovered) = root.need(all).unwrap() else {
         panic!("authorized names must return their original Need for normal progress");
     };
