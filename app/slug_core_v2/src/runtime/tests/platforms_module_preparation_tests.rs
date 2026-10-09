@@ -383,7 +383,7 @@ const RULES_CC_IMPORTS: [&str; 50] = [
     "cc/toolchains/BUILD",
     "cc/toolchains/toolchain_config_utils.bzl",
 ];
-const RULES_CC_IMPORT_METADATA: [&str; 12] = [
+const RULES_CC_IMPORT_METADATA: [&str; 14] = [
     "cc",
     "cc/common",
     "cc/private",
@@ -396,6 +396,8 @@ const RULES_CC_IMPORT_METADATA: [&str; 12] = [
     "cc/toolchains/BUILD.bazel",
     "cc/toolchains/BUILD",
     "cc/toolchains/toolchain_config_utils.bzl",
+    "cc/private/toolchain/BUILD.bazel",
+    "cc/private/toolchain/BUILD",
 ];
 const PLATFORMS_HOST_IMPORTS: [&str; 3] =
     ["host/constraints.bzl", "host/BUILD", "host/extension.bzl"];

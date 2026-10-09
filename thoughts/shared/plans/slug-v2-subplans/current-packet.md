@@ -1,89 +1,102 @@
 # Slug V2 current work packet
 
-Packet: WP-7-259-m7a-normal-rustc-cc-detection-environment-readiness-r1
-Status: Accepted finite tracked CC environment readiness; next package metadata selected
+Packet: WP-7-260-m7a-normal-rustc-cc-package-marker-metadata-r1
+Status: Exact CC marker metadata accepted; next finite template prerequisite under selection
 
-Baseline:85b9a08da2cfb65f5ddcab7101b24ae4fe518517; predecessor WP1034 accepted.
-[Frozen design](../../../../target/wp1035/design.md)
-SHA0c7463307782a7c34152816f46b6b5cd66e0375e7e20f54d803376426c78727a.
-Independent DESIGN acceptance is required before source/helper authoring.
+Baseline:5d8f4869b30746fd8fde99d1a1ae87e51f9740c3, accepted WP1035. Its actual FINAL, post-FINAL
+operative receipt, source/gate acceptance and commit are complete. The normal
+public Rustc producer on the unchanged Bazel9.2/rules_rust0.73 fixture continues.
+This is Slug-native cfgtest-Linux readiness; accepted source/oracle bytes remain
+exact. Windows remains minimal/deferred.
 
-The observable outcome is to admit the exact original one-name environment Need
-`BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN` through the existing finite native fixture
-policy and immutable command snapshot, then expose the next genuine normal
-public Rustc prerequisite. No completed producer outcome is predetermined.
-The change is Slug-native cfgtest-Linux readiness; accepted Bazel9.2/rules_rust0.73
-source/oracle bytes remain exact, with Windows deferred.
+## Outcome and owner
 
-## Owner and decision
+Admit the original exact CC package-marker Lstat prerequisite through the
+existing root/role predicate, then record the next genuine native result under
+unchanged memory/time/byte limits. WP1035 passed5.007664012s/208820KiB<262144,
+source131/ErrorNone. Original220B offender is input-matched CCroot plus
+cc/private/toolchain/BUILD.bazel, operationLstat from WP957. The historical
+transport field is not caller attribution; availability/kind/body remain unknown.
 
-Extend `RULES_CC_ENVIRONMENT_NAMES` from13 to14 static borrowed names. Preserve
-Bodies::admits_repository_environment's effective PreparedFile/PublicProbe
-rules_cc_import_sources, selected additional[2], original workspace and positive
-canonical whole-name subset checks. Public projection_matches independently
-requires the original command snapshot to be empty. Mixed unknown names refuse
-the complete Need before progress, regardless of construction order.
+Append exactly cc/private/toolchain/BUILD.bazel then cc/private/toolchain/BUILD
+to RULES_CC_IMPORT_METADATA12→14. Body50 and its exact signatures stay unchanged;
+overlap2, union62/Need112 (50FileBytes+62Lstat). Existing metadata directory
+cc/private/toolchain is already admitted. Root selects metadata-only readiness
+because the actual request is Lstat. A subsequent content Need must ground its
+own eligibility contract; no source capture/body grant/cohort append is chosen.
 
-NativeDemandSession owns the frontier, immutable request and normal injection.
-Repository host input injection stages Observed(snapshot.get(name)); the empty
-snapshot yields Observed(None), distinct from Unauthorized and a present empty
-value. Loading checks tracked cells against its current snapshot. Existing
-DICE structural identity/equality, revision, A→B→A, cancellation, rejection
-restoration and source certificates remain authoritative. No process environment
-read, snapshot reset, caller inference or production identity change is selected.
+Bzlmod host_package.rs::drive_external_repository_package_marker_lookup755–824
+owns normal observed primary/fallback lookup through HostRepositoryPathObservationKey.
+It forwards original Need/errors and epoch observations, continues missing or
+nonqualifying nodes and returns NoBuildFile when appropriate. RepositoryPackageSource
+uses that normal result before content selection. This grounds the pair, without
+asserting the actual higher caller. Existing DICE/source identity, equality,
+revision/restoration, cancellation, containment, path resolution and certificate
+reobservation remain authoritative. Metadata membership does not invent a kind.
 
-## Scope and allocation
+Bodies::admits_rules_cc_import_source keeps its default-false PreparedFile AND
+PublicProbe role, selected additional[2] CC root, borrowed relative components
+and exact static membership. The pair admits only Lstat; FileBytes uses body50.
+Original whole-Need priority/first offender/zero progress and all other source,
+Local/own-plan/current-epoch namespace roles remain unchanged. All14 environment
+names/empty original snapshot/normal cells and observed-absence distinctions stay.
+No production key, locking, flag, platform/interface or semantic representation
+change. Readiness comparison adds32B static descriptors+58literal bytes before
+layout/dedup, no runtime retained String/path/Arc/container/request/interner/cache.
+Borrow/transfer storage; scopedinterners only fitting retained repetition.
+Existing test scratch and real graph/epoch retention are not claimed free.
+
+## Scope and discriminators
 
 Only two Rust cfgtest files: runtime/tests/platforms_module_preparation_tests.rs
-(static table) and its public_probe_preparation_tests.rs child (existing test).
-Expected1 table line plus15–40 net test lines. The large parent remains cohesive
-because the existing local constant owns this precise policy. No new owner,
-framework, retained field, owned runtime String/path/map/cache/interner or lock.
-Borrowed static comparison adds one literal/descriptor; normal shared snapshot
-and frontier storage keeps its existing lifetime and actual retention cost.
-Borrow or transfer strings where lifetime fits; scoped interners apply only to
-repeated retained strings with fitting cleanup. No donor/Stage9 utility import.
+(metadata constant) and public_probe_preparation_tests.rs (existing selector).
+Expected2 table lines+10–35 test net; >50 net requires cohesive-growth reassessment.
+The large parent remains cohesive for this existing local table; no new framework.
+No donor/Stage9 retained utility import, source capture, scan or recursive frontier.
 
-Extend repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only:
-all14, singleton new/mixed old+new positives, wrong case/suffix/unknown/empty/
-foreign workspace/disabled mode/missing selectedslot negatives; full15 including
-unknown rejected; both-order wholeNeed unsupported families, borrowed original
-request/name pointers, zero progress and Weak retirement preserved. Retain the
-bounded borrowed refusal formatter and four existing environment-cell lifecycle
-selectors for unrelated cutoffs, A→B→A/empty revisions, retry/rejection and
-cancelled current-only revocation. All99 selector names remain unchanged.
+Extend rules_cc_import_sources_need_is_opt_in_exact_table_only: body50 unchanged,
+metadata14 exact Lstat-only matrix, union112; focused exactpair FileBytes negatives
+and case/suffix/child/foreign-slot metadata lookalikes in existing both-order mixed
+loop. Preserve mode/default/sparse/wrong/restoredslot/root/namespace/operation,
+borrowed demand pointer/Local request/Weak/zero-progress controls. Digest/Link/List
+negatives retain their existing operation classification. Keep all99 selector names,
+four environment-cell lifecycle checks and source256/census257 controls.
 
-Root authors twelve current private helper counterparts, preserving historical
-helpers/captures/constants/raw output. Protocol's exact environment tuple and
-bound become14; retain full50 CC root/order/signatures before qualified8 legacy
-interface and full original workspace/Need context. Original names-only decoder,
-closed carrier and ordering stay unchanged. Canonical test construction places
-the new name before BAZEL_VC; malformed raw ordering stays rejected.
-Extend the four existing themes with exactnew/full14/mixedold admissions-as-denial
-contradictions and unknown/mixed both-order/case/suffix/count15/context negatives.
-No fake successful transcript or role-disabled checked native is created.
+Twelve fresh private helper counterparts under root integration keep historical
+helpers/constants/captures/raw output immutable. Current protocol CC_METADATA
+becomes14; full50 CC ordered root/signatures validation precedes qualified8 legacy
+interface. Lstat uses fullbody+metadata, FileBytes body50 only, other operations
+no grant. Four existing themes cover exactpair effective Lstat-denial contradictions,
+FileBytes/Digest/Link/List/case/child/root/namespace nongrants, precise metadata-minus-
+body view and fulltable/context/role qualifiers. No fabricated successful transcript,
+checked disabled-role shim, raw normalization, count-only permission or stale resolver.
+Inputs/cohort/owners/selectors/toolchain remain byteexact WP1035; 301 original
+ordered leases188+113/two64KiB/6455750physical12911500brackets,0fresh captures.
 
-## Validation and limits
+## Validation and acceptance
 
-Inherit WP1034's complete gate/resource contract. Independent DESIGN before edits;
-complete source/config/nine-role API and combined STATIC before role copies then
-sole prepare/protocol activation. Three freshly resolved pinned nightly2025-09-14
-serial compiler preparations<=60s/offline/jobs1/nine profiles, current CargoJSON
-selection and exact preflight/list;99 ordinary tests/four decoder themes/independent
-prelaunch/one changed native/audit. Join each operation before dependent work.
-Both explicit frozen next-source/evidence notes precede final-source/draft;
-actual independent FINAL precedes receipt.py, which precedes acceptance assembly.
-No new acquisition/capture/source grant/inventory/scan or old target traversal.
+Independent DESIGN before edits; complete current source/config/nine-role API,
+combined actual STATIC, review-role copies BEFORE sole two literal prepare/protocol
+activations/import/API/firstgate. Three serial freshly resolved pinned nightly2025-09-14
+preparations<=60s/offlinejobs1/nine profiles/current unique Core CargoJSON; exact
+preflight/list/99Rust/fourthemes/independent prelaunch/one changed native/audit.
+JOIN each operation. Before native, verify BOTH notes contain the complete outer+
+leaf ten-reference union: prepare/leaf/controls/supervise/protocol/design/input,
+current SOURCES0/1 and current Core. Capture actual API after current runtime
+binding; do not assume leaf's local declarations are its installed source list.
+Both frozen next notes precede root final-source/draft; actual independent FINAL
+then receipt.py before acceptance assembly/commit. Preserve failures/zero-child
+preconditions and qualified prior references, no identical failed retry or extra
+credit/reactivation. A new genuine typed boundary selects the next natural owner.
 
-Selected native256/ordinary128/probe16/production64/global257 census events and
-all byte/time/memory caps remain: work5/life8/native10/sharedcleanup3,
-RSS262144KiB/AS512MiB, registry128/default object1MiB/exact known_shas4749878,
-banks16MiB/log1each/report4/FSIZE16. Same301 ordered leases188+113 and two64KiB
-buffers; prior captures are qualified0fresh. Selector76 alone MALLOC_ARENA_MAX2;
-native environment unchanged. No forced success, identical failed retry, quota
-increase, source refund/newscope or freshness bypass. New genuine prerequisite
-is evidence for the next natural owner. Whole producer/compiler/actions/edition
-restoration/certificate/body retirement/aggregate/whole fit remain open.
+All caps unchanged: selectedsource256/ordinary128/probe16/production64/global257
+census/path1024/raw128KiB/encoded512KiB/summary1024; work5/life8/native10/sharedabsolute
+cleanup3/RSS262144KiB/AS512MiB/registry128/defaultobject1MiB/exactknown_shas4749878/
+banks16MiB/log1each/report4/FSIZE16, nineprofiles. Selector76 aloneMALLOC_ARENA_MAX2,
+native environment unchanged. Prefix fits; normal producer/compiler/actions/edition
+restoration/certificates/native body retirement/aggregate/wholegraph fit remain open.
+Goal stays active. Routine invocation/compiler corrections stay within this contract;
+another semantic owner or parity decision needs consequential review before expansion.
 
 
 ## Immediate predecessor

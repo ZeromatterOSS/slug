@@ -6408,7 +6408,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 110);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 112);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6417,6 +6417,30 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/toolchain/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/Build.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/BUILD.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/BUILD.bazel/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/private/toolchain/BUILD",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/cc/cc/toolchains/BUILD.bazel",
             PathObservationOperation::FileBytes,
