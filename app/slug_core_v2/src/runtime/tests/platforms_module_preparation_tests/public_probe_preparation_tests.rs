@@ -6836,6 +6836,15 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
 }
 #[test]
 fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
+    eprintln!(
+        "WP1044_CC_METADATA_LAYOUT metadata={} row={} literal={}",
+        std::mem::size_of_val(&RULES_CC_IMPORT_METADATA),
+        std::mem::size_of::<&str>(),
+        RULES_CC_IMPORT_METADATA[15..]
+            .iter()
+            .map(|relative| relative.len())
+            .sum::<usize>()
+    );
     let operations = [
         PathObservationOperation::Lstat,
         PathObservationOperation::FileBytes,
@@ -6903,7 +6912,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 114);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 117);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -6912,6 +6921,38 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/cc/cc/private/toolchain/test",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/toolchain/Test",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/test.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/BUILD.bazel/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/rules/cc/private/toolchain/test",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/toolchain/test/unknown.bzl",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/cc/cc/private/toolchain/BUILD.toolchains.tpl.disabled",
             PathObservationOperation::FileBytes,

@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-267-m7a-normal-rustc-cc-toolchains-package-marker-metadata-r1
+Packet: WP-7-268-m7a-normal-rustc-cc-test-package-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1043](./slug-v2-subplans/wp1043-cc-toolchains-package-marker-metadata-2026-10-09.json) accepts exact original CC BUILD.bazel Lstat-only metadata under existing
-checked generated/CC context, original full Spec/workspace/own-plan and unique current epoch.
-104 named checks and106 current passing records; native4.612179309s/209580KiB
-below256MiB. All302 source signatures remain exact. The existing64B descriptor
-and three stack slots are reused; no new retained production strings or fields.
+[WP1044](./slug-v2-subplans/wp1044-cc-test-package-metadata-2026-10-09.json) accepts three exact selected CC Host test-package Lstat metadata paths
+under the existing checked source role, with body51 unchanged. 104 named checks
+and106 current passing records; native4.631496680s/210824KiB below256MiB.
+All302 source signatures remain exact. Static metadata grows by three references
+and93 literalbytes before compiler pooling; no new retained production strings or fields.
 Borrow or transfer first; use existing scoped interners for repeated
 retained immutable strings when their lifetime and cleanup fit. Full Rustc,
 actions, certificates, producer and whole-workload fit remain open. The frozen
