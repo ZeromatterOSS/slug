@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-283-m7a-normal-rustc-shell-package-marker-metadata-r1
+Packet: WP-7-284-m7a-normal-rustc-shell-toolchains-directory-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the Bazel9.2/rules_rust0.73 fixture.
-[WP1059](./slug-v2-subplans/wp1059-shell-package-marker-metadata-2026-10-09.json) accepts exact original-root Shell
-BUILD.bazel Lstat under the existing checked generated/Shell context and unique current
-original epoch/full Spec/own-plan. Existing repo/ignore metadata is preserved independently; package body operations remain
+[WP1060](./slug-v2-subplans/wp1060-shell-toolchains-directory-metadata-2026-10-09.json) accepts exact original-root Shell
+shell/toolchains Host Lstat under the existing checked selected Shell role/root.
+Metadata17→18/body7/O7/Need25; one16B target reference and16B literal before pooling. Existing namespace marker gates and roles remain unchanged; candidates/body operations remain
 closed. All306 source signatures stay exact;104 names/106 current passing records,
-currentcapture0; native4.864315257s/210156KiB below256MiB. Reused borrowed descriptor
-and literal; zero new retained productionfields/strings/staticreferences.
+currentcapture0; native4.852880376s/209932KiB below256MiB. Reused borrowed roots/paths/static membership; zero new retained productionfields/owned strings.
+Static table target size288B; whole binary pooling unmeasured.
 Borrow or transfer first; existing scoped interners when retained lifetime and
 cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
 frozen successor notes ground the next step. Windows minimal/deferred.

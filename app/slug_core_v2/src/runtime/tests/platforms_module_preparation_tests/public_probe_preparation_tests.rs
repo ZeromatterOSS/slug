@@ -7879,6 +7879,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/repositories/BUILD.bazel",
         "/shell/shell/private/repositories/BUILD",
         "/shell/shell/private/repositories/sh_config.bzl",
+        "/shell/shell/toolchains",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -7930,9 +7931,39 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 24);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 25);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
+        (
+            "/shell/shell/toolchains",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/toolchains",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/shell/shell/toolchains",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/shell/shell/Toolchains", PathObservationOperation::Lstat),
+        (
+            "/shell/shell/toolchains.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/toolchains/child",
+            PathObservationOperation::Lstat,
+        ),
+        ("/cc/shell/toolchains", PathObservationOperation::Lstat),
+        (
+            "/shell/shell/toolchains/BUILD.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/toolchains/BUILD",
+            PathObservationOperation::Lstat,
+        ),
         (
             "/shell/shell/private/repositories/sh_config.bzl.disabled",
             PathObservationOperation::FileBytes,
