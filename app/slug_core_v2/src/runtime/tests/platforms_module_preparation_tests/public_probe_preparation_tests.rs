@@ -299,7 +299,8 @@ fn namespace_policy(
         if files.iter().any(|file| relative == Path::new(file.0)) {
             "fixed_file"
         } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
-            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
             && bodies.repo_marker_metadata
             && relative == Path::new("REPO.bazel")
         {
@@ -1586,7 +1587,8 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    matches!(owner, 3 | 4) && index != 1
+                    (matches!(owner, 3 | 4)
+                        || (owner == 5 && path == "/generation/REPO.bazel")) && index != 1
                 );
             }
             if owner == 4 {
@@ -2728,6 +2730,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation/BUILD",
             "/parent/generation/BUILD.bazel",
             "/parent/generation/REPO.bazel",
+            "/parent/generation/repo.bazel",
+            "/parent/generation/REPO.bazel.bak",
+            "/parent/generation/REPO.bazel/child",
             "/parent/generation/.bazelignore",
             "/parent/generation/BUILD/child",
             "/other/BUILD",
@@ -2748,7 +2753,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/",
                             "/parent",
                             "/parent/generation",
-                            "/parent/generation/BUILD"
+                            "/parent/generation/BUILD",
+                            "/parent/generation/REPO.bazel"
                         ]
                         .contains(&p))
                         || (op == PathObservationOperation::FileBytes
@@ -2761,8 +2767,11 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             PathObservationOperation::FileBytes,
         );
         let features = SourcePreparationNeeds::repository(namespace_test_request(&bodies, false));
+        let marker = need("/parent/generation/REPO.bazel", PathObservationOperation::Lstat);
         let own = valid
             .try_union(&leaf)
+            .unwrap()
+            .try_union(&marker)
             .unwrap()
             .try_union(&features)
             .unwrap();
@@ -2799,6 +2808,21 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         ];
         for unavailable in &unavailable_epochs {
             assert!(admit(&leaf, unavailable.as_ref()).is_err());
+            assert!(admit(&marker, unavailable.as_ref()).is_err());
+        }
+        let original_marker = marker.path_observations().unwrap().demands().first().unwrap();
+        for enabled in [false, true] {
+            let mut configured = namespace_test_bodies()
+                .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+                .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+            configured.repo_marker_metadata = enabled;
+            for (e, own_plan) in [(Some(&epoch), true), (unavailable_epochs[3].as_ref(), false)] {
+                let policy = namespace_policy(&configured, original_marker, e, &matches);
+                assert_eq!(policy.path_class, if enabled { "repo_marker" } else { "other" });
+                assert_eq!(policy.owner_plan_allowed, own_plan);
+                assert_eq!(policy.admits(&PathObservationOperation::Lstat), enabled && own_plan);
+                assert!(!policy.admits(&PathObservationOperation::FileBytes));
+            }
         }
         for namespace in [
             PathObservationNamespace::Host,
