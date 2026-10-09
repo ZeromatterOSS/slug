@@ -315,7 +315,8 @@ fn namespace_policy(
         {
             "ignore_marker"
         } else if (std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
-            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..])
+            || std::ptr::eq(files, &GENERATED_SHELL_CONFIG_FILES[..]))
             && relative == Path::new("BUILD.bazel")
         {
             "package_marker"
@@ -1803,7 +1804,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&candidate.operation()),
-                    matches!(owner, 4 | 5) && index != 1
+                    matches!(owner, 4 | 5 | 6) && index != 1
                 );
             }
             if index == 0 {
@@ -3035,11 +3036,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent/generation/BUILD",
                             "/parent/generation/REPO.bazel",
                             "/parent/generation/.bazelignore",
+                            "/parent/generation/BUILD.bazel",
                         ]
                         .contains(&p))
-                        || (!shell
-                            && op == PathObservationOperation::Lstat
-                            && p == "/parent/generation/BUILD.bazel")
                         || (op == PathObservationOperation::FileBytes
                             && p == "/parent/generation/BUILD")
                 );
@@ -3068,6 +3067,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 .try_union(&marker)
                 .unwrap()
                 .try_union(&ignore)
+                .unwrap()
+                .try_union(&candidate)
                 .unwrap()
                 .try_union(&features)
                 .unwrap()
@@ -3171,7 +3172,6 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
-                        let enabled = enabled && (!shell || class != "package_marker");
                         assert_eq!(policy.path_class, if enabled { class } else { "other" });
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
@@ -3179,11 +3179,11 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             enabled && own_plan
                         );
                         assert!(!policy.admits(&PathObservationOperation::FileBytes));
-                        if shell && class != "package_marker" {
-                            let marker_need = if class == "repo_marker" {
-                                &marker
-                            } else {
-                                &ignore
+                        if shell {
+                            let marker_need = match class {
+                                "repo_marker" => &marker,
+                                "ignore_marker" => &ignore,
+                                _ => &candidate,
                             };
                             for mixed in [
                                 valid.try_union(marker_need).unwrap(),
@@ -3252,7 +3252,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 PathObservationOperation::Lstat,
             ),
         ];
-        for bad in bad.iter().chain([&candidate].into_iter().filter(|_| shell)) {
+        for bad in &bad {
             for mixed in [own.try_union(bad).unwrap(), bad.try_union(&own).unwrap()] {
                 let mut progress = 0;
                 if admit(&mixed, Some(&epoch)).is_ok() {
