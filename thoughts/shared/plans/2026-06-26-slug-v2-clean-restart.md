@@ -34,14 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-265-m7a-normal-rustc-cc-toolchains-repo-marker-metadata-r1
+Packet: WP-7-266-m7a-normal-rustc-cc-toolchains-ignore-marker-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1041](./slug-v2-subplans/wp1041-cc-toolchains-repo-marker-metadata-2026-10-09.json) accepts exact original CC REPO.bazel Lstat-only metadata under the checked
-repo role, original full Spec/workspace/own-plan and unique current epoch.
-104 named checks and106 current passing records; native4.557886576s/209556KiB
+[WP1042](./slug-v2-subplans/wp1042-cc-toolchains-ignore-marker-metadata-2026-10-09.json) accepts exact original CC .bazelignore Lstat-only metadata under the independent
+checked ignore role, original full Spec/workspace/own-plan and unique current epoch.
+104 named checks and106 current passing records; native4.516260351s/210044KiB
 below256MiB. All302 source signatures remain exact. The existing64B descriptor
 and three stack slots are reused; no new retained production strings or fields.
 Borrow or transfer first; use existing scoped interners for repeated

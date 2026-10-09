@@ -306,7 +306,8 @@ fn namespace_policy(
         {
             "repo_marker"
         } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
-            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
+            || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..]))
             && bodies.ignore_file_bytes
             && relative == Path::new(".bazelignore")
         {
@@ -1587,8 +1588,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    (matches!(owner, 3 | 4)
-                        || (owner == 5 && path == "/generation/REPO.bazel")) && index != 1
+                    matches!(owner, 3 | 4 | 5) && index != 1
                 );
             }
             if owner == 4 {
@@ -2692,7 +2692,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             } else {
                 builder
                     .push_archive(
-                        Arc::from([compact_str::CompactString::new("https://example.invalid/a.tar.xz")]),
+                        Arc::from([compact_str::CompactString::new(
+                            "https://example.invalid/a.tar.xz",
+                        )]),
                         [0; 32],
                         "prefix".into(),
                     )
@@ -2704,19 +2706,22 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         let epoch =
             namespace_test_epoch_at(&bodies, [original.clone()], instance, "/parent/generation");
         let need = |p, op| {
-            SourcePreparationNeeds::path(NeedPathObservations::singleton(
-                match op {
-                    PathObservationOperation::WindowsLongPath =>
-                        PathObservationDemand::windows_long_path(path(p), Arc::from([b'x' as u16])),
-                    PathObservationOperation::WindowsOptionPathLongName =>
-                        PathObservationDemand::windows_option_path_long_name(path(p), Arc::from([b'x' as u16])),
-                    _ => PathObservationDemand::new(
-                        PathObservationNamespace::Materialization(instance),
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(match op {
+                PathObservationOperation::WindowsLongPath => {
+                    PathObservationDemand::windows_long_path(path(p), Arc::from([b'x' as u16]))
+                }
+                PathObservationOperation::WindowsOptionPathLongName => {
+                    PathObservationDemand::windows_option_path_long_name(
                         path(p),
-                        op,
-                    ),
-                },
-            ))
+                        Arc::from([b'x' as u16]),
+                    )
+                }
+                _ => PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(instance),
+                    path(p),
+                    op,
+                ),
+            }))
         };
         let admit = |n: &SourcePreparationNeeds, e| {
             bodies.admit_with_matchers(n, &matches, &|d| {
@@ -2734,6 +2739,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             "/parent/generation/REPO.bazel.bak",
             "/parent/generation/REPO.bazel/child",
             "/parent/generation/.bazelignore",
+            "/parent/generation/.BAZELIGNORE",
+            "/parent/generation/.bazelignore.bak",
+            "/parent/generation/.bazelignore/child",
             "/parent/generation/BUILD/child",
             "/other/BUILD",
         ] {
@@ -2754,7 +2762,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent",
                             "/parent/generation",
                             "/parent/generation/BUILD",
-                            "/parent/generation/REPO.bazel"
+                            "/parent/generation/REPO.bazel",
+                            "/parent/generation/.bazelignore"
                         ]
                         .contains(&p))
                         || (op == PathObservationOperation::FileBytes
@@ -2767,11 +2776,20 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             PathObservationOperation::FileBytes,
         );
         let features = SourcePreparationNeeds::repository(namespace_test_request(&bodies, false));
-        let marker = need("/parent/generation/REPO.bazel", PathObservationOperation::Lstat);
+        let marker = need(
+            "/parent/generation/REPO.bazel",
+            PathObservationOperation::Lstat,
+        );
+        let ignore = need(
+            "/parent/generation/.bazelignore",
+            PathObservationOperation::Lstat,
+        );
         let own = valid
             .try_union(&leaf)
             .unwrap()
             .try_union(&marker)
+            .unwrap()
+            .try_union(&ignore)
             .unwrap()
             .try_union(&features)
             .unwrap();
@@ -2809,19 +2827,51 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         for unavailable in &unavailable_epochs {
             assert!(admit(&leaf, unavailable.as_ref()).is_err());
             assert!(admit(&marker, unavailable.as_ref()).is_err());
+            assert!(admit(&ignore, unavailable.as_ref()).is_err());
         }
-        let original_marker = marker.path_observations().unwrap().demands().first().unwrap();
-        for enabled in [false, true] {
-            let mut configured = namespace_test_bodies()
-                .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-                .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-            configured.repo_marker_metadata = enabled;
-            for (e, own_plan) in [(Some(&epoch), true), (unavailable_epochs[3].as_ref(), false)] {
-                let policy = namespace_policy(&configured, original_marker, e, &matches);
-                assert_eq!(policy.path_class, if enabled { "repo_marker" } else { "other" });
-                assert_eq!(policy.owner_plan_allowed, own_plan);
-                assert_eq!(policy.admits(&PathObservationOperation::Lstat), enabled && own_plan);
-                assert!(!policy.admits(&PathObservationOperation::FileBytes));
+        let original_marker = marker
+            .path_observations()
+            .unwrap()
+            .demands()
+            .first()
+            .unwrap();
+        let original_ignore = ignore
+            .path_observations()
+            .unwrap()
+            .demands()
+            .first()
+            .unwrap();
+        for repo_enabled in [false, true] {
+            for ignore_enabled in [false, true] {
+                let mut configured = namespace_test_bodies()
+                    .with_repo_marker_metadata(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    )
+                    .with_ignore_file_bytes(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    );
+                configured.repo_marker_metadata = repo_enabled;
+                configured.ignore_file_bytes = ignore_enabled;
+                for (e, own_plan) in [
+                    (Some(&epoch), true),
+                    (unavailable_epochs[3].as_ref(), false),
+                ] {
+                    for (demand, enabled, class) in [
+                        (original_marker, repo_enabled, "repo_marker"),
+                        (original_ignore, ignore_enabled, "ignore_marker"),
+                    ] {
+                        let policy = namespace_policy(&configured, demand, e, &matches);
+                        assert_eq!(policy.path_class, if enabled { class } else { "other" });
+                        assert_eq!(policy.owner_plan_allowed, own_plan);
+                        assert_eq!(
+                            policy.admits(&PathObservationOperation::Lstat),
+                            enabled && own_plan
+                        );
+                        assert!(!policy.admits(&PathObservationOperation::FileBytes));
+                    }
+                }
             }
         }
         for namespace in [
