@@ -7440,6 +7440,15 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     assert!(weak.upgrade().is_none());
 }
 pub(super) fn rules_shell_import_sources_matrix() {
+    eprintln!(
+        "WP1048_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
+        std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
+        std::mem::size_of::<&str>(),
+        RULES_SHELL_IMPORT_METADATA[9..]
+            .iter()
+            .map(|relative| relative.len())
+            .sum::<usize>()
+    );
     for (name, selected) in RULES_SHELL_IMPORT_METADATA.into_iter().zip([
         "/shell/shell",
         "/shell/shell/BUILD.bazel",
@@ -7450,6 +7459,9 @@ pub(super) fn rules_shell_import_sources_matrix() {
         "/shell/shell/private/BUILD",
         "/shell/shell/private/sh_binary.bzl",
         "/shell/shell/private/sh_executable.bzl",
+        "/shell/shell/private/extensions",
+        "/shell/shell/private/extensions/BUILD.bazel",
+        "/shell/shell/private/extensions/BUILD",
     ]) {
         let operations = [
             PathObservationOperation::Lstat,
@@ -7501,9 +7513,45 @@ pub(super) fn rules_shell_import_sources_matrix() {
         }))
         .reduce(|a, b| a.try_union(&b).unwrap())
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 14);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 17);
     assert!(bodies.admit(&allowed).is_ok());
     for (p, operation) in [
+        (
+            "/shell/shell/private/extensions",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/extensions/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/extensions/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/shell/shell/private/Extensions",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/shell/private/extensions",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/shell/shell/private/extensions",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/shell/shell/private/extensions/BUILD.bazel",
+            PathObservationOperation::FileDigest,
+        ),
         (
             "/shell/shell/BUILD.bazel",
             PathObservationOperation::FileBytes,
@@ -7572,6 +7620,8 @@ pub(super) fn rules_shell_import_sources_matrix() {
     let mut wrong_slot = make();
     wrong_slot.additional[3] = wrong_slot.additional[4].take();
     assert!(wrong_slot.admit(&allowed).is_err());
+    wrong_slot.additional[4] = wrong_slot.additional[3].take();
+    assert!(wrong_slot.admit(&allowed).is_ok());
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "unknown+", "/shell")).clone(),
     );
