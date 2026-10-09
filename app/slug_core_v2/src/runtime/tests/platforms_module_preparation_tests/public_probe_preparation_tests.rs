@@ -4097,11 +4097,27 @@ const GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
+    let shell_owner = (
+        "rules_shell++sh_configure+local_config_shell",
+        "@@rules_shell+//shell/private/repositories:sh_config.bzl",
+        "sh_config",
+    );
+    eprintln!(
+        "WP1055_SHELL_DIAGNOSTIC_LAYOUT owner={} row={} literal={}",
+        std::mem::size_of::<(&str, &str, &str, &str, &str)>(),
+        std::mem::size_of::<&str>(),
+        shell_owner.0.len()
+            + "rules_shell+".len()
+            + "shell/private/repositories".len()
+            + "sh_config.bzl".len()
+            + shell_owner.2.len(),
+    );
     for (owner, &(canonical, defining_label, rule_name)) in GENERATED_DIAGNOSTIC_TEST_OWNERS
         .iter()
         .chain(std::iter::once(
             &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
         ))
+        .chain(std::iter::once(&shell_owner))
         .enumerate()
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
@@ -4137,6 +4153,12 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             .with_fourth(path("/features"))
             .with_fifth(path("/skylib"))
             .with_sixth(path("/cc"))
+            .with_seventh(path("/license"))
+            .with_eighth(path("/shell"))
+            .with_rules_shell_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_bazel_features_import_sources(
                 RegistryChoice::PreparedFile,
@@ -4156,9 +4178,16 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             );
         assert!(enabled.rules_rust_defs_import_sources);
         assert!(enabled.rules_cc_import_sources);
+        assert!(enabled.rules_shell_import_sources);
+        assert!(enabled.additional[4].is_some());
+        assert!(enabled.generated_features_file_effects);
+        assert!(!bodies.rules_shell_import_sources);
+        assert!(!bodies.generated_features_file_effects);
         // The permissive phase seam still requires the complete typed owner and source roles.
         let permissive = enabled.admit_with_plan_matcher(&needs, &|_, _| true);
-        if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() {
+        if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len()
+            || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 1
+        {
             assert_eq!(permissive.unwrap_err().family, "materialization");
             assert_eq!(
                 enabled.first_denied_materialization(&needs).unwrap().1,
@@ -4298,6 +4327,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             .chain(std::iter::once(
                 &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
             ))
+            .chain(std::iter::once(&shell_owner))
         {
             if other_canonical == canonical {
                 continue;
@@ -4449,12 +4479,17 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
 #[test]
 fn generated_plan_refusal_projection_is_bounded() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
-    for &(canonical, defining_label, rule_name) in
-        GENERATED_DIAGNOSTIC_TEST_OWNERS
-            .iter()
-            .chain(std::iter::once(
-                &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
-            ))
+    let shell_owner = (
+        "rules_shell++sh_configure+local_config_shell",
+        "@@rules_shell+//shell/private/repositories:sh_config.bzl",
+        "sh_config",
+    );
+    for &(canonical, defining_label, rule_name) in GENERATED_DIAGNOSTIC_TEST_OWNERS
+        .iter()
+        .chain(std::iter::once(
+            &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
+        ))
+        .chain(std::iter::once(&shell_owner))
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);

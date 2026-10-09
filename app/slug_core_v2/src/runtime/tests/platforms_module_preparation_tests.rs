@@ -1097,6 +1097,12 @@ impl Bodies {
                 "cc/private/toolchain",
                 "cc_configure.bzl",
                 "cc_autoconf_toolchains"
+            ) | (
+                "rules_shell++sh_configure+local_config_shell",
+                "rules_shell+",
+                "shell/private/repositories",
+                "sh_config.bzl",
+                "sh_config"
             )
         );
         if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {

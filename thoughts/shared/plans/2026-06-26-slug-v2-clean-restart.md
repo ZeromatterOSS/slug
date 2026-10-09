@@ -34,21 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-278-m7a-normal-rustc-shell-environment-readiness-r1
+Packet: WP-7-279-m7a-normal-rustc-shell-generated-plan-diagnostic-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the Bazel9.2/rules_rust0.73 fixture.
-[WP1054](./slug-v2-subplans/wp1054-shell-environment-readiness-2026-10-09.json) accepts finite Shell BAZEL_SH/PATH/WINDIR
-environment snapshot readiness under the
-existing checked Shell role, CC14 independent, whole-Need every-name guards. All306 ordered body
-signatures and CC53/19/120 remain exact.104 named checks and106 native passing records; no current capture;
-native4.636438696s/210896KiB below256MiB. Three static references add48bytes
-and18 name literal bytes before compiler pooling; no new retained production strings or fields.
-Borrow or transfer first; use existing scoped interners for repeated
-retained immutable strings when their lifetime and cleanup fit. Full Rustc,
-actions, certificates, producer and whole-workload fit remain open. The frozen
-successor notes ground the next observed boundary. Windows remains minimal/deferred.
+[WP1055](./slug-v2-subplans/wp1055-shell-generated-plan-diagnostic-2026-10-09.json) accepts the bounded borrowed original Shell
+generated-plan diagnostic for the exact observed tuple/workspace/first offender.
+Functional and namespace policies remain unchanged. All306 source signatures
+stay exact;104 named checks/106 passing native records/currentcapture0;
+native4.686929152s/210260KiB below256MiB. Five-&str type witness80bytes,
+104 tuple literal bytes before pooling, no retained descriptor table/owned strings/fields.
+Borrow or transfer first; scoped interners for retained immutable repetition
+when lifetime/cleanup fit. Full Rustc/actions/certificates/producer/wholefit
+remain open; frozen successor notes ground the next step. Windows minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
