@@ -34,13 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-261-m7a-normal-rustc-cc-template-metadata-r1
-Status: Exact template metadata accepted; next finite source prerequisite under selection
+Packet: WP-7-262-m7a-normal-rustc-cc-template-byte-source-r1
+Status: Exact template byte source accepted; next original CC toolchain plan under selection
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues the normal
 retained Slug Rustc producer on the same Bazel9.2/rules_rust0.73 fixture. Memory
-remains within the256MiB child budget; next resolve its exact CC package-marker
-metadata prerequisite through the existing owner. Broader producer gates stay open.
+remains within the256MiB child budget for the measured prefix; next observe and
+admit the exact CC template byte prerequisite through its existing owner. Broader
+producer gates and whole-workload memory fit stay open.
 [WP1035](./slug-v2-subplans/wp1035-cc-detection-environment-readiness-2026-10-09.json) accepts the
 exact CC detection environment name through the existing finite14-name fixture
 policy and immutable tracked snapshot/cells. Original role/mode/slot/workspace/
