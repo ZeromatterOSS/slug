@@ -155,6 +155,30 @@ impl<'a> SourceAttemptContext<'a> {
         result
     }
 
+    pub(super) fn report_charge(
+        &self,
+        scope: &super::dice::source_service::SourceServiceScope,
+        demand: &PathObservationDemand,
+        record: super::dice::source_service::SourceChargeRecord,
+    ) {
+        use super::dice::source_service::SourceChargeIdentity;
+        scope.report_source_charge_for_test(
+            record,
+            self.charge_phase(),
+            SourceChargeIdentity::Demand(demand),
+        );
+    }
+
+    pub(super) fn charge_phase(&self) -> super::dice::source_service::SourceChargePhase {
+        use super::dice::source_service::SourceChargePhase;
+        match self.phase {
+            SourceAttemptPhase::CommandPreflight => SourceChargePhase::CommandPreflight,
+            SourceAttemptPhase::NeedPaths => SourceChargePhase::NeedPaths,
+            SourceAttemptPhase::CertificatePrecheck => SourceChargePhase::CertificatePrecheck,
+            SourceAttemptPhase::CertificateFinalize => SourceChargePhase::CertificateFinalize,
+        }
+    }
+
     pub(super) fn report(&self, demand: &PathObservationDemand) {
         if demand.operation() != PathObservationOperation::FileBytes
             || matches!(demand.namespace(), PathObservationNamespace::Materialization(id) if id.value() == 0)

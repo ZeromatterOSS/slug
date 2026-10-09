@@ -198,14 +198,17 @@ fn source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal()
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 
     let healthy = scope(&root);
-    let observed = observe_native_scoped_with_charge_origin(
+    let disabled_events = Cell::new(0);
+    let observed = observe_native_scoped_with_charge_census(
         &directory,
         [],
         [absent.clone()],
         Some(&healthy),
         &mut |_| calls.set(calls.get() + 1),
+        &mut |_, _, _| disabled_events.set(disabled_events.get() + 1),
     )
     .unwrap();
+    assert_eq!(disabled_events.get(), 0);
     assert_eq!(
         observed.get(&absent).unwrap().as_ref(),
         &PathObservationResult::FileBytes(PathOperationResult::Missing)
@@ -217,7 +220,7 @@ fn source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal()
         observe_native_scoped_with_charge_origin(
             &directory,
             [],
-            [absent],
+            [absent.clone()],
             Some(&healthy),
             &mut |_| calls.set(calls.get() + 1),
         ),
@@ -226,6 +229,77 @@ fn source_attempt_callback_preserves_whole_set_first_origin_and_sticky_refusal()
         ))
     );
     assert_eq!(calls.get(), 1);
+
+    let work = Instant::now() + Duration::from_secs(2);
+    let census = SourceServiceScope::new_for_test_with_source_charge_census(
+        root,
+        work,
+        work + Duration::from_secs(1),
+        SourceServiceLimits {
+            source_attempts: 1,
+            ..SourceServiceLimits::default()
+        },
+        None,
+    )
+    .unwrap();
+    let events = Cell::new(0);
+    let unknown = PathObservationDemand::new(
+        PathObservationNamespace::Materialization(PathObservationInstanceId::new(9)),
+        absent.path().clone(),
+        PathObservationOperation::Lstat,
+    );
+    assert!(matches!(
+        observe_native_scoped_with_charge_census(
+            &directory,
+            [],
+            [absent.clone(), unknown],
+            Some(&census),
+            &mut |_| {},
+            &mut |_, _, _| events.set(events.get() + 1),
+        ),
+        Err(PathObservationKernelError::UnknownDemandInstance(_))
+    ));
+    assert_eq!(census.snapshot().source_attempts, 0);
+    for expected in 1..=2 {
+        let result = observe_native_scoped_with_charge_census(
+            &directory,
+            [],
+            [absent.clone()],
+            Some(&census),
+            &mut |_| {},
+            &mut |scope, original, record| {
+                assert_eq!(
+                    original.path().as_path().as_os_str().as_bytes().as_ptr(),
+                    original_path
+                );
+                assert_eq!(original, &absent);
+                assert_eq!(scope.snapshot().source_attempts, 1);
+                assert_eq!(record.first_created, expected == 2);
+                assert_eq!(
+                    (record.event, record.before, record.after),
+                    (expected, if expected == 1 { 0 } else { 1 }, 1)
+                );
+                events.set(events.get() + 1);
+                report_unassociated_charge(scope, original, record);
+            },
+        );
+        if expected == 1 {
+            assert_eq!(
+                result.unwrap().get(&absent).unwrap().as_ref(),
+                &PathObservationResult::FileBytes(PathOperationResult::Missing)
+            );
+        } else {
+            assert_eq!(
+                result,
+                Err(PathObservationKernelError::SourceService(
+                    SourceServiceError::Limit(SourceCounter::SourceAttempts)
+                ))
+            );
+        }
+    }
+    assert_eq!(events.get(), 2);
+    assert_eq!(census.snapshot().decoded_bytes, 0);
+    assert!(!absent.path().as_path().exists());
 }
 
 #[test]

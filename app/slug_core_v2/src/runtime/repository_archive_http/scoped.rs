@@ -2,8 +2,36 @@
 use super::*;
 use crate::runtime::dice::source_service::SourceBufferSite;
 use crate::runtime::dice::source_service::SourceBufferUnit;
+#[cfg(all(test, target_os = "linux"))]
+use crate::runtime::dice::source_service::SourceChargeDomain;
+#[cfg(all(test, target_os = "linux"))]
+use crate::runtime::dice::source_service::SourceChargeIdentity;
+#[cfg(all(test, target_os = "linux"))]
+use crate::runtime::dice::source_service::SourceChargePhase;
 use crate::runtime::dice::source_service::SourceHttpAdmission;
 use crate::runtime::dice::source_service::request_scoped;
+
+fn charge_archive(
+    scope: &SourceServiceScope,
+    #[cfg(all(test, target_os = "linux"))] domain: SourceChargeDomain,
+) -> Result<(), source_service::SourceServiceError> {
+    #[cfg(all(test, target_os = "linux"))]
+    {
+        let (result, record) = scope.charge_source_with_record_for_test(1, domain);
+        if let Some(record) = record {
+            scope.report_source_charge_for_test(
+                record,
+                SourceChargePhase::Unassociated,
+                SourceChargeIdentity::Anonymous,
+            );
+        }
+        result
+    }
+    #[cfg(not(all(test, target_os = "linux")))]
+    {
+        scope.charge(SourceCounter::SourceAttempts, 1)
+    }
+}
 
 pub(super) fn transfer_selected_capture(
     mut capture: tempfile::NamedTempFile,
@@ -136,9 +164,12 @@ pub(super) fn capture_one(
         .get(..5)
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case("file:"))
     {
-        scope
-            .charge(SourceCounter::SourceAttempts, 1)
-            .map_err(|e| e.to_string())?;
+        charge_archive(
+            scope,
+            #[cfg(all(test, target_os = "linux"))]
+            SourceChargeDomain::ArchiveFile,
+        )
+        .map_err(|e| e.to_string())?;
         let capture =
             tempfile::NamedTempFile::new().map_err(|_| "creating source capture failed")?;
         let capture = super::super::repository_archive_file::capture_file(
@@ -155,18 +186,24 @@ pub(super) fn capture_one(
     }
     let mut url = url::Url::parse(original).map_err(|_| "invalid source URL")?;
     validate_https(&url)?;
-    scope
-        .charge(SourceCounter::SourceAttempts, 1)
-        .map_err(|e| e.to_string())?;
+    charge_archive(
+        scope,
+        #[cfg(all(test, target_os = "linux"))]
+        SourceChargeDomain::ArchiveHttps,
+    )
+    .map_err(|e| e.to_string())?;
     let mut capture =
         tempfile::NamedTempFile::new().map_err(|_| "creating source capture failed")?;
     for redirect in 0..=MAX_REDIRECTS {
         live()?;
         validate_https(&url)?;
         if redirect != 0 {
-            scope
-                .charge(SourceCounter::SourceAttempts, 1)
-                .map_err(|e| e.to_string())?;
+            charge_archive(
+                scope,
+                #[cfg(all(test, target_os = "linux"))]
+                SourceChargeDomain::ArchiveRedirect,
+            )
+            .map_err(|e| e.to_string())?;
         }
         let mut response =
             runtime.block_on(request_scoped(scope, &url, SourceHttpAdmission::Archive))?;

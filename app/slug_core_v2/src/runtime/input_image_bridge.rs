@@ -378,10 +378,11 @@ pub(in crate::runtime::dice) fn observe_image_rows(
                 Some(&command.repository_results),
             );
             materializer
-                .observe_native_with_charge_origin(
+                .observe_native_with_charge_census(
                     command.repository_session,
                     legacy,
                     &mut |demand| context.report(demand),
+                    &mut |scope, demand, record| context.report_charge(scope, demand, record),
                 )
                 .map_err(NativeDemandSessionError::Repository)?
         };

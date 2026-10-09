@@ -122,6 +122,75 @@ fn scoped_native_origin_callback_runs_outside_session_lock_before_postcheck() {
     ).is_err());
     assert_eq!(calls.get(), 1);
     assert_eq!(fresh.snapshot().source_attempts, 0);
+
+    // Enabled reporting borrows both owners and observes the same original error.
+    let work = Instant::now() + Duration::from_secs(2);
+    let census = SourceServiceScope::new_for_test_with_source_charge_census(
+        materializer.workspace().clone(),
+        work,
+        work + Duration::from_secs(1),
+        SourceServiceLimits {
+            source_attempts: 1,
+            ..SourceServiceLimits::default()
+        },
+        None,
+    )
+    .unwrap();
+    let counted =
+        RepositoryMaterializer::new_scoped(materializer.workspace().clone(), census.clone())
+            .unwrap();
+    let token = begin_empty(&counted);
+    let first = Cell::new(0);
+    let events = Cell::new(0);
+    for expected in 1..=2 {
+        let observed = counted.observe_native_with_charge_census(
+            token,
+            [demand.clone()],
+            &mut |_| first.set(first.get() + 1),
+            &mut |scope, original, record| {
+                assert!(std::ptr::eq(scope, census.as_ref()));
+                assert_eq!(original, &demand);
+                assert_eq!(
+                    original.path().as_path().as_os_str().as_bytes().as_ptr(),
+                    demand.path().as_path().as_os_str().as_bytes().as_ptr()
+                );
+                assert!(counted.session_is_active(token));
+                assert_eq!(scope.snapshot().source_attempts, 1);
+                assert_eq!(record.first_created, expected == 2);
+                assert_eq!(
+                    (record.event, record.before, record.after),
+                    (expected, if expected == 1 { 0 } else { 1 }, 1)
+                );
+                events.set(events.get() + 1);
+                super::super::path_observation::report_unassociated_charge(scope, original, record);
+            },
+        );
+        if expected == 1 {
+            assert!(matches!(observed.unwrap().get(&demand).unwrap().as_ref(),
+                PathObservationResult::FileBytes(PathOperationResult::Present(body)) if body.as_ref() == b"abc"));
+        } else {
+            assert_eq!(
+                observed,
+                Err(RepositorySessionError::SourceService(
+                    SourceServiceError::Limit(SourceCounter::SourceAttempts)
+                ))
+            );
+        }
+    }
+    assert_eq!((events.get(), first.get()), (2, 1));
+    assert_eq!(census.snapshot().decoded_bytes, 3);
+    assert!(
+        counted
+            .observe_native_with_charge_census(
+                token,
+                [demand],
+                &mut |_| first.set(first.get() + 1),
+                &mut |_, _, _| events.set(events.get() + 1)
+            )
+            .is_err()
+    );
+    assert_eq!((events.get(), first.get()), (2, 1));
+    counted.discard(token).unwrap();
 }
 
 #[test]

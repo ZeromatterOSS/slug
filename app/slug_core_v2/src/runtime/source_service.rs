@@ -18,6 +18,9 @@ mod registry_association;
 mod regular_file;
 #[path = "source_service/scope.rs"]
 mod scope;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_service/source_charge_census.rs"]
+mod source_charge_census;
 #[cfg(test)]
 #[path = "source_service/tests.rs"]
 mod tests;
@@ -58,12 +61,22 @@ pub(in crate::runtime) use regular_file::read_host_file;
 pub(in crate::runtime) use regular_file::read_host_file_with_charge_origin;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance_and_census;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
 pub(in crate::runtime) use scope::SourceServiceCounters;
 pub(in crate::runtime) use scope::SourceServiceError;
 pub(in crate::runtime) use scope::SourceServiceLimits;
 pub(in crate::runtime) use scope::SourceServiceScope;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use source_charge_census::SourceChargeDomain;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use source_charge_census::SourceChargeIdentity;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use source_charge_census::SourceChargePhase;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use source_charge_census::SourceChargeRecord;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use timeout_provenance::SourceTimeoutDomain;
 #[cfg(all(test, target_os = "linux"))]

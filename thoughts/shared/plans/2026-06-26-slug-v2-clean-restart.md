@@ -34,32 +34,36 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-256-m7a-normal-rustc-skylib-unittest-imports-readiness-r1
-Status: Accepted finite Skylib unittest imports readiness; next natural-owner decision selected
+Packet: WP-7-257-m7a-normal-rustc-source-charge-provenance-r1
+Status: Accepted bounded source charge provenance; next finite workload contract selected
 
 The [current manifest](./slug-v2-subplans/current-packet.md) moves toward a normal
 retained Slug Rustc producer using the unchanged Bazel9.2/rules_rust0.73 public
 probe fixture and existing Spawn view/query APIs. First prove exact offline source,
 generated mapping and provider readiness, then normal configured action ownership.
-[WP1032](./slug-v2-subplans/wp1032-skylib-unittest-imports-readiness-2026-10-08.json) accepts four original
-Skylib source bodies: lib/new_sets.bzl6359,partial5587,types3820,dicts2410. Two strict
-captures/4decisions/4usable18176B/passNone/zeroTests; one direct literal frontier exhausted.
-Existing defaultfalse PreparedFile AND PublicProbe/additional[1]/borrowedroot/wholeNeed:
-body7→11/meta10 unchanged/O2/Need30. Both old absent primaryBUILD.bazelFileBytesclosed.
-Full11 signatures/order/root before actual immutable qualified4then3 interfaces/freshprivate
-metadata tuple; no recursive grants/sourcecertificate/caller/provider inference.
-Core98/fourthemes/native1/independentFINAL:103names/105nativegates+2capture=107current
-passingrecords/no supervised failure, superseded record, runtime retry/reactivation/stalepin/oldexe/capraise. One separate post-FINAL root Path conversion error before tracked writes/zero children was preserved and corrected; no runtime evidence changed. Complete
-roleAPI before firstprep and receipt summary after actualFINAL before acceptance assembly.
-Native4.927827092s/208604KiB<262144/direct1037/audit1050; Source128/decoded
-6209675/ErrorSome(Limit(SourceAttempts)). Actual typed refusal/phase preserved in receipt;
-Source128 fixed, no closure/futurefit claim or quota reset. Physical297prefix+4END→301188+113/
-6455750physical12911500brackets/two64KiB. Source30net/twelvehelpers24net,
-all98/fourpolicies exact/config solebindingarrayappend. Static64descriptor+57literal spelling
-bytes before compilerlayout/dedup; no newnative retainedString/path/Vec/Arc/request/Spec/plan
-copies/fields/cache/interner/pool. Borrow/transferstorage; scopedinterners for retainedrepetition
-fitting lifetime/cleanup. Current bounded prefixfits; fullproducer/compiler/actions/Rustc/
-editionrestoration/certificates/nativeheapWeak/aggregate/wholegraphfitopen. Windows deferred.
+[WP1033](./slug-v2-subplans/wp1033-source-charge-provenance-2026-10-09.json) accepts a default-off
+cfgtest-Linux source charge census. All129 actual debits retain original FileBytes
+identity/NeedPaths phase/domainHost:123Host and6Materialization namespace tuples,
+128 admitted plus first refused;129 distinct tuples, no repeats.
+Same-mutex Copy outcome/ordinal and synchronous borrowed reporting preserve charge/error,
+DICE/epoch/certificate freshness and permissions. Accounting/identity complete,0loss,
+26456raw/81927encoded bytes inside unchanged128KiBraw/512KiBstream bounds. Recurrence repair,
+necessity, successfulIO or certificate are not inferred. Native4.334242525s/
+211688KiB<262144, Source128/decoded6209675/refusedlib/types.bzl;
+public repository native_refusal, no actions/Rustc. Current memory prefix fits; full producer,
+compiler, edition restoration, aggregate/wholegraph fit and native heap retirement remain open.
+Current99Core/fourthemes/native1=104names/106passingrecords/independentFINAL; one failedcompile
+and supersededdependency preserved0credit, two root preconditions0children; freshcorrected
+three compilerpreps, strict pins/direct1051/union1064, no reactivation/stale resolver/retry.
+ActualSTATIC reassessed1512net/privatecohesiveformatter and +120Bcfgtestscope/state; no new
+runtime diagnostic ownedstrings/paths/heapcontainer/callback/globalinterner/lock, production
+layout unchanged. Borrow/transfer and scopedinterners for retained repetition with matching
+semantic lifetime/cleanup. Stable301leases188+113/two64KiB/6455750physical12911500brackets;
+prior27captures81decisions70observations0fresh. All caps retained: memory256MiB/AS512MiB,
+work5/life8/native10/sharedcleanup3/source128/default16/production64/bytebanks16MiB.
+Windows deferred. [Frozen next-source](../../../target/wp1033/next-source.md) and
+[next-evidence](../../../target/wp1033/next-evidence.md) select a separately reviewed finite
+fixture-workload source contract, with no number/grant/activation selected by this acceptance.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

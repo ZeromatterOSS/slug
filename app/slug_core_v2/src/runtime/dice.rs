@@ -1237,8 +1237,9 @@ impl NativeCommandCompletionContext<'_, '_> {
                         let context = super::source_attempt_context::SourceAttemptContext::certificate_precheck(
                             materializer.workspace(), Some(self.selected_repository_results),
                         );
-                        materializer.observe_native_with_charge_origin(
+                        materializer.observe_native_with_charge_census(
                             self.command.repository_session, demands, &mut |demand| context.report(demand),
+                            &mut |scope, demand, record| context.report_charge(scope, demand, record),
                         ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
                     }
                     #[cfg(not(all(test, target_os = "linux")))]
@@ -6592,8 +6593,9 @@ impl WorkspaceRuntime {
                                             let context = super::source_attempt_context::SourceAttemptContext::certificate_finalize(
                                                 self.repository_materializer.workspace(), Some(&prepared.snapshot.repository_results),
                                             );
-                                            self.repository_materializer.observe_native_with_charge_origin(
+                                            self.repository_materializer.observe_native_with_charge_census(
                                                 repository_session, demands, &mut |demand| context.report(demand),
+                            &mut |scope, demand, record| context.report_charge(scope, demand, record),
                                             ).map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
                                         }
                                         #[cfg(not(all(test, target_os = "linux")))]

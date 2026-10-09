@@ -2982,14 +2982,16 @@ fn observe_native_command(
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
     let limits = bodies.source_limits(registry_choice);
-    let scope = bodies
-        .source_scope(
-            workspace.clone(),
-            start + Duration::from_secs(5),
-            start + Duration::from_secs(8),
-            limits,
-        )
-        .unwrap();
+    let scope = SourceServiceScope::new_for_test_with_source_charge_census(
+        workspace.clone(),
+        start + Duration::from_secs(5),
+        start + Duration::from_secs(8),
+        limits,
+        bodies
+            .rules_rust_defs_import_sources
+            .then(|| bodies.roots[1].dupe()),
+    )
+    .unwrap();
     let allowance = scope.known_shas_allowance_for_test();
     assert_eq!(allowance.is_some(), bodies.rules_rust_defs_import_sources);
     if let Some((selected_root, _)) = allowance {
@@ -3376,6 +3378,7 @@ fn observe_native_command(
         assert_eq!(image.logical_bytes_used(), 0);
         assert_eq!(scratch.payload_budget().used_bytes(), 0);
     }
+    scope.report_source_charge_summary_for_test();
     drop(scope);
     while scope_weak.upgrade().is_some() && Instant::now() < deadline {
         thread::sleep(Duration::from_millis(1));

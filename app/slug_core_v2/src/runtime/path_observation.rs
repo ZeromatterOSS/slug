@@ -43,8 +43,31 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WindowsOptionPathLongNameOutcome;
 
+#[cfg(all(test, target_os = "linux"))]
+use super::dice::source_service::SourceChargeIdentity;
+#[cfg(all(test, target_os = "linux"))]
+use super::dice::source_service::SourceChargePhase;
+#[cfg(all(test, target_os = "linux"))]
+use super::dice::source_service::SourceChargeRecord;
 use super::dice::source_service::SourceServiceError;
 use super::dice::source_service::SourceServiceScope;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) type SourceChargeCallback<'a> =
+    dyn FnMut(&SourceServiceScope, &PathObservationDemand, SourceChargeRecord) + 'a;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn report_unassociated_charge(
+    scope: &SourceServiceScope,
+    demand: &PathObservationDemand,
+    record: SourceChargeRecord,
+) {
+    scope.report_source_charge_for_test(
+        record,
+        SourceChargePhase::Unassociated,
+        SourceChargeIdentity::Demand(demand),
+    );
+}
 
 #[derive(Debug, PartialEq, Eq, Allocative)]
 struct RetainedMaterializationRoot {
@@ -116,6 +139,7 @@ pub(super) fn observe_native_scoped<T>(
                 &mut UnixPathObservationAdapter,
                 scope,
                 &mut |_| {},
+                &mut report_unassociated_charge,
             )
         }
         #[cfg(not(all(test, target_os = "linux")))]
@@ -137,6 +161,25 @@ pub(super) fn observe_native_scoped_with_charge_origin<T>(
     scope: Option<&Arc<SourceServiceScope>>,
     on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
+    observe_native_scoped_with_charge_census(
+        owner,
+        roots,
+        demands,
+        scope,
+        on_first_refusal,
+        &mut report_unassociated_charge,
+    )
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn observe_native_scoped_with_charge_census<T>(
+    owner: &T,
+    roots: impl IntoIterator<Item = (PathObservationInstanceId, NormalizedAbsolutePath)>,
+    demands: impl IntoIterator<Item = PathObservationDemand>,
+    scope: Option<&Arc<SourceServiceScope>>,
+    on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
+    on_charge: &mut SourceChargeCallback<'_>,
+) -> Result<PathObservationEpoch, PathObservationKernelError> {
     if scope.is_none() {
         return observe_native(owner, roots, demands);
     }
@@ -147,6 +190,7 @@ pub(super) fn observe_native_scoped_with_charge_origin<T>(
         &mut UnixPathObservationAdapter,
         scope,
         on_first_refusal,
+        on_charge,
     )
 }
 
@@ -223,7 +267,14 @@ fn observe_with(
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
     #[cfg(all(test, target_os = "linux"))]
     {
-        observe_with_scoped(retained, demands, operations, None, &mut |_| {})
+        observe_with_scoped(
+            retained,
+            demands,
+            operations,
+            None,
+            &mut |_| {},
+            &mut report_unassociated_charge,
+        )
     }
     #[cfg(not(all(test, target_os = "linux")))]
     {
@@ -237,6 +288,7 @@ fn observe_with_scoped(
     operations: &mut impl ObservationOperations,
     scope: Option<&Arc<SourceServiceScope>>,
     #[cfg(all(test, target_os = "linux"))] on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
+    #[cfg(all(test, target_os = "linux"))] on_charge: &mut SourceChargeCallback<'_>,
 ) -> Result<PathObservationEpoch, PathObservationKernelError> {
     let mut demands = demands.into_iter().collect::<Vec<_>>();
     demands.sort_unstable();
@@ -300,7 +352,7 @@ fn observe_with_scoped(
                 Some(scope) => {
                     #[cfg(all(test, target_os = "linux"))]
                     {
-                        scoped_file_bytes(&demand, operations, scope, on_first_refusal)?
+                        scoped_file_bytes(&demand, operations, scope, on_first_refusal, on_charge)?
                     }
                     #[cfg(not(all(test, target_os = "linux")))]
                     {
@@ -331,6 +383,7 @@ fn scoped_file_bytes(
     operations: &mut impl ObservationOperations,
     scope: &Arc<SourceServiceScope>,
     #[cfg(test)] on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
+    #[cfg(test)] on_charge: &mut SourceChargeCallback<'_>,
 ) -> Result<PathObservationResult, PathObservationKernelError> {
     use super::dice::source_service::RegularFileError;
     #[cfg(not(test))]
@@ -338,13 +391,14 @@ fn scoped_file_bytes(
 
     let path = demand.path();
     #[cfg(test)]
-    let read = super::dice::source_service::read_host_file_with_known_shas_allowance(
+    let read = super::dice::source_service::read_host_file_with_known_shas_allowance_and_census(
         scope,
         demand,
         || {
             source_attempt_diagnostic::report(demand);
             on_first_refusal(demand);
         },
+        |record| on_charge(scope, demand, record),
     );
     #[cfg(not(test))]
     let read = read_host_file(scope, path.as_path());

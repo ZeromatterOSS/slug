@@ -177,8 +177,15 @@ pub(in crate::runtime) fn read_host_file(
     scope: &Arc<SourceServiceScope>,
     path: &Path,
 ) -> Result<Arc<[u8]>, RegularFileError> {
-    scope.charge(SourceCounter::SourceAttempts, 1)?;
-    read_regular(scope, path, ReadPolicy::Host)
+    #[cfg(all(test, target_os = "linux"))]
+    {
+        return read_host_with_charge_origin(scope, path, ReadPolicy::Host, || {});
+    }
+    #[cfg(not(all(test, target_os = "linux")))]
+    {
+        scope.charge(SourceCounter::SourceAttempts, 1)?;
+        read_regular(scope, path, ReadPolicy::Host)
+    }
 }
 
 #[cfg(all(test, target_os = "linux"))]
@@ -211,7 +218,49 @@ fn read_host_with_charge_origin(
     policy: ReadPolicy,
     on_first_refusal: impl FnOnce(),
 ) -> Result<Arc<[u8]>, RegularFileError> {
-    let (admission, created) = scope.charge_source_attempt_with_origin();
+    read_host_with_census(scope, path, policy, on_first_refusal, |record| {
+        scope.report_source_charge_for_test(
+            record,
+            super::SourceChargePhase::Unassociated,
+            super::SourceChargeIdentity::HostPath(path),
+        );
+    })
+}
+
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) fn read_host_file_with_known_shas_allowance_and_census(
+    scope: &Arc<SourceServiceScope>,
+    demand: &slug_workspace_v2::PathObservationDemand,
+    on_first_refusal: impl FnOnce(),
+    on_charge: impl FnMut(super::SourceChargeRecord),
+) -> Result<Arc<[u8]>, RegularFileError> {
+    let policy = if scope.known_shas_object_bytes_for_test(demand).is_some() {
+        ReadPolicy::KnownShas
+    } else {
+        ReadPolicy::Host
+    };
+    read_host_with_census(
+        scope,
+        demand.path().as_path(),
+        policy,
+        on_first_refusal,
+        on_charge,
+    )
+}
+
+#[cfg(all(test, target_os = "linux"))]
+fn read_host_with_census(
+    scope: &Arc<SourceServiceScope>,
+    path: &Path,
+    policy: ReadPolicy,
+    on_first_refusal: impl FnOnce(),
+    mut on_charge: impl FnMut(super::SourceChargeRecord),
+) -> Result<Arc<[u8]>, RegularFileError> {
+    let (admission, created, record) =
+        scope.charge_source_with_origin_record_for_test(1, super::SourceChargeDomain::Host);
+    if let Some(record) = record {
+        on_charge(record);
+    }
     if let Err(error) = admission {
         if created {
             on_first_refusal();

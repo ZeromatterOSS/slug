@@ -42,6 +42,19 @@ fn source_attempt_context_preserves_current_owner_phase_and_bounds() {
             "selected_finalization",
         ),
     ] {
+        use crate::runtime::dice::source_service::SourceChargePhase;
+        assert!(matches!(
+            (phase, context.charge_phase()),
+            ("need_paths", SourceChargePhase::NeedPaths)
+                | (
+                    "certificate_precheck",
+                    SourceChargePhase::CertificatePrecheck
+                )
+                | (
+                    "certificate_finalize",
+                    SourceChargePhase::CertificateFinalize
+                )
+        ));
         let diagnostic = context.diagnostic(&demand);
         assert!(std::ptr::eq(diagnostic.demand, &demand));
         assert_eq!(
@@ -72,6 +85,10 @@ fn source_attempt_context_preserves_current_owner_phase_and_bounds() {
         );
         assert!(owner_line.len() <= MATERIALIZATION_MARKER_BYTES);
     }
+    assert!(matches!(
+        SourceAttemptContext::command_preflight(workspace).charge_phase(),
+        crate::runtime::dice::source_service::SourceChargePhase::CommandPreflight
+    ));
     let context = SourceAttemptContext::need_paths(workspace, Some(&epoch));
     for (path, association, relation) in [
         ("/generation", "unique", "root"),

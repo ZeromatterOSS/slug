@@ -179,6 +179,8 @@ struct ScopeState {
     timeout: SourceTimeoutState,
     #[cfg(all(test, target_os = "linux"))]
     buffer: SourceBufferState,
+    #[cfg(all(test, target_os = "linux"))]
+    census: Option<super::source_charge_census::CensusState>,
 }
 
 pub(in crate::runtime) struct SourceServiceScope {
@@ -247,6 +249,24 @@ impl SourceServiceScope {
         Arc::get_mut(&mut scope)
             .expect("new source scope is uniquely owned")
             .known_shas_root = Some(selected_rules_rust_root);
+        Ok(scope)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn new_for_test_with_source_charge_census(
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+        known_shas_root: Option<NormalizedAbsolutePath>,
+    ) -> Result<Arc<Self>, SourceServiceError> {
+        let mut scope = Self::new(workspace, work_deadline, cleanup_deadline, limits)?;
+        let owned = Arc::get_mut(&mut scope).expect("new source scope is uniquely owned");
+        owned.known_shas_root = known_shas_root;
+        owned
+            .state
+            .get_mut()
+            .unwrap_or_else(|e| e.into_inner())
+            .census = Some(Default::default());
         Ok(scope)
     }
     #[cfg(all(test, target_os = "linux"))]
@@ -440,19 +460,137 @@ impl SourceServiceScope {
         counter: SourceCounter,
         amount: u64,
     ) -> Result<(), SourceServiceError> {
+        #[cfg(all(test, target_os = "linux"))]
+        if counter == SourceCounter::SourceAttempts {
+            let (result, record) = self.charge_source_with_record_for_test(
+                amount,
+                super::SourceChargeDomain::Unassociated,
+            );
+            if let Some(record) = record {
+                self.report_source_charge_for_test(
+                    record,
+                    super::SourceChargePhase::Unassociated,
+                    super::SourceChargeIdentity::Anonymous,
+                );
+            }
+            return result;
+        }
         let mut state = self.state();
         self.charge_locked(&mut state, counter, amount)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn charge_source_with_origin_record_for_test(
+        &self,
+        amount: u64,
+        domain: super::SourceChargeDomain,
+    ) -> (
+        Result<(), SourceServiceError>,
+        bool,
+        Option<super::SourceChargeRecord>,
+    ) {
+        let mut state = self.state();
+        let unpoisoned = state.first.is_none();
+        let before = state.counters.source_attempts;
+        let result = self.charge_locked(&mut state, SourceCounter::SourceAttempts, amount);
+        let created =
+            unpoisoned && result == Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+        let after = state.counters.source_attempts;
+        let record = state
+            .census
+            .as_mut()
+            .and_then(|c| c.record(amount, domain, before, after, result, created));
+        (result, created, record)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn charge_source_with_record_for_test(
+        &self,
+        amount: u64,
+        domain: super::SourceChargeDomain,
+    ) -> (
+        Result<(), SourceServiceError>,
+        Option<super::SourceChargeRecord>,
+    ) {
+        let (result, _, record) = self.charge_source_with_origin_record_for_test(amount, domain);
+        (result, record)
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) fn charge_source_attempt_with_origin(
         &self,
     ) -> (Result<(), SourceServiceError>, bool) {
-        let mut state = self.state();
-        let unpoisoned = state.first.is_none();
-        let result = self.charge_locked(&mut state, SourceCounter::SourceAttempts, 1);
-        let created =
-            unpoisoned && result == Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+        let (result, created, record) = self
+            .charge_source_with_origin_record_for_test(1, super::SourceChargeDomain::Unassociated);
+        if let Some(record) = record {
+            self.report_source_charge_for_test(
+                record,
+                super::SourceChargePhase::Unassociated,
+                super::SourceChargeIdentity::Anonymous,
+            );
+        }
         (result, created)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn report_source_charge_for_test(
+        &self,
+        record: super::SourceChargeRecord,
+        phase: super::SourceChargePhase,
+        identity: super::SourceChargeIdentity<'_>,
+    ) {
+        use std::io::Write;
+
+        use super::source_charge_census::Row;
+        use super::source_charge_census::encoded_len;
+        if self.state().census.is_none() {
+            return;
+        }
+        let row = Row::new(record, phase, identity);
+        let Ok(bytes) = encoded_len(&row) else {
+            if let Some(census) = self.state().census.as_mut() {
+                census.encoding_failed(true);
+            }
+            return;
+        };
+        {
+            let mut state = self.state();
+            let Some(census) = state.census.as_mut() else {
+                return;
+            };
+            if !census.reserve(&row, bytes) {
+                return;
+            }
+        }
+        // Only the existing stdout framing lock is held while borrowed bytes stream.
+        let success = std::io::stdout()
+            .lock()
+            .write_fmt(format_args!("{row}"))
+            .is_ok();
+        if let Some(census) = self.state().census.as_mut() {
+            census.finish(&row, bytes, success);
+        }
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn report_source_charge_summary_for_test(&self) {
+        use std::io::Write;
+        let summary = {
+            let state = self.state();
+            let Some(census) = state.census.as_ref() else {
+                return;
+            };
+            census
+                .summary(self.limits.source_attempts, state.counters.source_attempts)
+                .including_summary()
+        };
+        // A missing/partial summary is invalid evidence; never alter source errors.
+        let success = summary.is_ok_and(|summary| {
+            std::io::stdout()
+                .lock()
+                .write_fmt(format_args!("{summary}"))
+                .is_ok()
+        });
+        if !success {
+            if let Some(census) = self.state().census.as_mut() {
+                census.encoding_failed(false);
+            }
+        }
     }
     fn charge_locked(
         &self,
@@ -782,3 +920,34 @@ impl Drop for SourceBufferReservation {
 #[cfg(all(test, target_os = "linux"))]
 #[path = "source_attempt_origin_tests.rs"]
 mod source_attempt_origin_tests;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(super) fn census_layout_for_test() -> (usize, usize, usize, usize) {
+    // Test-only mirrors of the immediately preceding field lists, not runtime owners.
+    #[allow(dead_code)]
+    struct PriorState {
+        counters: SourceServiceCounters,
+        first: Option<SourceServiceError>,
+        closed: bool,
+        timeout: SourceTimeoutState,
+        buffer: SourceBufferState,
+    }
+    #[allow(dead_code)]
+    struct PriorScope {
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+        cancelled: tokio::sync::watch::Sender<bool>,
+        state: Mutex<PriorState>,
+        registry_association:
+            std::sync::OnceLock<std::sync::Weak<super::RegistryRequestAssociation>>,
+        known_shas_root: Option<NormalizedAbsolutePath>,
+    }
+    (
+        std::mem::size_of::<PriorState>(),
+        std::mem::size_of::<ScopeState>(),
+        std::mem::size_of::<PriorScope>(),
+        std::mem::size_of::<SourceServiceScope>(),
+    )
+}

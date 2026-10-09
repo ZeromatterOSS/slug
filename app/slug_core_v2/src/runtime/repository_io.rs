@@ -430,12 +430,13 @@ impl RepositoryMaterializer {
                     super::source_attempt_context::SourceAttemptContext::command_preflight(
                         &self.workspace,
                     );
-                super::path_observation::observe_native_scoped_with_charge_origin(
+                super::path_observation::observe_native_scoped_with_charge_census(
                     &root_owners,
                     roots,
                     demands,
                     self.source_scope.as_ref(),
                     &mut |demand| context.report(demand),
+                    &mut |scope, demand, record| context.report_charge(scope, demand, record),
                 )
             }
             #[cfg(not(all(test, target_os = "linux")))]
@@ -972,7 +973,12 @@ impl RepositoryMaterializer {
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
         #[cfg(all(test, target_os = "linux"))]
         {
-            self.observe_native_impl(token, demands, &mut |_| {})
+            self.observe_native_impl(
+                token,
+                demands,
+                &mut |_| {},
+                &mut super::path_observation::report_unassociated_charge,
+            )
         }
         #[cfg(not(all(test, target_os = "linux")))]
         {
@@ -987,7 +993,23 @@ impl RepositoryMaterializer {
         demands: impl IntoIterator<Item = PathObservationDemand>,
         on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
-        self.observe_native_impl(token, demands, on_first_refusal)
+        self.observe_native_impl(
+            token,
+            demands,
+            on_first_refusal,
+            &mut super::path_observation::report_unassociated_charge,
+        )
+    }
+
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn observe_native_with_charge_census(
+        &self,
+        token: RepositorySessionToken,
+        demands: impl IntoIterator<Item = PathObservationDemand>,
+        on_first_refusal: &mut dyn FnMut(&PathObservationDemand),
+        on_charge: &mut super::path_observation::SourceChargeCallback<'_>,
+    ) -> Result<PathObservationEpoch, RepositorySessionError> {
+        self.observe_native_impl(token, demands, on_first_refusal, on_charge)
     }
 
     fn observe_native_impl(
@@ -997,6 +1019,8 @@ impl RepositoryMaterializer {
         #[cfg(all(test, target_os = "linux"))] on_first_refusal: &mut dyn FnMut(
             &PathObservationDemand,
         ),
+        #[cfg(all(test, target_os = "linux"))]
+        on_charge: &mut super::path_observation::SourceChargeCallback<'_>,
     ) -> Result<PathObservationEpoch, RepositorySessionError> {
         self.check_source_scope(self.source_scope.as_ref())?;
         let root_owners = {
@@ -1020,12 +1044,13 @@ impl RepositoryMaterializer {
         };
         let roots = normalize_retained_roots(&root_owners)?;
         #[cfg(all(test, target_os = "linux"))]
-        let observed = super::path_observation::observe_native_scoped_with_charge_origin(
+        let observed = super::path_observation::observe_native_scoped_with_charge_census(
             &root_owners,
             roots,
             demands,
             self.source_scope.as_ref(),
             on_first_refusal,
+            on_charge,
         )
         .map_err(native_observation_error);
         #[cfg(not(all(test, target_os = "linux")))]
