@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-287-m7a-normal-rustc-apple-setup-source-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-setup-internal-source-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1063](./slug-v2-subplans/wp1063-apple-setup-source-2026-10-09.json) accepts only exact original-root Apple
-Support crosstool/setup.bzl Host Lstat+FileBytes under its checked cfgtest source role.
-Metadata1/body1/ownNeed2; new borrowed reference16B/literal19B and cfgtestBoolean1 before
+[WP1064](./slug-v2-subplans/wp1064-apple-setup-internal-source-2026-10-09.json) accepts only exact original-root Apple
+Support crosstool/setup_internal.bzl Host Lstat+FileBytes under its checked cfgtest source role.
+Metadata2/body2/ownNeed4; new borrowed reference16B/literal28B and existing cfgtestBoolean with0 growth before
 padding. Actual Bodies size/alignment recorded, padding delta unassigned.
-Old307 source signatures exactprefix+632BEND/308;Shell19/8 unchanged;104 names/106native records,
-currentcapture1/raw0tests/107allphase;priorWP1062 initial4 qualifiedhistorical0fresh; native4.881663669s/209968KiB below256MiB. No newownedproductionstrings.
+Old308 source signatures exactprefix+3139BEND/309;Shell19/8 unchanged;104 names/106native records,
+currentcapture1/raw0tests/107allphase;priorWP1062 initial4 qualifiedhistorical0fresh; native4.947932743s/209836KiB below256MiB. No newownedproductionstrings.
 Borrow or transfer first; existing scoped interners when retained lifetime and
 cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
 frozen successor notes ground the next step. Windows minimal/deferred.
