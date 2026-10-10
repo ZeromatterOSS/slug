@@ -34,20 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-312-m7a-original-progress-need-projection-r1
-Status: accepted —45 ordinary/production/ONE native/FINAL ACCEPT; next owner selection underway
+Packet: WP-7-313-m7a-extension-definition-frontier-r1
+Status: accepted — 51 focused proofs, production check, ONE native and independent FINAL ACCEPT
 
-The [current manifest](./slug-v2-subplans/current-packet.md) and
-[WP1100 receipt](./slug-v2-subplans/wp1100-original-progress-need-projection-2026-10-10.json)
-accept the bounded borrowed original retry diagnostic. ONE native stayed at
-225.77MiB supervisor/226.61MiB phase peak under256, with the same WorkDeadline7:296
-and source252/root333. The original queued work is Lstat `/`, Materialization13,
-current generated `rules_java++toolchains+local_jdk` owner header at attempt333.
-FullSpec/sourceidentity/options and preceding CPUcause remain unavailable. Next
-match its existing full request, source policy and normal producer continuation;
-no new authority from projected headers. Allocation borrowing/sharing discipline,
-original caps, Linux priority and minimal/deferred Windows persist. Full producer/
-time/wholefit/certificates/Rustc/actions/bootstrap open; goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepted compatible
+missing-input batching across independent observed extension-definition rows.
+Borrowed module carriers and attempt-local Need unions add no persistent string
+storage. Fresh51 proofs and production checks pass; independent FINAL reviews
+accept the [receipt](./slug-v2-subplans/wp1101-extension-definition-frontier-2026-10-10.json).
+The original native prefix peaks at227.863MiB under256, but producer completion
+remains at WorkDeadline7 with source252/root333 and the same queued local_jdk
+Lstat. No native timing, frequency, advancement or whole-workload fit is proved.
+Next is the reviewed distinct Bzlmod/Core opt1 build-readiness experiment under
+unchanged sources/admission/caps. Linux priority and minimal Windows persist.
 
 ### Ready and blocked queue
 
@@ -71,9 +70,9 @@ review. The one opt-in 30-second F3 proof was independently reviewed, ran once
 and is closed without success. Compile/preparation remains separate and must
 be split or checked in smaller units when necessary. An unattributed timeout
 is not a semantic failure.
-Cumulative path-epoch fanout remains a separate measured concern: the recorded
-retry 116 recomputed 109 path keys and checked 163 module/192 registry keys.
-It is not evidence of a semantic loop or authority for checkout-wide replay.
+Historical retry116 global path-epoch fanout predates current per-demand inputs.
+It is not current invalidation or CPU evidence; existing exact-cell tests cover
+unrelated publication cutoff, revocation and restoration.
 
 ## Non-Negotiables
 

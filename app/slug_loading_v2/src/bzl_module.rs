@@ -3781,11 +3781,15 @@ async fn drive_loaded_extension_definitions(
     drop(requests_result);
 
     let mut definitions = Vec::new();
+    let mut needs = None;
     for request in requests.parts().1 {
         let (label, export, _, _) = request.parts();
         let target = match RootPackageBzlTarget::parse(label.target().as_str()) {
             Ok(target) => target,
             Err(error) => {
+                if let Some(need) = needs.take() {
+                    return SourcePreparationOutcome::Need(need);
+                }
                 return loaded_extension_definitions_driver_complete(
                     Err(HostLoadedModuleExtensionDefinitionsError::Request {
                         requests: requests.clone(),
@@ -3808,6 +3812,18 @@ async fn drive_loaded_extension_definitions(
                     SourcePreparationOutcome::Complete(Err(error))
                 }
             };
+        // Preserve the prefix observation owner: the finisher consumes it.
+        let child = match child {
+            SourcePreparationOutcome::Need(need)
+                if matches!(mode, LoadedModuleExtensionDefinitionsMode::Observed) =>
+            {
+                if try_accumulate_external_bzl_need(&mut needs, need).is_err() {
+                    return SourcePreparationOutcome::Need(needs.take().unwrap());
+                }
+                continue;
+            }
+            child => child,
+        };
         let (module_result, merged) = match finish_loaded_extension_definition_observed_child(
             &requests,
             request,
@@ -3818,10 +3834,13 @@ async fn drive_loaded_extension_definitions(
             Err(terminal) => return terminal,
         };
         observations = merged;
-        let module = match module_result {
+        let module = match &module_result {
             DefinitionBzlModuleCarrier::Root(result) => match result.as_ref() {
-                Ok(module) => module.clone(),
+                Ok(module) => module,
                 Err(error) => {
+                    if let Some(need) = needs.take() {
+                        return SourcePreparationOutcome::Need(need);
+                    }
                     return loaded_extension_definitions_driver_complete(
                         Err(HostLoadedModuleExtensionDefinitionsError::Request {
                             requests: requests.clone(),
@@ -3836,8 +3855,11 @@ async fn drive_loaded_extension_definitions(
                 }
             },
             DefinitionBzlModuleCarrier::Selected(result) => match result.as_ref() {
-                Ok(module) => module.clone(),
+                Ok(module) => module,
                 Err(error) => {
+                    if let Some(need) = needs.take() {
+                        return SourcePreparationOutcome::Need(need);
+                    }
                     return loaded_extension_definitions_driver_complete(
                         Err(HostLoadedModuleExtensionDefinitionsError::Request {
                             requests: requests.clone(),
@@ -3855,6 +3877,9 @@ async fn drive_loaded_extension_definitions(
         let exported = match module.module.get_assigned(export) {
             Ok((value, _visibility)) => value,
             Err(error) => {
+                if let Some(need) = needs.take() {
+                    return SourcePreparationOutcome::Need(need);
+                }
                 return loaded_extension_definitions_driver_complete(
                     Err(HostLoadedModuleExtensionDefinitionsError::Request {
                         requests: requests.clone(),
@@ -3872,6 +3897,9 @@ async fn drive_loaded_extension_definitions(
         let exported = match exported.downcast::<FrozenModuleExtensionDefinition>() {
             Ok(value) => value,
             Err(_) => {
+                if let Some(need) = needs.take() {
+                    return SourcePreparationOutcome::Need(need);
+                }
                 return loaded_extension_definitions_driver_complete(
                     Err(HostLoadedModuleExtensionDefinitionsError::Request {
                         requests: requests.clone(),
@@ -3885,11 +3913,16 @@ async fn drive_loaded_extension_definitions(
                 );
             }
         };
-        definitions.push(HostLoadedModuleExtensionDefinition {
-            request: request.clone(),
-            manifest: module.manifest.clone(),
-            definition: exported.projection(),
-        });
+        if needs.is_none() {
+            definitions.push(HostLoadedModuleExtensionDefinition {
+                request: request.clone(),
+                manifest: module.manifest.clone(),
+                definition: exported.projection(),
+            });
+        }
+    }
+    if let Some(need) = needs {
+        return SourcePreparationOutcome::Need(need);
     }
     loaded_extension_definitions_driver_complete(
         Ok(HostLoadedModuleExtensionDefinitions {
@@ -8332,6 +8365,7 @@ pub(crate) mod local_extension_definition_tests;
 
 #[cfg(test)]
 mod module_extension_definition_loading_tests {
+    mod frontier_tests;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
     use std::hash::Hasher;

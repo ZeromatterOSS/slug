@@ -1,0 +1,190 @@
+{
+  "packet": "WP-7-313-m7a-extension-definition-frontier-r1",
+  "baseline": "852bf47ea46f2ddeb356ea6aad43e5b3aefdb547",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "compatibility": {
+    "successful_definitions": "existing exact ordering/errors/identity/observations/events unchanged",
+    "need_scheduling": "Slug-native observed-only compatible frontier batching",
+    "windows": "deferred"
+  },
+  "outcome": "Independent observed extension definitions request compatible missing inputs together; legacy remains serial. Original earlier semantic errors stop later probes; later semantic errors defer behind earlier Need; observed outer errors remain immediate; conflicts return original accumulated Need. No parent completion/preparation/invocation until sources settle.",
+  "allocation": "Borrow existing module carrier; no new String/cache/interner/key/retained field. Original typed Need unions are attempt scratch, with unchanged scoped owners and cleanup.",
+  "changes": {
+    "new_proof_lines_raw": 202,
+    "new_proof_lines_formatted": 369,
+    "qualification": "same cohesive producer loop; private child reuses existing real-DICE fixture.167 formatting expansion reassessed, no copied harness/adjacent cleanup. Parent counts include one test-child registration line.",
+    "parent_added": 42,
+    "parent_removed": 8
+  },
+  "focused": {
+    "selected": 51,
+    "passed": 51,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.3351677400059998,
+        "operation_sha256": "6800cc047a3f5a7cc7f350ddf3ca676f229d4ae8ce9d5053902a9ee4fdc39ff6"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.12444409902673215,
+        "operation_sha256": "80919d26110b0e7487bbed014602c5c69ce6385d810673a26807c21f56179078"
+      },
+      "core": {
+        "selected": 18,
+        "passed": 18,
+        "elapsed_seconds": 0.24646888801362365,
+        "operation_sha256": "5e2b413b2fc52d1b824846d652d16fe689c87b7e04268c13218bda9f75a31f09"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at original profiles. Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "compile-loading": {
+      "seconds": 16.68952003598679,
+      "operation_sha256": "d086c744037fa9d523fd4bc70769609de3bc65b2b8e6ba181adc73b2fc0bd88e",
+      "qualification": "separate60s preparation; RSS uncapped and no workload memory credit"
+    },
+    "compile-bzlmod": {
+      "seconds": 4.692228917963803,
+      "operation_sha256": "e540916cf6b81fb3097c99c153163a3235df9ccb8872c3a6fd450ecfa729c38c",
+      "qualification": "separate60s preparation; RSS uncapped and no workload memory credit"
+    },
+    "compile-core": {
+      "seconds": 20.544503109995276,
+      "operation_sha256": "e2f3e191e0f832367c9b5c8907efb517478f4aa803e2ebf7e30470b3c5ce35bf",
+      "qualification": "separate60s preparation; RSS uncapped and no workload memory credit"
+    },
+    "production-check": {
+      "seconds": 9.580659491941333,
+      "operation_sha256": "fc955be0fe7dbffdcbcb5196e5765ee7a014b34e16866f1af2dfa84d56e205bf",
+      "qualification": "separate60s preparation; RSS uncapped and no workload memory credit"
+    }
+  },
+  "native": {
+    "operation_sha256": "873275215662d6ca861b4dc7615490f8f001f08896fab0f5b1042f0dd1095437",
+    "stdout_sha256": "5e067672a344752a95d05e956a0ef4ecf1c520aaeae5156ad518bd6cc8a77abd",
+    "config_sha256": "f7af6b37a0cbc639281cbdf3bca6b3db4642b94fa17c044a338f262fd45a494e",
+    "elapsed_seconds": 7.787214497104287,
+    "selected": 1,
+    "passed": 1,
+    "supervisor_rss_kib": 232608,
+    "rusage_peak_kib": 232608,
+    "phase_rss_kib": {
+      "after_runtime": 41264,
+      "after_command": 233332,
+      "after_terminal_drop": 233332,
+      "after_runtime_drop": 233332,
+      "after_scope_drop": 231276
+    },
+    "phase_peak_mib": 227.86328125,
+    "held_fds": 350,
+    "environment_rows": 18,
+    "actual_stable_pins": 133,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "observer_status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 333,
+        "wall_ns": 182360276,
+        "process_cpu_ns": 182476049,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 333,
+        "wall_ns": 6884093587,
+        "process_cpu_ns": 6898199789,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 332,
+        "wall_ns": 182726759,
+        "process_cpu_ns": 182288468,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 333,
+        "wall_ns": 15090817,
+        "process_cpu_ns": 21206571,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "terminal": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+    "timeout": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+    "outstanding": {
+      "attempt": 333,
+      "operation": "Lstat",
+      "raw_path_hex": "2f",
+      "namespace": "Materialization13",
+      "lookup": "current unique",
+      "owner_header": "generated_file_effects rules_java++toolchains+local_jdk / @@rules_java+//toolchains:local_java_repository.bzl / _local_java_repository_rule",
+      "full_spec": "unavailable",
+      "source_identity": "unavailable",
+      "request_options": "unavailable"
+    },
+    "progress_marker_sha256": "bebf0f6150533971b1f8281d7d0d5b52d0b978a9fae49a6315099176996cf5b5",
+    "claim_limit": "Same WorkDeadline pre-batch caller7:296/source252/root333. No proven current native frequency, timing improvement, preceding CPU cause, full producer/certificate/actions/Rustc/wholeworkloadfit. WP938_SCOPE235521 is registry bytes, neverRSS. source_weak_seen=false makes source retirement vacuous; scope/recorder Weak retirement is narrow. Charge accounting_complete=true/identity_complete=false, anonymous archive rows/charge-before-completion caveats persist."
+  },
+  "source_freeze": {
+    "path": "target/wp1101/source-freeze.json",
+    "sha256": "39ee820818f9fe5909aba55c096719bbbd5d9768ef3de36b0ee70968dab2bd1e",
+    "authorities": 36,
+    "metadata": 8
+  },
+  "reviews": {
+    "frontier-design-review.md": {
+      "path": "target/wp1101/frontier-design-review.md",
+      "sha256": "0913537d1592e7a123db72714e5a35730bfc53fae079c84f28dad839ee8a0f66"
+    },
+    "source-review.md": {
+      "path": "target/wp1101/source-review.md",
+      "sha256": "acaca13806ee323c09657a32be697d93e4c52db142805a6e8b094c7c1f28067c"
+    },
+    "helper-review.md": {
+      "path": "target/wp1101/helper-review.md",
+      "sha256": "29fa24fd166b703d1d856deaab291613cb08e189d36c3411ec40717143e16eff"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1101/prelaunch-evidence.md",
+      "sha256": "e6b1c2e8335d0bff92a3aff5eccb8d6878718369a03fd5620ef448dad959867a"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1101/root-prelaunch.md",
+      "sha256": "7b2f3c84c618dd03298debb35ac53091beb2a02200b7204fd71ad57fd039bc82"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1101/final-source-review.md",
+      "sha256": "65ed8c8eb38803c514c930f07008697afaa9b7e5b2dfca19b1ab28ed1fe1e2bd",
+      "verdict": "ACCEPT"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1101/final-evidence-review.md",
+      "sha256": "854cb5185fdf06000580292d3c9c168f09c5e45c791c8b58540b160d8211721a",
+      "verdict": "ACCEPT"
+    }
+  },
+  "corrections": "No Rust implementation/gate correction. Pre-gate helper stream authentication added after review. Archive shell script invocation corrected from Python to bash,0failed-invocation credit. All actual gates and ONE native successful with original profiles/caps.",
+  "next": "Original producer remains under RSS cap but incomplete at work deadline. The reviewed, previously unactivated Bzlmod/Core opt1 build experiment is a distinct next readiness operation, retaining all caps/sources/admission; no supported current semantic fanout/root-Lstat repair found.",
+  "goal": "ACTIVE; M7A/bootstrap incomplete",
+  "elapsed_since_design_binding_seconds": 947.3731365203857,
+  "elapsed_qualification": "includes implementation/compile/test/review/native after design binding; earlier research excluded",
+  "reviewed_candidate_sha256": "699bd653ba46788fd2956ede3d157f7e0dfaea44752209e292e2f870b28d32e5",
+  "accepted_at_utc": "2026-10-10T23:27:34.553015+00:00"
+}
