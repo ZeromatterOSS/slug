@@ -34,18 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-298-m7a-skylib-bzl-library-source-r1
-Status: accepted — original two-file Skylib load closure
+Packet: WP-7-299-m7a-cc-library-eager-source-cohort-r1
+Status: accepted — complete original eager rules_cc cohort advanced to Java generated proxy
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records
-[WP1085](./slug-v2-subplans/wp1085-skylib-bzl-library-source-2026-10-10.json):
-the normal scoped Host read passed both original Skylib files and reached the
-genuine rules_cc cc/cc_library.bzl Lstat. The extended37-demand matrix and current
-compile/check gates passed; ONE native5.81243s/205.375MiB stayed under unchanged
-caps with no source/time error. Five static rows add no runtime owned strings or
-retained fields. The next source/producer closure is being qualified. Terminal
-producer/Rustc/actions/certificates/full-workload fit remain open; Windows minimal/
-deferred. Goal ACTIVE.
+[WP1086](./slug-v2-subplans/wp1086-cc-library-eager-source-cohort-2026-10-10.json):
+all34 missing original rules_cc sources admitted and charged through unchanged
+source owners and the existing exact generated compatibility proxy. The real
+continuation took6.38901s at205.676MiB against256MiB, with no source/timeerror,
+and advanced through seven original Java archive source demands to that ruleset's
+generated compatibility proxy-kind refusal. Borrowed static tables add no runtime
+owned strings or retained fields; existing scoped interning remains. Next bounded
+Java proxy owner contract research is underway. Terminal producer/Rustc/actions/
+certificates/full-workload fit remain open; Windows minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

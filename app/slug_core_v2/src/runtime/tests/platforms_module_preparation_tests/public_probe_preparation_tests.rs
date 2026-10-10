@@ -8032,6 +8032,17 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
 #[test]
 fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
     eprintln!(
+        "WP1086_CC_SOURCE_LAYOUT bodies={}/{} scope={}/{} row={}/{} sources={} metadata={}",
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>(),
+        std::mem::size_of::<&str>(),
+        std::mem::align_of::<&str>(),
+        std::mem::size_of_val(&RULES_CC_IMPORTS),
+        std::mem::size_of_val(&RULES_CC_IMPORT_METADATA),
+    );
+    eprintln!(
         "WP1047_CC_BODY_LAYOUT body={} row={} literal={}",
         std::mem::size_of_val(&RULES_CC_IMPORTS),
         std::mem::size_of::<&str>(),
@@ -8126,7 +8137,7 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 120);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 197);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -8135,6 +8146,50 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        ("/cc/cc/Cc_library.bzl", PathObservationOperation::FileBytes),
+        ("/cc/cc/cc_library.bzl.bak", PathObservationOperation::Lstat),
+        (
+            "/cc/cc/private/rules_impl/cc_library.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/common/Cc_helper.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl/attrs.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/rules/cc/private/rules_impl/cc_binary.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl/fdo/Fdo_profile.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/cc/private/rules_impl/fdo/fdo_context.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        ("/cc/cc/BUILD.bazel", PathObservationOperation::FileBytes),
+        ("/cc/cc/common/BUILD", PathObservationOperation::FileBytes),
+        (
+            "/cc/cc/private/rules_impl/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl/fdo/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl/fdo",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/cc/cc/private/rules_impl/fdo",
+            PathObservationOperation::DirectoryEntries,
+        ),
         (
             "/cc/cc/private/toolchain/test/default_test_runner.bzl.disabled",
             PathObservationOperation::FileBytes,
@@ -8562,13 +8617,18 @@ fn rules_cc_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::FileDigest,
         ),
     ] {
+        let expected_family = if operation == PathObservationOperation::DirectoryEntries {
+            "operation"
+        } else {
+            "path"
+        };
         let bad = need(Path::new(excluded), operation.dupe());
         for mixed in [all.try_union(&bad).unwrap(), bad.try_union(&all).unwrap()] {
             assert_eq!(usize::from(bodies.admit(&mixed).is_ok()), 0);
             let denied = bodies.admit(&mixed).unwrap_err();
             assert_eq!(
                 (denied.family, denied.operation),
-                ("path", path_operation_code(&operation))
+                (expected_family, path_operation_code(&operation))
             );
             assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
             let first = bodies
