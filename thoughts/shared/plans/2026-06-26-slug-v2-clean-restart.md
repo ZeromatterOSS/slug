@@ -34,20 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-305-m7a-java-environment-frontier-r1
-Status: accepted — remaining root computation frontier trace follows
+Packet: WP-7-306-m7a-no-op-observation-union-r1
+Status: accepted — broader compiler producer materialization follows
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records finite JAVA_HOME
-name admission under the exact original offline Java binding and prepared public
-role. Eight controls prove normal empty-snapshot observed absence and rollback;
-no runtime fields, string copies or ambient value capture were added. One changed
-native prefix stayed within223.35MiB of256 and stopped at WorkDeadline/source251
-before that environment frontier, so native admission remains unobserved.
-The [receipt](./slug-v2-subplans/wp1093-java-environment-frontier-2026-10-10.json) binds
-current source/gates/qualified metrics. Next work traces concrete repeated allocation
-inside normal root computation. WP1092 source/load sharing remains accepted in
-09b345f11. Current caps/allocation discipline remain; fullproducer/time/wholefit/
-Rustc/actions/certificates/bootstrap stay open. Linux priority; Windows minimal/deferred.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts borrowed no-op
+observation-map reuse with full equality and original left credit ownership.
+Twenty focused tests and production/native-profile checks pass. One native prefix
+stayed within 226.40 MiB of 256 MiB and reached the local JDK generated-file materialization
+refusal. The [receipt](./slug-v2-subplans/wp1094-no-op-observation-union-2026-10-10.json)
+records current evidence and preserved preparation/fixture corrections. Next is
+source-grounded admission through the existing generated-file producer. Borrowing,
+sharing and appropriate scoped interning remain required; full producer/time/wholefit/
+Rustc/actions/certificates/bootstrap stay open. Linux priority; Windows deferred.
 Goal ACTIVE.
 
 ### Ready and blocked queue

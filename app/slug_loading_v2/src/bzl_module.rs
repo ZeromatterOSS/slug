@@ -2855,6 +2855,19 @@ fn union_host_observations(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    if right.observations().is_empty() || std::ptr::eq(left.observations(), right.observations()) {
+        return Ok(left.dupe());
+    }
+    if left.observations().is_empty() {
+        return Ok(right.dupe());
+    }
+    if right.observations().iter().all(|(demand, result)| {
+        left.get(demand).is_some_and(|original| {
+            Arc::ptr_eq(original, result) || original.as_ref() == result.as_ref()
+        })
+    }) {
+        return Ok(left.dupe());
+    }
     PathObservationEpoch::from_shared(
         left.observations()
             .iter()
@@ -9694,6 +9707,229 @@ mod module_extension_definition_loading_tests {
         ));
     }
 
+    #[test]
+    fn observed_observation_union_reuses_no_op_left_owner() {
+        use slug_workspace_v2::ImageChargedPath;
+        use slug_workspace_v2::ImageDescriptorBudget;
+        use slug_workspace_v2::ImageObservationData;
+        use slug_workspace_v2::ImageObservationOperation;
+        use slug_workspace_v2::ImageObservationRequest;
+        use slug_workspace_v2::ImageObservationResult;
+        use slug_workspace_v2::PathObservationInstanceId;
+        let demand = |namespace, operation, path: &str| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let a = demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            "/union/a",
+        );
+        let z = demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::Lstat,
+            "/union/z",
+        );
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let equal = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        assert!(!Arc::ptr_eq(&first, &equal));
+        let left =
+            PathObservationEpoch::from_shared([(a.dupe(), first.dupe()), (z.dupe(), first.dupe())])
+                .unwrap();
+        let same =
+            PathObservationEpoch::from_shared([(a.dupe(), first.dupe()), (z.dupe(), first.dupe())])
+                .unwrap();
+        let subset = PathObservationEpoch::from_shared([(a.dupe(), equal.dupe())]).unwrap();
+        let empty = PathObservationEpoch::empty();
+        let counts = (Arc::strong_count(&first), Arc::strong_count(&equal));
+        for right in [&empty, &left, &same, &subset] {
+            let merged = union_host_observations(&left, right).unwrap();
+            assert!(std::ptr::eq(merged.observations(), left.observations()));
+            assert!(Arc::ptr_eq(merged.get(&a).unwrap(), &first));
+            assert_eq!(
+                (Arc::strong_count(&first), Arc::strong_count(&equal)),
+                counts
+            );
+        }
+        let merged = union_host_observations(&empty, &subset).unwrap();
+        assert!(std::ptr::eq(merged.observations(), subset.observations()));
+        drop(merged);
+        let file = demand(
+            PathObservationNamespace::Host,
+            PathObservationOperation::FileBytes,
+            "/union/a",
+        );
+        let materialized = |instance| {
+            demand(
+                PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance)),
+                PathObservationOperation::Lstat,
+                "/union/a",
+            )
+        };
+        let additions = PathObservationEpoch::from_shared([
+            (materialized(2), first.dupe()),
+            (
+                file.dupe(),
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Present(Arc::from(b"tiny".as_slice())),
+                )),
+            ),
+            (materialized(1), first.dupe()),
+            (a.dupe(), equal.dupe()),
+            (z.dupe(), equal.dupe()),
+        ])
+        .unwrap();
+        let union = union_host_observations(&left, &additions).unwrap();
+        assert!(!std::ptr::eq(union.observations(), left.observations()));
+        let mut expected = vec![a.dupe(), z.dupe(), file, materialized(1), materialized(2)];
+        expected.sort();
+        assert_eq!(
+            union.observations().keys().cloned().collect::<Vec<_>>(),
+            expected
+        );
+        assert!(Arc::ptr_eq(union.get(&a).unwrap(), &first));
+        assert!(Arc::ptr_eq(union.get(&z).unwrap(), &first));
+        // Unequal full metadata takes the unchanged fallback, with earliest sorted conflict.
+        let changed = Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644),
+        )));
+        let conflicts = PathObservationEpoch::from_shared([
+            (z.dupe(), changed.dupe()),
+            (materialized(3), first.dupe()),
+            (a.dupe(), changed),
+        ])
+        .unwrap();
+        let fallback = PathObservationEpoch::from_shared(
+            left.observations()
+                .iter()
+                .chain(conflicts.observations().iter())
+                .map(|(d, r)| (d.dupe(), r.dupe())),
+        )
+        .unwrap_err();
+        assert_eq!(fallback, PathObservationEpochError::ConflictingDemand(a));
+        assert_eq!(
+            union_host_observations(&left, &conflicts).unwrap_err(),
+            ObservedPathFrontierError::from(fallback)
+        );
+
+        // Equal semantic images can belong to independent credit banks; preserve left.
+        let image = |bank: &ImageDescriptorBudget, anchor: &str, data| {
+            let root =
+                ImageChargedPath::pin_existing(NormalizedAbsolutePath::new(anchor).unwrap(), bank)
+                    .unwrap();
+            let issued = ImageChargedPath::pin_existing(
+                NormalizedAbsolutePath::new("/union/image").unwrap(),
+                bank,
+            )
+            .unwrap();
+            Arc::new(PathObservationResult::InputImage(
+                ImageObservationResult::new(
+                    issued,
+                    ImageObservationRequest::new(root, ImageObservationOperation::Lstat),
+                    data,
+                    bank.try_reserve(64).unwrap(),
+                )
+                .unwrap(),
+            ))
+        };
+        let missing = || ImageObservationData::Lstat(PathOperationResult::Missing);
+        let left_bank = ImageDescriptorBudget::new(4096);
+        let right_bank = ImageDescriptorBudget::new(4096);
+        assert!(!left_bank.same_instance(&right_bank));
+        let left_image = image(&left_bank, "/union", missing());
+        let right_image = image(&right_bank, "/union", missing());
+        assert!(!Arc::ptr_eq(&left_image, &right_image));
+        assert_eq!(left_image.as_ref(), right_image.as_ref());
+        let image_demand = |value: &Arc<PathObservationResult>| {
+            let PathObservationResult::InputImage(image) = value.as_ref() else {
+                panic!("image row")
+            };
+            PathObservationDemand::input_image(
+                PathObservationNamespace::Host,
+                image.issued_path().dupe(),
+                image.request().dupe(),
+            )
+            .unwrap()
+        };
+        let image_key = image_demand(&left_image);
+        let left_epoch =
+            PathObservationEpoch::from_shared([(image_key.dupe(), left_image.dupe())]).unwrap();
+        let right_epoch =
+            PathObservationEpoch::from_shared([(image_key.dupe(), right_image.dupe())]).unwrap();
+        let used = (left_bank.used_bytes(), right_bank.used_bytes());
+        let counts = (
+            Arc::strong_count(&left_image),
+            Arc::strong_count(&right_image),
+        );
+        let merged = union_host_observations(&left_epoch, &right_epoch).unwrap();
+        assert!(std::ptr::eq(
+            merged.observations(),
+            left_epoch.observations()
+        ));
+        assert!(Arc::ptr_eq(merged.get(&image_key).unwrap(), &left_image));
+        assert_eq!((left_bank.used_bytes(), right_bank.used_bytes()), used);
+        assert_eq!(
+            (
+                Arc::strong_count(&left_image),
+                Arc::strong_count(&right_image)
+            ),
+            counts
+        );
+        let unequal = image(
+            &right_bank,
+            "/union",
+            ImageObservationData::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o600,
+            ))),
+        );
+        let conflicting =
+            PathObservationEpoch::from_shared([(image_key.dupe(), unequal.dupe())]).unwrap();
+        assert_eq!(
+            union_host_observations(&left_epoch, &conflicting).unwrap_err(),
+            ObservedPathFrontierError::from(PathObservationEpochError::ConflictingDemand(
+                image_key.dupe()
+            ))
+        );
+        let other_anchor = image(&right_bank, "/", missing());
+        assert_ne!(left_image.as_ref(), other_anchor.as_ref());
+        let other_key = image_demand(&other_anchor);
+        let other =
+            PathObservationEpoch::from_shared([(other_key.dupe(), other_anchor.dupe())]).unwrap();
+        let both = union_host_observations(&left_epoch, &other).unwrap();
+        assert_eq!(both.observations().len(), 2);
+        assert!(Arc::ptr_eq(both.get(&image_key).unwrap(), &left_image));
+        assert!(Arc::ptr_eq(both.get(&other_key).unwrap(), &other_anchor));
+        drop((conflicting, unequal, other, other_anchor, other_key, both));
+        let left_weak = Arc::downgrade(&left_image);
+        let right_weak = Arc::downgrade(&right_image);
+        drop((right_epoch, right_image));
+        assert!(right_weak.upgrade().is_none());
+        assert_eq!(right_bank.used_bytes(), 0);
+        drop((left_epoch, left_image, image_key));
+        assert!(left_weak.upgrade().is_some());
+        assert!(left_bank.used_bytes() > 0);
+        drop(merged);
+        assert!(left_weak.upgrade().is_none());
+        assert_eq!(left_bank.used_bytes(), 0);
+        eprintln!(
+            "WP1094_UNION_LAYOUT epoch={}/{} row={}/{} budget={}/{}",
+            std::mem::size_of::<PathObservationEpoch>(),
+            std::mem::align_of::<PathObservationEpoch>(),
+            std::mem::size_of::<(PathObservationDemand, Arc<PathObservationResult>)>(),
+            std::mem::align_of::<(PathObservationDemand, Arc<PathObservationResult>)>(),
+            std::mem::size_of::<ImageDescriptorBudget>(),
+            std::mem::align_of::<ImageDescriptorBudget>()
+        );
+    }
+
     #[tokio::test]
     async fn observed_prepared_identity_and_finisher_algebra() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -9752,6 +9988,7 @@ mod module_extension_definition_loading_tests {
         )
         .unwrap();
         assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+        assert!(std::ptr::eq(merged.observations(), current.observations()));
 
         let conflicting = PathObservationEpoch::from_shared([(
             demand.dupe(),
