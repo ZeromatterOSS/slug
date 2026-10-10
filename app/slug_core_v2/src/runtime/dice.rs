@@ -6663,7 +6663,9 @@ impl WorkspaceRuntime {
             // The block_on future has dropped every attempt transaction on
             // success or error. Retire cancellation workers before progressing,
             // restoring, accepting, or opening the next attempt.
+            begin_probe_phase!(idle_phase, self, IdleDrain);
             self.runtime.block_on(self.dice.wait_for_idle());
+            finish_probe_phase!(idle_phase);
             let attempt = match attempt {
                 Ok(attempt) => attempt,
                 Err(error) => {

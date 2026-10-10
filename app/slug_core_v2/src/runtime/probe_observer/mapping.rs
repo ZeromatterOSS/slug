@@ -11,7 +11,7 @@ use std::sync::atomic::Ordering;
 pub(super) const WORDS: usize = 64;
 pub(super) const BYTES: usize = WORDS * size_of::<AtomicU64>();
 pub(super) const MAGIC: u64 = u64::from_le_bytes(*b"SLGOBS01");
-pub(super) const VERSION: u64 = 1;
+pub(super) const VERSION: u64 = 2;
 pub(super) const DISABLED: usize = 3;
 pub(super) const OVERFLOW: usize = 4;
 pub(super) const DROPPED: usize = 5;
@@ -23,6 +23,18 @@ pub(super) const ACTIVITY_SELECTOR: usize = 22;
 pub(super) const ACTIVITY_FRAMES: usize = 23;
 pub(super) const PHASE_FRAME_WORDS: usize = 4;
 pub(super) const ACTIVITY_FRAME_WORDS: usize = 14;
+pub(super) const INTERVAL_TOTALS: usize = 51;
+pub(super) const INTERVAL_STATUS: usize = 63;
+pub(super) const INTERVAL_STATUS_STRIDE: usize = 12;
+pub(super) const MISSING_WALL: u64 = 1 << 0;
+pub(super) const MISSING_CPU: u64 = 1 << 1;
+pub(super) const REVERSED_WALL: u64 = 1 << 2;
+pub(super) const REVERSED_CPU: u64 = 1 << 3;
+pub(super) const COUNT_OVERFLOW: u64 = 1 << 4;
+pub(super) const WALL_OVERFLOW: u64 = 1 << 5;
+pub(super) const CPU_OVERFLOW: u64 = 1 << 6;
+pub(super) const ABORTED_INTERVAL: u64 = 1 << 7;
+pub(super) const SUPPRESSED_INTERVAL: u64 = 1 << 8;
 
 #[cfg(test)]
 pub(crate) static CALLBACK_GATE: AtomicU8 = AtomicU8::new(0);

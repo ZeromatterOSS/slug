@@ -1,0 +1,271 @@
+{
+  "packet": "WP-7-303-m7a-cumulative-producer-intervals-r1",
+  "status": "accepted",
+  "baseline": "4e409e5ac6262ddfc7f47e7b1d92355b930005ae",
+  "compatibility": "Slug-native opt-in Linux x86_64 observer; exact admitted semantics unchanged, Windows minimal/deferred",
+  "sources": {
+    "baseline": "4e409e5ac6262ddfc7f47e7b1d92355b930005ae",
+    "before": {
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "400abb1e33983c7834abe1122cf3414b0d8fb2c3c887d24859f1e943bcbfe7e0",
+      "app/slug_core_v2/src/runtime/probe_observer/mapping.rs": "bfd1d973e4d96d7a41fdcfc8947369ae6d5f772cfcff3404d509d8fdaf79b4b1",
+      "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "fc0028065b4ef8954a21c56abf1f55ec513ca727ef7d874897970880371068dd",
+      "app/slug_core_v2/src/runtime/dice.rs": "163f3df005fb210bca4168ff1affbda2b7a2fe8c6de7468bbdd345cfc7e9b7f1"
+    },
+    "after_format": {
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "6c3b2b7446e676281d0a4643c62a094db02e75dda491af0c7e9c06a15096f357",
+      "app/slug_core_v2/src/runtime/probe_observer/mapping.rs": "a65ab2f8f5b3f693cda65f3187350e503f775828bb8838720bfe33aa947eec2d",
+      "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "4b38ca52251b7c88a66b5d2e6d298225f590d39976beab15dbae5ffd78335525",
+      "app/slug_core_v2/src/runtime/dice.rs": "c7695697ca241158800f671cfb00ed5d5224927ad52a28136b17f1d456324b35"
+    }
+  },
+  "growth": [
+    {
+      "path": "app/slug_core_v2/src/runtime/dice.rs",
+      "added": 2,
+      "deleted": 0
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/probe_observer.rs",
+      "added": 164,
+      "deleted": 8
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/probe_observer/mapping.rs",
+      "added": 13,
+      "deleted": 1
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs",
+      "added": 215,
+      "deleted": 39
+    }
+  ],
+  "layout": {
+    "phase_guard": {
+      "size": 48,
+      "alignment": 8
+    },
+    "before_phase_guard": {
+      "size": 16,
+      "alignment": 8
+    },
+    "observer": {
+      "size": 8,
+      "alignment": 8
+    },
+    "probe_guard": {
+      "size": 8,
+      "alignment": 8
+    },
+    "deferred_phase": {
+      "size": 16,
+      "alignment": 8
+    },
+    "mapping_bytes": 512,
+    "control_bytes": 224
+  },
+  "gates": {
+    "compile-core": {
+      "elapsed_seconds": 41.687947994912975,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 3318128,
+      "child_rusage_peak_kib": 2908256,
+      "sha256": "2d96c04e7db4f8fd838c2299ca5199796400af87b1bb76071451ad67808203c3"
+    },
+    "ordinary-list": {
+      "elapsed_seconds": 0.17602501006331295,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 3424,
+      "child_rusage_peak_kib": 16396,
+      "sha256": "d30bfc08f391a58a0929e57f212826aaf9a87c1a1724f3b1a0bf88f9c63918fb"
+    },
+    "core-preflight": {
+      "elapsed_seconds": 0.1997768369037658,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 14204,
+      "child_rusage_peak_kib": 16700,
+      "sha256": "8c688783e5afe6d913f2c15f5a8aa1f320a8607c80d312fecdaf0cc9b2572c6c"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.20976381690707058,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 11,
+      "pass_count": 11,
+      "monitored_rss_kib": 70088,
+      "child_rusage_peak_kib": 70380,
+      "sha256": "8ef8a6aab78dacebd1f6125e279889effa4902f1472ae4d972767ac9727ceef3"
+    },
+    "production-check": {
+      "elapsed_seconds": 7.79853521392215,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 730376,
+      "child_rusage_peak_kib": 644436,
+      "sha256": "4595210fce99df198d372cc5adff19f28779951b09d926576e0ee88be257b5c3"
+    },
+    "production-feature-check": {
+      "elapsed_seconds": 16.55311120499391,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 983392,
+      "child_rusage_peak_kib": 896576,
+      "sha256": "a2375c0ae76c4f6fb95a5517b5bb003ad3e895110dcc46263590fbccbeab9498"
+    },
+    "native-list-isolated": {
+      "elapsed_seconds": 0.1788146300241351,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 1440,
+      "child_rusage_peak_kib": 16608,
+      "sha256": "6c5dbe4ede7f95ed29a26fb3630a2cfc161b02792ddf40224e63df5312037479"
+    },
+    "native": {
+      "elapsed_seconds": 7.260447827982716,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "monitored_rss_kib": 211228,
+      "child_rusage_peak_kib": 211228,
+      "sha256": "57443ba784cafe9353096a1ad4ce9d7434fa1e1650e67290d2912697177a8255"
+    }
+  },
+  "native": {
+    "operation_sha256": "57443ba784cafe9353096a1ad4ce9d7434fa1e1650e67290d2912697177a8255",
+    "stdout_sha256": "785a1bbb1d1b8de3a4c75ccef9285b8d9eef0e7a36ac7339bbf3a41786178eeb",
+    "elapsed_seconds": 7.260447827982716,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 211228,
+    "rss_mib": 206.27734375,
+    "source_count": 244,
+    "decode_bytes": 55519862,
+    "write_bytes": 52795418,
+    "held_fds": 350,
+    "pins": 55,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 321,
+        "wall_ns": 172417830,
+        "process_cpu_ns": 171438037,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 321,
+        "wall_ns": 6623002747,
+        "process_cpu_ns": 6607024650,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 320,
+        "wall_ns": 180601510,
+        "process_cpu_ns": 180001992,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 321,
+        "wall_ns": 13062777,
+        "process_cpu_ns": 18852055,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 244 7021682 55519862 52795418 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=244 seen=244 emitted=244 admitted=244 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40456 encoded_bytes=136455 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged."
+  },
+  "preserved_unproved": {
+    "native-list": {
+      "sha256": "c211d7871f8f10a442ee159d09bb030931c066e7bd66ddae07387d0bd7ba5abb",
+      "reason": "chained final shell exec carried prior preparation RUSAGE_CHILDREN highwater896576KiB; monitored1552KiB; listchildexit0, completegate0credit, no native body. Sameexe/selector isolated correctedPASS. Allcaps unchanged."
+    },
+    "prior_wp1090_socket_fixtures": "two unchanged UnixListener fixtures unproved in preceding packet; this packet selects observerowner only, no fresh broaderOSsuite claim"
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "evidence": {
+    "design.md": "dd7f54d05c7c2441ff04a5fbafa35366b8a633fbcd68ed3a4c740560c4a960c9",
+    "design-review.md": "3eea33230d19e0d37b286e90cbd63d040ac024742c93c5aa9e1fafc511fbfb06",
+    "design-binding.json": "cf46b43afb328f00c9eadd6c120731915c9c4a766746ee5c0ba67697a1135afd",
+    "implementation.md": "e10e4099ef0f2ae3d9572e7365c190be65099ea966944b6c4656e523eaac6698",
+    "source-freeze.json": "73f6c1fb44423550fc32604164e916accc0b09998a5520619ccee4e2cf125f5a",
+    "prelaunch-source.md": "53ea98451857150dc0f7c6f64688b316e3f14f1912299ae45b60450be26aa9cf",
+    "helper-review.md": "f91c0ff598ebd0997917fbb6ce45175c0b3d56b4d35e5cdd254616b62d60a4f1",
+    "prelaunch-review.md": "625aa372b15e7f45c9f4b00ae4798b33c91118ca3d1f2cb68cce3a5696dae34a",
+    "prelaunch-evidence.md": "51c632de514083bf2b53e53891a83f298eb72a3ff317092f9e00734496db729a",
+    "focused-results.json": "69789291113e413fd8e935456e3b64c6600b6a113db5c49221e05724969fd24a",
+    "native-results.json": "8649a2c2505043a1733060365553a836e189e8d9893fda7f685c42dd4e7d7e13",
+    "native-config.json": "bfc82b656677d23ab47fca788cd11c22d046646999b72cfc91f22baf21aafa4c",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "decode_native.py": "704655dca6f4a8fdc47fd8babe00bdeefb945f30f48fd3b452ce0d96f659beea",
+    "list-environment-correction.md": "87afa1985a095e8e20e25555480c891f3616178c75fc7584bbdd6c2e0b942ad1",
+    "final-review.md": "3b89098b0cf37c8914ed7bec567e60a625f2e03a040cc26d99ba659bc05c1e32",
+    "archive-status.txt": "5f5cc2209b81af5a4cebc480b97cd7bfa72c9a4fac5efb23f0220a0b8a3254ca"
+  },
+  "claim_limits": "Four selected serial normal windows; all-thread processCPU, not exclusive/per-key or cause/speed. Count includes completed+aborted enabled intervals, validity qualified. Currentstatus0; unbracketed validation/seal/drop/download/execute/startup/teardown residual. Mapping512 and retainedObserver8/Arc24 unchanged; guard48 phase scratch +32 vs explicit16 field-shape reconstruction is not historicalheapcredit. ONE changed-source native observed prefix206.277MiB and244admissions, not bodycompletion/fullproducer/wholeworkloadfit/retirement. No String/payload copies/globalinterner/newkey/lock/IO/sourceprofile/ceiling change. No identicalnative retry. Preparation has no workloadmemorycredit.",
+  "goal_status": "ACTIVE",
+  "next": "Trace concrete repeated-work seam within normal root computation before choosing measured substantive improvement; preserve string borrowing/sharing/scopedinterner ownership.",
+  "packet_timing_utc": {
+    "start": "2026-10-10 18:32:39 UTC",
+    "accept": "2026-10-10 18:50 UTC",
+    "qualification": "Approximate root packet wall span includes design/implementation/review; exact compile/test/native durations above, no workflow speedup claim."
+  }
+}

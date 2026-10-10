@@ -51,6 +51,19 @@ pub enum Phase {
     DiagnosticProjection,
     EventPublication,
     TerminalRelease,
+    IdleDrain,
+}
+
+impl Phase {
+    fn interval_category(self) -> Option<usize> {
+        match self {
+            Self::AttemptInjectionRevision => Some(0),
+            Self::RootCompute => Some(1),
+            Self::NeedRepository | Self::NeedEnvironment | Self::NeedPath => Some(2),
+            Self::IdleDrain => Some(3),
+            _ => None,
+        }
+    }
 }
 
 pub struct ProbeGuard {
@@ -122,16 +135,25 @@ impl Observer {
     }
 
     pub fn phase(self: &Arc<Self>, phase: Phase) -> PhaseGuard {
-        self.record_phase(phase, PhaseStatus::Entry);
+        let entry = self.record_phase(phase, PhaseStatus::Entry);
+        self.phase_guard(phase, entry)
+    }
+
+    fn phase_guard(self: &Arc<Self>, phase: Phase, entry: Option<(u64, u64, u64)>) -> PhaseGuard {
         PhaseGuard {
             observer: self.clone(),
             phase,
             armed: true,
+            entry: if phase.interval_category().is_some() {
+                entry
+            } else {
+                None
+            },
         }
     }
 
     pub fn enter(&self, phase: Phase) {
-        self.record_phase(phase, PhaseStatus::Entry);
+        let _ = self.record_phase(phase, PhaseStatus::Entry);
     }
 
     pub fn deferred_entry(self: &Arc<Self>, phase: Phase) -> DeferredPhase {
@@ -150,19 +172,133 @@ impl Observer {
         }
     }
 
-    fn record_phase(&self, phase: Phase, status: PhaseStatus) {
+    fn record_phase(&self, phase: Phase, status: PhaseStatus) -> Option<(u64, u64, u64)> {
         if self.words()[DISABLED].load(Ordering::Acquire) != 0 {
-            return;
+            return None;
+        }
+        self.record_phase_with_clocks(phase, status, clocks())
+    }
+
+    fn record_phase_with_clocks(
+        &self,
+        phase: Phase,
+        status: PhaseStatus,
+        sample: (u64, u64, u64),
+    ) -> Option<(u64, u64, u64)> {
+        if self.words()[DISABLED].load(Ordering::Acquire) != 0 {
+            return None;
         }
         let current = self.words()[PHASE_SELECTOR].load(Ordering::Acquire);
         let slot = usize::from(current == 1);
         let start = PHASE_FRAMES + slot * PHASE_FRAME_WORDS;
-        let (wall, cpu, valid) = clocks();
+        let (wall, cpu, valid) = sample;
         self.words()[start].store((phase as u64) | ((status as u64) << 16), Ordering::Relaxed);
         self.words()[start + 1].store(wall, Ordering::Relaxed);
         self.words()[start + 2].store(cpu, Ordering::Relaxed);
         self.words()[start + 3].store(valid, Ordering::Relaxed);
         self.words()[PHASE_SELECTOR].store((slot + 1) as u64, Ordering::Release);
+        Some(sample)
+    }
+
+    fn qualify_interval(&self, category: usize, flags: u64) {
+        self.words()[INTERVAL_STATUS].fetch_or(
+            flags << (category * INTERVAL_STATUS_STRIDE),
+            Ordering::Relaxed,
+        );
+    }
+
+    fn add_interval(&self, category: usize, component: usize, amount: u64, overflow: u64) {
+        let cell = &self.words()[INTERVAL_TOTALS + category * 3 + component];
+        let mut failure = 0;
+        let result = cell.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |old| {
+            if self.words()[DISABLED].load(Ordering::Acquire) != 0 {
+                failure = SUPPRESSED_INTERVAL;
+                None
+            } else {
+                old.checked_add(amount).or_else(|| {
+                    failure = overflow;
+                    None
+                })
+            }
+        });
+        if result.is_err() {
+            self.qualify_interval(category, failure);
+        }
+    }
+
+    fn fold_interval(
+        &self,
+        phase: Phase,
+        entry: Option<(u64, u64, u64)>,
+        exit: Option<(u64, u64, u64)>,
+        status: PhaseStatus,
+    ) {
+        let (Some(category), Some(entry)) = (phase.interval_category(), entry) else {
+            return;
+        };
+        let aborted = if matches!(status, PhaseStatus::Aborted) {
+            ABORTED_INTERVAL
+        } else {
+            0
+        };
+        if self.words()[DISABLED].load(Ordering::Acquire) != 0 || exit.is_none() {
+            self.qualify_interval(category, aborted | SUPPRESSED_INTERVAL);
+            return;
+        }
+        let exit = exit.expect("enabled phase closure supplied clocks");
+        self.qualify_interval(category, aborted);
+        self.add_interval(category, 0, 1, COUNT_OVERFLOW);
+        for (component, start, end, valid_bit, missing, reversed, overflow) in [
+            (
+                1,
+                entry.0,
+                exit.0,
+                1,
+                MISSING_WALL,
+                REVERSED_WALL,
+                WALL_OVERFLOW,
+            ),
+            (
+                2,
+                entry.1,
+                exit.1,
+                2,
+                MISSING_CPU,
+                REVERSED_CPU,
+                CPU_OVERFLOW,
+            ),
+        ] {
+            if entry.2 & exit.2 & valid_bit == 0 {
+                self.qualify_interval(category, missing);
+            } else if let Some(delta) = end.checked_sub(start) {
+                self.add_interval(category, component, delta, overflow);
+            } else {
+                self.qualify_interval(category, reversed);
+            }
+        }
+        if self.words()[DISABLED].load(Ordering::Acquire) != 0 {
+            self.qualify_interval(category, SUPPRESSED_INTERVAL);
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn phase_with_clocks_for_test(
+        self: &Arc<Self>,
+        phase: Phase,
+        sample: (u64, u64, u64),
+    ) -> PhaseGuard {
+        let entry = self.record_phase_with_clocks(phase, PhaseStatus::Entry, sample);
+        self.phase_guard(phase, entry)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fold_interval_for_test(
+        &self,
+        phase: Phase,
+        entry: (u64, u64, u64),
+        exit: (u64, u64, u64),
+    ) {
+        self.fold_interval(phase, Some(entry), Some(exit), PhaseStatus::Exit);
     }
 
     fn record_event(&self, kind: usize, tag: &'static str) {
@@ -269,11 +405,29 @@ pub struct PhaseGuard {
     observer: Arc<Observer>,
     phase: Phase,
     armed: bool,
+    entry: Option<(u64, u64, u64)>,
 }
 
 impl PhaseGuard {
     pub fn finish(mut self) {
-        self.observer.record_phase(self.phase, PhaseStatus::Exit);
+        let exit = self.observer.record_phase(self.phase, PhaseStatus::Exit);
+        self.observer
+            .fold_interval(self.phase, self.entry, exit, PhaseStatus::Exit);
+        self.armed = false;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn close_with_clocks_for_test(mut self, sample: (u64, u64, u64), aborted: bool) {
+        let status = if aborted {
+            PhaseStatus::Aborted
+        } else {
+            PhaseStatus::Exit
+        };
+        let exit = self
+            .observer
+            .record_phase_with_clocks(self.phase, status, sample);
+        self.observer
+            .fold_interval(self.phase, self.entry, exit, status);
         self.armed = false;
     }
 }
@@ -281,7 +435,9 @@ impl PhaseGuard {
 impl Drop for PhaseGuard {
     fn drop(&mut self) {
         if self.armed {
-            self.observer.record_phase(self.phase, PhaseStatus::Aborted);
+            let exit = self.observer.record_phase(self.phase, PhaseStatus::Aborted);
+            self.observer
+                .fold_interval(self.phase, self.entry, exit, PhaseStatus::Aborted);
         }
     }
 }
@@ -294,6 +450,6 @@ pub struct DeferredPhase {
 
 impl Drop for DeferredPhase {
     fn drop(&mut self) {
-        self.observer.record_phase(self.phase, self.status);
+        let _ = self.observer.record_phase(self.phase, self.status);
     }
 }
