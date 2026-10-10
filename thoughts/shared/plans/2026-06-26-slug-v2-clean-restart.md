@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-285-m7a-normal-rustc-shell-sh-toolchain-source-r1
+Packet: WP-7-286-m7a-normal-rustc-apple-crosstool-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
-retained Rustc readiness on the Bazel9.2/rules_rust0.73 fixture.
-[WP1061](./slug-v2-subplans/wp1061-shell-sh-toolchain-source-2026-10-09.json) accepts exact original-root Shell
-sh_toolchain.bzl Host metadata/body under the existing checked selected Shell role/root.
-Metadata18→19/body7→8/O8/Need27; two16B target references andone33B literal before pooling. Existing namespace marker gates and roles remain unchanged; unselected candidates/other operations remain
-closed. Old306 signatures stay exact prefix plus measured1775B END307;104 names/106 native records,107allphase,
-currentcapture1 decision0tests; native4.889541096s/209584KiB below256MiB. Reused borrowed roots/paths/static membership; zero new retained productionfields/owned strings.
-Static tables metadata304B/body128B; whole binary pooling unmeasured.
+retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
+[WP1062](./slug-v2-subplans/wp1062-apple-crosstool-metadata-2026-10-09.json) accepts only exact original-root Apple
+Support crosstool Host Lstat under its dedicated checked cfgtest metadata role.
+Metadata1/body0; new borrowed reference16B/literal9B and cfgtestBoolean1 before
+padding. Actual Bodies size/alignment recorded, padding delta unassigned.
+Existing307 source signatures/Shell19/8 unchanged;104 names/106native records,
+currentcapture0;4 initial attempts qualified0fresh (1failedcontrols/3superseded preparations),110actual; native4.852318569s/208832KiB below256MiB. No newownedproductionstrings.
 Borrow or transfer first; existing scoped interners when retained lifetime and
 cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
 frozen successor notes ground the next step. Windows minimal/deferred.
