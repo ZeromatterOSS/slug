@@ -824,11 +824,20 @@ impl PathObservationEpoch {
     pub fn from_shared(
         observations: impl IntoIterator<Item = (PathObservationDemand, Arc<PathObservationResult>)>,
     ) -> Result<Self, PathObservationEpochError> {
-        let mut observations = observations.into_iter().collect::<Vec<_>>();
+        let observations = Self::compact_shared(observations.into_iter().collect())?;
+        Ok(Self {
+            observations: Arc::new(observations.into_iter().collect()),
+        })
+    }
+
+    fn compact_shared(
+        mut observations: Vec<(PathObservationDemand, Arc<PathObservationResult>)>,
+    ) -> Result<Vec<(PathObservationDemand, Arc<PathObservationResult>)>, PathObservationEpochError>
+    {
         observations.sort_by(|(left, _), (right, _)| left.cmp(right));
-        let mut unique: Vec<(PathObservationDemand, Arc<PathObservationResult>)> =
-            Vec::with_capacity(observations.len());
-        for (demand, result) in observations {
+        let mut retained = 0;
+        for index in 0..observations.len() {
+            let (demand, result) = &observations[index];
             if let PathObservationResult::InputImage(image) = result.as_ref() {
                 if image.issued_path().as_path() != demand.path().as_path() {
                     return Err(PathObservationEpochError::InputImagePathMismatch(
@@ -838,22 +847,22 @@ impl PathObservationEpoch {
             }
             if demand.operation() != result.operation() {
                 return Err(PathObservationEpochError::OperationMismatch {
-                    demand,
+                    demand: demand.dupe(),
                     result_operation: result.operation(),
                 });
             }
-            match unique.last() {
-                Some((previous, previous_result)) if *previous == demand => {
-                    if previous_result.as_ref() != result.as_ref() {
-                        return Err(PathObservationEpochError::ConflictingDemand(demand));
-                    }
+            if retained != 0 && observations[retained - 1].0 == *demand {
+                if observations[retained - 1].1.as_ref() != result.as_ref() {
+                    return Err(PathObservationEpochError::ConflictingDemand(demand.dupe()));
                 }
-                _ => unique.push((demand, result)),
+            } else {
+                // The destination was already processed; future sorted rows stay untouched.
+                observations.swap(retained, index);
+                retained += 1;
             }
         }
-        Ok(Self {
-            observations: Arc::new(unique.into_iter().collect()),
-        })
+        observations.truncate(retained);
+        Ok(observations)
     }
 
     pub fn observations(&self) -> &SortedMap<PathObservationDemand, Arc<PathObservationResult>> {
@@ -1708,6 +1717,123 @@ mod tests {
             )]),
             Err(PathObservationEpochError::OperationMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn shared_epoch_compaction_retains_source_buffer_and_first_arcs() {
+        type Row = (PathObservationDemand, Arc<PathObservationResult>);
+        let demands = (0..64)
+            .map(|index| {
+                demand(
+                    PathObservationNamespace::Host,
+                    &format!("/workspace/{index:02}"),
+                    PathObservationOperation::Lstat,
+                )
+            })
+            .collect::<Vec<_>>();
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let equal = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        assert!(!Arc::ptr_eq(&first, &equal));
+        let discarded = Arc::downgrade(&equal);
+        let mut rows: Vec<Row> = Vec::with_capacity(8192);
+        for round in 0..128 {
+            for demand in demands.iter().rev() {
+                rows.push((
+                    demand.dupe(),
+                    if round == 0 {
+                        first.dupe()
+                    } else {
+                        equal.dupe()
+                    },
+                ));
+            }
+        }
+        drop(equal);
+        let pointer = rows.as_ptr();
+        let capacity = rows.capacity();
+        let compact = PathObservationEpoch::compact_shared(rows).unwrap();
+        assert_eq!(compact.as_ptr(), pointer);
+        assert_eq!(compact.capacity(), capacity);
+        assert_eq!(compact.len(), demands.len());
+        for ((actual, result), expected) in compact.iter().zip(&demands) {
+            assert_eq!(actual, expected);
+            assert!(Arc::ptr_eq(result, &first));
+        }
+        assert!(discarded.upgrade().is_none());
+        eprintln!(
+            "WP1089_SHARED_ROWS rows=8192 unique={} row_size={} row_align={} source_capacity={} removed_unique_capacity_bytes={}",
+            compact.len(),
+            std::mem::size_of::<Row>(),
+            std::mem::align_of::<Row>(),
+            capacity,
+            8192 * std::mem::size_of::<Row>()
+        );
+        // The seam proves the collected Vec, not the final SortedMap's buffer, is retained.
+        let epoch = PathObservationEpoch::from_shared(compact).unwrap();
+        for demand in &demands {
+            assert!(Arc::ptr_eq(epoch.get(demand).unwrap(), &first));
+        }
+    }
+
+    #[test]
+    fn shared_epoch_compaction_preserves_sorted_row_error_precedence() {
+        let a = demand(
+            PathObservationNamespace::Host,
+            "/workspace/a",
+            PathObservationOperation::Lstat,
+        );
+        let b = demand(
+            PathObservationNamespace::Host,
+            "/workspace/b",
+            PathObservationOperation::Lstat,
+        );
+        let missing = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let present = Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::RegularFile, 0, 0, 0, 0, 0),
+        )));
+        let wrong_operation = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        ));
+        let budget = crate::ImageDescriptorBudget::new(8192);
+        let charged = |value| crate::ImageChargedPath::pin_existing(path(value), &budget).unwrap();
+        let request = crate::ImageObservationRequest::new(
+            charged("/workspace"),
+            crate::ImageObservationOperation::Lstat,
+        );
+        let image = |value| {
+            Arc::new(PathObservationResult::InputImage(
+                crate::ImageObservationResult::new(
+                    charged(value),
+                    request.dupe(),
+                    crate::ImageObservationData::Lstat(PathOperationResult::Missing),
+                    budget.try_reserve(256).unwrap(),
+                )
+                .unwrap(),
+            ))
+        };
+        let same_path_image = image("/workspace/a");
+        let wrong_path_image = image("/workspace/b");
+        // A row violating both image-path and operation checks wins before duplicate conflict.
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (a.dupe(), missing.dupe()), (a.dupe(), wrong_path_image.dupe()),
+        ]), Err(PathObservationEpochError::InputImagePathMismatch(found)) if found == a));
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (a.dupe(), missing.dupe()), (a.dupe(), same_path_image),
+        ]), Err(PathObservationEpochError::OperationMismatch { demand: found, result_operation })
+            if found == a && result_operation == PathObservationOperation::InputImage(request.dupe())));
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (a.dupe(), missing.dupe()), (a.dupe(), wrong_operation.dupe()),
+        ]), Err(PathObservationEpochError::OperationMismatch { demand: found, result_operation: PathObservationOperation::FileBytes }) if found == a));
+        // Original input order is reversed; the earliest stable-sorted invalid row still wins.
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (b.dupe(), wrong_operation.dupe()), (a.dupe(), wrong_path_image.dupe()),
+        ]), Err(PathObservationEpochError::InputImagePathMismatch(found)) if found == a));
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (b.dupe(), wrong_path_image), (a.dupe(), missing.dupe()), (a.dupe(), present.dupe()),
+        ]), Err(PathObservationEpochError::ConflictingDemand(found)) if found == a));
+        assert!(matches!(PathObservationEpoch::from_shared([
+            (b.dupe(), missing), (b, present), (a.dupe(), wrong_operation),
+        ]), Err(PathObservationEpochError::OperationMismatch { demand: found, result_operation: PathObservationOperation::FileBytes }) if found == a));
     }
 
     #[tokio::test]

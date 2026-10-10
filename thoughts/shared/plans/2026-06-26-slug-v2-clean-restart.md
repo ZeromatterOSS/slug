@@ -34,21 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-300-m7a-external-glob-source-owner-r1
-Status: accepted — next producer work frontier pending selection
+Packet: WP-7-301-m7a-shared-path-epoch-coalescing-r1
+Status: accepted — coalescing complete; normal producer time fit open
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records the external
-glob ownership fix and [receipt](./slug-v2-subplans/wp1088-external-glob-source-owner-2026-10-10.json).
-External segments share original route/raw directory storage and use the existing
-current repository path owner, including its explicit root target; listing and
-observation certificates preserve current namespace ownership. Invalid relative
-paths and semantic byte cutoff remain unchanged. All58 focused tests and direct
-Core/CLI checks pass. ONE original-profile continuation used207.211MiB/256 in
-7.26990s, then hit WorkDeadline at source243 before the previous245 frontier.
-Absence of a denied/tmp frame does not prove that frontier advanced. Source
-ownership is accepted; full producer/time/whole-workload fit, Rustc/actions,
-certificates and bootstrap remain open. Next work must address a concrete measured
-producer work owner under unchanged caps. Windows stays minimal/deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts in-place shared
+path-epoch coalescing in the Workspace constructor. It preserves the original
+buffer, first Arc and error order while removing a second full-capacity temporary
+Vec. All 22 focused tests, current production/Core gates and independent FINAL pass.
+The 8,192-row metadata cohort removes 1.25 MiB of temporary capacity only. One
+native run used 207.918 MiB of 256 MiB in 7.269355 s, then hit the generic work
+deadline at 246 source admission events, versus the prior 243. Completed bodies,
+speed, cause and whole-workload fit are unproved. [Receipt](./slug-v2-subplans/wp1089-shared-path-epoch-coalescing-2026-10-10.json).
+Existing shared typed paths, result Arcs and scoped interners remain. Next research
+identifies the first deadline caller or stage in the normal producer under the
+same caps. Full producer, time and whole-workload fit, Rustc, actions, certificates
+and bootstrap remain open. Linux priority; Windows minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

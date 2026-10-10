@@ -1,0 +1,221 @@
+{
+  "packet": "WP-7-301-m7a-shared-path-epoch-coalescing-r1",
+  "baseline": "3bf27920cd1a82308d87b36a4a07d743b4369ab5",
+  "status": "accepted",
+  "compatibility": "Slug-native temporary allocation; existing exact semantic boundaries unchanged; Windows no expansion",
+  "source": {
+    "app/slug_workspace_v2/src/path_observation.rs": {
+      "sha256": "0300858926bda24a631100697ccb1e84732005c924c01264ff56fa5ccf06a10b",
+      "bytes": 88529
+    }
+  },
+  "source_growth": "140\t14\tapp/slug_workspace_v2/src/path_observation.rs",
+  "change": "Safe stable-sort/prefixswap/truncate compacts originalowned Vec; removes second fullcapacity unique Vec. Firstequal originalArc and perrow image\u2192operation\u2192conflict/earliest sortederror retained. Unchanged final SortedMap/Arc/publickey/namespace/equality/Need/certificate owner; no newString/payloadclone/interner/cache/pool/dependency/lock.",
+  "allocation": {
+    "rows": 8192,
+    "unique": 64,
+    "row_size": 160,
+    "row_align": 8,
+    "source_capacity": 8192,
+    "removed_unique_capacity_bytes": 1310720
+  },
+  "focused": {
+    "selected": 22,
+    "passed": 22,
+    "elapsed_seconds": 0.040735446964390576,
+    "operation_sha256": "1c1e6cca940f81e01b8e58f733c9b886eeafafd557f9bf8583bbe4209585b57a",
+    "layout": {
+      "rows": 8192,
+      "unique": 64,
+      "row_size": 160,
+      "row_align": 8,
+      "source_capacity": 8192,
+      "removed_unique_capacity_bytes": 1310720
+    },
+    "qualification": "Compaction seam originalVec pointer/capacity and firstArc retention, exact error precedence, existing epoch/DICE restoration. Temporary old unique capacity1.25MiB only for8192metadata rows; sort/finalmap/Arc/heap distinct, no wholeheap/RSS/speed/cause claim. Focused Workspaceopt0 only, native/direct originalprofile."
+  },
+  "native": {
+    "operation": "target/wp1089/native/operation.json",
+    "elapsed_seconds": 7.269355450058356,
+    "selected": 1,
+    "passed": 1,
+    "exit_code": 0,
+    "stop_reason": null,
+    "rss_kib": 212908,
+    "rusage_peak_kib": 212908,
+    "rss_mib": 207.91796875,
+    "source_count": 246,
+    "source_count_prior": 243,
+    "decode_bytes": 55525245,
+    "write_bytes": 52795418,
+    "held_fds": 350,
+    "held_physical_bytes": 13861148,
+    "hash_bracket_bytes": 27722296,
+    "collection_atomic": false,
+    "pins": 45,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "joined": true,
+    "owned_group_empty": true,
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 246 7021682 55525245 52795418 2114151 11679531",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=246 seen=246 emitted=246 admitted=246 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40542 encoded_bytes=137095 accounting_complete=true identity_complete=false"
+    },
+    "last_three_admission_events": [
+      {
+        "event": 244,
+        "operation": "file_bytes",
+        "namespace": "materialization",
+        "instance": "11",
+        "path": "/tmp/.tmppUW8I2/java/toolchains/java_toolchain.bzl"
+      },
+      {
+        "event": 245,
+        "operation": "file_bytes",
+        "namespace": "materialization",
+        "instance": "11",
+        "path": "/tmp/.tmppUW8I2/toolchains/java_toolchain_alias.bzl"
+      },
+      {
+        "event": 246,
+        "operation": "file_bytes",
+        "namespace": "materialization",
+        "instance": "11",
+        "path": "/tmp/.tmppUW8I2/java/extensions.bzl"
+      }
+    ],
+    "qualification": "ONE originalprofile distinct changedsource candidate under unchanged caps. Internal generic WorkDeadline;246source admission events vs prior243, not payloadcompletion/fullproducer/performance/cause/wholeheapfit.207.918MiB fits observedprefix only; no duplicate native/caprise.",
+    "parser_correction": "Initial metadata-only extraction tried decoding uncaptured none pathhex, failed before writing results. Filter captured events; saved native not rerun."
+  },
+  "caps": "Unchanged prep60s/RSSuncapped no workloadcredit; native10s/RSS256MiB/AS512MiB/live+transfer16MiB/decode+write64MiB/source256/registry128/object1MiB/admitted16MiB/directory128entries-name1KiB-total16KiB/selectedwork7/default5/lifetime8/cleanup3/FSIZE16MiB/log1/report4MiB",
+  "operations": {
+    "compile-workspace": {
+      "path": "target/wp1089/compile-workspace/operation.json",
+      "sha256": "9ad90be81754c859c1da7fac312f37638dec990fe73233685d38e46998b5b86e",
+      "elapsed_seconds": 3.904825644916855,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "workspace-list": {
+      "path": "target/wp1089/workspace-list/operation.json",
+      "sha256": "3412ab6ed496a260550c105b7f2d124a8590c6656df40042b03b7a7089e61e12",
+      "elapsed_seconds": 0.04071376705542207,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "workspace-preflight": {
+      "path": "target/wp1089/workspace-preflight/operation.json",
+      "sha256": "65512f786a0a83d46ff075ee4a00bc5f0dd038d58462c9305183e5af89a8b136",
+      "elapsed_seconds": 0.05079434800427407,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "workspace-tests": {
+      "path": "target/wp1089/workspace-tests/operation.json",
+      "sha256": "1c1e6cca940f81e01b8e58f733c9b886eeafafd557f9bf8583bbe4209585b57a",
+      "elapsed_seconds": 0.040735446964390576,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 22,
+      "passed": 22
+    },
+    "production-check": {
+      "path": "target/wp1089/production-check/operation.json",
+      "sha256": "bb863b2285529a723c15ff5a3229f89f70f642f754a32b65069e2440c8cec904",
+      "elapsed_seconds": 9.48356076492928,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "compile-core": {
+      "path": "target/wp1089/compile-core/operation.json",
+      "sha256": "e5f611507464b1b72762672ae5677e315c48666494f8208f15e45bf6eb46e93f",
+      "elapsed_seconds": 55.842958251945674,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "native-list": {
+      "path": "target/wp1089/native-list/operation.json",
+      "sha256": "470efd8cebab9185491ccf33653177abdf05338496a656eaab42cf023e2d4b38",
+      "elapsed_seconds": 0.17646398197393864,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0
+    },
+    "native": {
+      "path": "target/wp1089/native/operation.json",
+      "sha256": "8e58060783d2a660e61acc20b179d04c9ea6830cee69942d5c5c6cec0d32962a",
+      "elapsed_seconds": 7.269355450058356,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 1,
+      "passed": 1
+    }
+  },
+  "evidence": {
+    "target/wp1089/allocation-review.md": "5418596553fe4c27d1c8fa1e826707a09e34e8507e81cef313e6cfa8b11f56f9",
+    "target/wp1089/archive-status.json": "f04afe703805627979d1596e082ad14ed36170c625b0faed498f5c151516c05e",
+    "target/wp1089/design-binding.json": "34d7dfc4571cb9abf0cfbb7b7b51075867b65a5f01c66097fc0a6975b8aefda5",
+    "target/wp1089/design-review.md": "7b9145f0bc2ef58e9cf72758ff8a9c5f49e273321306a2578ea8cb672522c08f",
+    "target/wp1089/design.md": "b556a31425c8ed6c7e3138d7d582f127d1066bc6880ecf43f2313742915cadcd",
+    "target/wp1089/focused-results.json": "bd806f0d3ec7c7af44de26f875b0a2758c41afc43c1be8acfaa5140c6651373c",
+    "target/wp1089/helper-delta.md": "aa3d30a097a6522f16b6416c681fa31a4599c4d683bdd50548e861cfe8c166b6",
+    "target/wp1089/helper-review.md": "f4ca1c1e6d6d4f8b799c62e1e38772b47e62fd555f00978281a2500dd1286f8a",
+    "target/wp1089/implementation.md": "ffee0e8730b4f1ff602f9b39523c114f8019392db0ea9a74c73b0802117d18fb",
+    "target/wp1089/inputs.json": "ce5e964783c0bd3f085c5d7e8b3ba601b6d39038057694d12270b9ac3cf536b1",
+    "target/wp1089/native-results.json": "5469d857affb080d2914d08e01c5c47390a7f1251d35a8051b610b27665dbe3d",
+    "target/wp1089/native_setup.py": "2006c7e8b62d34736a332ac147f9c819887b978730d29a211504e6b017001537",
+    "target/wp1089/prelaunch-evidence.md": "d2c25a001a8bf59fc7bfaddc861aacb1ccecdcb80d31ca05fc0da5856dc74e02",
+    "target/wp1089/prelaunch-review.md": "13f8f69b841e4ef11fbafcc3f4d649aa0d17f0a9b360cbacfb86927263c863e2",
+    "target/wp1089/prelaunch-source.md": "a53ad1f713ec1dbce530c95ccafa04de704f50a8657faa8e683e505096319528",
+    "target/wp1089/run_gate.py": "401e53bbbac14efeb712452ed12491c56b94a107bced35cfa6cec45b237a859b",
+    "target/wp1089/setup_gates.py": "f413038ded8094c6fedf58d4c2453a6f544b2a785ac61df45f8cc3e95e336ede",
+    "target/wp1089/slug_core_v2-executable.json": "351b702e104d1dc979d720329c6763786cdf792a2486e6142863a1a4ec91e051",
+    "target/wp1089/slug_workspace_v2-executable.json": "5ff9b58f220a7ec8a3587759f91c40b6c9dcb2342f29f91a96ec818b3cd3d7a7",
+    "target/wp1089/source-baseline.json": "e28ce1e3f51cf8699663f706f87a308b9a602d824c26930e14a2a177251ed8ab",
+    "target/wp1089/source-freeze.json": "179b5f8dc2767b6dfb3d37923058679702dccad6d1731b21c42f45fe4cb68e01",
+    "target/wp1089/source-vector.json": "fb7b6bb5e88578810c4afd223331d5d7c1d5013c5dd4c0b1034b670fe75d8472",
+    "target/wp1089/static-review.md": "0f71bf0954f81a4ed10ba20e07d61a0f94ea4b4597efe17ff06744198c94cf8a",
+    "target/wp1089/toolchain-resolution.json": "0c8351a16465f1a4ee6e1b9db57ee5ce0c6a8e5fe137599f79c1f4ee39e94d42",
+    "target/wp1089/workspace-selectors.json": "b957f0b0482f71ed3a4c85c669c95fdb67ee1f1e474254e943e62ea5a5fe2f33",
+    "target/wp1089/final-review.md": "5e471f4f4c6a289b89ef7d92ef02f09cc73b21dbedf22f248f61817523ed1ad5",
+    "target/wp1089/native-config.json": "1f610ef64587cf1136893b7b43df88d9aded3f207f65622356be13fdcdf30e53"
+  },
+  "residual": "Stable sort scratch, original collected spare capacity and finalmap/Arc allocations remain. Duplicate payloaddrop timing differs within constructor. Compaction bufferproof1.25MiB eliminates one temporarycapacity only; runtimepeak/deadlinecause/speed/wholeheap not established. NativeWorkDeadline source246 vs243 admissionevents not completedbodies/fullproducer. Rustc/actions/certificates/bootstrap/wholeworkload/timefit remain open. ONEcandidate native no duplicate/caprise. Native sourceWeak status is not new body-retirement credit; actual new discarded metadataWeak proof is scoped to compaction.",
+  "timing": {
+    "wall_seconds_since_design_file": 827.7188348770142,
+    "preparation_seconds": 69.23134466179181,
+    "focused_operation_seconds": 0.040735446964390576,
+    "qualification": "Wall file timestamp span includes interveningturns; no speedupclaim"
+  },
+  "goal": "active unlimited; packet acceptance is not full goal completion",
+  "acceptance": "Independent DESIGN, actualsource, allocation/helper/prelaunch and FINAL ACCEPT.22focused passes/directBzlmod-Loading-Core-CLI/currentCore originalprofile and ONE native observer; time/fullproducer/wholeworkload remain open.",
+  "static_checks": {
+    "format": "PASS current changedsource rustfmt --check",
+    "diff": "PASS git diff --check",
+    "archive": {
+      "command": [
+        "sh",
+        "scripts/v2_archive_status.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.0312824979191646
+    },
+    "plan_status": "matchingWP-7-301; run after scheduling update"
+  }
+}
