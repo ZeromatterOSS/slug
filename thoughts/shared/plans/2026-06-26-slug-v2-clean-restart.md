@@ -34,20 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-setup-internal-source-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-osx-cc-configure-source-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1064](./slug-v2-subplans/wp1064-apple-setup-internal-source-2026-10-09.json) accepts only exact original-root Apple
-Support crosstool/setup_internal.bzl Host Lstat+FileBytes under its checked cfgtest source role.
-Metadata2/body2/ownNeed4; new borrowed reference16B/literal28B and existing cfgtestBoolean with0 growth before
-padding. Actual Bodies size/alignment recorded, padding delta unassigned.
-Old308 source signatures exactprefix+3139BEND/309;Shell19/8 unchanged;104 names/106native records,
-currentcapture1/raw0tests/107allphase;priorWP1062 initial4 qualifiedhistorical0fresh; native4.947932743s/209836KiB below256MiB. No newownedproductionstrings.
-Borrow or transfer first; existing scoped interners when retained lifetime and
-cleanup fit. Full Rustc/actions/certificates/producer/wholefit remain open;
-frozen successor notes ground the next step. Windows minimal/deferred.
+[WP1065](./slug-v2-subplans/wp1065-apple-osx-cc-configure-source-2026-10-10.json) accepts exact original-root Apple
+Support crosstool/osx_cc_configure.bzl Host Lstat+FileBytes under the existing
+checked cfgtest role: metadata3/body3/ownNeed6; borrowed reference16B/literal30B,
+existing Boolean growth0, Bodies200B/align8 without attributed padding delta.
+Old309 source signatures exactprefix+9201BEND/310;Shell19/8 unchanged;
+104names/106native records plus currentraw0tests=107allphase. Native
+4.933742390s/209312KiB below256MiB, no new owned production strings.
+The actual next boundary requests two Apple toolchain environment names;
+values, permission and owner association remain unproved. Borrow/transfer
+first; existing scoped interners when retained lifetime and cleanup fit.
+Full Rustc/actions/certificates/producer/wholefit remain open. Frozen
+successor notes ground the next step. Windows minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.

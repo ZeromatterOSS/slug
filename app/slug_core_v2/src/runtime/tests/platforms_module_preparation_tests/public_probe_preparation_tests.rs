@@ -8260,6 +8260,27 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
         "/apple/crosstool/setup_internal.bzl",
         Some("/apple"),
     );
+    assert_exact_root_file_role(
+        APPLE_SUPPORT_IMPORTS[2],
+        &[
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ],
+        Bodies::with_apple_support_import_sources,
+        |b| b.apple_support_import_sources,
+        &[
+            "/apple/CROSSTOOL/osx_cc_configure.bzl",
+            "/apple/crosstool/OSX_CC_CONFIGURE.bzl",
+            "/apple/crosstool/osx_cc_configure.bzl.bak",
+            "/apple/crosstool/osx_cc_configure.bzl/child",
+            "/apple-other/crosstool/osx_cc_configure.bzl",
+            "/apple/crosstool/osx_cc_configure.bzl/BUILD",
+            "/apple/crosstool/osx_cc_configure.bzl/BUILD.bazel",
+            "/apple/crosstool/other.bzl",
+        ],
+        "/apple/crosstool/osx_cc_configure.bzl",
+        Some("/apple"),
+    );
     bodies.rules_shell_import_sources = false;
     bodies.apple_support_crosstool_metadata = false;
     bodies = bodies.with_apple_support_import_sources(
@@ -8286,8 +8307,18 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
             "/apple/crosstool/setup_internal.bzl",
             PathObservationOperation::FileBytes,
         ))
+        .unwrap()
+        .try_union(&need(
+            "/apple/crosstool/osx_cc_configure.bzl",
+            PathObservationOperation::Lstat,
+        ))
+        .unwrap()
+        .try_union(&need(
+            "/apple/crosstool/osx_cc_configure.bzl",
+            PathObservationOperation::FileBytes,
+        ))
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 4);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 6);
     assert!(bodies.admit(&allowed).is_ok());
     assert!(
         bodies
@@ -8349,6 +8380,30 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
         ),
         (
             "/cc/crosstool/setup_internal.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/crosstool/osx_cc_configure.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/apple/crosstool/osx_cc_configure.bzl",
+            PathObservationOperation::ReadLink,
+        ),
+        (
+            "/apple/crosstool/osx_cc_configure.bzl",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/apple/crosstool/osx_cc_configure.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/crosstool/osx_cc_configure.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/cc/crosstool/osx_cc_configure.bzl",
             PathObservationOperation::FileBytes,
         ),
     ]

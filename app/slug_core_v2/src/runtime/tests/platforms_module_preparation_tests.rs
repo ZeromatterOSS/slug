@@ -449,7 +449,11 @@ const RULES_SHELL_IMPORTS: [&str; 8] = [
     RULES_SHELL_IMPORT_METADATA[18],
 ];
 const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 1] = ["crosstool"];
-const APPLE_SUPPORT_IMPORTS: [&str; 2] = ["crosstool/setup.bzl", "crosstool/setup_internal.bzl"];
+const APPLE_SUPPORT_IMPORTS: [&str; 3] = [
+    "crosstool/setup.bzl",
+    "crosstool/setup_internal.bzl",
+    "crosstool/osx_cc_configure.bzl",
+];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
