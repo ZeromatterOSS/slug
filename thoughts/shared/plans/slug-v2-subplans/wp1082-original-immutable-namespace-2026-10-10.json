@@ -1,0 +1,119 @@
+{
+  "schema": "slug-v2-accepted-packet-v1",
+  "packet": "WP-7-295-m7a-original-immutable-namespace-r1",
+  "status": "accepted",
+  "baseline": "f6c4c2cbf29f8573447212227a414cc624d408a9",
+  "compatibility": "Slug-native Linux scoped public-probe policy; original request/archive/epoch semantics unchanged; Windows deferred",
+  "changes": {
+    "rust_files": 2,
+    "added_rust_lines": 412,
+    "projection_owned_strings": 0,
+    "new_retained_fields": 0,
+    "policy": "unique bounded current epoch original9attr guard; Linux five-operation root/tree; ancestors Lstat; outside/sibling/prefix lookalike/Windows/InputImage refused; generated policy unchanged",
+    "existing_accounting_distinction": "FileDigest64KiB fixed scratch is not transfer/decode/live-credit charged, kernel checks before/after; scoped directory limits128/1024/16384 unchanged"
+  },
+  "validation": {
+    "distinct_focused_rust_names": 5,
+    "ordinary_pass_records": 9,
+    "initial_ordinary_failure": 1,
+    "failed_case": "strict Weak expiry checked before async DICE actor shutdown; bounded existing actor drain/yield added, strict assertion retained",
+    "native_runs": 1,
+    "native_observer_passes": 1,
+    "actual_supervised_children": 18,
+    "preparation_seconds": 30.05532314593438,
+    "preparation_rss_separately_uncapped": true,
+    "format_diff_plan_archive": "pass",
+    "layout_bytes": {
+      "policy": 24,
+      "view": 24,
+      "bodies": 216
+    },
+    "wp1080_wp1081_reused_tests_fresh_credit": 0
+  },
+  "native": {
+    "elapsed_seconds": 5.318402400007471,
+    "peak_rss_kib": 209920,
+    "peak_rss_mib": 205.0,
+    "terminal": {
+      "stage": "native_refusal",
+      "kind": "source_service",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": "true",
+      "certificate": "unavailable",
+      "observations": "unavailable",
+      "analyses": "unavailable",
+      "actions": "unavailable",
+      "rustc": "unavailable"
+    },
+    "scope": {
+      "first_error": "Some(WorkDeadline)",
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 147,
+      "transferred_bytes": 6902898,
+      "decoded_bytes": 54140551,
+      "written_bytes": 52147294,
+      "live_buffer_bytes": 2114151,
+      "peak_buffer_bytes": 11679531
+    },
+    "timeout": {
+      "raw": {
+        "status": "available",
+        "armed": "true",
+        "first_work": "true",
+        "origin": "true",
+        "site": "1",
+        "domain": "1",
+        "phase": "1",
+        "return": "1",
+        "overflow": "false",
+        "sticky": "false"
+      },
+      "site": "GenericScope",
+      "domain": "Common",
+      "phase": "ScopeCheck",
+      "return": "Deadline",
+      "fine_callsite_or_graph_progress": "unavailable",
+      "source_owner": "source_service/timeout_provenance.rs enum codes1; scope.rs generic check"
+    },
+    "source_brackets": {
+      "count": 313,
+      "physical_bytes": 13374629,
+      "collection_atomic": false,
+      "each_full_sha_before_after_equal": true,
+      "inherited_fds": false
+    },
+    "retirement": {
+      "source_weak_seen": "false",
+      "source_weak_expired": "true",
+      "live_buffer_zero": "true",
+      "scope_weak_expired": "true",
+      "recorder_weak_expired": "true"
+    },
+    "boundary": "existing5s common source-work deadline; exact semantic call site unavailable",
+    "actual_namespace_progress_proved": false,
+    "current_native_provisional_result_proved": false
+  },
+  "normal_producer_completed": false,
+  "whole_workload_memory_fit": false,
+  "source_census_identity_complete": false,
+  "next_work": "finite reviewed common work profile for exact offline role within existing8s lifetime/10s native/256MiB envelope; no identical retry or guessed fine callsite attribution",
+  "goal_status": "active",
+  "evidence": {
+    "target/wp1082/candidate.json": "248837482e90c9c60cf68113deefe71d31c2ad8b51640de774761892b13be364",
+    "target/wp1082/design-review.md": "248efde192394217abf7ac9fb9194644e2e61b4186cfb7d848983967c33a6b8c",
+    "target/wp1082/namespace-design.md": "71c0cf044434355a97587c057c0f9bce9b1ff44f0e57d7c92fbc332aa946cb84",
+    "target/wp1082/static-review.md": "b9f576dc57d3fcf0cd471faa104ecfa65ae213ae869f41152a24963b85aab15c",
+    "target/wp1082/correction-review.md": "2d4ce11b3baf3f6dab617050f9d5e903dddf9e942d808b54d8f288e852456ed3",
+    "target/wp1082/source-freeze.json": "29ead3e494348263c0d279b787c558b8faebc8907d28de217167000e2db99aab",
+    "target/wp1082/focused-results.json": "fbf7665e494bd235800fbe677fc7a6b1f174757865b9f241c14e81d44fa9e23e",
+    "target/wp1082/prelaunch-source.md": "53a9ae2e5c7887a0c6506d75d3a545eb73dad18a8dd9e4fcebb5b7cfa78f76ab",
+    "target/wp1082/prelaunch-evidence.md": "1a7d7c20da8e1238a0e0c6c4b1fa4647e87f5b882a14c7dee21bfe6f6c73f2c5",
+    "target/wp1082/native-result.json": "c9ceed30249adf4abaf97740792a65f973a6c8c342848a4b8b4e3bff22c1bde2",
+    "target/wp1082/native/operation.json": "c395b9d52f11038d984fe2a3d412d3b6ac043f486a7d6d2494cd6564c3e61bb2",
+    "target/wp1082/operation-ledger.json": "bc3e12e5c1b973839128aa886dcc81c40ca34d8b742858339bf54b6cbeb5177c",
+    "target/wp1082/final-review.md": "f6ef722afa4ea0bcb62892ca8259ded16018a16012f70f387e1feba45d89b36b"
+  },
+  "read_only_discovery_note": "optional missing-path guesses corrected using literal module/file inventory; no source/body acquisition or semantic operation credit"
+}

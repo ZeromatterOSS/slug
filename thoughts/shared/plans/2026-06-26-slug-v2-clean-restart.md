@@ -34,19 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-294-m7a-original-immutable-byte-budget-r1
-Status: accepted — measured64MiB profile; real provisional immutable result; next namespace boundary
+Packet: WP-7-295-m7a-original-immutable-namespace-r1
+Status: accepted — confined namespace policy; real common work deadline preserved
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts a measured,
-exact-fixture64MiB cumulative decode/write profile.
-[WP1081](./slug-v2-subplans/wp1081-original-immutable-byte-budget-2026-10-10.json)
-produces the original normal provisional protobuf immutable result at205.3MiB,
-within the unchanged256MiB memory envelope. The next actual demand is namespace
-Lstat on /, refused by the generated-only observation policy. Reuse the exact
-original owner guard and current epoch authority for that continuation; retain
-borrow/transfer and scoped interning discipline. Terminal producer, Rustc/actions,
-certificates and whole-workload fit remain open. Windows minimal/deferred.
-The implementation goal stays active.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts the borrowed,
+confined original protobuf namespace policy. Five focused tests preserve current
+epochs, whole-Need refusal and last-Drop. [WP1082](./slug-v2-subplans/wp1082-original-immutable-namespace-2026-10-10.json)
+records one205MiB native run ending at the existing5s common work deadline;
+actual namespace progression is unproved. Select a reviewed finite work profile
+for the exact offline role within the existing memory/lifetime/native envelope.
+Original request/epoch semantics and borrowing/scoped interning discipline stay
+intact. Terminal producer/Rustc/actions/certificates and whole-workload fit remain
+open; Windows minimal/deferred. The goal stays active.
 
 ### Ready and blocked queue
 

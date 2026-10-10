@@ -1,5 +1,10 @@
 use super::*;
 
+#[cfg(target_os = "linux")]
+mod immutable_archive_namespace {
+    include!("public_probe_preparation_tests/immutable_archive_namespace.rs");
+}
+
 mod platforms_os_package_tests {
     include!("public_probe_preparation_tests/platforms_os_package_tests.rs");
 }
@@ -253,6 +258,15 @@ impl NamespacePolicy {
                     operation,
                     PathObservationOperation::Lstat | PathObservationOperation::FileBytes
                 ),
+                #[cfg(target_os = "linux")]
+                "immutable_tree" => matches!(
+                    operation,
+                    PathObservationOperation::Lstat
+                        | PathObservationOperation::FileBytes
+                        | PathObservationOperation::FileDigest
+                        | PathObservationOperation::DirectoryEntries
+                        | PathObservationOperation::ReadLink
+                ),
                 _ => false,
             }
     }
@@ -286,6 +300,12 @@ fn namespace_policy(
         return unavailable;
     };
     let request = view.request();
+    #[cfg(target_os = "linux")]
+    if let Some(policy) =
+        immutable_archive_namespace::policy(bodies, request, view.generation_root(), demand)
+    {
+        return policy;
+    }
     let Some(files) = bodies.generated_features_owner_signatures(request) else {
         return NamespacePolicy {
             owner_plan_allowed: false,
