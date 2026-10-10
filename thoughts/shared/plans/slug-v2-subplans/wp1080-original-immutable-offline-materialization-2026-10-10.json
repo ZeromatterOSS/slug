@@ -1,0 +1,154 @@
+{
+  "schema": "slug-v2-acceptance-v1",
+  "packet": "WP-7-293-m7a-original-immutable-offline-materialization-r1",
+  "checkpoint": "WP1080",
+  "baseline": "8c2357f53b60a5641cb34b24b87370e1cec84bde",
+  "status": "accepted portable scoped capability; real archive write-quota boundary qualified",
+  "compatibility": "Slug-native Linux scoped offline backing; cfg(test) activation; unchanged archive semantic contract; Windows deferred",
+  "change": "Exact original protobuf+ guard plus constructor-owned shared archive backing streams original HTTPS/SRI through existing held-inode capture and normal materializer. Original RepoSpec, request/result epoch, namespace and whole-Need precedence preserved.",
+  "growth": {
+    "rust_files": 9,
+    "insertions": 886,
+    "deletions": 13,
+    "net_lines": 873,
+    "review": "Independent STATIC explicitly reassesses formatted growth beyond estimates: narrow owner/wiring and five discriminating tests; no new framework or archive copy."
+  },
+  "allocation": {
+    "new_owned_production_strings": 0,
+    "new_retained_production_fields": 0,
+    "new_payload_copy": false,
+    "shared_backing_bytes": 56,
+    "scope_bytes": 440,
+    "bodies_bytes": 216,
+    "optional_backing_bytes": 8,
+    "shared_path_bytes": 8,
+    "scope": "New storage is Linux cfg(test), one descriptor/optional shared references and owned normalized configured paths; actual retained cost, no global pool. Borrow original attrs/paths; scope lifetime and last Drop retire backing. Existing interners remain preferred for repeated retained strings.",
+    "scratch_bytes": 65536,
+    "whole_workload_fit": false
+  },
+  "validation": {
+    "actual_supervised_child_operations": 21,
+    "passing_phase_records": 15,
+    "preserved_failed_operations": 3,
+    "expected_fault_injected_delegate_refusals": 3,
+    "fresh_named_passes": 12,
+    "fresh_core_ordinary": 8,
+    "fresh_core_native_observer": 1,
+    "fresh_python_helper_controls": 3,
+    "successful_preparations": 3,
+    "failed_compile": "6 test wiring errors corrected by import/existing scope.check(); no semantic change",
+    "failed_preflight": "six guessed runtime::dice prefixes corrected to actual runtime owners; zero Rust execution",
+    "failed_control_wrapper": "absolute/relative path setup corrected before any delegate children",
+    "native_attempts": 1,
+    "resource_retry": 0,
+    "historical_fresh_credit": 0,
+    "static_design_and_prelaunch": "accepted",
+    "diff_and_archive_checks": "passed"
+  },
+  "native": {
+    "native_observer_pass": 1,
+    "normal_producer_completed": false,
+    "original_archive_capture_verified": true,
+    "original_module_capture_verified": true,
+    "full_archive_realization_proved": false,
+    "boundary": "cumulative SourceService WrittenBytes limit during normal archive realization",
+    "terminal": {
+      "stage": "native_refusal",
+      "kind": "repository",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": "true",
+      "certificate": "unavailable",
+      "observations": "unavailable",
+      "analyses": "unavailable",
+      "actions": "unavailable",
+      "rustc": "unavailable"
+    },
+    "scope": {
+      "first_error": "Some(Limit(WrittenBytes))",
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 147,
+      "transferred_bytes": 6902898,
+      "decoded_bytes": 16530270,
+      "written_bytes": 16772882,
+      "live_buffer_bytes": 2114151,
+      "peak_buffer_bytes": 11679531
+    },
+    "source_charge_summary": {
+      "enabled": "true",
+      "limit": "256",
+      "source": "147",
+      "seen": "147",
+      "emitted": "147",
+      "admitted": "147",
+      "first_limit": "none",
+      "in_flight": "0",
+      "skipped": "0",
+      "bounds": "0",
+      "writer_failed": "0",
+      "raw_bytes": "29347",
+      "encoded_bytes": "91817",
+      "accounting_complete": "true",
+      "identity_complete": "false"
+    },
+    "retirement": {
+      "source_weak_seen": "false",
+      "source_weak_expired": "true",
+      "live_buffer_zero": "true",
+      "scope_weak_expired": "true",
+      "recorder_weak_expired": "true"
+    },
+    "peak_rss_kib": 209720,
+    "peak_rss_mib": 204.8046875,
+    "elapsed_seconds": 5.126226834952831,
+    "diagnostic_identity_note": "ArchiveFile debits remain explicitly anonymous; identity_complete=false, no full native certificate claim"
+  },
+  "leases": {
+    "count": 313,
+    "physical_bytes": 13374629,
+    "collection_atomic": false,
+    "each_full_sha_before_after_equal": true,
+    "inherited_fds": false
+  },
+  "timing": {
+    "compile_including_failed_attempt_seconds": 33.40559233480599,
+    "focused_supervised_seconds": 1.4586153990821913,
+    "native_supervised_seconds": 5.126226834952831,
+    "review_seconds": null,
+    "packet_elapsed_seconds": null,
+    "qualification": "Review/packet durations not instrumented; synthetic11s control clock is excluded from elapsed totals."
+  },
+  "fixed_memory_time_byte_caps_unchanged": true,
+  "evidence": {
+    "target/wp1080/design.md": "a0de440406ba2d994d57556eaacd7f5f9bf5bc5ea9fe913776d606ef65561bd8",
+    "target/wp1080/design-review.md": "5b752e9fff6a9a37bc869642686b1e8cbbfdd6b464f2e92a38ba15e7973ca6e7",
+    "target/wp1080/source-freeze.json": "7b3459aadb503f642aedc85a886c226b28b8be12ecaf1ce114d44f25dd725560",
+    "target/wp1080/rust-static-review.md": "dde28652a0e1e261b4981b6f9ef817327f3f5bf988d43fcec47f45bd5175c60c",
+    "target/wp1080/helper-correction-review.md": "f73ac96ba6728af1118746d516d7e71b2854618c85aaed74bdaa7f007fcac8c0",
+    "target/wp1080/prelaunch-source.md": "85669a6c20a88e4aa3967aea2049f48b9df50d9956f83200e98d3a698751514b",
+    "target/wp1080/prelaunch-evidence.md": "f05d051f81ec5129ff1284d21311e1ff4e518e697cc8f77b4553dabab22b18d7",
+    "target/wp1080/focused-results.json": "6c9c184475c03ed867db2df673d56a9a484521b66839f82e4c5a0739481f6c92",
+    "target/wp1080/native-result.json": "c659bea2f07a62c2e5556a482b2d8e2053cd8765863bffe603fc9b4c36ed6144",
+    "target/wp1080/native/operation.json": "ddbed53911cbbcb20ed86666a839aa955bd684ecedbc5e0191c36829876277de",
+    "target/wp1080/native/stdout": "a459cbdd659dc560d4022a77b5a398bb0a1fc7b013ce78f8096c6d73aa8d2ed3",
+    "target/wp1080/native/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1080/operation-ledger.json": "fda63defce2076e22a5921e4ed56da9e9bf1df591f39f5084ef497499778c414"
+  },
+  "residuals": [
+    "Actual protobuf realization refused cumulative16MiB written budget, no accepted immutable root or compiler-producer certificate.",
+    "Full Rustc/actions/normal producer and whole-workload fit remain open. ArchiveFile census is anonymous and identity_complete=false; no certificate inferred.",
+    "Windows-specific implementation remains minimal/deferred."
+  ],
+  "successor": "Ground the real archive decoded/output byte workload and make an explicit scoped byte-budget/resource decision while retaining the256MiB RSS and16MiB live-buffer envelope, then continue normal materialization. No identical capped retry or silent quota growth.",
+  "goal_status": "active",
+  "independent_final": {
+    "path": "target/wp1080/final-review.md",
+    "sha256": "bb216f933ac3fb4caa6363426f8de4a951e556d62dab327d2602c088e493cb88"
+  },
+  "candidate_reviewed": {
+    "path": "target/wp1080/acceptance-candidate.json",
+    "sha256": "3dab73d9cc0ba4a73d1380b77fd0a91ec3b6b2a0867f9e6a072e87535839f8cf"
+  },
+  "accepted_at": "2026-10-10T13:36:19.207553+00:00"
+}

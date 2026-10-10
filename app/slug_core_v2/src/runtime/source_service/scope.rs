@@ -194,6 +194,8 @@ pub(in crate::runtime) struct SourceServiceScope {
     registry_association: std::sync::OnceLock<std::sync::Weak<super::RegistryRequestAssociation>>,
     #[cfg(all(test, target_os = "linux"))]
     known_shas_root: Option<NormalizedAbsolutePath>,
+    #[cfg(all(test, target_os = "linux"))]
+    offline_archive: Option<Arc<super::OfflineArchiveBacking>>,
 }
 impl SourceServiceScope {
     pub(super) fn new(
@@ -225,6 +227,8 @@ impl SourceServiceScope {
             registry_association: std::sync::OnceLock::new(),
             #[cfg(all(test, target_os = "linux"))]
             known_shas_root: None,
+            #[cfg(all(test, target_os = "linux"))]
+            offline_archive: None,
         }))
     }
     #[cfg(test)]
@@ -244,12 +248,15 @@ impl SourceServiceScope {
         limits: SourceServiceLimits,
         selected_rules_rust_root: NormalizedAbsolutePath,
     ) -> Result<Arc<Self>, SourceServiceError> {
-        let mut scope = Self::new(workspace, work_deadline, cleanup_deadline, limits)?;
-        // Construction owns the sole Arc. No allowance setter survives publication.
-        Arc::get_mut(&mut scope)
-            .expect("new source scope is uniquely owned")
-            .known_shas_root = Some(selected_rules_rust_root);
-        Ok(scope)
+        Self::new_for_test_with_offline_archive(
+            workspace,
+            work_deadline,
+            cleanup_deadline,
+            limits,
+            Some(selected_rules_rust_root),
+            None,
+            false,
+        )
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) fn new_for_test_with_source_charge_census(
@@ -259,15 +266,50 @@ impl SourceServiceScope {
         limits: SourceServiceLimits,
         known_shas_root: Option<NormalizedAbsolutePath>,
     ) -> Result<Arc<Self>, SourceServiceError> {
+        Self::new_for_test_with_offline_archive(
+            workspace,
+            work_deadline,
+            cleanup_deadline,
+            limits,
+            known_shas_root,
+            None,
+            true,
+        )
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn new_for_test_with_offline_archive(
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+        known_shas_root: Option<NormalizedAbsolutePath>,
+        offline_archive: Option<Arc<super::OfflineArchiveBacking>>,
+        source_charge_census: bool,
+    ) -> Result<Arc<Self>, SourceServiceError> {
         let mut scope = Self::new(workspace, work_deadline, cleanup_deadline, limits)?;
+        // Construction owns the sole Arc; no setter survives publication.
         let owned = Arc::get_mut(&mut scope).expect("new source scope is uniquely owned");
         owned.known_shas_root = known_shas_root;
-        owned
-            .state
-            .get_mut()
-            .unwrap_or_else(|e| e.into_inner())
-            .census = Some(Default::default());
+        owned.offline_archive = offline_archive;
+        if source_charge_census {
+            owned
+                .state
+                .get_mut()
+                .unwrap_or_else(|e| e.into_inner())
+                .census = Some(Default::default());
+        }
         Ok(scope)
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn offline_archive_path_for_test(
+        &self,
+        original_url: &str,
+        integrity: &[u8; 32],
+    ) -> Option<&NormalizedAbsolutePath> {
+        self.offline_archive
+            .as_ref()
+            .filter(|backing| backing.matches(original_url, integrity))
+            .map(|backing| backing.path())
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) fn known_shas_allowance_for_test(

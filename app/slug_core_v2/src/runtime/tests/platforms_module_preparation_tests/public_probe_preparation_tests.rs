@@ -21,6 +21,13 @@ pub(super) enum CommandChoice {
     Modules,
     PublicProbe,
 }
+pub(super) fn offline_archive_native_role(
+    registry: RegistryChoice,
+    command: CommandChoice,
+) -> bool {
+    matches!(registry, RegistryChoice::PreparedFile)
+        && matches!(command, CommandChoice::PublicProbe)
+}
 pub(super) enum ObservationOutcome {
     Modules(Result<DrivenCommand<ModuleTerminal>, NativeDemandSessionError>),
     Probe(ProbeOutcome),

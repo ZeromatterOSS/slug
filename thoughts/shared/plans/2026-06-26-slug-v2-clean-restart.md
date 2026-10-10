@@ -34,23 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-292-m7a-normal-rustc-immutable-spec-readiness-r1
-Status: accepted — actual FINAL and operative receipt complete
+Packet: WP-7-293-m7a-original-immutable-offline-materialization-r1
+Status: accepted — portable materialization; real archive write-quota boundary
 
-[WP1079](./slug-v2-subplans/wp1079-immutable-spec-readiness-2026-10-10.json) exposes the original immutable
-first-offender RepoSpec as a bounded borrowed typed diagnostic. Mapping and nested
-order survive; complete allocation-free preflight precedes streaming. Original
-immutable_kind refusal and archive/transport/current epoch/namespace admission
-remain. The view is one borrowed reference; new owned production strings and
-retained fields are zero. Growth562net is cohesively reviewed.
-Fresh5Core+4decoder+1native=10names/12passingphases. Four preserved failed/superseded
-records make16total attempts: compiler failure1, decoder failures2, superseded dependency1; currentcapture0.
-Native7.003039177s/209312KiB below256MiB.
-All312 source lease triples stay unchanged. Both successor notes freeze actual
-observed attributes or bounded unavailability for the next admission decision.
-Borrow or transfer first; existing scoped interners serve repeated retained
-strings when lifetime and cleanup fit. Full Rustc/actions/certificates/normal
-producer and whole-workload fit remain open; Windows deferred.
+[WP1080](./slug-v2-subplans/wp1080-original-immutable-offline-materialization-2026-10-10.json)
+adds scoped offline backing for the original protobuf+ request and proves normal
+materialization in the existing small fixture. Eight ordinary Core tests, three
+helper controls and one native observer pass. The real run captured and verified
+the archive and MODULE, then refused the unchanged cumulative16MiB write quota
+while extracting; peak204.8MiB fits the256MiB memory ceiling. Full real-archive
+realization, Rustc/actions/certificates/normal producer and whole-workload fit
+remain open. Next ground the archive byte workload and explicitly settle its
+scoped byte budget while preserving memory limits. Borrow/transfer first; use
+existing scoped interners for repeated retained strings with fitting lifetimes.
+Windows minimal/deferred. The [manifest](./slug-v2-subplans/current-packet.md)
+retains the accepted contract until the successor is installed.
 
 ### Ready and blocked queue
 

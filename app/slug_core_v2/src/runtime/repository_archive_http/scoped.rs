@@ -186,6 +186,23 @@ pub(super) fn capture_one(
     }
     let mut url = url::Url::parse(original).map_err(|_| "invalid source URL")?;
     validate_https(&url)?;
+    #[cfg(all(test, target_os = "linux"))]
+    if let Some(path) = scope.offline_archive_path_for_test(original, &integrity) {
+        charge_archive(scope, SourceChargeDomain::ArchiveFile).map_err(|e| e.to_string())?;
+        let capture =
+            tempfile::NamedTempFile::new().map_err(|_| "creating source capture failed")?;
+        let capture = super::super::repository_archive_file::capture_path(
+            path.as_path(),
+            capture,
+            integrity,
+            limit,
+            subject,
+            active,
+            Some(scope),
+        )?;
+        live()?;
+        return Ok(capture);
+    }
     charge_archive(
         scope,
         #[cfg(all(test, target_os = "linux"))]

@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -78,6 +80,27 @@ pub(super) fn capture_file(
 #[cfg(target_os = "linux")]
 pub(super) fn capture_file(
     original: &str,
+    capture: tempfile::NamedTempFile,
+    integrity: [u8; 32],
+    limit: u64,
+    subject: &str,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<tempfile::NamedTempFile, String> {
+    capture_path(
+        &file_path(original)?,
+        capture,
+        integrity,
+        limit,
+        subject,
+        active,
+        scope,
+    )
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn capture_path(
+    path: &Path,
     mut capture: tempfile::NamedTempFile,
     integrity: [u8; 32],
     limit: u64,
@@ -104,7 +127,6 @@ pub(super) fn capture_file(
         }
     };
     let oversized = || format!("BCR {subject} exceeds {limit} byte capture limit");
-    let path = file_path(original)?;
     check_active()?;
     // O_PATH does not open the object for data, even for a FIFO or device.
     // A symlink may select an inode; SRI, not its mutable pathname, binds bytes.

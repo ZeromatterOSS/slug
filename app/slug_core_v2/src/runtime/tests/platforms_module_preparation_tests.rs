@@ -33,9 +33,13 @@ mod runtime_activity;
 mod public_probe_preparation_tests {
     include!("platforms_module_preparation_tests/public_probe_preparation_tests.rs");
 }
+#[path = "platforms_module_preparation_tests/immutable_archive_preparation.rs"]
+mod immutable_archive_preparation;
 use public_probe_preparation_tests::CommandChoice;
 use public_probe_preparation_tests::ObservationOutcome;
 use public_probe_preparation_tests::ProbeReport;
+
+use crate::runtime::dice::source_service::OfflineArchiveBacking;
 
 const PLATFORMS_SHA: [u8; 32] = [
     0x1c, 0x0c, 0x09, 0xf5, 0xbd, 0xcf, 0x4b, 0x3f, 0x92, 0x47, 0x20, 0xd2, 0x47, 0x8a, 0x37, 0x11,
@@ -501,6 +505,8 @@ struct Bodies {
     rules_shell_import_sources: bool,
     apple_support_crosstool_metadata: bool,
     apple_support_import_sources: bool,
+    offline_archive: Option<Arc<OfflineArchiveBacking>>,
+    offline_archive_module: Option<NormalizedAbsolutePath>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1017,6 +1023,9 @@ impl Bodies {
             let logical_root = match &request.kind {
                 RepositoryMaterializationKind::Local { logical_root } => logical_root,
                 RepositoryMaterializationKind::Immutable => {
+                    if immutable_archive_preparation::matches(self, request) {
+                        continue;
+                    }
                     return Some((request, "immutable_kind"));
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
@@ -1239,6 +1248,8 @@ impl Bodies {
             rules_shell_import_sources: false,
             apple_support_crosstool_metadata: false,
             apple_support_import_sources: false,
+            offline_archive: None,
+            offline_archive_module: None,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1659,6 +1670,18 @@ impl Bodies {
         cleanup_deadline: Instant,
         limits: SourceServiceLimits,
     ) -> Result<Arc<SourceServiceScope>, SourceServiceError> {
+        if self.offline_archive.is_some() {
+            return SourceServiceScope::new_for_test_with_offline_archive(
+                workspace,
+                work_deadline,
+                cleanup_deadline,
+                limits,
+                self.rules_rust_defs_import_sources
+                    .then(|| self.roots[1].dupe()),
+                self.offline_archive.clone(),
+                false,
+            );
+        }
         if self.rules_rust_defs_import_sources {
             SourceServiceScope::new_for_test_with_known_shas_allowance(
                 workspace,
@@ -3113,6 +3136,20 @@ fn observe_native_command(
         Err(std::env::VarError::NotPresent) => false,
         _ => panic!("Apple source opt-in must be exactly true or false"),
     };
+    let offline_archive_requested = match std::env::var("SLUG_NATIVE_PROTOBUF_OFFLINE_ARCHIVE") {
+        Ok(value) if value == "true" => true,
+        Ok(value) if value == "false" => false,
+        Err(std::env::VarError::NotPresent) => false,
+        _ => panic!("offline archive opt-in must be exactly true or false"),
+    };
+    assert!(
+        !offline_archive_requested
+            || public_probe_preparation_tests::offline_archive_native_role(
+                registry_choice,
+                command
+            ),
+        "offline archive requires PreparedFile/PublicProbe"
+    );
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace"),
@@ -3197,6 +3234,35 @@ fn observe_native_command(
                 .display()
         );
     }
+    if offline_archive_requested {
+        let archive = root("SLUG_NATIVE_PROTOBUF_ARCHIVE_PATH");
+        let module = root("SLUG_NATIVE_PROTOBUF_MODULE_PATH");
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/protocolbuffers/protobuf/releases/download/v33.4/protobuf-33.4.bazel.tar.gz");
+        let prepared = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/wp954/registry/modules/protobuf/33.4/MODULE.bazel");
+        assert_eq!(
+            archive,
+            NormalizedAbsolutePath::new(fixture).unwrap(),
+            "qualified original archive backing"
+        );
+        assert_eq!(
+            module,
+            NormalizedAbsolutePath::new(prepared).unwrap(),
+            "qualified original MODULE backing"
+        );
+        let backing = OfflineArchiveBacking::new(
+            immutable_archive_preparation::PROTOBUF_URL,
+            immutable_archive_preparation::PROTOBUF_DIGEST,
+            archive,
+        );
+        bodies = immutable_archive_preparation::configure(
+            bodies,
+            registry_choice,
+            command,
+            backing,
+            module,
+        );
+    }
     let bodies = Arc::new(bodies);
     println!(
         "WP942_REQUEST workspace={} rules_root={} platforms_root={} registry={} lockfile=off local_overrides=true",
@@ -3218,7 +3284,7 @@ fn observe_native_command(
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
     let limits = bodies.native_source_limits(registry_choice, command);
-    let scope = SourceServiceScope::new_for_test_with_source_charge_census(
+    let scope = SourceServiceScope::new_for_test_with_offline_archive(
         workspace.clone(),
         start + Duration::from_secs(5),
         start + Duration::from_secs(8),
@@ -3226,6 +3292,8 @@ fn observe_native_command(
         bodies
             .rules_rust_defs_import_sources
             .then(|| bodies.roots[1].dupe()),
+        bodies.offline_archive.clone(),
+        true,
     )
     .unwrap();
     let allowance = scope.known_shas_allowance_for_test();

@@ -8,6 +8,9 @@ use slug_bzlmod_v2::OverrideAttributeKey;
 use super::super::repository_archive::ArchivePlan;
 use super::super::repository_archive::materialize_selected_bcr_capture;
 use super::super::repository_archive::parse_archive_plan;
+use crate::runtime::dice::source_service::OfflineArchiveBacking;
+use crate::runtime::dice::source_service::SourceCounter;
+use crate::runtime::dice::source_service::SourceServiceLimits;
 
 struct SelectedBcrFileFixture {
     _directory: tempfile::TempDir,
@@ -432,4 +435,328 @@ fn selected_bcr_file_session_stale_real_capture_drops_root_and_allows_replacemen
     assert!(root.exists());
     assert_ne!(instance.value(), 0);
     materializer.discard(replacement).unwrap();
+}
+
+const OFFLINE_ARCHIVE_TEST_URL: &str = "https://example.invalid/original/archive.tar.gz";
+
+fn selected_bcr_offline_session_fixture() -> (SelectedBcrFileFixture, Arc<OfflineArchiveBacking>) {
+    let mut fixture = selected_bcr_file_session_fixture();
+    let attributes = Arc::make_mut(&mut fixture.spec.attributes);
+    attributes.shift_remove("type");
+    attributes.insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([selected_bcr_file_session_value(
+            OFFLINE_ARCHIVE_TEST_URL,
+        )])),
+    );
+    for key in [
+        "remote_patches",
+        "remote_file_urls",
+        "remote_file_integrity",
+    ] {
+        attributes.insert(
+            key.into(),
+            OverrideAttributeValue::Map(Arc::new(SmallMap::new())),
+        );
+    }
+    attributes.insert("remote_patch_strip".into(), OverrideAttributeValue::Int(0));
+    let backing = OfflineArchiveBacking::new(
+        OFFLINE_ARCHIVE_TEST_URL,
+        sha2::Sha256::digest(&fixture.archive_bytes).into(),
+        NormalizedAbsolutePath::new(fixture.archive.clone()).unwrap(),
+    );
+    (fixture, backing)
+}
+
+fn selected_bcr_offline_session_scope(
+    workspace: &NormalizedAbsolutePath,
+    backing: Option<Arc<OfflineArchiveBacking>>,
+    limits: SourceServiceLimits,
+) -> Arc<SourceServiceScope> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    SourceServiceScope::new_for_test_with_offline_archive(
+        workspace.clone(),
+        deadline,
+        deadline + std::time::Duration::from_secs(1),
+        limits,
+        None,
+        backing,
+        false,
+    )
+    .unwrap()
+}
+
+#[test]
+fn selected_bcr_offline_session_materializes_original_https_and_reuses_deleted_sources() {
+    let (fixture, backing) = selected_bcr_offline_session_fixture();
+    let workspace_root = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+    let scope = selected_bcr_offline_session_scope(
+        &workspace,
+        Some(backing.clone()),
+        SourceServiceLimits {
+            allow_network: false,
+            ..SourceServiceLimits::default()
+        },
+    );
+    assert_eq!(Arc::strong_count(&backing), 2);
+    assert!(std::ptr::eq(
+        scope
+            .offline_archive_path_for_test(backing.original_url(), backing.integrity())
+            .unwrap(),
+        backing.path(),
+    ));
+    let weak_backing = Arc::downgrade(&backing);
+    let weak_scope = Arc::downgrade(&scope);
+    let materializer =
+        RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+    let request = selected_bcr_file_session_request(&workspace, "offline", fixture.spec.clone());
+    let attributes = request.repo_spec.attributes.clone();
+    let attribute_owners = Arc::strong_count(&attributes);
+    let runtime = selected_bcr_file_session_runtime();
+    let token = begin_empty(&materializer);
+    let epoch = materializer
+        .materialize_native_with_runtime(
+            token,
+            request.clone(),
+            RepositoryMaterializationGeneration(1),
+            &runtime,
+            Some(&scope),
+        )
+        .unwrap();
+    let (root, instance) = immutable_result(&materializer, "offline");
+    assert_eq!(std::fs::read(root.join("value.txt")).unwrap(), b"archive\n");
+    assert_eq!(
+        std::fs::read(root.join("MODULE.bazel")).unwrap(),
+        fixture.module_bytes
+    );
+    let original = epoch
+        .borrowed_instance_for_namespace(&workspace, instance, 1)
+        .unwrap()
+        .unwrap();
+    assert!(std::ptr::eq(original.request(), request.as_ref()));
+    assert!(Arc::ptr_eq(
+        &original.request().repo_spec.attributes,
+        &attributes
+    ));
+    assert_eq!(Arc::strong_count(&attributes), attribute_owners);
+    assert_eq!(Arc::strong_count(&backing), 2);
+    assert_eq!(original.generation_root(), root.as_path());
+    assert_eq!(original.request().repo_spec, fixture.spec);
+    assert_eq!(request.repo_spec.attributes.len(), 9);
+    let counters = scope.snapshot();
+    assert_eq!(counters.source_attempts, 2);
+    assert_eq!(
+        counters.transferred_bytes,
+        (fixture.archive_bytes.len() + fixture.module_bytes.len()) as u64
+    );
+    assert_eq!(counters.registry_attempts, 0);
+    assert!(counters.decoded_bytes > 0);
+    assert!(counters.written_bytes > counters.transferred_bytes);
+    assert_eq!(counters.live_buffer_bytes, 0);
+    assert_eq!(scope.check(), Ok(()));
+    materializer
+        .accept(token, std::slice::from_ref(&request), vec![])
+        .unwrap();
+    std::fs::remove_file(&fixture.archive).unwrap();
+    std::fs::remove_file(&fixture.module).unwrap();
+    let reuse = begin_empty(&materializer);
+    materializer
+        .materialize_native_with_runtime(
+            reuse,
+            request,
+            RepositoryMaterializationGeneration(2),
+            &runtime,
+            Some(&scope),
+        )
+        .unwrap();
+    assert_eq!(
+        immutable_result(&materializer, "offline"),
+        (root.clone(), instance)
+    );
+    assert_eq!(scope.snapshot().source_attempts, counters.source_attempts);
+    assert_eq!(
+        scope.snapshot().transferred_bytes,
+        counters.transferred_bytes
+    );
+    materializer.discard(reuse).unwrap();
+    println!(
+        "WP1080_OFFLINE_ARCHIVE_LAYOUT backing_bytes={} backing_align={} scope_bytes={} scope_align={} optional_backing_bytes={} path_bytes={}",
+        std::mem::size_of::<OfflineArchiveBacking>(),
+        std::mem::align_of::<OfflineArchiveBacking>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>(),
+        std::mem::size_of::<Option<Arc<OfflineArchiveBacking>>>(),
+        std::mem::size_of::<NormalizedAbsolutePath>()
+    );
+    drop(backing);
+    drop(scope);
+    assert!(weak_backing.upgrade().is_some());
+    assert!(weak_scope.upgrade().is_some());
+    drop(materializer);
+    assert!(weak_backing.upgrade().is_none());
+    assert!(weak_scope.upgrade().is_none());
+    assert!(!root.exists());
+}
+
+#[test]
+fn selected_bcr_offline_session_recaptures_missing_corrupt_and_repaired_newer_generations() {
+    let (fixture, backing) = selected_bcr_offline_session_fixture();
+    let workspace_root = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+    let scope = selected_bcr_offline_session_scope(
+        &workspace,
+        Some(backing),
+        SourceServiceLimits {
+            allow_network: false,
+            ..SourceServiceLimits::default()
+        },
+    );
+    let materializer =
+        RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+    let request = selected_bcr_file_session_request(&workspace, "repair", fixture.spec);
+    let runtime = selected_bcr_file_session_runtime();
+    std::fs::remove_file(&fixture.archive).unwrap();
+    let mut attempts = 0;
+    for generation in 1..=4 {
+        let token = begin_empty(&materializer);
+        materializer
+            .materialize_native_with_runtime(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(generation),
+                &runtime,
+                Some(&scope),
+            )
+            .unwrap();
+        if generation % 2 == 1 {
+            assert!(matches!(active_result(&materializer, "repair"),
+                RepositoryMaterializationResult::TransportError { generation: actual, .. }
+                    if actual == RepositoryMaterializationGeneration(generation)));
+            assert_eq!(scope.snapshot().source_attempts, attempts + 1);
+        } else {
+            let (root, instance) = immutable_result(&materializer, "repair");
+            assert!(root.exists());
+            assert_ne!(instance.value(), 0);
+            assert_eq!(
+                std::fs::read(root.join("MODULE.bazel")).unwrap(),
+                fixture.module_bytes
+            );
+            assert_eq!(scope.snapshot().source_attempts, attempts + 2);
+            materializer.discard(token).unwrap();
+            assert!(!root.exists());
+        }
+        attempts = scope.snapshot().source_attempts;
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+        assert_eq!(scope.check(), Ok(()));
+        if generation % 2 == 1 {
+            // The failure belongs to this generation even if its backing is repaired.
+            std::fs::write(&fixture.archive, &fixture.archive_bytes).unwrap();
+            materializer
+                .materialize_native_with_runtime(
+                    token,
+                    request.clone(),
+                    RepositoryMaterializationGeneration(generation),
+                    &runtime,
+                    Some(&scope),
+                )
+                .unwrap();
+            assert_eq!(scope.snapshot().source_attempts, attempts);
+            materializer.discard(token).unwrap();
+        } else if generation == 2 {
+            std::fs::write(&fixture.archive, b"corrupt archive").unwrap();
+        }
+    }
+}
+
+#[test]
+fn selected_bcr_offline_session_refuses_mismatch_foreign_cancel_and_resource_limits() {
+    let (fixture, backing) = selected_bcr_offline_session_fixture();
+    let workspace_root = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+    let runtime = selected_bcr_file_session_runtime();
+    let request = selected_bcr_file_session_request(&workspace, "refused", fixture.spec);
+    for case in 0..9 {
+        let mut limits = SourceServiceLimits {
+            allow_network: false,
+            ..SourceServiceLimits::default()
+        };
+        let configured = match case {
+            0 => None,
+            1 => Some(OfflineArchiveBacking::new(
+                "https://example.invalid/foreign.tar.gz",
+                *backing.integrity(),
+                backing.path().clone(),
+            )),
+            2 => Some(OfflineArchiveBacking::new(
+                OFFLINE_ARCHIVE_TEST_URL,
+                [0; 32],
+                backing.path().clone(),
+            )),
+            _ => Some(backing.clone()),
+        };
+        let expected = match case {
+            0..=2 => SourceServiceError::NetworkDisabled,
+            3 => {
+                limits.transferred_bytes = 1;
+                SourceServiceError::Limit(SourceCounter::TransferBytes)
+            }
+            4 => {
+                limits.written_bytes = 1;
+                SourceServiceError::Limit(SourceCounter::WrittenBytes)
+            }
+            5 => {
+                limits.decoded_bytes = 1;
+                SourceServiceError::Limit(SourceCounter::DecodedBytes)
+            }
+            6 => {
+                limits.live_buffer_bytes = 1;
+                SourceServiceError::BufferLimit
+            }
+            7 => SourceServiceError::ForeignScope,
+            _ => SourceServiceError::Cancelled,
+        };
+        let scope = selected_bcr_offline_session_scope(&workspace, configured, limits);
+        let weak_scope = Arc::downgrade(&scope);
+        let materializer =
+            RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+        let token = begin_empty(&materializer);
+        let foreign = selected_bcr_offline_session_scope(
+            &workspace,
+            Some(backing.clone()),
+            SourceServiceLimits::default(),
+        );
+        if case == 8 {
+            scope.cancel();
+        }
+        let supplied = if case == 7 { &foreign } else { &scope };
+        assert_eq!(
+            materializer.materialize_native_with_runtime(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(case + 1),
+                &runtime,
+                Some(supplied),
+            ),
+            Err(RepositorySessionError::SourceService(expected)),
+            "case {case}"
+        );
+        let state = materializer.state.lock().unwrap();
+        assert!(state.active.as_ref().unwrap().entries.is_empty());
+        drop(state);
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+        assert_eq!(scope.snapshot().registry_attempts, 0);
+        if case >= 7 {
+            assert_eq!(scope.snapshot().source_attempts, 0);
+            assert_eq!(scope.snapshot().transferred_bytes, 0);
+            assert_eq!(scope.snapshot().written_bytes, 0);
+        }
+        if case != 7 {
+            assert_eq!(scope.check(), Err(expected));
+        }
+        materializer.discard(token).unwrap();
+        drop(materializer);
+        drop(scope);
+        assert!(weak_scope.upgrade().is_none());
+    }
 }

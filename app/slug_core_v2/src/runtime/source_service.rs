@@ -9,6 +9,9 @@ mod diagnostic;
 mod failure;
 #[path = "source_service/http.rs"]
 mod http;
+#[cfg(all(test, target_os = "linux"))]
+#[path = "source_service/offline_archive.rs"]
+mod offline_archive;
 #[path = "source_service/registry.rs"]
 mod registry;
 #[cfg(all(test, target_os = "linux"))]
@@ -44,6 +47,8 @@ pub(super) use failure::SourceTransportFailure;
 pub(in crate::runtime) use http::SourceHttpAdmission;
 pub(in crate::runtime) use http::request_scoped;
 pub(super) use http::request_scoped_typed;
+#[cfg(all(test, target_os = "linux"))]
+pub(in crate::runtime) use offline_archive::OfflineArchiveBacking;
 pub(in crate::runtime) use registry::ScopedRegistryIo;
 #[cfg(all(test, target_os = "linux"))]
 pub(in crate::runtime) use registry_association::RegistryAssociationSnapshot;
