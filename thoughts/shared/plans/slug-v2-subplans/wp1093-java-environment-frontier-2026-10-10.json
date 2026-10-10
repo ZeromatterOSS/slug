@@ -1,0 +1,295 @@
+{
+  "packet": "WP-7-305-m7a-java-environment-frontier-r1",
+  "status": "accepted",
+  "baseline": "09b345f111f8ae084dd0068cffbedc58db33b5cc",
+  "compatibility": "Slug-native finite command-scope environment-name admission; exact existing Bazel9 getenv/Need/source/error semantics unchanged. Linux priority; Windows minimal/deferred.",
+  "owner": "Existing test-only prepared public-probe Bodies complete-Need admission; normal immutable snapshot/frontier/progress/injection/rollback runtime DICE owners unchanged. TypedNeed lacks callerowner, no Java callsite attribution.",
+  "decision": "Staticborrowed JAVA_HOME exactname requires common matchingworkspace/everyname/finite20 and native_java_proxy_binding exactoriginal rules_java9.1.0 URL/digest/mirror/preparedMODULE AND existing defs PreparedFile/PublicProbe flag. IndependentCC/shell/apple cohorts unchanged. Normal acceptedempty snapshot supplies observedabsence; no ambientenvvalue capture.",
+  "sources": {
+    "before": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "6d8c13719232cdefc4a2c337aa49828799796d892d11dac7472843d273860635",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "68b09a6b5d26e3e288606dea9f2d70992fa2e0b08cb394267f0ae889f2a929c3"
+    },
+    "after_format": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "400405aee8e91f69c2191789941ade2ed52ad3a3f62742de9017a8f605156a9c",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "9d6e80378c538156caa00c51f255480104b8b1c7380eb9a6326efab8108b243f",
+      "app/slug_core_v2/src/runtime/source_service/offline_archive.rs": "a722375bf559745204014c7f3d6155e41fed6458417f1ba65437d658bd85233d",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs": "5580d5a77d6ba72e7ae115771fd8aeea5b3cfd68ce56af7a16910c8cf18ad3d8",
+      "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "c349008bb6af9a5c04fea351a032746bfaf37f36628aa0f0dae5fab20c7e6bec",
+      "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "be7e8886710456279d436d7abc2eb1e3d0669cef419d2b41bdfd0e3cffff543b",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "3ce9970c4a06ca14080064db8102dbd5634292f3189c0db8f6e9c6b479d6eda6",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/immutable_archive_namespace.rs": "5fe5d6122ef25b0e5bbf48b056fdccfae9e92c34746b9ffaf4d3877f74e2080d",
+      "app/slug_loading_v2/src/bzl_module.rs": "0b29609b83af0722babd73f4edde78a3dd7d15a05f55167fe8db2334ada2bb49",
+      "app/slug_loading_v2/src/bzl_module/external_bzl_syntax.rs": "f4aac200f3367bf7a633f6967e5812622d7bbef9552de3c2797d936864689294",
+      "app/slug_loading_v2/src/host_package_load_tests/external_bzl_frontier_tests.rs": "bc82d69e0786fbb0329748fb094557b2dffe94f3e48d23f60bed812ca100f98b",
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "6c3b2b7446e676281d0a4643c62a094db02e75dda491af0c7e9c06a15096f357",
+      "app/slug_core_v2/src/runtime/probe_observer/mapping.rs": "a65ab2f8f5b3f693cda65f3187350e503f775828bb8838720bfe33aa947eec2d",
+      "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "4b38ca52251b7c88a66b5d2e6d298225f590d39976beab15dbae5ffd78335525",
+      "app/slug_core_v2/src/runtime/dice.rs": "c7695697ca241158800f671cfb00ed5d5224927ad52a28136b17f1d456324b35",
+      "app/slug_loading_v2/src/host_package_load_tests.rs": "adec598714d7dd4db709a6b5cf2bec728091342866dde9583bba124e4f0006e7",
+      "app/slug_core_v2/src/runtime/source_service/regular_file.rs": "7e2f8f89dad916f30144bb53a70fab3054bc3e835638f9f914116461b6c10016",
+      "app/slug_core_v2/src/runtime/path_observation.rs": "c478a7c0b5bcc1eacca84e2c8b9e1c6ae45d8d58e4a82fc1b166445c66834b83",
+      "app/slug_core_v2/src/runtime/path_observation/scoped_directory.rs": "f9c0ed8553a963102a6fbd692cf52d055cf0a1efee57de83525c6aa7e1d990ee",
+      "app/slug_core_v2/src/runtime/input_image_bridge.rs": "8412150c5e2f4ad00ceed3e30a8bc0d84f5636e3215d2b7415f275de311761a8",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+      "app/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs": "6419cfb29331221ee8bed723e95dbf7fa1f0287ea6e147db02ec94d3aa89fe09",
+      "app/slug_core_v2/src/runtime/repository_host_input.rs": "88564e5b2e9639b8d0d905d8a547c1e3c05759459d2b41fbfc45808469cd2774",
+      "app/slug_core_v2/src/runtime/tests/repository_host_input_tests.rs": "a7c349439c9cec36f0ef5a12aeb041ca2f8551725c1ba8284c93e76eaeab159a"
+    }
+  },
+  "growth": {
+    "parent_policy_added": 5,
+    "focused_proof_added": 240,
+    "deleted": 0,
+    "qualification": "Largeparent narrow5lineboundary; singlecohesive matrix+normalprogress proof reuses fixtures, formatted240 exceedsestimate/150trigger reviewed. No newfixturetree/runtime/API/dependency/counters."
+  },
+  "allocation": {
+    "static_table_bytes": 16,
+    "literal_bytes": 9,
+    "bodies_size": 232,
+    "bodies_alignment": 8,
+    "qualification": "Actualcurrentstderr layout; unchangedBodies layout also emitted byexistingJava proxycontrol. No newretainedfield/pool/cache/String/Vec/valuecopy or sourceprofile. Tests own normal CompactStringfrontier/path/backing handles; existing scopedowners keepcleanup."
+  },
+  "focused": {
+    "current_artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-c50d299f2267e28b",
+      "sha256": "61aa5c01e8b4f8d3a5994ae526b70507bb1e6de2cf2129553593aa24a04b441c",
+      "features": [
+        "default",
+        "native-probe-observer"
+      ],
+      "compile_operation_sha256": "b79df1785719ba2688c76ccb55818ed15e8181637ecac3beb3d9f7befe4b599a",
+      "qualification": "Cargo JSON linewise; executable SHA streamed64KiB"
+    },
+    "selected": 8,
+    "passed": 8,
+    "elapsed_seconds": 0.19990901101846248,
+    "rss_kib": 57232,
+    "operation_sha256": "ce4b45089ea8bb7fa28f861b05555c8df53166d9577c131dce306adbd5ef8d42",
+    "preflight_sha256": "125c2cbe614e0d14f5e4a23cf6f8658b484b45fd569f6e9a76406d6e842df8b3",
+    "list_sha256": "de944dfe07fac7c172dab81dae0264eb73cc8d286848822e92766b9d74b42ea5",
+    "layout": {
+      "static_table_bytes": 16,
+      "static_row_bytes": 16,
+      "literal_bytes": 9,
+      "bodies_size": 232,
+      "bodies_alignment": 8
+    },
+    "layout_stream_sha256": "4317abd6bf057ef2fd833d4988edb2d3a397407357395818e1f895ed85daf051",
+    "proof": "Qualifiedcommand Java name with exact URL/digest/mirror/MODULE and defs PreparedFile/PublicProbe; foreign/case/suffix/unknown/independentCC/mixedbothorders reject with originalborrowedNeed. Normalempty accepted snapshot observesNone, duplicateprogress rejects, discardrestores Unauthorized/emptyacceptedstate. Fourgeneric runtime snapshot/cell/retry/cancel plus existingenv/proxycontrols pass. No caller/envvalue/body/wholefit/speed claim.",
+    "preserved_unproved": "First sourceREVISE inheritedCCfixture beforeanygates, rootlocalCCfalse correction; priorfreeze/verdict retained. Firstroot layoutsummary incorrectly expected eprintln marker in stdout, assertion stopped beforewrite; corrected actualstderr authority, no gate rerun."
+  },
+  "gates": {
+    "compile-core": {
+      "elapsed_seconds": 12.549606770044193,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 2816280,
+      "child_rusage_peak_kib": 2010700,
+      "sha256": "b79df1785719ba2688c76ccb55818ed15e8181637ecac3beb3d9f7befe4b599a"
+    },
+    "ordinary-list": {
+      "elapsed_seconds": 0.17716948606539518,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 868,
+      "child_rusage_peak_kib": 16208,
+      "sha256": "de944dfe07fac7c172dab81dae0264eb73cc8d286848822e92766b9d74b42ea5"
+    },
+    "core-preflight": {
+      "elapsed_seconds": 0.20031968294642866,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 14532,
+      "child_rusage_peak_kib": 16448,
+      "sha256": "125c2cbe614e0d14f5e4a23cf6f8658b484b45fd569f6e9a76406d6e842df8b3"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.19990901101846248,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 8,
+      "pass_count": 8,
+      "monitored_rss_kib": 56720,
+      "child_rusage_peak_kib": 57232,
+      "sha256": "ce4b45089ea8bb7fa28f861b05555c8df53166d9577c131dce306adbd5ef8d42"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.18091472098603845,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 1472,
+      "child_rusage_peak_kib": 15948,
+      "sha256": "024700b541a0a6c4a9f32a77237a712a915ea58609083de722b5ef68721a1484"
+    },
+    "native": {
+      "elapsed_seconds": 7.2722116959048435,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "monitored_rss_kib": 227432,
+      "child_rusage_peak_kib": 227608,
+      "sha256": "53d75c773d9bfd2ef4cd110f5e684c34e9a674473ab978fecf2b675fb5999162"
+    }
+  },
+  "native": {
+    "operation_sha256": "53d75c773d9bfd2ef4cd110f5e684c34e9a674473ab978fecf2b675fb5999162",
+    "stdout_sha256": "f053d8a81aa2570d6c15e64e4dba1f687ffda19a979ec640c2b3b29d5d6f0c24",
+    "elapsed_seconds": 7.2722116959048435,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 227608,
+    "rss_mib": 222.2734375,
+    "source_count": 251,
+    "decode_bytes": 55574013,
+    "write_bytes": 52795418,
+    "held_fds": 350,
+    "pins": 60,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 330,
+        "wall_ns": 180118778,
+        "process_cpu_ns": 180059377,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 330,
+        "wall_ns": 6621556019,
+        "process_cpu_ns": 6625803306,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 329,
+        "wall_ns": 183607256,
+        "process_cpu_ns": 183088125,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 330,
+        "wall_ns": 14422540,
+        "process_cpu_ns": 20395278,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 251 7021682 55574013 52795418 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=251 seen=251 emitted=251 admitted=251 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40770 encoded_bytes=138721 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "self_reported_phase_peak_kib": 228712,
+    "self_reported_phase_peak_mib": 223.3515625,
+    "rss_metric_qualification": "Supervisor monitor/childrusage peak separate from child self-reported phaseRSS; preserveboth as observedprefix, not wholefit/heapretirement.",
+    "java_environment_frontier_observed": false
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "evidence": {
+    "design.md": "8cf9393b1b3e2a3b7834dcf11b436385649c54d36c590d76e4182d7fe69e85a9",
+    "design-review.md": "9999482b10f8b489e3f767e12edf0fe642d4e8ee8a4b9386cf35317c26d9d1ca",
+    "design-binding.json": "69e6657d8514c841bafca32a4fa6f92e412ae3c4c18c40e5206b823f123e3934",
+    "implementation.md": "4a5c2f35b44c24050e5d73b1ba78b39731cf59b8facfb114625fd8bf7d2c224c",
+    "source-baseline.json": "0a5a1ee94d28ebaf1d6a3cff122a5484aa41830a412e83f2dd72d15584a30733",
+    "source-freeze.json": "35709e5b00cc894b6cde4d2f19dd0469272bf439e07a0f4541cdfbc71c2f409c",
+    "source-freeze-first.json": "cfaf43e22dc92404521d72254f85cf00ef0c39a10e7f95cc8b55e95e307721ce",
+    "prelaunch-source-first.md": "12442825849e6641b9decb1fb685b89cf05b011a44c5e9eff0aa838dcba77f7a",
+    "fixture-correction.md": "67061e4c67bc68286203d690489da0513ae17898b28c8a79d63f3772c33d88dc",
+    "static-review.md": "da2017cc72860dddfbbbc50201c11b69f09d28935de66de141ae1a15cf65d20c",
+    "helper-review.md": "b1aabdfa5cfa42c556a73aa895324bc3a813afbefc0eff91eb7b383e67be2877",
+    "prelaunch-source.md": "5dc550041435209b565788d3cea28892fd8f840b38ad15c10a4d6465b57e2974",
+    "prelaunch-evidence.md": "d5ea6094335ee2c1a596b4f65d52e1c44fa2eac9f9e127ed42f5ea63fff85bb4",
+    "prelaunch-review.md": "596f3ac704d3ad13888d459b9d56df7268c0f44720979a3c418fd8f12aed3cfb",
+    "focused-results.json": "2b8f5c3015a9668ac49989166895a713410d7761d6bf780f4c60e8d8f5193b84",
+    "native-results.json": "678d58c90bfcd9a085e35e902edafb9cfdfef30b6c21b8feb488cda942fedb6b",
+    "native-config.json": "889e946ad07a6e7b2580c096ae9523ad2f85ab14c0b6ff82aa46633d182e4407",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "run_gate.py": "68fb842f8a0f2540cf4caf89502cab39c3446693680d944507e9c34112e455d6",
+    "decode_native.py": "805123db1317f68c92c6ba16ef8ce9e634de17293f21b52bea4eaee556553e1c",
+    "setup_gates.py": "323bfdc7d19f7384cede99c45b147c9ba2c59edeaaf578a193bf6efc38e744c7",
+    "native_setup.py": "0ac22fc837d99970927e38954628470c245f8b6021c9ba3ffee816b116d57055",
+    "prepare_configs.py": "a1660b47777163647aed3ddecb60912f35bad4797b3eeecbe20af343e02e7326",
+    "gate-preparation-notes.md": "0292d03fa560d3eefce3dad6e916f9a6fb3554e4d3e29ca332d7af042e63cf1e",
+    "final-source-review.md": "b148ee1b8daf5b674e49caa97dd65dc3a78a266604b6fb6d7db0d3d4a9cefb3c",
+    "final-evidence-review.md": "1ba56079076a0bd91de0b8302aadcedc80e62317c318a7593c36795b6a7c16f3",
+    "archive-status.txt": "237664a8e76b30aaf9babf0c21994c8ae19b4256ab10ffe93aeefc7a35097dd6"
+  },
+  "preserved_unproved": {
+    "source_REVISE": "InheritedCC role madeTEMP negativeauthorized; localfixtureCCfalse fixedbeforeanygates, unchangedsharedfactory/policy/TEMP assertion/explicitCCmixedpositive. Firstreview/freezepreserved.",
+    "root_layout_decode": "Firstsummary expected eprintln in stdout/asserted beforewrite; actualstderr corrected withoutgate rerun.",
+    "native_java_frontier": "Currentnative stoppedWorkDeadline source251 beforeknownJAVA_HOME environmentNeed; finiteadmission unobserved inthisnative, currentunit/normalguardproof establishes behavior."
+  },
+  "claim_limits": "ONE nativeprefix supervisor222.273MiB/selfreported223.352MiB of256, source251. GenuineWorkDeadline firstcallerdiagnostic7:296, version2status0; no clock/overflow/partial/suppressed flags.350heldnoninheritedFDs/currentpinsstable/joinempty/collectionnon-atomic. Root330windows6.622s allthreadCPU6.626s not exclusive/perkey/cause/speed; fullproducer/time/wholefit/Rustc/actions/certificates/bootstrap open. Allcapsunchanged/no identicalnative retry; preparationno workloadcredit.",
+  "checks": {
+    "pinned_twofile_format": "PASS",
+    "diff": "PASS",
+    "plan": "PASS matchedcurrentpacket",
+    "archive": "PASS acceptance"
+  },
+  "goal_status": "ACTIVE",
+  "next": "Trace concrete remaining repeated normal rootcompute work for substantive reuse/allocation improvement; preserve current exactsemantics/caps and scopedinterning ownership.",
+  "packet_timing_utc": {
+    "start": "2026-10-10 19:40 UTC",
+    "native_complete": "2026-10-10 19:54 UTC",
+    "qualification": "Approximate packetspan includesdesign/helper/source/correction/reviews; exactgate timingsabove,no workflowspeed claim.",
+    "accept": "2026-10-10 19:57 UTC"
+  },
+  "toolchain": {
+    "channel": "nightly-2025-09-14",
+    "tools": {
+      "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "rustc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "rustdoc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "rustfmt": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt"
+    },
+    "qualification": "fresh rustup which pinned TOML channel"
+  }
+}

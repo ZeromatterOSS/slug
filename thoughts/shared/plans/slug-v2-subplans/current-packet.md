@@ -1,46 +1,40 @@
-# WP1092 external syntax/load synopsis reuse
+# WP1093 qualified Java environment frontier
 
-Packet: WP-7-304-m7a-external-syntax-synopsis-r1
-Status: accepted — broader producer frontier trace follows
-Baseline: 22fd34ebc187bff450dfbd8ae58dae71cca4f188
-Owner: existing Loading external source/parse/evaluation DICE owners.
-Compatibility: exact admitted Bazel9 syntax/encoding/load/error/evaluation behavior;
-Rust-native incremental reuse Slug-native. Linux priority; Windows minimal/deferred.
+Packet: WP-7-305-m7a-java-environment-frontier-r1
+Status: accepted — remaining root computation frontier trace follows
+Baseline: 09b345f111f8ae084dd0068cffbedc58db33b5cc
+Owner: existing Core test-only prepared public-probe Bodies complete-Need admission.
+Compatibility: Slug-native finite command-scope name admission; exact admitted Bazel9
+getenv/source/Need/error behavior unchanged. Linux priority; Windows minimal/deferred.
 
-Private ExternalBzlSyntaxKey owns the full original module identity plus mode.
-Original current source completes first in the same immutable transaction under
-its existing module guard; the private synopsis only revalidates that completed
-source. No new detector identity, child routing or direct-root/source-wait surface.
-Pure syntax metadata/errors are valid; Need/source/outer/cycle failures invalid.
-Existing source observations remain current on every parent attempt.
+The borrowed static JAVA_HOME row requires exact original native_java_proxy_binding
+URL/digest/mirror/preparedMODULE AND existing defs PreparedFile/PublicProbe flag.
+Common matching workspace/nonempty/everyname/finite20 and complete-batch ordering
+remain. CC/shell/Apple cohorts stay independent. Typed Need has no caller field;
+no Java callsite attribution. The accepted empty command snapshot supplies observed
+absence through existing normal DICE progress/injection/discard; no ambient capture,
+new key/field/cache/pool/runtime sourceprofile or cap change.
 
-The synopsis shares existing byteArc, moves filename and shares ordered immutable
-load names. Retries borrow names; settled APIs receive required independent storage.
-No retained AST/CodeMap/full sourceString/cache/global interner/lock. Metadata520B,
-key312B versus original304B; filename/load capacities and extended DICE body/history
-retention are real costs. Source live credits retire at finish, not with returned
-Arc; current scope cumulative budgets and actual Weak graph release stay explicit.
-One extra cold settled parse is traded for proven unresolved operation reuse;
-CPU/speed improvement remains unproved. Existing scoped interning stays in use.
+Actual policy5 lines, one cohesive focused proof240 afterformat. Staticrow16B/literal9B,
+Bodies232align8 unchanged; runtime policy adds no owned string/value allocation.
+Allowed sources only existing platforms_module_preparation_tests.rs and public child.
+First sourceREVISE inheritedCCrole fixed locally before any gates; sharedfactory,
+policy/TEMPnegative/explicitCCpositive unchanged, firstfreeze/review preserved.
+Independent DESIGN/source/FINAL+evidence reviews accepted;8 current exact owner/runtime
+controls pass, original-profile native-feature Core compiles12.550s. Fresh current
+singleton selection and ONE changed-policy native executed. Format/diff/archive/
+plan checks pass; no failedCargo/test/native or identicalnative retry.
 
-Accepted source scope: narrow bzl_module.rs, new private external_bzl_syntax.rs,
-existing external_bzl_frontier_tests.rs and five-line strict observed dependency
-expectation in host_package_load_tests.rs. Independent DESIGN/amendment/source/FINAL
-and evidence review;18 current focused passes, direct Loading/Core/CLI production
-check and original-profile native-feature Core preparation pass. Format/archive/
-diff/plan checks pass. Failed/stale preparations and first fixture batch preserved.
+Native7.272s supervisor222.273MiB/selfreported223.352MiB of256, source251;
+350 ordered held noninherited FD bindings/60pins stable, joined empty group,
+collectionnon-atomic. First WorkDeadline callerdiagnostic7:296, version2status0;
+330 root windows6.622wall/6.626allthreadCPU, not perkey/exclusive/cause/speed.
+No WP1024 environment frame reached; native newpolicy admission remains unobserved,
+while current unit+normal empty-frontier proof establishes the finite behavior.
+Fullproducer/time/wholefit/Rustc/actions/certificates/bootstrap remain open.
 
-ONE native7.289s, supervisor224.977MiB/self-reported226.035MiB of256, source252;
-350 ordered held noninherited FD bindings and66 pins stable, group joined/empty,
-collection non-atomic. Captured workspace-matching JAVA_HOME names-only environment
-Need is outside current prepared-source admission; no Scope error/timeout latch.
-Final root cumulative interval aborted_partial. This prefix proves resource fit
-only; full producer/time/wholefit/Rustc/actions/certificates/bootstrap remain open.
-All caps unchanged; no identical native retry or preparation workload credit.
-
-[Compact receipt](wp1092-external-syntax-synopsis-2026-10-10.json) owns exact hashes,
-gates/caps/reviews/qualifications. Accepted implementation contract and research
-remain reachable at this packet's acceptance commit and target/wp1092. Next selection
-traces the current normal producer refusal before defining a bounded owner change.
-Goal ACTIVE. Preserve allocation discipline and prefer borrow/move/share/scoped
-interning whenever owner lifetime and cleanup fit.
+[Receipt](wp1093-java-environment-frontier-2026-10-10.json) owns exact source/gates/
+review hashes/caps/metrics/qualifications. Next selection traces concrete repeated
+normal root-computation allocation for substantive reuse, without inferred CPUcause
+or caprise. Goal ACTIVE. Borrow/move/share and use existing scoped interners where
+owner lifetime/cleanup fit; don't pool unique temporary strings.

@@ -2525,6 +2525,246 @@ fn java_proxy_test_bodies() -> Bodies {
     bodies
 }
 #[cfg(target_os = "linux")]
+#[test]
+fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
+    use immutable_archive_preparation::JAVA_DIGEST;
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PROTOBUF_URL;
+    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+    use slug_bzlmod_v2::RepositoryEnvironmentCell;
+    use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
+    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
+    use slug_bzlmod_v2::RepositoryHostInputTransaction;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let selected = || {
+        let mut bodies = java_proxy_test_bodies().with_rules_rust_defs_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
+        bodies.rules_cc_import_sources = false;
+        bodies
+    };
+    let need = |workspace: &NormalizedAbsolutePath, names: &[&str]| {
+        SourcePreparationNeeds::environment(
+            NeedRepositoryEnvironmentNames::new(
+                workspace.dupe(),
+                RepositoryEnvironmentNameFrontier::from_unsorted(
+                    names.iter().copied().map(Into::into),
+                ),
+            )
+            .unwrap(),
+        )
+    };
+    let bodies = selected();
+    let java = need(&bodies.roots[0], &RULES_JAVA_ENVIRONMENT_NAMES);
+    assert!(bodies.admit(&java).is_ok());
+    assert_eq!(
+        RULES_CC_ENVIRONMENT_NAMES.len()
+            + RULES_SHELL_ENVIRONMENT_NAMES.len()
+            + APPLE_SUPPORT_ENVIRONMENT_NAMES.len()
+            + RULES_JAVA_ENVIRONMENT_NAMES.len(),
+        20
+    );
+    eprintln!(
+        "WP1093_JAVA_ENVIRONMENT_LAYOUT table={} row={} literal={} bodies={}/{}",
+        std::mem::size_of_val(&RULES_JAVA_ENVIRONMENT_NAMES),
+        std::mem::size_of::<&str>(),
+        RULES_JAVA_ENVIRONMENT_NAMES[0].len(),
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let candidate =
+                java_proxy_test_bodies().with_rules_rust_defs_import_sources(registry, command);
+            assert_eq!(
+                candidate.admit(&java).is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    let default = Bodies::new(bodies.roots.clone());
+    assert_eq!(default.admit(&java).unwrap_err().family, "environment");
+    for case in 0..6 {
+        let mut closed = selected();
+        match case {
+            0 => closed.java_offline_archive = None,
+            5 => closed.rules_rust_defs_import_sources = false,
+            _ => {
+                let binding = closed.java_offline_archive.as_mut().unwrap();
+                match case {
+                    1 => {
+                        binding.backing = OfflineArchiveBacking::new(
+                            PROTOBUF_URL,
+                            JAVA_DIGEST,
+                            binding.backing.path().dupe(),
+                        )
+                    }
+                    2 => {
+                        binding.backing = OfflineArchiveBacking::new(
+                            JAVA_URL,
+                            [0; 32],
+                            binding.backing.path().dupe(),
+                        )
+                    }
+                    3 => {
+                        binding.backing = OfflineArchiveBacking::new(
+                            JAVA_URL,
+                            JAVA_DIGEST,
+                            path("/foreign/java.tar.gz"),
+                        )
+                    }
+                    _ => binding.module = path("/foreign/MODULE.bazel"),
+                }
+            }
+        }
+        let denied = closed.admit(&java).unwrap_err();
+        assert_eq!(denied.family, "environment");
+        assert!(std::ptr::eq(
+            closed
+                .environment_diagnostic(&java, &denied)
+                .unwrap()
+                .request,
+            java.repository_environment().unwrap()
+        ));
+    }
+    assert_eq!(
+        bodies
+            .admit(&need(&path("/foreign"), &RULES_JAVA_ENVIRONMENT_NAMES))
+            .unwrap_err()
+            .family,
+        "environment"
+    );
+    for name in [
+        "java_home",
+        "JAVA_HOME_suffix",
+        "UNKNOWN",
+        "TEMP",
+        "PATH",
+        "",
+    ] {
+        let bad = need(&bodies.roots[0], &[name]);
+        for mixed in [java.try_union(&bad).unwrap(), bad.try_union(&java).unwrap()] {
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(denied.family, "environment");
+            assert!(denied.path.is_none());
+            assert!(std::ptr::eq(
+                bodies
+                    .environment_diagnostic(&mixed, &denied)
+                    .unwrap()
+                    .request,
+                mixed.repository_environment().unwrap()
+            ));
+        }
+    }
+    // Another cohort stays independent; enabling Java cannot grant its names.
+    let cc = selected()
+        .with_sixth(path("/cc"))
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let cc_need = need(&cc.roots[0], &RULES_CC_ENVIRONMENT_NAMES);
+    assert!(cc.admit(&java.try_union(&cc_need).unwrap()).is_ok());
+    let mut no_java = cc;
+    no_java.java_offline_archive = None;
+    assert!(no_java.admit(&cc_need).is_ok());
+    assert_eq!(no_java.admit(&java).unwrap_err().family, "environment");
+
+    // Exercise the normal command/frontier owner with the accepted empty snapshot.
+    let workspace = tempfile::tempdir().unwrap();
+    let runtime = test_runtime(workspace.path()).unwrap();
+    let normalized = NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap();
+    let accepted = accepted_native_snapshot(&runtime);
+    assert!(accepted.inputs.request.repository_environment.is_empty());
+    let mut current = selected();
+    current.roots[0] = normalized.dupe();
+    let java = need(&normalized, &RULES_JAVA_ENVIRONMENT_NAMES);
+    current.admit(&java).unwrap();
+    let mut guard = NativeDemandAbortGuard::new(
+        runtime
+            .begin_native_demand_command_with_inputs(
+                NativeDemandRequestInputBundle::normalized_initial(),
+            )
+            .unwrap()
+            .into_command(),
+    );
+    let bad = need(&normalized, &["UNKNOWN"]);
+    for mixed in [java.try_union(&bad).unwrap(), bad.try_union(&java).unwrap()] {
+        let denied = current.admit(&mixed).unwrap_err();
+        assert!(std::ptr::eq(
+            current
+                .environment_diagnostic(&mixed, &denied)
+                .unwrap()
+                .request,
+            mixed.repository_environment().unwrap()
+        ));
+        assert_eq!(
+            guard.command().repository_environment_frontier,
+            accepted.repository_environment_frontier
+        );
+        assert!(
+            !guard
+                .command()
+                .repository_environment_frontier
+                .contains(RULES_JAVA_ENVIRONMENT_NAMES[0])
+        );
+    }
+    assert_eq!(
+        guard.progress(&java).unwrap(),
+        NativeDemandProgress::Environment
+    );
+    assert!(matches!(
+        guard.progress(&java),
+        Err(NativeDemandSessionError::EnvironmentInternalNonProgress)
+    ));
+    guard.begin_attempt().unwrap();
+    let cell =
+        RepositoryEnvironmentCellKey::new(normalized.dupe(), RULES_JAVA_ENVIRONMENT_NAMES[0]);
+    runtime.runtime.block_on(async {
+        let data = guard.attempt_user_computation_data().unwrap();
+        let carrier = data.data.get::<RepositoryHostInputTransaction>().unwrap();
+        assert!(carrier.snapshot().is_empty());
+        assert!(carrier.frontier().contains(RULES_JAVA_ENVIRONMENT_NAMES[0]));
+        let mut updater = runtime.dice.updater_with_data(data);
+        guard.inject_attempt(&mut updater).unwrap();
+        let mut tx = updater.commit().await;
+        runtime.request_revision.bind_cycle_detector(&tx);
+        assert_eq!(
+            tx.compute(&cell).await.unwrap(),
+            RepositoryEnvironmentCell::observed(None)
+        );
+        assert!(
+            tx.compute(&RepositoryEnvironmentSnapshotKey::new(normalized.dupe()))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    });
+    let restored = guard.discard().unwrap();
+    assert!(restored.snapshot().is_empty());
+    assert!(
+        !restored
+            .frontier()
+            .contains(RULES_JAVA_ENVIRONMENT_NAMES[0])
+    );
+    assert_current_native_snapshot(&runtime, &accepted);
+    runtime.runtime.block_on(async {
+        let data = runtime.user_computation_data(None).unwrap();
+        let mut tx = runtime.dice.updater_with_data(data).existing_state().await;
+        runtime.request_revision.bind_cycle_detector(&tx);
+        assert_eq!(
+            tx.compute(&cell).await.unwrap(),
+            RepositoryEnvironmentCell::Unauthorized
+        );
+        assert!(
+            tx.compute(&RepositoryEnvironmentSnapshotKey::new(normalized))
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    });
+}
+#[cfg(target_os = "linux")]
 fn java_proxy_generated_request(
     bodies: &Bodies,
     plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,

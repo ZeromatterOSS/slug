@@ -34,21 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-304-m7a-external-syntax-synopsis-r1
-Status: accepted — broader producer frontier trace follows
+Packet: WP-7-305-m7a-java-environment-frontier-r1
+Status: accepted — remaining root computation frontier trace follows
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records accepted private
-DICE syntax/load synopsis reuse. Unresolved retries share immutable source/load
-storage and borrow names; ASTs stay transient, current source observations and exact
-errors/evaluation remain authoritative. All18 focused tests and production checks
-pass. One capped native prefix has supervisor225MiB/self-reported226MiB of256,
-252 source admissions, and a captured JAVA_HOME environment Need outside the current
-prepared-source policy. The last root interval is partial; no speed or full-workload
-fit claim follows. The [receipt](./slug-v2-subplans/wp1092-external-syntax-synopsis-2026-10-10.json)
-records cold extra parse/metadata retention and preserved correction evidence.
-Next work traces that concrete normal producer refusal. Full producer, time and
-whole-workload fit, Rustc, actions, certificates and bootstrap remain open. Linux
-priority; Windows minimal/deferred. Goal ACTIVE; allocation discipline applies.
+The [current manifest](./slug-v2-subplans/current-packet.md) records finite JAVA_HOME
+name admission under the exact original offline Java binding and prepared public
+role. Eight controls prove normal empty-snapshot observed absence and rollback;
+no runtime fields, string copies or ambient value capture were added. One changed
+native prefix stayed within223.35MiB of256 and stopped at WorkDeadline/source251
+before that environment frontier, so native admission remains unobserved.
+The [receipt](./slug-v2-subplans/wp1093-java-environment-frontier-2026-10-10.json) binds
+current source/gates/qualified metrics. Next work traces concrete repeated allocation
+inside normal root computation. WP1092 source/load sharing remains accepted in
+09b345f11. Current caps/allocation discipline remain; fullproducer/time/wholefit/
+Rustc/actions/certificates/bootstrap stay open. Linux priority; Windows minimal/deferred.
+Goal ACTIVE.
 
 ### Ready and blocked queue
 
