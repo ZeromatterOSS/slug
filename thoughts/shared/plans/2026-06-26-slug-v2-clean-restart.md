@@ -34,19 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-299-m7a-cc-library-eager-source-cohort-r1
-Status: accepted — complete original eager rules_cc cohort advanced to Java generated proxy
+Packet: WP-7-300-m7a-java-compatibility-proxy-r1
+Status: accepted — original Java proxy advanced to genuine Host metadata frontier
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records
-[WP1086](./slug-v2-subplans/wp1086-cc-library-eager-source-cohort-2026-10-10.json):
-all34 missing original rules_cc sources admitted and charged through unchanged
-source owners and the existing exact generated compatibility proxy. The real
-continuation took6.38901s at205.676MiB against256MiB, with no source/timeerror,
-and advanced through seven original Java archive source demands to that ruleset's
-generated compatibility proxy-kind refusal. Borrowed static tables add no runtime
-owned strings or retained fields; existing scoped interning remains. Next bounded
-Java proxy owner contract research is underway. Terminal producer/Rustc/actions/
-certificates/full-workload fit remain open; Windows minimal/deferred. Goal ACTIVE.
+[WP1087](./slug-v2-subplans/wp1087-java-compatibility-proxy-2026-10-10.json):
+exact original two-file Java proxy admission through the qualified archive backing,
+complete generated plan and supplied current namespace. The real continuation
+wrote2239B of original output and charged the proxy plus39 later Java archive files,
+including all12 direct eager leaves, in7.24162s at207.402MiB against256MiB.
+No source/timeerror; next genuine Host/tmp Lstat is being traced to its normal
+source owner before a successor contract. Existing borrowing/scoped interning and
+all caps persist. Terminal producer/Rustc/actions/certificates/full-workload fit
+remain open; Windows minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

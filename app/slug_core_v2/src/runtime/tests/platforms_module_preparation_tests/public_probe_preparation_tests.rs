@@ -2440,6 +2440,527 @@ fn proxy_generated_request(
     request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
     request
 }
+#[cfg(target_os = "linux")]
+const JAVA_PROXY_LITERAL_0: &[u8] = br###"
+load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+exports_files(['proxy.bzl'], visibility = ["@rules_java//test:__pkg__"])
+bzl_library(
+    name = "proxy_bzl",
+    srcs = ["proxy.bzl"],
+    deps = [
+        "@rules_java//java/bazel/rules",
+        "@rules_java//java/common/rules:toolchain_rules",
+        "@rules_java//java/private:internals",
+        "@rules_java//java/bazel:http_jar_bzl",
+    ],
+    visibility = ["//visibility:public"]
+)
+            "###;
+
+#[cfg(target_os = "linux")]
+const JAVA_PROXY_LITERAL_1: &[u8] = br###"
+load("@rules_java//java/bazel/rules:bazel_java_binary_wrapper.bzl", _java_binary = "java_binary")
+load("@rules_java//java/bazel/rules:bazel_java_import.bzl", _java_import = "java_import")
+load("@rules_java//java/bazel/rules:bazel_java_library.bzl", _java_library = "java_library")
+load("@rules_java//java/bazel/rules:bazel_java_plugin.bzl", _java_plugin = "java_plugin")
+load("@rules_java//java/bazel/rules:bazel_java_test.bzl", _java_test = "java_test")
+load("@rules_java//java/bazel:http_jar.bzl", _http_jar = "http_jar")
+load("@rules_java//java/common/rules:java_package_configuration.bzl", _java_package_configuration = "java_package_configuration")
+load("@rules_java//java/common/rules:java_runtime.bzl", _java_runtime = "java_runtime")
+load("@rules_java//java/common/rules:java_toolchain.bzl", _java_toolchain = "java_toolchain")
+load("@rules_java//java/private:java_common.bzl", _java_common = "java_common")
+load("@rules_java//java/private:java_common_internal.bzl", _java_common_internal_compile = "compile")
+load("@rules_java//java/private:java_info.bzl", _JavaInfo = "JavaInfo", _JavaPluginInfo = "JavaPluginInfo",
+  _java_info_internal_merge = "merge", _java_info_to_implicit_exportable = "to_implicit_exportable")
+
+java_binary = _java_binary
+java_import = _java_import
+java_library = _java_library
+java_plugin = _java_plugin
+java_test = _java_test
+java_package_configuration = _java_package_configuration
+java_runtime = _java_runtime
+java_toolchain = _java_toolchain
+java_common = _java_common
+JavaInfo = _JavaInfo
+JavaPluginInfo = _JavaPluginInfo
+java_common_internal_compile = _java_common_internal_compile
+java_info_internal_merge = _java_info_internal_merge
+java_info_to_implicit_exportable = _java_info_to_implicit_exportable
+http_jar = _http_jar
+            "###;
+
+#[cfg(target_os = "linux")]
+fn java_proxy_literal_rows() -> [(&'static str, &'static [u8], bool); 2] {
+    [
+        ("BUILD.bazel", JAVA_PROXY_LITERAL_0, true),
+        ("proxy.bzl", JAVA_PROXY_LITERAL_1, true),
+    ]
+}
+#[cfg(target_os = "linux")]
+fn java_proxy_test_bodies() -> Bodies {
+    use immutable_archive_preparation::ArchiveBinding;
+    use immutable_archive_preparation::JAVA_DIGEST;
+    use immutable_archive_preparation::JAVA_PREPARED_MODULE;
+    use immutable_archive_preparation::JAVA_URL;
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let mut bodies = namespace_test_bodies();
+    bodies.java_offline_archive = Some(ArchiveBinding {
+        backing: OfflineArchiveBacking::new(
+            JAVA_URL,
+            JAVA_DIGEST,
+            NormalizedAbsolutePath::new(
+                project
+                    .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                    .join(JAVA_URL.strip_prefix("https://").unwrap()),
+            )
+            .unwrap(),
+        ),
+        module: NormalizedAbsolutePath::new(project.join(JAVA_PREPARED_MODULE)).unwrap(),
+    });
+    bodies
+}
+#[cfg(target_os = "linux")]
+fn java_proxy_generated_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = generated_globals_request(bodies, plan);
+    request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+        "rules_java++compatibility_proxy+compatibility_proxy",
+    )
+    .unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_java+//java:rules_java_deps.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "_compatibility_proxy_repo_rule".into();
+    request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+    request
+}
+#[test]
+#[cfg(target_os = "linux")]
+fn java_compatibility_proxy_materialization_is_exact_and_opt_in() {
+    use immutable_archive_preparation::JAVA_DIGEST;
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PROTOBUF_URL;
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = java_proxy_test_bodies();
+    let rows = java_proxy_literal_rows();
+    let valid = SourcePreparationNeeds::repository(java_proxy_generated_request(
+        &bodies,
+        small_generated_plan(&rows),
+    ));
+    let original = valid.repository_materializations().values().next().unwrap();
+    let count = Arc::strong_count(original);
+    let backing = &bodies.java_offline_archive.as_ref().unwrap().backing;
+    let owners = Arc::strong_count(backing);
+    assert!(bodies.offline_archive.is_none()); // Java authorization has no protobuf dependency.
+    assert!(bodies.admit(&valid).is_ok());
+    assert_eq!(Arc::strong_count(original), count);
+    assert_eq!(Arc::strong_count(backing), owners);
+    assert!(std::ptr::eq(
+        bodies
+            .generated_features_owner_signatures(original)
+            .unwrap(),
+        &GENERATED_JAVA_PROXY_FILES[..]
+    ));
+    eprintln!(
+        "WP1087_JAVA_PROXY_LAYOUT bodies={}/{} scope={}/{} signatures={} row={} literal={}",
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>(),
+        std::mem::size_of_val(&GENERATED_JAVA_PROXY_FILES),
+        std::mem::size_of::<GeneratedFileSignature>(),
+        JAVA_PROXY_LITERAL_0.len() + JAVA_PROXY_LITERAL_1.len()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let selected =
+                java_proxy_test_bodies().with_generated_features_file_effects(registry, command);
+            assert_eq!(
+                selected.admit(&valid).is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    let default = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    assert!(default.admit(&valid).is_err());
+    for case in 0..5 {
+        let mut closed = java_proxy_test_bodies();
+        if case == 0 {
+            closed.java_offline_archive = None;
+        } else {
+            let binding = closed.java_offline_archive.as_mut().unwrap();
+            match case {
+                1 => {
+                    binding.backing = OfflineArchiveBacking::new(
+                        PROTOBUF_URL,
+                        JAVA_DIGEST,
+                        binding.backing.path().dupe(),
+                    )
+                }
+                2 => {
+                    binding.backing =
+                        OfflineArchiveBacking::new(JAVA_URL, [0; 32], binding.backing.path().dupe())
+                }
+                3 => {
+                    binding.backing = OfflineArchiveBacking::new(
+                        JAVA_URL,
+                        JAVA_DIGEST,
+                        path("/foreign/java.tar.gz"),
+                    )
+                }
+                _ => binding.module = path("/foreign/MODULE.bazel"),
+            }
+        }
+        assert!(
+            closed
+                .admit_with_plan_matcher(&valid, &|_, _| true)
+                .is_err()
+        );
+    }
+    let allowed = SourcePreparationNeeds::repository(proxy_generated_request(
+        &bodies,
+        small_generated_plan(&proxy_literal_rows()),
+    ));
+    assert!(bodies.admit(&allowed).is_ok());
+    let reject = |bad: SourcePreparationNeeds| {
+        let offender = bad.repository_materializations().values().next().unwrap();
+        for mixed in [
+            allowed.try_union(&bad).unwrap(),
+            bad.try_union(&allowed).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(bodies.admit(&mixed).unwrap_err().family, "materialization");
+            let (first, reason) = bodies.first_denied_materialization(&mixed).unwrap();
+            assert_eq!(reason, "generated_kind");
+            assert!(std::ptr::eq(first, offender.as_ref()));
+        }
+    };
+    for case in 0..9 {
+        let mut wrong = original.as_ref().clone(); // Shares original immutable plan/attribute storage.
+        match case {
+            0 => wrong.id.workspace = path("/other"),
+            1 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    "rules_java++compatibility_proxy+other",
+                )
+                .unwrap()
+            }
+            2 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other+//java:rules_java_deps.bzl").unwrap()
+            }
+            3 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_java+//private:rules_java_deps.bzl").unwrap()
+            }
+            4 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_java+//java:other.bzl").unwrap()
+            }
+            5 => wrong.repo_spec.rule_id.rule_name = "other".into(),
+            6 => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("java").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("rules_java+").unwrap(),
+                );
+                wrong.repo_spec.rule_id.bzl_file =
+                    slug_identity_v2::ApparentLabel::parse("@java//java:rules_java_deps.bzl")
+                        .unwrap()
+                        .resolve(&mapping);
+            }
+            _ => {
+                let mut attributes = starlark_map::small_map::SmallMap::new();
+                attributes.insert(
+                    compact_str::CompactString::new("unexpected"),
+                    if case == 7 {
+                        slug_bzlmod_v2::OverrideAttributeValue::None
+                    } else {
+                        slug_bzlmod_v2::OverrideAttributeValue::Bool(true)
+                    },
+                );
+                wrong.repo_spec.attributes = Arc::new(attributes);
+            }
+        }
+        let bad = SourcePreparationNeeds::repository(wrong);
+        assert!(bodies.admit_with_plan_matcher(&bad, &|_, _| true).is_err());
+        reject(bad);
+    }
+    let reject_rows = |changed: &[(&str, &[u8], bool)]| {
+        reject(SourcePreparationNeeds::repository(
+            java_proxy_generated_request(&bodies, small_generated_plan(changed)),
+        ));
+    };
+    reject_rows(&[]);
+    reject_rows(&rows[..1]);
+    reject_rows(&[rows[0], rows[1], ("extra", b"", true)]);
+    reject_rows(&[rows[1], rows[0]]);
+    let mutation = [b'x'; 1778];
+    for file in 0..2 {
+        for change in 0..4 {
+            let mut changed = rows;
+            match change {
+                0 => changed[file].0 = "wrong.bzl",
+                1 => changed[file].1 = b"",
+                2 => changed[file].1 = &mutation[..rows[file].1.len()],
+                _ => changed[file].2 = false,
+            }
+            reject_rows(&changed);
+        }
+    }
+    let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+    builder
+        .push_archive(
+            Arc::from([compact_str::CompactString::new(
+                "https://example.invalid/archive.tar.xz",
+            )]),
+            [0; 32],
+            compact_str::CompactString::new("prefix"),
+        )
+        .unwrap();
+    reject(SourcePreparationNeeds::repository(
+        java_proxy_generated_request(&bodies, builder.finish()),
+    ));
+    assert_eq!(Arc::strong_count(original), count);
+    assert_eq!(Arc::strong_count(backing), owners);
+}
+#[test]
+#[cfg(target_os = "linux")]
+fn java_compatibility_proxy_namespace_is_current_and_confined() {
+    let bodies = java_proxy_test_bodies();
+    let request = Arc::new(java_proxy_generated_request(
+        &bodies,
+        small_generated_plan(&java_proxy_literal_rows()),
+    ));
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let epoch_a = namespace_test_epoch_at(&bodies, [request.clone()], instance, "/parent/A");
+    let epoch_b = namespace_test_epoch_at(&bodies, [request.clone()], instance, "/parent/B");
+    let count = Arc::strong_count(&request);
+    let demand = |namespace, path, operation| {
+        PathObservationDemand::new(
+            namespace,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let materialized = PathObservationNamespace::Materialization(instance);
+    let admits = |d: &PathObservationDemand, epoch| {
+        namespace_policy(&bodies, d, epoch, &generated_features_plan_matches).admits(&d.operation())
+    };
+    for (epoch, root, fixed) in [
+        (&epoch_a, "/parent/A", "/parent/A/proxy.bzl"),
+        (&epoch_b, "/parent/B", "/parent/B/proxy.bzl"),
+    ] {
+        for path in ["/", "/parent", root] {
+            assert!(admits(
+                &demand(materialized, path, PathObservationOperation::Lstat),
+                Some(epoch)
+            ));
+            assert!(!admits(
+                &demand(materialized, path, PathObservationOperation::FileBytes),
+                Some(epoch)
+            ));
+        }
+        assert!(admits(
+            &demand(materialized, fixed, PathObservationOperation::FileBytes),
+            Some(epoch)
+        ));
+    }
+    let valid_demand = demand(
+        materialized,
+        "/parent/B/proxy.bzl",
+        PathObservationOperation::FileBytes,
+    );
+    assert!(!admits(&valid_demand, Some(&epoch_a)));
+    assert!(!admits(&valid_demand, None));
+    assert!(!admits(
+        &demand(
+            materialized,
+            "/parent/A/proxy.bzl",
+            PathObservationOperation::FileBytes
+        ),
+        Some(&epoch_b)
+    ));
+    let wrong_workspace = slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+        NormalizedAbsolutePath::new("/foreign").unwrap(),
+        [],
+    )
+    .unwrap();
+    assert!(!admits(&valid_demand, Some(&wrong_workspace)));
+    let mut other = request.as_ref().clone();
+    other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let ambiguous = namespace_test_epoch_at(
+        &bodies,
+        [request.clone(), Arc::new(other)],
+        instance,
+        "/parent/B",
+    );
+    assert!(!admits(&valid_demand, Some(&ambiguous)));
+    let mut wrong_plan = request.as_ref().clone();
+    wrong_plan.kind = RepositoryMaterializationKind::GeneratedFileEffects(small_generated_plan(
+        &java_proxy_literal_rows()[..1],
+    ));
+    let wrong_epoch =
+        namespace_test_epoch_at(&bodies, [Arc::new(wrong_plan)], instance, "/parent/B");
+    assert!(!admits(&valid_demand, Some(&wrong_epoch)));
+    let valid = SourcePreparationNeeds::path(NeedPathObservations::singleton(valid_demand));
+    let admit_need = |needs: &SourcePreparationNeeds| {
+        bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|d| {
+            admits(d, Some(&epoch_b))
+        })
+    };
+    assert!(admit_need(&valid).is_ok());
+    let foreign = PathObservationNamespace::Materialization(
+        slug_workspace_v2::PathObservationInstanceId::new(18),
+    );
+    for excluded in [
+        demand(
+            materialized,
+            "/parent/B/BUILD.bazel",
+            PathObservationOperation::FileDigest,
+        ),
+        demand(
+            materialized,
+            "/parent/B/proxy.bzl",
+            PathObservationOperation::ReadLink,
+        ),
+        demand(
+            materialized,
+            "/parent/B",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        demand(
+            materialized,
+            "/parent/B/Proxy.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        demand(
+            materialized,
+            "/parent/B/proxy.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        demand(
+            materialized,
+            "/parent/B/proxy.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        demand(
+            materialized,
+            "/parent/B/BUILD",
+            PathObservationOperation::Lstat,
+        ),
+        demand(
+            materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        demand(
+            materialized,
+            "/parent/B/.bazelignore",
+            PathObservationOperation::Lstat,
+        ),
+        demand(
+            materialized,
+            "/parent/B-sibling/proxy.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        demand(materialized, "/outside", PathObservationOperation::Lstat),
+        demand(
+            materialized,
+            "/parent/A/proxy.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        demand(
+            foreign,
+            "/parent/B/proxy.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        demand(
+            PathObservationNamespace::Host,
+            "/parent/B/proxy.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+    ] {
+        let bad = SourcePreparationNeeds::path(NeedPathObservations::singleton(excluded));
+        for mixed in [
+            valid.try_union(&bad).unwrap(),
+            bad.try_union(&valid).unwrap(),
+        ] {
+            let mut progress = 0;
+            if admit_need(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            let denied = admit_need(&mixed).unwrap_err();
+            assert_eq!(
+                denied.family,
+                if bad.path_observations().unwrap().demands()[0].namespace()
+                    == PathObservationNamespace::Host
+                {
+                    "path"
+                } else {
+                    "namespace"
+                }
+            );
+            let (first, _) = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|d| admits(d, Some(&epoch_b)))
+                .unwrap();
+            let original = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| {
+                    d.path() == bad.path_observations().unwrap().demands()[0].path()
+                        && d.operation()
+                            == bad.path_observations().unwrap().demands()[0].operation()
+                        && d.namespace()
+                            == bad.path_observations().unwrap().demands()[0].namespace()
+                })
+                .unwrap();
+            assert!(std::ptr::eq(first, original));
+        }
+    }
+    for file in ["/parent/B/BUILD.bazel", "/parent/B/proxy.bzl"] {
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ] {
+            assert!(admits(
+                &demand(materialized, file, operation),
+                Some(&epoch_b)
+            ));
+        }
+    }
+    drop(ambiguous);
+    assert_eq!(Arc::strong_count(&request), count);
+    assert!(std::ptr::eq(
+        epoch_b
+            .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
+            .unwrap()
+            .unwrap()
+            .request(),
+        request.as_ref()
+    ));
+    let weak = Arc::downgrade(&request);
+    drop(epoch_a);
+    drop(epoch_b);
+    drop(request);
+    assert!(weak.upgrade().is_none());
+}
 fn proxy_test_bodies() -> Bodies {
     namespace_test_bodies()
         .with_fifth(NormalizedAbsolutePath::new("/skylib").unwrap())

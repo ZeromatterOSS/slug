@@ -853,6 +853,29 @@ static GENERATED_CC_PROXY_FILES: [GeneratedFileSignature; 3] = [
         ],
     ),
 ];
+#[cfg(target_os = "linux")]
+static GENERATED_JAVA_PROXY_FILES: [GeneratedFileSignature; 2] = [
+    (
+        "BUILD.bazel",
+        461,
+        true,
+        [
+            0x5c, 0x7d, 0xf4, 0x20, 0x2f, 0x4f, 0x77, 0x62, 0x9a, 0xf3, 0x24, 0x74, 0x92, 0x1a,
+            0xc5, 0x64, 0x8e, 0x23, 0xb9, 0x8b, 0xd0, 0x8a, 0x83, 0xdd, 0xd3, 0x78, 0x35, 0x8e,
+            0xbb, 0x6e, 0x55, 0xa6,
+        ],
+    ),
+    (
+        "proxy.bzl",
+        1778,
+        true,
+        [
+            0x5c, 0xf2, 0xdb, 0x41, 0xa6, 0xd4, 0x54, 0xa9, 0xfb, 0x45, 0x25, 0xf2, 0x89, 0x91,
+            0xa1, 0xbb, 0x42, 0xb8, 0xea, 0x44, 0x83, 0x29, 0x7c, 0x7b, 0xe3, 0xcf, 0x42, 0x63,
+            0x02, 0x21, 0xa7, 0x8d,
+        ],
+    ),
+];
 static GENERATED_WINSDK_FILES: [GeneratedFileSignature; 2] = [
     (
         "BUILD",
@@ -1001,6 +1024,18 @@ impl Bodies {
                 && request.repo_spec.attributes.is_empty() =>
             {
                 Some(&GENERATED_CC_PROXY_FILES)
+            }
+            #[cfg(target_os = "linux")]
+            (
+                "rules_java++compatibility_proxy+compatibility_proxy",
+                "rules_java+",
+                "java",
+                "rules_java_deps.bzl",
+                "_compatibility_proxy_repo_rule",
+            ) if request.repo_spec.attributes.is_empty()
+                && immutable_archive_preparation::native_java_proxy_binding(self) =>
+            {
+                Some(&GENERATED_JAVA_PROXY_FILES)
             }
             (
                 "rules_rust++rust+rust_toolchains",

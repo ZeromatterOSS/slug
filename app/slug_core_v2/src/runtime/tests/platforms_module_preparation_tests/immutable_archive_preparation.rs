@@ -93,6 +93,16 @@ fn native_binding(
             .strip_prefix(project)
             .is_ok_and(|relative| relative == Path::new(descriptor.prepared_module))
 }
+pub(super) fn native_java_proxy_binding(bodies: &Bodies) -> bool {
+    let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+    else {
+        return false;
+    };
+    binding(bodies, 1)
+        .is_some_and(|(backing, module)| native_binding(project, &ARCHIVES[1], backing, module))
+}
 pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
     let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
