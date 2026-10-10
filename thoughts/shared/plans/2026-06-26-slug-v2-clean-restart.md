@@ -34,21 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-307-m7a-local-jdk-file-effects-r1
-Status: accepted — next bounded normal producer packet being selected
+Packet: WP-7-308-m7a-no-op-request-map-union-r1
+Status: accepted — FINAL gates pass; next normal producer allocation work under source review
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts bounded local
-JDK File-only admission through the existing Rust materializer and current epoch;
-all old exact-signature owners remain unchanged. Current 13 focused tests and
-production/native-profile checks pass. Its
-[receipt](./slug-v2-subplans/wp1095-local-jdk-file-effects-2026-10-10.json) records
-one 7.600s native prefix, supervisor 227.73/phase 228.32 MiB under 256 MiB, and an
-actual WorkDeadline at pre-acquisition scope validation. The previous generated-kind
-refusal is absent and writes increased 1004 bytes; complete JDK/namespace/full producer,
-whole-fit/Rustc/actions/certificates/bootstrap remain open. Select the next bounded
-normal producer allocation/performance improvement from current source; no cap
-raise or identical probe replay. Borrowing/sharing and existing scoped interning
-remain required. Linux priority, Windows deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts exact no-op
+sharing of existing Bzlmod Need maps, preserving full request equality, original
+map/value owners, typed fallback and error order. [WP1096 receipt](./slug-v2-subplans/wp1096-no-op-request-map-union-2026-10-10.json):
+25 fresh focused tests, production/native-profile checks and FINAL reviews pass.
+One 7.843s native prefix fits at supervisor226.69/phase227.55MiB under256MiB,
+with the same WorkDeadline/source252 boundary as WP1095; full producer and
+whole-workload fit remain open. Next work targets source-proven string copying
+in normal producer retries. Keep borrowing, sharing and existing scoped interners;
+no cap raise or identical replay. Linux priority, Windows deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

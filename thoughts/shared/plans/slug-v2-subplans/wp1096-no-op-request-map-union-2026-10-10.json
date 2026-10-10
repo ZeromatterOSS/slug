@@ -1,0 +1,469 @@
+{
+  "packet": "WP-7-308-m7a-no-op-request-map-union-r1",
+  "status": "accepted",
+  "baseline": "60ed16f5630f5354e8de19d8551816295aec5151",
+  "compatibility": "Slug-native storage reuse; exact existing Need/request/descriptor equality, DICE, ordering and error semantics unchanged. Linux priority; Windows deferred.",
+  "decision": "One private borrowed prehashed full-value equality check shares original Arc maps independently for right-empty/same-map/fullEqsubset or nonempty-right/empty-left. Proper superset/missing/unequal uses original typed fallback. No whole-Need shortcut.",
+  "source": {
+    "path": "app/slug_bzlmod_v2/src/source_preparation.rs",
+    "added": 517,
+    "deleted": 41,
+    "before_sha256": "e829c744d0689c1f123904eadfa41d6ce40190ec5ccb70cd7162f5881742de97",
+    "after_sha256": "1866efa21e23c21ea48cb42891f46bb64600429b41af1a8b8b733c5eda28ed57"
+  },
+  "unchanged_frozen_owners": 29,
+  "allocation": {
+    "new_retained_fields": 0,
+    "new_retained_strings": 0,
+    "new_interner_or_cache": false,
+    "layout": {
+      "needs": {
+        "size": 80,
+        "alignment": 8
+      },
+      "repository": {
+        "size": 32,
+        "alignment": 8
+      },
+      "download": {
+        "size": 32,
+        "alignment": 8
+      },
+      "execute": {
+        "size": 32,
+        "alignment": 8
+      },
+      "arc": {
+        "size": 8,
+        "alignment": 8
+      }
+    },
+    "proof": "Allthree concrete map/value pointer identities, stable request counts, first equal-left values, proper addition/insertion/conflict order and genuine map/request/sharedbody Weak last-drop retirement.",
+    "discipline": "Borrow, move or share strings; use existing scoped interners when owner lifetime and cleanup fit. No extra pool/cache/new payload. Failed no-op checks add borrowed lookup/fullEq before original allocating fallback; no universal speed or native frequency claim."
+  },
+  "focused": {
+    "selected": 25,
+    "passed": 25,
+    "families": {
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.12499651405960321,
+        "monitored_rss_kib": 2100,
+        "child_rusage_peak_kib": 21132,
+        "artifact": {
+          "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+          "sha256": "707d3011c7dfcf9b86a99dbab0047f3ab7ed458bdef6b2a64a634c29d3879e64",
+          "features": [],
+          "compile_operation_path": "target/wp1096/compile-bzlmod/operation.json",
+          "compile_operation_sha256": "61e0f3707ec4789eaeb8b28110c91f1f2da4e646e95afe63e7c071c4f181caad",
+          "compile_config_path": "target/wp1096/compile-bzlmod-config.json",
+          "compile_config_sha256": "103cfe1b8d9369d062cb5fa5fc61e148b5c1d929c4524ecb009fd1329da4e35d",
+          "qualification": "Cargo JSON linewise; executable SHA streamed64KiB; actual successful preparation op/config, including separately qualified recovery if needed"
+        },
+        "test_operation_sha256": "b5effe44509aa4b7c274c855833770a8d544322a73e5e646e78cb142ceaf6e05",
+        "preflight_sha256": "5d731b5f0676cdea9f6bbe7ebaaf7c723f94e3aaf5fae0e0e53f94d993783f95",
+        "list_sha256": "55052c24ec5deff8e6c4f6a688f0e6091badb88c811265058fa9c3c0923e65b7"
+      },
+      "loading": {
+        "selected": 5,
+        "passed": 5,
+        "elapsed_seconds": 0.17064705793745816,
+        "monitored_rss_kib": 51400,
+        "child_rusage_peak_kib": 51528,
+        "artifact": {
+          "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-340e3e66377ddbe2",
+          "sha256": "7792259a85e6b7dcea14415adfc2deedb81958ccc9cceab7c330d80b0731749c",
+          "features": [],
+          "compile_operation_path": "target/wp1096/compile-loading/operation.json",
+          "compile_operation_sha256": "a767ece5410fc1ec13eaae6c46e465dce591868247ea696e66c1cb4ea92d1a0f",
+          "compile_config_path": "target/wp1096/compile-loading-config.json",
+          "compile_config_sha256": "9380daa9b7d02591c447a5e376209ce1ab3a30adb215e2ca1da2128f71acd2ac",
+          "qualification": "Cargo JSON linewise; executable SHA streamed64KiB; actual successful preparation op/config, including separately qualified recovery if needed"
+        },
+        "test_operation_sha256": "2e1a117d64d3b4abe4cf3a9cfed12b2c3ec833379fa664fd8c464bc43f5f4e47",
+        "preflight_sha256": "dd532ca79981de8bfee2c76faeeee220b4cba49d33d1b17cff15bb1b2e047693",
+        "list_sha256": "06ff73016a9090c4fb4b2b568846f543e11a150aa3159c81da7290a66ea293c7"
+      },
+      "core": {
+        "selected": 13,
+        "passed": 13,
+        "elapsed_seconds": 0.20220078399870545,
+        "monitored_rss_kib": 58300,
+        "child_rusage_peak_kib": 61284,
+        "artifact": {
+          "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-c50d299f2267e28b",
+          "sha256": "6568854b850b36b4c4293ede789501dc5b720fcc5b40ba50a47ef3118877576b",
+          "features": [
+            "default",
+            "native-probe-observer"
+          ],
+          "compile_operation_path": "target/wp1096/compile-core-remaining/operation.json",
+          "compile_operation_sha256": "6503ba6a82f326b87668a500ac4ad330c17d8ca35221d9fb8b367e71c2cb2f54",
+          "compile_config_path": "target/wp1096/compile-core-remaining-config.json",
+          "compile_config_sha256": "a9cec9ff640e16069aba41a2de50ba482e052335827f550d19e17d36a959f690",
+          "qualification": "Cargo JSON linewise; executable SHA streamed64KiB; actual successful preparation op/config, including separately qualified recovery if needed"
+        },
+        "test_operation_sha256": "3aaff0b253e573e9726ae803035d5fe1bfaec8d955505c66090ddde66acdac8f",
+        "preflight_sha256": "d7cf774440bb8f80c81b73252618b572f9895176ee1659b1be02c6742ab554de",
+        "list_sha256": "b78898f06a0d0e4a58b8625a2ef615738b3fbce2b0770cf8ad9c915bbdb130ad"
+      }
+    },
+    "layout": {
+      "needs": {
+        "size": 80,
+        "alignment": 8
+      },
+      "repository": {
+        "size": 32,
+        "alignment": 8
+      },
+      "download": {
+        "size": 32,
+        "alignment": 8
+      },
+      "execute": {
+        "size": 32,
+        "alignment": 8
+      },
+      "arc": {
+        "size": 8,
+        "alignment": 8
+      }
+    },
+    "layout_line": "needs=80/8 repository=32/8 download=32/8 execute=32/8 arc=8/8",
+    "native_list_sha256": "1a4a93f4f2367ebdfe5edf1ddc575c7803294fc8930c6558b1d979a44dd3256a",
+    "production_check_sha256": "7801c922120aa7473e9e1a39c17daaba6d169042692b15f88ad561d9cad192e5",
+    "preparation_recovery_sha256": "6680bacd371023a0a309ba6efa90827136d20fc516111c85840df467e6119387",
+    "qualification": "25 fresh exact nonzero passes (7 Bzlmod, 5 Loading, 13 Core); no prior Loading reuse. Needs/map/Arc layout unchanged. First Core preparation capped at60s without a test artifact or valid after-pin bracket; preserved unproved. Successful remaining stage uses completed dependencies, same original native profiles/tools/caps/current sources. Ordinary Bzlmod/Loading opt0 remains test-only. No workload/native speed or full-fit credit. Root aggregate initially used selector-object length and stopped before writes; corrected to ordinary array membership, with all gate evidence unchanged."
+  },
+  "gates": {
+    "compile-bzlmod": {
+      "elapsed_seconds": 15.90118425199762,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "61e0f3707ec4789eaeb8b28110c91f1f2da4e646e95afe63e7c071c4f181caad"
+    },
+    "compile-loading": {
+      "elapsed_seconds": 28.907989601022564,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "a767ece5410fc1ec13eaae6c46e465dce591868247ea696e66c1cb4ea92d1a0f"
+    },
+    "compile-core": {
+      "elapsed_seconds": 60.06425000994932,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "f1f025447973e6558b5dad72fb479c187975cd322f7ac16397bfb6cc7267e98f"
+    },
+    "compile-core-remaining": {
+      "elapsed_seconds": 17.18795501498971,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "6503ba6a82f326b87668a500ac4ad330c17d8ca35221d9fb8b367e71c2cb2f54"
+    },
+    "bzlmod-list": {
+      "elapsed_seconds": 0.1241458299336955,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "55052c24ec5deff8e6c4f6a688f0e6091badb88c811265058fa9c3c0923e65b7"
+    },
+    "bzlmod-preflight": {
+      "elapsed_seconds": 0.1445829999865964,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "5d731b5f0676cdea9f6bbe7ebaaf7c723f94e3aaf5fae0e0e53f94d993783f95"
+    },
+    "bzlmod-tests": {
+      "elapsed_seconds": 0.12499651405960321,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 7,
+      "pass_count": 7,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "b5effe44509aa4b7c274c855833770a8d544322a73e5e646e78cb142ceaf6e05"
+    },
+    "loading-list": {
+      "elapsed_seconds": 0.14884860208258033,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "06ff73016a9090c4fb4b2b568846f543e11a150aa3159c81da7290a66ea293c7"
+    },
+    "loading-preflight": {
+      "elapsed_seconds": 0.17025127704255283,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "dd532ca79981de8bfee2c76faeeee220b4cba49d33d1b17cff15bb1b2e047693"
+    },
+    "loading-tests": {
+      "elapsed_seconds": 0.17064705793745816,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 5,
+      "pass_count": 5,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "2e1a117d64d3b4abe4cf3a9cfed12b2c3ec833379fa664fd8c464bc43f5f4e47"
+    },
+    "ordinary-list": {
+      "elapsed_seconds": 0.18156062194611877,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "b78898f06a0d0e4a58b8625a2ef615738b3fbce2b0770cf8ad9c915bbdb130ad"
+    },
+    "core-preflight": {
+      "elapsed_seconds": 0.20267006603535265,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "d7cf774440bb8f80c81b73252618b572f9895176ee1659b1be02c6742ab554de"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.20220078399870545,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 13,
+      "pass_count": 13,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "3aaff0b253e573e9726ae803035d5fe1bfaec8d955505c66090ddde66acdac8f"
+    },
+    "production-check": {
+      "elapsed_seconds": 12.590808614040725,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "7801c922120aa7473e9e1a39c17daaba6d169042692b15f88ad561d9cad192e5"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.18197453406173736,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "1a4a93f4f2367ebdfe5edf1ddc575c7803294fc8930c6558b1d979a44dd3256a"
+    },
+    "native": {
+      "elapsed_seconds": 7.843136062962003,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "bbf7e7fb2b92db3025139d3c3612658c5f45cb091dd0d93d6f2721e533002809"
+    }
+  },
+  "native": {
+    "operation_sha256": "bbf7e7fb2b92db3025139d3c3612658c5f45cb091dd0d93d6f2721e533002809",
+    "stdout_sha256": "f5584a015156308457b891420da6afb445bf470f8847f0c415be9fd9147cc4e1",
+    "elapsed_seconds": 7.843136062962003,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 232128,
+    "rss_mib": 226.6875,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 123,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 333,
+        "wall_ns": 185169395,
+        "process_cpu_ns": 185388506,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 333,
+        "wall_ns": 6941011791,
+        "process_cpu_ns": 6956854844,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 332,
+        "wall_ns": 182643992,
+        "process_cpu_ns": 182219976,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 333,
+        "wall_ns": 15309812,
+        "process_cpu_ns": 21507490,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 252 7021682 55574923 52796422 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=252 seen=252 emitted=252 admitted=252 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40818 encoded_bytes=139051 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "self_reported_phase_peak_kib": 233008,
+    "self_reported_phase_peak_mib": 227.546875,
+    "scope_frontier": "WorkDeadline",
+    "materialization_frontier": null,
+    "materialization_capture": "absent; no local_jdk generated_kind denial frame",
+    "write_delta_from_wp1095": 0,
+    "rss_metric_qualification": "Supervisor226.6875MiB and phase227.546875MiB are separate observed prefix peaks under256MiB; no full-workload fit or A/B speed claim.",
+    "claim_limit": "ONE distinct changed-source candidate reaches same source_service WorkDeadline caller7 diagnostic.rs:296 before batch acquisition; checkpoint is not preceding work cause or next source identity. All four v2 window lanes unqualified; root333 windows dominate the observed prefix. Same252 source/52796422write counts as WP1095, no frontier advance inferred. Complete producer/JDK/namespace/certificates/Rustc/actions/bootstrap/wholeworkload fit and fullgraph retirement remain unproved."
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "preserved_unproved": {
+    "first_core_preparation": {
+      "elapsed_seconds": 60.06425000994932,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "selected_count": 0,
+      "pass_count": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "sha256": "f1f025447973e6558b5dad72fb479c187975cd322f7ac16397bfb6cc7267e98f"
+    },
+    "reason": "60s cap preserved; no Core test executable, unavailable after-pin bracket. Actual completed dependency artifacts reused by distinct successful remaining stage with same original profile/source/tools/caps. Preparation RSS uncapped and excluded from native memory evidence.",
+    "recovery_sha256": "6680bacd371023a0a309ba6efa90827136d20fc516111c85840df467e6119387",
+    "aggregate_reader_correction": "Selector-object length assertion stopped before writes; corrected ordinary-array accounting, no gate replay or code change."
+  },
+  "claim_limits": "ONE distinct changed-source candidate reaches same source_service WorkDeadline caller7 diagnostic.rs:296 before batch acquisition; checkpoint is not preceding work cause or next source identity. All four v2 window lanes unqualified; root333 windows dominate the observed prefix. Same252 source/52796422write counts as WP1095, no frontier advance inferred. Complete producer/JDK/namespace/certificates/Rustc/actions/bootstrap/wholeworkload fit and fullgraph retirement remain unproved.",
+  "checks": {
+    "pinned_format": "PASS",
+    "diff": "PASS",
+    "plan": "PASS",
+    "archive": "PASS"
+  },
+  "goal_status": "ACTIVE",
+  "next": "Select bounded normal producer allocation/readiness work from current source and actual deadline evidence, without cap raise or identical native replay.",
+  "toolchain": {
+    "channel": "nightly-2025-09-14",
+    "tools": {
+      "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "rustc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "rustdoc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "rustfmt": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt"
+    }
+  },
+  "evidence": {
+    "design.md": "2855c089a9c58066b86f81378c423469f038c03bb519ad2064366dc15715b75c",
+    "design-review.md": "3f27c01ff9eb36933d2fcfc9ab61a780eee8241d6f5aa6094150170981c25779",
+    "design-binding.json": "b5da3a2267a14ad119ca09f535d19a3500c8513c7b3144ae456b964c0f803a36",
+    "implementation-plan.md": "61d11981b35acc64ac49bcb107ae47cdd8c113df65786b98e4c82f147d53767f",
+    "implementation.md": "9d9e28f99a0a9182354b35a76cb64bc15517c46aeddd96a30d613a35c5850995",
+    "source-baseline.json": "4a369af5c2d1cc47cb80184ff3f8c1c10070d8eb448c006fb3a6849bb7e65afb",
+    "source-freeze.json": "a39323f18e08a7dafa027b6614c4f60c1f43111c9231f10a6a5b4ef4b7e71a2d",
+    "static-review.md": "51cf175d2e40f6b186fa20516512e8e3054db467e97e08ae50253fda76cfff15",
+    "source-review.md": "84506afb021e8bb1b48f5cceda06a5ae72545e26755eda523cead0fc77e60c7a",
+    "root-helper-review.md": "4658f7fff3c2627f06512e3e800b1635a32d4d53f38bb029b6bf5b37eae6faa6",
+    "helper-review.md": "12826257e853cf5cbcccb609eb307df5a9f1412500336b5b51e56f0638af97f9",
+    "prelaunch-source.md": "84506afb021e8bb1b48f5cceda06a5ae72545e26755eda523cead0fc77e60c7a",
+    "prelaunch-evidence.md": "8bdaec6a3a10108c7a2635acb2c845748e27545765a10510853654bc028aa92e",
+    "prelaunch-review.md": "23b1b049095f942371da304e5c2c40deb8c863ecbaef0e6a2c5c701a794e46dc",
+    "focused-results.json": "71fd69bcf3f271dd200a0b7218d62c4cc1665eed4aa4e6a643d0060dfae5cedb",
+    "native-results.json": "2fff1eab009b9bc4aef7b9f0295a882c125f5f2bf91326ff31dd3156935ac7f2",
+    "native-config.json": "c648476992dbb5c3a2bc19c94f2cf82ffc8bb33392cb1e6fb080921140aaf5cb",
+    "preparation-recovery.json": "6680bacd371023a0a309ba6efa90827136d20fc516111c85840df467e6119387",
+    "source-vector.json": "fb7b6bb5e88578810c4afd223331d5d7c1d5013c5dd4c0b1034b670fe75d8472",
+    "inputs.json": "ce5e964783c0bd3f085c5d7e8b3ba601b6d39038057694d12270b9ac3cf536b1",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "run_gate.py": "7484af424c810fa7da86cd03cba64036ce04e71255640e7f0b0aaff3ea6175c3",
+    "decode_native.py": "16c76d78e93a6fa04f698b2c9bb07bc76d9c8c368f1d29b1b89932ff6d453063",
+    "setup_gates.py": "ce0fa1fd4763d691a7996377d6a4a5caddafc88c72012596a5916cd5de5402a3",
+    "prepare_configs.py": "ba8eeb0f437e4baeb48433d3389c1bb6e2ff0fe2eeb995ecd6fdcc2f5c645d48",
+    "native_setup.py": "1f0ac86bb779a25c949d82c770b6fd8826cbfe2d92b9a9315912754c5ef9297d",
+    "gate-source-paths.json": "86ce319900c3dadbbc0c6cf311ecebfb65d3e723646b2c4ae86a6b618b9f06d8",
+    "gate-preparation-notes.md": "186728952ab1587d149b67235084bf073c4f6042e66397b879a4f1580ffd91a4",
+    "toolchain-resolution.json": "75e2c93dfba196bd9423538da2acd4df70e8627b5a30702187d5ec07fdb986d3",
+    "final-source-review.md": "87c5b825790f7bf895e822fdb363553dc5d02fcde7d1147cd3ed7743f66a8da7",
+    "final-evidence-review.md": "4975ac61a8dfbc68a7aac9ee34e6cc710b99a3b31010e0716fd5fc3b23e23969"
+  },
+  "packet_timing": {
+    "first_frozen_design_utc": "2026-10-10T20:47:37.341748+00:00",
+    "qualification": "Design publication brackets part of packet work; actual compile/test/native elapsed operations recorded separately. No workflow speedup claim.",
+    "acceptance_utc": "2026-10-10T21:04:14.256153+00:00"
+  }
+}

@@ -204,6 +204,26 @@ pub enum SourcePreparationNeedsError {
     },
 }
 
+// Reuse only an exact no-op; typed callers retain their original conflict loops.
+fn shared_no_op_need_map<K: Eq, V: PartialEq>(
+    left: &Arc<SmallMap<K, V>>,
+    right: &Arc<SmallMap<K, V>>,
+) -> Option<Arc<SmallMap<K, V>>> {
+    if right.is_empty() || Arc::ptr_eq(left, right) {
+        Some(left.dupe())
+    } else if left.is_empty() {
+        Some(right.dupe())
+    } else if right.len() <= left.len()
+        && right
+            .iter_hashed()
+            .all(|(key, value)| left.get_hashed(key) == Some(value))
+    {
+        Some(left.dupe())
+    } else {
+        None
+    }
+}
+
 impl SourcePreparationNeeds {
     pub fn scratch_elf_metadata(need: crate::SelectedScratchElfMetadataNeeds) -> Self {
         Self {
@@ -357,50 +377,73 @@ impl SourcePreparationNeeds {
             (Some(need), None) | (None, Some(need)) => Some(need.dupe()),
             (None, None) => None,
         };
-        let mut requests = (*self.repository_materializations).clone();
-        for (request_id, request) in other.repository_materializations.iter() {
-            match requests.get(request_id) {
-                Some(existing) if existing == request => {}
-                Some(_) => {
-                    return Err(SourcePreparationNeedsError::ConflictingRepositoryRequest {
-                        canonical_repo: request_id.canonical_repo.clone(),
-                    });
-                }
-                None => {
-                    requests.insert(request_id.clone(), request.dupe());
-                }
-            }
-        }
-        let mut selected_extension_downloads = (*self.selected_extension_downloads).clone();
-        for (owner, request) in other.selected_extension_downloads.iter() {
-            match selected_extension_downloads.get(owner) {
-                Some(existing) if existing == request => {}
-                Some(_) => {
-                    return Err(
-                        SourcePreparationNeedsError::ConflictingSelectedExtensionDownload {
-                            owner: owner.clone(),
-                        },
-                    );
-                }
-                None => {
-                    selected_extension_downloads.insert(owner.clone(), request.clone());
+        let requests = if let Some(shared) = shared_no_op_need_map(
+            &self.repository_materializations,
+            &other.repository_materializations,
+        ) {
+            shared
+        } else {
+            let mut requests = (*self.repository_materializations).clone();
+            for (request_id, request) in other.repository_materializations.iter() {
+                match requests.get(request_id) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(SourcePreparationNeedsError::ConflictingRepositoryRequest {
+                            canonical_repo: request_id.canonical_repo.clone(),
+                        });
+                    }
+                    None => {
+                        requests.insert(request_id.clone(), request.dupe());
+                    }
                 }
             }
-        }
-        let mut repository_executes = (*self.repository_executes).clone();
-        for (id, request) in other.repository_executes.iter() {
-            match repository_executes.get(id) {
-                Some(existing) if existing == request => {}
-                Some(_) => {
-                    return Err(SourcePreparationNeedsError::ConflictingRepositoryExecute {
-                        id: id.clone(),
-                    });
-                }
-                None => {
-                    repository_executes.insert(id.clone(), request.dupe());
+            Arc::new(requests)
+        };
+        let selected_extension_downloads = if let Some(shared) = shared_no_op_need_map(
+            &self.selected_extension_downloads,
+            &other.selected_extension_downloads,
+        ) {
+            shared
+        } else {
+            let mut selected_extension_downloads = (*self.selected_extension_downloads).clone();
+            for (owner, request) in other.selected_extension_downloads.iter() {
+                match selected_extension_downloads.get(owner) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(
+                            SourcePreparationNeedsError::ConflictingSelectedExtensionDownload {
+                                owner: owner.clone(),
+                            },
+                        );
+                    }
+                    None => {
+                        selected_extension_downloads.insert(owner.clone(), request.clone());
+                    }
                 }
             }
-        }
+            Arc::new(selected_extension_downloads)
+        };
+        let repository_executes = if let Some(shared) =
+            shared_no_op_need_map(&self.repository_executes, &other.repository_executes)
+        {
+            shared
+        } else {
+            let mut repository_executes = (*self.repository_executes).clone();
+            for (id, request) in other.repository_executes.iter() {
+                match repository_executes.get(id) {
+                    Some(existing) if existing == request => {}
+                    Some(_) => {
+                        return Err(SourcePreparationNeedsError::ConflictingRepositoryExecute {
+                            id: id.clone(),
+                        });
+                    }
+                    None => {
+                        repository_executes.insert(id.clone(), request.dupe());
+                    }
+                }
+            }
+            Arc::new(repository_executes)
+        };
         let root_module_bootstrap =
             match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
                 (Some(left), Some(right)) if left == right => Some(left.dupe()),
@@ -424,9 +467,9 @@ impl SourcePreparationNeeds {
             root_module_bootstrap,
             repository_environment,
             path_observations,
-            repository_materializations: Arc::new(requests),
-            selected_extension_downloads: Arc::new(selected_extension_downloads),
-            repository_executes: Arc::new(repository_executes),
+            repository_materializations: requests,
+            selected_extension_downloads,
+            repository_executes,
         })
     }
 }
@@ -8934,6 +8977,439 @@ mod tests {
             Err(SourcePreparationNeedsError::RepositoryEnvironment(
                 crate::RepositoryEnvironmentCanonicalError::ConflictingNeedWorkspace { .. }
             ))
+        ));
+    }
+
+    fn request_map_union_test_needs(name: &str, bytes: &Arc<[u8]>) -> SourcePreparationNeeds {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let owner = Arc::new(crate::HostSelectedExtensionOwner::testing(name));
+        let mut prefix = GeneratedRepositoryFileEffectPlan::builder();
+        prefix.push("file".into(), bytes.dupe(), false).unwrap();
+        let prefix = prefix.finish();
+        SourcePreparationNeeds::repository(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: workspace.dupe(),
+                canonical_repo: CanonicalRepoName::new(name).unwrap(),
+            },
+            repo_spec: RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: slug_identity_v2::CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::default(),
+            },
+            kind: RepositoryMaterializationKind::GeneratedFileEffects(prefix.clone()),
+        })
+        .try_union(&SourcePreparationNeeds::selected_extension_download(
+            crate::SelectedExtensionDownloadRequest::new(
+                workspace,
+                owner.dupe(),
+                host_repository_relative_path(PathBuf::from("out")).unwrap(),
+                "file:///tmp/synthetic-source",
+                [0; 32],
+                true,
+            )
+            .unwrap(),
+        ))
+        .unwrap()
+        .try_union(&SourcePreparationNeeds::repository_execute(
+            crate::RepositoryExecuteRequest::new(
+                crate::RepositoryExecuteCallId::new(owner, 2, 0),
+                "owner+repo".into(),
+                Arc::from([crate::RepositoryExecuteArg::String("synthetic".into())]),
+                crate::RepositoryEnvironmentSnapshot::empty(),
+                prefix,
+            ),
+        ))
+        .unwrap()
+    }
+    #[test]
+    fn source_preparation_needs_union_reuses_exact_map_owners() {
+        let bytes: Arc<[u8]> = Arc::from(&b"tiny"[..]);
+        let body_weak = Arc::downgrade(&bytes);
+        let a = request_map_union_test_needs("a+", &bytes);
+        let b = request_map_union_test_needs("b+", &bytes);
+        let equal_a = request_map_union_test_needs("a+", &bytes);
+        let equal_b = request_map_union_test_needs("b+", &bytes);
+        let left = a.try_union(&b).unwrap();
+        let reversed = equal_b.try_union(&equal_a).unwrap();
+        let path_need = |path| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+            ))
+        };
+        let empty = path_need("/first");
+        let empty_other = path_need("/second");
+        let paths = empty.try_union(&empty_other).unwrap();
+        assert_eq!(paths.path_observations().unwrap().demands().len(), 2);
+        let adopted = empty.try_union(&a).unwrap();
+        macro_rules! check_map {
+            ($field:ident) => {
+                assert!(Arc::ptr_eq(&paths.$field, &empty.$field));
+                assert!(Arc::ptr_eq(&adopted.$field, &a.$field));
+                assert!(!Arc::ptr_eq(
+                    a.$field.values().next().unwrap(),
+                    equal_a.$field.values().next().unwrap()
+                ));
+                let count = Arc::strong_count(left.$field.values().next().unwrap());
+                for right in [&empty, &left, &equal_a, &reversed] {
+                    let merged = left.try_union(right).unwrap();
+                    assert!(Arc::ptr_eq(&merged.$field, &left.$field));
+                    assert!(Arc::ptr_eq(
+                        merged.$field.values().next().unwrap(),
+                        left.$field.values().next().unwrap()
+                    ));
+                    assert_eq!(
+                        Arc::strong_count(left.$field.values().next().unwrap()),
+                        count
+                    );
+                }
+            };
+        }
+        check_map!(repository_materializations);
+        check_map!(selected_extension_downloads);
+        check_map!(repository_executes);
+        // Proper right superset has reversed order and equal distinct values: never adopt it.
+        let extended = a.try_union(&reversed).unwrap();
+        assert!(!Arc::ptr_eq(
+            &extended.repository_materializations,
+            &reversed.repository_materializations
+        ));
+        assert!(!Arc::ptr_eq(
+            &extended.selected_extension_downloads,
+            &reversed.selected_extension_downloads
+        ));
+        assert!(!Arc::ptr_eq(
+            &extended.repository_executes,
+            &reversed.repository_executes
+        ));
+        assert_eq!(
+            extended
+                .repository_materializations
+                .keys()
+                .map(|id| id.canonical_repo.as_str())
+                .collect::<Vec<_>>(),
+            ["a+", "b+"]
+        );
+        assert_eq!(
+            extended
+                .selected_extension_downloads
+                .keys()
+                .map(|owner| owner.unique_name().as_str())
+                .collect::<Vec<_>>(),
+            ["a+", "b+"]
+        );
+        assert_eq!(
+            extended
+                .repository_executes
+                .keys()
+                .map(|id| id.owner().unique_name().as_str())
+                .collect::<Vec<_>>(),
+            ["a+", "b+"]
+        );
+        assert!(Arc::ptr_eq(
+            extended
+                .repository_materializations
+                .values()
+                .next()
+                .unwrap(),
+            a.repository_materializations.values().next().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            extended
+                .selected_extension_downloads
+                .values()
+                .next()
+                .unwrap(),
+            a.selected_extension_downloads.values().next().unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            extended.repository_executes.values().next().unwrap(),
+            a.repository_executes.values().next().unwrap()
+        ));
+        println!(
+            "WP1096_LAYOUT needs={}/{} repository={}/{} download={}/{} execute={}/{} arc={}/{}",
+            std::mem::size_of::<SourcePreparationNeeds>(),
+            std::mem::align_of::<SourcePreparationNeeds>(),
+            std::mem::size_of_val(left.repository_materializations.as_ref()),
+            std::mem::align_of_val(left.repository_materializations.as_ref()),
+            std::mem::size_of_val(left.selected_extension_downloads.as_ref()),
+            std::mem::align_of_val(left.selected_extension_downloads.as_ref()),
+            std::mem::size_of_val(left.repository_executes.as_ref()),
+            std::mem::align_of_val(left.repository_executes.as_ref()),
+            std::mem::size_of_val(&left.repository_materializations),
+            std::mem::align_of_val(&left.repository_materializations)
+        );
+        let map_weak = Arc::downgrade(&left.repository_materializations);
+        let download_map_weak = Arc::downgrade(&left.selected_extension_downloads);
+        let execute_map_weak = Arc::downgrade(&left.repository_executes);
+        let request_weak = Arc::downgrade(a.repository_materializations.values().next().unwrap());
+        let download_weak = Arc::downgrade(a.selected_extension_downloads.values().next().unwrap());
+        let execute_weak = Arc::downgrade(a.repository_executes.values().next().unwrap());
+        let retained = left.try_union(&empty).unwrap();
+        drop(left);
+        assert!(map_weak.upgrade().is_some());
+        drop(retained);
+        assert!(map_weak.upgrade().is_none());
+        assert!(download_map_weak.upgrade().is_none());
+        assert!(execute_map_weak.upgrade().is_none());
+        // Independent originals still own requests until their own final drop.
+        assert!(request_weak.upgrade().is_some());
+        drop(adopted);
+        drop(extended);
+        drop(a);
+        drop(b);
+        drop(equal_a);
+        drop(equal_b);
+        drop(reversed);
+        assert!(request_weak.upgrade().is_none());
+        assert!(download_weak.upgrade().is_none());
+        assert!(execute_weak.upgrade().is_none());
+        assert_eq!(body_weak.strong_count(), 1);
+        drop(bytes);
+        assert!(body_weak.upgrade().is_none());
+    }
+    #[test]
+    fn source_preparation_needs_union_preserves_full_identity_and_error_order() {
+        let bytes: Arc<[u8]> = Arc::from(&b"tiny"[..]);
+        let a = request_map_union_test_needs("a+", &bytes);
+        let b = request_map_union_test_needs("b+", &bytes);
+        let left = a.try_union(&b).unwrap();
+        let reversed = b.try_union(&a).unwrap();
+        let repository = a.repository_materializations.values().next().unwrap();
+        for case in 0..4 {
+            let mut request = repository.as_ref().clone();
+            match case {
+                0 => request.repo_spec.rule_id.rule_name = "changed".into(),
+                1 => {
+                    request.repo_spec.attributes = Arc::new(
+                        [(
+                            CompactString::new("flag"),
+                            OverrideAttributeValue::Bool(true),
+                        )]
+                        .into_iter()
+                        .collect(),
+                    )
+                }
+                2 => request.kind = RepositoryMaterializationKind::Immutable,
+                _ => {
+                    request.kind = RepositoryMaterializationKind::GeneratedFileEffects(
+                        GeneratedRepositoryFileEffectPlan::build([(
+                            CompactString::new("file"),
+                            Arc::from(&b"changed"[..]),
+                            true,
+                        )])
+                        .unwrap(),
+                    )
+                }
+            }
+            assert!(matches!(
+                a.try_union(&SourcePreparationNeeds::repository(request)),
+                Err(SourcePreparationNeedsError::ConflictingRepositoryRequest { .. })
+            ));
+        }
+        let download = a.selected_extension_downloads.values().next().unwrap();
+        for case in 0..5 {
+            let request = crate::SelectedExtensionDownloadRequest::new(
+                if case == 0 {
+                    NormalizedAbsolutePath::new("/foreign").unwrap()
+                } else {
+                    download.workspace().dupe()
+                },
+                download.owner().dupe(),
+                if case == 1 {
+                    host_repository_relative_path(PathBuf::from("changed")).unwrap()
+                } else {
+                    download.output().clone()
+                },
+                if case == 2 {
+                    "file:///tmp/changed"
+                } else {
+                    download.url()
+                },
+                if case == 3 {
+                    [1; 32]
+                } else {
+                    *download.sha256()
+                },
+                case != 4,
+            )
+            .unwrap();
+            assert!(matches!(
+                a.try_union(&SourcePreparationNeeds::selected_extension_download(
+                    request
+                )),
+                Err(SourcePreparationNeedsError::ConflictingSelectedExtensionDownload { .. })
+            ));
+        }
+        let execute = a.repository_executes.values().next().unwrap();
+        for case in 0..4 {
+            let environment = if case == 2 {
+                crate::RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+                    crate::RepositoryEnvironmentEntry::new("SYNTHETIC", "value"),
+                ]))
+                .unwrap()
+            } else {
+                execute.environment().dupe()
+            };
+            let request = crate::RepositoryExecuteRequest::new(
+                execute.id().clone(),
+                if case == 0 {
+                    "changed"
+                } else {
+                    execute.generated_repository()
+                }
+                .into(),
+                if case == 1 {
+                    Arc::from([crate::RepositoryExecuteArg::Which(
+                        crate::HostRepositoryLabelPathValue::new(
+                            NormalizedAbsolutePath::new("/synthetic/tool").unwrap(),
+                            PathObservationNamespace::Host,
+                        )
+                        .unwrap(),
+                    )])
+                } else {
+                    Arc::from(execute.argv())
+                },
+                environment,
+                if case == 3 {
+                    GeneratedRepositoryFileEffectPlan::build([(
+                        CompactString::new("file"),
+                        Arc::from(&b"other"[..]),
+                        false,
+                    )])
+                    .unwrap()
+                } else {
+                    execute.prefix().clone()
+                },
+            );
+            assert!(matches!(
+                a.try_union(&SourcePreparationNeeds::repository_execute(request)),
+                Err(SourcePreparationNeedsError::ConflictingRepositoryExecute { .. })
+            ));
+        }
+        // Right insertion order, not a sorted owner name, chooses the first conflict.
+        let mut bad_repository = reversed.clone();
+        bad_repository.repository_materializations = Arc::new(
+            reversed
+                .repository_materializations
+                .iter()
+                .map(|(id, request)| {
+                    let mut request = request.as_ref().clone();
+                    request.kind = RepositoryMaterializationKind::Immutable;
+                    (id.clone(), Arc::new(request))
+                })
+                .collect(),
+        );
+        let mut bad_download = reversed.clone();
+        bad_download.selected_extension_downloads = Arc::new(
+            reversed
+                .selected_extension_downloads
+                .iter()
+                .map(|(owner, request)| {
+                    (
+                        owner.dupe(),
+                        Arc::new(
+                            crate::SelectedExtensionDownloadRequest::new(
+                                request.workspace().dupe(),
+                                owner.dupe(),
+                                request.output().clone(),
+                                request.url(),
+                                [1; 32],
+                                request.executable(),
+                            )
+                            .unwrap(),
+                        ),
+                    )
+                })
+                .collect(),
+        );
+        let mut bad_execute = reversed.clone();
+        bad_execute.repository_executes = Arc::new(
+            reversed
+                .repository_executes
+                .iter()
+                .map(|(id, request)| {
+                    (
+                        id.clone(),
+                        Arc::new(crate::RepositoryExecuteRequest::new(
+                            id.clone(),
+                            "changed".into(),
+                            Arc::from(request.argv()),
+                            request.environment().dupe(),
+                            request.prefix().clone(),
+                        )),
+                    )
+                })
+                .collect(),
+        );
+        assert!(
+            matches!(left.try_union(&bad_repository), Err(SourcePreparationNeedsError::ConflictingRepositoryRequest { canonical_repo }) if canonical_repo.as_str() == "b+")
+        );
+        assert!(
+            matches!(left.try_union(&bad_download), Err(SourcePreparationNeedsError::ConflictingSelectedExtensionDownload { owner }) if owner.unique_name().as_str() == "b+")
+        );
+        assert!(
+            matches!(left.try_union(&bad_execute), Err(SourcePreparationNeedsError::ConflictingRepositoryExecute { id }) if id.owner().unique_name().as_str() == "b+")
+        );
+        let mut mixed = bad_repository.clone();
+        mixed.selected_extension_downloads = bad_download.selected_extension_downloads.dupe();
+        mixed.repository_executes = bad_execute.repository_executes.dupe();
+        assert!(matches!(
+            left.try_union(&mixed),
+            Err(SourcePreparationNeedsError::ConflictingRepositoryRequest { .. })
+        ));
+        mixed.repository_materializations = reversed.repository_materializations.dupe();
+        assert!(matches!(
+            left.try_union(&mixed),
+            Err(SourcePreparationNeedsError::ConflictingSelectedExtensionDownload { .. })
+        ));
+        mixed.selected_extension_downloads = reversed.selected_extension_downloads.dupe();
+        assert!(matches!(
+            left.try_union(&mixed),
+            Err(SourcePreparationNeedsError::ConflictingRepositoryExecute { .. })
+        ));
+        let environment = |workspace| {
+            crate::NeedRepositoryEnvironmentNames::new(
+                NormalizedAbsolutePath::new(workspace).unwrap(),
+                crate::RepositoryEnvironmentNameFrontier::from_unsorted([CompactString::new(
+                    "SYNTHETIC",
+                )]),
+            )
+            .unwrap()
+        };
+        let mut before = left.clone();
+        before.repository_environment = Some(environment("/workspace"));
+        let mut after = bad_repository;
+        after.repository_environment = Some(environment("/foreign"));
+        assert!(matches!(
+            before.try_union(&after),
+            Err(SourcePreparationNeedsError::RepositoryEnvironment(_))
+        ));
+        before.repository_environment = None;
+        before.root_module_bootstrap = Some(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+        });
+        let mut after = reversed;
+        after.root_module_bootstrap = Some(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/foreign").unwrap(),
+        });
+        assert!(matches!(
+            before.try_union(&after),
+            Err(SourcePreparationNeedsError::ConflictingRootModuleBootstrap)
+        ));
+        after.repository_materializations = mixed.repository_materializations.dupe();
+        after.repository_executes = mixed.repository_executes.dupe();
+        assert!(matches!(
+            before.try_union(&after),
+            Err(SourcePreparationNeedsError::ConflictingRepositoryExecute { .. })
         ));
     }
 
