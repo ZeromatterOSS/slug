@@ -467,11 +467,12 @@ const APPLE_GENERATED_DIAGNOSTIC_OWNER: (&str, &str, &str, &str, &str) = (
     "setup_internal.bzl",
     "apple_cc_autoconf_toolchains",
 );
-const APPLE_SUPPORT_IMPORTS: [&str; 4] = [
+const APPLE_SUPPORT_IMPORTS: [&str; 5] = [
     "crosstool/setup.bzl",
     "crosstool/setup_internal.bzl",
     "crosstool/osx_cc_configure.bzl",
     APPLE_SUPPORT_CROSSTOOL_METADATA[3],
+    APPLE_SUPPORT_CROSSTOOL_METADATA[5],
 ];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],

@@ -8204,6 +8204,14 @@ pub(super) fn rules_shell_import_sources_matrix() {
         APPLE_SUPPORT_IMPORTS[3].as_ptr(),
         APPLE_SUPPORT_CROSSTOOL_METADATA[3].as_ptr()
     ));
+    assert_eq!(
+        APPLE_SUPPORT_IMPORTS[4],
+        APPLE_SUPPORT_CROSSTOOL_METADATA[5]
+    );
+    assert!(std::ptr::eq(
+        APPLE_SUPPORT_IMPORTS[4].as_ptr(),
+        APPLE_SUPPORT_CROSSTOOL_METADATA[5].as_ptr()
+    ));
     eprintln!(
         "WP1053_SHELL_BODY_LAYOUT body={} row={} literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORTS),
@@ -8700,6 +8708,26 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
         "/apple/crosstool/BUILD.toolchains",
         Some("/apple"),
     );
+    assert_exact_root_file_role(
+        APPLE_SUPPORT_IMPORTS[4],
+        &[
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ],
+        Bodies::with_apple_support_import_sources,
+        |b| b.apple_support_import_sources,
+        &[
+            "/apple/CONFIGS/platforms.bzl",
+            "/apple/configs/PLATFORMS.bzl",
+            "/apple/configs/platforms.bzl.bak",
+            "/apple/configs/platforms.bzl/child",
+            "/apple/configs/other.bzl",
+            "/apple/other/platforms.bzl",
+            "/apple-other/configs/platforms.bzl",
+        ],
+        "/apple/configs/platforms.bzl",
+        Some("/apple"),
+    );
     bodies.rules_shell_import_sources = false;
     bodies.apple_support_crosstool_metadata = false;
     bodies = bodies.with_apple_support_import_sources(
@@ -8746,8 +8774,18 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
             "/apple/crosstool/BUILD.toolchains",
             PathObservationOperation::FileBytes,
         ))
+        .unwrap()
+        .try_union(&need(
+            "/apple/configs/platforms.bzl",
+            PathObservationOperation::Lstat,
+        ))
+        .unwrap()
+        .try_union(&need(
+            "/apple/configs/platforms.bzl",
+            PathObservationOperation::FileBytes,
+        ))
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 8);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 10);
     assert!(bodies.admit(&allowed).is_ok());
     assert!(
         bodies
@@ -8883,6 +8921,47 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
             "/apple/crosstool/BUILD",
             PathObservationOperation::FileBytes,
         ),
+        (
+            "/apple/configs/platforms.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/apple/configs/platforms.bzl",
+            PathObservationOperation::ReadLink,
+        ),
+        (
+            "/apple/configs/platforms.bzl",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            "/apple/CONFIGS/platforms.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/apple/configs/PLATFORMS.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/configs/platforms.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/configs/platforms.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/apple/configs/other.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/other/platforms.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple-other/configs/platforms.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/apple/configs", PathObservationOperation::Lstat),
     ]
     .map(|(p, operation)| need(p, operation))
     .into_iter()
@@ -8903,7 +8982,25 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
             path("/apple/crosstool/BUILD.toolchains"),
             PathObservationOperation::FileBytes,
         )),
-    ))) {
+    )))
+    .chain(
+        [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ]
+        .into_iter()
+        .map(|operation| {
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Materialization(
+                        slug_workspace_v2::PathObservationInstanceId::new(1),
+                    ),
+                    path("/apple/configs/platforms.bzl"),
+                    operation,
+                ),
+            ))
+        }),
+    ) {
         let expected = bad.path_observations().unwrap().demands().first().unwrap();
         for mixed in [
             allowed.try_union(&bad).unwrap(),
@@ -8962,6 +9059,50 @@ fn apple_support_import_sources_matrix(mut bodies: Bodies) {
     assert_eq!(Arc::strong_count(original), 1);
     drop(local);
     assert!(weak.upgrade().is_none());
+    let first_path = allowed
+        .path_observations()
+        .unwrap()
+        .demands()
+        .first()
+        .unwrap()
+        .path()
+        .as_path()
+        .as_os_str()
+        .as_encoded_bytes()
+        .as_ptr();
+    let milestones = Arc::new(Mutex::new(Milestones::default()));
+    let root = ModuleRoot {
+        bodies: Arc::new(bodies),
+        expected_registry: None,
+        milestones: milestones.clone(),
+    };
+    let weak_bodies = Arc::downgrade(&root.bodies);
+    let SourcePreparationOutcome::Need(recovered) = root.need(allowed).unwrap() else {
+        panic!("all authorized source demands must preserve the original Need");
+    };
+    assert_eq!(recovered.path_observations().unwrap().demands().len(), 10);
+    assert_eq!(
+        recovered
+            .path_observations()
+            .unwrap()
+            .demands()
+            .first()
+            .unwrap()
+            .path()
+            .as_path()
+            .as_os_str()
+            .as_encoded_bytes()
+            .as_ptr(),
+        first_path
+    );
+    assert!(root.bodies.admit(&recovered).is_ok());
+    {
+        let observed = milestones.lock().unwrap();
+        assert_eq!((observed.calls, observed.preparations), (0, 0));
+    }
+    drop(recovered);
+    drop(root);
+    assert!(weak_bodies.upgrade().is_none());
 }
 
 fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
@@ -9135,7 +9276,19 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             bodies.apple_support_import_sources = source_enabled;
             assert_eq!(bodies.admit(&allowed).is_ok(), metadata_enabled);
             assert_eq!(bodies.admit(&configs).is_ok(), metadata_enabled);
-            assert_eq!(bodies.admit(&platforms).is_ok(), metadata_enabled);
+            assert_eq!(
+                bodies.admit(&platforms).is_ok(),
+                metadata_enabled || source_enabled
+            );
+            assert_eq!(
+                bodies
+                    .admit(&need(
+                        "/apple/configs/platforms.bzl",
+                        PathObservationOperation::FileBytes
+                    ))
+                    .is_ok(),
+                source_enabled
+            );
             for operation in [
                 PathObservationOperation::FileBytes,
                 PathObservationOperation::FileDigest,
@@ -9145,7 +9298,6 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
                 assert!(bodies.admit(&need("/apple/configs", operation)).is_err());
             }
             for operation in [
-                PathObservationOperation::FileBytes,
                 PathObservationOperation::FileDigest,
                 PathObservationOperation::ReadLink,
                 PathObservationOperation::DirectoryEntries,

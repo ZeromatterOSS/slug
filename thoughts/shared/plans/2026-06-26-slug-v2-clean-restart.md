@@ -34,21 +34,22 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-290-m7a-normal-rustc-apple-platforms-metadata-r1
+Packet: WP-7-291-m7a-normal-rustc-apple-platforms-source-r1
 Status: accepted — actual FINAL and operative receipt complete
 
-[WP1077](./slug-v2-subplans/wp1077-apple-platforms-metadata-2026-10-10.json) admits exact selected Apple configs/platforms.bzl Host Lstat
-under the existing PreparedFile/PublicProbe metadata role/root/workspace.
-One static metadata row5→6/table80→96 +16reference bytes/literals78→99 +21bytes.
-Typed Spec/plan/currentepoch namespace policy and source4 remain unchanged.
-Borrowed storage is reused; owned production strings/retained fields0. Source101net,
-helpers50net; actual memory/layout evidence in receipt.
-All311 ordered source triples remain unchanged.104names/106current records,
-currentcapture0,failed/superseded0. Native6.316203474s/209656KiB below256MiB.
-Both successor notes freeze the actual next boundary. Borrow/transfer first;
-existing scoped interners fit repeated retained strings with matching lifetime
-and cleanup. Full normal Rustc/actions/certificates/producer/whole-workload fit
-remains open; Windows deferred.
+[WP1078](./slug-v2-subplans/wp1078-apple-platforms-source-2026-10-10.json) admits exact measured selected Apple
+configs/platforms.bzl as fifth source under the existing checked
+PreparedFile/PublicProbe role/root/workspace. Full Need10/source table80
+adds16 reference bytes, reusing metadata[5] with zero new path literal storage.
+Independent metadata6/table96/literals99 and typedSpec/plan/currentepoch
+namespace policy remain. Owned production strings/retained fields0.
+Source153net/helpers100net; actual memory/layout receipt.
+Old311 ordered source triples unchanged; one measured END312.
+104names/106nativegate+1raw=107allphase; failed/superseded0.
+Native6.645985171s/210096KiB below256MiB. Both successor notes freeze next boundary.
+Borrow/transfer first; scoped existing interners match repeated retained
+strings' owner lifetime and cleanup. Full normal Rustc/actions/certificates/
+producer/wholeworkloadfit open; Windows deferred.
 
 ### Ready and blocked queue
 
