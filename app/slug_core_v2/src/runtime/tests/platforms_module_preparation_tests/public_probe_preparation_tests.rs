@@ -428,6 +428,9 @@ impl GuardedSingleton {
         }
         if let Some(diagnostic) = self.bodies.materialization_diagnostic(needs, &denied) {
             println!("{diagnostic}");
+            if let Some(spec) = self.bodies.immutable_spec_diagnostic(needs, &denied) {
+                println!("{spec}");
+            }
             if let Some(plan) = self.bodies.generated_plan_diagnostic(needs, &denied) {
                 println!("{plan}");
             }
@@ -1633,6 +1636,367 @@ fn materialization_refusal_projection_is_bounded_and_borrowed() {
     };
     assert!(writer.write_str("x").is_err());
     assert!(output.is_empty());
+}
+
+#[test]
+fn immutable_spec_projection_preserves_original_typed_borrowed_bounds() {
+    use fmt::Write;
+    use slug_bzlmod_v2::OverrideAttributeKey as K;
+    use slug_bzlmod_v2::OverrideAttributeValue as V;
+    use starlark_map::small_map::SmallMap;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+    let request = |attributes: SmallMap<compact_str::CompactString, V>| {
+        let mut request =
+            (*local_native_request(&bodies.roots[0], "protobuf+", "/platforms")).clone();
+        request.kind = RepositoryMaterializationKind::Immutable;
+        request.repo_spec.rule_id.bzl_file =
+            CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl").unwrap();
+        request.repo_spec.rule_id.rule_name = "http_archive".into();
+        request.repo_spec.attributes = Arc::new(attributes);
+        request
+    };
+    let singleton = |value| SmallMap::from_iter([(compact_str::CompactString::new("a"), value)]);
+    let mapped_label = |id: &str, spelling: &str| {
+        let mut mapping = slug_identity_v2::RepositoryMapping::new(
+            slug_identity_v2::RepositoryMappingId::new(id).unwrap(),
+        );
+        mapping.insert(
+            slug_identity_v2::ApparentRepoName::new("r").unwrap(),
+            slug_identity_v2::CanonicalRepoName::new("r").unwrap(),
+        );
+        slug_identity_v2::ApparentLabel::parse(spelling)
+            .unwrap()
+            .resolve(&mapping)
+    };
+    let label = CanonicalLabel::parse("@@r//p:t").unwrap();
+    let mapped = mapped_label("mapped", "@r//p:t");
+    let map = SmallMap::from_iter([
+        (K::String("@@r//p:t".into()), V::None),
+        (K::Label(label), V::Bool(false)),
+        (K::Label(mapped), V::Int(i32::MAX)),
+        (K::String("".into()), V::String("".into())),
+    ]);
+    let attributes = SmallMap::from_iter([
+        (compact_str::CompactString::new("none"), V::None),
+        (compact_str::CompactString::new("bool"), V::Bool(true)),
+        (compact_str::CompactString::new("int"), V::Int(i32::MIN)),
+        (
+            compact_str::CompactString::new("string"),
+            V::String("\0\né".into()),
+        ),
+        (
+            compact_str::CompactString::new("label"),
+            V::Label(mapped_label("other", "@r//p:t")),
+        ),
+        (
+            compact_str::CompactString::new("iter"),
+            V::Iterable(Arc::from([
+                V::String("".into()),
+                V::Iterable(Arc::from([])),
+            ])),
+        ),
+        (
+            compact_str::CompactString::new("map"),
+            V::Map(Arc::new(map)),
+        ),
+    ]);
+    let needs = SourcePreparationNeeds::repository(request(attributes));
+    let original = needs.repository_materializations().values().next().unwrap();
+    let weak = Arc::downgrade(original);
+    let attributes_weak = Arc::downgrade(&original.repo_spec.attributes);
+    assert_eq!(Arc::strong_count(original), 1);
+    assert_eq!(Arc::strong_count(&original.repo_spec.attributes), 1);
+    {
+        let denied = bodies.admit(&needs).unwrap_err();
+        let view = bodies.immutable_spec_diagnostic(&needs, &denied).unwrap();
+        assert!(std::ptr::eq(view.request, original.as_ref()));
+        assert_eq!(
+            bodies.first_denied_materialization(&needs).unwrap().1,
+            "immutable_kind"
+        );
+        assert!(Arc::ptr_eq(
+            &view.request.repo_spec.attributes,
+            &original.repo_spec.attributes
+        ));
+        for ((name, value), (held_name, held_value)) in original
+            .repo_spec
+            .attributes
+            .iter()
+            .zip(view.request.repo_spec.attributes.iter())
+        {
+            assert!(std::ptr::eq(
+                name.as_bytes().as_ptr(),
+                held_name.as_bytes().as_ptr()
+            ));
+            match (value, held_value) {
+                (V::String(a), V::String(b)) => {
+                    assert!(std::ptr::eq(a.as_bytes().as_ptr(), b.as_bytes().as_ptr()))
+                }
+                (V::Label(a), V::Label(b)) => {
+                    for (a, b) in [
+                        (a.package().repo().as_str(), b.package().repo().as_str()),
+                        (
+                            a.package().package().as_str(),
+                            b.package().package().as_str(),
+                        ),
+                        (a.target().as_str(), b.target().as_str()),
+                        (
+                            a.mapping_id().unwrap().as_str(),
+                            b.mapping_id().unwrap().as_str(),
+                        ),
+                    ] {
+                        assert!(std::ptr::eq(a.as_bytes().as_ptr(), b.as_bytes().as_ptr()));
+                    }
+                }
+                (V::Iterable(a), V::Iterable(b)) => assert!(Arc::ptr_eq(a, b)),
+                (V::Map(a), V::Map(b)) => assert!(Arc::ptr_eq(a, b)),
+                _ => {}
+            }
+        }
+        assert_eq!(Arc::strong_count(original), 1);
+        assert_eq!(Arc::strong_count(&original.repo_spec.attributes), 1);
+        let encoded = view.to_string();
+        assert!(encoded.starts_with("WP1079_IMMUTABLE_SPEC {\"capture\":\"captured\",\"kind\":\"immutable\",\"reason\":\"immutable_kind\",\"identity\":["));
+        assert!(encoded.contains("\"rule_mapping\":null,\"attributes\":["));
+        for fragment in [
+            "[\"n\"]",
+            "[\"b\",true]",
+            "[\"b\",false]",
+            "[\"i\",-2147483648]",
+            "[\"i\",2147483647]",
+            "[\"s\",[4,\"000ac3a9\"]]",
+            "[\"s\",[0,\"\"]]",
+            "[\"v\",[]]",
+            "[\"l\",[1,\"72\"],[1,\"70\"],[1,\"74\"],null]",
+            "[\"l\",[1,\"72\"],[1,\"70\"],[1,\"74\"],[6,\"6d6170706564\"]]",
+        ] {
+            assert!(encoded.contains(fragment), "missing {fragment}");
+        }
+        assert!(
+            encoded.find("[\"s\",[8,\"4040722f2f703a74\"]]").unwrap()
+                < encoded
+                    .find("[\"l\",[1,\"72\"],[1,\"70\"],[1,\"74\"],null]")
+                    .unwrap()
+        );
+        assert_eq!(Arc::strong_count(original), 1);
+        assert_eq!(Arc::strong_count(&original.repo_spec.attributes), 1);
+        assert!(encoded.len() + 1 <= MATERIALIZATION_MARKER_BYTES);
+        println!(
+            "WP1079_IMMUTABLE_SPEC_LAYOUT view_bytes={} view_align={} writer_bytes={} writer_align={} identity_bytes={} identity_align={} bodies_bytes={} bodies_align={}",
+            std::mem::size_of::<ImmutableSpecDiagnostic<'_>>(),
+            std::mem::align_of::<ImmutableSpecDiagnostic<'_>>(),
+            std::mem::size_of::<MaterializationWriter<'_, String>>(),
+            std::mem::align_of::<MaterializationWriter<'_, String>>(),
+            std::mem::size_of::<MaterializationDiagnostic<'_>>(),
+            std::mem::align_of::<MaterializationDiagnostic<'_>>(),
+            std::mem::size_of::<Bodies>(),
+            std::mem::align_of::<Bodies>()
+        );
+    }
+    drop(needs);
+    assert!(weak.upgrade().is_none());
+    assert!(attributes_weak.upgrade().is_none());
+    let encode = |request| ImmutableSpecDiagnostic { request: &request }.to_string();
+    let refused = "WP1079_IMMUTABLE_SPEC {\"capture\":\"bounds_refused\",\"kind\":\"immutable\",\"reason\":\"immutable_kind\",\"identity\":null,\"rule_mapping\":null,\"attributes\":null}";
+    let captured = |text: &str| text.starts_with("WP1079_IMMUTABLE_SPEC {\"capture\":\"captured\"");
+    assert!(encode(request(SmallMap::new())).ends_with("\"attributes\":[]}"));
+    assert!(encode(request(singleton(V::Map(Arc::new(SmallMap::new()))))).contains("[\"m\",[]]"));
+    for (length, expected) in [(32, true), (33, false)] {
+        let attrs = (0..length)
+            .map(|n| (compact_str::CompactString::new(format!("a{n}")), V::None))
+            .collect();
+        assert_eq!(captured(&encode(request(attrs))), expected);
+    }
+    for (length, expected) in [(127, true), (128, false)] {
+        let values: Arc<[V]> = (0..length).map(|_| V::None).collect();
+        assert_eq!(
+            captured(&encode(request(singleton(V::Iterable(values))))),
+            expected
+        );
+    }
+    for (pairs, expected) in [(63, true), (64, false)] {
+        let map = (0..pairs)
+            .map(|n| (K::String(format!("k{n}").into()), V::None))
+            .collect();
+        let mut attrs = singleton(V::Map(Arc::new(map)));
+        attrs.insert("b".into(), V::None); // 1 map + 2 nodes/key-value + 1 second attr.
+        assert_eq!(captured(&encode(request(attrs))), expected);
+    }
+    for (depth, expected) in [(8, true), (9, false)] {
+        let mut value = V::None;
+        for _ in 1..depth {
+            value = V::Iterable(Arc::from([value]));
+        }
+        assert_eq!(captured(&encode(request(singleton(value)))), expected);
+    }
+    for (depth, expected) in [(7, true), (8, false)] {
+        let mut value = V::Map(Arc::new(SmallMap::from_iter([(
+            K::String("k".into()),
+            V::None,
+        )])));
+        for _ in 1..depth {
+            value = V::Iterable(Arc::from([value]));
+        }
+        assert_eq!(captured(&encode(request(singleton(value)))), expected);
+    }
+    let mut mapped_owner = request(SmallMap::new());
+    mapped_owner.repo_spec.rule_id.bzl_file = mapped_label("mapped", "@r//p:t");
+    let view = ImmutableSpecDiagnostic {
+        request: &mapped_owner,
+    };
+    assert!(std::ptr::eq(
+        view.request
+            .repo_spec
+            .rule_id
+            .bzl_file
+            .mapping_id()
+            .unwrap()
+            .as_str()
+            .as_ptr(),
+        mapped_owner
+            .repo_spec
+            .rule_id
+            .bzl_file
+            .mapping_id()
+            .unwrap()
+            .as_str()
+            .as_ptr()
+    ));
+    assert!(
+        view.to_string()
+            .contains("\"rule_mapping\":[6,\"6d6170706564\"]")
+    );
+    for (length, expected) in [(1024, true), (1025, false)] {
+        let text = encode(request(singleton(V::String("x".repeat(length).into()))));
+        assert_eq!(captured(&text), expected);
+        if !expected {
+            assert_eq!(text, refused);
+        }
+        let mut owner = request(SmallMap::new());
+        owner.repo_spec.rule_id.bzl_file = mapped_label(&"m".repeat(length), "@r//p:t");
+        assert_eq!(captured(&encode(owner)), expected);
+    }
+    let owner_raw = MaterializationDiagnostic::new(&request(SmallMap::new()), "immutable_kind")
+        .fields
+        .iter()
+        .flatten()
+        .map(|field| field.len())
+        .sum::<usize>();
+    for (raw, expected) in [(4096, true), (4097, false)] {
+        let lengths = [1024, 1024, 1024, raw - owner_raw - 4 - 3072];
+        let attrs = ["a", "b", "c", "d"]
+            .into_iter()
+            .zip(lengths)
+            .map(|(name, length)| {
+                (
+                    compact_str::CompactString::new(name),
+                    V::String("x".repeat(length).into()),
+                )
+            })
+            .collect();
+        let text = encode(request(attrs));
+        assert_eq!(captured(&text), expected);
+        if !expected {
+            assert_eq!(text, refused);
+        }
+    }
+    assert_eq!(
+        encode(request(SmallMap::from_iter([
+            (
+                compact_str::CompactString::new("first"),
+                V::String("visible".into())
+            ),
+            (
+                compact_str::CompactString::new("last"),
+                V::String("x".repeat(1025).into())
+            ),
+        ]))),
+        refused
+    );
+    let label = mapped_label(&"m".repeat(28), "@r//p:t");
+    // 128 nodes/depth2/raw4007, all fields<=28; only encoded marker cap refuses.
+    assert!(owner_raw + 1 + 127 * (3 + 28) <= MATERIALIZATION_AGGREGATE_BYTES);
+    let values: Arc<[V]> = (0..127).map(|_| V::Label(label.clone())).collect();
+    assert_eq!(encode(request(singleton(V::Iterable(values)))), refused);
+    let ordered = |reverse: bool| {
+        let mut entries = [
+            (K::String("z".into()), V::None),
+            (K::String("a".into()), V::None),
+        ];
+        if reverse {
+            entries.reverse();
+        }
+        encode(request(singleton(V::Map(Arc::new(SmallMap::from_iter(
+            entries,
+        ))))))
+    };
+    assert_ne!(ordered(false), ordered(true));
+    let mut output = String::new();
+    let mut writer = MaterializationWriter {
+        writer: &mut output,
+        bytes: MATERIALIZATION_MARKER_BYTES - 2,
+        limit: MATERIALIZATION_MARKER_BYTES,
+    };
+    assert!(writer.write_str("x").is_ok());
+    assert!(writer.write_str("x").is_err());
+    assert_eq!(output, "x");
+    let allowed = SourcePreparationNeeds::repository(
+        (*local_native_request(&bodies.roots[0], "platforms+", "/platforms")).clone(),
+    );
+    let first = SourcePreparationNeeds::repository(request(singleton(V::String("first".into()))));
+    let mut second = request(singleton(V::String("second".into())));
+    second.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let second = SourcePreparationNeeds::repository(second);
+    let body =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/fixture/MODULE.bazel"),
+            PathObservationOperation::FileBytes,
+        )));
+    for (a, b) in [(&first, &second), (&second, &first)] {
+        let mixed = allowed
+            .try_union(a)
+            .unwrap()
+            .try_union(b)
+            .unwrap()
+            .try_union(&body)
+            .unwrap();
+        let offender = mixed
+            .repository_materializations()
+            .values()
+            .find(|request| matches!(&request.kind, RepositoryMaterializationKind::Immutable))
+            .unwrap();
+        let denied = bodies.admit(&mixed).unwrap_err();
+        let view = bodies.immutable_spec_diagnostic(&mixed, &denied).unwrap();
+        assert!(std::ptr::eq(view.request, offender.as_ref()));
+        assert_eq!(denied.family, "materialization");
+        let mut progress = 0;
+        if bodies.admit(&mixed).is_ok() {
+            progress += 1;
+        }
+        assert_eq!(progress, 0);
+        assert_eq!(
+            view.to_string(),
+            ImmutableSpecDiagnostic { request: offender }.to_string()
+        );
+    }
+    for kind in [
+        RepositoryMaterializationKind::Local {
+            logical_root: path("/platforms"),
+        },
+        RepositoryMaterializationKind::GeneratedFileEffects(
+            slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::build([]).unwrap(),
+        ),
+    ] {
+        let mut other = (*local_native_request(&bodies.roots[0], "unknown+", "/platforms")).clone();
+        other.kind = kind;
+        let mixed = SourcePreparationNeeds::repository(other)
+            .try_union(&first)
+            .unwrap();
+        let denied = bodies.admit(&mixed).unwrap_err();
+        assert!(bodies.immutable_spec_diagnostic(&mixed, &denied).is_none());
+    }
 }
 
 fn generated_globals_request(

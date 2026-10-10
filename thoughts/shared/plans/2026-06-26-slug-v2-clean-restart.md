@@ -34,22 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-291-m7a-normal-rustc-apple-platforms-source-r1
+Packet: WP-7-292-m7a-normal-rustc-immutable-spec-readiness-r1
 Status: accepted — actual FINAL and operative receipt complete
 
-[WP1078](./slug-v2-subplans/wp1078-apple-platforms-source-2026-10-10.json) admits exact measured selected Apple
-configs/platforms.bzl as fifth source under the existing checked
-PreparedFile/PublicProbe role/root/workspace. Full Need10/source table80
-adds16 reference bytes, reusing metadata[5] with zero new path literal storage.
-Independent metadata6/table96/literals99 and typedSpec/plan/currentepoch
-namespace policy remain. Owned production strings/retained fields0.
-Source153net/helpers100net; actual memory/layout receipt.
-Old311 ordered source triples unchanged; one measured END312.
-104names/106nativegate+1raw=107allphase; failed/superseded0.
-Native6.645985171s/210096KiB below256MiB. Both successor notes freeze next boundary.
-Borrow/transfer first; scoped existing interners match repeated retained
-strings' owner lifetime and cleanup. Full normal Rustc/actions/certificates/
-producer/wholeworkloadfit open; Windows deferred.
+[WP1079](./slug-v2-subplans/wp1079-immutable-spec-readiness-2026-10-10.json) exposes the original immutable
+first-offender RepoSpec as a bounded borrowed typed diagnostic. Mapping and nested
+order survive; complete allocation-free preflight precedes streaming. Original
+immutable_kind refusal and archive/transport/current epoch/namespace admission
+remain. The view is one borrowed reference; new owned production strings and
+retained fields are zero. Growth562net is cohesively reviewed.
+Fresh5Core+4decoder+1native=10names/12passingphases. Four preserved failed/superseded
+records make16total attempts: compiler failure1, decoder failures2, superseded dependency1; currentcapture0.
+Native7.003039177s/209312KiB below256MiB.
+All312 source lease triples stay unchanged. Both successor notes freeze actual
+observed attributes or bounded unavailability for the next admission decision.
+Borrow or transfer first; existing scoped interners serve repeated retained
+strings when lifetime and cleanup fit. Full Rustc/actions/certificates/normal
+producer and whole-workload fit remain open; Windows deferred.
 
 ### Ready and blocked queue
 

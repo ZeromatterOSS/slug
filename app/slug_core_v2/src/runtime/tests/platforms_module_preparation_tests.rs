@@ -19,6 +19,7 @@ use slug_workspace_v2::ObservedPathFrontierError;
 
 use super::*;
 use crate::runtime::materialization_diagnostic::BorrowedHex;
+use crate::runtime::materialization_diagnostic::ImmutableSpecDiagnostic;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_AGGREGATE_BYTES;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_FIELD_BYTES;
 use crate::runtime::materialization_diagnostic::MATERIALIZATION_MARKER_BYTES;
@@ -1118,6 +1119,19 @@ impl Bodies {
             .first_denied_materialization(needs)
             .expect("materialization refusal preserves its original offender");
         Some(MaterializationDiagnostic::new(request, reason))
+    }
+    fn immutable_spec_diagnostic<'a>(
+        &self,
+        needs: &'a SourcePreparationNeeds,
+        denied: &Denied,
+    ) -> Option<ImmutableSpecDiagnostic<'a>> {
+        if denied.family != "materialization" {
+            return None;
+        }
+        let (request, reason) = self.first_denied_materialization(needs)?;
+        (reason == "immutable_kind"
+            && matches!(&request.kind, RepositoryMaterializationKind::Immutable))
+        .then_some(ImmutableSpecDiagnostic { request })
     }
     fn generated_plan_diagnostic<'a>(
         &self,
