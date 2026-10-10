@@ -7105,7 +7105,7 @@ async fn evaluate_repository_package(
     let (logical_package_root, boundary_scope) = match &prepared.glob_source {
         RepositoryPackageGlobSource::Host(root) => (
             root.dupe(),
-            HostGlobBoundaryScope::External(key.route.clone()),
+            HostGlobBoundaryScope::External(Arc::new(key.route.clone())),
         ),
         RepositoryPackageGlobSource::BuiltinCatalog => (
             key.route.workspace().dupe(),

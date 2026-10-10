@@ -34,19 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-300-m7a-java-compatibility-proxy-r1
-Status: accepted — original Java proxy advanced to genuine Host metadata frontier
+Packet: WP-7-300-m7a-external-glob-source-owner-r1
+Status: accepted — next producer work frontier pending selection
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records
-[WP1087](./slug-v2-subplans/wp1087-java-compatibility-proxy-2026-10-10.json):
-exact original two-file Java proxy admission through the qualified archive backing,
-complete generated plan and supplied current namespace. The real continuation
-wrote2239B of original output and charged the proxy plus39 later Java archive files,
-including all12 direct eager leaves, in7.24162s at207.402MiB against256MiB.
-No source/timeerror; next genuine Host/tmp Lstat is being traced to its normal
-source owner before a successor contract. Existing borrowing/scoped interning and
-all caps persist. Terminal producer/Rustc/actions/certificates/full-workload fit
-remain open; Windows minimal/deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) records the external
+glob ownership fix and [receipt](./slug-v2-subplans/wp1088-external-glob-source-owner-2026-10-10.json).
+External segments share original route/raw directory storage and use the existing
+current repository path owner, including its explicit root target; listing and
+observation certificates preserve current namespace ownership. Invalid relative
+paths and semantic byte cutoff remain unchanged. All58 focused tests and direct
+Core/CLI checks pass. ONE original-profile continuation used207.211MiB/256 in
+7.26990s, then hit WorkDeadline at source243 before the previous245 frontier.
+Absence of a denied/tmp frame does not prove that frontier advanced. Source
+ownership is accepted; full producer/time/whole-workload fit, Rustc/actions,
+certificates and bootstrap remain open. Next work must address a concrete measured
+producer work owner under unchanged caps. Windows stays minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

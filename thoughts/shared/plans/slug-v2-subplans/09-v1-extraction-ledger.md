@@ -713,6 +713,18 @@ is unreachable, so no nested-repository state is required. Multi-segment and
 BUILD/`.bzl` acquisition, parser/evaluator retry, and consumer publication
 remain later packets.
 
+WP1088 operational routing correction (2026-10-10): external segments now share
+original route/raw relative-directory storage and reuse current repository path
+resolution, including an explicit repository-root target, before namespace-aware
+listing. Exact child observation Arcs/full Needs and raw OS names are preserved;
+Root Host/catalog and semantic source-byte cutoff remain distinct. No new donor,
+interner/cache or global owner. Necessary inherited route/path/request copies remain
+accounted; ignored absolute-child and raw diagnostic String allocations were removed.
+Inline segment key24→40B/path key280B unchanged; Arc heap cost is separate. Focused
+58/direct Core-CLI/independent FINAL accept this ownership fix. ONE original-profile
+native used207.211MiB/256, then WorkDeadline/source243 before prior245; no actual/tmp
+advance or full producer/wholeheap fit claim. [Receipt](wp1088-external-glob-source-owner-2026-10-10.json).
+
 ### Stage 4 public Host root-package boundary projection
 
 Status: Landed, public and dormant

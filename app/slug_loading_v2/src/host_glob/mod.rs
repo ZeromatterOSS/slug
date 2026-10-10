@@ -15,6 +15,7 @@ use std::fmt;
 use std::os::unix::ffi::OsStrExt;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -24,8 +25,15 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::HostRepositoryDirectoryListingError;
+#[cfg(unix)]
+use slug_bzlmod_v2::HostRepositoryPathKey;
+#[cfg(unix)]
+use slug_bzlmod_v2::HostRepositoryPathObservationKey;
+use slug_bzlmod_v2::HostRepositorySourceRoute;
+use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+#[cfg(all(test, unix))]
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
@@ -117,6 +125,7 @@ enum HostGlobSegmentError {
     UnsupportedHost,
     DirectoryListing(PathDirectoryListingError),
     RepositoryDirectoryListing(HostRepositoryDirectoryListingError),
+    RepositoryPath(Arc<RepositorySourceFileError>),
     CatalogDirectoryMissing,
     CatalogComponentEncoding,
     CatalogEntryKind(PathDirectoryEntryKind),
@@ -160,6 +169,7 @@ impl fmt::Display for HostGlobSegmentError {
             Self::RepositoryDirectoryListing(error) => {
                 write!(f, "repository glob directory listing failed: {error:?}")
             }
+            Self::RepositoryPath(error) => write!(f, "repository glob path failed: {error:?}"),
             Self::CatalogDirectoryMissing => {
                 f.write_str("built-in catalog glob directory disappeared")
             }
@@ -244,7 +254,17 @@ impl fmt::Display for HexBytes<'_> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+enum HostGlobSegmentSource {
+    Host,
+    Repository {
+        route: Arc<HostRepositorySourceRoute>,
+        directory: Arc<PathBuf>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 struct HostGlobSegmentCandidatesKey {
+    source: HostGlobSegmentSource,
     logical_directory: NormalizedAbsolutePath,
     pattern: HostGlobSegmentPattern,
 }
@@ -252,6 +272,19 @@ struct HostGlobSegmentCandidatesKey {
 impl HostGlobSegmentCandidatesKey {
     fn new(logical_directory: NormalizedAbsolutePath, pattern: HostGlobSegmentPattern) -> Self {
         Self {
+            source: HostGlobSegmentSource::Host,
+            logical_directory,
+            pattern,
+        }
+    }
+    fn from_repository(
+        route: Arc<HostRepositorySourceRoute>,
+        directory: Arc<PathBuf>,
+        logical_directory: NormalizedAbsolutePath,
+        pattern: HostGlobSegmentPattern,
+    ) -> Self {
+        Self {
+            source: HostGlobSegmentSource::Repository { route, directory },
             logical_directory,
             pattern,
         }
@@ -321,8 +354,8 @@ fn segment_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
-fn segment_need(need: NeedPathObservations) -> HostGlobSegmentDriverOutcome {
-    SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+fn segment_need(need: SourcePreparationNeeds) -> HostGlobSegmentDriverOutcome {
+    SourcePreparationOutcome::Need(need)
 }
 
 fn union_observation_epochs(
@@ -355,16 +388,29 @@ struct SegmentInput<T, E> {
 }
 
 #[cfg(unix)]
-type SegmentInputOutcome<T, E> = PathOutcome<Result<SegmentInput<T, E>, ObservedPathFrontierError>>;
+type SegmentInputOutcome<T, E> =
+    SourcePreparationOutcome<Result<SegmentInput<T, E>, ObservedPathFrontierError>>;
+
+#[cfg(unix)]
+fn path_segment_input<T, E>(
+    outcome: PathOutcome<Result<SegmentInput<T, E>, ObservedPathFrontierError>>,
+) -> SegmentInputOutcome<T, E> {
+    match outcome {
+        PathOutcome::Need(need) => {
+            SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+        }
+        PathOutcome::Complete(result) => SourcePreparationOutcome::Complete(result),
+    }
+}
 
 #[cfg(unix)]
 fn legacy_segment_input<T, E>(outcome: PathOutcome<Result<T, E>>) -> SegmentInputOutcome<T, E> {
-    outcome.map(|result| {
+    path_segment_input(outcome.map(|result| {
         Ok(SegmentInput {
             result,
             observations: PathObservationEpoch::empty(),
         })
-    })
+    }))
 }
 
 #[cfg(unix)]
@@ -372,8 +418,71 @@ impl HostGlobSegmentMode {
     async fn resolve(
         self,
         ctx: &mut DiceComputations<'_>,
-        logical_path: NormalizedAbsolutePath,
-    ) -> SegmentInputOutcome<ResolvedPath, PathResolutionError> {
+        key: &HostGlobSegmentCandidatesKey,
+        component: Option<&[u8]>,
+    ) -> SegmentInputOutcome<ResolvedPath, HostGlobSegmentError> {
+        if let HostGlobSegmentSource::Repository { route, directory } = &key.source {
+            let mut relative = directory.as_ref().clone();
+            if let Some(component) = component {
+                relative.push(std::ffi::OsStr::from_bytes(component));
+            }
+            return match self {
+                Self::Legacy => {
+                    let child = if relative.as_os_str().is_empty() {
+                        HostRepositoryPathKey::for_repository_root(route.as_ref().clone())
+                    } else {
+                        HostRepositoryPathKey::from_source_route(route.as_ref().clone(), relative)
+                    };
+                    dice_invariant(ctx.compute(&child).await).map(|result| {
+                        Ok(SegmentInput {
+                            result: result
+                                .as_ref()
+                                .map(|value| value.resolved().dupe())
+                                .map_err(|error| {
+                                    HostGlobSegmentError::RepositoryPath(Arc::new(error.clone()))
+                                }),
+                            observations: PathObservationEpoch::empty(),
+                        })
+                    })
+                }
+                Self::Observed => {
+                    let child = if relative.as_os_str().is_empty() {
+                        HostRepositoryPathObservationKey::for_repository_root(
+                            route.as_ref().clone(),
+                        )
+                    } else {
+                        HostRepositoryPathObservationKey::from_source_route(
+                            route.as_ref().clone(),
+                            relative,
+                        )
+                    };
+                    dice_invariant(ctx.compute(&child).await).map(|observed| {
+                        observed.map(|observed| SegmentInput {
+                            result: observed
+                                .result()
+                                .as_ref()
+                                .as_ref()
+                                .map(|value| value.resolved().dupe())
+                                .map_err(|error| {
+                                    HostGlobSegmentError::RepositoryPath(Arc::new(error.clone()))
+                                }),
+                            observations: observed.observations().dupe(),
+                        })
+                    })
+                }
+            };
+        }
+        let logical_path = component.map_or_else(
+            || key.logical_directory.dupe(),
+            |component| logical_child(&key.logical_directory, component),
+        );
+        let project_error = |error| {
+            resolution_error(
+                &key.logical_directory,
+                component.map_or_else(|| Arc::from([]), Arc::from),
+                error,
+            )
+        };
         match self {
             Self::Legacy => legacy_segment_input(dice_invariant(
                 ctx.compute(&ResolvedPathKey::new(
@@ -381,52 +490,109 @@ impl HostGlobSegmentMode {
                     logical_path,
                 ))
                 .await,
+            ))
+            .map(|result| {
+                result.map(|input| SegmentInput {
+                    result: input.result.map_err(project_error),
+                    observations: input.observations,
+                })
+            }),
+            Self::Observed => path_segment_input(
+                dice_invariant(
+                    ctx.compute(&ResolvedPathObservationKey::new(
+                        PathObservationNamespace::Host,
+                        logical_path,
+                    ))
+                    .await,
+                )
+                .map(|observed| {
+                    observed.map(|observed| SegmentInput {
+                        result: observed.result().clone().map_err(project_error),
+                        observations: observed.observations().dupe(),
+                    })
+                }),
+            ),
+        }
+    }
+
+    async fn scoped_list(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        namespace: PathObservationNamespace,
+        logical_path: NormalizedAbsolutePath,
+    ) -> SegmentInputOutcome<PathDirectoryListing, PathDirectoryListingError> {
+        match self {
+            Self::Legacy => legacy_segment_input(dice_invariant(
+                ctx.compute(&PathDirectoryListingKey::new(namespace, logical_path))
+                    .await,
             )),
-            Self::Observed => match dice_invariant(
-                ctx.compute(&ResolvedPathObservationKey::new(
-                    PathObservationNamespace::Host,
-                    logical_path,
-                ))
-                .await,
-            ) {
-                PathOutcome::Need(need) => PathOutcome::Need(need),
-                PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
-                PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(Ok(SegmentInput {
-                    result: observed.result().clone(),
-                    observations: observed.observations().dupe(),
-                })),
-            },
+            Self::Observed => path_segment_input(
+                dice_invariant(
+                    ctx.compute(&PathDirectoryListingObservationKey::new(
+                        namespace,
+                        logical_path,
+                    ))
+                    .await,
+                )
+                .map(|observed| {
+                    observed.map(|observed| SegmentInput {
+                        result: observed.result().clone(),
+                        observations: observed.observations().dupe(),
+                    })
+                }),
+            ),
         }
     }
 
     async fn list(
         self,
         ctx: &mut DiceComputations<'_>,
-        logical_path: NormalizedAbsolutePath,
-    ) -> SegmentInputOutcome<PathDirectoryListing, PathDirectoryListingError> {
-        match self {
-            Self::Legacy => legacy_segment_input(dice_invariant(
-                ctx.compute(&PathDirectoryListingKey::new(
-                    PathObservationNamespace::Host,
-                    logical_path,
-                ))
-                .await,
-            )),
-            Self::Observed => match dice_invariant(
-                ctx.compute(&PathDirectoryListingObservationKey::new(
-                    PathObservationNamespace::Host,
-                    logical_path,
-                ))
-                .await,
-            ) {
-                PathOutcome::Need(need) => PathOutcome::Need(need),
-                PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
-                PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(Ok(SegmentInput {
-                    result: observed.result().clone(),
-                    observations: observed.observations().dupe(),
-                })),
-            },
-        }
+        key: &HostGlobSegmentCandidatesKey,
+    ) -> SegmentInputOutcome<PathDirectoryListing, HostGlobSegmentError> {
+        let (namespace, logical_path, resolution_observations) = match &key.source {
+            HostGlobSegmentSource::Host => (
+                PathObservationNamespace::Host,
+                key.logical_directory.dupe(),
+                PathObservationEpoch::empty(),
+            ),
+            HostGlobSegmentSource::Repository { .. } => {
+                let input = match self.resolve(ctx, key, None).await {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        return SourcePreparationOutcome::Complete(Err(error));
+                    }
+                    SourcePreparationOutcome::Complete(Ok(input)) => input,
+                };
+                match input.result {
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Ok(SegmentInput {
+                            result: Err(error),
+                            observations: input.observations,
+                        }));
+                    }
+                    Ok(resolved) => (
+                        resolved.namespace(),
+                        resolved.requested_path().dupe(),
+                        input.observations,
+                    ),
+                }
+            }
+        };
+        self.scoped_list(ctx, namespace, logical_path)
+            .await
+            .map(|result| {
+                result.and_then(|input| {
+                    Ok(SegmentInput {
+                        result: input.result.map_err(HostGlobSegmentError::DirectoryListing),
+                        observations: union_observation_epochs(
+                            &resolution_observations,
+                            &input.observations,
+                        )?,
+                    })
+                })
+            })
     }
 }
 
@@ -435,7 +601,6 @@ impl HostGlobSegmentMode {
 struct PendingSymlink {
     slot: usize,
     component: Arc<[u8]>,
-    logical_path: NormalizedAbsolutePath,
 }
 
 #[cfg(unix)]
@@ -449,7 +614,7 @@ struct PendingSymlinkBatch {
 #[cfg(unix)]
 type PendingSymlinkOutcome = (
     PendingSymlink,
-    SegmentInputOutcome<ResolvedPath, PathResolutionError>,
+    SegmentInputOutcome<ResolvedPath, HostGlobSegmentError>,
 );
 
 #[cfg(unix)]
@@ -471,16 +636,15 @@ impl HostGlobSegmentCandidatesKey {
         mode: HostGlobSegmentMode,
     ) -> HostGlobSegmentDriverOutcome {
         let component: Arc<[u8]> = Arc::from(self.pattern.bytes());
-        let logical_path = logical_child(&self.logical_directory, &component);
-        let resolved = match mode.resolve(ctx, logical_path).await {
-            PathOutcome::Need(need) => return segment_need(need),
-            PathOutcome::Complete(Err(error)) => {
+        let resolved = match mode.resolve(ctx, self, Some(&component)).await {
+            SourcePreparationOutcome::Need(need) => return segment_need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
                 return SourcePreparationOutcome::Complete(Err(error));
             }
-            PathOutcome::Complete(Ok(resolved)) => resolved,
+            SourcePreparationOutcome::Complete(Ok(resolved)) => resolved,
         };
         let result = match resolved.result {
-            Err(error) => Err(resolution_error(&self.logical_directory, component, error)),
+            Err(error) => Err(error),
             Ok(resolved) => match resolved.state() {
                 ResolvedPathState::Missing => Ok(HostGlobSegmentCandidates::empty()),
                 ResolvedPathState::Present(lstat) => Ok(HostGlobSegmentCandidates::from_vec(vec![
@@ -499,20 +663,17 @@ impl HostGlobSegmentCandidatesKey {
         ctx: &mut DiceComputations<'_>,
         mode: HostGlobSegmentMode,
     ) -> HostGlobSegmentDriverOutcome {
-        let listing = match mode.list(ctx, self.logical_directory.dupe()).await {
-            PathOutcome::Need(need) => return segment_need(need),
-            PathOutcome::Complete(Err(error)) => {
+        let listing = match mode.list(ctx, self).await {
+            SourcePreparationOutcome::Need(need) => return segment_need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
                 return SourcePreparationOutcome::Complete(Err(error));
             }
-            PathOutcome::Complete(Ok(listing)) => listing,
+            SourcePreparationOutcome::Complete(Ok(listing)) => listing,
         };
         let mut observations = listing.observations;
         let entries = match listing.result {
             Err(error) => {
-                return segment_complete(
-                    Err(HostGlobSegmentError::DirectoryListing(error)),
-                    observations,
-                );
+                return segment_complete(Err(error), observations);
             }
             Ok(PathDirectoryListing::Missing) => {
                 return segment_complete(
@@ -548,13 +709,8 @@ impl HostGlobSegmentCandidatesKey {
                     }));
                 }
                 PathDirectoryEntryKind::Symlink => {
-                    let logical_path = logical_child(&self.logical_directory, &component);
                     slots.push(None);
-                    pending.push(PendingSymlink {
-                        slot,
-                        component,
-                        logical_path,
-                    });
+                    pending.push(PendingSymlink { slot, component });
                 }
             }
         }
@@ -569,12 +725,12 @@ impl HostGlobSegmentCandidatesKey {
 
         // The listing already resolved this base. Reuse that completed dependency
         // to identify the physical child recorded by ResolvedPath.
-        let resolved_directory = match mode.resolve(ctx, self.logical_directory.dupe()).await {
-            PathOutcome::Need(need) => return segment_need(need),
-            PathOutcome::Complete(Err(error)) => {
+        let resolved_directory = match mode.resolve(ctx, self, None).await {
+            SourcePreparationOutcome::Need(need) => return segment_need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
                 return SourcePreparationOutcome::Complete(Err(error));
             }
-            PathOutcome::Complete(Ok(resolved)) => resolved,
+            SourcePreparationOutcome::Complete(Ok(resolved)) => resolved,
         };
         observations =
             match union_observation_epochs(&observations, &resolved_directory.observations) {
@@ -621,7 +777,7 @@ impl HostGlobSegmentCandidatesKey {
         let outcomes = ctx
             .compute_join(pending, |ctx, pending| {
                 Box::pin(async move {
-                    let outcome = mode.resolve(ctx, pending.logical_path.dupe()).await;
+                    let outcome = mode.resolve(ctx, self, Some(&pending.component)).await;
                     (pending, outcome)
                 })
             })
@@ -635,22 +791,24 @@ impl HostGlobSegmentCandidatesKey {
         batch: PendingSymlinkBatch,
         outcomes: Vec<PendingSymlinkOutcome>,
     ) -> HostGlobSegmentDriverOutcome {
-        let mut all_need: Option<NeedPathObservations> = None;
+        let mut all_need: Option<SourcePreparationNeeds> = None;
         let mut observations = batch.observations;
         let mut slots = batch.slots;
         for (pending, outcome) in outcomes {
             let resolved = match outcome {
-                PathOutcome::Need(need) => {
+                SourcePreparationOutcome::Need(need) => {
                     all_need = Some(match all_need {
-                        Some(current) => current.union(&need),
+                        Some(current) => current
+                            .try_union(&need)
+                            .expect("same repository segment needs cannot conflict"),
                         None => need,
                     });
                     continue;
                 }
-                PathOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error)) => {
                     return SourcePreparationOutcome::Complete(Err(error));
                 }
-                PathOutcome::Complete(Ok(resolved)) => resolved,
+                SourcePreparationOutcome::Complete(Ok(resolved)) => resolved,
             };
             observations = match union_observation_epochs(&observations, &resolved.observations) {
                 Ok(observations) => observations,
@@ -659,14 +817,7 @@ impl HostGlobSegmentCandidatesKey {
             let resolved = match resolved.result {
                 Ok(resolved) => resolved,
                 Err(error) => {
-                    return segment_complete(
-                        Err(resolution_error(
-                            &self.logical_directory,
-                            pending.component,
-                            error,
-                        )),
-                        observations,
-                    );
+                    return segment_complete(Err(error), observations);
                 }
             };
             let physical_child = logical_child(&batch.directory_real_path, &pending.component);

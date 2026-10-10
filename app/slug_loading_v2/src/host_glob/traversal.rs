@@ -10,6 +10,9 @@
 use std::collections::VecDeque;
 use std::ffi::OsStr;
 use std::fmt;
+#[cfg(unix)]
+use std::os::unix::ffi::OsStringExt;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use allocative::Allocative;
@@ -65,7 +68,7 @@ pub(super) enum HostGlobTraversalOperation {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub(crate) enum HostGlobBoundaryScope {
     Root,
-    External(HostRepositorySourceRoute),
+    External(Arc<HostRepositorySourceRoute>),
     BuiltinCatalog(HostRepositorySourceRoute),
 }
 
@@ -349,32 +352,44 @@ impl HostGlobTraversalMode {
         ctx: &mut DiceComputations<'_>,
         scope: &HostGlobBoundaryScope,
         logical_directory: NormalizedAbsolutePath,
-        package: PackagePath,
+        package: &PackagePath,
+        raw_package: &[u8],
+        raw_relative: &[u8],
         pattern: HostGlobSegmentPattern,
     ) -> TraversalChildOutcome<HostGlobSegmentCandidates, HostGlobSegmentError> {
         if let HostGlobBoundaryScope::BuiltinCatalog(route) = scope {
-            return self.catalog_segment(ctx, route, package, pattern).await;
+            return self
+                .catalog_segment(ctx, route, package.clone(), pattern)
+                .await;
         }
-        match self {
-            Self::Legacy => dice_invariant(
-                ctx.compute(&HostGlobSegmentCandidatesKey::new(
+        let key = match scope {
+            HostGlobBoundaryScope::External(route) => {
+                #[cfg(unix)]
+                let directory = PathBuf::from(std::ffi::OsString::from_vec(raw_child_bytes(
+                    raw_package,
+                    raw_relative,
+                )));
+                #[cfg(not(unix))]
+                let directory = PathBuf::new(); // Non-Unix segments still return UnsupportedHost.
+                HostGlobSegmentCandidatesKey::from_repository(
+                    route.dupe(),
+                    Arc::new(directory),
                     logical_directory,
                     pattern,
-                ))
-                .await,
-            )
-            .map(|result| {
+                )
+            }
+            _ => HostGlobSegmentCandidatesKey::new(logical_directory, pattern),
+        };
+        match self {
+            Self::Legacy => dice_invariant(ctx.compute(&key).await).map(|result| {
                 Ok(TraversalChild {
                     result,
                     observations: PathObservationEpoch::empty(),
                 })
             }),
             Self::Observed => dice_invariant(
-                ctx.compute(&HostGlobSegmentCandidatesObservationKey::new(
-                    logical_directory,
-                    pattern,
-                ))
-                .await,
+                ctx.compute(&HostGlobSegmentCandidatesObservationKey(key))
+                    .await,
             )
             .map(|observed| {
                 observed.map(|observed| TraversalChild {
@@ -445,8 +460,10 @@ impl HostGlobTraversalMode {
     ) -> TraversalChildOutcome<HostGlobBoundary, HostGlobBoundaryError> {
         match scope {
             HostGlobBoundaryScope::Root => self.root_boundary(ctx, workspace, package).await,
-            HostGlobBoundaryScope::External(route)
-            | HostGlobBoundaryScope::BuiltinCatalog(route) => {
+            HostGlobBoundaryScope::External(route) => {
+                self.external_boundary(ctx, route.as_ref(), package).await
+            }
+            HostGlobBoundaryScope::BuiltinCatalog(route) => {
                 self.external_boundary(ctx, route, package).await
             }
         }
@@ -608,15 +625,20 @@ fn project_external_boundary(
         .map_err(|error| HostGlobBoundaryError::External(*error))
 }
 
-fn raw_child(parent: &[u8], child: &[u8]) -> Arc<[u8]> {
-    let mut result =
-        Vec::with_capacity(parent.len() + usize::from(!parent.is_empty()) + child.len());
+fn raw_child_bytes(parent: &[u8], child: &[u8]) -> Vec<u8> {
+    let mut result = Vec::with_capacity(
+        parent.len() + usize::from(!parent.is_empty() && !child.is_empty()) + child.len(),
+    );
     result.extend_from_slice(parent);
-    if !parent.is_empty() {
+    if !parent.is_empty() && !child.is_empty() {
         result.push(b'/');
     }
     result.extend_from_slice(child);
-    result.into()
+    result
+}
+
+fn raw_child(parent: &[u8], child: &[u8]) -> Arc<[u8]> {
+    raw_child_bytes(parent, child).into()
 }
 
 fn package_child(parent: &PackagePath, child: &[u8]) -> PackagePath {
@@ -706,7 +728,9 @@ impl HostGlobTraversalKey {
                     ctx,
                     &self.boundary_scope,
                     state.logical_directory.dupe(),
-                    state.package.clone(),
+                    &state.package,
+                    &self.package_bytes,
+                    &state.relative_path,
                     candidate_pattern,
                 )
                 .await

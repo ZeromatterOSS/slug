@@ -1672,7 +1672,7 @@ compatibility=module_extension(implementation=impl)
         }));
 
         let source_route = HostRepositorySourceRoute::Canonical(route.input().clone());
-        let host_scope = HostGlobBoundaryScope::External(source_route.clone());
+        let host_scope = HostGlobBoundaryScope::External(Arc::new(source_route.clone()));
         let catalog_scope = HostGlobBoundaryScope::BuiltinCatalog(source_route.clone());
         assert_ne!(host_scope, catalog_scope);
         assert_eq!(

@@ -460,29 +460,34 @@ fn pending_prefix_ignores_later_outer_and_full_batch_outer_wins_need() {
     let pending = |slot, name: &'static [u8]| PendingSymlink {
         slot,
         component: Arc::from(name),
-        logical_path: path(&format!("/pkg/{}", String::from_utf8_lossy(name))),
     };
     let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern("*"));
     let outcomes = vec![
         (
             pending(0, b"a-link"),
-            PathOutcome::Need(NeedPathObservations::singleton(need_demand.dupe())),
+            SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+                NeedPathObservations::singleton(need_demand.dupe()),
+            )),
         ),
         (
             pending(1, b"b-link"),
-            PathOutcome::Complete(Ok(SegmentInput {
-                result: Err(PathResolutionError::Observation {
-                    namespace: PathObservationNamespace::Host,
-                    requested_path: path("/pkg/b-link"),
-                    demand: semantic_demand.dupe(),
-                    error: semantic_error,
-                }),
+            SourcePreparationOutcome::Complete(Ok(SegmentInput {
+                result: Err(resolution_error(
+                    &path("/pkg"),
+                    Arc::from(b"b-link".as_slice()),
+                    PathResolutionError::Observation {
+                        namespace: PathObservationNamespace::Host,
+                        requested_path: path("/pkg/b-link"),
+                        demand: semantic_demand.dupe(),
+                        error: semantic_error,
+                    },
+                )),
                 observations: semantic_epoch,
             })),
         ),
         (
             pending(2, b"c-link"),
-            PathOutcome::Complete(Err(outer.clone())),
+            SourcePreparationOutcome::Complete(Err(outer.clone())),
         ),
     ];
     let outcome = key.finish_pending_symlinks(
@@ -523,9 +528,14 @@ fn pending_prefix_ignores_later_outer_and_full_batch_outer_wins_need() {
         vec![
             (
                 pending(0, b"a-link"),
-                PathOutcome::Need(NeedPathObservations::singleton(need_demand)),
+                SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+                    NeedPathObservations::singleton(need_demand),
+                )),
             ),
-            (pending(1, b"c-link"), PathOutcome::Complete(Err(outer))),
+            (
+                pending(1, b"c-link"),
+                SourcePreparationOutcome::Complete(Err(outer)),
+            ),
         ],
     );
     assert!(matches!(
@@ -1268,4 +1278,441 @@ async fn wildcard_missing_directory_is_a_semantic_error() {
         Err(HostGlobSegmentError::DirectoryDisappeared { logical_directory })
             if logical_directory == &path("/pkg")
     ));
+}
+
+pub(super) async fn external_fixture() -> (
+    Arc<Dice>,
+    Arc<HostRepositorySourceRoute>,
+    Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+    dice::DiceTransaction,
+) {
+    external_fixture_source(crate::canonical_repository_route_tests::tests::EXTENSION_A).await
+}
+
+async fn external_fixture_source(
+    extension: &str,
+) -> (
+    Arc<Dice>,
+    Arc<HostRepositorySourceRoute>,
+    Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+    dice::DiceTransaction,
+) {
+    use crate::canonical_repository_route_tests::tests::MODULE;
+    use crate::canonical_repository_route_tests::tests::WORKSPACE;
+    use crate::canonical_repository_route_tests::tests::transaction;
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut tx = transaction(&dice, MODULE, extension, true, None).await;
+    let key = crate::HostRootRepositoryLoadRouteKey::new(
+        path(WORKSPACE),
+        slug_identity_v2::ApparentRepoName::new("first").unwrap(),
+    )
+    .unwrap();
+    let SourcePreparationOutcome::Complete(result) = tx.compute(&key).await.unwrap() else {
+        panic!("original generated route")
+    };
+    let route = Arc::new(result.as_ref().as_ref().unwrap().source().clone());
+    let HostRepositorySourceRoute::Canonical(input) = route.as_ref() else {
+        panic!("canonical route")
+    };
+    let slug_bzlmod_v2::HostRepositorySourceInputDispositionView::Request(request) =
+        input.view().disposition()
+    else {
+        panic!("original request")
+    };
+    let request = request.clone();
+    (dice, route, request, tx)
+}
+
+pub(super) fn external_epoch(
+    namespace: PathObservationNamespace,
+    root: &str,
+    directory: &[u8],
+    errors: bool,
+) -> PathObservationEpoch {
+    let base = logical_child(&path(root), directory);
+    let mut entries = vec![
+        present("/", PathNodeKind::Directory),
+        present(root, PathNodeKind::Directory),
+    ];
+    if !directory.is_empty() {
+        entries.push(lstat_result(
+            base.dupe(),
+            PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+        ));
+    }
+    for (name, kind) in [
+        (b"entry".as_slice(), PathNodeKind::RegularFile),
+        (b"link", PathNodeKind::Symlink),
+        (b"err1", PathNodeKind::Symlink),
+        (b"\xe9", PathNodeKind::Symlink),
+    ] {
+        entries.push(lstat_result(
+            logical_child(&base, name),
+            PathOperationResult::Present(lstat(kind)),
+        ));
+    }
+    entries.push((
+        demand(
+            logical_child(&base, b"link"),
+            PathObservationOperation::ReadLink,
+        ),
+        PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+            "entry",
+        )))),
+    ));
+    entries.push((
+        demand(
+            logical_child(&base, b"\xe9"),
+            PathObservationOperation::ReadLink,
+        ),
+        PathObservationResult::ReadLink(PathOperationResult::Present(Arc::new(PathBuf::from(
+            "entry",
+        )))),
+    ));
+    entries.push(lstat_result(
+        logical_child(&base, b"missing"),
+        PathOperationResult::Missing,
+    ));
+    entries.push(lstat_result(
+        logical_child(&base, b"err2"),
+        PathOperationResult::Error(PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        }),
+    ));
+    let listing = PathDirectoryEntries::new(
+        [
+            (b"entry".as_slice(), PathDirectoryEntryKind::File),
+            (b"link", PathDirectoryEntryKind::Symlink),
+            (b"\xe9", PathDirectoryEntryKind::Symlink),
+        ]
+        .into_iter()
+        .chain(
+            errors
+                .then_some([
+                    (b"err1".as_slice(), PathDirectoryEntryKind::Symlink),
+                    (b"err2".as_slice(), PathDirectoryEntryKind::Symlink),
+                ])
+                .into_iter()
+                .flatten(),
+        )
+        .map(|(name, kind)| {
+            PathDirectoryEntry::new(
+                PathDirectoryName::new(OsString::from_vec(name.to_vec())).unwrap(),
+                kind,
+            )
+        }),
+    );
+    entries.push((
+        demand(base, PathObservationOperation::DirectoryEntries),
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(listing)),
+    ));
+    PathObservationEpoch::new(entries.into_iter().map(|(demand, result)| {
+        (
+            PathObservationDemand::new(namespace, demand.path().dupe(), demand.operation()),
+            result,
+        )
+    }))
+    .unwrap()
+}
+
+pub(super) async fn external_update(
+    tx: dice::DiceTransaction,
+    request: &Arc<slug_bzlmod_v2::RepositoryMaterializationRequest>,
+    root: &str,
+    instance: u64,
+    epoch: PathObservationEpoch,
+) -> dice::DiceTransaction {
+    use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
+    use slug_bzlmod_v2::RepositoryMaterializationResult;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RepositoryMaterializationSuccess;
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: request.id.workspace.dupe(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                request.id.workspace.dupe(),
+                [RepositoryMaterializationEpochEntry {
+                    request: request.clone(),
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Immutable {
+                            source_identity: Arc::from("glob-fixture"),
+                            generation_root: PathBuf::from(root),
+                            observation_instance: PathObservationInstanceId::new(instance),
+                        },
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    updater.commit().await
+}
+
+#[tokio::test]
+async fn external_segments_preserve_raw_original_route_and_observed_arcs() {
+    let (_dice, route, request, mut tx) = external_fixture().await;
+    let pending = HostGlobSegmentCandidatesKey::from_repository(
+        route.dupe(),
+        Arc::new(PathBuf::new()),
+        path("/image"),
+        pattern("entry"),
+    );
+    let mut updater = tx.into_updater();
+    updater
+        .changed_to(vec![(
+            slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
+                workspace: request.id.workspace.dupe(),
+            },
+            slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+                request.id.workspace.dupe(),
+                std::iter::empty::<slug_bzlmod_v2::RepositoryMaterializationEpochEntry>(),
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    tx = updater.commit().await;
+    for observed in [false, true] {
+        let need = if observed {
+            match tx
+                .compute(&HostGlobSegmentCandidatesObservationKey(pending.clone()))
+                .await
+                .unwrap()
+            {
+                SourcePreparationOutcome::Need(need) => need,
+                other => panic!("original materialization Need: {other:?}"),
+            }
+        } else {
+            match tx.compute(&pending).await.unwrap() {
+                SourcePreparationOutcome::Need(need) => need,
+                other => panic!("original materialization Need: {other:?}"),
+            }
+        };
+        // The inherited materialization owner clones the complete request into
+        // its Need; full structural identity, including attributes/plan, is required.
+        assert_eq!(
+            need.repository_materializations().values().next().unwrap(),
+            &request
+        );
+    }
+    let namespace = PathObservationNamespace::Materialization(PathObservationInstanceId::new(71));
+    let normal_epoch = external_epoch(namespace, "/image", b"\xe9", false);
+    let changed_epoch = external_epoch(namespace, "/image", b"\xe9", true);
+    // Retain unchanged observation allocations across the listing-only update.
+    let error_epoch = PathObservationEpoch::from_shared(changed_epoch.observations().iter().map(
+        |(demand, result)| {
+            let shared = normal_epoch
+                .get(demand)
+                .filter(|prior| prior.as_ref() == result.as_ref())
+                .unwrap_or(result);
+            (demand.dupe(), shared.dupe())
+        },
+    ))
+    .unwrap();
+    let mut tx = external_update(tx, &request, "/image", 71, normal_epoch.dupe()).await;
+    let directory = Arc::new(PathBuf::from(OsString::from_vec(vec![0xe9])));
+    for (glob, expected) in [
+        ("entry", "ok"),
+        ("l*", "ok"),
+        ("*", "ok"),
+        ("missing", "empty"),
+        ("err*", "error"),
+    ] {
+        let epoch = if glob == "err*" {
+            error_epoch.dupe()
+        } else {
+            normal_epoch.dupe()
+        };
+        tx = external_update(tx, &request, "/image", 71, epoch.dupe()).await;
+        let key = HostGlobSegmentCandidatesKey::from_repository(
+            route.dupe(),
+            directory.dupe(),
+            logical_child(&path("/image"), b"\xe9"),
+            pattern(glob),
+        );
+        assert_ne!(
+            key,
+            HostGlobSegmentCandidatesKey::new(key.logical_directory.dupe(), key.pattern.dupe())
+        );
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&key).await.unwrap() else {
+            panic!("complete error outranks err1 ReadLink Need")
+        };
+        let outcome = tx
+            .compute(&HostGlobSegmentCandidatesObservationKey(key.clone()))
+            .await
+            .unwrap();
+        let observed = observed_value(&outcome);
+        assert_eq!(observed.result.as_ref(), legacy.as_ref());
+        assert_eq!(legacy.is_err(), expected == "error");
+        if expected == "empty" {
+            assert!(legacy.as_ref().as_ref().unwrap().candidates().is_empty());
+        }
+        if glob == "*" {
+            assert!(
+                legacy
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .candidates()
+                    .iter()
+                    .any(|candidate| candidate.component.as_ref() == b"\xe9")
+            );
+        }
+        // Use the retained injected epoch, not newly allocated equal results.
+        let injected = tx.compute(&PathObservationEpochKey).await.unwrap();
+        assert_eq!(injected, epoch);
+        for (demand, result) in observed.observations.observations() {
+            assert_eq!(demand.namespace(), namespace);
+            assert!(
+                demand
+                    .path()
+                    .as_path()
+                    .as_os_str()
+                    .as_bytes()
+                    .contains(&0xe9)
+                    || demand.path() == &path("/image")
+                    || demand.path() == &path("/")
+            );
+            assert!(Arc::ptr_eq(result, injected.get(demand).unwrap()));
+        }
+    }
+    let raw_key = HostGlobSegmentCandidatesKey::from_repository(
+        route.dupe(),
+        directory,
+        path("/unused-physical-spelling"),
+        pattern("entry"),
+    );
+    // Same canonical repository, different original attributes: separate segment identity.
+    let extension = crate::canonical_repository_route_tests::tests::EXTENSION_A
+        .replace("value='one'", "value='changed'");
+    let (_other_dice, other_route, other_request, _other_tx) =
+        external_fixture_source(&extension).await;
+    assert_eq!(request.id, other_request.id);
+    assert_ne!(request.repo_spec, other_request.repo_spec);
+    let other_key = HostGlobSegmentCandidatesKey::from_repository(
+        other_route,
+        match &raw_key.source {
+            HostGlobSegmentSource::Repository { directory, .. } => directory.dupe(),
+            _ => unreachable!(),
+        },
+        raw_key.logical_directory.dupe(),
+        raw_key.pattern.dupe(),
+    );
+    assert_ne!(raw_key, other_key);
+    assert!(
+        matches!(&raw_key.source, HostGlobSegmentSource::Repository { route: shared, .. } if Arc::ptr_eq(shared, &route))
+    );
+    #[allow(dead_code)]
+    struct PriorSegmentKey {
+        logical_directory: NormalizedAbsolutePath,
+        pattern: HostGlobSegmentPattern,
+    }
+    #[allow(dead_code)]
+    enum PriorBoundaryScope {
+        Root,
+        External(HostRepositorySourceRoute),
+        BuiltinCatalog(HostRepositorySourceRoute),
+    }
+    eprintln!(
+        "WP1088_GLOB_BASELINE key={}/{} scope={}/{}",
+        std::mem::size_of::<PriorSegmentKey>(),
+        std::mem::align_of::<PriorSegmentKey>(),
+        std::mem::size_of::<PriorBoundaryScope>(),
+        std::mem::align_of::<PriorBoundaryScope>()
+    );
+    eprintln!(
+        "WP1088_GLOB_LAYOUT key={}/{} source={}/{} route={}/{} traversal={}/{} scope={}/{}",
+        std::mem::size_of::<HostGlobSegmentCandidatesKey>(),
+        std::mem::align_of::<HostGlobSegmentCandidatesKey>(),
+        std::mem::size_of::<HostGlobSegmentSource>(),
+        std::mem::align_of::<HostGlobSegmentSource>(),
+        std::mem::size_of::<HostRepositorySourceRoute>(),
+        std::mem::align_of::<HostRepositorySourceRoute>(),
+        std::mem::size_of::<HostGlobTraversalKey>(),
+        std::mem::align_of::<HostGlobTraversalKey>(),
+        std::mem::size_of::<super::traversal::HostGlobBoundaryScope>(),
+        std::mem::align_of::<super::traversal::HostGlobBoundaryScope>()
+    );
+}
+
+#[tokio::test]
+async fn external_segments_follow_current_materialization_a_b_a() {
+    let (_dice, route, request, tx) = external_fixture().await;
+    let key = HostGlobSegmentCandidatesKey::from_repository(
+        route,
+        Arc::new(PathBuf::new()),
+        path("/image"),
+        pattern("entry"),
+    );
+    let a = PathObservationNamespace::Materialization(PathObservationInstanceId::new(81));
+    let mut tx = external_update(
+        tx,
+        &request,
+        "/image",
+        81,
+        external_epoch(a, "/image", b"", false),
+    )
+    .await;
+    let SourcePreparationOutcome::Complete(first) = tx.compute(&key).await.unwrap() else {
+        panic!("first segment must complete")
+    };
+    let SourcePreparationOutcome::Complete(warm) = tx.compute(&key).await.unwrap() else {
+        panic!("warm segment must complete")
+    };
+    assert_eq!(first, warm);
+    for (root, instance) in [("/image", 82), ("/image", 81), ("/new-image", 83)] {
+        let namespace =
+            PathObservationNamespace::Materialization(PathObservationInstanceId::new(instance));
+        tx = external_update(
+            tx,
+            &request,
+            root,
+            instance,
+            external_epoch(a, "/image", b"", false),
+        )
+        .await;
+        if instance != 81 {
+            let SourcePreparationOutcome::Need(need) = tx.compute(&key).await.unwrap() else {
+                panic!("stale A cannot satisfy current instance")
+            };
+            assert!(
+                need.path_observations()
+                    .unwrap()
+                    .demands()
+                    .iter()
+                    .all(|demand| demand.namespace() == namespace)
+            );
+        }
+        let epoch = external_epoch(namespace, root, b"", false);
+        tx = external_update(tx, &request, root, instance, epoch.dupe()).await;
+        let SourcePreparationOutcome::Complete(current) = tx.compute(&key).await.unwrap() else {
+            panic!("current segment must complete")
+        };
+        assert_eq!(first, current);
+        let observed = tx
+            .compute(&HostGlobSegmentCandidatesObservationKey(key.clone()))
+            .await
+            .unwrap();
+        let injected = tx.compute(&PathObservationEpochKey).await.unwrap();
+        assert_eq!(injected, epoch);
+        for (demand, result) in observed_value(&observed).observations.observations() {
+            assert_eq!(demand.namespace(), namespace);
+            assert!(Arc::ptr_eq(result, injected.get(demand).unwrap()));
+        }
+    }
+    // Root package wildcard must use the explicit owner-root constructor.
+    let wildcard = HostGlobSegmentCandidatesKey {
+        pattern: pattern("l*"),
+        ..key
+    };
+    assert!(
+        matches!(tx.compute(&wildcard).await.unwrap(), SourcePreparationOutcome::Complete(result) if result.is_ok())
+    );
 }

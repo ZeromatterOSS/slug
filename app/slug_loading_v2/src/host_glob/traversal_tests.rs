@@ -1305,3 +1305,105 @@ async fn observed_warm_and_create_delete_restore_reactivate_and_restore_value() 
     }
     assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 3);
 }
+
+#[tokio::test]
+async fn external_traversal_preserves_original_route_and_raw_children() {
+    use super::super::tests::external_epoch;
+    use super::super::tests::external_fixture;
+    use super::super::tests::external_update;
+    let (_dice, route, request, mut tx) = external_fixture().await;
+    let workspace = route.workspace().dupe();
+    let builtin_key = crate::HostRootRepositoryLoadRouteKey::for_root_build(
+        workspace.dupe(),
+        slug_identity_v2::ApparentRepoName::new("bazel_tools").unwrap(),
+    )
+    .unwrap();
+    let SourcePreparationOutcome::Complete(builtin) = tx.compute(&builtin_key).await.unwrap()
+    else {
+        panic!("original built-in route")
+    };
+    let builtin = builtin.as_ref().as_ref().unwrap().source().clone();
+    let namespace = PathObservationNamespace::Materialization(
+        slug_workspace_v2::PathObservationInstanceId::new(91),
+    );
+    let epoch = external_epoch(namespace, "/image", b"\xe9", false);
+    tx = external_update(tx, &request, "/image", 91, epoch.dupe()).await;
+    for glob in ["entry", "*", "l*"] {
+        let key = HostGlobTraversalKey::new(
+            workspace.dupe(),
+            HostGlobBoundaryScope::External(route.dupe()),
+            path("/image"),
+            PackagePath::parse("é").unwrap(),
+            GlobPattern::include(glob).unwrap(),
+            HostGlobTraversalOperation::Files,
+        )
+        .unwrap();
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&key).await.unwrap() else {
+            panic!("external raw traversal")
+        };
+        let outcome = tx
+            .compute(&HostGlobTraversalObservationKey(key))
+            .await
+            .unwrap();
+        let value = observed_value(&outcome);
+        assert_eq!(value.result.as_ref(), legacy.as_ref());
+        assert!(value.result.is_ok());
+        if glob == "*" {
+            assert!(
+                value
+                    .result
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .matches()
+                    .iter()
+                    .any(|value| value.relative_path.as_ref() == b"\xe9")
+            );
+        }
+        for (demand, result) in value.observations.observations() {
+            assert_eq!(demand.namespace(), namespace);
+            assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+        }
+    }
+    // Catalog traversal keeps its own immutable directory owner despite absent Host observations.
+    let key = HostGlobTraversalKey::new(
+        workspace.dupe(),
+        HostGlobBoundaryScope::BuiltinCatalog(builtin),
+        workspace.dupe(),
+        PackagePath::parse("tools/build_defs/repo").unwrap(),
+        GlobPattern::include("*.bzl").unwrap(),
+        HostGlobTraversalOperation::Files,
+    )
+    .unwrap();
+    let outcome = tx
+        .compute(&HostGlobTraversalObservationKey(key))
+        .await
+        .unwrap();
+    assert!(observed_value(&outcome).result.is_ok());
+    assert!(
+        observed_value(&outcome)
+            .observations
+            .observations()
+            .is_empty()
+    );
+    // Root's ordinary Host constructor remains distinct and asks for Host observations.
+    let key = HostGlobTraversalKey::new(
+        workspace.dupe(),
+        HostGlobBoundaryScope::Root,
+        path("/image"),
+        PackagePath::parse("pkg").unwrap(),
+        GlobPattern::include("entry").unwrap(),
+        HostGlobTraversalOperation::Files,
+    )
+    .unwrap();
+    let SourcePreparationOutcome::Need(need) = tx.compute(&key).await.unwrap() else {
+        panic!("Root must not consume materialized observations")
+    };
+    assert!(
+        need.path_observations()
+            .unwrap()
+            .demands()
+            .iter()
+            .all(|demand| demand.namespace() == PathObservationNamespace::Host)
+    );
+}

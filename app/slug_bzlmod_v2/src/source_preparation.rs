@@ -1658,7 +1658,13 @@ impl ObservedRepositorySourceFileValue {
 #[doc(hidden)]
 pub struct HostRepositoryPathKey {
     route: HostRepositorySourceRoute,
-    repo_relative_path: PathBuf,
+    target: HostRepositoryPathTarget,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+enum HostRepositoryPathTarget {
+    RepositoryRoot,
+    Relative(PathBuf),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -1666,10 +1672,18 @@ pub struct HostRepositoryPathKey {
 pub struct HostRepositoryPathObservationKey(pub(crate) HostRepositoryPathKey);
 
 impl HostRepositoryPathKey {
+    /// Resolve the original current materialization root without reading file bytes.
+    pub fn for_repository_root(route: HostRepositorySourceRoute) -> Self {
+        Self {
+            route,
+            target: HostRepositoryPathTarget::RepositoryRoot,
+        }
+    }
+
     pub(crate) fn new(route: RootRepositoryRoute, repo_relative_path: PathBuf) -> Self {
         Self {
             route: HostRepositorySourceRoute::root(route),
-            repo_relative_path,
+            target: HostRepositoryPathTarget::Relative(repo_relative_path),
         }
     }
 
@@ -1679,12 +1693,16 @@ impl HostRepositoryPathKey {
     ) -> Self {
         Self {
             route,
-            repo_relative_path,
+            target: HostRepositoryPathTarget::Relative(repo_relative_path),
         }
     }
 }
 
 impl HostRepositoryPathObservationKey {
+    pub fn for_repository_root(route: HostRepositorySourceRoute) -> Self {
+        Self(HostRepositoryPathKey::for_repository_root(route))
+    }
+
     pub fn from_source_route(
         route: HostRepositorySourceRoute,
         repo_relative_path: PathBuf,
@@ -1699,18 +1717,17 @@ impl HostRepositoryPathObservationKey {
 impl Hash for HostRepositoryPathKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.route.hash(state);
-        self.repo_relative_path.hash(state);
+        self.target.hash(state);
     }
 }
 
 impl fmt::Display for HostRepositoryPathKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "host-repository-path:{}:{}",
-            self.route.canonical_repo(),
-            self.repo_relative_path.display()
-        )
+        write!(f, "host-repository-path:{}:", self.route.canonical_repo())?;
+        match &self.target {
+            HostRepositoryPathTarget::RepositoryRoot => f.write_str("<repository-root>"),
+            HostRepositoryPathTarget::Relative(path) => write!(f, "{}", path.display()),
+        }
     }
 }
 
@@ -5958,18 +5975,21 @@ async fn drive_host_repository_path(
     key: &HostRepositoryPathKey,
     mode: HostRepositoryObservationMode,
 ) -> HostRepositoryPathDriverOutcome {
-    let relative = match checked_relative_path(&key.repo_relative_path) {
-        Ok(relative) => relative,
-        Err(_) => {
-            return host_repository_complete(
-                Err(RepositorySourceFileError::InvalidRepoRelativePath {
-                    requested_path: Arc::new(key.repo_relative_path.clone()),
-                }),
-                PathObservationEpoch::empty(),
-            );
-        }
+    let relative = match &key.target {
+        HostRepositoryPathTarget::RepositoryRoot => None,
+        HostRepositoryPathTarget::Relative(path) => match checked_relative_path(path) {
+            Ok(relative) => Some(relative),
+            Err(_) => {
+                return host_repository_complete(
+                    Err(RepositorySourceFileError::InvalidRepoRelativePath {
+                        requested_path: Arc::new(path.clone()),
+                    }),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
     };
-    let repo_relative_path = Arc::new(relative.to_owned());
+    let repo_relative_path = Arc::new(relative.map_or_else(PathBuf::new, Path::to_path_buf));
     let request = match key.route.materialization_disposition() {
         Ok(HostRepositoryMaterializationDisposition::Request(request)) => request,
         Ok(HostRepositoryMaterializationDisposition::Builtin(_)) => {
@@ -6034,7 +6054,9 @@ async fn drive_host_repository_path(
             generation_root,
         ),
     };
-    let requested_path = match NormalizedAbsolutePath::new(root.join(relative)) {
+    let requested_path = match NormalizedAbsolutePath::new(
+        relative.map_or_else(|| root.clone(), |relative| root.join(relative)),
+    ) {
         Ok(path) => path,
         Err(_) => {
             return host_repository_complete(
@@ -11708,6 +11730,166 @@ mod tests {
         match path.resolved().state() {
             ResolvedPathState::Missing => None,
             ResolvedPathState::Present(lstat) => Some(lstat.kind()),
+        }
+    }
+
+    #[tokio::test]
+    async fn host_repository_path_root_target_preserves_relative_validation_and_local_owner() {
+        let route = HostRepositorySourceRoute::root(local_route());
+        let root = HostRepositoryPathKey::for_repository_root(route.clone());
+        let observed = HostRepositoryPathObservationKey::for_repository_root(route.clone());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let epoch = host_path_epoch(
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            Some(PathNodeKind::Directory),
+            None,
+        );
+        let mut tx = host_path_transaction(&dice, material("dep"), epoch.dupe()).await;
+        let SourcePreparationOutcome::Complete(Ok(value)) = tx.compute(&root).await.unwrap() else {
+            panic!("local root must resolve without bytes")
+        };
+        assert_eq!(
+            value.resolved().requested_path().as_path(),
+            Path::new("/workspace/dep")
+        );
+        assert_eq!(value.resolved().namespace(), PathObservationNamespace::Host);
+        let SourcePreparationOutcome::Complete(Ok(value)) = tx.compute(&observed).await.unwrap()
+        else {
+            panic!("observed root must resolve")
+        };
+        for (demand, result) in value.observations().observations() {
+            assert_ne!(demand.operation(), PathObservationOperation::FileBytes);
+            assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+        }
+        for relative in ["", ".", "..", "/absolute", "a/../b"] {
+            let invalid =
+                HostRepositoryPathKey::from_source_route(route.clone(), PathBuf::from(relative));
+            assert_ne!(root, invalid);
+            let SourcePreparationOutcome::Complete(Err(error)) =
+                tx.compute(&invalid).await.unwrap()
+            else {
+                panic!("invalid relative must remain invalid")
+            };
+            assert!(matches!(
+                error,
+                RepositorySourceFileError::InvalidRepoRelativePath { .. }
+            ));
+            let SourcePreparationOutcome::Complete(Ok(value)) = tx
+                .compute(&HostRepositoryPathObservationKey(invalid))
+                .await
+                .unwrap()
+            else {
+                panic!("observed invalid relative must complete semantically")
+            };
+            assert!(matches!(
+                value.result().as_ref(),
+                Err(RepositorySourceFileError::InvalidRepoRelativePath { .. })
+            ));
+        }
+        #[allow(dead_code)]
+        struct PriorPathKey {
+            route: HostRepositorySourceRoute,
+            repo_relative_path: PathBuf,
+        }
+        eprintln!(
+            "WP1088_PATH_BASELINE key={}/{} relative={}/{}",
+            std::mem::size_of::<PriorPathKey>(),
+            std::mem::align_of::<PriorPathKey>(),
+            std::mem::size_of::<PathBuf>(),
+            std::mem::align_of::<PathBuf>()
+        );
+        eprintln!(
+            "WP1088_PATH_LAYOUT key={}/{} target={}/{} route={}/{}",
+            std::mem::size_of::<HostRepositoryPathKey>(),
+            std::mem::align_of::<HostRepositoryPathKey>(),
+            std::mem::size_of::<HostRepositoryPathTarget>(),
+            std::mem::align_of::<HostRepositoryPathTarget>(),
+            std::mem::size_of::<HostRepositorySourceRoute>(),
+            std::mem::align_of::<HostRepositorySourceRoute>()
+        );
+    }
+
+    #[tokio::test]
+    async fn host_repository_path_root_tracks_current_instance_and_generation() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = HostRepositoryPathKey::for_repository_root(HostRepositorySourceRoute::root(
+            immutable_route(),
+        ));
+        let observed = HostRepositoryPathObservationKey(key.clone());
+        let a = PathObservationInstanceId::new(51);
+        let stale = host_path_epoch(
+            PathObservationNamespace::Materialization(a),
+            "/generation/same",
+            Some(PathNodeKind::Directory),
+            None,
+        );
+        let mut tx = host_path_transaction(
+            &dice,
+            immutable_material("/generation/same", a),
+            stale.dupe(),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(first)) = tx.compute(&key).await.unwrap() else {
+            panic!("first root")
+        };
+        for (root, instance) in [
+            ("/generation/same", 52),
+            ("/generation/same", 51),
+            ("/generation/new", 53),
+        ] {
+            let instance = PathObservationInstanceId::new(instance);
+            let namespace = PathObservationNamespace::Materialization(instance);
+            let epoch = host_path_epoch(namespace, root, Some(PathNodeKind::Directory), None);
+            let mut updater = tx.into_updater();
+            updater
+                .changed_to(vec![(
+                    RepositoryMaterializationResultEpochKey {
+                        workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    },
+                    immutable_material(root, instance),
+                )])
+                .unwrap();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, stale.dupe())])
+                .unwrap();
+            tx = updater.commit().await;
+            if instance != a {
+                let SourcePreparationOutcome::Need(need) = tx.compute(&key).await.unwrap() else {
+                    panic!("stale namespace cannot satisfy current root")
+                };
+                assert!(
+                    need.path_observations()
+                        .unwrap()
+                        .demands()
+                        .iter()
+                        .all(|demand| demand.namespace() == namespace)
+                );
+            }
+            let mut updater = tx.into_updater();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+                .unwrap();
+            tx = updater.commit().await;
+            let SourcePreparationOutcome::Complete(Ok(value)) = tx.compute(&key).await.unwrap()
+            else {
+                panic!("current root")
+            };
+            assert_eq!(value.resolved().namespace(), namespace);
+            assert_eq!(value.resolved().requested_path().as_path(), Path::new(root));
+            if instance == a {
+                assert_eq!(value, first);
+            }
+            let SourcePreparationOutcome::Complete(Ok(value)) =
+                tx.compute(&observed).await.unwrap()
+            else {
+                panic!("current observed root")
+            };
+            let injected = tx.compute(&PathObservationEpochKey).await.unwrap();
+            assert_eq!(injected, epoch);
+            for (demand, result) in value.observations().observations() {
+                assert!(Arc::ptr_eq(result, injected.get(demand).unwrap()));
+            }
         }
     }
 
