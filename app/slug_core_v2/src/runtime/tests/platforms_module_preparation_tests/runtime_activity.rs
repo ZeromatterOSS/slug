@@ -96,7 +96,7 @@ pub(super) fn report_timeout(recorder: Option<&RegistryRequestAssociation>) {
     // snapshot returned: no recorder or Scope lock is held while formatting.
     let origin = timeout.origin;
     println!(
-        "WP1008_TIMEOUT status=available armed={} first_work={} origin={} site={} domain={} phase={} return={} overflow={} sticky={}",
+        "WP1008_TIMEOUT status=available armed={} first_work={} origin={} site={} domain={} phase={} return={} overflow={} sticky={} caller={} caller_owner={} caller_line={}",
         timeout.armed,
         timeout.first_error_is_work_deadline,
         origin.is_some(),
@@ -106,5 +106,8 @@ pub(super) fn report_timeout(recorder: Option<&RegistryRequestAssociation>) {
         origin.map_or(0, |o| o.return_disposition.code()),
         origin.is_some_and(|o| o.step_add_overflow),
         timeout.later_sticky_work_deadline_observed,
+        origin.is_some_and(|o| o.caller.is_some()),
+        origin.and_then(|o| o.caller).map_or(0, |c| c.owner),
+        origin.and_then(|o| o.caller).map_or(0, |c| c.line),
     );
 }

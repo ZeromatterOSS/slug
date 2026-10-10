@@ -373,6 +373,7 @@ impl SourceServiceScope {
     fn state(&self) -> std::sync::MutexGuard<'_, ScopeState> {
         self.state.lock().unwrap_or_else(|e| e.into_inner())
     }
+    #[cfg_attr(all(test, target_os = "linux"), track_caller)]
     fn check_locked(
         &self,
         state: &mut ScopeState,
@@ -385,6 +386,7 @@ impl SourceServiceScope {
             SourceTimeoutPhase::ScopeCheck,
         )
     }
+    #[cfg_attr(all(test, target_os = "linux"), track_caller)]
     fn check_locked_at(
         &self,
         state: &mut ScopeState,
@@ -409,13 +411,31 @@ impl SourceServiceScope {
             None
         };
         if let Some(error) = error {
-            let error = Self::poison_locked(state, error, SourceTimeoutOrigin::common(site, phase));
+            let origin = SourceTimeoutOrigin::common(site, phase);
+            #[cfg(all(test, target_os = "linux"))]
+            let origin = {
+                let mut origin = origin;
+                if error == SourceServiceError::WorkDeadline
+                    && state.timeout.is_armed()
+                    && site == SourceTimeoutSite::GenericScope
+                    && phase == SourceTimeoutPhase::ScopeCheck
+                {
+                    let caller = std::panic::Location::caller();
+                    origin.caller = Some(super::timeout_provenance::SourceTimeoutCaller::project(
+                        caller.file(),
+                        caller.line(),
+                    ));
+                }
+                origin
+            };
+            let error = Self::poison_locked(state, error, origin);
             self.cancelled.send_replace(true);
             Err(error)
         } else {
             Ok(())
         }
     }
+    #[cfg_attr(all(test, target_os = "linux"), track_caller)]
     pub(in crate::runtime) fn check(&self) -> Result<(), SourceServiceError> {
         self.check_locked(&mut self.state(), false)
     }

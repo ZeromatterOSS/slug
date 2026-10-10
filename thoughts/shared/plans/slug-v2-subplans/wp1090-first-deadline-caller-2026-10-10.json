@@ -1,0 +1,303 @@
+{
+  "packet": "WP-7-302-m7a-first-deadline-caller-r1",
+  "baseline": "c23c62f5fa860de16289da5ab91676fe2dd56974",
+  "status": "accepted",
+  "compatibility": "Slug-native optional Linux-test diagnostic; production error/cancel/key/DICE/IO/semantic behavior unchanged; Windows minimal/deferred",
+  "source": {
+    "app/slug_core_v2/src/runtime/source_service/timeout_provenance.rs": {
+      "sha256": "defa118478f965fb726e1f6c50ae10f634fbafb22ca9a65110375432380c980c",
+      "bytes": 6511
+    },
+    "app/slug_core_v2/src/runtime/source_service/scope.rs": {
+      "sha256": "5580d5a77d6ba72e7ae115771fd8aeea5b3cfd68ce56af7a16910c8cf18ad3d8",
+      "bytes": 38315
+    },
+    "app/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs": {
+      "sha256": "6419cfb29331221ee8bed723e95dbf7fa1f0287ea6e147db02ec94d3aa89fe09",
+      "bytes": 18519
+    },
+    "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": {
+      "sha256": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+      "bytes": 12274
+    },
+    "app/slug_core_v2/src/runtime/path_observation.rs": {
+      "sha256": "c478a7c0b5bcc1eacca84e2c8b9e1c6ae45d8d58e4a82fc1b166445c66834b83",
+      "bytes": 186318
+    },
+    "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/runtime_activity.rs": {
+      "sha256": "d0f44f4d0dabc574247e7c2ae67ff0ded6d85a927c3fed72f647b5763c215988",
+      "bytes": 4144
+    },
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": {
+      "sha256": "7e9c798e055e509863ad4164e69048527655991374a8b243af9ead15e9c6e20d",
+      "bytes": 76766
+    }
+  },
+  "source_growth": [
+    "54\t3\tapp/slug_core_v2/src/runtime/path_observation.rs",
+    "1\t0\tapp/slug_core_v2/src/runtime/source_preparation/genuine_root.rs",
+    "2\t0\tapp/slug_core_v2/src/runtime/source_service/diagnostic.rs",
+    "21\t1\tapp/slug_core_v2/src/runtime/source_service/scope.rs",
+    "38\t0\tapp/slug_core_v2/src/runtime/source_service/timeout_provenance.rs",
+    "120\t0\tapp/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs",
+    "4\t1\tapp/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/runtime_activity.rs"
+  ],
+  "change": "FirstarmedGenericScope/ScopeCheck WorkDeadline transientcompilerLocation projectedinto finiteowneru8/lineu32 POD, unknown0/0; no retainedLocation/fileString/path/reference/payload/cache/interner/key.3checkchain+2command attrs and equivalentkernelNone/Somematch. Firstcreator/sticky/nonwork/unarmed/explicitwait behavior unchanged; receiptformats after snapshotlock returns. Mechanical seventh genuine Headers/Timer callerNone initializer only.",
+  "focused": {
+    "selected": 40,
+    "passed": 40,
+    "elapsed_seconds": 0.32194010098464787,
+    "layout": {
+      "caller": {
+        "size": 8,
+        "alignment": 4
+      },
+      "origin": {
+        "size": 20,
+        "alignment": 4
+      },
+      "snapshot": {
+        "size": 24,
+        "alignment": 4
+      },
+      "state": {
+        "size": 24,
+        "alignment": 4
+      },
+      "before_origin": {
+        "size": 5,
+        "alignment": 1
+      },
+      "before_snapshot": {
+        "size": 8,
+        "alignment": 1
+      },
+      "before_state": {
+        "size": 7,
+        "alignment": 1
+      }
+    },
+    "qualification": "40current relevant exactordinarytests after full42selector preflight;2unchanged directUnixSocket fixtureEPERM preserved/unproved, originalbroadbatch0gatecredit. Candidate PODactuals vs explicitoriginalshape reconstruction, not historicalcompiledbaseline/heap/RSS. NewLinux-testonly caller8B/align4, origin20/state24/snapshot24; production layout unchanged. Detector location notCPU/stageowner."
+  },
+  "native": {
+    "operation": "target/wp1090/native/operation.json",
+    "elapsed_seconds": 7.261364129954018,
+    "selected": 1,
+    "passed": 1,
+    "exit_code": 0,
+    "stop_reason": null,
+    "rss_kib": 212932,
+    "rusage_peak_kib": 212932,
+    "rss_mib": 207.94140625,
+    "source_count": 245,
+    "source_count_prior": 246,
+    "decode_bytes": 55523799,
+    "write_bytes": 52795418,
+    "held_fds": 350,
+    "held_physical_bytes": 13861148,
+    "hash_bracket_bytes": 27722296,
+    "pins": 57,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 245 7021682 55523799 52795418 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=245 seen=245 emitted=245 admitted=245 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40507 encoded_bytes=136791 accounting_complete=true identity_complete=false"
+    },
+    "caller": {
+      "path": "app/slug_core_v2/src/runtime/source_service/diagnostic.rs",
+      "sha256": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+      "bytes": 12274,
+      "owner": 7,
+      "line": 296,
+      "source_line": "self.check_source_scope()?;",
+      "interpretation": "validate_source_progress entry before complete batch validation/acquisition; two check_source_scope wrappers propagate actual caller"
+    },
+    "qualification": "ONE changed-source instrumented native observer. Internalgeneric WorkDeadline; exactfirstdetector known, not CPU/time/IO/stage/cause attribution.245admissionsvs246previous not bodycompletion/producerspeed/wholefit;207.941MiB observedprefix only. Allcaps unchanged/no identicalretry."
+  },
+  "caller_source_pins": {
+    "1": {
+      "path": "app/slug_core_v2/src/runtime/source_service/scope.rs",
+      "sha256": "5580d5a77d6ba72e7ae115771fd8aeea5b3cfd68ce56af7a16910c8cf18ad3d8",
+      "bytes": 38315
+    },
+    "2": {
+      "path": "app/slug_core_v2/src/runtime/source_service/regular_file.rs",
+      "sha256": "7e2f8f89dad916f30144bb53a70fab3054bc3e835638f9f914116461b6c10016",
+      "bytes": 14743
+    },
+    "3": {
+      "path": "app/slug_core_v2/src/runtime/path_observation.rs",
+      "sha256": "c478a7c0b5bcc1eacca84e2c8b9e1c6ae45d8d58e4a82fc1b166445c66834b83",
+      "bytes": 186318
+    },
+    "4": {
+      "path": "app/slug_core_v2/src/runtime/path_observation/scoped_directory.rs",
+      "sha256": "f9c0ed8553a963102a6fbd692cf52d055cf0a1efee57de83525c6aa7e1d990ee",
+      "bytes": 9956
+    },
+    "5": {
+      "path": "app/slug_core_v2/src/runtime/dice.rs",
+      "sha256": "163f3df005fb210bca4168ff1affbda2b7a2fe8c6de7468bbdd345cfc7e9b7f1",
+      "bytes": 547909
+    },
+    "6": {
+      "path": "app/slug_core_v2/src/runtime/input_image_bridge.rs",
+      "sha256": "8412150c5e2f4ad00ceed3e30a8bc0d84f5636e3215d2b7415f275de311761a8",
+      "bytes": 21811
+    },
+    "7": {
+      "path": "app/slug_core_v2/src/runtime/source_service/diagnostic.rs",
+      "sha256": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+      "bytes": 12274
+    },
+    "8": {
+      "path": "app/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs",
+      "sha256": "6419cfb29331221ee8bed723e95dbf7fa1f0287ea6e147db02ec94d3aa89fe09",
+      "bytes": 18519
+    }
+  },
+  "operations": {
+    "compile-core": {
+      "path": "target/wp1090/compile-core/operation.json",
+      "sha256": "be124d92ccb2abe4d070af0aa44cb541f33ea3982d66a9b86dfce7e799e8d442",
+      "elapsed_seconds": 40.06680251099169,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0,
+      "qualification": "recordedcurrentoperation"
+    },
+    "ordinary-list": {
+      "path": "target/wp1090/ordinary-list/operation.json",
+      "sha256": "22bc1fc4975a2cb3ce1beddc6aa2c9d48accb06c037bcb3f4532fa2c46f6dbd4",
+      "elapsed_seconds": 0.17541971406899393,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0,
+      "qualification": "recordedcurrentoperation"
+    },
+    "core-preflight": {
+      "path": "target/wp1090/core-preflight/operation.json",
+      "sha256": "16c71bc4e9c2737a8b451bc5384017f04cf45f99bb0795c47d236ed3b378c306",
+      "elapsed_seconds": 0.2013704590499401,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0,
+      "qualification": "recordedcurrentoperation"
+    },
+    "core-tests": {
+      "path": "target/wp1090/core-tests/operation.json",
+      "sha256": "7772f8aa673600d87c3c472d0b1ef3a1f34b711ca0e11fa239aea8b94e059808",
+      "elapsed_seconds": 0.32200789102353156,
+      "exit_code": 101,
+      "stop_reason": "test_count_mismatch",
+      "selected": 42,
+      "passed": 0,
+      "qualification": "broad40stdoutpasses/2unchangedsocketEPERM;0completegatecredit"
+    },
+    "core-tests-focused": {
+      "path": "target/wp1090/core-tests-focused/operation.json",
+      "sha256": "93b98b58afd19f5a3e058775e83344004aac4583a74c65e2bc405c78eb27bffe",
+      "elapsed_seconds": 0.32194010098464787,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 40,
+      "passed": 40,
+      "qualification": "recordedcurrentoperation"
+    },
+    "production-check": {
+      "path": "target/wp1090/production-check/operation.json",
+      "sha256": "bd4f2f6b2f38f4b3e1ab1fffb4f0841960ce9c9f4307be00b7734d2be7fe7cb7",
+      "elapsed_seconds": 7.633300384040922,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0,
+      "qualification": "recordedcurrentoperation"
+    },
+    "native-list": {
+      "path": "target/wp1090/native-list/operation.json",
+      "sha256": "49f88d3c8ef07d20b3fa9f23a146f2319a3b6facc23215a0dfd3bb8bd76a0fba",
+      "elapsed_seconds": 0.17849460698198527,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 0,
+      "passed": 0,
+      "qualification": "recordedcurrentoperation"
+    },
+    "native": {
+      "path": "target/wp1090/native/operation.json",
+      "sha256": "a0e314d4df5ab26f2c30bc82189ca25b0b6134925b2d456f2447ed4b5a62dc20",
+      "elapsed_seconds": 7.261364129954018,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected": 1,
+      "passed": 1,
+      "qualification": "recordedcurrentoperation"
+    }
+  },
+  "evidence": {
+    "target/wp1090/design.md": "f50e31b315a31ade1a97f363e7c2ffdba388ec2565c5e1daba5c37369d7c307c",
+    "target/wp1090/design-review.md": "256f1d0a1653c8499e84d10df81ae347edd578f850c60a2b4af623b94cc7f1b2",
+    "target/wp1090/design-binding.json": "6127543ed3bcc381f406c8695d49cd094a16710da2520f83f44decc121e1d699",
+    "target/wp1090/source-baseline.json": "dc2e51bf40b72ada244341a515582482dfe6d030793b906f337b5fa32d58c556",
+    "target/wp1090/initializer-baseline.json": "a9dc1b9a54c1eded2004bd86324adcfe32e71005ab6e0107ab7ea69dd1eddc25",
+    "target/wp1090/initializer-correction.md": "04b4a6777d64d2ccca9e623e74bf49751ef4cbf89ed937ab541dfaa1b3b371be",
+    "target/wp1090/implementation.md": "789dd2f22b304bb1290dd850d9f8b2ebbe8e41214467df652c9b0d3e4fdf7e69",
+    "target/wp1090/source-freeze.json": "1f2155a0233b6b2cb2b914d647c4fb2b445f0e4fe3d1e9b95dccaf2504cb72e7",
+    "target/wp1090/static-review.md": "a27cd89b2bc73ddd140e06447adfdbc02d1819b11d6d081636c3f48a330fb795",
+    "target/wp1090/caller-source-pins.json": "b2994738327a9db9e532a4445b8baa369e1e7a1a9c11dafc503f0dd164040458",
+    "target/wp1090/helper-delta.md": "33475ab2445081970dc4da9b231f77583f7e0642076bbc4e099c7c5cf61e619c",
+    "target/wp1090/helper-review.md": "ce1748eccdaf6be788dc15969b774ddff952289f1355168de667e5db90a6ba6c",
+    "target/wp1090/selector-correction.md": "6b9f966536215a948ae07798fe412eebbe47fa943a8824eb403d81334764f5f3",
+    "target/wp1090/environment-correction.md": "23705df6ede895da61ba63098150bfb1d5b202393ebd6788f6171d93418acbf3",
+    "target/wp1090/focused-results.json": "02871474183dd2ac31bfc185202c415c9d86a3ee83d738f06b3ecbc4b23b0643",
+    "target/wp1090/prelaunch-source.md": "446e68c4c3015cc1563034227f326ff863b8d8e27b03269313838f20e0bed290",
+    "target/wp1090/prelaunch-evidence.md": "f505137da46a4ede049ac75d762a352057a6fb0211beed98b837469b8183064a",
+    "target/wp1090/prelaunch-review.md": "4bb6d526ce817e9cad04aa953d703902f397f745de760e2269aaf91732e7cd5d",
+    "target/wp1090/native-results.json": "14f131566337b629d7bd48c16732af46d4f68c7794eeb5e1e8fd4dea05f51c94",
+    "target/wp1090/native-config.json": "956a9af80e6cc169ac81a9636053a2cb0437fc0891ed303c9ac5eaf5f713277c",
+    "target/wp1090/toolchain-resolution.json": "03dc208cfafb3be96d69ef85146b8aa386991f66f5074faf832a968b95d19a90",
+    "target/wp1090/source-vector.json": "fb7b6bb5e88578810c4afd223331d5d7c1d5013c5dd4c0b1034b670fe75d8472",
+    "target/wp1090/inputs.json": "ce5e964783c0bd3f085c5d7e8b3ba601b6d39038057694d12270b9ac3cf536b1",
+    "target/wp1090/core-focused-selectors.json": "55c70d51e7ee6c4726349a08da52a103ad163edff0ebcaee63d2fde887cab2da",
+    "target/wp1090/run_gate.py": "f354a4b22aa49949fac83d2835fd4732a38e1db0845bb8dcf0dfb13586b974df",
+    "target/wp1090/setup_gates.py": "1cbc5f9829f83b877f81610c523a13ac9b6300e019aa0c8bd0a320e43881a53e",
+    "target/wp1090/native_setup.py": "1c145dc0c1fdabb569f51d844eef822a1b5258ec3569cc11a58cc9e26241ae8c",
+    "target/wp1090/final-review.md": "10001c951ef1ccbf04bd6b1aac14a32444082f515d40acbd1eba6f9b6dc3b2f4"
+  },
+  "corrections": "Rawmovecode completedkernel relocation thenqualification assertstopped withoutmalformedwrites; guessedreadonlypaths0gatecredit. Rootactualmoduleprefix fixedbeforefirstselector/preflight;40scompile oldhelperhashstable/sourceprofiles unchanged.42testbroadgate0credit/2unchangeddirectUnixSocketEPERM;40relevant coveredsubsetPASS withoutprivilege/source/assertionchange,2socketfixturesunproved. Samecurrentexe/full42preflight retained.",
+  "caps": "Unchanged prep60s/RSSuncapped no workloadcredit; native10s/RSS256MiB/AS512MiB/live+transfer16MiB/decode+write64MiB/source256/registry128/object1MiB/admitted16MiB/directory128-name1KiB-total16KiB/selectedwork7/default5/lifetime8/cleanup3/FSIZE16MiB/log1/report4MiB;12suserguideline not generalcap",
+  "residual": "Known detector diagnostic:296 validate_source_progress entry. No precedingCPU/time/IOstage/cause attribution.245admissionsvs246prior notbodiescompletion/speed/wholeworkload. Originalshape5/8/7 layouts nothistoricalcompiledbaseline; no aggregateheap/RSSsavings. No nativebodyWeak/retirementcredit. Fullproducer/time/wholefit/Rustc/actions/certificates/bootstrap open; no duplicatecandidate/caprise/sourceacquisition.",
+  "static_checks": {
+    "format": "PASS currentchangedsourcecheck",
+    "diff": "PASS",
+    "archive": {
+      "command": [
+        "sh",
+        "scripts/v2_archive_status.sh"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.03243749192915857
+    },
+    "plan_status": "matchingWP-7-302; run afteracceptanceedit"
+  },
+  "timing": {
+    "wall_seconds_since_design_file": 1080.7315340042114,
+    "preparation_seconds": 47.700102895032614,
+    "ordinary_operation_seconds_total": 0.6439479920081794,
+    "qualification": "filemtime span includesinterveningturns; no speedupclaim"
+  },
+  "goal": "active unlimited; packet acceptance not fullgoalcompletion",
+  "acceptance": "Independent DESIGN, actualsource, helper/prelaunch and FINAL ACCEPT.40relevant currentordinary checks/directCoreCLI/currentoriginalprofileCore+nativefeature and ONE native observer; firstdetector known, time/fullproducer/wholefit remain open. Two unchanged UnixSocketEPERM fixtures unproved, originalbroadbatch0credit."
+}

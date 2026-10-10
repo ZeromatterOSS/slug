@@ -205,6 +205,7 @@ impl WorkspaceRuntime {
         self.source_scope.as_ref()
     }
 
+    #[cfg_attr(all(test, target_os = "linux"), track_caller)]
     pub(in crate::runtime::dice) fn check_source_scope(
         &self,
     ) -> Result<(), NativeDemandSessionError> {
@@ -269,6 +270,7 @@ impl WorkspaceRuntime {
 }
 
 impl NativeDemandCommand<'_> {
+    #[cfg_attr(all(test, target_os = "linux"), track_caller)]
     pub(in crate::runtime::dice) fn check_source_scope(
         &self,
     ) -> Result<(), NativeDemandSessionError> {

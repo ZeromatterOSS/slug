@@ -26,6 +26,33 @@ code_enum!(SourceTimeoutPhase {
 });
 code_enum!(SourceTimeoutReturn { Unknown = 0, Deadline = 1, CompletedPrimary = 2 });
 
+#[cfg(all(test, target_os = "linux"))]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::runtime) struct SourceTimeoutCaller {
+    pub(in crate::runtime) owner: u8,
+    pub(in crate::runtime) line: u32,
+}
+#[cfg(all(test, target_os = "linux"))]
+impl SourceTimeoutCaller {
+    pub(super) fn project(file: &str, line: u32) -> Self {
+        let owner = match file.strip_prefix("app/slug_core_v2/").unwrap_or(file) {
+            "src/runtime/source_service/scope.rs" => 1,
+            "src/runtime/source_service/regular_file.rs" => 2,
+            "src/runtime/path_observation.rs" => 3,
+            "src/runtime/path_observation/scoped_directory.rs" => 4,
+            "src/runtime/dice.rs" => 5,
+            "src/runtime/input_image_bridge.rs" => 6,
+            "src/runtime/source_service/diagnostic.rs" => 7,
+            "src/runtime/source_service/timeout_provenance/tests.rs" => 8,
+            _ => 0,
+        };
+        Self {
+            owner,
+            line: if owner == 0 { 0 } else { line },
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) struct SourceTimeoutOrigin {
     pub(in crate::runtime) site: SourceTimeoutSite,
@@ -33,6 +60,8 @@ pub(in crate::runtime) struct SourceTimeoutOrigin {
     pub(in crate::runtime) phase: SourceTimeoutPhase,
     pub(in crate::runtime) return_disposition: SourceTimeoutReturn,
     pub(in crate::runtime) step_add_overflow: bool,
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) caller: Option<SourceTimeoutCaller>,
 }
 impl SourceTimeoutOrigin {
     pub(super) fn common(site: SourceTimeoutSite, phase: SourceTimeoutPhase) -> Self {
@@ -42,6 +71,8 @@ impl SourceTimeoutOrigin {
             phase,
             return_disposition: SourceTimeoutReturn::Deadline,
             step_add_overflow: false,
+            #[cfg(all(test, target_os = "linux"))]
+            caller: None,
         }
     }
     pub(super) fn unattributed() -> Self {
@@ -51,6 +82,8 @@ impl SourceTimeoutOrigin {
             phase: SourceTimeoutPhase::UnattributedPoison,
             return_disposition: SourceTimeoutReturn::Unknown,
             step_add_overflow: false,
+            #[cfg(all(test, target_os = "linux"))]
+            caller: None,
         }
     }
 }
@@ -86,6 +119,8 @@ impl SourceTimeoutDeadline {
             phase,
             return_disposition,
             step_add_overflow: self.overflow,
+            #[cfg(all(test, target_os = "linux"))]
+            caller: None,
         }
     }
 }
@@ -108,6 +143,9 @@ pub(super) struct SourceTimeoutState {
 }
 #[cfg(all(test, target_os = "linux"))]
 impl SourceTimeoutState {
+    pub(super) fn is_armed(&self) -> bool {
+        self.armed
+    }
     pub(super) fn arm(&mut self) {
         self.armed = true;
     }

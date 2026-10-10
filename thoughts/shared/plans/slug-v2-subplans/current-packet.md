@@ -1,97 +1,116 @@
-# WP1089 shared path-epoch coalescing
+# WP1090 first deadline check caller
 
-Packet: WP-7-301-m7a-shared-path-epoch-coalescing-r1
-Status: accepted — coalescing complete; normal producer time fit open
-Baseline: 3bf27920cd1a82308d87b36a4a07d743b4369ab5 (WP1088 accepted)
-Owner: Workspace shared path-epoch constructor; normal M7A producer path-progress.
-Compatibility: Slug-native temporary allocation implementation; all existing epoch
-semantic identity, equality/error/observation ownership and admitted Bazel surfaces unchanged.
-Windows: unchanged existing portable constructor; no platform implementation work.
+Packet: WP-7-302-m7a-first-deadline-caller-r1
+Status: accepted — detector known; preceding work/time fit open
+Baseline: c23c62f5fa860de16289da5ab91676fe2dd56974 (WP1089 accepted)
+Owner: existing Core source-service first-timeout evidence; normal producer continuation.
+Compatibility: Slug-native Linux test diagnostic only; production errors, ownership,
+DICE and admitted Bazel surfaces unchanged. Windows remains minimal/deferred.
 
-Outcome: remove the independently visible second full-capacity coalescing Vec in
-PathObservationEpoch::from_shared. Normal runtime/dice.rs7940–7960 rebuilds merged
-path epochs after newly observed batches. At baseline, constructor824–855 collects and
-stably sorts one Vec, then allocates a second full-sized unique Vec. This is a
-concrete temporary-allocation opportunity, not identified deadline cause or claimed
-runtime benefit. Prior native207.211MiB/256 hit GenericScope/Common/ScopeCheck deadline
-at source243, before previous245; fullproducer/time/wholeworkload fit stays open.
-Authority: WP1088 accepted receipt and target/wp1088/next-work-frontier.md
-SHA ddd1bd05dd416b1a6a3b285aa79b51683370da731a4b93e624df9e6d2ceee2df;
-actual current Workspace constructor, normal producer callsite, retained DICE docs.
-Reuse existing SortedMap, Arc/Dupe, typed demand/results and Allocative. No donor
-import, new interner/cache/map/key/public carrier, global allocator, pool or lock.
+Outcome: identify the exact source callsite which first detects the common work
+deadline at a generic ScopeCheck. WP1089 now fits the observed prefix at207.918MiB
+of256 but stops at WorkDeadline after246 admissions. Existing site1/domain1/phase1/
+return1 identifies GenericScope/Common/ScopeCheck/Deadline, not its caller. The
+last Java FileBytes charge precedes body completion. This packet supplies missing
+caller evidence for broader normal producer work; it does not select an optimization
+or infer CPU-time owner, completed producer, whole-workload fit or speed.
+Authority: WP1089 committed receipt; target/wp1089/next-work-frontier.md SHA256
+c09fd7ba84b6c9be1381722046fa27f608d36ca18b8534c499cd1e99c90fe961;
+current timeout_provenance/scope checks and command/kernel forwarding sites.
 
-Decision: collect/stable-sort the same owned input vector, validate and compact
-unique rows in place with safe swaps and a retained-prefix length, then truncate
-and transfer that vector into the existing SortedMap collection/final Arc. A small
-private helper may expose the same owned-vector phase to focused cfg(test) proof;
-public signature/final representation stay unchanged. No unsafe code/dummy result,
-body clone or second full-capacity Vec. Existing stable sort scratch and final map/
-Arc allocations remain real costs; this is not zero-allocation construction.
+Decision: extend the existing first-work Linux-test evidence with optional POD
+caller metadata: finite owner code plus u32 source line. Use compiler Location
+only transiently to project a closed list of actual current source owners; unknown
+must project honest owner0/line0. No retained Location/file identifier/reference,
+String/path/request/payload, address mapping, timestamp series, stack/profiler,
+new allocator/cache/interner/key/lock or semantic runtime field. Existing compiler
+static identifiers are borrowed synchronously; no string allocation/interner needed.
+Only armed first-created WorkDeadline at GenericScope/ScopeCheck records this caller.
+Existing explicit wait sites/phases/timer origins carry no generic caller. Unarmed,
+non-work and previously poisoned scopes cannot invent or replace one. Preserve
+first-creator locking, cancellation, return/error/poison precedence and sticky state.
+No callbacks or formatting under the lock; report actual evidence POD/layout growth.
 
-Material invariants: stable demand order and first equal duplicate's ORIGINAL Arc
-must survive (including equal values with distinct Arc allocations). Conflicting
-same-demand values remain an error. For each sorted input row, preserve existing
-InputImage issued-path check before operation mismatch check before duplicate
-conflict check; earliest sorted-row error wins with exact demand/kind. Preserve
-valid-input/certificate/equality/namespace/instance/key-specific DICE boundaries;
-no current-path trust, reverse-epoch shortcut or changed dependency/Need semantics.
-No observer/body/IO/source-admission/runtime resource-owner change. All moves and
-Dupe metadata preserve independent retention; existing scoped string interners
-remain untouched because these rows already share typed paths/result Arcs.
+Use cfg_attr(all(test,target_os="linux"),track_caller) on the narrow synchronous
+check→check_locked→check_locked_at forwarding chain. Capture the projected caller
+only in the first generic WorkDeadline branch when evidence armed. Add propagation
+attributes only to the existing WorkspaceRuntime/NativeDemandCommand check_source_scope
+wrappers and private kernel check_scope. The kernel's map_or closure hides caller;
+replace it with an explicit equivalent match (None Ok, Some original check/map_err).
+All production signatures and routing stay; cfg-only attributes do not change
+normal runtime semantics. A shared checked_io detector line remains unable to name
+its Pin/Stat/Open invocation; do not silently widen callsite evidence into stage/time.
+Pin exact source bytes used to interpret numeric lines in the native receipt.
 
-Exact source allowlist: app/slug_workspace_v2/src/path_observation.rs — only
-from_shared, one cohesive private compaction helper if needed and focused existing
-module tests. File2289lines exceeds complexity trigger: existing constructor/tests
-remain cohesive; no additional subsystem or unrelated extraction. Expected20–60
-production plus60–120proof lines, helpers below150; review actual growth. Root may
-update matching Stage9 utility facts, receipt and scheduling only.
+Exact source allowlist (all under app/slug_core_v2/src/runtime/):
+- source_service/timeout_provenance.rs: caller POD/projection and gated origin field.
+- source_service/scope.rs: narrow forwarding/armed first-origin capture only.
+- source_service/timeout_provenance/tests.rs: missing synchronous caller discriminators.
+- source_service/diagnostic.rs: attributes on the two existing check_source_scope wrappers only.
+- path_observation.rs: private check_scope equivalent match/propagation and small existing-module forwarding proof.
+- tests/platforms_module_preparation_tests/runtime_activity.rs: append scalar caller fields to existing WP1008_TIMEOUT output after snapshot.
+No dice.rs/source reader/IO/admission/profile/resource/global observer change. Root
+may update matching Stage9/evidence receipt and scheduling. Existing cohesive source
+owners may exceed complexity triggers; helpers<150, estimated30–70production and
+50–100proof lines; inspect actual growth. No fixture tree or unrelated extraction.
 
-Proofs: reuse shared_epoch_coalesces_equal_arcs_and_rejects_conflicts and
-partitioned_epoch_add_change_remove_and_restore_preserve_exact_path_values.
-Add discriminators for safe in-place source Vec pointer/capacity retention on a
-bounded duplicate-heavy cohort (8192rows metadata sharing, no bodies) and preserved
-first duplicate Arc/order; mixed invalid-image/operation/conflict cases retain
-exact earliest-row/per-row error precedence. Add only missing cases. Do not use a
-new allocator/framework, fixture tree or runtime fields. Measure row size/count and
-removed temporary capacity arithmetically; inline/heap/workload claims separate.
+Proofs: existing timeout selector/timer/entry/post/final/competition/sticky/disarm
+controls remain. Add bounded deterministic expired generic checks at distinct
+line!()-based callsites; finite owner/line exact, first sticks across laterlocation,
+original error/cancellation unchanged. Unarmed, prior cancellation/limit poison and
+explicit wait/timer origin give no caller. Closed projection includes known and
+unknown owner controls. One actual private kernel forwarding test proves caller
+propagates through the selected wrapper, not merely an internal scope line. Command
+attribute chain is reviewed against actual source; reuse existing relevant command
+controls, do not build an extra fixture merely to mirror Rust track_caller. Record
+actual sizes/alignment separately from heap; no allocating metadata/body/profiling
+framework. Expires use existing tiny bounded fixture, no sleep benchmark.
 
-Gates: independent DESIGN before source; root actual diff/format/freeze, independent
-actual-source/prelaunch review. Fresh pinned nightly; serial locked/offline/jobs1
-Cargo JSON Workspace no-run/current exe; list and exact batched preflight ordinary
-path_observation tests, actual nonzero selected/pass count. Direct named production
-Bzlmod/Loading/Core/CLI check because public shared constructor is used across those
-owners. Original-profile Core native-feature no-run/current exe+ignored singleton
-list; reuse completed exact dependency artifacts to isolate preparation phases,
-never count timed-out overall gates as passing. Focused test-only optimization0
-per admitted recovery; native/direct Loadingopt1 and other accepted profiles stay.
-ONE new candidate native with same350 source triples/18env and all original caps;
-code changes make this a distinct measured candidate, not an identical retry.
-No writers during gates, stream blob hashes64KiB/Cargo JSON linewise, preserve
-actual memory/time/resource refusal and all held-FD/current pin brackets.
-FINAL reviews actual source+discriminating evidence+small native delta. No broad
-history/lifecycle replay; unchanged contracts0fresh credit. Format/diff/archive/plan
-status required. Root owns integration and commit; full goal remains ACTIVE.
+Gates: independent DESIGN before consequential first-origin evidence change;
+root actualdiff/pinned format/freeze; independent source/prelaunch and FINAL.
+Fresh pinned nightly; serial locked/offline/jobs1 current Core native-feature no-run
+CargoJSON. List exact ordinary timeout and relevant kernel forwarding/owner tests,
+one exact batched preflight per executable, actual nonzero selected/pass. Current
+Core/CLI production check protects equivalent wrapper flow/non-test compilation.
+Current ignored native singleton list; ONE distinct instrumented candidate native
+with accepted350triples/18env and unchanged caps, held non-inherited FD/hash/pins.
+No writers during gates/native; streamed64KiB hashes/linewise CargoJSON. Report
+whether generic first caller is available, its pinned source owner/line and actual
+frontier/refusal/memory; no CPU/speed/fullfit inference. Unknown stays unknown.
+Existing generic lifecycle/contracts reused0fresh; no broad history/replay. Format,
+diff/archive/planstatus and compact receipt required; full goal remains ACTIVE.
 
 Caps unchanged: prep60s/RSSuncapped/no workloadcredit; native10s/RSS256MiB/AS512MiB;
 live+transfer16MiB/decode+write64MiB/source256/registry128/object1MiB/admitted16MiB;
 directory128entries/name1KiB/total16KiB; selectedwork7/default5/lifetime8/cleanup3/
-FSIZE16MiB/log1/report4MiB. User12s guideline, no cap rise or duplicate native. Replan
-only unmodeled ownership/semantic/error-order prerequisite or envelope requirement.
-Routine compiler/fixture corrections preserve failed evidence and repair same owner.
-Acceptance must report whether natural producer frontier advances; passing refusal
-observer or Vec proof never establishes wholeworkload/bootstrap/retirement/time fit.
+FSIZE16MiB/log1/report4MiB. User12s guideline not a general cap. No duplicate native
+or cap rise. Routine compiler/fixture corrections stay within owner; REPLAN only
+new ownership/semantic/identity/resource prerequisite. No source acquisition.
 
-DESIGN accepted: target/wp1089/design-review.md SHA256
-7b9145f0bc2ef58e9cf72758ff8a9c5f49e273321306a2578ea8cb672522c08f.
-Frozen design.md b556a31425c8ed6c7e3138d7d582f127d1066bc6880ecf43f2313742915cadcd;
-review accepted source implementation within this contract; DESIGN itself gives no gate credit.
+DESIGN ACCEPT: target/wp1090/design-review.md SHA256
+256f1d0a1653c8499e84d10df81ae347edd578f850c60a2b4af623b94cc7f1b2.
+No source/gate credit from DESIGN alone; accepted contract now implementable.
 
-Acceptance: independent FINAL target/wp1089/final-review.md SHA256
-5e471f4f4c6a289b89ef7d92ef02f09cc73b21dbedf22f248f61817523ed1ad5.
-22focused/currentdirect/currentCoreoriginalprofile gates pass.8192metadata-row
-compaction retains originalbuffer and removes second1.25MiBcapacity only. ONE
-native7.269355s/207.918MiB within256 hitsgeneric WorkDeadline/source246vs243
-admissions, not bodycompletion/speed/cause/wholefit. Caps unchanged; no retry.
-[Receipt](wp1089-shared-path-epoch-coalescing-2026-10-10.json). Full goal ACTIVE;
-next normalproducer deadlinecaller/stage attribution research, no speculativepool.
+Routine initializer prerequisite: root-only seventh caller file
+source_preparation/genuine_root.rs adds caller:None to the existing Linux-test
+explicit Headers/Timer origin literal. No flow/assertion/fixture change. Frozen
+DESIGN six-owner scope stays; actual-source review covers this mechanical caller.
+Baseline extension + current compiler pins include the original/corrected file.
+
+Validation scope correction: full current42-name preflight succeeded, broadbatch
+failed2unchanged directUnixListener fixtureEPERM/40observedpasses/0completecredit.
+Those exactOSclassifier/lstat tests do not exercise changedcheck_scope; preserve
+as unproved. Relevant40covered names thenPASS40/40 samecurrentexe/source, no new
+privileges/source/assertionchange. selector-correction.md/environment-correction.md
+qualify actualmoduleprefix and boundedgate; no fullOSkernel suite claim.
+
+Acceptance: FINAL target/wp1090/final-review.md SHA256
+10001c951ef1ccbf04bd6b1aac14a32444082f515d40acbd1eba6f9b6dc3b2f4.
+40 relevant ordinary checks/currentCoreCLI/currentnative-feature compile pass;
+2unchanged socketfixtures EPERM unproved and originalbroadgate0credit. Actualcaller
+8B/align4; Linux-testorigin20/state24/snapshot24; originalshape5/7/8 comparisons
+are not historicalbinaries. ONE7.261364s native207.941MiB/256 hitsWorkDeadline at
+245admissions. Firstcaller7:296 pinneddiagnostic validate_source_progress entry,
+not precedingCPU/time/IOstage/cause.57pins/350FDhashbrackets stable. No caprise/retry.
+[Receipt](wp1090-first-deadline-caller-2026-10-10.json). Goal ACTIVE; next trace
+normal producer work reaching this checkpoint using existing phase evidence.

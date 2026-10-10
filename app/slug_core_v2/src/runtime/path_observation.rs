@@ -371,10 +371,14 @@ fn observe_with_scoped(
     PathObservationEpoch::new(observations).map_err(PathObservationKernelError::Epoch)
 }
 
+#[cfg_attr(all(test, target_os = "linux"), track_caller)]
 fn check_scope(scope: Option<&Arc<SourceServiceScope>>) -> Result<(), PathObservationKernelError> {
-    scope
-        .map_or(Ok(()), |scope| scope.check())
-        .map_err(PathObservationKernelError::SourceService)
+    match scope {
+        None => Ok(()),
+        Some(scope) => scope
+            .check()
+            .map_err(PathObservationKernelError::SourceService),
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -3207,6 +3211,53 @@ mod tests {
     use slug_workspace_v2::PathIoErrorKind;
 
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn kernel_scope_check_forwards_first_deadline_caller() {
+        use std::time::Duration;
+        use std::time::Instant;
+
+        use super::super::dice::source_service::SourceServiceLimits;
+        assert!(check_scope(None).is_ok());
+        let deadline = Instant::now() + Duration::from_millis(10);
+        let owner = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new("/kernel-caller-test").unwrap(),
+            deadline,
+            deadline + Duration::from_secs(1),
+            SourceServiceLimits::default(),
+        )
+        .unwrap();
+        let ledger = owner.arm_registry_association_for_test().unwrap();
+        while Instant::now() < deadline {
+            std::hint::spin_loop();
+        }
+        let (expected_line, result) = (line!(), check_scope(Some(&owner)));
+        assert!(matches!(
+            result,
+            Err(PathObservationKernelError::SourceService(
+                SourceServiceError::WorkDeadline
+            ))
+        ));
+        let first = ledger.snapshot().timeout.origin.unwrap();
+        let caller = first.caller.unwrap();
+        assert_eq!((caller.owner, caller.line), (3, expected_line));
+        assert!(matches!(
+            check_scope(Some(&owner)),
+            Err(PathObservationKernelError::SourceService(
+                SourceServiceError::WorkDeadline
+            ))
+        ));
+        assert_eq!(ledger.snapshot().timeout.origin, Some(first));
+        assert!(
+            ledger
+                .snapshot()
+                .timeout
+                .later_sticky_work_deadline_observed
+        );
+        drop(ledger);
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     enum Call {

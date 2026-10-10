@@ -37,6 +37,124 @@ fn origin(ledger: &RegistryRequestAssociation) -> SourceTimeoutOrigin {
 }
 
 #[test]
+fn generic_first_deadline_caller_is_scalar_exact_and_sticky() {
+    for (file, owner) in [
+        ("src/runtime/source_service/scope.rs", 1),
+        ("src/runtime/source_service/regular_file.rs", 2),
+        ("src/runtime/path_observation.rs", 3),
+        ("src/runtime/path_observation/scoped_directory.rs", 4),
+        ("src/runtime/dice.rs", 5),
+        ("src/runtime/input_image_bridge.rs", 6),
+        ("src/runtime/source_service/diagnostic.rs", 7),
+        ("src/runtime/source_service/timeout_provenance/tests.rs", 8),
+    ] {
+        assert_eq!(
+            SourceTimeoutCaller::project(file, 42),
+            SourceTimeoutCaller { owner, line: 42 }
+        );
+    }
+    assert_eq!(
+        SourceTimeoutCaller::project("app/slug_core_v2/src/runtime/dice.rs", 42).owner,
+        5
+    );
+    for file in [
+        "scope.rs",
+        "foreign/src/runtime/dice.rs",
+        "/tmp/src/runtime/dice.rs",
+    ] {
+        assert_eq!(
+            SourceTimeoutCaller::project(file, 42),
+            SourceTimeoutCaller { owner: 0, line: 0 }
+        );
+    }
+    let mut observed_lines = [0; 2];
+    for (index, observed_line) in observed_lines.iter_mut().enumerate() {
+        let (owner, ledger) = armed(Duration::from_millis(10));
+        expire(owner.work_deadline());
+        let (expected_line, result) = if index == 0 {
+            (line!(), owner.check())
+        } else {
+            (line!(), owner.check())
+        };
+        assert_eq!(result, Err(SourceServiceError::WorkDeadline));
+        let first = origin(&ledger);
+        let expected = SourceTimeoutCaller::project(file!(), expected_line);
+        assert_eq!(expected.owner, 8);
+        assert_eq!(first.caller, Some(expected));
+        assert_eq!(
+            (
+                first.site,
+                first.domain,
+                first.phase,
+                first.return_disposition
+            ),
+            (
+                SourceTimeoutSite::GenericScope,
+                SourceTimeoutDomain::Common,
+                SourceTimeoutPhase::ScopeCheck,
+                SourceTimeoutReturn::Deadline
+            )
+        );
+        *observed_line = expected_line;
+        assert_eq!(owner.check(), Err(SourceServiceError::WorkDeadline));
+        assert_eq!(origin(&ledger), first);
+        assert!(
+            ledger
+                .snapshot()
+                .timeout
+                .later_sticky_work_deadline_observed
+        );
+        drop(ledger);
+        assert!(owner.registry_observation_for_test().1.origin.is_none());
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    }
+    assert_ne!(observed_lines[0], observed_lines[1]);
+    let owner = scope(Duration::from_millis(10), SourceServiceLimits::default());
+    expire(owner.work_deadline());
+    assert_eq!(owner.check(), Err(SourceServiceError::WorkDeadline));
+    let unarmed = owner.registry_observation_for_test().1;
+    assert!(!unarmed.armed && unarmed.origin.is_none());
+    #[allow(dead_code)]
+    struct BeforeOrigin {
+        site: SourceTimeoutSite,
+        domain: SourceTimeoutDomain,
+        phase: SourceTimeoutPhase,
+        return_disposition: SourceTimeoutReturn,
+        step_add_overflow: bool,
+    }
+    #[allow(dead_code)]
+    struct BeforeSnapshot {
+        armed: bool,
+        first_error_is_work_deadline: bool,
+        origin: Option<BeforeOrigin>,
+        later_sticky_work_deadline_observed: bool,
+    }
+    #[allow(dead_code)]
+    struct BeforeState {
+        armed: bool,
+        origin: Option<BeforeOrigin>,
+        sticky: bool,
+    }
+    eprintln!(
+        "WP1090_CALLER_LAYOUT caller={}:{} origin={}:{} snapshot={}:{} state={}:{} before_origin={}:{} before_snapshot={}:{} before_state={}:{}",
+        std::mem::size_of::<SourceTimeoutCaller>(),
+        std::mem::align_of::<SourceTimeoutCaller>(),
+        std::mem::size_of::<SourceTimeoutOrigin>(),
+        std::mem::align_of::<SourceTimeoutOrigin>(),
+        std::mem::size_of::<SourceTimeoutSnapshot>(),
+        std::mem::align_of::<SourceTimeoutSnapshot>(),
+        std::mem::size_of::<SourceTimeoutState>(),
+        std::mem::align_of::<SourceTimeoutState>(),
+        std::mem::size_of::<BeforeOrigin>(),
+        std::mem::align_of::<BeforeOrigin>(),
+        std::mem::size_of::<BeforeSnapshot>(),
+        std::mem::align_of::<BeforeSnapshot>(),
+        std::mem::size_of::<BeforeState>(),
+        std::mem::align_of::<BeforeState>()
+    );
+}
+
+#[test]
 fn deadline_selector_exact_tie_overflow_and_finite_codes() {
     let start = Instant::now();
     let common = start + Duration::from_secs(1);
@@ -92,6 +210,7 @@ async fn actual_timer_common_step_and_later_sticky_preserve_first_creator() {
         );
         assert!(polled.get());
         let first = origin(&ledger);
+        assert!(first.caller.is_none());
         assert_eq!(
             (
                 first.site,
@@ -152,6 +271,7 @@ async fn expired_checks_postcheck_primary_and_final_common_are_distinct() {
         assert_eq!(result, Err(SourceServiceError::WorkDeadline));
         assert!(!polled.get());
         let observed = origin(&ledger);
+        assert_eq!(observed.caller.is_some(), !entry);
         assert_eq!(observed.domain, SourceTimeoutDomain::Common);
         assert_eq!(
             observed.phase,

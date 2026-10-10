@@ -34,21 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-301-m7a-shared-path-epoch-coalescing-r1
-Status: accepted — coalescing complete; normal producer time fit open
+Packet: WP-7-302-m7a-first-deadline-caller-r1
+Status: accepted — detector known; preceding work/time fit open
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts in-place shared
-path-epoch coalescing in the Workspace constructor. It preserves the original
-buffer, first Arc and error order while removing a second full-capacity temporary
-Vec. All 22 focused tests, current production/Core gates and independent FINAL pass.
-The 8,192-row metadata cohort removes 1.25 MiB of temporary capacity only. One
-native run used 207.918 MiB of 256 MiB in 7.269355 s, then hit the generic work
-deadline at 246 source admission events, versus the prior 243. Completed bodies,
-speed, cause and whole-workload fit are unproved. [Receipt](./slug-v2-subplans/wp1089-shared-path-epoch-coalescing-2026-10-10.json).
-Existing shared typed paths, result Arcs and scoped interners remain. Next research
-identifies the first deadline caller or stage in the normal producer under the
-same caps. Full producer, time and whole-workload fit, Rustc, actions, certificates
-and bootstrap remain open. Linux priority; Windows minimal/deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts scalar first
+caller attribution in the existing Linux test evidence. The actual first deadline
+check is diagnostic.rs:296, at entry to validate_source_progress. Borrowed compiler
+metadata becomes only an owner code and source line; production errors, DICE,
+scoped interning and caps remain. All 40 relevant checks, current Core/CLI compile
+and independent FINAL pass; two unchanged Unix socket fixtures remain unproved
+under the sandbox. One native run used 207.941 MiB of 256 MiB in 7.261364 s, then
+hit the work deadline at 245 source admission events. The detector is known;
+preceding CPU time, full producer and whole-workload fit remain unproved.
+[Receipt](./slug-v2-subplans/wp1090-first-deadline-caller-2026-10-10.json).
+WP1089 in c23c62f5f preserves the original shared-epoch buffer and string/Arc sharing.
+Next research traces normal producer work reaching this checkpoint using existing
+phase evidence. Rustc, actions, certificates and bootstrap remain open. Linux
+priority; Windows minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

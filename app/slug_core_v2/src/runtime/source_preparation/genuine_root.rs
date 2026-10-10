@@ -1379,6 +1379,7 @@ fn genuine_timeout_receipt_requires_settled_named_creator_and_exact_chosen_cause
         phase: SourceTimeoutPhase::Timer,
         return_disposition: SourceTimeoutReturn::Deadline,
         step_add_overflow: false,
+        caller: None,
     };
     let snapshot = SourceTimeoutSnapshot {
         armed: true,
