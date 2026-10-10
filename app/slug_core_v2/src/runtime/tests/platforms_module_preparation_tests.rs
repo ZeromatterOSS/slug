@@ -452,7 +452,7 @@ const RULES_SHELL_IMPORTS: [&str; 8] = [
     "shell/private/repositories/sh_config.bzl",
     RULES_SHELL_IMPORT_METADATA[18],
 ];
-const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 1] = ["crosstool"];
+const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 2] = ["crosstool", "crosstool/BUILD.bazel"];
 const APPLE_SUPPORT_IMPORTS: [&str; 3] = [
     "crosstool/setup.bzl",
     "crosstool/setup_internal.bzl",
