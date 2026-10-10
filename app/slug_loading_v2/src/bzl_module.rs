@@ -1260,9 +1260,9 @@ struct ResolvedExternalBzlLoad {
     label: RepositoryBzlLabel,
 }
 
-enum ExternalBzlChildLoad {
-    Canonical(String),
-    Resolved(String, ResolvedExternalBzlLoad),
+enum ExternalBzlChildLoad<'a> {
+    Canonical(&'a str),
+    Resolved(&'a str, ResolvedExternalBzlLoad),
 }
 
 fn resolve_external_bzl_load_label(
@@ -4471,12 +4471,16 @@ impl Key for HostPreparedModuleExtensionInputsObservationKey {
     }
 }
 
+mod external_bzl_syntax;
+use external_bzl_syntax::ExternalBzlSyntaxKey;
+use external_bzl_syntax::parse_external_bzl;
+
 type ExternalBzlModuleCarrier = Arc<Result<FrozenBzlModule, ExternalBzlModuleError>>;
 type ExternalBzlDriverOutcome = SourcePreparationOutcome<
     Result<(ExternalBzlModuleCarrier, PathObservationEpoch), ObservedPathFrontierError>,
 >;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 enum ExternalBzlModuleMode {
     Legacy,
     Observed,
@@ -5213,14 +5217,15 @@ fn finish_external_bzl_child_failure(
     failure
 }
 
-async fn compute_external_bzl_children(
+async fn compute_external_bzl_children<'a>(
     ctx: &mut DiceComputations<'_>,
     key: &ExternalBzlModuleEvalKey,
     route: &HostRepositorySourceRoute,
     mode: ExternalBzlModuleMode,
-    loads: Vec<ExternalBzlChildLoad>,
+    loads: Vec<ExternalBzlChildLoad<'a>>,
     mut observations: PathObservationEpoch,
-) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(String, FrozenBzlModule)>, PathObservationEpoch)> {
+) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(&'a str, FrozenBzlModule)>, PathObservationEpoch)>
+{
     let mut loaded_modules = Vec::with_capacity(loads.len());
     let mut needs: Option<SourcePreparationNeeds> = None;
     let mut first_failure = None;
@@ -5236,7 +5241,7 @@ async fn compute_external_bzl_children(
                     &key.label.package,
                     key.canonical_label(),
                     mode,
-                    &raw_load,
+                    raw_load,
                     observations.dupe(),
                 )
                 .await
@@ -5295,7 +5300,7 @@ async fn compute_external_bzl_children(
             ExternalBzlRecursiveChild::Compute(message) => {
                 let failure = external_bzl_complete(
                     Err(ExternalBzlModuleError::Child {
-                        raw_load: Arc::from(raw_load.as_str()),
+                        raw_load: Arc::from(raw_load),
                         canonical_label: child_label.clone(),
                         error: Arc::new(ExternalBzlModuleError::SourceCompute {
                             label: child_label,
@@ -5375,7 +5380,7 @@ async fn compute_external_bzl_children(
             Err(error) => {
                 let failure = external_bzl_complete(
                     Err(ExternalBzlModuleError::Child {
-                        raw_load: Arc::from(raw_load.as_str()),
+                        raw_load: Arc::from(raw_load),
                         canonical_label: child_label,
                         error: Arc::new(error.clone()),
                     }),
@@ -5399,18 +5404,17 @@ async fn compute_external_bzl_children(
     ControlFlow::Continue((loaded_modules, observations))
 }
 
-fn prepare_external_bzl_child_loads(
+fn prepare_external_bzl_child_loads<'a>(
     key: &ExternalBzlModuleEvalKey,
     effective_route: &HostRepositorySourceRoute,
-    loads: &[String],
+    loads: &'a [String],
     source: CanonicalLabel,
     observations: &PathObservationEpoch,
-) -> Result<Vec<ExternalBzlChildLoad>, ExternalBzlDriverOutcome> {
+) -> Result<Vec<ExternalBzlChildLoad<'a>>, ExternalBzlDriverOutcome> {
     let HostRepositorySourceRoute::Root(route) = effective_route else {
         return Ok(loads
             .iter()
-            .cloned()
-            .map(ExternalBzlChildLoad::Canonical)
+            .map(|load| ExternalBzlChildLoad::Canonical(load.as_str()))
             .collect());
     };
     loads
@@ -5419,14 +5423,14 @@ fn prepare_external_bzl_child_loads(
             resolve_external_bzl_load_label(route, &key.label.package, load)
                 .map(|(route, label)| match route {
                     RootRepositoryBzlLoadRoute::Root(route) => ExternalBzlChildLoad::Resolved(
-                        load.clone(),
+                        load.as_str(),
                         ResolvedExternalBzlLoad {
                             route: HostRepositorySourceRoute::root(route),
                             label,
                         },
                     ),
                     RootRepositoryBzlLoadRoute::Canonical(_) => {
-                        ExternalBzlChildLoad::Canonical(load.clone())
+                        ExternalBzlChildLoad::Canonical(load.as_str())
                     }
                 })
                 .map_err(|error| {
@@ -5551,27 +5555,20 @@ async fn compute_external_bzl_module(
             }
         }
     };
-    let source_text = match std::str::from_utf8(source.bytes.as_ref()) {
-        Ok(source) => source,
-        Err(_) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Encoding {
-                    label: canonical_label,
-                }),
-                source.observations,
-            );
-        }
-    };
-    let ast = match AstModule::parse_with_string_encoding(
-        &source.source_name,
-        source_text.to_owned(),
-        &Dialect::Bazel,
-        StringEncoding::BazelInternal,
-    ) {
-        Ok(ast) => ast,
+    // Source-first dominance is mandatory: this private key has no module
+    // detector identity and only revalidates the already-completed source child.
+    let syntax = match ctx
+        .compute(&ExternalBzlSyntaxKey {
+            module: key.clone(),
+            mode,
+        })
+        .await
+    {
+        Ok(Ok(syntax)) => syntax,
+        Ok(Err(outcome)) => return outcome,
         Err(error) => {
             return external_bzl_complete(
-                Err(ExternalBzlModuleError::Parse {
+                Err(ExternalBzlModuleError::SourceCompute {
                     label: canonical_label,
                     message: Arc::from(error.to_string()),
                 }),
@@ -5579,18 +5576,19 @@ async fn compute_external_bzl_module(
             );
         }
     };
-    let loads = ast
-        .loads()
-        .into_iter()
-        .map(|load| load.module_id.to_owned())
-        .collect::<Vec<_>>();
+    debug_assert!(Arc::ptr_eq(&syntax.bytes, &source.bytes) || syntax.bytes == source.bytes);
+    debug_assert!(syntax.source_name == source.source_name);
+    let loads = match &syntax.result {
+        Ok(loads) => loads,
+        Err(error) => return external_bzl_complete(Err(error.clone()), source.observations),
+    };
     let (effective_route, observations) = match compute_external_bzl_effective_route(
         ctx,
         key,
         &loads,
         canonical_label.clone(),
         mode,
-        source.observations,
+        source.observations.dupe(),
     )
     .await
     {
@@ -5621,6 +5619,17 @@ async fn compute_external_bzl_module(
         ControlFlow::Break(value) => return value,
     };
 
+    let ast = match parse_external_bzl(&source, &canonical_label) {
+        Ok(ast) => ast,
+        Err(error) => return external_bzl_complete(Err(error), observations),
+    };
+    let source_text = std::str::from_utf8(&source.bytes)
+        .expect("successful synopsis and final parse validated the current source");
+    // Independently retained settled APIs own names; retries above borrow them.
+    let loaded_modules = loaded_modules
+        .into_iter()
+        .map(|(name, module)| (name.to_owned(), module))
+        .collect();
     evaluate_external_bzl_module(
         &effective_route,
         key.context,
@@ -5628,7 +5637,7 @@ async fn compute_external_bzl_module(
         source.presentation_path,
         source_text,
         ast,
-        loads,
+        loads.to_vec(),
         loaded_modules,
         observations,
         capture_events,

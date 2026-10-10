@@ -34,22 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-303-m7a-cumulative-producer-intervals-r1
-Status: accepted — root compute window dominates; producer time fit open
+Packet: WP-7-304-m7a-external-syntax-synopsis-r1
+Status: accepted — broader producer frontier trace follows
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts cumulative
-normal producer intervals in the existing fixed observer. All11 focused tests,
-current default+feature CoreCLI checks and independent FINAL pass. One native run
-uses206.277MiB of256MiB, then stops at WorkDeadline after244 source admissions.
-Root computation takes6.623s across321 attempts, about95% of measured serial
-windows; injection .172s, acquisition+merge .181s and idle drain .013s. Process CPU
-is all-thread windowed, not exclusive key or cause attribution. Mapping/retained
-owner allocations stay fixed and no strings are retained; phase scratch grows32B.
-[Receipt](./slug-v2-subplans/wp1091-cumulative-producer-intervals-2026-10-10.json).
-Next work traces repeated normal root computation for a bounded improvement, using
-shared strings/scoped interning where reasonable. Full producer, time and whole-
-workload fit, Rustc, actions, certificates and bootstrap remain open. Linux
-priority; Windows minimal/deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) records accepted private
+DICE syntax/load synopsis reuse. Unresolved retries share immutable source/load
+storage and borrow names; ASTs stay transient, current source observations and exact
+errors/evaluation remain authoritative. All18 focused tests and production checks
+pass. One capped native prefix has supervisor225MiB/self-reported226MiB of256,
+252 source admissions, and a captured JAVA_HOME environment Need outside the current
+prepared-source policy. The last root interval is partial; no speed or full-workload
+fit claim follows. The [receipt](./slug-v2-subplans/wp1092-external-syntax-synopsis-2026-10-10.json)
+records cold extra parse/metadata retention and preserved correction evidence.
+Next work traces that concrete normal producer refusal. Full producer, time and
+whole-workload fit, Rustc, actions, certificates and bootstrap remain open. Linux
+priority; Windows minimal/deferred. Goal ACTIVE; allocation discipline applies.
 
 ### Ready and blocked queue
 

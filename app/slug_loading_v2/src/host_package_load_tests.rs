@@ -3194,6 +3194,11 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
         [
             HostRepositorySourceFileObservationKey::new(route.clone(), PathBuf::from("root.bzl"),)
                 .to_string(),
+            super::external_bzl_syntax::ExternalBzlSyntaxKey {
+                module: key.0.clone(),
+                mode: super::ExternalBzlModuleMode::Observed,
+            }
+            .to_string(),
             observed_external_bzl_key(route.clone(), "", "left.bzl").to_string(),
             observed_external_bzl_key(route.clone(), "", "right.bzl").to_string(),
         ]

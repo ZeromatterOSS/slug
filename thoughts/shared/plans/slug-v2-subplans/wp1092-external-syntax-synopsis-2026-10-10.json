@@ -1,0 +1,355 @@
+{
+  "packet": "WP-7-304-m7a-external-syntax-synopsis-r1",
+  "status": "accepted",
+  "baseline": "22fd34ebc187bff450dfbd8ae58dae71cca4f188",
+  "compatibility": "Exact admitted Bazel9 external source/syntax/encoding/load/error/evaluation behavior unchanged; private incremental reuse Slug-native; Windows minimal/deferred",
+  "sources": {
+    "before": {
+      "app/slug_loading_v2/src/bzl_module.rs": "2174d8f4f1f098806d9d94c5514033c32d226f82d2329c54474b93abeced8525",
+      "app/slug_loading_v2/src/bzl_module/external_bzl_syntax.rs": null,
+      "app/slug_loading_v2/src/host_package_load_tests/external_bzl_frontier_tests.rs": "9f5932f645c09118e7a511d6c3c7eaa91cb97223e09f3d10b5ed0cbaf123342f"
+    },
+    "fourth_before": {
+      "app/slug_loading_v2/src/host_package_load_tests.rs": "fd593c0d922856bf137f818048632d8570f33eafa34797ec4ae0867a2da76eaf",
+      "design_amendment_sha256": "dba600bf499bee973428124d2d58701e09c353f2cc7e38022ed8e583bdd77086",
+      "qualification": "ONLY strict recursive epoch/events directdependency expectation includes actual newsyntax owner"
+    },
+    "after_format": {
+      "app/slug_loading_v2/src/bzl_module.rs": "0b29609b83af0722babd73f4edde78a3dd7d15a05f55167fe8db2334ada2bb49",
+      "app/slug_loading_v2/src/bzl_module/external_bzl_syntax.rs": "f4aac200f3367bf7a633f6967e5812622d7bbef9552de3c2797d936864689294",
+      "app/slug_loading_v2/src/host_package_load_tests/external_bzl_frontier_tests.rs": "bc82d69e0786fbb0329748fb094557b2dffe94f3e48d23f60bed812ca100f98b",
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "6c3b2b7446e676281d0a4643c62a094db02e75dda491af0c7e9c06a15096f357",
+      "app/slug_core_v2/src/runtime/probe_observer/mapping.rs": "a65ab2f8f5b3f693cda65f3187350e503f775828bb8838720bfe33aa947eec2d",
+      "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "4b38ca52251b7c88a66b5d2e6d298225f590d39976beab15dbae5ffd78335525",
+      "app/slug_core_v2/src/runtime/dice.rs": "c7695697ca241158800f671cfb00ed5d5224927ad52a28136b17f1d456324b35",
+      "app/slug_loading_v2/src/host_package_load_tests.rs": "adec598714d7dd4db709a6b5cf2bec728091342866dde9583bba124e4f0006e7"
+    }
+  },
+  "retained_owner": "Private DICE ExternalBzlSyntaxKey includes original fullroute/label/context plusmode; original source completes first in same immutabletransaction under moduleguard; no new detector identity or childrouting/sourceauthority. Deterministic syntaxerrors valid; Need/source/outer/cycle failure invalid.",
+  "representation": {
+    "syntax_bytes": 520,
+    "syntax_key_bytes": 312,
+    "original_module_key_bytes": 304,
+    "alignment": 8,
+    "syntax_arc_allocation_bytes": 536,
+    "qualification": "Measured pinnedx86_64 layout; metadata owns existingbyteArc, movedfilename and sharedorderedloadStringslice; filename/load capacities/keyclone/history actualextra cost. No retainedAST/CodeMap/fullsourceString/newglobalinterner/cache/lock."
+  },
+  "allocation": "Retry routing/childadmission borrows sharednames; only settled independent APIs copy. Existing scopedinterner/compactlabel owners preserved. SamebyteArc may extend existingbody lifetime; capture/conversionlive credits endatfinish, cumulativebudgets bound actualscope history. No wholeheap/DICEhistory bound implied. TestWeak confirms release after graphowner teardown.",
+  "tradeoff": "One additional cold settled parse vs predecessor; three unresolved parent attempts compute synopsis once. Operationreuse proven, CPU/speed benefit unproved.",
+  "focused": {
+    "current_artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-340e3e66377ddbe2",
+      "sha256": "ec689a70a791fdc6c98beebe57452c7db4b6964c92bdb2e62c1c497adcebbd4a",
+      "features": [],
+      "compile_operation_sha256": "6cee5cb2c4435d3b873eaef63c0de14cb3b73de1173a0eb1ff268c0ec3ba48e7",
+      "qualification": "Cargo JSON linewise; executable SHA streamed64KiB"
+    },
+    "ordinary_profile": "Loadingopt0/debug0 only; original production/nativeLoadingopt1 unchanged",
+    "selected": 18,
+    "passed": 18,
+    "elapsed_seconds": 0.25989113200921565,
+    "rss_kib": 54096,
+    "operation_sha256": "8b3bef4dce31278da84cc93445837199c9ccc26012fbaa0c9f228d49e8b7d33e",
+    "layout": {
+      "syntax_size": 520,
+      "syntax_align": 8,
+      "syntax_key_size": 312,
+      "syntax_key_align": 8,
+      "module_key_size": 304,
+      "module_key_align": 8,
+      "shared_body_bytes": 66,
+      "shared_loads": 1
+    },
+    "structural_reuse": "Three normal source-present parent attempts Need\u2192Need/unrelatedepoch\u2192childrepair; syntax evaluated once, same shared pointer/loadslice; sourceA/B/A41/42/41 currentresults; errors/currentcert/events/cycles/polldrop and actualWeakgraphrelease pass. No parser CPU/speed/wholefit claim.",
+    "failures_preserved": {
+      "compile-loading": "101 missing7testimports",
+      "compile-loading-imports": "101 incorrect root crate import",
+      "compile-loading-current": "60s deadline originalordinaryopt1",
+      "loading-tests": "3 failures/15 observed passes0completebatchcredit; all corrected current18 pass"
+    },
+    "preflight_sha256": "8f46d59d1805f6c3d2a51afc04dbea76d425fe53a4d77ff017eb348afc64baa6",
+    "list_sha256": "96c6b22e2b7afe94bd43c5bfce93bb6c0de0e302d36b19091f8b72aa289e8ca1"
+  },
+  "gates": {
+    "compile-loading-fixtures": {
+      "elapsed_seconds": 11.569221553974785,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 2419860,
+      "child_rusage_peak_kib": 2159436,
+      "sha256": "6cee5cb2c4435d3b873eaef63c0de14cb3b73de1173a0eb1ff268c0ec3ba48e7"
+    },
+    "loading-list-current": {
+      "elapsed_seconds": 0.14691525604575872,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 1572,
+      "child_rusage_peak_kib": 12116,
+      "sha256": "96c6b22e2b7afe94bd43c5bfce93bb6c0de0e302d36b19091f8b72aa289e8ca1"
+    },
+    "loading-preflight-current": {
+      "elapsed_seconds": 0.1696159989805892,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 14184,
+      "child_rusage_peak_kib": 14184,
+      "sha256": "8f46d59d1805f6c3d2a51afc04dbea76d425fe53a4d77ff017eb348afc64baa6"
+    },
+    "loading-tests-current": {
+      "elapsed_seconds": 0.25989113200921565,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 18,
+      "pass_count": 18,
+      "monitored_rss_kib": 53788,
+      "child_rusage_peak_kib": 54096,
+      "sha256": "8b3bef4dce31278da84cc93445837199c9ccc26012fbaa0c9f228d49e8b7d33e"
+    },
+    "production-check": {
+      "elapsed_seconds": 30.31145047803875,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 1202308,
+      "child_rusage_peak_kib": 1121844,
+      "sha256": "c9f178f8894e6a020a21f0d895dfef5ff1b4061339e509c05e10f9e56660943e"
+    },
+    "compile-core-prepared": {
+      "elapsed_seconds": 40.468264707014896,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 3320524,
+      "child_rusage_peak_kib": 2926264,
+      "sha256": "17ceff023ca8cee65a8cd46eb2327ebe03c89227c91c11d23e5e5e0dbac66549"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.17787705396767706,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "monitored_rss_kib": 2016,
+      "child_rusage_peak_kib": 16388,
+      "sha256": "e654e6f61999d562d0e33a2049f2c406d692f592102bbcc4baa564745b631bed"
+    },
+    "native": {
+      "elapsed_seconds": 7.288579605985433,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "monitored_rss_kib": 230148,
+      "child_rusage_peak_kib": 230376,
+      "sha256": "a3a90ac8164854cbf524ececacdb29bb7fb0811ff553a639be5531305315aa4f"
+    }
+  },
+  "native": {
+    "operation_sha256": "a3a90ac8164854cbf524ececacdb29bb7fb0811ff553a639be5531305315aa4f",
+    "stdout_sha256": "46debd6f406b913e11bce637bdd2ca5f0e96254a031e77276aff22f7cb6a3c24",
+    "elapsed_seconds": 7.288579605985433,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 230376,
+    "rss_mib": 224.9765625,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52795418,
+    "held_fds": 350,
+    "pins": 66,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 331,
+        "wall_ns": 181178677,
+        "process_cpu_ns": 181240030,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 331,
+        "wall_ns": 6643662933,
+        "process_cpu_ns": 6654027758,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 330,
+        "wall_ns": 182301386,
+        "process_cpu_ns": 181847707,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 331,
+        "wall_ns": 14641349,
+        "process_cpu_ns": 20681663,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=environment path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 252 7021682 55574923 52795418 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=252 seen=252 emitted=252 admitted=252 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40818 encoded_bytes=139051 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "self_reported_phase_peak_kib": 231460,
+    "self_reported_phase_peak_mib": 226.03515625,
+    "rss_metric_qualification": "Supervisor monitor/childrusage peak230376KiB224.9765625MiB; independent child self-reported phase highwater231460KiB226.03515625MiB. Preserve both; neither wholeworkloadfit or heapretirement proof."
+  },
+  "preserved_unproved": {
+    "compile-loading": {
+      "sha256": "2db7ae47826c775d426c863285c849698e1215cb2ccede08505846f7912a48a9",
+      "elapsed_seconds": 23.8753582930658,
+      "exit_code": 101,
+      "stop_reason": null,
+      "qualification": "missing fixture imports"
+    },
+    "compile-loading-imports": {
+      "sha256": "f0d306d9ed368965e2c320163ee2a15bf0b781526cf9bddde32dba1eb3d0527a",
+      "elapsed_seconds": 19.097311264951713,
+      "exit_code": 101,
+      "stop_reason": null,
+      "qualification": "incorrect Loading crate import"
+    },
+    "compile-loading-current": {
+      "sha256": "0c8ed59db13b6d1da782f83dff0b851ff420d08644d77f6ab6c96dded3410ac9",
+      "elapsed_seconds": 60.07567900698632,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "qualification": "original ordinary opt1 preparation deadline; recovered ordinary tests only atopt0"
+    },
+    "loading-tests": {
+      "sha256": "cfbe11a2656f43a09e29033dc049a5bee64a64259d05998fb58909ad3a215deb",
+      "elapsed_seconds": 0.24733187595847994,
+      "exit_code": 101,
+      "stop_reason": "test_count_mismatch",
+      "qualification": "three fixture/assertion failures; corrected current18passed, initialbatch0credit"
+    },
+    "compile-core": {
+      "sha256": "7a2b87a04ed4c3b314d93cc0384d07d5018efa5fd9004dabcd5636aed83b727b",
+      "elapsed_seconds": 60.067095045000315,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "qualification": "original native preparation deadline after actualLoading/Analysis prerequisites completed; residual sameprofile preparation passed"
+    }
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "evidence": {
+    "design.md": "29669854e3c1932ed903f9a3d363ab1140e0399ec74f6c216cc5091b71db8ed0",
+    "design-review.md": "0010f6562056208bcf9b86a33c33903a867fd4910fcd8714f4cdae7e25a6c9f3",
+    "design-binding.json": "930085e13f3b43a02f3dd19576eaa34ba427da28f4e05c488b5380a682e39159",
+    "correction-design.md": "dba600bf499bee973428124d2d58701e09c353f2cc7e38022ed8e583bdd77086",
+    "source-baseline-amendment.json": "2f84b3cd2c4ddfdfe927321920eb7255530d0176d8db2c07b1dd88d2490b1773",
+    "source-freeze.json": "c2b574b196dedf4b42e3c97489d425f17f1fd9f4b2d96b8032bfcb548bc22214",
+    "prelaunch-source.md": "3a9d508064c4820b650edbdd9aba6c7fa28d8e7b89d91f0cfe0a3bce99483145",
+    "prelaunch-evidence.md": "c4f4f082753581db1bfc21632ccddbdf328f62d8a655992f442c45e0b31db304",
+    "helper-review.md": "decac69612042456c4a3ec1661b15a8968249fe63ba7ededde23d3db7c78d520",
+    "prelaunch-review.md": "a7d9761e0f50d1c425a13cf73b53b5c6b2c7cb979858052a82fc673d3d153934",
+    "focused-results.json": "4a63f26060c5fd86b9bfc3b4ba1c3eaf67a9e5cecbbe92b267078a9b961b46fa",
+    "native-results.json": "ca4cc50cf813ae44f490392b028afc9fb7d08693dd9b6bb6db7c3e0d2953c4f0",
+    "native-config.json": "479231b9d6bd069817780a4518f5bf6a7358d221dcf087ee7a51a10d02f3047a",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "compiler-correction.md": "3a7898ab4907282532349b21ac2b40fadf3be10655d64ad238eff2840b2ff488",
+    "test-correction-plan.md": "5eafaddfd9a19cfe3e1d8a2664e9eaf67c66142a0d94af76f1b4650d210df43e",
+    "native-preparation-correction.json": "3410da48c7d720cea1a9a406ebb29da61272648076935d334b67eea25eb5e9a4",
+    "run_gate.py": "e7d6f0a6af398c8295065a515db92eba700703509794d8f635842bd22e15706b",
+    "decode_native.py": "e154aba45876223e078a175a5da4cd9c6614692591629f190fe0db5b70828550",
+    "final-source-review.md": "87c5b85cf488fcc5c089c2e5a94c2b5300933110b7c08c568b63e2ecd0e4c68d",
+    "final-evidence-review.md": "76b049f57e70a6445f64b8b667b5f0700b704c5697a7d7aebc39e64ab3772c71",
+    "archive-status.txt": "4d139d784be9775c27a1e325af6c34b8e69a21a045db4b3b7c75800f618d7635"
+  },
+  "claim_limits": "ONE currentinstrumented nativeprefix supervisor224.977MiB/selfreported226.035MiB/256 source252, not fullproducer/wholefit/bodycompletion or speed. Nativefirstrefusal computation/environment: WP1024 captured matchingworkspace and JAVA_HOME name; WP942 capturemissing means no deniedpath, not absentenvironmentcapture, scopeNone, timeoutunlatched; finalrootinterval abortedpartial. Sourcebinding350stable heldnoninheritedFDs/pins66stable/ownedgroupempty; collectionnon-atomic. Preparationno workloadcredit. Allcaps unchanged, no identicalnative retry.",
+  "goal_status": "ACTIVE",
+  "next": "Trace first current normal producer refusal, preserve allocation discipline; fullproducer/time/wholefit/Rustc/actions/certificates/bootstrap remain open.",
+  "packet_timing_utc": {
+    "start": "2026-10-10 18:50 UTC",
+    "native_complete": "2026-10-10 19:34 UTC",
+    "qualification": "Approximate packet span includes design/implementation/corrections/review; exactgate timings above, no workflow speedup claim.",
+    "accept": "2026-10-10 19:39 UTC"
+  },
+  "toolchain": {
+    "channel": "nightly-2025-09-14",
+    "tools": {
+      "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "rustc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "rustdoc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "rustfmt": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt"
+    },
+    "qualification": "fresh rustup which pinned TOML channel"
+  },
+  "checks": {
+    "changed_four_Rust_pinned_rustfmt_skip_children": "PASS",
+    "archive_status": "PASS",
+    "plan_status": "PASS matched WP-7-304-m7a-external-syntax-synopsis-r1",
+    "diff_check": "PASS"
+  },
+  "growth": {
+    "bzl_module": {
+      "added": 52,
+      "deleted": 43
+    },
+    "new_external_syntax": {
+      "added": 179,
+      "deleted": 0
+    },
+    "frontier_proofs": {
+      "added": 454,
+      "deleted": 1
+    },
+    "strict_dependency_proof": {
+      "added": 5,
+      "deleted": 0
+    },
+    "total_added": 690,
+    "total_deleted": 44,
+    "qualification": "New key isolated from large parent; cohesive existing fixture proofgrowth aboveestimate reviewed, no newfixturetree/dependency/publicAPI."
+  }
+}
