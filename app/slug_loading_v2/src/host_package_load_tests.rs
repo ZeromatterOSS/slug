@@ -39761,3 +39761,6 @@ async fn native_package_name_rejects_direct_build_calls_and_invalid_contexts() {
         assert!(eval_global("X = native.package_name()\n", &globals).is_err());
     }
 }
+
+#[path = "host_package_load_tests/root_package_syntax_tests.rs"]
+mod root_package_syntax_tests;

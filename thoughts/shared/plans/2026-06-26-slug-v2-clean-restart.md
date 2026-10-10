@@ -34,19 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-309-m7a-external-child-copy-deferral-r1
-Status: accepted — FINAL reviews and all selected gates pass; next readiness selection underway
+Packet: WP-7-310-m7a-root-package-syntax-reuse-r1
+Status: accepted — 33 focused, production, native and FINAL review gates passed
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records accepted normal
-producer child-copy deferral. [WP1097 receipt](./slug-v2-subplans/wp1097-external-child-copy-deferral-2026-10-10.json):
-26 fresh focused tests, production/current native-profile and FINAL reviews pass.
-Temporary child slots retain original shared results until all siblings and final
-parse settle; settled evaluator ownership remains. Native supervisor225.63/actual
-phase226.84MiB under256, source252/WorkDeadline persists. No speed, savings or full-fit
-claim. Next broader normal root-package producer/readiness seam is under source
-review. Full producer/time/whole-workload fit/Rustc/actions/certificates/bootstrap
-remain open. Borrow/move/share strings and use existing scoped interners where owner
-and cleanup fit; all caps unchanged. Linux priority, Windows deferred. Goal ACTIVE.
+root BUILD syntax reuse. [WP1098 receipt](./slug-v2-subplans/wp1098-root-package-syntax-reuse-2026-10-10.json)
+binds full source/key identity, current source-first observations, borrowed retry
+load names and deferred evaluator copies. Actual graph/storage retirement proofs
+pass; cold success still parses twice. Native supervisor226.44/phase227.53MiB stay
+under256, while source252/WorkDeadline caller7:296 remains. No speed, native savings,
+frontier advance or whole-workload fit is claimed. Full producer/time/certificates/
+Rustc/actions/bootstrap remain open. Next source-grounded normal-producer readiness
+selection is pending; no identical native replay or cap raise. Borrow/move/share
+strings and use existing scoped interners where owner and cleanup fit. Linux
+priority, Windows deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

@@ -681,7 +681,7 @@ type HostPackageAttemptDriverOutcome = SourcePreparationOutcome<
     Result<(Arc<HostPackageAttemptTerminal>, PathObservationEpoch), ObservedPathFrontierError>,
 >;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
 enum HostPackageLoadMode {
     Legacy,
@@ -5775,6 +5775,9 @@ impl Key for ExternalBzlModuleObservationKey {
     }
 }
 
+mod root_package_syntax;
+use root_package_syntax::RootPackageSyntaxKey;
+
 type RootPackageLoadCarrier = Arc<Result<LoadedPackage, RootPackageLoadError>>;
 type RootPackageLoadDriverOutcome = SourcePreparationOutcome<
     Result<(RootPackageLoadCarrier, PathObservationEpoch), ObservedPathFrontierError>,
@@ -6231,50 +6234,28 @@ async fn compute_root_package(
             );
         }
     };
-    let source_text = match host_source_text(&source) {
-        Ok(source) => Arc::new(source.to_owned()),
-        Err(error) => {
-            return root_package_driver_complete(
-                Err(RootPackageLoadError::new(RootPackageLoadErrorInner::Input(
-                    error,
-                ))),
-                observations,
-            );
-        }
-    };
-    let source_name = match host_source_name(&source) {
-        Ok(name) => name,
-        Err(error) => {
-            return root_package_driver_complete(
-                Err(RootPackageLoadError::new(RootPackageLoadErrorInner::Input(
-                    error,
-                ))),
-                observations,
-            );
-        }
-    };
-    let ast = match AstModule::parse_with_string_encoding(
-        &source_name,
-        source_text.as_ref().clone(),
-        &Dialect::Bazel,
-        StringEncoding::BazelInternal,
+    let syntax = match host_dice_invariant(
+        ctx.compute(&RootPackageSyntaxKey {
+            package: key.clone(),
+            mode,
+        })
+        .await,
     ) {
-        Ok(ast) => ast,
-        Err(error) => {
-            return root_package_driver_complete(
-                Err(RootPackageLoadError::new(
-                    RootPackageLoadErrorInner::Parse {
-                        package: key.package.clone(),
-                        message: Arc::from(error.to_string()),
-                    },
-                )),
-                observations,
-            );
-        }
+        Ok(syntax) => syntax,
+        Err(outcome) => return outcome,
+    };
+    debug_assert!(
+        Arc::ptr_eq(&syntax.bytes, source.bytes())
+            || syntax.bytes.as_ref() == source.bytes().as_ref()
+    );
+    debug_assert_eq!(&syntax.logical_path, source.logical_path());
+    debug_assert_eq!(&syntax.relative_build, source.relative_path());
+    let loads = match &syntax.result {
+        Ok(loads) => loads,
+        Err(error) => return root_package_driver_complete(Err(error.clone()), observations),
     };
     let mut loaded_modules = Vec::new();
-    for load in ast.loads() {
-        let load = load.module_id.to_owned();
+    for load in loads.iter().map(String::as_str) {
         let resolved = match resolve_root_package_direct_load(&key.package, &load) {
             Ok(label) => label,
             Err(error) => {
@@ -6339,12 +6320,21 @@ async fn compute_root_package(
         };
         loaded_modules.push((load, module));
     }
-    drop(ast);
     let repository_mapping =
         match load_root_runfiles_repository_mapping(key, ctx, mode, &mut observations).await {
             Ok(mapping) => mapping,
             Err(outcome) => return outcome,
         };
+    // Independently owned evaluator inputs are needed only after every frontier settles.
+    let loaded_modules: Vec<_> = loaded_modules
+        .into_iter()
+        .map(|(load, module)| (load.to_owned(), module))
+        .collect();
+    let source_text = Arc::new(
+        host_source_text(&source)
+            .expect("source-bound syntax already validated UTF-8")
+            .to_owned(),
+    );
     let package_dir = source.package_root().as_path().join(key.package.as_str());
     let attempts = evaluate_host_package_attempts_driver(
         ctx,

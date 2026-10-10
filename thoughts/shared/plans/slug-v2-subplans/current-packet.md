@@ -1,112 +1,118 @@
-# WP1097 normal external-child allocation deferral
+# WP1098 normal root BUILD syntax reuse
 
-Packet: WP-7-309-m7a-external-child-copy-deferral-r1
-Status: accepted — FINAL reviews and all selected gates pass; next readiness selection underway
-Baseline: eb7c736a7d8ae6fa00d0352d4fa98c88fd314c22 (WP1096 accepted)
+Packet: WP-7-310-m7a-root-package-syntax-reuse-r1
+Status: accepted — 33 focused, production, native and FINAL review gates passed
+Baseline: 3b52ddec231da3723a68f252148e80c6587e483b (WP1097 accepted)
 
-Packet WP-7-309-m7a-external-child-copy-deferral-r1. Baseline
-eb7c736a7d8ae6fa00d0352d4fa98c88fd314c22 (WP1096 accepted). DESIGN required
-before source activation. Source research target/wp1096/next-work-frontier.md,
-SHA6da92b45b9b5ea0c2c260a1079882e1aafec32ea67cbdd4d45cc21160ee9eedf.
-Outcome: normal producer retries keep original completed child result handles
-until all siblings and final parent parse settle, avoiding unusable owned path
-and load-string copies. Slug-native storage change; existing admitted exact
-semantic identities, output, order, errors, observations and DICE remain exact.
-Linux priority; Windows deferred.
+Outcome: the existing normal requested root-package producer reuses compact BUILD
+syntax/load metadata across child-only Need revisions, preserving current source
+and every package/evaluator semantic boundary. Slug-native storage/recomputation;
+existing admitted exact source/order/errors/events/identity remain exact. Linux
+priority; Windows deferred. Full producer completion remains the broader goal.
+Research target/wp1097/next-work-frontier.md SHA 6d22e75b1f4d1481764cde077369b67135162ca14d115fcb1f320a9d1ca6380a. Actual existing
+//pkg:probe → SingletonRootSingleBuildCommandKey → RootPackageLoadObservationKey
+is source-grounded; no requested root/dependency is removed to obtain a pass.
 
-Source-established seam: bzl_module.rs562–575 FrozenBzlModule derives Clone and
-owns PathBuf/Vec<String>. ExternalBzlModuleCarrier4491 is already an immutable
-Arc<Result<FrozenBzlModule,ExternalBzlModuleError>>. Private
-compute_external_bzl_children5233/5392 clones every completed child into a scratch
-prefix before later sibling Need/error/cycle/observation conflicts may discard it.
-The owned evaluator5463 and settled conversion5642 remain the existing independent
-ownership boundary. Current native prefix fits supervisor226.69/phase227.55MiB
-under256 but stops at WorkDeadline caller7:296/source252. Detector timing does not
-identify the expensive key, next source, frequency or cause of the copies.
+Source facts: bzl_module.rs6234 copies BUILD text to Arc<String>,6256 clones it
+into AST, extracts owned load names, then awaits children. Need discards this
+preparation. AST is loads-only and dropped6361; existing package-attempt evaluator
+753 already reparses its source. A compact private syntax owner replaces that
+pre-child AST; successful parse count stays two (synopsis + original evaluator),
+not an added final preparse. Observed native225.63/phase226.84MiB fits256 but still
+source252/WorkDeadline at caller7:296. That detector does not identify costly work,
+key frequency or a cause. No speed, allocation total or full-fit claim.
 
-Decision: return private Vec<(&str,ExternalBzlModuleCarrier)> from the child loop.
-In the existing success match arm move the existing immutable Arc into the
-temporary prefix; preserve the original error arm, full observation merging,
-route/context/mode, source-before-syntax, cycle/detector/dependency calls and
-first-failure/Need order. After all children settle and final parent parse succeeds,
-the existing conversion owns the raw name and clones the successful Frozen value
-once, immediately before the original evaluator. A local documented expect is
-permitted only for the private invariant that each pushed carrier was checked Ok;
-no untrusted error can become a panic, swallowed error or silently removed row.
-No whole-parent shortcut, child reordering, bypassed computation or evaluator on
-partial attempts. Success still owns path/loads and its original lifetime closure;
-this is deferred cloning, not zero-copy successful evaluation.
+Decision: private RootPackageSyntaxKey owns the full existing RootPackageLoadKey
+(workspace/package) and private mode. Track the original RootPackageSourceKey or
+ObservationKey::for_build directly. Parent still obtains anchor, current source,
+left-first observation merge and forced observed outer hook BEFORE synopsis.
+All source/outer failures retain original precedence; Need/nonpure failures are
+invalid and unequal. Syntax computes no children/route/evaluation/IO bypass.
+Private mode gets structural Eq/Hash/Allocative support, with no public field/API.
 
-The temporary Vec replaces existing owned-module scratch. It owns ordinary Arc
-refs until Need/error/cancellation/drop or settled conversion; no retained field,
-AST/source-body/cache/interner/pool/key/lock/API/dependency/profile/cap change.
-Holding the result wrapper through an attempt is bounded by the existing load
-count; full DICE graph/module equality/invalidation/events/lifetime semantics stay
-unchanged. Borrow/move/share strings and use existing scoped interners only where
-their retention/cleanup fit; no unrelated representation migration. Stage9 existing
-Arc/Dupe/FrozenModule closure/Allocative and no-op reuse are concept anchors, no
-donor import. docs/developers/dice.md remains graph ownership authority.
+Value owns original shared bytes, exact logical/source filename/BUILD identity and
+ordered Arc slice of moved load Strings or original pure encoding/parse error.
+Retain only input identity needed for syntax; derive the exact host_source_name
+and Bazel/BazelInternal parser behavior. A source-name String need not survive
+parsing when original immutable logical path already owns the exact identity.
+Pointer fast path followed by full bytes/path/name/encoding/result equality;
+no digest-only/key-only/loads-only equality or ignored same-load body changes.
+SourceBytes already has Arc ownership; this value adds DICE-retained semantic
+metadata/history retention and must not borrow request/evaluator scratch.
+No AST/CodeMap/sourceString/global cache/interner/lock/counter is retained.
 
-Two-file allowlist: app/slug_loading_v2/src/bzl_module.rs (private return type,
-success push and settled conversion only) and
-app/slug_loading_v2/src/host_package_load_tests/external_bzl_frontier_tests.rs
-(one small proof). Estimate10–25 runtime and60–120 proof lines; large existing
-file remains cohesive for this seam, no extraction or fixture tree. New basename
-external_bzl_child_prefix_retains_original_carriers_until_settlement. Reuse current
-in-memory frontier transactions and graph-produced successful child values.
-The proof must observe the actual normal parent computation, not manually mirror
-its temporary Vec. Precompute the completed left child in the same transaction,
-inspect original nonempty path/load buffers and retain only its Weak; drop temporary
-strong results before recording baseline. A tiny fixture-only ActivationTracker
-wrapper delegates existing FrontierTracker callbacks and samples Weak::strong_count
-without upgrade when the exact later missing sibling FileBytes demand activates.
-Use distinct never-computed normal parent labels for Need/error/success, retaining
-the same warmed left carrier across epochs. This excludes historical parent
-dependency validation before ordered child loading; every exact later callback
-must see baseline+1, with nonzero samples and baseline after parent discard.
-The normal success evaluator/strict closure retains independent final owned values.
-Existing protected same-parent repair remains its own authority; this new proof
-covers outcome/ownership, not same-parent repair. No direct
-private-driver call, cycle guard bypass, new test key or manually mirrored slot.
-Reuse existing early semantic-error/Need, synopsis/current epoch and finisher
-controls. Any Weak final-drop claim must release actual graph/original owners;
-graph-retained lifetime is explicitly qualified. Existing early poll-drop control
-remains reuse and is not relabeled populated-prefix cancellation. The bounded
-Weak/count fixture probe is test-local instrumentation only; production capture
-fields/counters/keys/instrumentation remain excluded. Source placement and actual
-carrier ownership establish avoided premature copies, not allocator totals,
-CPU cost, native frequency or a benchmark.
+Parent borrows load names during original declaration-order route/child awaits;
+independently retained evaluator name/module values own their original copies.
+Delay original source_text Arc<String> until children AND runfiles mapping settle,
+immediately before existing HostPackageAttemptInput. Reuse source UTF8/name/error
+precedence from the pure syntax result. Leave attempt/glob/policy/evaluator/event
+publication and package source certificate closures unchanged. Existing graph
+invalidation/cutoff/cancellation/shutdown remain ownership authority. Failed key
+never becomes a reusable syntax success. No whole-parent cache or fresh-graph
+shortcut; no unrelated HostBzl/externalBzl/repository BUILD migration.
 
-Gates: stopped source/helper/fixture writers; pinned format/30-owner freeze;
-independent DESIGN/source/prelaunch/FINAL review. Serial pinned
-nightly2025-09-14 offline/locked/jobs1 CargoJSON no-run; current unique artifact
-lists/exact preflights/actual nonzero bodies. Loading6 = new proof plus current5
-WP1096 sibling/semantic-order/synopsis/finisher controls. Bzlmod7 exact WP1096
-controls and Core13 exact WP1096 protected/generated-file controls remain fresh
-for a26-test total; production Bzlmod/Loading/Core/CLI check. Ordinary Bzlmod and
-Loading opt0 uses accepted test-only recovery, native original Loadingopt1 remains.
-Prep60s separate uncapped RSS, preserve capped/failed records and split completed
-dependency stages as needed. No preparation peak can become native RSS evidence.
+Allowlist: app/slug_loading_v2/src/bzl_module.rs (private mode/module/root-driver
+seam), new app/slug_loading_v2/src/bzl_module/root_package_syntax.rs (cohesive pure
+owner), app/slug_loading_v2/src/host_package_load_tests.rs (module registration
+only), new app/slug_loading_v2/src/host_package_load_tests/root_package_syntax_tests.rs
+(two finite proofs). Large parent/test files remain wiring-only for this change;
+new owner/proofs are split, not expanded into a broad existing file. Estimate
+100–200 runtime/150–300 proof lines; actual growth triggers cohesive review.
+Reuse external_bzl_syntax.rs concept at22fd34ebc, Stage9 existing Arc/Dupe/
+Allocative/compact-synopsis rows; no donor import. docs/developers/dice.md owns
+key/dependency/lifetime decisions; Stage4 root-package exact contract4052–4099
+owns anchor→source→orderedchildren→evaluation semantics. Existing accepted Bazel9.2
+BUILD loading controls remain oracle authority; no new semantic parity surface.
 
-Fresh standalone ignored singleton list and ONE changed-source native under all
-WP1096 caps: operation10/work7/default5/lifetime8/cleanup3/RSS256MiB/AS512MiB,
-original350 ordered source triples/18 bindings/held noninherited FD brackets,
-current three artifacts/source30/callers/observer/gates/reviews and v2raw64/status.
-Root reviews helpers before use; supervisor/decoder ROOT-only accepted copies.
-No identical native replay or cap raise. Separate supervisor and phase prefix
-RSS, exact frontier and qualified windows. Actual borrowed buffer layout/counts
-are finite fixtures; no guaranteed speed, native savings, full producer/time/fit,
-JDK/namespace/certificates/actions/Rustc/bootstrap or fullgraph retirement claim.
+Two finite discriminators: actual normal observed root syntax activation/Weak
+proof across child-only Need and unrelated epochs, same-parent repair/current
+observations/Complete events, full same-load body A/B/A and source absence before
+syntax; exact pure input identity/encoding/parse errors with pointer-distinct equal
+bytes versus changed bytes/logical BUILD filename, plus real graph/held-byte
+last-drop retirement. Use existing capture/ActivationTracker test seam exposing
+only Weak/scalars; no new production instrumentation/key/helper or manual mirror.
+Do not infer parser invocation count from parent activations. Prove actual syntax
+key evaluations/reuse with meaningful nonzero current witnesses. Source-missing
+Must not hit historical syntax. Cached deterministic encoding/parse errors keep
+original diagnostics and precede child probing. Full-input equality preserves
+comment/body edits even if loads equal. No broad parser matrix or fixture tree.
 
-REPLAN only if deferral requires a new public/retained representation, cannot
-preserve full identities/error/observation order or cannot safely retain/drop the
-original carrier. Routine fixture/type/invocation corrections stay in contract
-and preserve first evidence. Format/archive/diff/plan checks, compact receipt,
-Stage9 ownership note and accepted commit. Goal ACTIVE; this normal producer
-string-copy seam advances allocation discipline while finite authentic-root/full
-producer closure remains open. A narrower root is a separate explicitly scoped
-readiness claim, not current full-closure acceptance.
+Reuse fresh focused controls: existing WP1097 Loading6 plus root
+observed_root_package_preserves_semantics_arcs_order_events_and_families,
+observed_root_package_reuses_restores_and_preserves_terminal_polarity,
+observed_root_package_cancellation_publishes_no_parent_and_recovers,
+host_package_need_is_transient_and_root_anchor_precedes_source,
+host_package_loads_bzl_and_owns_only_local_complete_events; two new proofs make
+Loading13. Bzlmod7/Core13 unchanged controls:33 exact nonzero ordinary passes.
+Final selectors must be actual executable-list unique, batched preflight/body;
+new selector spellings fixed by design/source handoff before gates. Actual
+syntax/key/Arc/load layout and retained bytes/storage recorded, not heap totals.
+Production Bzlmod/Loading/Core/CLI check and current native-feature compile.
 
-Immediate predecessor: [WP1096 receipt](wp1096-no-op-request-map-union-2026-10-10.json), accepted in eb7c736a7.25fresh focused/production/native-profile/FINAL gates pass; native supervisor226.69/phase227.55MiB under256, same source252/WorkDeadline. No full-workload or speed claim.
+Gates inherit WP1097 receipt caps/profiles/original350 ordered source triples/
+18bindings/held noninherited FD brackets. Pinned nightly2025-09-14 offline/locked/
+jobs1 CargoJSON no-run serial, prep60s separate uncappedRSS; ordinary Loadingopt0
+only test lane/native originalLoadingopt1/Coreopt0. Add the two actual new owner
+paths to current32 source freeze/helperpins; preserve original350vector unchanged.
+Stopped source/helper/fixture writers before fresh standalone list and ONE
+changed-source native10s/work7/default5/lifetime8/cleanup3/RSS256MiB/AS512MiB.
+Remaining byte/source/directory/log caps unchanged. Independent DESIGN/source/
+prelaunch/FINAL review, format/archive/diff/plan, compact receipt and Stage9 note.
+No identical native replay/cap raise. All native metrics use exact grammar;
+WP938_SCOPE registry bytes are separate from actual WP938_PHASE RSS tags.
 
-Acceptance: [WP1097 receipt](wp1097-external-child-copy-deferral-2026-10-10.json).26fresh focused passes, production/current native-profile/FINAL ACCEPT. Native supervisor225.63/actual phase226.84MiB under256; source252/WorkDeadline beforebatch persists, no speed/savings/frontier/fullfit claim. Both failedproof generations preserved; source-grounded coldparent correction retains strictcounts. Source30 owners frozen, runtime18+/4-/proof232+, no new persistent representation. Root report registrybytecounter/RSS error corrected from exact phase tags before acceptance, no replay. Next normal root-package producer/readiness seam under source review; goal ACTIVE.
+REPLAN only if exact source-before-syntax/semantic/error/observation order cannot
+be retained, compact value needs AST/global ownership/new public source API, or
+actual reuse requires bypassing original dependencies. Routine invocation/type/
+fixture corrections stay within this owner; second correction reassessed. New
+persistent bytes/history retention and cold/warm tradeoffs reviewed before source
+activation; full-workload fit/cancellation/native retirement/frequency/CPU/speed
+are qualified unless directly established. Goal ACTIVE. Borrow/move/share strings;
+use existing scoped interners when repetition and cleanup justify retention.
+
+Immediate predecessor: [WP1097 receipt](wp1097-external-child-copy-deferral-2026-10-10.json)
+accepted at3b52ddec231da3723a68f252148e80c6587e483b.26fresh/production/current-native/FINAL gates pass;
+shared child scratch24B versus344B; actual native prefix225.63/226.84MiB under256,
+source252/WorkDeadline persists. Both failedproof generations preserved0credit.
+
+Acceptance: [WP1098 receipt](wp1098-root-package-syntax-reuse-2026-10-10.json). Four source owners; 28 inherited owners unchanged. Actual syntax832B/key40B plus shared storage/history; both normal-root reuse/source identity and graph/last-body retirement proofs pass. Corrected Need activation/publication assertion preserves strict nonzero/allNone and fresh Complete batch. First12pass1fail aggregate and Core60s capped49nullafter maps preserved0credit; actual Core-final43.54s strict successful preparation supplies current authority. Native ONE7.8855s/125stablepins/350stableheldFD/original18env/version2raw64status0; supervisor226.4375/actual five-phase227.52734375MiB under256. Still source252/WorkDeadline caller7:296; write+1004/rootwindows+2 are not cause, speed or frontier advancement. Full producer/time/wholefit/certificates/Rustc/actions/bootstrap open. Next normal producer candidate research target/wp1098/next-work-frontier.md (47681e27b3a8cb4c04e1ecb11d30ba9b3cbb45428a2424a8d1c21d743d9bfb35), conditional on concrete readiness priority; no new packet activated. Goal ACTIVE.

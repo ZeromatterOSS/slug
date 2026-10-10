@@ -1,0 +1,275 @@
+{
+  "packet": "WP-7-310-m7a-root-package-syntax-reuse-r1",
+  "status": "accepted",
+  "baseline": "3b52ddec231da3723a68f252148e80c6587e483b",
+  "compatibility": "Slug-native syntax sharing/recomputation; existing admitted exact source/errors/order/events/certificates unchanged. Linux priority; Windows deferred.",
+  "decision": "Full workspace/package/mode syntax key directly tracks original BUILD source; parent source-first authority remains. Share original immutable source/load storage and borrow names through child/runfiles frontiers; defer evaluator-owned strings until settlement, no retained AST or global pool.",
+  "source": [
+    {
+      "path": "app/slug_loading_v2/src/bzl_module.rs",
+      "before_sha256": "7f6d9e941dbc5bbbfb5d9146e24e06e99925bd529a16c33862429a38785f5081",
+      "after_sha256": "93b59886cc11b3a51614cb3cad0072610daf473898360dc871094f81796deda3",
+      "added": 33,
+      "deleted": 43
+    },
+    {
+      "path": "app/slug_loading_v2/src/bzl_module/root_package_syntax.rs",
+      "before_sha256": null,
+      "after_sha256": "e177ec072c16eeafb76cbb34660e7116a1319ce337966241b7b841e5e0cf58a2",
+      "added": 148,
+      "deleted": 0
+    },
+    {
+      "path": "app/slug_loading_v2/src/host_package_load_tests.rs",
+      "before_sha256": "adec598714d7dd4db709a6b5cf2bec728091342866dde9583bba124e4f0006e7",
+      "after_sha256": "a726e7833dfced5b43d1d17d82fd1b76065431008a0558791019e701544a70f7",
+      "added": 3,
+      "deleted": 0
+    },
+    {
+      "path": "app/slug_loading_v2/src/host_package_load_tests/root_package_syntax_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "ff6e0f1b6fb2639f187cb33f5682114153787a377ccb8ae8dd5d41dd74e037bb",
+      "added": 449,
+      "deleted": 0
+    }
+  ],
+  "unchanged_frozen_owners": 28,
+  "allocation": {
+    "layout": {
+      "syntax": {
+        "size": 832,
+        "alignment": 8
+      },
+      "key": {
+        "size": 40,
+        "alignment": 8
+      },
+      "source": {
+        "size": 64,
+        "alignment": 8
+      },
+      "shared_body": {
+        "size": 16,
+        "alignment": 8
+      },
+      "shared_loads": {
+        "size": 16,
+        "alignment": 8
+      },
+      "body_bytes": 70,
+      "loads": 1
+    },
+    "proof": "Actual normal root childNeed/unrelated revision reuse; full same-load source invalidation/A-B-A; exact filename, pure errors, sourceabsence and real graph/heldbody retirement.",
+    "discipline": "Borrow/move/share strings; existing scoped interners when lifetime and cleanup fit. Shared source metadata uses DICE history and no live-bank credit; cold success still2parses.832B inline syntax plus sharedstorage/transientVec and evaluatorcopy costs; no totalheap/frequency/speed savings claim."
+  },
+  "focused": {
+    "selected": 33,
+    "passed": 33,
+    "families": {
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.1248707469785586
+      },
+      "loading": {
+        "selected": 13,
+        "passed": 13,
+        "elapsed_seconds": 0.2114032399840653
+      },
+      "core": {
+        "selected": 13,
+        "passed": 13,
+        "elapsed_seconds": 0.20307955099269748
+      }
+    },
+    "sha256": "63f22c6d37e43a71731d50a55e30624a51a6d453e24abf03769f217ac1203dc2"
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "goal_status": "ACTIVE",
+  "packet_timing": {
+    "source_activation_utc": "2026-10-10T21:41:42.081557+00:00",
+    "draft_utc": "2026-10-10T21:59:16.641102+00:00",
+    "qualification": "Separate bounded preparation/body/native operations; no workflow speed claim.",
+    "native_completed_utc": "2026-10-10T22:02:03.853458+00:00",
+    "acceptance_utc": "2026-10-10T22:02:55.628665+00:00"
+  },
+  "corrections": "First proof incorrectly required no activation row onNeed; current actual tracker/source establish nonzero rows with no publishedbatch. Fixed strict nonzero/allNone and freshly drained Completebatch assertions, no runtime change. Failedfirstaggregate0credit. Combined Coreprep60s capped with49null aftermaps; finalseparate43.54s strictsuccessful generation suppliesactualartifact, no cap/profile/sourcechange.",
+  "checks": {
+    "pinned_format": "PASS",
+    "diff": "PASS",
+    "plan": "PASS",
+    "archive": "PASS actualbash"
+  },
+  "gates": {
+    "compile-bzlmod": {
+      "elapsed_seconds": 4.70706938393414,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "db9f81609d1c752d33fcaca7e09c98216e8b1c3572631b693f8a3c8712eb0aa2"
+    },
+    "compile-loading": {
+      "elapsed_seconds": 9.746474658022635,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "53094178fbb88f64fd6463f5786d267a348c0d35ea768ad2948c5df778f32364"
+    },
+    "compile-core-final": {
+      "elapsed_seconds": 43.535875934991054,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "9a72a7f2649ceebbcde49355af5f2501735739724922056eaa60b1992222cef4"
+    },
+    "production-check": {
+      "elapsed_seconds": 30.56482338893693,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "36b01914aab15b7272a2b86c16ebf5bf4879291cea2bd3dc5a72f2670aba19f7"
+    },
+    "bzlmod-tests": {
+      "elapsed_seconds": 0.1248707469785586,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 7,
+      "pass_count": 7,
+      "operation_sha256": "177b54c88ba1e84cbffb02cbfe747538f16fabdb713ecf99fef57116f0700063"
+    },
+    "loading-tests": {
+      "elapsed_seconds": 0.2114032399840653,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 13,
+      "pass_count": 13,
+      "operation_sha256": "5188b82b85465b52d557b9eb4fbc867bb3347d16c3456099bb0f9e6622f5a07b"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.20307955099269748,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 13,
+      "pass_count": 13,
+      "operation_sha256": "bfce6cf9c8ffa4ef4830b83deead507fa973947041de6876aa9245808e826551"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.18542679003439844,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "d97f03f7369a1d19f61eb4228bda645392293e3dc5ae5aefa26927edbd4f96f2"
+    },
+    "native": {
+      "elapsed_seconds": 7.885499614058062,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "operation_sha256": "d9dcbe74d04d72f27625dadd556ac414b32f6714fe44df4dd0b553ca4d25fc67"
+    }
+  },
+  "native": {
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 7.885499614058062,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 125,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "observer_version": 2,
+    "status": 0,
+    "supervisor_peak_mib": 226.4375,
+    "phase_peak_mib": 227.52734375,
+    "frontier": "WorkDeadline",
+    "report_sha256": "3d4eb8fadd1b284592131c6fc0ba79c5fa4e16e4706db84ce8f730845fe1a3cf",
+    "stdout_sha256": "7d4bc458df494ecd9aa6c76052e3051526e86ae04ec94c9cf4c92c72d68c347a"
+  },
+  "claim_limits": "ONE changed-source candidate still reaches source_service WorkDeadline caller7 diagnostic.rs:296 before batch acquisition. Detector does not identify preceding expensive work or nextsource.252sources/decode55574923 unchanged; write52796422 differs+1004 and root333windows differ+2 fromWP1097, no causal/performance/frontieradvance inference. Full producer/time/wholefit/JDK/namespace/certificates/Rustc/actions/bootstrap remain unproved. Originalcaps/vector/env unchanged.",
+  "preserved_unproved": {
+    "first-proof": {
+      "operation_sha256": "d5389570453bd5a8291f84775e089632ce3160b368bdd04bfa6b1b6edced31fd",
+      "exit_code": 101,
+      "stop_reason": "test_count_mismatch",
+      "complete_pass_count": 0,
+      "raw_observed_passes": 12
+    },
+    "compile-core": {
+      "operation_sha256": "dd8d9b12a62d5f100e4d488ac8e46202c2657c3213cc87a58a5cdbed3bc35290",
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "complete_pass_count": 0,
+      "null_after_hashes": 49,
+      "joined": true,
+      "owned_group_empty": true
+    }
+  },
+  "next": "Continue broader normal requested producer readiness from source-grounded next-work research and current deadline evidence, preservingcaps; no identicalnative replay.",
+  "evidence": {
+    "design.md": "6a85e39330f6d589a5357c6fca55e2b5f69ea8b9e2a59b0b9629dde74549d5f3",
+    "design-review.md": "d400e75c45bee14b7a59f99d51b6f58faa60be5dae771c909f0723acec347b36",
+    "design-binding.json": "12a5a0ea1ff2c6e442a0582721c629a2010d6fb09724a682cb83dd74c7256a6e",
+    "implementation-plan.md": "873137d1e71cf2d7ff9dcdd8a2d01c896c1a1f1913a46ba415231b69948f62a5",
+    "implementation.md": "51671a5c052e2e2f02c5e0c8f3a3c90d2e7ba92e19c33cba62dc834f0c98eb9c",
+    "source-baseline.json": "0c32d305f8b6a4f9175a17f6147def93948d24b9f6453cf9ff8a2c14e3829910",
+    "source-freeze.json": "bf23019a6562f2e9e984f4ff95b1039d054d5d9dc250a6c39d94c04f0f438237",
+    "static-review.md": "8ef9cd364a93bfe64c7321cef959a57e4f20b87e1ac32fb0b848ba903d2f921f",
+    "source-review.md": "9a968cb2ae9fbedc2ea320de33ee5db127ed8a63e9f80888b8dec7edb7e2576f",
+    "correction-1.md": "a45713e8fe1fb67cf704d287c78bac5d4d8a7d29bde808193ed84776247ffa20",
+    "helper-review.md": "0418246bb27bcb9dda9f8c1e26885d0ab55dfa417a2c8f3adfb1f3f7d6b3ee46",
+    "root-helper-review.md": "33291eea9615cd9cd6a30b30cedc58d285249c0c262899295375e6bd72708908",
+    "gate-preparation-notes.md": "aaf67dc8e4aeec74410954f016be1b5cdd3b31d62d60b134c4db04eb566aa97f",
+    "preparation-recovery.md": "0d3b9afd66ad959a3264d633dd41684d3ca5060479126afe79cb389838dbda9a",
+    "preparation-recovery-qualification.md": "c4da20d579e400c5d9104d631c300b09c83af91a4a73c9c376d523918172b432",
+    "prelaunch-source.md": "7d2f3f034589ce82d613c04c3d3521adcf18ca11b2d7ba5af5b2121b601f65a8",
+    "prelaunch-evidence.md": "41bffd938fed9867a14480020df36e4541a2e9a0a49069756b02a2de5e564f68",
+    "prelaunch-review.md": "06f6b3137775f66d5482d739bb45820230ffbd85c75d33cf99243548a3929d02",
+    "final-source-review.md": "4e2e4eec7f3639c12acb984343b710087a8f92cc724e55b46dd52415c76f8c9e",
+    "final-evidence-review.md": "7478f5e883f4f6a04f4fb3a68671a9bbe2c0f32cadc5d8bebd81392f040860c0",
+    "focused-results.json": "63f22c6d37e43a71731d50a55e30624a51a6d453e24abf03769f217ac1203dc2",
+    "native-results.json": "3d4eb8fadd1b284592131c6fc0ba79c5fa4e16e4706db84ce8f730845fe1a3cf",
+    "native-config.json": "a0c9121a6e4b809a92e5d5e20e9e6ba7ea63dcac50d5e0d46a0467d64beaf1ae",
+    "source-vector.json": "fb7b6bb5e88578810c4afd223331d5d7c1d5013c5dd4c0b1034b670fe75d8472",
+    "inputs.json": "ce5e964783c0bd3f085c5d7e8b3ba601b6d39038057694d12270b9ac3cf536b1",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "run_gate.py": "82be7f6bf358c2c2c537c7fdbdbfcc464311572f84e36cc4ef83ebc3dd6664ba",
+    "decode_native.py": "aa7c2e90df5aedd667e03fcfc800ef7de531a1436384ab2e33fdbfdfdecdd509",
+    "setup_gates.py": "8bae24ea80f13ef0ef369b7ec05651f65c035c39247bc7131c8c98d75fb6485f",
+    "prepare_configs.py": "e1a82141d2814c591166b82714e3b3fe066fdfe486895a5e20175d7dbec66ac3",
+    "native_setup.py": "728fcc86f04a4382210635eda0bcb5f580081e8746c0a2cf5cf34702ff6567e2",
+    "aggregate_focused.py": "a4c4305df70577582d05ae5bef75897cda6d3ce04e8eb327196323efbbed726a",
+    "next-work-frontier.md": "47681e27b3a8cb4c04e1ecb11d30ba9b3cbb45428a2424a8d1c21d743d9bfb35"
+  }
+}
