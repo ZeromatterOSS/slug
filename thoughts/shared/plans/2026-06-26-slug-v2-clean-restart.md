@@ -34,19 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-306-m7a-no-op-observation-union-r1
-Status: accepted — broader compiler producer materialization follows
+Packet: WP-7-307-m7a-local-jdk-file-effects-r1
+Status: accepted — next bounded normal producer packet being selected
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts borrowed no-op
-observation-map reuse with full equality and original left credit ownership.
-Twenty focused tests and production/native-profile checks pass. One native prefix
-stayed within 226.40 MiB of 256 MiB and reached the local JDK generated-file materialization
-refusal. The [receipt](./slug-v2-subplans/wp1094-no-op-observation-union-2026-10-10.json)
-records current evidence and preserved preparation/fixture corrections. Next is
-source-grounded admission through the existing generated-file producer. Borrowing,
-sharing and appropriate scoped interning remain required; full producer/time/wholefit/
-Rustc/actions/certificates/bootstrap stay open. Linux priority; Windows deferred.
-Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts bounded local
+JDK File-only admission through the existing Rust materializer and current epoch;
+all old exact-signature owners remain unchanged. Current 13 focused tests and
+production/native-profile checks pass. Its
+[receipt](./slug-v2-subplans/wp1095-local-jdk-file-effects-2026-10-10.json) records
+one 7.600s native prefix, supervisor 227.73/phase 228.32 MiB under 256 MiB, and an
+actual WorkDeadline at pre-acquisition scope validation. The previous generated-kind
+refusal is absent and writes increased 1004 bytes; complete JDK/namespace/full producer,
+whole-fit/Rustc/actions/certificates/bootstrap remain open. Select the next bounded
+normal producer allocation/performance improvement from current source; no cap
+raise or identical probe replay. Borrowing/sharing and existing scoped interning
+remain required. Linux priority, Windows deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

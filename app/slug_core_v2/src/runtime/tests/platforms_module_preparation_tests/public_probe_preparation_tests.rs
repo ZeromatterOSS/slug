@@ -306,6 +306,38 @@ fn namespace_policy(
     {
         return policy;
     }
+    #[cfg(target_os = "linux")]
+    if let Some(plan) = bodies.local_jdk_file_plan(request) {
+        let path = demand.path().as_path();
+        let root = view.generation_root();
+        let path_class = if path == root {
+            "root"
+        } else if root.starts_with(path) {
+            "ancestor"
+        } else if let Ok(relative) = path.strip_prefix(root) {
+            if plan
+                .effects()
+                .iter()
+                .any(|file| relative == Path::new(file.path()))
+            {
+                "fixed_file"
+            } else if plan
+                .effects()
+                .iter()
+                .any(|file| Path::new(file.path()).starts_with(relative))
+            {
+                "ancestor"
+            } else {
+                "other"
+            }
+        } else {
+            "other"
+        };
+        return NamespacePolicy {
+            owner_plan_allowed: true,
+            path_class,
+        };
+    }
     let Some(files) = bodies.generated_features_owner_signatures(request) else {
         return NamespacePolicy {
             owner_plan_allowed: false,
@@ -2779,6 +2811,594 @@ fn java_proxy_generated_request(
     request.repo_spec.rule_id.rule_name = "_compatibility_proxy_repo_rule".into();
     request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
     request
+}
+#[cfg(target_os = "linux")]
+fn local_jdk_test_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = java_proxy_generated_request(bodies, plan);
+    request.id.canonical_repo =
+        slug_identity_v2::CanonicalRepoName::new("rules_java++toolchains+local_jdk").unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_java+//toolchains:local_java_repository.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "_local_java_repository_rule".into();
+    // Synthetic semantic attributes are retained, not guessed native attribute filters.
+    request.repo_spec.attributes = Arc::new(
+        [(
+            compact_str::CompactString::new("synthetic"),
+            slug_bzlmod_v2::OverrideAttributeValue::Bool(true),
+        )]
+        .into_iter()
+        .collect(),
+    );
+    request
+}
+#[test]
+#[cfg(target_os = "linux")]
+fn local_jdk_file_effects_are_bounded_and_opt_in() {
+    use immutable_archive_preparation::JAVA_DIGEST;
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PROTOBUF_URL;
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let bodies = java_proxy_test_bodies();
+    let valid = SourcePreparationNeeds::repository(local_jdk_test_request(
+        &bodies,
+        small_generated_plan(&[
+            ("BUILD", b"synthetic", false),
+            ("nested/defs.bzl", b"", true),
+        ]),
+    ));
+    let original = valid.repository_materializations().values().next().unwrap();
+    let counts = (
+        Arc::strong_count(original),
+        Arc::strong_count(&original.repo_spec.attributes),
+        Arc::strong_count(&bodies.java_offline_archive.as_ref().unwrap().backing),
+    );
+    let RepositoryMaterializationKind::GeneratedFileEffects(original_plan) = &original.kind else {
+        panic!();
+    };
+    assert!(std::ptr::eq(
+        bodies.local_jdk_file_plan(original).unwrap(),
+        original_plan
+    ));
+    assert!(
+        bodies
+            .generated_features_owner_signatures(original)
+            .is_none()
+    );
+    assert!(bodies.admit(&valid).is_ok());
+    let mut changed = local_jdk_test_request(
+        &bodies,
+        small_generated_plan(&[("BUILD", b"different valid content", true)]),
+    );
+    changed.repo_spec.attributes = Arc::new(
+        [(
+            compact_str::CompactString::new("different"),
+            slug_bzlmod_v2::OverrideAttributeValue::Int(7),
+        )]
+        .into_iter()
+        .collect(),
+    );
+    let alternative = SourcePreparationNeeds::repository(changed);
+    assert_ne!(
+        original.as_ref(),
+        alternative
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .as_ref()
+    );
+    assert!(bodies.admit(&alternative).is_ok()); // New policy does not invent static output signatures.
+    println!(
+        "WP1095_LAYOUT bodies={}/{} scope={}/{} borrowed_paths={}/{}",
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>(),
+        std::mem::size_of::<[Option<&str>; GENERATED_PLAN_ROWS]>(),
+        std::mem::align_of::<[Option<&str>; GENERATED_PLAN_ROWS]>()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            for defs in [false, true] {
+                let selected = java_proxy_test_bodies()
+                    .with_generated_features_file_effects(registry, command)
+                    .with_rules_rust_defs_import_sources(
+                        if defs {
+                            registry
+                        } else {
+                            RegistryChoice::DefaultBcr
+                        },
+                        command,
+                    );
+                assert_eq!(
+                    selected.admit(&valid).is_ok(),
+                    defs && matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe)
+                );
+            }
+        }
+    }
+    assert!(
+        Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+            .admit(&valid)
+            .is_err()
+    );
+    for case in 0..5 {
+        let mut closed = java_proxy_test_bodies();
+        if case == 0 {
+            closed.java_offline_archive = None;
+        } else {
+            let binding = closed.java_offline_archive.as_mut().unwrap();
+            match case {
+                1 => {
+                    binding.backing = OfflineArchiveBacking::new(
+                        PROTOBUF_URL,
+                        JAVA_DIGEST,
+                        binding.backing.path().dupe(),
+                    )
+                }
+                2 => {
+                    binding.backing =
+                        OfflineArchiveBacking::new(JAVA_URL, [0; 32], binding.backing.path().dupe())
+                }
+                3 => {
+                    binding.backing = OfflineArchiveBacking::new(
+                        JAVA_URL,
+                        JAVA_DIGEST,
+                        path("/foreign/java.tar.gz"),
+                    )
+                }
+                _ => binding.module = path("/foreign/MODULE.bazel"),
+            }
+        }
+        assert!(
+            closed
+                .admit_with_plan_matcher(&valid, &|_, _| true)
+                .is_err()
+        );
+    }
+    // An unchanged static owner is a different key, so union retains both original requests.
+    let allowed = SourcePreparationNeeds::repository(java_proxy_generated_request(
+        &bodies,
+        small_generated_plan(&java_proxy_literal_rows()),
+    ));
+    assert!(bodies.admit(&allowed).is_ok());
+    let reject = |bad: SourcePreparationNeeds| {
+        let offender = bad.repository_materializations().values().next().unwrap();
+        for mixed in [
+            allowed.try_union(&bad).unwrap(),
+            bad.try_union(&allowed).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(bodies.admit(&mixed).unwrap_err().family, "materialization");
+            let (first, reason) = bodies.first_denied_materialization(&mixed).unwrap();
+            assert_eq!(reason, "generated_kind");
+            assert!(std::ptr::eq(first, offender.as_ref()));
+        }
+    };
+    for case in 0..7 {
+        let mut wrong = original.as_ref().clone();
+        match case {
+            0 => wrong.id.workspace = path("/other"),
+            1 => {
+                wrong.id.canonical_repo =
+                    slug_identity_v2::CanonicalRepoName::new("rules_java++toolchains+other")
+                        .unwrap()
+            }
+            2 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other+//toolchains:local_java_repository.bzl").unwrap()
+            }
+            3 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_java+//private:local_java_repository.bzl")
+                        .unwrap()
+            }
+            4 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_java+//toolchains:Local_java_repository.bzl")
+                        .unwrap()
+            }
+            5 => wrong.repo_spec.rule_id.rule_name = "_local_java_repository_rule_extra".into(),
+            _ => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("java").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("rules_java+").unwrap(),
+                );
+                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                    "@java//toolchains:local_java_repository.bzl",
+                )
+                .unwrap()
+                .resolve(&mapping);
+            }
+        }
+        let bad = SourcePreparationNeeds::repository(wrong);
+        assert!(bodies.admit_with_plan_matcher(&bad, &|_, _| true).is_err());
+        reject(bad);
+    }
+    let reject_plan = |plan| {
+        reject(SourcePreparationNeeds::repository(local_jdk_test_request(
+            &bodies, plan,
+        )))
+    };
+    reject_plan(small_generated_plan(&[]));
+    for rows in [
+        [("a", &b""[..], false), ("a/b", &b""[..], true)],
+        [("a/b", &b""[..], true), ("a", &b""[..], false)],
+    ] {
+        reject_plan(small_generated_plan(&rows));
+    }
+    // Public builder forbids raw invalid paths; the predicate independently checks original spelling.
+    for raw in [
+        "",
+        "/absolute",
+        "a//b",
+        "a/./b",
+        "a/../b",
+        "a/",
+        "a\\b",
+        "a\0b",
+    ] {
+        assert!(
+            slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder()
+                .push(raw.into(), Arc::from(&b""[..]), false)
+                .is_err()
+        );
+    }
+    let shared: Arc<[u8]> = Arc::from(vec![0; GENERATED_PLAN_CONTENT_BYTES]);
+    let make_plan = |paths: &[String], bytes: &Arc<[u8]>| {
+        slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::build(
+            paths
+                .iter()
+                .map(|path| (compact_str::CompactString::new(path), bytes.clone(), true)),
+        )
+        .unwrap()
+    };
+    let short: Vec<_> = (0..9).map(|i| format!("f{i}")).collect();
+    let empty: Arc<[u8]> = Arc::from(&b""[..]);
+    let max_rows = SourcePreparationNeeds::repository(local_jdk_test_request(
+        &bodies,
+        make_plan(&short[..8], &empty),
+    ));
+    assert!(bodies.admit(&max_rows).is_ok());
+    reject_plan(make_plan(&short, &empty));
+    let long: Vec<_> = (0..5)
+        .map(|i| format!("{}{i}", "x".repeat(GENERATED_PLAN_PATH_BYTES - 1)))
+        .collect();
+    let exact = SourcePreparationNeeds::repository(local_jdk_test_request(
+        &bodies,
+        make_plan(&long[..4], &shared),
+    ));
+    assert!(bodies.admit(&exact).is_ok()); // Exact per-field and aggregate ceilings, sharing one body.
+    let mut sum_over = long[..4].to_vec();
+    sum_over.push("y".to_owned()); // Exact path sum ceiling plus one.
+    reject_plan(make_plan(&sum_over, &empty));
+    reject_plan(make_plan(
+        &["x".repeat(GENERATED_PLAN_PATH_BYTES + 1)],
+        &empty,
+    ));
+    let mut sum_over = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+    for file in &short[..4] {
+        sum_over
+            .push(file.as_str().into(), shared.clone(), true)
+            .unwrap();
+    }
+    sum_over
+        .push(short[4].as_str().into(), Arc::from(&b"x"[..]), false)
+        .unwrap();
+    reject_plan(sum_over.finish()); // Exact content sum ceiling plus one.
+    let too_large: Arc<[u8]> = Arc::from(vec![0; GENERATED_PLAN_CONTENT_BYTES + 1]);
+    reject_plan(make_plan(&short[..1], &too_large));
+    for symlink in [false, true] {
+        let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+        builder.push("BUILD".into(), empty.clone(), false).unwrap();
+        if symlink {
+            builder
+                .push_symlink(
+                    "extra".into(),
+                    slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
+                        path("/source"),
+                        PathObservationNamespace::Host,
+                    )
+                    .unwrap(),
+                    empty.clone(),
+                )
+                .unwrap();
+        } else {
+            builder
+                .push_archive(
+                    Arc::from([compact_str::CompactString::new(
+                        "https://example.invalid/a.tar.xz",
+                    )]),
+                    [0; 32],
+                    "prefix".into(),
+                )
+                .unwrap();
+        }
+        reject_plan(builder.finish());
+    }
+    assert_eq!(
+        (
+            Arc::strong_count(original),
+            Arc::strong_count(&original.repo_spec.attributes),
+            Arc::strong_count(&bodies.java_offline_archive.as_ref().unwrap().backing)
+        ),
+        counts
+    );
+}
+#[test]
+#[cfg(target_os = "linux")]
+fn local_jdk_namespace_is_current_and_declared_only() {
+    let bodies = java_proxy_test_bodies();
+    let content: Arc<[u8]> = Arc::from(&b"synthetic"[..]);
+    let body_weak = Arc::downgrade(&content);
+    let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+    builder.push("nested/BUILD".into(), content, false).unwrap();
+    let request = Arc::new(local_jdk_test_request(&bodies, builder.finish()));
+    let request_weak = Arc::downgrade(&request);
+    let attributes_weak = Arc::downgrade(&request.repo_spec.attributes);
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
+    let epoch_a = namespace_test_epoch_at(&bodies, [request.clone()], instance, "/parent/A");
+    let epoch_b = namespace_test_epoch_at(&bodies, [request.clone()], instance, "/parent/B");
+    let counts = (
+        Arc::strong_count(&request),
+        Arc::strong_count(&request.repo_spec.attributes),
+        body_weak.strong_count(),
+    );
+    let materialized = PathObservationNamespace::Materialization(instance);
+    let demand = |namespace, path, operation| {
+        PathObservationDemand::new(
+            namespace,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let admits =
+        |d: &PathObservationDemand,
+         epoch: Option<&slug_bzlmod_v2::RepositoryMaterializationResultEpoch>| {
+            namespace_policy(&bodies, d, epoch, &generated_features_plan_matches)
+                .admits(&d.operation())
+        };
+    for (epoch, root, parent, leaf) in [
+        (
+            &epoch_a,
+            "/parent/A",
+            "/parent/A/nested",
+            "/parent/A/nested/BUILD",
+        ),
+        (
+            &epoch_b,
+            "/parent/B",
+            "/parent/B/nested",
+            "/parent/B/nested/BUILD",
+        ),
+    ] {
+        for path in ["/", "/parent", root, parent] {
+            assert!(admits(
+                &demand(materialized, path, PathObservationOperation::Lstat),
+                Some(epoch)
+            ));
+            assert!(!admits(
+                &demand(materialized, path, PathObservationOperation::FileBytes),
+                Some(epoch)
+            ));
+            assert!(!admits(
+                &demand(
+                    materialized,
+                    path,
+                    PathObservationOperation::DirectoryEntries
+                ),
+                Some(epoch)
+            ));
+        }
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ] {
+            assert!(admits(&demand(materialized, leaf, operation), Some(epoch)));
+        }
+    }
+    let valid_demand = demand(
+        materialized,
+        "/parent/B/nested/BUILD",
+        PathObservationOperation::FileBytes,
+    );
+    assert!(!admits(&valid_demand, None));
+    assert!(!admits(&valid_demand, Some(&epoch_a)));
+    let wrong_workspace = slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+        NormalizedAbsolutePath::new("/foreign").unwrap(),
+        [],
+    )
+    .unwrap();
+    assert!(!admits(&valid_demand, Some(&wrong_workspace)));
+    let mut other = request.as_ref().clone();
+    other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let ambiguous = namespace_test_epoch_at(
+        &bodies,
+        [request.clone(), Arc::new(other)],
+        instance,
+        "/parent/B",
+    );
+    assert!(!admits(&valid_demand, Some(&ambiguous)));
+    // A malformed successful epoch must not turn a file-parent collision into path authority.
+    for plan in [
+        small_generated_plan(&[("a", b"", false), ("a/b", b"", false)]),
+        small_generated_plan(&[]),
+    ] {
+        let malformed = namespace_test_epoch_at(
+            &bodies,
+            [Arc::new(local_jdk_test_request(&bodies, plan))],
+            instance,
+            "/parent/B",
+        );
+        for path in ["/parent/B", "/parent/B/a", "/parent/B/a/b", "/parent"] {
+            assert!(!admits(
+                &demand(materialized, path, PathObservationOperation::Lstat),
+                Some(&malformed)
+            ));
+        }
+    }
+    let mut closed = java_proxy_test_bodies();
+    closed.java_offline_archive = None;
+    assert!(
+        !namespace_policy(
+            &closed,
+            &valid_demand,
+            Some(&epoch_b),
+            &generated_features_plan_matches
+        )
+        .admits(&valid_demand.operation())
+    );
+    let valid = SourcePreparationNeeds::path(NeedPathObservations::singleton(valid_demand));
+    let admit_need = |needs: &SourcePreparationNeeds| {
+        bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|d| {
+            admits(d, Some(&epoch_b))
+        })
+    };
+    assert!(admit_need(&valid).is_ok());
+    let foreign = PathObservationNamespace::Materialization(
+        slug_workspace_v2::PathObservationInstanceId::new(18),
+    );
+    for (namespace, path, operation) in [
+        (
+            materialized,
+            "/parent/B/nested/BUILD",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/BUILD",
+            PathObservationOperation::ReadLink,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/BUILD",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/build",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/BUILD.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/other",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/.bazelignore",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            materialized,
+            "/parent/B-sibling/nested/BUILD",
+            PathObservationOperation::Lstat,
+        ),
+        (materialized, "/outside", PathObservationOperation::Lstat),
+        (
+            materialized,
+            "/parent/A/nested/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            foreign,
+            "/parent/B/nested/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            PathObservationNamespace::Host,
+            "/parent/B/nested/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+    ] {
+        let bad = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand(
+            namespace,
+            path,
+            operation.dupe(),
+        )));
+        for mixed in [
+            valid.try_union(&bad).unwrap(),
+            bad.try_union(&valid).unwrap(),
+        ] {
+            let mut progress = 0;
+            if admit_need(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(
+                admit_need(&mixed).unwrap_err().family,
+                if namespace == PathObservationNamespace::Host {
+                    "path"
+                } else {
+                    "namespace"
+                }
+            );
+            let (first, _) = bodies
+                .first_denied_path_with_namespace_matcher(&mixed, &|d| admits(d, Some(&epoch_b)))
+                .unwrap();
+            let original = mixed
+                .path_observations()
+                .unwrap()
+                .demands()
+                .iter()
+                .find(|d| {
+                    d.namespace() == namespace
+                        && d.path().as_path() == Path::new(path)
+                        && d.operation() == operation
+                })
+                .unwrap();
+            assert!(std::ptr::eq(first, original));
+        }
+    }
+    assert!(std::ptr::eq(
+        epoch_b
+            .borrowed_instance_for_namespace(&bodies.roots[0], instance, 32)
+            .unwrap()
+            .unwrap()
+            .request(),
+        request.as_ref()
+    ));
+    drop(ambiguous);
+    assert_eq!(
+        (
+            Arc::strong_count(&request),
+            Arc::strong_count(&request.repo_spec.attributes),
+            body_weak.strong_count()
+        ),
+        counts
+    );
+    drop(epoch_a);
+    drop(epoch_b);
+    drop(request);
+    assert!(request_weak.upgrade().is_none());
+    assert!(attributes_weak.upgrade().is_none());
+    assert!(body_weak.upgrade().is_none());
 }
 #[test]
 #[cfg(target_os = "linux")]

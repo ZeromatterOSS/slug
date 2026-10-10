@@ -1,84 +1,114 @@
-# WP1094 no-op observation union reuse
+# WP1095 local JDK generated-file producer readiness
 
-Packet: WP-7-306-m7a-no-op-observation-union-r1
-Status: accepted — broader compiler producer materialization follows
-Baseline: 3dfeb8658789f01191e16ad4c49e829716f22aa8 (WP1093 accepted)
-Owner: existing private Loading union_host_observations and immutable validated
-PathObservationEpoch certificate owner. Compatibility: exact existing admitted
-certificate/error/Need/current source semantics; reuse Slug-native. Linux priority;
-Windows minimal/deferred.
+Packet: WP-7-307-m7a-local-jdk-file-effects-r1
+Status: accepted — next bounded normal producer packet being selected
+Baseline: 7e411da04773492780fe45d96d9ae1eb708b4329 (WP1094 accepted)
+Owner: existing Core prepared-public-probe Bodies admission and current unique
+RepositoryMaterializationResultEpoch namespace view. Production Loading/Bzlmod
+selected repository rule and Core generated-file materializer stay unchanged.
+Compatibility: explicit new Slug-native bounded test admission for this owner;
+exact existing producer/request/effect/association/source semantics unchanged.
+Linux only; Windows minimal/deferred; no JVM or host-JDK execution/capture.
 
-Outcome: avoid row/map allocation and per-row Arc bumps for already-complete no-op
-certificate unions during normal unresolved-parent retries. Research
-[target/wp1093/next-work-frontier.md](../../../../target/wp1093/next-work-frontier.md)
-SHAe28c945f652145b34b4c0e3c59766bfb94fefe040076628657fd45238154491e:
-private helper bzl_module.rs2854–2870 always sends both valid epochs to from_shared;
-Workspace path_observation.rs824–865 allocates Vec/stablesorts/coalesces and fresh
-SortedMap; retained SortedMap FromIterator137–149 builds/sorts OrderedMap. Normal
-external child completion5370 and route/prepared finishes use this union repeatedly.
-Existing duplicate finisher algebra proves original resultArc survives, yet map
-rebuild persists. No native no-op frequency/per-key CPU/cause attribution is known.
+Outcome: move the normal retained compiler producer through its actual local JDK
+GeneratedFileEffects refusal using the existing validated Rust materializer.
+Research [target/wp1094/next-work-frontier.md](../../../../target/wp1094/next-work-frontier.md),
+SHA8f59de196413ce92d61961c6cdc1e1b0f5b415018d293a08f3f7a6270258313f:
+actual WP982 generated_kind tuple rules_java++toolchains+local_jdk /
+@@rules_java+//toolchains:local_java_repository.bzl / _local_java_repository_rule.
+Normal selected rule export/definition/source/ordinal authenticity remains with
+Loading; Bzlmod preserves full original RepoSpec and generated plan. The request
+has no separate owner certificate field; tuple alone is not that certificate.
+Core repository_io already validates, confines, writes and hashes ordered files;
+scoped execution rejects symlinks. Existing guard only knows static signatures,
+so the complete original Need currently refuses before this materializer.
 
-Decision: borrowed shortcut in existing private helper only. Rightempty/sameunderlying
-map returnsleft.dupe; leftempty returnsright.dupe; otherwise require EVERY right
-exactdemand lookup exists inleft and resultArc pointerequal OR full result.as_ref()
-Eq exactly matching current compact_shared855–858. Then return originalleft epoch.
-Any newdemand/unequal result falls through original from_shared chain unchanged;
-no early conflict error, partial union or wholesale rightsuperset substitution.
-Inputs alreadyconstructor-validated immutable maps; raw image/path/operation validation
-stays. Current source/route/child computations and freshness always remain upstream;
-no certificate cache across epochs, new DICE key/lock/publicAPI/runtime/sourceprofile.
+Decision requires independent DESIGN: NEW finite file-only admission for exactly
+this owner, current original workspace, unmapped defining label, existing
+GeneratedFileEffects flag, defs PreparedFile/PublicProbe role and unchanged
+immutable_archive_preparation::native_java_proxy_binding (original9.1.0 URL/
+digest/mirror/MODULE). Keep full attributes and actual ordered plan as existing
+semantic identity; do not guess native attributes, output bytes or static SHA
+signatures from synthetic local-JDK fixtures. Changed valid file contents are
+intentionally admitted under this new bounded owner policy. All existing static
+signature owners still use their original exact matcher; no blanket generated
+owner grant, fallback, new role/flag or direct filesystem shortcut.
 
-Result Eq includes full variant/issuedpath/request/imagedata/Lstatmetadata/error,
-never justbody/digest. BudgetedImageBlock Eq is semanticdata, notbankidentity: preserve
-stable LEFT original resultArc/body/image/credit ownership for equal distinctowners,
-matching oldconstructor; no strongerbank Eq or rightowner adoption. Returning owned
-normalDupe keeps caller lifetime independent; borrows exist only during decision.
-No new retained fields/body/string/AST/cache/pool/interner. Existing Arc/Dupe/Allocative
-and SortedMap owners/cleanup reused; Stage9 shared epoch row/WP1089 is authority.
-Extra borrowedlookup/Eq work on non-subsets is a tradeoff, not universal speedclaim.
-Primary acceptance is actual no-op returnedmap identity/no per-row newowner; native
-memory/time prefix remains qualified, not CPU benefit or wholeproducer fit.
+Every ordered effect must be File, positive count<=8, each path<=512 bytes,
+checked path sum<=2048, each content<=1MiB and checked content sum<=4MiB.
+These existing diagnostic ceilings are deliberately new admission limits here,
+not inherited permission. Preserve executable bits/order; reject archive/symlink
+and over-limit plans as a complete Need before progress. Existing plan/materializer
+lexical confinement, file/tree collision and atomic validation remain authoritative;
+namespace cannot admit an escaping path even in synthetic malformed epochs.
 
-Source allowlist only app/slug_loading_v2/src/bzl_module.rs smallprivatehelper plus
-adjacent existing owneralgebra proof, and existing host_package_load_tests/
-external_bzl_frontier_tests.rs if needed for compact normalNeed/currentepoch proof.
-No Workspace/Bzlmod/Core/thirdowner changes, fixturetree or unrelated extraction.
-Largeparent remains existingcohesive helper; estimated10–25policy/80–130proof lines,
-review actualgrowth. Root may scheduling/Stage9/compactreceipt/helper evidence edits.
+Use the same exact owner/complete-plan predicate for namespace continuation.
+Borrow the unique CURRENT workspace/instance epoch view and its actual plan:
+declared file leaves Lstat/FileBytes, root and lexical ancestors Lstat only.
+No listing, whole-tree, sibling, discovery-body, physical-JDK or reverse path
+inference. Missing/ambiguous/foreign epochs and stale A leaves under current B
+refuse; only legitimate shared ancestor metadata may overlap. Preserve original
+request identity, materializer association/digest, observed-source ownership,
+Need/error ordering, rollback and strict mixed-Need all-before-progress behavior.
+No DICE key/equality/locking change; never cache this decision across epochs.
 
-Proof: actualmap pointer on empty/same/rightsubset; equal pointerdistinct result
-retainsleftArc/rowstrongcounts and original creditowner; addition complete sorted
-union and conflicts same earliest-demand error as originalfallback. Host/materialized
-A/B namespaces, distinctoperations and representativeimage fullEq discriminate
-body-only shortcuts. Reuse observed_prepared_identity_and_finisher_algebra and current
-externalNeed→Need/childrepair/sourceA/B/A/sourceerrors/cycle/polldrop/Weak controls.
-Workspace sharedepoch equality/errorordering/partitionedrestore accepted unchanged;
-add no duplicate fullmatrix/allocator/counter. No real additional sourcebody reads.
+Source allowlist only existing Core test files runtime/tests/
+platforms_module_preparation_tests.rs and its public_probe_preparation_tests.rs.
+Parent remains narrow admission/predicate owner; namespace and cohesive proofs
+remain under existing public-probe owner. Estimate40–80 policy/helper and150–250
+proof lines; review actual growth/cohesion rather than unrelated extraction.
+No production owner/API/dependency/fixture tree/source-vector or archive read change.
+No new retained fields, String/body/Vec copies, pool/cache/interner/counter. Borrow
+existing request/path/content/plan handles and preserve Arc/Dupe/Allocative owners.
+Actual generated plan retention/transfer remains the original owner's cost.
+Borrow/move/share strings and use existing scoped interners when scope/cleanup fit.
 
-Gates: independent DESIGN before ownership activation; stoppedwriters/pinnedformat/
-sourcefreeze/actualsource/prelaunch/FINAL. Serial absolute pinnednightly2025-09-14
-lockedoffline/jobs1 Loadingno-run/CargoJSON/currentlist/batchedexactpreflight/nonzero
-pass; direct Loading/Core/CLI production check, originalprofile nativefeature Core
-no-run + freshshell ignoredsingleton selection. OrdinaryLoading opt0 recovery retained
-only for smalltests if originalprep hitscap; nativeLoadingopt1 unchanged. ONE changed
-source native same350orderedtriples/18env/heldnoninheritedFD/currentcaller+observerpins.
-Reuse supervisedWP1093 helpers/version2; no Cargo/writers overlap; preparation60s
-separate/no workloadcredit, splitcompleteddeps ifneeded. Format/archive/diff/plancheck,
-compactreceipt and acceptedcommit. No identicalnative replay or diagnostic-onlypacket.
+Proof: exact owner/binding/workspace/mapping/role negatives; bounded complete file
+positive and alternative legitimate contents; empty/overcount/path/content/sum/
+archive/symlink negatives; complete mixed Needs in both orders preserve original
+borrowed offender/progress0. Current namespace declared versus sibling/outside/
+stale/ambiguous cases, exact operations and unchanged request/Arc ownership.
+Reuse existing tiny normal scoped materializer atomic/count/session controls and
+selected repository-file-effect owner/ordinal/source/restoration/cancel controls
+identified in research. Synthetic absence fragments are not authentic Java output
+byte evidence. Reuse Workspace/current epoch controls; no duplicate full matrix.
 
-All WP1093 receiptcaps unchanged: native10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/
-cleanup3/live+transfer16MiB/decode+write64MiB/source256/registry128/object1MiB/admitted16MiB/
-dir128/name1KiB/total16KiB/FSIZE16MiB/log1/report4MiB. No caprise. REPLAN if subset
-projection cannot preserve exact Eq/leftcreditowner/conflictorder/currentsource or
-needs new authority/API/key/locking; routine invocation/fixture fixes preserve failures.
-Fullproducer/time/wholefit/Rustc/actions/certificates/bootstrap remain open. Goal ACTIVE.
+Gates: independent DESIGN before activation, source freeze/pinned format/actual
+source/prelaunch/FINAL; stopped source/helper/fixture writers during gates.
+Serial pinnednightly2025-09-14 locked/offline/jobs1 Core native-feature no-run /
+CargoJSON/current list/batched exact preflight/nonzero focused pass; relevant
+normal scoped generated-file materializer controls and direct Core/CLI check.
+Unchanged Loading producer controls qualified reuse unless an actual gap appears.
+Fresh-shell ignored singleton list; ONE changed-policy native exact350 ordered
+source triples/18 bindings/held noninherited FD brackets/current caller+observer
+pins/version2. Reuse WP1094 supervisor without old runner chains. Preparation60s
+separate; split completed dependencies if required; no workload credit.
+All WP1094 receipt caps unchanged: native10s/RSS256MiB/AS512MiB/work7/default5/
+lifetime8/cleanup3/live+transfer16MiB/decode+write64MiB/source256/registry128/
+object1MiB/admitted16MiB/dir128/name1KiB/total16KiB/FSIZE16MiB/log1/report4MiB.
+No identical native replay/cap increase. Preserve actual refusal and qualify
+partial process-CPU intervals; no predicted native shape, speed or whole-fit claim.
+REPLAN only if normal identity/confinement/namespace/budget cannot fit this bounded
+owner or requires a new production authority/key/lock/effect family. Routine
+fixture/invocation corrections retain failure evidence. Format/archive/diff/plan
+checks, compact receipt and accepted commit. Full producer/time/whole-workload
+fit/Rustc/actions/certificates/bootstrap remain open. Goal ACTIVE.
 
-Immediate predecessor WP1093 in3dfeb8658:8focused/originalprofileCore/FINAL pass,
-ONE7.272s native supervisor222.273/selfreported223.352MiB of256, WorkDeadline/source251/
-caller7:296/status0, before environment frontier. JAVA_HOME finite empty-snapshot
-behavior proven separately inunit/normalguard, nativeadmission unobserved. WP1092
-sharing in09b345f11 staysaccepted with coldextra parse/metadataretention qualifications.
-Borrow/move/share and use existing scoped string interners when lifetime/cleanup fit.
+Immediate predecessor WP1094 in7e411da04:13-line private no-op map shortcut, current
+20 focused and production/native-profile/FINAL pass; actual epoch8B/row160B unchanged
+and real two-bank retirement proven. One7.247s native prefix maxphase226.402MiB/256,
+ScopeNone/source252, captured local_jdk generated_kind; root interval aborted_partial.
+Initial60s optimized test-prep cap and19/1 constructor-fixture failure preserved;
+corrected ordinary opt0 tests pass, native original profile unchanged.
+[Receipt](wp1094-no-op-observation-union-2026-10-10.json).
 
-Accepted: DESIGN/source/FINAL reviews, current 20 focused tests and production/native-profile checks pass. One changed native prefix stayed within 226.40 MiB of 256 MiB and reached local_jdk generated-file materialization refusal. [Receipt](wp1094-no-op-observation-union-2026-10-10.json) binds qualified evidence; full producer/whole-workload fit remains open.
+Acceptance WP1095: DESIGN/source/prelaunch/FINAL ACCEPT; current 13 exact tests
+pass in 0.201s, original-profile native prep 13.596s, production Core/CLI check 7.421s.
+Bodies 232/8 and Scope 464/8 unchanged; borrowed stack 128/8. One 7.600s native
+under unchanged caps has supervisor 227.727 MiB/phase 228.320 MiB separate prefix peaks,
+350 stable held FDs/77 stable pins/source 252/v2 status 0. Actual source_service WorkDeadline
+first-work/origin/caller 7:296 pre-acquisition check; previous generated_kind frame
+absent and writes increased 1004 bytes. These do not certify complete JDK/namespace/full producer,
+whole fit, speed, Rustc/actions/certificates or all DICE retirement. Two fixture-only
+compile typing/move errors preserved with zero credit; corrected gates pass.
+[Accepted receipt](wp1095-local-jdk-file-effects-2026-10-10.json). Goal ACTIVE.

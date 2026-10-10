@@ -1,0 +1,278 @@
+{
+  "packet": "WP-7-307-m7a-local-jdk-file-effects-r1",
+  "status": "accepted",
+  "baseline": "7e411da04773492780fe45d96d9ae1eb708b4329",
+  "compatibility": "New explicit Slug-native finite dynamic File-only local_jdk test admission. Original exact-signature owners and full producer/request/plan/association/observed-source semantics unchanged. Linux only; Windows deferred.",
+  "decision": "Borrow the complete original current owner plan; require qualified original Java binding/workspace/unmapped tuple/PreparedFile-PublicProbe role, bounded file-only rows/raw confined collision-free paths. Reuse same predicate for unique current epoch declared-leaf Lstat/FileBytes and ancestor Lstat-only policy. Actual ordered contents/executable bits/full attrs remain semantic identity.",
+  "source": [
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "added": 74,
+      "deleted": 0,
+      "before_sha256": "400405aee8e91f69c2191789941ade2ed52ad3a3f62742de9017a8f605156a9c",
+      "after_sha256": "ebb70f811b1922e1b392c117eb128945696357fa0b02b87d6495805acc5f899e"
+    },
+    {
+      "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+      "added": 620,
+      "deleted": 0,
+      "before_sha256": "9d6e80378c538156caa00c51f255480104b8b1c7380eb9a6326efab8108b243f",
+      "after_sha256": "eb43727e4d23b665e131a8c16a338f02f0d1f87820957e2a417a8baf550539c0"
+    }
+  ],
+  "unchanged_frozen_owners": 25,
+  "allocation": {
+    "new_retained_fields": 0,
+    "new_retained_strings": 0,
+    "new_interner_or_cache": false,
+    "bodies_size": 232,
+    "scope_size": 464,
+    "borrowed_path_stack_size": 128,
+    "alignment": 8,
+    "discipline": "Borrow/move/share existing strings and use existing scoped interners for repeated immutable values when scope/cleanup fit. No global pool or newly retained body/path/Vec. Limit fixture shares one1MiB Arc across four rows; final request/attrs/body Weak release proven.",
+    "qualification": "Normal producer generated plan retains its original owners/cost. No new allocation-free whole workload or speed claim."
+  },
+  "focused": {
+    "selected": 13,
+    "passed": 13,
+    "elapsed_seconds": 0.2005454560276121,
+    "rss_kib": 62104,
+    "artifact": {
+      "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_core_v2-c50d299f2267e28b",
+      "sha256": "b4ebaee6597fe0dedafbe8fe28d415fc30d6a3261d3f938a4189a7210014f6fc",
+      "features": [
+        "default",
+        "native-probe-observer"
+      ],
+      "compile_operation_path": "target/wp1095/compile-core-corrected/operation.json",
+      "compile_operation_sha256": "e220216258c0c8cb3d0e484560af6540bd40f389cabb4cb2784a5a13ae81bafd",
+      "compile_config_path": "target/wp1095/compile-core-corrected-config.json",
+      "compile_config_sha256": "3a8c4b91ab63870beff45ab6e46edc0a0addf610df0df85aaa9370fc2528992f",
+      "qualification": "Cargo JSON linewise; executable SHA streamed64KiB; actual successful preparation op/config, including separately qualified recovery if needed"
+    },
+    "prior_loading_selected": 20,
+    "prior_loading_fresh": 0,
+    "qualification": "Current exact13:8 protected,3 normal scoped materializer,2 new admission/current epoch proofs. PriorLoading20 only four unchanged source owners and accepted evidence, no fresh execution."
+  },
+  "gates": {
+    "compile-core-corrected": {
+      "elapsed_seconds": 13.595603586989455,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "sha256": "e220216258c0c8cb3d0e484560af6540bd40f389cabb4cb2784a5a13ae81bafd"
+    },
+    "ordinary-list": {
+      "elapsed_seconds": 0.18102174799423665,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "sha256": "d6192c3c59d8242dbc2cbda8799dba65769cdfa8de4e80b5f92338783aaab512"
+    },
+    "core-preflight": {
+      "elapsed_seconds": 0.20426989195402712,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "sha256": "62d9b69b1f7d1dfc6f0fa7f1b2a17d696b2dd27c3835baa8133c2c25a3ca3f40"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.2005454560276121,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 13,
+      "pass_count": 13,
+      "sha256": "5133a36c547213c72a5a0f0e344ed04a5398ede67f8413d72f2644ae254c8441"
+    },
+    "production-check": {
+      "elapsed_seconds": 7.421284272102639,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "sha256": "c872f09241cb3647542b2a6613bdbdded35afb1db0b64226d41a5d6929661101"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.1841810829937458,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "sha256": "c3a04dc3088983b373fd1a5f558b0b0e089175679ab24f58f2026cd0a2aaf172"
+    },
+    "native": {
+      "elapsed_seconds": 7.600061600911431,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "sha256": "9d41dd895c40de5e48fdea8cd3777650e94ff9169131150e63ed5c564a828629"
+    }
+  },
+  "native": {
+    "operation_sha256": "9d41dd895c40de5e48fdea8cd3777650e94ff9169131150e63ed5c564a828629",
+    "stdout_sha256": "ad3314eecad91d83c18a1f4903d27edba205d945ff29303f8c56a06b650aefc3",
+    "elapsed_seconds": 7.600061600911431,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 233192,
+    "rss_mib": 227.7265625,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 77,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 333,
+        "wall_ns": 183552172,
+        "process_cpu_ns": 183593431,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 333,
+        "wall_ns": 6941979253,
+        "process_cpu_ns": 6949989064,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 332,
+        "wall_ns": 184457487,
+        "process_cpu_ns": 183924665,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 333,
+        "wall_ns": 14731224,
+        "process_cpu_ns": 20758723,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 252 7021682 55574923 52796422 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=252 seen=252 emitted=252 admitted=252 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40818 encoded_bytes=139051 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "self_reported_phase_peak_kib": 233800,
+    "self_reported_phase_peak_mib": 228.3203125,
+    "materialization_frontier": null,
+    "materialization_capture": "absent; no local_jdk generated_kind denial frame",
+    "scope_frontier": "WorkDeadline",
+    "write_delta_from_wp1094": 1004,
+    "rss_metric_qualification": "Supervisor227.727MiB and selfreportedphase228.320MiB separate prefix observations under256MiB; no wholeworkload fit.",
+    "claim_limit": "Actual captured source_service WorkDeadline with first-work/origin/caller latch. All four window lanes unqualified but full producer/certificates/Rustc/actions remain unavailable. No exact next source identity/cause, staticoutput/authenticplan bytes, speedup or full retirement proof inferred. Generated_kind refusal absent and writecount increased1004; these observations alone do not certify full local-JDK or namespace completion."
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "preserved_unproved": {
+    "first_compile": {
+      "exit_code": 101,
+      "elapsed_seconds": 2.91209054493811,
+      "passed": 0,
+      "sha256": "2552bfc96e9da8c7b54ed2155c927cef59e14dd2882962cab0f06e7f3ffeb0cc",
+      "reason": "Two test-only Rust reference lifetime/moved-operation errors; explicit Option reference type/existing Dupe correction, unchanged policy/assertions. First freeze/static/failed op preserved."
+    },
+    "reader_corrections": "Root initial overly broad patch selector assertion stopped before mutation; exact proof scoped correction and collector layout regex correction, no replay. Archive script invoked once with wrong interpreter, then correct bash check PASS; wrong invocation no credit."
+  },
+  "claim_limits": "Actual captured source_service WorkDeadline with first-work/origin/caller latch. All four window lanes unqualified but full producer/certificates/Rustc/actions remain unavailable. No exact next source identity/cause, staticoutput/authenticplan bytes, speedup or full retirement proof inferred. Generated_kind refusal absent and writecount increased1004; these observations alone do not certify full local-JDK or namespace completion. SourceWeak unseen/vacuous; no full DICE graph/page or producer retirement proof. Deadline location at pre-acquisition scope check is observation, not exclusive CPU/cause attribution.",
+  "checks": {
+    "pinned_format": "PASS",
+    "diff": "PASS",
+    "plan": "PASS",
+    "archive": "PASS"
+  },
+  "goal_status": "ACTIVE",
+  "next": "Source-grounded bounded normal producer performance or attribution gap selected from actual WorkDeadline; no cap raise or identical native replay.",
+  "toolchain": {
+    "channel": "nightly-2025-09-14",
+    "tools": {
+      "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+      "rustc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "rustdoc": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "rustfmt": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustfmt"
+    }
+  },
+  "evidence": {
+    "design.md": "c4b485ebf60c286db237beb8ff77927e87e614c7f500a442e709415c7b3e6ec1",
+    "design-review.md": "10ac54c9729ad8b245870fb9a3060aab79469ebf77ed09054364b230d016a14c",
+    "design-binding.json": "e567100f398b3aae90cbd1783115b3a9f0354700393f49f2d3d0605e2d031cd7",
+    "implementation-plan.md": "c881d6619b90033b866759a57077b27bb6a20713e452d366248446aa5ebdba68",
+    "implementation.md": "e05a79f0ca0a6ad809c3fe6f3440d6e695823b56440577362d13a6a25abc2da5",
+    "source-baseline.json": "05fa06928b7c6a73bf33882f67f47513a502bf6687fb2fb67cc393ff3e4d0dec",
+    "supporting-source-pins.json": "1f6d445b7d16b587f558aaf7bb1dd8aad6b51aa8407a932a707bd97d1d55f425",
+    "source-freeze.json": "52a6c5873cc6396857241c936ba9bfdf85a607afb95249877334aeac02a02efc",
+    "source-freeze-first.json": "2309c8e79aa9f1d72aa8ad2c125063ea4068759a9bef1d8c3bcef3359225b879",
+    "static-review.md": "f0cc8d23bab9c6989895e2c475d211b316d95b2886892c7e652f624be80e5ec5",
+    "static-review-first.md": "0225e47efa5b20dfebfa8050a78e9843ec0af0793f1084929d2e04083845c417",
+    "source-review.md": "265b3e3614340338a6ee08f0f2a31865ee90d8fcf9c06954fc2850d7da189e88",
+    "helper-review.md": "92a86823adc70fa55be76cfd69085b604182680475b8160d71b8b6e0b8feecc8",
+    "prelaunch-source.md": "265b3e3614340338a6ee08f0f2a31865ee90d8fcf9c06954fc2850d7da189e88",
+    "prelaunch-evidence.md": "e78904240491b523e6563483e09129d6ddf9c348ad7c79205ffe70de7b9d0eb4",
+    "prelaunch-review.md": "e4887d2bd3c1051416b9d02d3e7828264c0aa458d658f4867d2e0a842c4217e8",
+    "focused-results.json": "97959e64b38ee7e2d2386980cc03db27d0c881aa6d61a0fecf4498a822ca3bed",
+    "native-results.json": "0487cf088f7a50c56e91e1489fffcce70452c16017afcdfd2691aeeb722304bd",
+    "native-config.json": "174d3ebabe5bc354e09b9bc7275839a4c8bd8c82b94918f735b862485c5c3157",
+    "source-vector.json": "fb7b6bb5e88578810c4afd223331d5d7c1d5013c5dd4c0b1034b670fe75d8472",
+    "inputs.json": "ce5e964783c0bd3f085c5d7e8b3ba601b6d39038057694d12270b9ac3cf536b1",
+    "caller-source-pins.json": "476a13614cbb2afab01b236093e4db8c6a049769313ce7e8ded9bc0421dbb2f1",
+    "run_gate.py": "6bc82b1814415fcbf98369ab927e4fb89e9928c81d03f76c45579fb60f88d05f",
+    "decode_native.py": "ff76822b6ef47d3e79ff1db7a775cd0e33cbe608b9932b906bd1f2259ca455a9",
+    "setup_gates.py": "f1acd96074c1eb034172d53abe867ff9ead4019141d57976337aca3f6d7d83eb",
+    "prepare_configs.py": "a1a86e48834cdaf558e34afaf42e01ff435825d53783bcf60fc8a65532e59abe",
+    "native_setup.py": "f5c2d927d7865fbfe49220e56432b0fa96ccd7bb8a97f3d516d6c33ec7b1e22e",
+    "gate-source-paths.json": "e308a5b41e8938728443a57175a6f835f0b535818d7c1aeb25770a6e3055f5e5",
+    "gate-preparation-notes.md": "8ff9f9aa95351ff8b34ba02e6564de15393ac2b0f2db8d8ebaf33ff72bbffa19",
+    "root-validation-notes.md": "52219856f4eef6b496cbb239b4f485d87223a40cc3e7635d3d8000ab747de745",
+    "final-source-review.md": "20b4c4cf56b809f1467a5f36e3818db43c3d5330b4e4ea73782f3c8003790f3f",
+    "final-evidence-review.md": "9cc14ca2358186308303f24a6284772992a387fa1bfb5692272dcc643adb4b8a"
+  },
+  "packet_timing": {
+    "first_frozen_design_utc": "2026-10-10T20:25:34.356020+00:00",
+    "acceptance_utc": "2026-10-10T20:41:27.795595+00:00",
+    "qualification": "Publication timestamps bracket a portion of packet work; exact individual compile/test/native operation times above. No workflow speedup claim."
+  }
+}

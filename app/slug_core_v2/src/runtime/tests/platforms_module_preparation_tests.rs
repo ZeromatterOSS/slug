@@ -968,6 +968,76 @@ impl Bodies {
     )> {
         self.first_denied_materialization_with_plan_matcher(needs, &generated_features_plan_matches)
     }
+    #[cfg(target_os = "linux")]
+    fn local_jdk_file_plan<'a>(
+        &self,
+        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
+        let label = &request.repo_spec.rule_id.bzl_file;
+        if !self.generated_features_file_effects
+            || !self.rules_rust_defs_import_sources
+            || request.id.workspace != self.roots[0]
+            || label.mapping_id().is_some()
+            || (
+                request.id.canonical_repo.as_str(),
+                label.package().repo().as_str(),
+                label.package().package().as_str(),
+                label.target().as_str(),
+                request.repo_spec.rule_id.rule_name.as_str(),
+            ) != (
+                "rules_java++toolchains+local_jdk",
+                "rules_java+",
+                "toolchains",
+                "local_java_repository.bzl",
+                "_local_java_repository_rule",
+            )
+            || !immutable_archive_preparation::native_java_proxy_binding(self)
+        {
+            return None;
+        }
+        let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind else {
+            return None;
+        };
+        // Complete borrowed preflight also protects synthetic successful epochs.
+        let mut paths = [None; GENERATED_PLAN_ROWS];
+        let (mut count, mut path_sum, mut content_sum) = (0usize, 0usize, 0usize);
+        for effect in plan.ordered_effects() {
+            let Effect::File(file) = effect else {
+                return None;
+            };
+            let raw = file.path();
+            let path = Path::new(raw);
+            if count == paths.len()
+                || raw.len() > GENERATED_PLAN_PATH_BYTES
+                || file.content().len() > GENERATED_PLAN_CONTENT_BYTES
+                || raw.is_empty()
+                || raw.contains('\\')
+                || raw.contains('\0')
+                || !raw
+                    .split('/')
+                    .all(|part| !part.is_empty() && part != "." && part != "..")
+                || !path
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_)))
+            {
+                return None;
+            }
+            path_sum = path_sum.checked_add(raw.len())?;
+            content_sum = content_sum.checked_add(file.content().len())?;
+            if path_sum > GENERATED_PLAN_PATH_SUM
+                || content_sum > GENERATED_PLAN_CONTENT_SUM
+                || paths[..count].iter().flatten().any(|other: &&str| {
+                    path.starts_with(Path::new(other)) || Path::new(other).starts_with(path)
+                })
+            {
+                return None;
+            }
+            paths[count] = Some(raw);
+            count += 1;
+        }
+        (count != 0).then_some(plan)
+    }
     fn generated_features_owner_signatures(
         &self,
         request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
@@ -1114,6 +1184,10 @@ impl Bodies {
                     return Some((request, "immutable_kind"));
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
+                    #[cfg(target_os = "linux")]
+                    if self.local_jdk_file_plan(request).is_some() {
+                        continue;
+                    }
                     if self
                         .generated_features_owner_signatures(request)
                         .is_some_and(|expected| plan_matches(plan, expected))
