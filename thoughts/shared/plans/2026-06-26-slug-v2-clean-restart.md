@@ -34,21 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-build-metadata-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-build-fallback-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1067](./slug-v2-subplans/wp1067-apple-crosstool-build-metadata-2026-10-10.json) accepts exact Apple
-crosstool/BUILD.bazel Host Lstat under the existing checked cfgtest metadata
-role: full2/body0, source3 and environment2/union19 remain independent.
-Borrowed static table32B/newreference16B/newliteral21B/first9B/total30B,
-Boolean growth0/Bodies200B/align8 without attributed padding; no new owned
-production strings or retained fields. Source147net=71authored+76formatter
-exceeds110trigger and actual independent STATIC assessed the cohesive delta.
-All310 source signatures unchanged;104names/106accepted native records,
-116packet attempts including preserved1failed/9superseded fixture generation,
-current capture0. Native4.922150336s/210172KiB below256MiB.
+[WP1068](./slug-v2-subplans/wp1068-apple-crosstool-build-fallback-metadata-2026-10-10.json) accepts exact Apple
+crosstool/BUILD Host Lstat under the existing checked cfgtest metadata role:
+full3/body0, source3 and environment2/union19 remain independent.
+Borrowed static table48B/newreference16B/newliteral15B/first9B/second21B/total45B;
+Boolean growth0/Bodies200B/align8 without attributed padding, no new owned
+production strings or retained fields. Source61net=28authored+33formatter,
+helper31net; independent STATIC and FINAL accepted the existing matrix delta.
+All310 source signatures unchanged;104names/106current native records,
+failed/superseded/currentcapture0. Native4.979550373s/210452KiB below256MiB.
 The actual next boundary and owner fields are frozen in both successor notes;
 metadata does not establish body/caller/closure/certificate proof.
 Borrow/transfer first; existing scoped interners when repeated retained

@@ -7937,7 +7937,7 @@ pub(super) fn rules_shell_import_sources_matrix() {
         RULES_SHELL_IMPORTS[6].len()
     );
     eprintln!(
-        "WP1052_SHELL_METADATA_LAYOUT metadata={} row={} literal={} apple_metadata={} apple_row={} apple_literal={} apple_flag={} bodies={} bodies_align={} apple_imports={} apple_import_row={} apple_import_literal={} apple_import_flag={} apple_metadata_new_literal={} apple_metadata_literal_total={}",
+        "WP1052_SHELL_METADATA_LAYOUT metadata={} row={} literal={} apple_metadata={} apple_row={} apple_literal={} apple_flag={} bodies={} bodies_align={} apple_imports={} apple_import_row={} apple_import_literal={} apple_import_flag={} apple_metadata_new_literal={} apple_metadata_literal_total={} apple_metadata_second_literal={}",
         std::mem::size_of_val(&RULES_SHELL_IMPORT_METADATA),
         std::mem::size_of::<&str>(),
         RULES_SHELL_IMPORT_METADATA[16].len(),
@@ -7951,11 +7951,12 @@ pub(super) fn rules_shell_import_sources_matrix() {
         std::mem::size_of::<&str>(),
         APPLE_SUPPORT_IMPORTS[0].len(),
         std::mem::size_of::<bool>(),
-        APPLE_SUPPORT_CROSSTOOL_METADATA[1].len(),
+        APPLE_SUPPORT_CROSSTOOL_METADATA[2].len(),
         APPLE_SUPPORT_CROSSTOOL_METADATA
             .iter()
             .map(|name| name.len())
-            .sum::<usize>()
+            .sum::<usize>(),
+        APPLE_SUPPORT_CROSSTOOL_METADATA[1].len()
     );
     eprintln!(
         "WP1051_SHELL_METADATA_LAYOUT metadata={} row={} literal={}",
@@ -8607,7 +8608,6 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             "/apple/crosstool.bak",
             "/apple/crosstool/child",
             "/apple-other/crosstool",
-            "/apple/crosstool/BUILD",
         ],
         "/apple/crosstool",
         Some("/apple"),
@@ -8621,12 +8621,28 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             "/apple/crosstool/build.bazel",
             "/apple/crosstool/BUILD.bazel.bak",
             "/apple/crosstool/BUILD.bazel/child",
-            "/apple/crosstool/BUILD",
             "/apple/crosstool/REPO.bazel",
             "/apple/other/BUILD.bazel",
             "/apple-other/crosstool/BUILD.bazel",
         ],
         "/apple/crosstool/BUILD.bazel",
+        Some("/apple"),
+    );
+    assert_exact_root_file_role(
+        APPLE_SUPPORT_CROSSTOOL_METADATA[2],
+        &[PathObservationOperation::Lstat],
+        Bodies::with_apple_support_crosstool_metadata,
+        |b| b.apple_support_crosstool_metadata,
+        &[
+            "/apple/crosstool/build",
+            "/apple/crosstool/Build",
+            "/apple/crosstool/BUILD.bak",
+            "/apple/crosstool/BUILD/child",
+            "/apple/crosstool/REPO.bazel",
+            "/apple/other/BUILD",
+            "/apple-other/crosstool/BUILD",
+        ],
+        "/apple/crosstool/BUILD",
         Some("/apple"),
     );
     // Reuse the Shell factory, but isolate Apple metadata from the Shell role.
@@ -8647,9 +8663,18 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
         "/apple/crosstool/BUILD.bazel",
         PathObservationOperation::Lstat,
     );
-    assert!(bodies.admit(&directory).is_ok() && bodies.admit(&marker).is_ok());
-    let allowed = directory.try_union(&marker).unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 2);
+    let fallback = need("/apple/crosstool/BUILD", PathObservationOperation::Lstat);
+    assert!(
+        bodies.admit(&directory).is_ok()
+            && bodies.admit(&marker).is_ok()
+            && bodies.admit(&fallback).is_ok()
+    );
+    let allowed = directory
+        .try_union(&marker)
+        .unwrap()
+        .try_union(&fallback)
+        .unwrap();
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 3);
     assert!(bodies.admit(&allowed).is_ok());
     let source = need(
         "/apple/crosstool/setup.bzl",
@@ -8673,14 +8698,13 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             assert_eq!(bodies.admit(&allowed).is_ok(), metadata_enabled);
             assert_eq!(bodies.admit(&source).is_ok(), source_enabled);
             assert_eq!(bodies.admit(&environment).is_ok(), source_enabled);
-            assert!(
-                bodies
-                    .admit(&need(
-                        "/apple/crosstool/BUILD.bazel",
-                        PathObservationOperation::FileBytes
-                    ))
-                    .is_err()
-            );
+            for marker in ["/apple/crosstool/BUILD.bazel", "/apple/crosstool/BUILD"] {
+                assert!(
+                    bodies
+                        .admit(&need(marker, PathObservationOperation::FileBytes))
+                        .is_err()
+                );
+            }
         }
     }
     bodies.apple_support_crosstool_metadata = true;
@@ -8746,7 +8770,34 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             "/apple-other/crosstool/BUILD.bazel",
             PathObservationOperation::Lstat,
         ),
-        ("/apple/crosstool/BUILD", PathObservationOperation::Lstat),
+        (
+            "/apple/crosstool/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/apple/crosstool/BUILD",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        ("/apple/crosstool/BUILD", PathObservationOperation::ReadLink),
+        (
+            "/apple/crosstool/BUILD",
+            PathObservationOperation::FileDigest,
+        ),
+        ("/apple/crosstool/build", PathObservationOperation::Lstat),
+        ("/apple/crosstool/Build", PathObservationOperation::Lstat),
+        (
+            "/apple/crosstool/BUILD.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/apple/crosstool/BUILD/child",
+            PathObservationOperation::Lstat,
+        ),
+        ("/apple/other/BUILD", PathObservationOperation::Lstat),
+        (
+            "/apple-other/crosstool/BUILD",
+            PathObservationOperation::Lstat,
+        ),
     ]
     .map(|(p, operation)| need(p, operation))
     .into_iter()
@@ -8765,6 +8816,15 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
                 slug_workspace_v2::PathObservationInstanceId::new(1),
             ),
             path("/apple/crosstool/BUILD.bazel"),
+            PathObservationOperation::Lstat,
+        )),
+    )))
+    .chain(std::iter::once(SourcePreparationNeeds::path(
+        NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(1),
+            ),
+            path("/apple/crosstool/BUILD"),
             PathObservationOperation::Lstat,
         )),
     ))) {
@@ -8845,9 +8905,9 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
     };
     let weak_bodies = Arc::downgrade(&root.bodies);
     let SourcePreparationOutcome::Need(recovered) = root.need(allowed).unwrap() else {
-        panic!("both authorized metadata demands must preserve the original Need");
+        panic!("all authorized metadata demands must preserve the original Need");
     };
-    assert_eq!(recovered.path_observations().unwrap().demands().len(), 2);
+    assert_eq!(recovered.path_observations().unwrap().demands().len(), 3);
     assert_eq!(
         recovered
             .path_observations()
