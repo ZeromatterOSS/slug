@@ -452,12 +452,13 @@ const RULES_SHELL_IMPORTS: [&str; 8] = [
     "shell/private/repositories/sh_config.bzl",
     RULES_SHELL_IMPORT_METADATA[18],
 ];
-const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 5] = [
+const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 6] = [
     "crosstool",
     "crosstool/BUILD.bazel",
     "crosstool/BUILD",
     "crosstool/BUILD.toolchains",
     "configs",
+    "configs/platforms.bzl",
 ];
 const APPLE_GENERATED_DIAGNOSTIC_OWNER: (&str, &str, &str, &str, &str) = (
     "apple_support++apple_cc_configure_extension+local_config_apple_cc_toolchains",
