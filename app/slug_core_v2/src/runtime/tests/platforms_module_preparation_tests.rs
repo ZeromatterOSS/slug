@@ -1660,6 +1660,10 @@ impl Bodies {
             && self.rules_rust_defs_import_sources
         {
             limits.source_attempts = 256;
+            if immutable_archive_preparation::native_byte_budget_backing(self) {
+                limits.decoded_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
+                limits.written_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
+            }
         }
         limits
     }

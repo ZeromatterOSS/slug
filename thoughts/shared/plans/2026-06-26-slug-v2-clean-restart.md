@@ -34,21 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-293-m7a-original-immutable-offline-materialization-r1
-Status: accepted — portable materialization; real archive write-quota boundary
+Packet: WP-7-294-m7a-original-immutable-byte-budget-r1
+Status: accepted — measured64MiB profile; real provisional immutable result; next namespace boundary
 
-[WP1080](./slug-v2-subplans/wp1080-original-immutable-offline-materialization-2026-10-10.json)
-adds scoped offline backing for the original protobuf+ request and proves normal
-materialization in the existing small fixture. Eight ordinary Core tests, three
-helper controls and one native observer pass. The real run captured and verified
-the archive and MODULE, then refused the unchanged cumulative16MiB write quota
-while extracting; peak204.8MiB fits the256MiB memory ceiling. Full real-archive
-realization, Rustc/actions/certificates/normal producer and whole-workload fit
-remain open. Next ground the archive byte workload and explicitly settle its
-scoped byte budget while preserving memory limits. Borrow/transfer first; use
-existing scoped interners for repeated retained strings with fitting lifetimes.
-Windows minimal/deferred. The [manifest](./slug-v2-subplans/current-packet.md)
-retains the accepted contract until the successor is installed.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts a measured,
+exact-fixture64MiB cumulative decode/write profile.
+[WP1081](./slug-v2-subplans/wp1081-original-immutable-byte-budget-2026-10-10.json)
+produces the original normal provisional protobuf immutable result at205.3MiB,
+within the unchanged256MiB memory envelope. The next actual demand is namespace
+Lstat on /, refused by the generated-only observation policy. Reuse the exact
+original owner guard and current epoch authority for that continuation; retain
+borrow/transfer and scoped interning discipline. Terminal producer, Rustc/actions,
+certificates and whole-workload fit remain open. Windows minimal/deferred.
+The implementation goal stays active.
 
 ### Ready and blocked queue
 

@@ -10,6 +10,36 @@ pub(super) const PROTOBUF_DIGEST: [u8; 32] = [
     0x2c, 0x0a, 0xde, 0x33, 0xf6, 0x49, 0xdb, 0x65, 0xe0, 0x0b, 0x29, 0x0f, 0x29, 0x34, 0x5a, 0x2b,
 ];
 
+pub(super) const PROTOBUF_NATIVE_BYTE_BUDGET: u64 = 64 << 20;
+const ARCHIVE_MIRROR: &str = "tests/v2_oracle/fixtures/configured-cli-authentic/mirror";
+const PREPARED_MODULE: &str = "target/wp954/registry/modules/protobuf/33.4/MODULE.bazel";
+
+pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
+    let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+    else {
+        return false;
+    };
+    let (Some(backing), Some(module)) = (&bodies.offline_archive, &bodies.offline_archive_module)
+    else {
+        return false;
+    };
+    backing.matches(PROTOBUF_URL, &PROTOBUF_DIGEST)
+        && backing
+            .path()
+            .as_path()
+            .strip_prefix(project)
+            .and_then(|relative| relative.strip_prefix(ARCHIVE_MIRROR))
+            .is_ok_and(|relative| {
+                Some(relative) == PROTOBUF_URL.strip_prefix("https://").map(Path::new)
+            })
+        && module
+            .as_path()
+            .strip_prefix(project)
+            .is_ok_and(|relative| relative == Path::new(PREPARED_MODULE))
+}
+
 fn string_is(value: Option<&OverrideAttributeValue>, expected: &str) -> bool {
     matches!(value, Some(OverrideAttributeValue::String(value)) if value.as_str() == expected)
 }
@@ -81,6 +111,7 @@ mod tests {
     use starlark_map::small_map::SmallMap;
 
     use super::*;
+    use crate::runtime::repository_io::source_service::SourceCounter;
 
     fn path(value: &str) -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new(value).unwrap()
@@ -340,5 +371,151 @@ mod tests {
             std::mem::size_of::<Bodies>(),
             std::mem::align_of::<Bodies>()
         );
+    }
+
+    #[test]
+    fn immutable_archive_native_byte_profile_is_exact_and_cumulative() {
+        use CommandChoice::Modules;
+        use CommandChoice::PublicProbe;
+        use RegistryChoice::DefaultBcr;
+        use RegistryChoice::PreparedFile;
+        let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let archive = NormalizedAbsolutePath::new(
+            project
+                .join(ARCHIVE_MIRROR)
+                .join(PROTOBUF_URL.strip_prefix("https://").unwrap()),
+        )
+        .unwrap();
+        let module = NormalizedAbsolutePath::new(project.join(PREPARED_MODULE)).unwrap();
+        let backing =
+            |url: &'static str, digest, path| OfflineArchiveBacking::new(url, digest, path);
+        let make = || {
+            let mut bodies = configured(PreparedFile, PublicProbe);
+            bodies.rules_rust_defs_import_sources = true;
+            bodies.offline_archive = Some(backing(PROTOBUF_URL, PROTOBUF_DIGEST, archive.dupe()));
+            bodies.offline_archive_module = Some(module.dupe());
+            bodies
+        };
+        let native = |b: &Bodies| b.native_source_limits(PreparedFile, PublicProbe);
+        let bodies = make();
+        let owner = bodies.offline_archive.as_ref().unwrap();
+        let owners = Arc::strong_count(owner);
+        let weak = Arc::downgrade(owner);
+        let expected = SourceServiceLimits {
+            source_attempts: 256,
+            decoded_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
+            written_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
+            ..bodies.source_limits(PreparedFile)
+        };
+        assert_eq!(native(&bodies), expected);
+        assert_eq!(Arc::strong_count(owner), owners);
+        assert!(std::ptr::eq(
+            bodies.offline_archive_module.as_ref().unwrap().as_path(),
+            module.as_path()
+        ));
+        let ordinary = bodies.source_limits(PreparedFile);
+        assert_eq!(ordinary.decoded_bytes, 16 << 20);
+        assert_eq!(ordinary.written_bytes, 16 << 20);
+        for case in 0..8 {
+            let mut b = make();
+            match case {
+                0 => b.offline_archive = None,
+                1 => b.offline_archive_module = None,
+                2 => {
+                    b.offline_archive = Some(backing(
+                        "https://other.test/archive.tar.gz",
+                        PROTOBUF_DIGEST,
+                        archive.dupe(),
+                    ))
+                }
+                3 => b.offline_archive = Some(backing(PROTOBUF_URL, [0; 32], archive.dupe())),
+                4 => {
+                    b.offline_archive = Some(backing(
+                        PROTOBUF_URL,
+                        PROTOBUF_DIGEST,
+                        path("/foreign/archive.tar.gz"),
+                    ))
+                }
+                5 => b.offline_archive_module = Some(path("/foreign/MODULE.bazel")),
+                6 => {
+                    b = configured(PreparedFile, PublicProbe);
+                    b.rules_rust_defs_import_sources = true;
+                }
+                _ => b.rules_rust_defs_import_sources = false,
+            }
+            assert_eq!(
+                native(&b),
+                SourceServiceLimits {
+                    source_attempts: if b.rules_rust_defs_import_sources {
+                        256
+                    } else {
+                        16
+                    },
+                    ..b.source_limits(PreparedFile)
+                },
+                "case {case}"
+            );
+        }
+        for (r, c) in [
+            (DefaultBcr, Modules),
+            (DefaultBcr, PublicProbe),
+            (PreparedFile, Modules),
+        ] {
+            assert_eq!(bodies.native_source_limits(r, c), bodies.source_limits(r));
+        }
+        for counter in [SourceCounter::DecodedBytes, SourceCounter::WrittenBytes] {
+            let start = Instant::now();
+            let scope = bodies
+                .source_scope(
+                    bodies.roots[0].dupe(),
+                    start + Duration::from_secs(2),
+                    start + Duration::from_secs(3),
+                    native(&bodies),
+                )
+                .unwrap();
+            let weak_scope = Arc::downgrade(&scope);
+            assert_eq!(scope.limits(), expected);
+            scope
+                .charge(counter, PROTOBUF_NATIVE_BYTE_BUDGET / 2)
+                .unwrap();
+            scope
+                .charge(counter, PROTOBUF_NATIVE_BYTE_BUDGET / 2)
+                .unwrap();
+            let refusal = Err(SourceServiceError::Limit(counter));
+            assert_eq!(scope.charge(counter, 1), refusal);
+            assert_eq!(
+                scope.first_error_for_test(),
+                Some(SourceServiceError::Limit(counter))
+            );
+            assert_eq!(scope.charge(SourceCounter::SourceAttempts, 1), refusal);
+            let counters = scope.snapshot();
+            assert_eq!(
+                counters.decoded_bytes,
+                if counter == SourceCounter::DecodedBytes {
+                    PROTOBUF_NATIVE_BYTE_BUDGET
+                } else {
+                    0
+                }
+            );
+            assert_eq!(
+                counters.written_bytes,
+                if counter == SourceCounter::WrittenBytes {
+                    PROTOBUF_NATIVE_BYTE_BUDGET
+                } else {
+                    0
+                }
+            );
+            assert_eq!(counters.source_attempts, 0);
+            assert_eq!(counters.live_buffer_bytes, 0);
+            drop(scope);
+            assert!(weak_scope.upgrade().is_none());
+        }
+        assert_eq!(Arc::strong_count(owner), owners);
+        drop(bodies);
+        assert!(weak.upgrade().is_none());
     }
 }

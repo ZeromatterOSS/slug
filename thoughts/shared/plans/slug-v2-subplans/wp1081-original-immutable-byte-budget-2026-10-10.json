@@ -1,0 +1,109 @@
+{
+  "schema": "slug-v2-accepted-packet-v1",
+  "packet": "WP-7-294-m7a-original-immutable-byte-budget-r1",
+  "status": "accepted",
+  "baseline": "752fd16ff40256f57bc0400056f2b6b600d6e54a",
+  "compatibility": "Slug-native Linux exact fixture-scoped diagnostic byte-work profile; original archive semantics unchanged; Windows deferred",
+  "changed_rust_files": 2,
+  "rust_lines_added": 181,
+  "new_production_owned_strings": 0,
+  "new_retained_fields": 0,
+  "measurement": {
+    "gzip_decoded_bytes": 47892480,
+    "conservative_decoded_upper": 54140551,
+    "conservative_written_upper": 54851223,
+    "scratch_bytes": 65536,
+    "full_eof_crc": true,
+    "elapsed_seconds": 0.09491053898818791,
+    "peak_rss_kib": 16508
+  },
+  "selected_limits": {
+    "decoded_bytes": 67108864,
+    "written_bytes": 67108864,
+    "rss_kib": 262144,
+    "live_bytes": 16777216,
+    "transfer_bytes": 16777216,
+    "other_caps_unchanged": true
+  },
+  "validation": {
+    "focused_rust_names": 2,
+    "ordinary_passing_records": 4,
+    "native_observer_runs": 1,
+    "native_observer_passes": 1,
+    "python_controls": 4,
+    "actual_supervised_children": 15,
+    "preserved_failed_compile": 1,
+    "compilation_check_seconds": 23.731479734065942,
+    "compilation_rss_separately_uncapped": true,
+    "wp1080_reused_tests_fresh_credit": 0,
+    "format_and_diff_checks": "pass"
+  },
+  "native": {
+    "elapsed_seconds": 5.338510703993961,
+    "peak_rss_kib": 210272,
+    "peak_rss_mib": 205.34375,
+    "original_protobuf_provisional_immutable_result": true,
+    "terminal_accepted_root_or_certificate": false,
+    "terminal": {
+      "stage": "native_refusal",
+      "kind": "computation",
+      "preparation": "complete",
+      "dispatch": "singleton",
+      "policy_checked": "true",
+      "certificate": "unavailable",
+      "observations": "unavailable",
+      "analyses": "unavailable",
+      "actions": "unavailable",
+      "rustc": "unavailable"
+    },
+    "scope": {
+      "first_error": "None",
+      "registry_attempts": 105,
+      "registry_admitted_bytes": 235521,
+      "source_attempts": 147,
+      "transferred_bytes": 6902898,
+      "decoded_bytes": 54140551,
+      "written_bytes": 52147294,
+      "live_buffer_bytes": 2114151,
+      "peak_buffer_bytes": 11679531
+    },
+    "boundary": "existing namespace policy excludes original immutable owner, refuses materialization instance10 Lstat on /",
+    "source_brackets": {
+      "count": 313,
+      "physical_bytes": 13374629,
+      "collection_atomic": false,
+      "each_full_sha_before_after_equal": true,
+      "inherited_fds": false
+    },
+    "retirement": {
+      "source_weak_seen": "false",
+      "source_weak_expired": "true",
+      "live_buffer_zero": "true",
+      "scope_weak_expired": "true",
+      "recorder_weak_expired": "true"
+    }
+  },
+  "normal_producer_completed": false,
+  "whole_workload_memory_fit": false,
+  "census_identity_complete": false,
+  "next_work": "original immutable materialization namespace policy through the unique current epoch owner; reuse exact request/backing guards and normal confined IO, avoid per-path grants",
+  "goal_status": "active",
+  "evidence": {
+    "target/wp1081/candidate.json": "9f4ed8d6c4b5c5b158c5908e5b2bf24ded231a6f4dad5f9386362ebda8cef641",
+    "target/wp1081/measurement-result.json": "9c7b6d6e40206f00c532062a5150d47a0fa737ee07bc1ed2aed351ffacd6eeee",
+    "target/wp1081/measurement-design-review.md": "c7e38be3a8e41d92b5ebbeb48eba0c4ed8bfafb6f2c81e4040442b79954d83f5",
+    "target/wp1081/measurement-static-review.md": "93e20a9a1eb9cc69c5678bc36bfbd17725c4415d24aca66a624c73fb3ec6c8ca",
+    "target/wp1081/numeric-design-review.md": "2caebe11879608b893003b0889f077eb15488a4e2f66952246efbf0ee70efdea",
+    "target/wp1081/profile-static-review.md": "6444ad4d2ef93902094df4a6deb700c3429a01e44c26c758fd0f624d24d5d8e2",
+    "target/wp1081/source-freeze.json": "9d64db4fcd74a231118dffc6a9859c8f06ca44aad4110f7d5777b68a4d40f98a",
+    "target/wp1081/focused-results.json": "fdaa2cc0e4fd40cb5c6587e0c8d611d3620092a3f2108cc6204978fd0e014615",
+    "target/wp1081/prelaunch-source.md": "333502709af960a0a0a9c8d89ea52db4a1e35a64bffa4bf0bf3c8f65a578cccc",
+    "target/wp1081/prelaunch-evidence.md": "85bd8e198af09995e1f303bbad50cd8d45e8867389a3b704a9071500908b6682",
+    "target/wp1081/native-result.json": "0b6199dfeabacfd72683cf6d5dd154302551bcf3cd3e293af07b2482a503d84a",
+    "target/wp1081/native/operation.json": "4c8e52cb2c33b8567b8541ecae5fb1fb18122af319e230823d78ffb9a52bb2a1",
+    "target/wp1081/operation-ledger.json": "4bab10d12efbc5d9c4e0fe87b8d4bc129684d9ef02926c416cee84fc07ebf928",
+    "target/wp1081/final-review.md": "5a4f698a694740983784d6dd1149ce020a52c02378387ff371ef3d913a747c8f"
+  },
+  "corrections": "First compile missing test import (five E0433 diagnostics), fixed in accepted scope; import-order-only formatting then same executable SHA, refreshed focused gates; config pin spelling corrected before any native launch. Old records preserved, unique names not double counted.",
+  "structural_checks": "rustfmt --check, git diff --check, plan checker and bash scripts/v2_archive_status.sh pass; initial accidental Python invocation of .sh refused before corrected shell check (no native/Cargo credit)"
+}
