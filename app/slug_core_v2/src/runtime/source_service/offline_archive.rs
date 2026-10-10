@@ -39,3 +39,22 @@ impl OfflineArchiveBacking {
         self.original_url == original_url && &self.integrity == integrity
     }
 }
+
+pub(super) fn cohort_has_unique_urls(backings: &[Option<Arc<OfflineArchiveBacking>>; 2]) -> bool {
+    match (&backings[0], &backings[1]) {
+        (Some(a), Some(b)) => a.original_url() != b.original_url(),
+        _ => true,
+    }
+}
+
+pub(super) fn cohort_path<'a>(
+    backings: &'a [Option<Arc<OfflineArchiveBacking>>; 2],
+    original_url: &str,
+    integrity: &[u8; 32],
+) -> Option<&'a NormalizedAbsolutePath> {
+    backings
+        .iter()
+        .flatten()
+        .find(|backing| backing.matches(original_url, integrity))
+        .map(|backing| backing.path())
+}

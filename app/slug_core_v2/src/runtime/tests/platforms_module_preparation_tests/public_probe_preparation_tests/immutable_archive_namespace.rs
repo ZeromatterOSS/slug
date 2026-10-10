@@ -95,6 +95,183 @@ mod tests {
             .admits(&demand.operation())
     }
 
+    #[tokio::test]
+    async fn immutable_archive_cohort_uses_current_epoch_and_confined_roots() {
+        use immutable_archive_preparation::JAVA_DIGEST;
+        use immutable_archive_preparation::JAVA_MODULE_SRI;
+        use immutable_archive_preparation::JAVA_SRI;
+        use immutable_archive_preparation::JAVA_URL;
+        let (mut bodies, protobuf) = fixture();
+        bodies = immutable_archive_preparation::configure_java(
+            bodies,
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+            OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
+            path("/prepared/java/MODULE.bazel"),
+        );
+        let mut java = protobuf.as_ref().clone();
+        java.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("rules_java+").unwrap();
+        for (key, value) in [
+            (
+                "urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    JAVA_URL.into(),
+                )])),
+            ),
+            ("integrity", OverrideAttributeValue::String(JAVA_SRI.into())),
+            ("strip_prefix", OverrideAttributeValue::String("".into())),
+            (
+                "remote_module_file_urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    "file:///prepared/java/MODULE.bazel".into(),
+                )])),
+            ),
+            (
+                "remote_module_file_integrity",
+                OverrideAttributeValue::String(JAVA_MODULE_SRI.into()),
+            ),
+        ] {
+            Arc::make_mut(&mut java.repo_spec.attributes).insert(key.into(), value);
+        }
+        let java = Arc::new(java);
+        let attrs = Arc::as_ptr(&java.repo_spec.attributes);
+        let weak = [Arc::downgrade(&protobuf), Arc::downgrade(&java)];
+        let dice = dice::Dice::builder().build(dice::DetectCycles::Enabled);
+        for (index, root) in ["/java-a", "/java-b", "/java-a"].into_iter().enumerate() {
+            let epoch = RepositoryMaterializationResultEpoch::new(
+                bodies.roots[0].dupe(),
+                [
+                    (protobuf.clone(), 17, "/protobuf-root"),
+                    (java.clone(), 18, root),
+                ]
+                .into_iter()
+                .map(|(request, instance, root)| {
+                    slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                        request,
+                        result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                            slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                                source_identity: Arc::from("test"),
+                                generation_root: PathBuf::from(root),
+                                observation_instance: PathObservationInstanceId::new(instance),
+                            },
+                        ),
+                    }
+                }),
+            )
+            .unwrap();
+            let mut updater = dice.updater();
+            updater
+                .changed_to(vec![(
+                    slug_bzlmod_v2::RepositoryMaterializationResultEpochKey {
+                        workspace: bodies.roots[0].dupe(),
+                    },
+                    epoch,
+                )])
+                .unwrap();
+            let mut tx = updater.commit().await;
+            let current = current_materialization_epoch(&mut tx, &bodies.roots[0])
+                .await
+                .unwrap();
+            let view = current
+                .borrowed_instance_for_namespace(
+                    &bodies.roots[0],
+                    PathObservationInstanceId::new(18),
+                    32,
+                )
+                .unwrap()
+                .unwrap();
+            assert!(std::ptr::eq(view.request(), java.as_ref()));
+            assert_eq!(Arc::as_ptr(&view.request().repo_spec.attributes), attrs);
+            assert_eq!(view.generation_root(), Path::new(root));
+            let valid = demand(18, root, PathObservationOperation::FileBytes);
+            assert!(admits(&bodies, &valid, Some(&current)));
+            assert!(admits(
+                &bodies,
+                &demand(
+                    17,
+                    "/protobuf-root/file",
+                    PathObservationOperation::FileBytes
+                ),
+                Some(&current)
+            ));
+            assert_eq!(
+                admits(
+                    &bodies,
+                    &demand(18, "/java-a/file", PathObservationOperation::FileBytes),
+                    Some(&current)
+                ),
+                index != 1
+            );
+            assert_eq!(
+                admits(
+                    &bodies,
+                    &demand(18, "/java-b/file", PathObservationOperation::FileBytes),
+                    Some(&current)
+                ),
+                index == 1
+            );
+            let good = SourcePreparationNeeds::path(NeedPathObservations::singleton(valid))
+                .try_union(&SourcePreparationNeeds::path(
+                    NeedPathObservations::singleton(demand(
+                        17,
+                        "/protobuf-root/file",
+                        PathObservationOperation::FileBytes,
+                    )),
+                ))
+                .unwrap();
+            assert!(admit_with_materialization_epoch(&bodies, &good, Some(&current)).is_ok());
+            let mut progress = 0;
+            for excluded in [
+                demand(
+                    18,
+                    "/protobuf-root/file",
+                    PathObservationOperation::FileBytes,
+                ),
+                demand(17, root, PathObservationOperation::FileBytes),
+                demand(18, "/java-a-sibling/file", PathObservationOperation::Lstat),
+                demand(18, "/outside", PathObservationOperation::Lstat),
+            ] {
+                assert!(!admits(&bodies, &excluded, Some(&current)));
+                let bad =
+                    SourcePreparationNeeds::path(NeedPathObservations::singleton(excluded.dupe()));
+                for mixed in [good.try_union(&bad).unwrap(), bad.try_union(&good).unwrap()] {
+                    if admit_with_materialization_epoch(&bodies, &mixed, Some(&current)).is_ok() {
+                        progress += 1;
+                    }
+                    let refusal = admit_with_materialization_epoch(&bodies, &mixed, Some(&current))
+                        .unwrap_err();
+                    assert_eq!(refusal.path.as_ref(), Some(excluded.path()));
+                }
+            }
+            assert_eq!(progress, 0);
+            let backing = bodies.java_offline_archive.take();
+            assert!(!admits(
+                &bodies,
+                &demand(18, root, PathObservationOperation::Lstat),
+                Some(&current)
+            ));
+            assert!(admits(
+                &bodies,
+                &demand(17, "/protobuf-root", PathObservationOperation::Lstat),
+                Some(&current)
+            ));
+            bodies.java_offline_archive = backing;
+        }
+        dice.wait_for_idle().await;
+        drop(dice);
+        drop(protobuf);
+        drop(java);
+        drop(bodies);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while weak.iter().any(|w| w.upgrade().is_some()) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("both original requests retire after DICE shutdown");
+        assert!(weak.iter().all(|w| w.upgrade().is_none()));
+    }
+
     #[test]
     fn original_immutable_namespace_is_confined_and_exact() {
         let (mut bodies, request) = fixture();

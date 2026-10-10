@@ -1,0 +1,124 @@
+{
+  "packet": "WP-7-297-m7a-original-offline-archive-cohort-r1",
+  "baseline": "33b0badf6960fb1365e9cc54beb8931e0d02e209",
+  "decision": "cfg(test,Linux) fixed two-archive backing and borrowed complete original request guard; native original rules_java beside protobuf with unique current namespaces",
+  "compatibility": "Slug-native bounded Linux native observation; original request/integrity/materializer/current DICE epoch semantics preserved; Windows deferred",
+  "source_delta": {
+    "files": [
+      "app/slug_core_v2/src/runtime/source_service/offline_archive.rs",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/immutable_archive_namespace.rs",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs"
+    ],
+    "added_lines": 883,
+    "removed_lines": 33,
+    "allocation": "scope +8B, Bodies +16B, test-only; two static descriptors; no new owned runtime strings/pool/interner; existing shared paths and Arc bindings",
+    "growth_review": "850 net formatted lines, including cohesive313-line transport regression; root and independent actual-source review accepted estimate overrun"
+  },
+  "validation": {
+    "focused_distinct_names": 5,
+    "focused_pass_records": 5,
+    "focused_names": [
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_cohort_preserves_original_identity_and_defaults",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::immutable_archive_namespace::tests::immutable_archive_cohort_uses_current_epoch_and_confined_roots",
+      "runtime::repository_io::tests::selected_bcr_offline_cohort_materializes_original_https_and_retires",
+      "runtime::repository_io::tests::selected_bcr_offline_session_materializes_original_https_and_reuses_deleted_sources",
+      "runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_native_byte_profile_is_exact_and_cumulative"
+    ],
+    "compile": [
+      "Core native-probe-observer CargoJSON --no-run",
+      "Core default test cfg CargoJSON --no-run"
+    ],
+    "direct_check": "Core/Loading/CLI native observer",
+    "actual_supervised_children": 11,
+    "native_runs": 1,
+    "failed_records": 0,
+    "preparation_seconds": 70.65604236000217,
+    "ordinary_seconds": 0.8915429610060528,
+    "review_time": "not separately measured",
+    "packet_elapsed_time": "not separately measured; actual gate durations preserved",
+    "archive_status": "pass",
+    "format_and_diff": "pass",
+    "helper_controls_fresh_credit": 0
+  },
+  "native": {
+    "elapsed_seconds": 5.787643528077751,
+    "exit_code": 0,
+    "stop_reason": null,
+    "pass_count": 1,
+    "joined": true,
+    "owned_group_empty": true,
+    "monitored_rss_kib": 206332,
+    "child_rusage_peak_kib": 210300,
+    "stdout_sha256": "1bd87665807af98c526f538c83487083d06d867c2cf5b568b1634c9cf80c2712",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "rss_peak_mib": 205.37109375,
+    "strict_pin_count": 42,
+    "pins_equal": true,
+    "full_source_brackets": 314,
+    "source_physical_bytes": 13489195,
+    "source_bracket_bytes": 26978390,
+    "source_vector_original_prefix_equal": true,
+    "raw_semantic": {
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP942_NATIVE": "WP942_NATIVE kind=computation attempts=unavailable roots=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=path path_len=203 path_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f363338366636366239653063356235333563373930323932313731333938383938653237616263643164366438336535663835306137613738633335316233392f36643134366562392d386332642d346631372d396336312d6535376436653433373761662f627a6c5f6c6962726172792e627a6c capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 162 7021682 54802910 52793179 2114151 11679531",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false",
+      "WP942_RETIREMENT": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=162 seen=162 emitted=162 admitted=162 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=29989 encoded_bytes=96621 accounting_complete=true identity_complete=false"
+    },
+    "next_denied_path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af/bzl_library.bzl",
+    "next_denied_operation": "lstat",
+    "rules_java_materialization_file_demand_charge_events": [
+      "WP1033_SOURCE_CHARGE event=162 amount=1 before=161 after=162 next=162 outcome=admitted first_created=false domain=host phase=need_paths capture=captured namespace=materialization instance=11 operation=file_bytes path_len=32 path_hex=2f746d702f2e746d7070504a6559712f746f6f6c636861696e732f4255494c44"
+    ],
+    "qualification": "Java materialization succeeded far enough to admit+charge one instance11 toolchains/BUILD FileBytes demand; event precedes reader, not per-file payload certificate. Genuine next host bzl_library.bzl Lstat refusal. Partial run memory fit only; terminal producer/Rustc/actions/certificates/full heap remain open."
+  },
+  "observable_gate_advanced": "Normal original rules_java materialization completed far enough to admit and charge instance11 toolchains/BUILD FileBytes demand, then genuine host bzl_library.bzl Lstat refusal; demand emission precedes reader, not payload certificate. No source-service first error or clock failure. Full producer/Rustc/actions/certificates remain open.",
+  "resource_caps": {
+    "rss_kib": 262144,
+    "address_space_bytes": 536870912,
+    "selected_work_seconds": 7,
+    "default_work_seconds": 5,
+    "scope_lifetime_seconds": 8,
+    "native_seconds": 10,
+    "supervisor_cleanup_seconds": 3,
+    "cumulative_decode_bytes": 67108864,
+    "cumulative_written_bytes": 67108864,
+    "transfer_bytes": 16777216,
+    "live_buffer_bytes": 16777216
+  },
+  "heap_qualification": "Partial run fits; allocation/credit/Weak tests pass; whole workload/interner/terminal producer fit remains unproved",
+  "corrections": [
+    "Bounded archive-only historical arithmetic qualified before design acceptance: current previous decoded54173204+Java614400=54787604; later namespace subject to existing quota."
+  ],
+  "next": "Bounded original bzl_library source admission, pending current-source authority/design; no guessed payload/acquisition",
+  "goal": "ACTIVE",
+  "evidence": {
+    "target/wp1084/design.md": "74d364d68928ade96cc4c4285e9052e825b9d22ec9393db67d3e2343c664543f",
+    "target/wp1084/archive-cohort-design.md": "6837bb7f1e71a69af4ec0edda45ab48f787a2857f9ce3487af580c273027aeff",
+    "target/wp1084/archive-cohort-source.md": "ebb66f11e06b21f59e62fdcee9ac491aa7718277fb0705a186f193387ab59a4f",
+    "target/wp1084/byte-bound-correction.md": "88b00548e59ceb21084b593a14720c7a866f7ea3e20fba22e5542aa73e657dc1",
+    "target/wp1084/design-review.md": "a623bf1b00bd97b78d09f3fab5782004765428491237d165b18d2ff568abe813",
+    "target/wp1084/static-review.md": "c056e7ff0e3811f856f6a834613bd75f59bb39ec40a4851c1a89b9d7f9c11dbd",
+    "target/wp1084/source-freeze.json": "1cf3f59426384b0bab3a50f9d5efe8c18a7311095beed342c28ec46dc55a9546",
+    "target/wp1084/prelaunch-source.md": "6053163f18b24aaa7276e9d6ce1253b9f0ff3be18ad2a0a8d345725e64af0112",
+    "target/wp1084/prelaunch-evidence.md": "582dc7bf4d140ee291547723f959953361066681e3372c4ba156522940a956a9",
+    "target/wp1084/focused-results.json": "6ee65f6bbedee2284f8d2e2f7cc7429cd189e1e8ad8215d686f974322850d37f",
+    "target/wp1084/native-result.json": "c6f3862938bc83b8261b23b02d96b165b3ca9619b2fc3be90be3fc7b9fbb52f5",
+    "target/wp1084/operation-ledger.json": "a033d5a497bba384e1ba1419421ee143178f272fc2b7e4c77ce9c863518de07a",
+    "target/wp1084/candidate.json": "602a0643b561fa0d7ebee3c515dd48e394016b781a5a914d41e19b0fb0203e4f",
+    "target/wp1084/executable.json": "998a4c7d77e9695b3bffa5c5c60da719ef775d02404c1bd786674d7e14ab420c",
+    "target/wp1084/validation-selection.md": "2d05658a23468c64e120e551555ac1d86e5171da270748d8d5780bbfffec9de0"
+  },
+  "independent_final": {
+    "path": "target/wp1084/final-review.md",
+    "sha256": "1a10966e91bcca9293d36b314ffc914395b12d22d910dc06f74fe87a1bd884c9",
+    "verdict": "ACCEPT"
+  }
+}

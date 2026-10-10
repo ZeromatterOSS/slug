@@ -14,6 +14,85 @@ pub(super) const PROTOBUF_NATIVE_BYTE_BUDGET: u64 = 64 << 20;
 const ARCHIVE_MIRROR: &str = "tests/v2_oracle/fixtures/configured-cli-authentic/mirror";
 const PREPARED_MODULE: &str = "target/wp954/registry/modules/protobuf/33.4/MODULE.bazel";
 
+pub(super) const JAVA_URL: &str =
+    "https://github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz";
+pub(super) const JAVA_SRI: &str = "sha256-Thooolwu+lNQDJKNIs7/vFBd2VszWi0CWDaik7WSIS8=";
+pub(super) const JAVA_MODULE_SRI: &str = "sha256-7mPyfjaj+tqANChpNhGC8SCpgZx0Mg6OZbHgS6DNep0=";
+pub(super) const JAVA_PREPARED_MODULE: &str =
+    "target/wp954/registry/modules/rules_java/9.1.0/MODULE.bazel";
+pub(super) const JAVA_DIGEST: [u8; 32] = [
+    0x4e, 0x1a, 0x28, 0xa2, 0x5c, 0x2e, 0xfa, 0x53, 0x50, 0x0c, 0x92, 0x8d, 0x22, 0xce, 0xff, 0xbc,
+    0x50, 0x5d, 0xd9, 0x5b, 0x33, 0x5a, 0x2d, 0x02, 0x58, 0x36, 0xa2, 0x93, 0xb5, 0x92, 0x21, 0x2f,
+];
+pub(super) struct ArchiveBinding {
+    pub(super) backing: Arc<OfflineArchiveBacking>,
+    pub(super) module: NormalizedAbsolutePath,
+}
+struct ArchiveDescriptor {
+    canonical: &'static str,
+    url: &'static str,
+    digest: &'static [u8; 32],
+    integrity: &'static str,
+    strip_prefix: &'static str,
+    module_integrity: &'static str,
+    prepared_module: &'static str,
+}
+static ARCHIVES: [ArchiveDescriptor; 2] = [
+    ArchiveDescriptor {
+        canonical: "protobuf+",
+        url: PROTOBUF_URL,
+        digest: &PROTOBUF_DIGEST,
+        integrity: PROTOBUF_SRI,
+        strip_prefix: "protobuf-33.4",
+        module_integrity: MODULE_SRI,
+        prepared_module: PREPARED_MODULE,
+    },
+    ArchiveDescriptor {
+        canonical: "rules_java+",
+        url: JAVA_URL,
+        digest: &JAVA_DIGEST,
+        integrity: JAVA_SRI,
+        strip_prefix: "",
+        module_integrity: JAVA_MODULE_SRI,
+        prepared_module: JAVA_PREPARED_MODULE,
+    },
+];
+fn binding(
+    bodies: &Bodies,
+    index: usize,
+) -> Option<(&Arc<OfflineArchiveBacking>, &NormalizedAbsolutePath)> {
+    match index {
+        0 => Some((
+            bodies.offline_archive.as_ref()?,
+            bodies.offline_archive_module.as_ref()?,
+        )),
+        1 => bodies
+            .java_offline_archive
+            .as_ref()
+            .map(|b| (&b.backing, &b.module)),
+        _ => None,
+    }
+}
+fn native_binding(
+    project: &Path,
+    descriptor: &ArchiveDescriptor,
+    backing: &OfflineArchiveBacking,
+    module: &NormalizedAbsolutePath,
+) -> bool {
+    backing.matches(descriptor.url, descriptor.digest)
+        && backing
+            .path()
+            .as_path()
+            .strip_prefix(project)
+            .and_then(|relative| relative.strip_prefix(ARCHIVE_MIRROR))
+            .is_ok_and(|relative| {
+                Some(relative) == descriptor.url.strip_prefix("https://").map(Path::new)
+            })
+        && module
+            .as_path()
+            .strip_prefix(project)
+            .is_ok_and(|relative| relative == Path::new(descriptor.prepared_module))
+}
 pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
     let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -21,23 +100,14 @@ pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
     else {
         return false;
     };
-    let (Some(backing), Some(module)) = (&bodies.offline_archive, &bodies.offline_archive_module)
-    else {
+    let Some((backing, module)) = binding(bodies, 0) else {
         return false;
     };
-    backing.matches(PROTOBUF_URL, &PROTOBUF_DIGEST)
-        && backing
-            .path()
-            .as_path()
-            .strip_prefix(project)
-            .and_then(|relative| relative.strip_prefix(ARCHIVE_MIRROR))
-            .is_ok_and(|relative| {
-                Some(relative) == PROTOBUF_URL.strip_prefix("https://").map(Path::new)
-            })
-        && module
-            .as_path()
-            .strip_prefix(project)
-            .is_ok_and(|relative| relative == Path::new(PREPARED_MODULE))
+    native_binding(project, &ARCHIVES[0], backing, module)
+        && bodies
+            .java_offline_archive
+            .as_ref()
+            .is_none_or(|b| native_binding(project, &ARCHIVES[1], &b.backing, &b.module))
 }
 
 fn string_is(value: Option<&OverrideAttributeValue>, expected: &str) -> bool {
@@ -57,31 +127,36 @@ pub(super) fn matches(
     bodies: &Bodies,
     request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
 ) -> bool {
-    let (Some(backing), Some(module)) = (&bodies.offline_archive, &bodies.offline_archive_module)
+    let Some((index, descriptor)) = ARCHIVES
+        .iter()
+        .enumerate()
+        .find(|(_, d)| request.id.canonical_repo.as_str() == d.canonical)
     else {
+        return false;
+    };
+    let Some((backing, module)) = binding(bodies, index) else {
         return false;
     };
     let label = &request.repo_spec.rule_id.bzl_file;
     let attrs = &request.repo_spec.attributes;
     request.id.workspace == bodies.roots[0]
-        && request.id.canonical_repo.as_str() == "protobuf+"
         && matches!(&request.kind, RepositoryMaterializationKind::Immutable)
         && label.mapping_id().is_none()
         && label.package().repo().as_str() == "bazel_tools"
         && label.package().package().as_str() == "tools/build_defs/repo"
         && label.target().as_str() == "http.bzl"
         && request.repo_spec.rule_id.rule_name.as_str() == "http_archive"
-        && backing.matches(PROTOBUF_URL, &PROTOBUF_DIGEST)
+        && backing.matches(descriptor.url, descriptor.digest)
         && attrs.len() == 9
-        && singleton(attrs.get("urls")) == Some(PROTOBUF_URL)
-        && string_is(attrs.get("integrity"), PROTOBUF_SRI)
-        && string_is(attrs.get("strip_prefix"), "protobuf-33.4")
+        && singleton(attrs.get("urls")) == Some(descriptor.url)
+        && string_is(attrs.get("integrity"), descriptor.integrity)
+        && string_is(attrs.get("strip_prefix"), descriptor.strip_prefix)
         && ["remote_patches", "remote_file_urls", "remote_file_integrity"].into_iter().all(|key| {
             matches!(attrs.get(key), Some(OverrideAttributeValue::Map(values)) if values.is_empty())
         })
         && singleton(attrs.get("remote_module_file_urls")).and_then(|url| url.strip_prefix("file://"))
             .is_some_and(|path| Some(path) == module.as_path().to_str())
-        && string_is(attrs.get("remote_module_file_integrity"), MODULE_SRI)
+        && string_is(attrs.get("remote_module_file_integrity"), descriptor.module_integrity)
         && matches!(attrs.get("remote_patch_strip"), Some(OverrideAttributeValue::Int(0)))
 }
 
@@ -95,6 +170,19 @@ pub(super) fn configure(
     if public_probe_preparation_tests::offline_archive_native_role(registry, command) {
         bodies.offline_archive = Some(backing);
         bodies.offline_archive_module = Some(module);
+    }
+    bodies
+}
+
+pub(super) fn configure_java(
+    mut bodies: Bodies,
+    registry: RegistryChoice,
+    command: CommandChoice,
+    backing: Arc<OfflineArchiveBacking>,
+    module: NormalizedAbsolutePath,
+) -> Bodies {
+    if public_probe_preparation_tests::offline_archive_native_role(registry, command) {
+        bodies.java_offline_archive = Some(ArchiveBinding { backing, module });
     }
     bodies
 }
@@ -160,6 +248,157 @@ mod tests {
             },
             kind: RepositoryMaterializationKind::Immutable,
         }
+    }
+
+    fn java_request() -> RepositoryMaterializationRequest {
+        let mut java = request();
+        java.id.canonical_repo = CanonicalRepoName::new("rules_java+").unwrap();
+        for (key, value) in [
+            (
+                "urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    JAVA_URL.into(),
+                )])),
+            ),
+            ("integrity", OverrideAttributeValue::String(JAVA_SRI.into())),
+            ("strip_prefix", OverrideAttributeValue::String("".into())),
+            (
+                "remote_module_file_urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    "file:///prepared/java/MODULE.bazel".into(),
+                )])),
+            ),
+            (
+                "remote_module_file_integrity",
+                OverrideAttributeValue::String(JAVA_MODULE_SRI.into()),
+            ),
+        ] {
+            Arc::make_mut(&mut java.repo_spec.attributes).insert(key.into(), value);
+        }
+        java
+    }
+
+    #[test]
+    fn immutable_archive_cohort_preserves_original_identity_and_defaults() {
+        let bodies = configure_java(
+            configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+            OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
+            path("/prepared/java/MODULE.bazel"),
+        );
+        let original = [request(), java_request()];
+        for r in &original {
+            let attrs = r.repo_spec.attributes.clone();
+            let owners = Arc::strong_count(&attrs);
+            assert!(matches(&bodies, r));
+            assert!(
+                bodies
+                    .admit(&SourcePreparationNeeds::repository(r.clone()))
+                    .is_ok()
+            );
+            assert!(Arc::ptr_eq(&attrs, &r.repo_spec.attributes));
+            assert_eq!(Arc::strong_count(&attrs), owners);
+        }
+        for (key, value) in [
+            (
+                "urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    PROTOBUF_URL.into(),
+                )])),
+            ),
+            (
+                "integrity",
+                OverrideAttributeValue::String(PROTOBUF_SRI.into()),
+            ),
+            (
+                "remote_module_file_urls",
+                OverrideAttributeValue::Iterable(Arc::new([OverrideAttributeValue::String(
+                    "file:///prepared/MODULE.bazel".into(),
+                )])),
+            ),
+            (
+                "remote_module_file_integrity",
+                OverrideAttributeValue::String(MODULE_SRI.into()),
+            ),
+            ("urls", OverrideAttributeValue::Bool(false)),
+        ] {
+            let mut crossed = original[1].clone();
+            Arc::make_mut(&mut crossed.repo_spec.attributes).insert(key.into(), value);
+            assert!(!matches(&bodies, &crossed), "crossed {key}");
+        }
+        let mut crossed = original[1].clone();
+        crossed.id.canonical_repo = CanonicalRepoName::new("protobuf+").unwrap();
+        assert!(!matches(&bodies, &crossed));
+        crossed = original[1].clone();
+        crossed.id.workspace = path("/foreign");
+        assert!(!matches(&bodies, &crossed));
+        for (registry, command) in [
+            (RegistryChoice::DefaultBcr, CommandChoice::PublicProbe),
+            (RegistryChoice::PreparedFile, CommandChoice::Modules),
+        ] {
+            let disabled = configure_java(
+                configured(registry, command),
+                registry,
+                command,
+                OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
+                path("/prepared/java/MODULE.bazel"),
+            );
+            assert!(disabled.java_offline_archive.is_none());
+            assert!(!matches(&disabled, &original[0]));
+            assert!(!matches(&disabled, &original[1]));
+        }
+        let single = configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert!(matches(&single, &original[0]));
+        assert!(!matches(&single, &original[1]));
+        let bad = SourcePreparationNeeds::repository(crossed);
+        let good = SourcePreparationNeeds::repository(original[0].clone())
+            .try_union(&SourcePreparationNeeds::repository(original[1].clone()))
+            .unwrap();
+        assert!(bodies.admit(&good).is_ok());
+        for mixed in [good.try_union(&bad).unwrap(), bad.try_union(&good).unwrap()] {
+            let calls = std::cell::Cell::new(0);
+            assert!(
+                bodies
+                    .admit_with_plan_matcher(&mixed, &|_, _| {
+                        calls.set(calls.get() + 1);
+                        false
+                    })
+                    .is_err()
+            );
+            assert_eq!(calls.get(), 0);
+        }
+        let owners = [
+            Arc::downgrade(bodies.offline_archive.as_ref().unwrap()),
+            Arc::downgrade(&bodies.java_offline_archive.as_ref().unwrap().backing),
+        ];
+        let start = Instant::now();
+        let scope = bodies
+            .source_scope(
+                bodies.roots[0].dupe(),
+                start + Duration::from_secs(1),
+                start + Duration::from_secs(2),
+                bodies.source_limits(RegistryChoice::PreparedFile),
+            )
+            .unwrap();
+        let scope_weak = Arc::downgrade(&scope);
+        drop(bodies);
+        assert!(owners.iter().all(|w| w.upgrade().is_some()));
+        drop(scope);
+        assert!(owners.iter().all(|w| w.upgrade().is_none()));
+        assert!(scope_weak.upgrade().is_none());
+        println!(
+            "WP1084_COHORT_LAYOUT scope={}/{} binding={}/{} bodies={}/{} descriptor={}/{} rows={}",
+            std::mem::size_of::<SourceServiceScope>(),
+            std::mem::align_of::<SourceServiceScope>(),
+            std::mem::size_of::<ArchiveBinding>(),
+            std::mem::align_of::<ArchiveBinding>(),
+            std::mem::size_of::<Bodies>(),
+            std::mem::align_of::<Bodies>(),
+            std::mem::size_of::<ArchiveDescriptor>(),
+            std::mem::align_of::<ArchiveDescriptor>(),
+            ARCHIVES.len()
+        );
     }
 
     #[test]
@@ -421,6 +660,45 @@ mod tests {
             bodies.offline_archive_module.as_ref().unwrap().as_path(),
             module.as_path()
         ));
+        let valid_java = || ArchiveBinding {
+            backing: backing(
+                JAVA_URL,
+                JAVA_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join(ARCHIVE_MIRROR)
+                        .join(JAVA_URL.strip_prefix("https://").unwrap()),
+                )
+                .unwrap(),
+            ),
+            module: NormalizedAbsolutePath::new(project.join(ARCHIVES[1].prepared_module)).unwrap(),
+        };
+        let mut cohort = make();
+        cohort.java_offline_archive = Some(valid_java());
+        assert_eq!(native(&cohort), expected);
+        assert_eq!(
+            cohort.native_source_work_duration(PreparedFile, PublicProbe),
+            Duration::from_secs(7)
+        );
+        for case in 0..4 {
+            let mut b = make();
+            let mut java = valid_java();
+            match case {
+                0 => java.backing = backing(PROTOBUF_URL, JAVA_DIGEST, java.backing.path().dupe()),
+                1 => java.backing = backing(JAVA_URL, [0; 32], java.backing.path().dupe()),
+                2 => java.backing = backing(JAVA_URL, JAVA_DIGEST, path("/foreign/java.tar.gz")),
+                _ => java.module = path("/foreign/MODULE.bazel"),
+            }
+            b.java_offline_archive = Some(java);
+            assert_eq!(native(&b).decoded_bytes, 16 << 20);
+            assert_eq!(native(&b).written_bytes, 16 << 20);
+            assert_eq!(
+                b.native_source_work_duration(PreparedFile, PublicProbe),
+                Duration::from_secs(5)
+            );
+        }
+        cohort.java_offline_archive = None;
+        assert_eq!(native(&cohort), expected);
         let ordinary = bodies.source_limits(PreparedFile);
         assert_eq!(ordinary.decoded_bytes, 16 << 20);
         assert_eq!(ordinary.written_bytes, 16 << 20);

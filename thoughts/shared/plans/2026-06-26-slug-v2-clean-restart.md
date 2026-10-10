@@ -34,18 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-296-m7a-original-immutable-work-profile-r1
-Status: accepted — original protobuf namespace continuation and next rules_java request
+Packet: WP-7-297-m7a-original-offline-archive-cohort-r1
+Status: accepted — normal two-archive continuation under unchanged caps
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts the finite
-seven-second original offline work profile within unchanged lifetime/native/memory
-caps. [WP1083](./slug-v2-subplans/wp1083-original-immutable-work-profile-2026-10-10.json)
-records one5.62681s/205.421875MiB run:12 original protobuf FileBytes demands admitted
-and charged, then a genuine original rules_java+ immutable request, source errorNone.
-The next bounded archive cohort reuses verified existing sources and original
-request ownership. Borrowing/scoped interning discipline persists. Terminal
-producer/Rustc/actions/certificates and whole-workload fit remain open; Windows
-minimal/deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) records
+[WP1084](./slug-v2-subplans/wp1084-original-offline-archive-cohort-2026-10-10.json):
+normal original rules_java archive beside protobuf, five focused tests and
+native/default compile lanes passed. The single real continuation advanced to
+bzl_library.bzl Lstat in5.78764s with conservative peak205.371094MiB/256MiB,
+no source-service first error and unchanged quotas. Fixed Arc slots and borrowed
+original requests add no owned runtime strings. Next bounded source admission is
+being qualified. Terminal producer/Rustc/actions/certificates and full-workload
+fit remain open; Windows minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

@@ -195,7 +195,7 @@ pub(in crate::runtime) struct SourceServiceScope {
     #[cfg(all(test, target_os = "linux"))]
     known_shas_root: Option<NormalizedAbsolutePath>,
     #[cfg(all(test, target_os = "linux"))]
-    offline_archive: Option<Arc<super::OfflineArchiveBacking>>,
+    offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 2],
 }
 impl SourceServiceScope {
     pub(super) fn new(
@@ -228,7 +228,7 @@ impl SourceServiceScope {
             #[cfg(all(test, target_os = "linux"))]
             known_shas_root: None,
             #[cfg(all(test, target_os = "linux"))]
-            offline_archive: None,
+            offline_archives: [None, None],
         }))
     }
     #[cfg(test)]
@@ -286,11 +286,34 @@ impl SourceServiceScope {
         offline_archive: Option<Arc<super::OfflineArchiveBacking>>,
         source_charge_census: bool,
     ) -> Result<Arc<Self>, SourceServiceError> {
+        Self::new_for_test_with_offline_archives(
+            workspace,
+            work_deadline,
+            cleanup_deadline,
+            limits,
+            known_shas_root,
+            [offline_archive, None],
+            source_charge_census,
+        )
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn new_for_test_with_offline_archives(
+        workspace: NormalizedAbsolutePath,
+        work_deadline: Instant,
+        cleanup_deadline: Instant,
+        limits: SourceServiceLimits,
+        known_shas_root: Option<NormalizedAbsolutePath>,
+        offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 2],
+        source_charge_census: bool,
+    ) -> Result<Arc<Self>, SourceServiceError> {
+        if !super::offline_archive::cohort_has_unique_urls(&offline_archives) {
+            return Err(SourceServiceError::InvalidLimits);
+        }
         let mut scope = Self::new(workspace, work_deadline, cleanup_deadline, limits)?;
         // Construction owns the sole Arc; no setter survives publication.
         let owned = Arc::get_mut(&mut scope).expect("new source scope is uniquely owned");
         owned.known_shas_root = known_shas_root;
-        owned.offline_archive = offline_archive;
+        owned.offline_archives = offline_archives;
         if source_charge_census {
             owned
                 .state
@@ -306,10 +329,7 @@ impl SourceServiceScope {
         original_url: &str,
         integrity: &[u8; 32],
     ) -> Option<&NormalizedAbsolutePath> {
-        self.offline_archive
-            .as_ref()
-            .filter(|backing| backing.matches(original_url, integrity))
-            .map(|backing| backing.path())
+        super::offline_archive::cohort_path(&self.offline_archives, original_url, integrity)
     }
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) fn known_shas_allowance_for_test(

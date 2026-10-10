@@ -760,3 +760,316 @@ fn selected_bcr_offline_session_refuses_mismatch_foreign_cancel_and_resource_lim
         assert!(weak_scope.upgrade().is_none());
     }
 }
+
+#[test]
+fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
+    const SECOND_URL: &str = "https://example.invalid/original/second.tar.gz";
+    let (first, first_backing) = selected_bcr_offline_session_fixture();
+    let (mut second, _) = selected_bcr_offline_session_fixture();
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder
+        .write_all(&ustar(
+            &[
+                TarEntry {
+                    name: b"pkg/value.txt",
+                    prefix: b"",
+                    typeflag: b'0',
+                    data: b"second archive\n",
+                },
+                TarEntry {
+                    name: b"pkg/MODULE.bazel",
+                    prefix: b"",
+                    typeflag: b'0',
+                    data: b"replaced module\n",
+                },
+            ],
+            true,
+        ))
+        .unwrap();
+    second.archive_bytes = encoder.finish().unwrap();
+    second.module_bytes = b"module(name = 'second_file_registry')\n".to_vec();
+    std::fs::write(&second.archive, &second.archive_bytes).unwrap();
+    std::fs::write(&second.module, &second.module_bytes).unwrap();
+    let attrs = Arc::make_mut(&mut second.spec.attributes);
+    attrs.insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([selected_bcr_file_session_value(SECOND_URL)])),
+    );
+    attrs.insert(
+        "integrity".into(),
+        selected_bcr_file_session_value(selected_bcr_file_session_sri(&second.archive_bytes)),
+    );
+    attrs.insert(
+        "remote_module_file_integrity".into(),
+        selected_bcr_file_session_value(selected_bcr_file_session_sri(&second.module_bytes)),
+    );
+    let second_backing = OfflineArchiveBacking::new(
+        SECOND_URL,
+        sha2::Sha256::digest(&second.archive_bytes).into(),
+        NormalizedAbsolutePath::new(second.archive.clone()).unwrap(),
+    );
+    let fixtures = [first, second];
+    let backings = [first_backing, second_backing];
+    assert_ne!(backings[0].integrity(), backings[1].integrity());
+    let weak_backings = backings.each_ref().map(Arc::downgrade);
+    let workspace_root = tempfile::tempdir().unwrap();
+    let workspace = NormalizedAbsolutePath::new(workspace_root.path().to_path_buf()).unwrap();
+    let limits = SourceServiceLimits {
+        allow_network: false,
+        ..SourceServiceLimits::default()
+    };
+    let make_scope = |slots, limits| {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+        SourceServiceScope::new_for_test_with_offline_archives(
+            workspace.clone(),
+            deadline,
+            deadline + std::time::Duration::from_secs(1),
+            limits,
+            None,
+            slots,
+            false,
+        )
+    };
+    for duplicate in [
+        backings[0].clone(),
+        OfflineArchiveBacking::new(
+            backings[0].original_url(),
+            *backings[1].integrity(),
+            backings[1].path().clone(),
+        ),
+    ] {
+        assert_eq!(
+            make_scope([Some(backings[0].clone()), Some(duplicate)], limits).err(),
+            Some(SourceServiceError::InvalidLimits)
+        );
+    }
+    let scope = make_scope(backings.each_ref().map(|b| Some(b.clone())), limits).unwrap();
+    let weak_scope = Arc::downgrade(&scope);
+    for backing in &backings {
+        assert!(std::ptr::eq(
+            scope
+                .offline_archive_path_for_test(backing.original_url(), backing.integrity())
+                .unwrap(),
+            backing.path()
+        ));
+        assert_eq!(Arc::strong_count(backing), 2);
+    }
+    assert!(
+        scope
+            .offline_archive_path_for_test(SECOND_URL, backings[0].integrity())
+            .is_none()
+    );
+    assert!(
+        scope
+            .offline_archive_path_for_test(
+                "https://example.invalid/unknown.tar.gz",
+                backings[0].integrity()
+            )
+            .is_none()
+    );
+    let requests = [
+        selected_bcr_file_session_request(&workspace, "cohort-a", fixtures[0].spec.clone()),
+        selected_bcr_file_session_request(&workspace, "cohort-b", fixtures[1].spec.clone()),
+    ];
+    let request_weaks = requests.each_ref().map(Arc::downgrade);
+    let runtime = selected_bcr_file_session_runtime();
+    let materializer =
+        RepositoryMaterializer::new_scoped(workspace.clone(), scope.clone()).unwrap();
+    let token = begin_empty(&materializer);
+    let mut first_counters = None;
+    for (index, request) in requests.iter().enumerate() {
+        let attrs = Arc::as_ptr(&request.repo_spec.attributes);
+        let owners = Arc::strong_count(&request.repo_spec.attributes);
+        let epoch = materializer
+            .materialize_native_with_runtime(
+                token,
+                request.clone(),
+                RepositoryMaterializationGeneration(1),
+                &runtime,
+                Some(&scope),
+            )
+            .unwrap();
+        let (root, instance) = immutable_result(&materializer, request.id.canonical_repo.as_str());
+        let view = epoch
+            .borrowed_instance_for_namespace(&workspace, instance, 2)
+            .unwrap()
+            .unwrap();
+        assert!(std::ptr::eq(view.request(), request.as_ref()));
+        assert_eq!(Arc::as_ptr(&view.request().repo_spec.attributes), attrs);
+        assert_eq!(Arc::strong_count(&request.repo_spec.attributes), owners);
+        assert_eq!(view.generation_root(), root.as_path());
+        assert_eq!(view.request().repo_spec, fixtures[index].spec);
+        assert_eq!(
+            std::fs::read(root.join("MODULE.bazel")).unwrap(),
+            fixtures[index].module_bytes
+        );
+        assert_eq!(
+            std::fs::read(root.join("value.txt")).unwrap(),
+            if index == 0 {
+                b"archive\n".as_slice()
+            } else {
+                b"second archive\n".as_slice()
+            }
+        );
+        if index == 0 {
+            first_counters = Some(scope.snapshot());
+        }
+    }
+    let roots = requests
+        .each_ref()
+        .map(|r| immutable_result(&materializer, r.id.canonical_repo.as_str()));
+    assert_ne!(roots[0].1, roots[1].1);
+    let counters = scope.snapshot();
+    assert_eq!(counters.source_attempts, 4);
+    assert_eq!(
+        counters.transferred_bytes,
+        fixtures
+            .iter()
+            .map(|f| (f.archive_bytes.len() + f.module_bytes.len()) as u64)
+            .sum::<u64>()
+    );
+    assert_eq!(counters.live_buffer_bytes, 0);
+    assert_eq!(scope.check(), Ok(()));
+    materializer.accept(token, &requests, vec![]).unwrap();
+    for fixture in &fixtures {
+        std::fs::remove_file(&fixture.archive).unwrap();
+        std::fs::remove_file(&fixture.module).unwrap();
+    }
+    let reuse = begin_empty(&materializer);
+    for (index, request) in requests.iter().enumerate() {
+        materializer
+            .materialize_native_with_runtime(
+                reuse,
+                request.clone(),
+                RepositoryMaterializationGeneration(2),
+                &runtime,
+                Some(&scope),
+            )
+            .unwrap();
+        assert_eq!(
+            immutable_result(&materializer, request.id.canonical_repo.as_str()),
+            roots[index]
+        );
+    }
+    let warm = scope.snapshot();
+    assert_eq!(
+        (
+            warm.source_attempts,
+            warm.transferred_bytes,
+            warm.decoded_bytes,
+            warm.written_bytes
+        ),
+        (
+            counters.source_attempts,
+            counters.transferred_bytes,
+            counters.decoded_bytes,
+            counters.written_bytes
+        )
+    );
+    materializer.discard(reuse).unwrap();
+    for fixture in &fixtures {
+        std::fs::write(&fixture.archive, &fixture.archive_bytes).unwrap();
+        std::fs::write(&fixture.module, &fixture.module_bytes).unwrap();
+    }
+    let first = first_counters.unwrap();
+    let counter_value = |snapshot: crate::runtime::dice::source_service::SourceServiceCounters,
+                         counter| match counter {
+        SourceCounter::TransferBytes => snapshot.transferred_bytes,
+        SourceCounter::DecodedBytes => snapshot.decoded_bytes,
+        SourceCounter::WrittenBytes => snapshot.written_bytes,
+        _ => unreachable!(),
+    };
+    for case in 0..5 {
+        let mut constrained = limits;
+        let counter = [
+            SourceCounter::TransferBytes,
+            SourceCounter::DecodedBytes,
+            SourceCounter::WrittenBytes,
+        ][case.min(2)];
+        match case {
+            0 => constrained.transferred_bytes = first.transferred_bytes + 1,
+            1 => constrained.decoded_bytes = first.decoded_bytes + 1,
+            2 => constrained.written_bytes = first.written_bytes + 1,
+            _ => (),
+        }
+        let owner = make_scope(backings.each_ref().map(|b| Some(b.clone())), constrained).unwrap();
+        let weak_owner = Arc::downgrade(&owner);
+        let failed = RepositoryMaterializer::new_scoped(workspace.clone(), owner.clone()).unwrap();
+        let session = begin_empty(&failed);
+        let held_root = if case == 3 {
+            owner.cancel();
+            None
+        } else {
+            failed
+                .materialize_native_with_runtime(
+                    session,
+                    requests[0].clone(),
+                    RepositoryMaterializationGeneration(3),
+                    &runtime,
+                    Some(&owner),
+                )
+                .unwrap();
+            assert_eq!(
+                counter_value(owner.snapshot(), counter),
+                counter_value(first, counter)
+            );
+            Some(immutable_result(&failed, "cohort-a").0)
+        };
+        if case == 4 {
+            std::fs::write(&fixtures[1].archive, b"corrupt archive").unwrap();
+        }
+        let result = failed.materialize_native_with_runtime(
+            session,
+            requests[1].clone(),
+            RepositoryMaterializationGeneration(3),
+            &runtime,
+            Some(&owner),
+        );
+        if case == 4 {
+            result.unwrap();
+            assert!(matches!(
+                active_result(&failed, "cohort-b"),
+                RepositoryMaterializationResult::TransportError { .. }
+            ));
+            assert_eq!(owner.check(), Ok(()));
+        } else {
+            let expected = if case == 3 {
+                SourceServiceError::Cancelled
+            } else {
+                SourceServiceError::Limit(counter)
+            };
+            assert_eq!(result, Err(RepositorySessionError::SourceService(expected)));
+            assert_eq!(owner.check(), Err(expected));
+            if case == 3 {
+                assert_eq!(owner.snapshot().source_attempts, 0);
+            }
+        }
+        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+        failed.discard(session).unwrap();
+        if let Some(root) = held_root {
+            assert!(!root.exists());
+        }
+        drop(failed);
+        drop(owner);
+        assert!(weak_owner.upgrade().is_none());
+    }
+    println!(
+        "WP1084_OFFLINE_COHORT_LAYOUT backing={}/{} slots={}/{} scope={}/{}",
+        std::mem::size_of::<OfflineArchiveBacking>(),
+        std::mem::align_of::<OfflineArchiveBacking>(),
+        std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 2]>(),
+        std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 2]>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>()
+    );
+    drop(requests);
+    drop(backings);
+    drop(scope);
+    assert!(weak_scope.upgrade().is_some());
+    assert!(weak_backings.iter().all(|weak| weak.upgrade().is_some()));
+    drop(materializer);
+    assert!(weak_scope.upgrade().is_none());
+    assert!(weak_backings.iter().all(|weak| weak.upgrade().is_none()));
+    assert!(request_weaks.iter().all(|weak| weak.upgrade().is_none()));
+    assert!(roots.iter().all(|(root, _)| !root.exists()));
+}

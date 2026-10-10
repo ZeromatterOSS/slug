@@ -1,76 +1,98 @@
 # Slug V2 current work packet
 
-Packet: WP-7-296-m7a-original-immutable-work-profile-r1
-Status: accepted — original protobuf namespace continuation and next rules_java request
-Baseline: aa10bfe90 (accepted WP1082).
+Packet: WP-7-297-m7a-original-offline-archive-cohort-r1
+Status: accepted — normal two-archive continuation under unchanged caps
+Baseline: 33b0badf6960fb1365e9cc54beb8931e0d02e209 (accepted WP1083).
 Owner: M7A bootstrap-readiness.md; normal retained compiler producer readiness.
-Compatibility: Slug-native Linux explicit native public-probe profile. Original
-normal archive/request/current epoch semantics unchanged; Windows deferred.
+Compatibility: Slug-native Linux explicit offline native role; original normal
+archive/spec/DICE epoch semantics remain exact within accepted named surfaces.
+Windows minimal/deferred.
 
-Outcome: continue the original protobuf repository observation with a reviewed
-seven-second common source-work profile, retaining the eight-second scope lifetime,
-ten-second native ceiling and existing memory/byte envelope. Record the genuine
-next producer result or refusal; do not infer namespace progress from counters.
+Outcome: let the normal original rules_java+ Immutable/http_archive materialize
+through existing verified offline backing alongside protobuf, then admit its unique
+current namespace observations. Capture the genuine next producer result/demand
+under unchanged limits. No new attribution-only packet or reconstructed RepoSpec.
 
-Learned basis: [WP1082](wp1082-original-immutable-namespace-2026-10-10.json)
-accepts borrowed confined namespace policy and five focused tests. ONE native run
-5.3184024s/205MiB reached GenericScope/Common/ScopeCheck/WorkDeadline, with actual
-namespace progression unavailable. Original capture and byte work fit the partial
-run memory budget; full producer/heap/certificate/Rustc/actions remain open.
-DESIGN proposal target/wp1083/work-profile-design.md uses existing owner and exact
-physical role predicate. No new attribution chain or unreviewed cap growth.
+Basis: [WP1083](wp1083-original-immutable-work-profile-2026-10-10.json) actual
+5.62681s/205.421875MiB, first source errorNone, source159. Twelve original protobuf
+instance10 FileBytes demands admitted+charged (not per-file payload certificates),
+then full original rules_java typed request. target/wp1084/archive-cohort-design.md
+(frozen6837bb7f...) and archive-cohort-source.md (frozen4d7569b1...) own the bounded
+proposal and known physical authority. Existing fixture mirror archive114566B,
+SHA4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f,
+MODULE4218B/SHAee63f27e36a3fada80342869361182f120a9819c74320e8e65b1e04ba0cd7a9d
+match actual original SRIs. Fullgzip614400B/CRC qualified. The archive-only historical-prefix estimate
+decode54754951/write55588625 fits64MiB; current decoded54173204 plus Java614400
+is54787604, including subsequent protobuf namespace reads. Later Java namespace
+reads remain unknown and subject to unchanged quotas. Re-bracket freshly at launch.
 
-Decision: Bodies::native_source_work_duration(registry, command) selects7s only
-for PreparedFile/PublicProbe, defs enabled, and unchanged exact
-immutable_archive_preparation::native_byte_budget_backing. All other roles retain5s.
-Use that scalar at the existing native SourceServiceScope constructor from one
-Instant start; preserve start+8 cleanup, scope limits/backing/known-shas/census.
-7/8/10 are absolute boundaries, not guaranteed tails. No production timeout,
-ordinary profile, source acquisition, semantic guard, DICE key/lock or epoch change.
+Decision for independent DESIGN: fixed two-slot cfg(test,Linux) scope backing,
+existing single constructor delegates [backing,None], duplicate URL bindings closed
+before publication. Borrowed exact URL/digest lookup visits at most2 slots. Bodies
+adds one bounded optional Java physical binding; static two-row descriptors drive
+one complete original9typed-attr/workspace/kind/unmapped-rule/MODULE matcher shared
+by materialization and namespace. No retained semantic Spec or string copies.
+Native existing opt-in config installs both declared paths before publication;
+wrong-role/configuration refusals precede IO. Present invalid Java backing defaults
+to5s/16MiB; absent Java preserves accepted single profile. No new env flags.
 
-Memory: borrowed predicate/static inputs and scalar Duration only; no owned
-strings, paths, Spec, fields, flags, lookup table or pool. Preserve source/buffer
-credit, owner Weak and scope cleanup evidence separately from RSS/all-heap fit.
-Borrow/transfer first; existing scoped interners only when repeated retained
-strings require ownership. Stage9 retained representation unchanged.
+Owners: normal materializer/session/current RepositoryMaterializationResultEpoch
+retain roots and requests; current unique borrowed view owns namespace authority.
+Both selected trees preserve root/descendant five Linux operations, strict ancestor
+Lstat, outside/sibling/stale/crossed paths and Windows/InputImage refusal. Original
+DICE keys/equality/invalidation/cancellation/publication/whole-Need precedence stay
+unchanged. Read docs/developers/dice.md before ownership edits. Existing FileDigest
+accounting qualifier and source scope enforcement remain inherited.
 
-Scope: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
-(small scalar method and one native constructor expression);
-app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs
-(existing profile matrix assertions and one portable deadline/retirement test).
-Estimate10–16 wiring/profile,3–6 assertions and40–65 discriminator lines. The large
-parent remains the native observation owner; no new framework or moved ownership.
-Target/wp1083 artifacts and scheduling/compact receipt root-owned.
+Allocation: fixed Arc slots, small shared normalized physical paths and static
+scalars; borrow/transfer existing storage. No String/Vec table/global interner or
+new pool. Existing scoped interners only where repeated retained strings need them.
+Matching Stage9 bounded Host capture row95 retains Arc/Dupe, normal epochs,
+credit/Weak distinctions. Emit actual layout, cumulative credit and last-Drop; RSS
+and whole-heap/producer/interner fit are separate claims. No donor import.
 
-Validation: independent DESIGN before implementation and FINAL actual diff/result;
-pinned nightly2025-09-14 offline jobs1 Core CargoJSON --no-run, direct
-Core/Loading/CLI check, serial60s preparation. Batch exact preflight and run
-augmented byte-profile positive/default negatives, new deadline/retirement test,
-protected ordinary defs byte-profile test. New zero-step during(Duration::ZERO)
-proves inherited step refusal/sticky poison/cleanup/credit+Weak retirement
-without sleep. Private export closure enforcement reuses unchanged source-service
-proofs0fresh; no visibility widening (target/wp1083/design-correction.md). Assert absolute7/8 construction; unchanged common-clock
-expiry/postcheck proofs reuse0fresh, not a claimed new common-clock timer exercise.
-Reuse accepted materializer/current-epoch/namespace evidence0fresh. Root owns
-format/freeze/prelaunch/gates and ONE actual original ignored native continuation.
-No source/helper/fixture writers during gates or shared-target concurrent Cargo.
+Exact source allowlist:
+- app/slug_core_v2/src/runtime/source_service/offline_archive.rs
+- app/slug_core_v2/src/runtime/source_service/scope.rs
+- app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
+- app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs
+- app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/immutable_archive_namespace.rs
+- app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs
+No HTTP/parser/public-parent/fixture/registry changes. Target/wp1084 and compact
+receipt/scheduling root-owned. Estimate80–140 policy/config+120–200 test lines;
+large existing owners stay cohesive, actual growth independently reviewed.
 
-Native sources: original313 ordered triples, original11 roots/preparedregistry and
-3 offline optins; heldFD fullEOF/hash before/after/noninheritance/non-atomic brackets.
-No acquisition. Reuse accepted supervisor with ROOT-only target/wp1083 delta.
-Caps: RSS262144KiB/AS512MiB/live16MiB/transfer16MiB/decode64MiB/write64MiB,
-source256/registry128/object1MiB/admitted16MiB; selected work7s/default5s, lifetime8s,
-native10s/cleanup3s/FSIZE16MiB/log1MiB/report4MiB. Preparation separate60s with
-uncapped RSS. These are packet operational ceilings; user12s remains a guideline.
+Validation: independent DESIGN before implementation and FINAL actual diff/run.
+Three proposal candidate tests cover exact identity/defaults+borrow/Weak, cohort
+current epochs/confinement/mixed Need, actual tiny two-source normal materialization
+plus cumulative quota/duplicate/cancel/reuse/retirement. Select minimal fresh changed
+profile and single-constructor regressions; reuse unaffected accepted proofs0fresh.
+Pinned nightly2025-09-14 offline jobs1 Core CargoJSON --no-run then direct
+Core/Loading/CLI check; source-service change adds applicable default compile gate.
+Root owns formatting/freeze/batch exact executable preflight/focused execution and
+ONE ignored actual original continuation after all writers stop. No shared-target
+concurrent Cargo or identical retry. No source acquisition/historical helper replay.
 
-Stop/replan: evidence requiring new semantic ownership, unavailable original
-source or envelope change. Preserve genuine deadline/quota/semantic refusal and
-choose a new hypothesis; no identical retry or automatic limit growth. Routine
-invocation/format/compiler corrections stay within this contract. Goal ACTIVE.
+Native sources: original313 ordered triples plus exactly one verified rules_java
+archive triple; original11roots/preparedregistry/optins. Held regular nonfollowingFD
+fullEOF/hash before/after/noninheritance/non-atomic brackets. Reuse supervisor with
+ROOT-only delta. Caps unchanged: RSS262144KiB/AS512MiB/live16MiB/transfer16MiB/
+decode64MiB/write64MiB/source256/registry128/object1MiB/admitted16MiB;
+selectedwork7s/default5s/lifetime8s/native10s/cleanup3s/FSIZE16MiB/log1MiB/report4MiB.
+Preparation separate60s/RSS uncapped; user's12s is a guideline, these packet caps
+are operational ceilings. Stop genuine limit, preserve refusal without cap growth.
 
-Acceptance: [WP1083 receipt](wp1083-original-immutable-work-profile-2026-10-10.json).
-Three focused tests pass; one real5.62681s/205.421875MiB continuation admits and
-charges12 original protobuf FileBytes demands (not per-file payload certificates),
-then reaches the original rules_java+ immutable request with first source errorNone.
-All byte/live/outer caps unchanged; full producer/Rustc/certificates remain open.
-Select the bounded original offline two-archive cohort next; goal ACTIVE.
+REPLAN only for unavailable original authority, new semantic ownership/compatibility
+choice or required envelope change. Routine invocation/format/compile correction
+stays within contract. Terminal producer/Rustc/actions/certificates/full workload
+remain open; goal ACTIVE.
+
+Acceptance: [WP1084](wp1084-original-offline-archive-cohort-2026-10-10.json)
+records five focused tests, native/default test compilation and direct Core/Loading/CLI
+check. The single real continuation passed in5.78764s with conservative peak
+205.371094MiB/256MiB, no first source error and unchanged decode/write quotas.
+Original rules_java instance11 toolchains/BUILD FileBytes demand was admitted and
+charged; this is not a per-file payload certificate. The genuine next boundary is
+bazel_skylib root bzl_library.bzl Lstat (source owner being qualified). All42 pins
+and314 held source brackets stayed equal; cleanup joined an empty owned group.
+Next source admission remains design-pending; no terminal milestone is closed.

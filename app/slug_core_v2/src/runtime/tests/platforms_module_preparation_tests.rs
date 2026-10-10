@@ -507,6 +507,7 @@ struct Bodies {
     apple_support_import_sources: bool,
     offline_archive: Option<Arc<OfflineArchiveBacking>>,
     offline_archive_module: Option<NormalizedAbsolutePath>,
+    java_offline_archive: Option<immutable_archive_preparation::ArchiveBinding>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1250,6 +1251,7 @@ impl Bodies {
             apple_support_import_sources: false,
             offline_archive: None,
             offline_archive_module: None,
+            java_offline_archive: None,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1690,15 +1692,20 @@ impl Bodies {
         cleanup_deadline: Instant,
         limits: SourceServiceLimits,
     ) -> Result<Arc<SourceServiceScope>, SourceServiceError> {
-        if self.offline_archive.is_some() {
-            return SourceServiceScope::new_for_test_with_offline_archive(
+        if self.offline_archive.is_some() || self.java_offline_archive.is_some() {
+            return SourceServiceScope::new_for_test_with_offline_archives(
                 workspace,
                 work_deadline,
                 cleanup_deadline,
                 limits,
                 self.rules_rust_defs_import_sources
                     .then(|| self.roots[1].dupe()),
-                self.offline_archive.clone(),
+                [
+                    self.offline_archive.clone(),
+                    self.java_offline_archive
+                        .as_ref()
+                        .map(|b| b.backing.clone()),
+                ],
                 false,
             );
         }
@@ -3282,6 +3289,36 @@ fn observe_native_command(
             backing,
             module,
         );
+        let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let archive = NormalizedAbsolutePath::new(
+            project
+                .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                .join(
+                    immutable_archive_preparation::JAVA_URL
+                        .strip_prefix("https://")
+                        .unwrap(),
+                ),
+        )
+        .unwrap();
+        let module = NormalizedAbsolutePath::new(
+            project.join(immutable_archive_preparation::JAVA_PREPARED_MODULE),
+        )
+        .unwrap();
+        bodies = immutable_archive_preparation::configure_java(
+            bodies,
+            registry_choice,
+            command,
+            OfflineArchiveBacking::new(
+                immutable_archive_preparation::JAVA_URL,
+                immutable_archive_preparation::JAVA_DIGEST,
+                archive,
+            ),
+            module,
+        );
     }
     let bodies = Arc::new(bodies);
     println!(
@@ -3304,7 +3341,7 @@ fn observe_native_command(
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
     let limits = bodies.native_source_limits(registry_choice, command);
-    let scope = SourceServiceScope::new_for_test_with_offline_archive(
+    let scope = SourceServiceScope::new_for_test_with_offline_archives(
         workspace.clone(),
         start + bodies.native_source_work_duration(registry_choice, command),
         start + Duration::from_secs(8),
@@ -3312,7 +3349,13 @@ fn observe_native_command(
         bodies
             .rules_rust_defs_import_sources
             .then(|| bodies.roots[1].dupe()),
-        bodies.offline_archive.clone(),
+        [
+            bodies.offline_archive.clone(),
+            bodies
+                .java_offline_archive
+                .as_ref()
+                .map(|b| b.backing.clone()),
+        ],
         true,
     )
     .unwrap();
