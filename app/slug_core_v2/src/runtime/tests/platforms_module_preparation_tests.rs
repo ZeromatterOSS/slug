@@ -295,7 +295,7 @@ const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
     "private/version_repo.bzl",
 ];
 const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
-const BAZEL_SKYLIB_IMPORTS: [&str; 11] = [
+const BAZEL_SKYLIB_IMPORTS: [&str; 13] = [
     "lib/paths.bzl",
     "lib/structs.bzl",
     "rules/common_settings.bzl",
@@ -307,8 +307,10 @@ const BAZEL_SKYLIB_IMPORTS: [&str; 11] = [
     "lib/partial.bzl",
     "lib/types.bzl",
     "lib/dicts.bzl",
+    "bzl_library.bzl",
+    "rules/private/bzl_library.bzl",
 ];
-const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 10] = [
+const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 13] = [
     "lib",
     "rules",
     "toolchains",
@@ -319,6 +321,9 @@ const BAZEL_SKYLIB_IMPORT_METADATA: [&str; 10] = [
     "toolchains/unittest/BUILD",
     "lib/BUILD.bazel",
     "lib/BUILD",
+    "rules/private",
+    "rules/private/BUILD.bazel",
+    "rules/private/BUILD",
 ];
 const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
     "BAZEL_DO_NOT_DETECT_CPP_TOOLCHAIN",

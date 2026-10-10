@@ -7664,6 +7664,17 @@ fn bazel_features_import_sources_need_is_opt_in_exact_table_only() {
 }
 #[test]
 fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
+    eprintln!(
+        "WP1085_SKYLIB_SOURCE_LAYOUT bodies={}/{} scope={}/{} row={}/{} sources={} metadata={}",
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>(),
+        std::mem::size_of::<&str>(),
+        std::mem::align_of::<&str>(),
+        std::mem::size_of_val(&BAZEL_SKYLIB_IMPORTS),
+        std::mem::size_of_val(&BAZEL_SKYLIB_IMPORT_METADATA),
+    );
     let operations = [
         PathObservationOperation::Lstat,
         PathObservationOperation::FileBytes,
@@ -7724,7 +7735,7 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 30);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 37);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -7733,6 +7744,43 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/skylib/Bzl_library.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/bzl_library.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/bzl_library.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/skylib/rules/private/bzl_library.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/skylib/rules/Private/bzl_library.bzl",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/rules/private/bzl_library.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        ("/skylib/rules/private", PathObservationOperation::FileBytes),
+        (
+            "/skylib/rules/private/BUILD.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/rules/private/BUILD",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/rules/private",
+            PathObservationOperation::DirectoryEntries,
+        ),
         ("/skylib/lib", PathObservationOperation::FileBytes),
         ("/skylib/rules", PathObservationOperation::FileBytes),
         ("/skylib/toolchains", PathObservationOperation::FileBytes),

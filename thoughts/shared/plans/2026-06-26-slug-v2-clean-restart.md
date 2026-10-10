@@ -34,18 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-297-m7a-original-offline-archive-cohort-r1
-Status: accepted — normal two-archive continuation under unchanged caps
+Packet: WP-7-298-m7a-skylib-bzl-library-source-r1
+Status: accepted — original two-file Skylib load closure
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records
-[WP1084](./slug-v2-subplans/wp1084-original-offline-archive-cohort-2026-10-10.json):
-normal original rules_java archive beside protobuf, five focused tests and
-native/default compile lanes passed. The single real continuation advanced to
-bzl_library.bzl Lstat in5.78764s with conservative peak205.371094MiB/256MiB,
-no source-service first error and unchanged quotas. Fixed Arc slots and borrowed
-original requests add no owned runtime strings. Next bounded source admission is
-being qualified. Terminal producer/Rustc/actions/certificates and full-workload
-fit remain open; Windows minimal/deferred. Goal ACTIVE.
+[WP1085](./slug-v2-subplans/wp1085-skylib-bzl-library-source-2026-10-10.json):
+the normal scoped Host read passed both original Skylib files and reached the
+genuine rules_cc cc/cc_library.bzl Lstat. The extended37-demand matrix and current
+compile/check gates passed; ONE native5.81243s/205.375MiB stayed under unchanged
+caps with no source/time error. Five static rows add no runtime owned strings or
+retained fields. The next source/producer closure is being qualified. Terminal
+producer/Rustc/actions/certificates/full-workload fit remain open; Windows minimal/
+deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 
