@@ -1,0 +1,220 @@
+{
+  "packet": "WP-7-314-m7a-normal-profile-producer-readiness-r1",
+  "baseline": "ba157b80300b87d400c211d23c0d65a18e4f6ca4",
+  "status": "REPLAN \u2014 preparation cap; unsuccessful readiness record FINAL ACCEPT",
+  "outcome": "Original Bzlmod/Core opt1 readiness and narrower Core1/Bzlmod0 refinement could not supply required test artifacts within60s preparation. Actual unchanged-profile Bzlmod7/Loading26 pass and Core1 production check succeeds. No candidate native launched.",
+  "compatibility": {
+    "existing_semantics": "exact unchanged accepted slices",
+    "resource_observer": "Slug-native",
+    "windows": "deferred"
+  },
+  "source": {
+    "rust_authorities": 36,
+    "metadata": 8,
+    "current_freeze_sha256": "12025d9a5f6475469dd3c69f846b237bbd2868511c7aee53c0a70d0497a3c7a8",
+    "current_hashes_match": true,
+    "runtime_changes": 0,
+    "fixture_changes": 0,
+    "allocation": "No new strings, pools, caches, keys or retained representation. Existing scoped interning/borrowed/shared carriers remain authoritative."
+  },
+  "focused": {
+    "selected": 33,
+    "passed": 33,
+    "families": {
+      "bzlmod": {
+        "tests": {
+          "stem": "bzlmod-tests",
+          "seconds": 0.12334536202251911,
+          "exit_code": 0,
+          "stop_reason": null,
+          "selected": 7,
+          "passed": 7,
+          "joined": true,
+          "owned_group_empty": true,
+          "operation_sha256": "bdec4bff2ca3e6dafdd49023cc3222acb81483aa633952c6554e8f4a4860d962",
+          "config_sha256": "3e468d6813fe85abb32fa61566ca0caddda942f1ba32345531a5d83b23a4610d",
+          "stdout_sha256": "7a0f2ca6e118607177304a964166fc2d918fd0fd6b0552671783a8aa67aca488",
+          "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "pins": 55,
+          "after_pins_available": true
+        },
+        "artifact": {
+          "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_bzlmod_v2-15691e4598a7cac3",
+          "sha256": "8960f6aabbc0f4e166907788ccf91ce942a067a9df5b35134a70fc78fbb6798f",
+          "features": [],
+          "compile_stem": "compile-bzlmod-core-only",
+          "compile_operation_sha256": "6a453199395e2b55b7fb200ca2e48349f2c1040d02d262743f74b9edc9384b80"
+        },
+        "preparation": {
+          "stem": "compile-bzlmod-core-only",
+          "seconds": 0.1061589770251885,
+          "exit_code": 0,
+          "stop_reason": null,
+          "selected": 0,
+          "passed": 0,
+          "joined": true,
+          "owned_group_empty": true,
+          "operation_sha256": "6a453199395e2b55b7fb200ca2e48349f2c1040d02d262743f74b9edc9384b80",
+          "config_sha256": "474a022343e15d88f18c705fac0a2cd7dcd0181855d923dad4ca1f7752408ab9",
+          "stdout_sha256": "b2c2dba325842b2a4979d72e0bdd5bc79847e8b0e2646826bae926dcf0b4ced2",
+          "stderr_sha256": "5ed4d317ff1d576d34d13e95550fd166de51c01baaf178723c91cabc688ea812",
+          "pins": 53,
+          "after_pins_available": true
+        }
+      },
+      "loading": {
+        "tests": {
+          "stem": "loading-tests",
+          "seconds": 0.3351560739101842,
+          "exit_code": 0,
+          "stop_reason": null,
+          "selected": 26,
+          "passed": 26,
+          "joined": true,
+          "owned_group_empty": true,
+          "operation_sha256": "f180f31934fef131796862be07d6128f5f5c3f8e22c0e0b9c4ea76dab3443867",
+          "config_sha256": "59e165907fc27cb57781b1130ae4414d9d0ca3c242f793e13d0d3caa91a0cab3",
+          "stdout_sha256": "88fa0dd8724d4dbc9ca93c509960bf11d0fcf7b2339c687f7bef17f64804fd1f",
+          "stderr_sha256": "c0c00333465dc403609f8a997640812f16a31806de9354ac700f0e27db00ce58",
+          "pins": 55,
+          "after_pins_available": true
+        },
+        "artifact": {
+          "path": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-340e3e66377ddbe2",
+          "sha256": "1cd3f52925565f5c6f43238390f07f7b7fea1d27219c69d701549ce33ab8e929",
+          "features": [],
+          "compile_stem": "compile-loading-core-only",
+          "compile_operation_sha256": "2a5b418f1cbe9fa3715fb38048f053bd478afd992377a5690745e6a682921b08"
+        },
+        "preparation": {
+          "stem": "compile-loading-core-only",
+          "seconds": 0.11599839990958571,
+          "exit_code": 0,
+          "stop_reason": null,
+          "selected": 0,
+          "passed": 0,
+          "joined": true,
+          "owned_group_empty": true,
+          "operation_sha256": "2a5b418f1cbe9fa3715fb38048f053bd478afd992377a5690745e6a682921b08",
+          "config_sha256": "387ccbb9fee846f22dbe919c2582dee9c2ad7cf8e84f584930a2944764b57e48",
+          "stdout_sha256": "e3ef806af3ccf315b6cc005647bef7b3adc78c7e770816f00320816dfdec0e39",
+          "stderr_sha256": "5ed4d317ff1d576d34d13e95550fd166de51c01baaf178723c91cabc688ea812",
+          "pins": 53,
+          "after_pins_available": true
+        }
+      }
+    },
+    "qualification": "Fresh current artifact/list/preflight/body records at Bzlmod0 and Loading0/Bzlmod0; these do not exercise Core1 runtime or grant fresh optimized-Bzlmod credit."
+  },
+  "production_check": {
+    "stem": "production-check-core-only",
+    "seconds": 16.93899291299749,
+    "exit_code": 0,
+    "stop_reason": null,
+    "selected": 0,
+    "passed": 0,
+    "joined": true,
+    "owned_group_empty": true,
+    "operation_sha256": "7f2ed088086313436e397bacc0791f81715ba8f95dbe8e13055c2e7c785476e1",
+    "config_sha256": "70b9590c9454e93ed2b0a477ba221a4642a9828f4d969388f6674cf0a7b0d3c5",
+    "stdout_sha256": "2d762465ce99ac0ce33067280b3aacd1b453e5e7adc418278e2ac60dc34667e7",
+    "stderr_sha256": "35e00e797a7a991dd68e5b8c0a749d800e91eb3074bff51d4876d191fbfc9f57",
+    "pins": 53,
+    "after_pins_available": true
+  },
+  "capped_preparations": [
+    {
+      "stem": "compile-bzlmod",
+      "seconds": 60.06129489396699,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "selected": 0,
+      "passed": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "operation_sha256": "ad1d357e01af68664fdbd91b3ca826878c2ce5a8aa15d76d92a034f0444e3350",
+      "config_sha256": "b1d2a16c2bbecfe116f36a8d79ece097ede16ed647728b84e22578a1033c2a0d",
+      "stdout_sha256": "a8fbc01a3ddcbbdb5d84c51dd8ff394b802421f409ee279ac917d00c6ebc40bd",
+      "stderr_sha256": "95e9ea40cd6732a9906fb4dd5af839374f73ee887ad89e377d2d4df8e935e4c5",
+      "pins": 53,
+      "after_pins_available": false
+    },
+    {
+      "stem": "compile-bzlmod-library",
+      "seconds": 60.033077509957366,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "selected": 0,
+      "passed": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "operation_sha256": "6051770819a6092af5a46dd1076a9cfdb891bda2977eaa22bd11623d3f557f86",
+      "config_sha256": "543274b9f62ad796000e995481ff4924bc47e53b9f857dac3e283eeef3c45ba4",
+      "stdout_sha256": "36c3adb2a3c82d1738f12c92cacfd92f713aee70571b54440f67bea3e6bf210b",
+      "stderr_sha256": "df8d1a1b7577d65e9d76f8576dcb868e89b2d498d1c6c8349c33c49074627390",
+      "pins": 53,
+      "after_pins_available": false
+    },
+    {
+      "stem": "compile-core-core-only",
+      "seconds": 60.06554445193615,
+      "exit_code": -15,
+      "stop_reason": "deadline",
+      "selected": 0,
+      "passed": 0,
+      "joined": true,
+      "owned_group_empty": true,
+      "operation_sha256": "ee2b5b6ba7492fcacc787c52ebc0ca5c7693c150e7f4ad60e104ae36faaba570",
+      "config_sha256": "436751e709ce8d6f2a607e80745215dd49f56b79b372b1f05550f2bfd3550157",
+      "stdout_sha256": "afc1d1904a7ab2aac0c493256cc97659944f7bbc1bc3c868b8724408c4ed4073",
+      "stderr_sha256": "6339513d4cb4429f61cd829dd4e08034db3ed650590b22aae107e54069b1eaf7",
+      "pins": 53,
+      "after_pins_available": false
+    }
+  ],
+  "capped_claim_limit": "All53 after-pin entries unavailable at deadline in each capped stage; not normalized to stable. No completed affected test/library artifact accepted, no timing/runtime-correctness or memory-fit inference. Compiler RSS uncapped and never workload memory credit.",
+  "native": {
+    "executed": false,
+    "core18": "unproved at candidate profile",
+    "ignored_singleton": "unproved at candidate profile",
+    "candidate_workload_memory": "unproved",
+    "previous_accepted_prefix": "WP1101 phase227.86328125MiB under256,producer still WorkDeadline7; prior evidence only,not candidate."
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1102/design-review.md",
+      "sha256": "d6d4f1bcefc9fe7e1ed0b2647842fdd484ba2a4c92afcacb3e0172e2cc2a57bb"
+    },
+    "design-delta-review.md": {
+      "path": "target/wp1102/design-delta-review.md",
+      "sha256": "013b389a40d777386a2745972d04311ac9d6170b9c502af5d3e4ff92313fa419"
+    },
+    "helper-review.md": {
+      "path": "target/wp1102/helper-review.md",
+      "sha256": "1b6257902274086c7450e5992acd77452c6c97cddb0e69976f5465acd6ae88be"
+    },
+    "helper-delta-review.md": {
+      "path": "target/wp1102/helper-delta-review.md",
+      "sha256": "f8cd7f8e9f520a42a9d9695802f22fd5f980bde6ad7e5026ad2f0d6a3b7da654"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1102/final-source-review.md",
+      "sha256": "184e822206c0e6e6e98f18e3c56ad6576d27fdbf7f6697f2d0be94db78533cb2",
+      "verdict": "ACCEPT of unsuccessful readiness record"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1102/final-evidence-review.md",
+      "sha256": "0d03bcaf12c0fa2d415cd8ffcd69f2cdeca5fcd69677090705fbea8bf0bafe37",
+      "verdict": "ACCEPT of unsuccessful readiness record"
+    }
+  },
+  "next": "Current source research found no admitted current-demand correction: local_jdk raw / Lstat already has scoped SourceService route. No hypothetical runtime repair or unchanged capped repeat. Requested user exception for compilation-only180s; remains unapproved; preserve workload memory/runtime/admission caps.",
+  "goal": "ACTIVE; M7A/M8/actions/Rustc/wholefit incomplete",
+  "elapsed_since_design_binding_seconds": 424.75948,
+  "reviewed_candidate_sha256": "603e31f89fe6150202c847839efed4bf92684df9718ec6bcf60fa00401db174b",
+  "research": {
+    "path": "target/wp1102/next-producer-research.md",
+    "sha256": "179253fbe99b982132487f34258cac4b77d26ec50242781964baae06eaded66a"
+  },
+  "recorded_at_utc": "2026-10-10T23:38:14.585974+00:00"
+}

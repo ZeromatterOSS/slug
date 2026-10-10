@@ -34,19 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-313-m7a-extension-definition-frontier-r1
-Status: accepted — 51 focused proofs, production check, ONE native and independent FINAL ACCEPT
+Packet: WP-7-314-m7a-normal-profile-producer-readiness-r1
+Status: REPLAN — optimized preparation exceeds skill60s; FINAL record ACCEPT
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepted compatible
-missing-input batching across independent observed extension-definition rows.
-Borrowed module carriers and attempt-local Need unions add no persistent string
-storage. Fresh51 proofs and production checks pass; independent FINAL reviews
-accept the [receipt](./slug-v2-subplans/wp1101-extension-definition-frontier-2026-10-10.json).
-The original native prefix peaks at227.863MiB under256, but producer completion
-remains at WorkDeadline7 with source252/root333 and the same queued local_jdk
-Lstat. No native timing, frequency, advancement or whole-workload fit is proved.
-Next is the reviewed distinct Bzlmod/Core opt1 build-readiness experiment under
-unchanged sources/admission/caps. Linux priority and minimal Windows persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) records an incomplete
+Core1/Bzlmod0 build-readiness experiment. Three optimized preparation stages hit
+the skill60s cap; no candidate native ran. Current33 controls and Core1 production
+check pass; [FINAL receipt](./slug-v2-subplans/wp1102-producer-profile-preparation-limit-2026-10-10.json)
+accepts only that qualified record. A compilation-only180s exception was requested;
+existing caps remain pending explicit user response. WP1101 allocation-safe
+batching remains accepted,51 proofs pass, original observed prefix227.863MiB fits
+256 but full producer remains at WorkDeadline7/source252/root333. No unsupported
+runtime/cache/admission repair was identified. Linux priority and minimal Windows persist.
 
 ### Ready and blocked queue
 

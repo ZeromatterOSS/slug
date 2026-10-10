@@ -1,96 +1,84 @@
-# WP1101 independent extension-definition source frontier
+# WP1102 Core-profile producer readiness
 
-Packet: WP-7-313-m7a-extension-definition-frontier-r1
-Status: accepted — 51 focused proofs, production check, ONE native and independent FINAL ACCEPT
-Baseline: 852bf47ea46f2ddeb356ea6aad43e5b3aefdb547 (WP1100 accepted)
+Packet: WP-7-314-m7a-normal-profile-producer-readiness-r1
+Status: REPLAN — optimized preparation exceeds skill60s; FINAL record ACCEPT
+Baseline: ba157b80300b87d400c211d23c0d65a18e4f6ca4 (WP1101 accepted)
 
-Outcome: one observed loaded-definition retry requests compatible missing inputs
-from independent known extension-definition rows together. Normal producer
-preparation advances; no new source admission or invocation capability. Successful
-ordered definitions/errors/observations/events remain exact under accepted Stage4
-source/graph parity controls. Need scheduling is Slug-native; Windows deferred.
-Allocation discipline in AGENTS remains mandatory. Original profile unchanged;
-target/wp1101/profile-proposal.md is an unactivated alternative, no gate credit.
+Outcome: execute the existing original normal compiler producer at an explicitly
+changed build configuration and preserve its actual next typed terminal under
+unchanged resource limits. This is functional readiness, with no timing/speed or
+CPU-cause acceptance claim. Existing exact semantic slices remain exact;
+resource/native observer evidence is Slug-native; Windows deferred.
 
-Basis: current drive_loaded_extension_definitions in Loading bzl_module.rs3760
-walks a completed immutable requests list, but first missing child exits via its
-finisher3733. Generic external child sources already batch independent Needs.
-Current command configuration and per-demand path transport already batch/reuse;
-historical retry116 global fanout is superseded and is not current CPU evidence.
-Research target/wp1101/independent-frontier-research.md; Stage4 accepted observed
-loaded real-order/parity, identity/finisher and lifecycle/cancellation tests.
-DICE ownership/dependency/validity/cancellation authority docs/developers/dice.md.
-Reuse original typed Needs/try_union and original scoped CompactString/Arc owners;
-no donor extraction, new retained representation or Stage9 activation.
+Basis: Cargo.toml profile.dev.opt-level=1, while accepted original native config
+had Bzlmod/Core overrides0 (Loading already1). Reviewed proposal/design:
+target/wp1101/profile-proposal.md and profile-design-review.md; their decision
+remains valid after WP1101 same source252/root333/WorkDeadline7 and under256MiB.
+Current source hashes equal accepted WP1101. Restore only Core override to1; retain Bzlmod0 in ignored preparation configurations; debug0/all other package settings,
+features, request/source/admission, DICE owners and allocation representation
+stay unchanged. No new semantic/cache/key/interner/retained storage or strings.
+Actual next terminal selects further normal producer work, never a new source
+grant from a projected owner header.
 
-Decision: only Observed mode accumulates compatible Needs in request order and
-continues independent rows. Legacy still firstNeed. Conflict stops scan and returns
-the earlier accumulated Need (serial fallback, resolves on next ordinary retry;
-not a newly invented terminal). Earlier semantic label/module/export/wrong-kind
-error remains immediate and prevents later probes. A later semantic error after
-Need stops scan and returns earlier Need, allowing original earlier input to settle
-first. Observed Bzl/merge outer errors remain immediate as existing external child
-contract. No parent Complete or prepared inputs/invocation/instantiation before all
-Needs settle. Successful definitions keep exact order/identity; duplicate demands
-union using existing full identity and canonical sorted demand order. Original whole-Need source guards still apply;
-a wider mixed family can reveal an existing unsupported prerequisite earlier.
-No partial admission, filesystem fallback, new graph/key/hash/equality/validity,
-namespace sharing, request cache, source/policy reconstruction or new authority.
+Allowlist: scheduling manifest/canonical status and one compact receipt. Ignored
+target/wp1102 holds rebound helpers/configuration/compile/test/review/evidence.
+No Rust, Cargo/lock/toolchain, fixtures, original corpus or runtime cap edits.
+Reuse WP1101 runner/decoders with ROOT-only rebinding and original exact selectors;
+source vector350, env18 and callers remain original. No donor/parity change or
+new fixture; reuse existing source/graph/lifecycle proofs and admission owners.
+Allocation discipline remains AGENTS-owned; observed prefix memory is not whole
+producer/interner/history fit or native source-body retirement evidence.
 
-Memory: optional Needs plus existing union temporaries are attempt scratch from
-original immutable owners; release when returning retry/error/cancellation. Keep
-observations by handling child Need before consuming existing finisher, no added
-observation Dupe per completed row. Do not retain completed definition projections
-after an earlier Need: validate error barriers, then drop the original module
-carrier. No owned string copies beyond original decisive errors/results; no new
-interner because transient borrowed/shared carriers already fit.
+Gates: serial pinnednightly2025-09-14 CargoJSON no-run offline/locked/jobs1,
+separate60s preparation with compiler RSS uncapped/no workload-memory credit.
+Fresh Bzlmod7 test artifact at accepted Bzlmod0; fresh Loading26 at its
+original Loading0/Bzlmod0; Core18 native-observer artifact with Loading1/Bzlmod0/
+Core1; current unique artifact/list/batched preflight/nonzero exact bodies.
+Direct production Loading/Core/CLI check uses Core1/Bzlmod0/Loading1.
+Preparation may split successful prerequisites from a remaining distinct stage;
+cap/failed stage has zero artifact credit, no identical indefinite retry.
+Standalone fresh-shell ignored singleton list and ONE candidate native only
+after independent design/config/prelaunch review/allwritersSTOPPED. Preserve
+10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/cleanup3 and all byte/attempt/
+object/directory/log/source ceilings. Same350ordered heldFD before/after brackets
+and18env, source/caller/helper/current artifact hashes; no body/envvalue/archive
+inspection by agents. Authenticate streams/pin maps before exact strictdecode.
+No smaller authentic-root substitute, unchanged replay, capraise or source-policy
+fallback. SourceAttempts256 remains and actual refusal may name the next gate.
 
-Allowlist app/slug_loading_v2/src/bzl_module.rs for bounded loop and one private
-test-child registration; NEW app/slug_loading_v2/src/bzl_module/module_extension_definition_loading_tests/frontier_tests.rs
-for cohesive proof using parent private fixture, no copied harness. Existing large
-owner retained for same ordered semantic loop, estimated <=50 runtime lines and
-<=250 test lines in child. Root scheduling docs and compact receipt only otherwise.
-Do not alter original finisher, other child scheduling, source policy, Cargo,
-fixture sources/corpus, native guards/resource owner or upstream semantics.
+REPLAN when readiness needs a new source admission/semantic owner or altered
+resource decision; an actual resource refusal is preserved without pretending
+semantic success. A natural next typed boundary may be selected under existing
+authorization. Review actual current config/proofs/native outcome at FINAL; diff/
+archive/plan checks and compact commit. Goal ACTIVE; no M7A/M8/certificate/actions/
+Rustc/fullfit claim until corresponding real terminal evidence is available.
 
-Proof threshold: actual DICE observed request with >=2 independently missing
-source files produces one ordered compatible Need and no parent publication or
-invocation. Reverse order/dedup, earlier error no-later probe, earlier Need/later
-error barrier, conflict serial fallback, source repair/ordered success/warm event
-reuse, unchanged Legacy firstNeed. Existing three loaded-definition controls and
-protected external sibling/syntax/root package reuse and lifecycle controls cover
-full identities, source A/B/A, events/cancellation and no upper keys. Timing/native
-frequency/speed and whole-workload fit are not proved by a tiny graph.
+Predecessor: WP1101 ba157b803 accepted observed definition-frontier batching,
+51 current original-profile proofs/prod/ONE native. Prefix227.863MiB; producer
+same WorkDeadline7 at source252/root333; compact accepted receipt in
+wp1101-extension-definition-frontier-2026-10-10.json.
 
-Gates: current original-profile Loading20 plus three loaded-definition controls
-and new focused child tests; Bzlmod7/Core18 protected current-source gates;
-production Loading/Core/CLI direct check. CargoJSON/no-run pinnednightly2025-09-14,
-offline/locked/jobs1 serial60s preparation; unique current lists/batched preflight/
-nonzero bodies. Keep original native Loadingopt1/Coreopt0 (ordinaryLoadingopt0),
-then standalone ignored singleton list. ONE changed-source original native after
-independent DESIGN/source/prelaunch and all writers STOPPED: same350ordered heldFD
-sources/18environment; inherit WP1100 exact10s/RSS256MiB/AS512/work7/default5/
-lifetime8/cleanup3 and all byte/attempt/object/directory/log ceilings, no capraise,
-source/body/env-value inspection by agents, smaller authentic-root substitute or
-identical replay. Existing authentic strict decoders, source/fixture/caller pins
-rebound to actual changed Loading owner and executable; absent/refused output stays
-unproved. Actual next typed boundary decides further implementation. Memory prefix
-WP1100~227MiB is under256, not full producer/wholefit/certificate/actions/Rustc proof.
-Format changed Rust only, diff/archive/plan, independent FINAL diff/evidence and
-compact receipt/commit. Goal ACTIVE; M7A/bootstrap closure remains open.
+Design delta: both original Bzlmod1 test60.061s and distinct library60.033s
+preparation stages reached deadline, joined/empty and no Bzlmod artifact credit.
+Preserve their original configurations/streams, never retry them. Narrow to the
+explicitly different Core1/Bzlmod0 configuration (all other settings unchanged).
+Only named *-core-only preparation stages may execute after delta DESIGN review.
+Native remains ONE and unexecuted; no runtime memory/correctness inference from
+compiler cap. This is a preparation feasibility refinement in the same readiness
+outcome; any Core preparation cap also stops its unchanged stage.
 
-REPLAN only if independent row evaluation cannot preserve ordering/publication
-without a new semantic owner or source admission; ordinary compiler/fixture
-corrections remain inside contract. Conflict fallback is deliberate scheduling,
-not a semantic bridge; removal when original Needs can union, tested by recovery.
-
-Acceptance: [compact receipt](./wp1101-extension-definition-frontier-2026-10-10.json).
-Loading26/Bzlmod7/Core18 all pass with fresh original-profile artifacts. Original
-producer probe passed its observer checks in7.787s with227.863MiB phase peak,
-but remains at WorkDeadline7/caller7:296, source252/root333 and the same queued
-Materialization13 local_jdk Lstat. No native timing/frequency/advancement or whole
-producer-fit claim. Parent+42/-8 includes one test registration; cohesive child
-202 authored/369 formatted lines reuses existing fixture. Independent FINAL
-source/evidence ACCEPT; actual runtime source/admission/caps unchanged. Next
-is the reviewed, distinct Bzlmod/Core opt1 build-readiness experiment, preserving
-all original sources and resource limits. Goal ACTIVE; M7A/bootstrap incomplete.
+Recorded outcome: [compact receipt](./wp1102-producer-profile-preparation-limit-2026-10-10.json).
+Three capped preparations: Bzlmod1 test60.061s/library60.033s and Core1 test60.066s;
+each joins/empties owned group, has53unavailable after-pins and zero affected
+artifact credit. Current Bzlmod7/Loading26 pass (accepted profile), production
+Core1 check16.939s passes. No Core18/current native singleton/native probe ran.
+Independent FINAL source/evidence accept only this unsuccessful readiness record.
+Source research found no supported current-demand runtime correction: original
+local_jdk '/' Lstat already has an admitted scoped SourceService route. Do not
+invent a cache/frontier/admission fix or replay capped stages unchanged. User
+exception requested for compilation-only180s because orchestration skill says
+"Compile separately, with preparation bounded to 60 seconds." No exception yet;
+existing cap remains. If authorized, use a new explicitly180s remaining Core-only
+test preparation, all runtime/memory/source/admission caps unchanged, then missing
+Core18/singleton/prod binding and one native with fresh independent prelaunch.
+Goal ACTIVE; M7A/M8/fullfit incomplete.
