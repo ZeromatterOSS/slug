@@ -9029,6 +9029,24 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
         "/apple/crosstool/BUILD.toolchains",
         Some("/apple"),
     );
+    assert_exact_root_file_role(
+        APPLE_SUPPORT_CROSSTOOL_METADATA[4],
+        &[PathObservationOperation::Lstat],
+        Bodies::with_apple_support_crosstool_metadata,
+        |b| b.apple_support_crosstool_metadata,
+        &[
+            "/apple/CONFIGS",
+            "/apple/configs.bak",
+            "/apple/configs/child",
+            "/apple/other/configs",
+            "/apple-other/configs",
+            "/apple/configs/BUILD",
+            "/apple/configs/BUILD.bazel",
+            "/apple/configs/BUILD.toolchains",
+        ],
+        "/apple/configs",
+        Some("/apple"),
+    );
     // Reuse the Shell factory, but isolate Apple metadata from the Shell role.
     bodies.rules_shell_import_sources = false;
     bodies = bodies.with_apple_support_crosstool_metadata(
@@ -9052,8 +9070,10 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
         "/apple/crosstool/BUILD.toolchains",
         PathObservationOperation::Lstat,
     );
+    let configs = need("/apple/configs", PathObservationOperation::Lstat);
     assert!(
-        bodies.admit(&directory).is_ok()
+        bodies.admit(&configs).is_ok()
+            && bodies.admit(&directory).is_ok()
             && bodies.admit(&marker).is_ok()
             && bodies.admit(&fallback).is_ok()
             && bodies.admit(&toolchains).is_ok()
@@ -9064,8 +9084,10 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
         .try_union(&fallback)
         .unwrap()
         .try_union(&toolchains)
+        .unwrap()
+        .try_union(&configs)
         .unwrap();
-    assert_eq!(allowed.path_observations().unwrap().demands().len(), 4);
+    assert_eq!(allowed.path_observations().unwrap().demands().len(), 5);
     assert!(bodies.admit(&allowed).is_ok());
     let source = need(
         "/apple/crosstool/setup.bzl",
@@ -9087,6 +9109,15 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             bodies.apple_support_crosstool_metadata = metadata_enabled;
             bodies.apple_support_import_sources = source_enabled;
             assert_eq!(bodies.admit(&allowed).is_ok(), metadata_enabled);
+            assert_eq!(bodies.admit(&configs).is_ok(), metadata_enabled);
+            for operation in [
+                PathObservationOperation::FileBytes,
+                PathObservationOperation::FileDigest,
+                PathObservationOperation::ReadLink,
+                PathObservationOperation::DirectoryEntries,
+            ] {
+                assert!(bodies.admit(&need("/apple/configs", operation)).is_err());
+            }
             assert_eq!(bodies.admit(&source).is_ok(), source_enabled);
             assert_eq!(bodies.admit(&environment).is_ok(), source_enabled);
             for marker in ["/apple/crosstool/BUILD.bazel", "/apple/crosstool/BUILD"] {
@@ -9123,6 +9154,26 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
     assert!(bodies.admit(&allowed).is_ok());
     let mut progress = 0;
     for bad in [
+        ("/apple/configs", PathObservationOperation::FileBytes),
+        ("/apple/configs", PathObservationOperation::FileDigest),
+        ("/apple/configs", PathObservationOperation::ReadLink),
+        ("/apple/configs", PathObservationOperation::DirectoryEntries),
+        ("/apple/CONFIGS", PathObservationOperation::Lstat),
+        ("/apple/configs.bak", PathObservationOperation::Lstat),
+        ("/apple/configs/child", PathObservationOperation::Lstat),
+        ("/apple/other/configs", PathObservationOperation::Lstat),
+        ("/apple-other/configs", PathObservationOperation::Lstat),
+        ("/apple/configs/BUILD", PathObservationOperation::Lstat),
+        (
+            "/apple/configs/BUILD.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/apple/configs/BUILD.toolchains",
+            PathObservationOperation::Lstat,
+        ),
+        ("/cc/configs", PathObservationOperation::Lstat),
+        ("/shell/configs", PathObservationOperation::Lstat),
         ("/apple/crosstool", PathObservationOperation::FileBytes),
         (
             "/apple/crosstool",
@@ -9276,6 +9327,15 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
             path("/apple/crosstool/BUILD.toolchains"),
             PathObservationOperation::Lstat,
         )),
+    )))
+    .chain(std::iter::once(SourcePreparationNeeds::path(
+        NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(1),
+            ),
+            path("/apple/configs"),
+            PathObservationOperation::Lstat,
+        )),
     ))) {
         let expected = bad.path_observations().unwrap().demands().first().unwrap();
         for mixed in [
@@ -9356,7 +9416,7 @@ fn apple_support_crosstool_metadata_matrix(mut bodies: Bodies) {
     let SourcePreparationOutcome::Need(recovered) = root.need(allowed).unwrap() else {
         panic!("all authorized metadata demands must preserve the original Need");
     };
-    assert_eq!(recovered.path_observations().unwrap().demands().len(), 4);
+    assert_eq!(recovered.path_observations().unwrap().demands().len(), 5);
     assert_eq!(
         recovered
             .path_observations()

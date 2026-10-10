@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-package-marker-metadata-r1
+Packet: WP-7-289-m7a-normal-rustc-apple-configs-metadata-r1
 Status: accepted — actual FINAL and operative receipt complete
 
-[WP1075](./slug-v2-subplans/wp1075-apple-package-marker-metadata-2026-10-10.json) admits exact root BUILD.bazel Lstat
-for the validated original Apple repository under the existing checked
-generated and Apple source context; no new role or profile. Original full Spec/plan/current transaction authority is preserved.
-Existing borrowed descriptor and path storage is reused; added static tables,
-owned production strings and retained fields0. Source-8net,
-helpers83net; actual memory/layout evidence in receipt.
+[WP1076](./slug-v2-subplans/wp1076-apple-configs-metadata-2026-10-10.json) admits exact selected Apple configs Host Lstat
+under the existing PreparedFile/PublicProbe metadata role/root/workspace.
+One static metadata row4→5/table64→80 +16reference bytes/literals71→78 +7bytes.
+Typed Spec/plan/currentepoch namespace policy and source4 remain unchanged.
+Borrowed storage is reused; owned production strings/retained fields0. Source61net,
+helpers50net; actual memory/layout evidence in receipt.
 All311 ordered source triples remain unchanged.104names/106current records,
-currentcapture0,failed/superseded0. Native5.836761200s/210440KiB below256MiB.
+currentcapture0,failed/superseded0. Native6.032619267s/209828KiB below256MiB.
 Both successor notes freeze the actual next boundary. Borrow/transfer first;
 existing scoped interners fit repeated retained strings with matching lifetime
 and cleanup. Full normal Rustc/actions/certificates/producer/whole-workload fit
