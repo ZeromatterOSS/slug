@@ -1,6 +1,11 @@
 use super::*;
 
 #[cfg(target_os = "linux")]
+mod progress_refusal_tests {
+    include!("public_probe_preparation_tests/progress_refusal_tests.rs");
+}
+
+#[cfg(target_os = "linux")]
 mod immutable_archive_namespace {
     include!("public_probe_preparation_tests/immutable_archive_namespace.rs");
 }
@@ -501,6 +506,30 @@ impl GuardedSingleton {
 #[async_trait]
 impl NativeCommandRoot for GuardedSingleton {
     type Terminal = SingletonRootSingleBuildCommandTerminal;
+    #[cfg(target_os = "linux")]
+    fn progress_refused(
+        &self,
+        needs: &SourcePreparationNeeds,
+        command: &NativeDemandCommand<'_>,
+        attempt: usize,
+        error: &NativeDemandSessionError,
+    ) {
+        use std::io::Write;
+        if let Some(diagnostic) =
+            progress_refusal_diagnostic::ProgressRefusalDiagnostic::for_refusal(
+                &self.inner.0,
+                command,
+                needs,
+                attempt,
+                error,
+            )
+        {
+            // Reporting is synchronous and never replaces the original refusal.
+            let _ = std::io::stdout()
+                .lock()
+                .write_fmt(format_args!("{diagnostic}"));
+        }
+    }
     fn complete<'a>(
         &'a self,
         terminal: &'a mut Self::Terminal,

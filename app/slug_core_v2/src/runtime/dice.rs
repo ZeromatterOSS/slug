@@ -23,6 +23,10 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::task::Poll;
 
+#[cfg(all(test, target_os = "linux"))]
+#[path = "progress_refusal_diagnostic.rs"]
+mod progress_refusal_diagnostic;
+
 #[cfg(feature = "native-probe-observer")]
 macro_rules! begin_probe_phase {
     ($binding:ident, $runtime:expr, $phase:ident) => {
@@ -1260,6 +1264,16 @@ impl NativeCommandCompletionContext<'_, '_> {
 #[async_trait]
 trait NativeCommandRoot: Clone {
     type Terminal: Clone;
+
+    #[cfg(all(test, target_os = "linux"))]
+    fn progress_refused(
+        &self,
+        _needs: &slug_bzlmod_v2::SourcePreparationNeeds,
+        _command: &NativeDemandCommand<'_>,
+        _attempt: usize,
+        _error: &NativeDemandSessionError,
+    ) {
+    }
 
     // Local driver future: adding completion does not impose new Send bounds on
     // ordinary roots. Only this private owner receives graph/session authority.
@@ -6678,6 +6692,8 @@ impl WorkspaceRuntime {
             match attempt {
                 CommandAttemptResult::Retry(needs) => {
                     if let Err(error) = guard.progress(&needs) {
+                        #[cfg(all(test, target_os = "linux"))]
+                        root.progress_refused(&needs, guard.command(), attempts, &error);
                         return guard.abort(error);
                     }
                 }

@@ -34,21 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-311-m7a-package-attempt-provenance-sharing-r1
-Status: ACCEPTED — current40/production/ONE native/FINAL; broader producer successor ready
+Packet: WP-7-312-m7a-original-progress-need-projection-r1
+Status: accepted —45 ordinary/production/ONE native/FINAL ACCEPT; next owner selection underway
 
 The [current manifest](./slug-v2-subplans/current-packet.md) and
-[WP1099 receipt](./slug-v2-subplans/wp1099-package-attempt-provenance-sharing-2026-10-10.json)
-accept private invocation-local sharing of the existing full loaded-Bzl
-provenance Arc across normal glob retries. All40 current controls, production,
-ONE native and FINAL pass; Stage9 explicitly amends only this finite lifetime.
-Observed supervisor225.953125MiB/exactphase226.92578125MiB remain under256;
-source252/decode55574923/write52796422/root333 and WorkDeadline7:296 unchanged.
-Next select broader normal compiler producer readiness from the original typed
-retry Need/context at first progress refusal, rather than another adjacent cache.
-Full producer/time/wholefit/certificates/Rustc/actions/bootstrap remain open.
-Borrow/move/share strings and use scoped interners where owner and cleanup fit;
-original caps unchanged. Linux priority, Windows deferred. Goal ACTIVE.
+[WP1100 receipt](./slug-v2-subplans/wp1100-original-progress-need-projection-2026-10-10.json)
+accept the bounded borrowed original retry diagnostic. ONE native stayed at
+225.77MiB supervisor/226.61MiB phase peak under256, with the same WorkDeadline7:296
+and source252/root333. The original queued work is Lstat `/`, Materialization13,
+current generated `rules_java++toolchains+local_jdk` owner header at attempt333.
+FullSpec/sourceidentity/options and preceding CPUcause remain unavailable. Next
+match its existing full request, source policy and normal producer continuation;
+no new authority from projected headers. Allocation borrowing/sharing discipline,
+original caps, Linux priority and minimal/deferred Windows persist. Full producer/
+time/wholefit/certificates/Rustc/actions/bootstrap open; goal ACTIVE.
 
 ### Ready and blocked queue
 

@@ -3521,6 +3521,7 @@ dependencies = [
  "regex",
  "rustls",
  "rustls-native-certs",
+ "serde_json",
  "sha2",
  "slug_analysis_v2",
  "slug_build_api_v2",
