@@ -34,22 +34,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-toolchains-metadata-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-toolchains-source-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1069](./slug-v2-subplans/wp1069-apple-crosstool-toolchains-metadata-2026-10-10.json) accepts exact Apple
-crosstool/BUILD.toolchains Host Lstat under the existing checked cfgtest metadata role:
-full4/body0, source3 and environment2/union19 remain independent.
-Borrowed static table64B/newreference16B/newliteral26B/first9B/second21B/third15B/total71B;
+[WP1070](./slug-v2-subplans/wp1070-apple-crosstool-toolchains-source-2026-10-10.json) accepts the measured734B Apple
+crosstool/BUILD.toolchains source under the existing checked original-root role:
+full4/Need8, independent metadata4/body0 and environment2/union19.
+The fourth source entry shares metadata[3] literal storage: table64B/newreference16B,
+newliteral0B/logical referenced-name bytes103B; metadata64B/literals71B unchanged.
 Boolean growth0/Bodies200B/align8 without attributed padding, no new owned
-production strings or retained fields. Source82net=38authored+44formatter,
-helper31net; independent STATIC and FINAL accepted the existing matrix delta.
-All310 source signatures unchanged;104names/106current native records,
-failed/superseded/currentcapture0. Native4.942964541s/209896KiB below256MiB.
+production strings or retained fields. Source106net=38authored+68formatter,
+helper78net; independent STATIC and FINAL accepted the matrix delta.
+Old310 ordered signatures preserved plus sole734B END311/[188,123]/6480266physical/
+12960532bracket.104names/106nativegate records plus rawcapture1zeroTests=107allphase;
+failed/superseded0. Native4.938802938s/209336KiB below256MiB.
 The actual next boundary and owner fields are frozen in both successor notes;
-metadata does not establish body/caller/closure/certificate proof.
+finite source readiness does not establish normal kind/caller/closure/certificates.
 Borrow/transfer first; existing scoped interners when repeated retained
 strings' owner lifetime and cleanup fit. Full Rustc/actions/certificates,
 normal producer and whole-workload fit remain open. Windows minimal/deferred.

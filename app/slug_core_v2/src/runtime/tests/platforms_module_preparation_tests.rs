@@ -458,10 +458,11 @@ const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 4] = [
     "crosstool/BUILD",
     "crosstool/BUILD.toolchains",
 ];
-const APPLE_SUPPORT_IMPORTS: [&str; 3] = [
+const APPLE_SUPPORT_IMPORTS: [&str; 4] = [
     "crosstool/setup.bzl",
     "crosstool/setup_internal.bzl",
     "crosstool/osx_cc_configure.bzl",
+    APPLE_SUPPORT_CROSSTOOL_METADATA[3],
 ];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
