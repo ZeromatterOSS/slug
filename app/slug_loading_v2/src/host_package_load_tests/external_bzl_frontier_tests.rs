@@ -662,3 +662,235 @@ async fn external_bzl_synopsis_preserves_source_identity_encoding_and_error_orde
     assert!(!ExternalBzlSyntaxKey::validity(&defensive));
     assert!(!ExternalBzlSyntaxKey::equality(&defensive, &defensive));
 }
+
+// The callback sees the production prefix while its next child awaits source.
+// Weak sampling does not perturb the carrier count or retain a module body.
+struct ChildCarrierTracker {
+    inner: FrontierTracker,
+    later: PathObservationDemand,
+    carrier: Mutex<Weak<Result<super::super::FrozenBzlModule, ExternalBzlModuleError>>>,
+    observed_count: Mutex<Option<(usize, usize, usize)>>,
+}
+impl ActivationTracker for ChildCarrierTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
+        data: ActivationData,
+    ) {
+        self.inner.key_activated(key, deps, data);
+    }
+    fn tracks_rich_activations(&self) -> bool {
+        self.inner.tracks_rich_activations()
+    }
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if key
+            .downcast_ref::<PathObservationKey>()
+            .is_some_and(|key| key.demand() == &self.later)
+        {
+            let count = self.carrier.lock().unwrap().strong_count();
+            let mut observed = self.observed_count.lock().unwrap();
+            let (expected, samples, case) =
+                observed.as_mut().expect("later byte sampling is armed");
+            assert_eq!(
+                count,
+                *expected,
+                "every later byte activation sees the live prefix carrier: case={case} kind={:?} sample={samples}",
+                activation.kind()
+            );
+            *samples = samples
+                .checked_add(1)
+                .expect("finite callback sample count");
+        }
+        self.inner.key_activated_rich(key, activation);
+    }
+    fn root_completed(&self, key: &DynKey, root: RootActivation, transient: bool) {
+        self.inner.root_completed(key, root, transient);
+    }
+}
+
+#[tokio::test]
+async fn external_bzl_child_prefix_retains_original_carriers_until_settlement() {
+    let later = EpochBuilder::demand(
+        "/workspace/dep/right.bzl",
+        PathObservationOperation::FileBytes,
+    );
+    let tracker = Arc::new(ChildCarrierTracker {
+        inner: FrontierTracker::default(),
+        later: later.dupe(),
+        carrier: Mutex::new(Weak::new()),
+        observed_count: Mutex::new(None),
+    });
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let make_epoch = |root_name: &str, right: Option<&[u8]>| {
+        let mut epoch = EpochBuilder::external_sources(&[
+            (root_name, b"load(':left.bzl', 'LEFT')\nload(':right.bzl', 'RIGHT')\nprint('settled prefix')\nRESULT = LEFT + RIGHT\n"),
+            ("left.bzl", b"load(':leaf.bzl', 'LEAF')\nLEFT = LEAF + 1\n"),
+            ("leaf.bzl", b"LEAF = 40\n"),
+            ("right.bzl", right.unwrap_or(b"RIGHT = 2\n")),
+        ], 879);
+        if right.is_none() {
+            assert!(epoch.entries.shift_remove(&later).is_some());
+        }
+        epoch.build()
+    };
+    let mut original = None;
+    let mut original_buffers = None;
+    for (case, right) in [
+        None,
+        Some(b"RIGHT =\n".as_slice()),
+        Some(b"RIGHT = 2\n".as_slice()),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        // Each parent is cold: previous-parent dependency validation must not
+        // sample the later path before this attempt builds its child prefix.
+        // Protected frontier controls separately prove same-parent repair.
+        let root_name = ["root-need.bzl", "root-error.bzl", "root-success.bzl"][case];
+        let mut data = UserComputationData {
+            cycle_detector: Some(bzl_load_cycle_detector()),
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut tx = transaction(&dice, make_epoch(root_name, right), true, None)
+            .await
+            .into_updater()
+            .commit_with_data(data)
+            .await;
+        let route = external_route(&mut tx).await;
+        let left_key = observed_external_bzl_key(route.clone(), "", "left.bzl");
+        let root_key = observed_external_bzl_key(route, "", root_name);
+        // Precompute through the normal graph and drop all temporary strong
+        // outcomes before taking the baseline. The graph owns this original.
+        let left = tx.compute(&left_key).await.unwrap();
+        let carrier = observed_external(&left).result();
+        let weak = Arc::downgrade(carrier);
+        let module = carrier.as_ref().as_ref().unwrap();
+        assert!(!module.path.as_os_str().is_empty());
+        assert_eq!(module.loads, [":leaf.bzl"]);
+        let buffers = (
+            Arc::as_ptr(carrier) as usize,
+            module.path.as_os_str().as_encoded_bytes().as_ptr() as usize,
+            module.loads.as_ptr() as usize,
+            module.loads[0].as_ptr() as usize,
+        );
+        let warm = tx.compute(&left_key).await.unwrap();
+        assert!(Arc::ptr_eq(carrier, observed_external(&warm).result()));
+        if let Some(previous) = &original {
+            assert!(Weak::ptr_eq(previous, &weak));
+            assert_eq!(original_buffers, Some(buffers));
+        } else {
+            original = Some(weak.clone());
+            original_buffers = Some(buffers);
+        }
+        drop(warm);
+        drop(left);
+        let baseline = weak.strong_count();
+        assert!(
+            baseline > 0,
+            "completed graph value retains the original carrier"
+        );
+        *tracker.carrier.lock().unwrap() = weak.clone();
+        *tracker.observed_count.lock().unwrap() = Some((baseline + 1, 0, case));
+        let outcome = tx.compute(&root_key).await.unwrap();
+        // This actual awaited later-child activation sees the original carrier
+        // in production scratch. The old Frozen clone would leave only baseline.
+        let (expected, samples, observed_case) = tracker.observed_count.lock().unwrap().unwrap();
+        assert_eq!(observed_case, case);
+        assert_eq!(expected, baseline + 1);
+        assert!(
+            samples > 0,
+            "the actual later child supplied an ownership sample"
+        );
+        assert_eq!(
+            weak.strong_count(),
+            baseline,
+            "ended parent releases its scratch carrier"
+        );
+        match case {
+            0 => {
+                let LoadingPreparationOutcome::Need(need) = &outcome else {
+                    panic!("later sibling requires bytes");
+                };
+                assert_eq!(need.path_observations().unwrap().demands(), &[later.dupe()]);
+                assert!(!ExternalBzlModuleObservationKey::validity(&outcome));
+                let (node, transient) = tracker.inner.completion(&root_key);
+                assert!(transient);
+                assert_eq!(
+                    tx.activation_closure([node]).await.unwrap_err(),
+                    ActivationClosureError::UnavailableRoot { root: node }
+                );
+                assert!(
+                    tracker
+                        .inner
+                        .events
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .all(|(name, _)| name != &root_key.to_string())
+                );
+            }
+            1 => assert_child_parse_error(&outcome, "right.bzl"),
+            _ => {
+                assert_eq!(synopsis_result(&outcome), 43);
+                assert!(
+                    observed_external(&outcome)
+                        .observations()
+                        .get(&later)
+                        .is_some()
+                );
+                let (node, transient) = tracker.inner.completion(&root_key);
+                assert!(!transient);
+                assert_eq!(
+                    tx.activation_closure([node]).await.unwrap().roots(),
+                    &[node]
+                );
+                let events = tracker.inner.events.lock().unwrap();
+                assert_eq!(
+                    event_texts(
+                        &events
+                            .iter()
+                            .rev()
+                            .find(|(name, _)| name == &root_key.to_string())
+                            .unwrap()
+                            .1
+                    ),
+                    ["settled prefix"]
+                );
+            }
+        }
+        drop(outcome);
+        drop(tx);
+        dice.wait_for_idle().await;
+    }
+    println!(
+        "WP1097_LAYOUT frozen={}:{} old_slot={}:{} new_slot={}:{} carrier={}:{}",
+        std::mem::size_of::<super::super::FrozenBzlModule>(),
+        std::mem::align_of::<super::super::FrozenBzlModule>(),
+        std::mem::size_of::<(&str, super::super::FrozenBzlModule)>(),
+        std::mem::align_of::<(&str, super::super::FrozenBzlModule)>(),
+        std::mem::size_of::<(&str, super::super::ExternalBzlModuleCarrier)>(),
+        std::mem::align_of::<(&str, super::super::ExternalBzlModuleCarrier)>(),
+        std::mem::size_of::<super::super::ExternalBzlModuleCarrier>(),
+        std::mem::align_of::<super::super::ExternalBzlModuleCarrier>()
+    );
+    let original = original.unwrap();
+    assert!(
+        original.strong_count() > 0,
+        "the graph still owns successful child history"
+    );
+    drop(dice);
+    // The graph state actor drains its closed channel asynchronously; wait for
+    // actual last-owner retirement, rather than assuming scratch drop erased it.
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while original.strong_count() != 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("retired graph releases the original child carrier");
+    assert!(original.upgrade().is_none());
+    assert!(tracker.carrier.lock().unwrap().upgrade().is_none());
+}

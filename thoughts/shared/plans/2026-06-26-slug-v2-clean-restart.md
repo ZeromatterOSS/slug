@@ -34,18 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-308-m7a-no-op-request-map-union-r1
-Status: accepted — FINAL gates pass; next normal producer allocation work under source review
+Packet: WP-7-309-m7a-external-child-copy-deferral-r1
+Status: accepted — FINAL reviews and all selected gates pass; next readiness selection underway
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts exact no-op
-sharing of existing Bzlmod Need maps, preserving full request equality, original
-map/value owners, typed fallback and error order. [WP1096 receipt](./slug-v2-subplans/wp1096-no-op-request-map-union-2026-10-10.json):
-25 fresh focused tests, production/native-profile checks and FINAL reviews pass.
-One 7.843s native prefix fits at supervisor226.69/phase227.55MiB under256MiB,
-with the same WorkDeadline/source252 boundary as WP1095; full producer and
-whole-workload fit remain open. Next work targets source-proven string copying
-in normal producer retries. Keep borrowing, sharing and existing scoped interners;
-no cap raise or identical replay. Linux priority, Windows deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) records accepted normal
+producer child-copy deferral. [WP1097 receipt](./slug-v2-subplans/wp1097-external-child-copy-deferral-2026-10-10.json):
+26 fresh focused tests, production/current native-profile and FINAL reviews pass.
+Temporary child slots retain original shared results until all siblings and final
+parse settle; settled evaluator ownership remains. Native supervisor225.63/actual
+phase226.84MiB under256, source252/WorkDeadline persists. No speed, savings or full-fit
+claim. Next broader normal root-package producer/readiness seam is under source
+review. Full producer/time/whole-workload fit/Rustc/actions/certificates/bootstrap
+remain open. Borrow/move/share strings and use existing scoped interners where owner
+and cleanup fit; all caps unchanged. Linux priority, Windows deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

@@ -5237,8 +5237,13 @@ async fn compute_external_bzl_children<'a>(
     mode: ExternalBzlModuleMode,
     loads: Vec<ExternalBzlChildLoad<'a>>,
     mut observations: PathObservationEpoch,
-) -> ControlFlow<ExternalBzlDriverOutcome, (Vec<(&'a str, FrozenBzlModule)>, PathObservationEpoch)>
-{
+) -> ControlFlow<
+    ExternalBzlDriverOutcome,
+    (
+        Vec<(&'a str, ExternalBzlModuleCarrier)>,
+        PathObservationEpoch,
+    ),
+> {
     let mut loaded_modules = Vec::with_capacity(loads.len());
     let mut needs: Option<SourcePreparationNeeds> = None;
     let mut first_failure = None;
@@ -5389,7 +5394,7 @@ async fn compute_external_bzl_children<'a>(
             }
         };
         match value.as_ref() {
-            Ok(module) => loaded_modules.push((raw_load, module.clone())),
+            Ok(_) => loaded_modules.push((raw_load, value)),
             Err(error) => {
                 let failure = external_bzl_complete(
                     Err(ExternalBzlModuleError::Child {
@@ -5641,7 +5646,16 @@ async fn compute_external_bzl_module(
     // Independently retained settled APIs own names; retries above borrow them.
     let loaded_modules = loaded_modules
         .into_iter()
-        .map(|(name, module)| (name.to_owned(), module))
+        .map(|(name, carrier)| {
+            // Only checked Ok carriers enter the private child prefix. Retained
+            // evaluator values own their copies after all children and parsing settle.
+            let module = carrier
+                .as_ref()
+                .as_ref()
+                .expect("successful external child prefix contains only Ok carriers")
+                .clone();
+            (name.to_owned(), module)
+        })
         .collect();
     evaluate_external_bzl_module(
         &effective_route,
