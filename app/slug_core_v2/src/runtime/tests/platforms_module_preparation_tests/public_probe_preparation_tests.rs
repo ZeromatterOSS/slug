@@ -301,7 +301,8 @@ fn namespace_policy(
         } else if (std::ptr::eq(files, &GENERATED_RUST_TOOLCHAIN_HUB_FILES[..])
             || std::ptr::eq(files, &GENERATED_WINSDK_FILES[..])
             || std::ptr::eq(files, &GENERATED_CC_TOOLCHAINS_FILES[..])
-            || std::ptr::eq(files, &GENERATED_SHELL_CONFIG_FILES[..]))
+            || std::ptr::eq(files, &GENERATED_SHELL_CONFIG_FILES[..])
+            || std::ptr::eq(files, &GENERATED_APPLE_TOOLCHAINS_FILES[..]))
             && bodies.repo_marker_metadata
             && relative == Path::new("REPO.bazel")
         {
@@ -1904,7 +1905,10 @@ async fn namespace_owner_read_uses_current_transaction() {
                 .admits(&demand.operation()),
                 index != 1
             );
-            for path in ["/generation/REPO.bazel", "/generation/.bazelignore"] {
+            for (path, apple_marker) in [
+                ("/generation/REPO.bazel", true),
+                ("/generation/.bazelignore", false),
+            ] {
                 let marker = PathObservationDemand::new(
                     PathObservationNamespace::Materialization(instance),
                     NormalizedAbsolutePath::new(path).unwrap(),
@@ -1918,7 +1922,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                         &small_namespace_plan_matches
                     )
                     .admits(&marker.operation()),
-                    matches!(owner, 3 | 4 | 5 | 6) && index != 1
+                    (matches!(owner, 3 | 4 | 5 | 6) || owner == 7 && apple_marker) && index != 1
                 );
             }
             if matches!(owner, 4 | 5 | 6 | 7) {
@@ -3232,6 +3236,16 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 namespace_policy(&bodies, d, e, &matches).admits(&d.operation())
             })
         };
+        let marker = need(
+            "/parent/generation/REPO.bazel",
+            PathObservationOperation::Lstat,
+        );
+        let original_marker = marker
+            .path_observations()
+            .unwrap()
+            .demands()
+            .first()
+            .unwrap();
         for p in [
             "/",
             "/parent",
@@ -3274,7 +3288,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         ]
                         .contains(&p)
                         || op == PathObservationOperation::Lstat
-                            && !apple
+                            && (!apple || Path::new(p) == original_marker.path().as_path())
                             && [
                                 "/parent/generation/REPO.bazel",
                                 "/parent/generation/.bazelignore",
@@ -3291,10 +3305,6 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             PathObservationOperation::FileBytes,
         );
         let features = SourcePreparationNeeds::repository(namespace_test_request(&bodies, false));
-        let marker = need(
-            "/parent/generation/REPO.bazel",
-            PathObservationOperation::Lstat,
-        );
         let ignore = need(
             "/parent/generation/.bazelignore",
             PathObservationOperation::Lstat,
@@ -3305,7 +3315,11 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         );
         let base_own = valid.try_union(&leaf).unwrap();
         let own = if apple {
-            base_own.try_union(&features).unwrap()
+            base_own
+                .try_union(&marker)
+                .unwrap()
+                .try_union(&features)
+                .unwrap()
         } else if shell {
             base_own
                 .try_union(&marker)
@@ -3393,12 +3407,6 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             assert!(admit(&ignore, unavailable.as_ref()).is_err());
             assert!(admit(&candidate, unavailable.as_ref()).is_err());
         }
-        let original_marker = marker
-            .path_observations()
-            .unwrap()
-            .demands()
-            .first()
-            .unwrap();
         let original_ignore = ignore
             .path_observations()
             .unwrap()
@@ -3433,17 +3441,29 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_ignore, ignore_enabled, "ignore_marker"),
                         (original_candidate, true, "package_marker"),
                     ] {
+                        let owner_supports_marker = !apple || class == "repo_marker";
                         let policy = namespace_policy(&configured, demand, e, &matches);
                         assert_eq!(
                             policy.path_class,
-                            if enabled && !apple { class } else { "other" }
+                            if enabled && owner_supports_marker {
+                                class
+                            } else {
+                                "other"
+                            }
                         );
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
                             policy.admits(&PathObservationOperation::Lstat),
-                            enabled && own_plan && !apple
+                            enabled && own_plan && owner_supports_marker
                         );
                         assert!(!policy.admits(&PathObservationOperation::FileBytes));
+                        for operation in [
+                            PathObservationOperation::FileDigest,
+                            PathObservationOperation::DirectoryEntries,
+                            PathObservationOperation::ReadLink,
+                        ] {
+                            assert!(!policy.admits(&operation));
+                        }
                         if shell || apple {
                             let marker_need = match class {
                                 "repo_marker" => &marker,
@@ -3461,7 +3481,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                                                 .admits(&d.operation())
                                         })
                                         .is_ok(),
-                                    enabled && own_plan && !apple
+                                    enabled && own_plan && owner_supports_marker
                                 );
                                 assert!(
                                     mixed
@@ -3469,7 +3489,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                                         .values()
                                         .any(|r| Arc::ptr_eq(r, original))
                                 );
-                                if !enabled || !own_plan || apple {
+                                if !enabled || !own_plan || !owner_supports_marker {
                                     let (first, _) = configured
                                         .first_denied_path_with_namespace_matcher(&mixed, &|d| {
                                             namespace_policy(&configured, d, e, &matches)
@@ -3502,13 +3522,22 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             ),
         ] {
             let demand = PathObservationDemand::new(
-                namespace,
+                namespace.dupe(),
                 path("/parent/generation/BUILD"),
                 PathObservationOperation::FileBytes,
             );
             assert!(
                 !namespace_policy(&bodies, &demand, Some(&epoch), &matches)
                     .admits(&demand.operation())
+            );
+            let marker = PathObservationDemand::new(
+                namespace,
+                original_marker.path().dupe(),
+                PathObservationOperation::Lstat,
+            );
+            assert!(
+                !namespace_policy(&bodies, &marker, Some(&epoch), &matches)
+                    .admits(&marker.operation())
             );
         }
         let mut unknown = request_for_plan(small_generated_plan(tiny));
