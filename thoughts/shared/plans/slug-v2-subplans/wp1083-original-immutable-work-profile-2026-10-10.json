@@ -1,0 +1,107 @@
+{
+  "packet": "WP-7-296-m7a-original-immutable-work-profile-r1",
+  "baseline": "aa10bfe907a2d740a5d4d1d9783bfdcf6e848a74",
+  "decision": "cfg(test) exact original offline PreparedFile/PublicProbe+defs native work7s; all others5s; scope lifetime8/native10 unchanged",
+  "compatibility": "Slug-native Linux bounded native observation; original archive/request/current epoch semantics unchanged; Windows deferred",
+  "source_delta": {
+    "files": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs"
+    ],
+    "added_lines": 125,
+    "removed_lines": 1,
+    "new_retained_fields": 0,
+    "new_owned_runtime_strings": 0,
+    "allocation": "borrowed exact predicate and scalar Duration; no interner needed"
+  },
+  "validation": {
+    "focused_distinct_names": 3,
+    "focused_pass_records": 3,
+    "compile": "Core CargoJSON --no-run",
+    "direct_check": "Core/Loading/CLI",
+    "actual_supervised_children": 9,
+    "native_runs": 1,
+    "invalid_preflight_records": 1,
+    "preparation_seconds": 17.703355494886637,
+    "ordinary_seconds": 0.5363245969638228,
+    "export_enforcement_fresh_credit": 0,
+    "common_clock_timer_fresh_credit": 0,
+    "archive_status": "pass",
+    "format_and_diff": "pass"
+  },
+  "native": {
+    "elapsed_seconds": 5.626809727051295,
+    "rss_kib": 210352,
+    "rss_mib": 205.421875,
+    "full_source_brackets": 313,
+    "source_physical_bytes": 13374629,
+    "source_bracket_bytes": 26749258,
+    "strict_pin_count": 43,
+    "pins_equal": true,
+    "exit_code": 0,
+    "stop_reason": null,
+    "joined": true,
+    "owned_group_empty": true,
+    "actual_original_protobuf_file_reads": 12,
+    "next_request_identity": [
+      "/run/media/system/Colossus/dev/slug/tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace",
+      "rules_java+",
+      "bazel_tools",
+      "tools/build_defs/repo",
+      "http.bzl",
+      "http_archive",
+      null
+    ],
+    "raw_semantic": {
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 159 6902898 54173204 52147294 2114151 11679531",
+      "WP942_DENIED": "WP942_DENIED family=materialization path_len=none path_hex=none capture=missing",
+      "WP982_MATERIALIZATION": "WP982_MATERIALIZATION capture=captured kind=immutable reason=immutable_kind workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=11 canonical_hex=72756c65735f6a6176612b rule_repo_len=11 rule_repo_hex=62617a656c5f746f6f6c73 rule_package_len=21 rule_package_hex=746f6f6c732f6275696c645f646566732f7265706f rule_target_len=8 rule_target_hex=687474702e627a6c rule_name_len=12 rule_name_hex=687474705f61726368697665 logical_root_len=none logical_root_hex=none",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false",
+      "WP942_RETIREMENT": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+    },
+    "file_read_count_qualification": "actual_original_protobuf_file_reads records FileBytes demand/charge events, not per-file payload certificates."
+  },
+  "observable_gate_advanced": "Twelve original protobuf instance10 FileBytes demands admitted and charged by the current namespace policy; emission precedes the regular reader and is not a per-file payload certificate. Genuine next original rules_java+ Immutable/http_archive materialization request, no source-service first error. Full producer/certificate/Rustc/actions remain open.",
+  "resource_caps": {
+    "rss_kib": 262144,
+    "address_space_bytes": 536870912,
+    "selected_work_seconds": 7,
+    "default_work_seconds": 5,
+    "scope_lifetime_seconds": 8,
+    "native_seconds": 10,
+    "supervisor_cleanup_seconds": 3,
+    "cumulative_decode_bytes": 67108864,
+    "cumulative_written_bytes": 67108864,
+    "transfer_bytes": 16777216,
+    "live_buffer_bytes": 16777216
+  },
+  "corrections": [
+    "Root removed3 inaccessible export assertions precompile without visibility widening; static reviewer corrected initial draft. Fresh export proof not claimed.",
+    "First preflight exited0 but inherited prior CargoJSON parser RUSAGE_CHILDREN peak389056KiB; invalid0credit preserved. Fresh single-command preflight passed unchanged limits."
+  ],
+  "heap_qualification": "Partial native run fits; live credits and scoped Weak retire, not whole heap/interner/producer certificate.",
+  "next": "Bounded normal original rules_java offline archive cohort; no new source acquisition or guessed specs.",
+  "goal": "ACTIVE",
+  "evidence": {
+    "target/wp1083/design.md": "7499a7d0513aed916c0737bad0c902d9c5baf944772c33fb0b3acaf75cb644aa",
+    "target/wp1083/work-profile-design.md": "c2d8c6de9e84ae2c04a457ed5f6db9743c5a08bd0b6fd49e29569c6e5110382c",
+    "target/wp1083/design-review.md": "9cf568565cdc5f7ad34cbcf003543b5c551cd1a99f476f188829aa31887fb5af",
+    "target/wp1083/design-correction.md": "b8e42cd74fdd0037bd6c11bccef59a9a436b9995933fa07ac172af443e83b966",
+    "target/wp1083/static-review.md": "289701c9d6a4080ad5efd76c246fc7e700aa7f9ec6c177074bc20a360fd4cea7",
+    "target/wp1083/source-freeze.json": "8b75b58cd3e8710ed9e4c577ea52dbc93dd957417cc38bd05fe251cf284781ce",
+    "target/wp1083/prelaunch-source.md": "16b9b12bb0a7b6a331d4783a8b04182b32d699a9e9f00269fa49b9fd435284e3",
+    "target/wp1083/prelaunch-evidence.md": "a90545e01f655e9db471dff7705e10682a192a7200c30101d794a7981ff61d05",
+    "target/wp1083/focused-results.json": "d76526d2fc7c36b9360d5774eaac907acd7891f5a9f9e941b5e4159e5590d9de",
+    "target/wp1083/native-result.json": "64d06c68a0a8b6fb17445462dfc5b0f981588d098fd2a485e4ca08c8980b3ebb",
+    "target/wp1083/operation-ledger.json": "7d7512707bfb1a458cdbb40e018229f49b7a5f7d61f1cb2e7cff83a3cd8a6080",
+    "target/wp1083/candidate.json": "4e59dc94bf6cc10ebf02688053c1696e5a3af563493cc76880dbebe2726b4627",
+    "target/wp1083/executable.json": "0d9ff545db7284eccddfc8ae24573eea3ee3d6254580fe0e9ec6a2443ae505fe",
+    "target/wp1083/invocation-correction.md": "f3e7f9e150ccf53c2664cdfb84c3d343f09e8dbdbf15a9bcb774fdc0416915da"
+  },
+  "independent_final": {
+    "path": "target/wp1083/final-review.md",
+    "sha256": "ce8a7d804c9b9d9c5690991a6215f2ac3a8414086b293c58b4120328a8161dab",
+    "verdict": "ACCEPT"
+  }
+}

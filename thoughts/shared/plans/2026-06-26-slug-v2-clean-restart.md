@@ -34,18 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-295-m7a-original-immutable-namespace-r1
-Status: accepted — confined namespace policy; real common work deadline preserved
+Packet: WP-7-296-m7a-original-immutable-work-profile-r1
+Status: accepted — original protobuf namespace continuation and next rules_java request
 
-The [current manifest](./slug-v2-subplans/current-packet.md) accepts the borrowed,
-confined original protobuf namespace policy. Five focused tests preserve current
-epochs, whole-Need refusal and last-Drop. [WP1082](./slug-v2-subplans/wp1082-original-immutable-namespace-2026-10-10.json)
-records one205MiB native run ending at the existing5s common work deadline;
-actual namespace progression is unproved. Select a reviewed finite work profile
-for the exact offline role within the existing memory/lifetime/native envelope.
-Original request/epoch semantics and borrowing/scoped interning discipline stay
-intact. Terminal producer/Rustc/actions/certificates and whole-workload fit remain
-open; Windows minimal/deferred. The goal stays active.
+The [current manifest](./slug-v2-subplans/current-packet.md) accepts the finite
+seven-second original offline work profile within unchanged lifetime/native/memory
+caps. [WP1083](./slug-v2-subplans/wp1083-original-immutable-work-profile-2026-10-10.json)
+records one5.62681s/205.421875MiB run:12 original protobuf FileBytes demands admitted
+and charged, then a genuine original rules_java+ immutable request, source errorNone.
+The next bounded archive cohort reuses verified existing sources and original
+request ownership. Borrowing/scoped interning discipline persists. Terminal
+producer/Rustc/actions/certificates and whole-workload fit remain open; Windows
+minimal/deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 

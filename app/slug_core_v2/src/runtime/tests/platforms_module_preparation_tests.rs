@@ -1667,6 +1667,22 @@ impl Bodies {
         }
         limits
     }
+    fn native_source_work_duration(
+        &self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Duration {
+        Duration::from_secs(
+            if public_probe_preparation_tests::offline_archive_native_role(registry, command)
+                && self.rules_rust_defs_import_sources
+                && immutable_archive_preparation::native_byte_budget_backing(self)
+            {
+                7
+            } else {
+                5
+            },
+        )
+    }
     fn source_scope(
         &self,
         workspace: NormalizedAbsolutePath,
@@ -3290,7 +3306,7 @@ fn observe_native_command(
     let limits = bodies.native_source_limits(registry_choice, command);
     let scope = SourceServiceScope::new_for_test_with_offline_archive(
         workspace.clone(),
-        start + Duration::from_secs(5),
+        start + bodies.native_source_work_duration(registry_choice, command),
         start + Duration::from_secs(8),
         limits,
         bodies

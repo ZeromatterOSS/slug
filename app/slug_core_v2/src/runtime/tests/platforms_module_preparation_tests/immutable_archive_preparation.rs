@@ -412,6 +412,10 @@ mod tests {
             ..bodies.source_limits(PreparedFile)
         };
         assert_eq!(native(&bodies), expected);
+        assert_eq!(
+            bodies.native_source_work_duration(PreparedFile, PublicProbe),
+            Duration::from_secs(7)
+        );
         assert_eq!(Arc::strong_count(owner), owners);
         assert!(std::ptr::eq(
             bodies.offline_archive_module.as_ref().unwrap().as_path(),
@@ -459,6 +463,11 @@ mod tests {
                 },
                 "case {case}"
             );
+            assert_eq!(
+                b.native_source_work_duration(PreparedFile, PublicProbe),
+                Duration::from_secs(5),
+                "case {case}"
+            );
         }
         for (r, c) in [
             (DefaultBcr, Modules),
@@ -466,6 +475,10 @@ mod tests {
             (PreparedFile, Modules),
         ] {
             assert_eq!(bodies.native_source_limits(r, c), bodies.source_limits(r));
+            assert_eq!(
+                bodies.native_source_work_duration(r, c),
+                Duration::from_secs(5)
+            );
         }
         for counter in [SourceCounter::DecodedBytes, SourceCounter::WrittenBytes] {
             let start = Instant::now();
@@ -517,5 +530,100 @@ mod tests {
         assert_eq!(Arc::strong_count(owner), owners);
         drop(bodies);
         assert!(weak.upgrade().is_none());
+    }
+
+    #[tokio::test]
+    async fn immutable_archive_native_work_profile_preserves_deadlines_and_retirement() {
+        let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let mut bodies = configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        bodies.rules_rust_defs_import_sources = true;
+        bodies.offline_archive = Some(OfflineArchiveBacking::new(
+            PROTOBUF_URL,
+            PROTOBUF_DIGEST,
+            NormalizedAbsolutePath::new(
+                project
+                    .join(ARCHIVE_MIRROR)
+                    .join(PROTOBUF_URL.strip_prefix("https://").unwrap()),
+            )
+            .unwrap(),
+        ));
+        bodies.offline_archive_module =
+            Some(NormalizedAbsolutePath::new(project.join(PREPARED_MODULE)).unwrap());
+        let backing = bodies.offline_archive.as_ref().unwrap();
+        let backing_weak = Arc::downgrade(backing);
+        let count = Arc::strong_count(backing);
+        let module = bodies.offline_archive_module.as_ref().unwrap().as_path();
+        let work = bodies
+            .native_source_work_duration(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert_eq!(work, Duration::from_secs(7));
+        assert_eq!(Arc::strong_count(backing), count);
+        assert!(std::ptr::eq(
+            bodies.offline_archive_module.as_ref().unwrap().as_path(),
+            module
+        ));
+        let limits =
+            bodies.native_source_limits(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert_eq!(
+            limits,
+            SourceServiceLimits {
+                source_attempts: 256,
+                decoded_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
+                written_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
+                ..bodies.source_limits(RegistryChoice::PreparedFile)
+            }
+        );
+        let start = Instant::now();
+        let scope = SourceServiceScope::new_for_test_with_offline_archive(
+            bodies.roots[0].dupe(),
+            start + work,
+            start + Duration::from_secs(8),
+            limits,
+            Some(bodies.roots[1].dupe()),
+            bodies.offline_archive.clone(),
+            true,
+        )
+        .unwrap();
+        let scope_weak = Arc::downgrade(&scope);
+        assert_eq!(scope.work_deadline(), start + Duration::from_secs(7));
+        assert_eq!(scope.cleanup_deadline(), start + Duration::from_secs(8));
+        assert_eq!(scope.limits(), limits);
+        let held = scope.reserve_buffer(16).unwrap();
+        assert_eq!(scope.snapshot().live_buffer_bytes, 16);
+        // Deterministic inherited-step expiry; this does not exercise common-clock expiry.
+        let refusal = Err(SourceServiceError::WorkDeadline);
+        assert_eq!(
+            scope
+                .during(Duration::ZERO, std::future::ready(Ok(())))
+                .await,
+            refusal
+        );
+        assert_eq!(
+            scope.first_error_for_test(),
+            Some(SourceServiceError::WorkDeadline)
+        );
+        scope.cancel();
+        assert_eq!(scope.check(), refusal);
+        assert_eq!(scope.charge(SourceCounter::SourceAttempts, 1), refusal);
+        scope
+            .during_cleanup(async move {
+                drop(held);
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert_eq!(scope.snapshot().live_buffer_bytes, 0);
+        drop(scope);
+        assert!(scope_weak.upgrade().is_none());
+        assert_eq!(
+            Arc::strong_count(bodies.offline_archive.as_ref().unwrap()),
+            count
+        );
+        assert!(backing_weak.upgrade().is_some());
+        drop(bodies);
+        assert!(backing_weak.upgrade().is_none());
     }
 }
