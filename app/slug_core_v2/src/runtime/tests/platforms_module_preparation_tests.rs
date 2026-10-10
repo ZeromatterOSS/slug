@@ -449,6 +449,7 @@ const RULES_SHELL_IMPORTS: [&str; 8] = [
     RULES_SHELL_IMPORT_METADATA[18],
 ];
 const APPLE_SUPPORT_CROSSTOOL_METADATA: [&str; 1] = ["crosstool"];
+const APPLE_SUPPORT_IMPORTS: [&str; 1] = ["crosstool/setup.bzl"];
 struct Bodies {
     roots: [NormalizedAbsolutePath; 3],
     files: [NormalizedAbsolutePath; 3],
@@ -474,6 +475,7 @@ struct Bodies {
     rules_cc_import_sources: bool,
     rules_shell_import_sources: bool,
     apple_support_crosstool_metadata: bool,
+    apple_support_import_sources: bool,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1169,6 +1171,7 @@ impl Bodies {
             rules_cc_import_sources: false,
             rules_shell_import_sources: false,
             apple_support_crosstool_metadata: false,
+            apple_support_import_sources: false,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1529,6 +1532,26 @@ impl Bodies {
                     })
             })
     }
+    fn with_apple_support_import_sources(
+        mut self,
+        registry: RegistryChoice,
+        command: CommandChoice,
+    ) -> Self {
+        self.apple_support_import_sources = matches!(registry, RegistryChoice::PreparedFile)
+            && matches!(command, CommandChoice::PublicProbe);
+        self
+    }
+    fn admits_apple_support_import_source(&self, path: &Path) -> bool {
+        self.apple_support_import_sources
+            && self.additional[5].as_ref().is_some_and(|module| {
+                path.strip_prefix(module.root.as_path())
+                    .is_ok_and(|relative| {
+                        APPLE_SUPPORT_IMPORTS
+                            .iter()
+                            .any(|p| relative == Path::new(p))
+                    })
+            })
+    }
     fn source_limits(&self, registry: RegistryChoice) -> SourceServiceLimits {
         SourceServiceLimits {
             allow_network: false,
@@ -1781,6 +1804,7 @@ impl Bodies {
                                     || self.admits_bazel_skylib_import_source(path, false)
                                     || self.admits_rules_cc_import_source(path, false)
                                     || self.admits_rules_shell_import_source(path, false)
+                                    || self.admits_apple_support_import_source(path)
                                     || self.admits_platforms_host_import_source(path)
                                     || self.admits_platforms_cpu_package(path, false)
                                     || self.admits_platforms_os_package(path, false)))
@@ -1803,6 +1827,7 @@ impl Bodies {
                             || self.admits_rules_cc_import_source(path, true)
                             || self.admits_rules_shell_import_source(path, true)
                             || self.admits_apple_support_crosstool_metadata(path)
+                            || self.admits_apple_support_import_source(path)
                             || (self.visible_lockfile_metadata
                                 && path.parent() == Some(self.roots[0].as_path())
                                 && path
@@ -3015,6 +3040,12 @@ fn observe_native_command(
             Err(std::env::VarError::NotPresent) => false,
             _ => panic!("Apple metadata opt-in must be exactly true or false"),
         };
+    let apple_imports_requested = match std::env::var("SLUG_NATIVE_APPLE_SUPPORT_IMPORT_SOURCES") {
+        Ok(value) if value == "true" => true,
+        Ok(value) if value == "false" => false,
+        Err(std::env::VarError::NotPresent) => false,
+        _ => panic!("Apple source opt-in must be exactly true or false"),
+    };
     let workspace = NormalizedAbsolutePath::new(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace"),
@@ -3072,6 +3103,9 @@ fn observe_native_command(
     if apple_crosstool_requested {
         bodies = bodies.with_apple_support_crosstool_metadata(registry_choice, command);
     }
+    if apple_imports_requested {
+        bodies = bodies.with_apple_support_import_sources(registry_choice, command);
+    }
     for slot in 0..mode.additional_count() {
         let extra_root = root(ADDITIONAL_ENV[slot]);
         bodies = match slot {
@@ -3110,6 +3144,7 @@ fn observe_native_command(
     let platforms_host_import_sources = bodies.platforms_host_import_sources;
     let rules_shell_import_sources = bodies.rules_shell_import_sources;
     let apple_support_crosstool_metadata = bodies.apple_support_crosstool_metadata;
+    let apple_support_import_sources = bodies.apple_support_import_sources;
     let platforms_cpu_package_sources = bodies.platforms_cpu_package_sources;
     let platforms_os_package_sources = bodies.platforms_os_package_sources;
     let features_import_sources = bodies.bazel_features_import_sources;
@@ -3298,6 +3333,13 @@ fn observe_native_command(
             apple_support_crosstool_metadata,
             probe_report.policy_checked(),
             APPLE_SUPPORT_CROSSTOOL_METADATA.len()
+        );
+        println!(
+            "WP1063_APPLE_IMPORTS enabled={} policy_checked={} additional_slot=5 metadata_count={} source_count={} cohort=setup_import kind=unobserved body=unobserved",
+            apple_support_import_sources,
+            probe_report.policy_checked(),
+            APPLE_SUPPORT_IMPORTS.len(),
+            APPLE_SUPPORT_IMPORTS.len()
         );
         println!(
             "WP1012_PLATFORMS_CPU_PACKAGE enabled={} policy_checked={} root_slot=2 metadata_operation=lstat metadata_count=3 source_operation=file_bytes source_count=1 metadata_cohort=cpu,cpu/BUILD.bazel,cpu/BUILD source_cohort=cpu/BUILD kind=unobserved body=unobserved",
