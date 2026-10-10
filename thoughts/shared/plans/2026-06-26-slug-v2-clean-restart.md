@@ -34,20 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-build-fallback-metadata-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-toolchains-metadata-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1068](./slug-v2-subplans/wp1068-apple-crosstool-build-fallback-metadata-2026-10-10.json) accepts exact Apple
-crosstool/BUILD Host Lstat under the existing checked cfgtest metadata role:
-full3/body0, source3 and environment2/union19 remain independent.
-Borrowed static table48B/newreference16B/newliteral15B/first9B/second21B/total45B;
+[WP1069](./slug-v2-subplans/wp1069-apple-crosstool-toolchains-metadata-2026-10-10.json) accepts exact Apple
+crosstool/BUILD.toolchains Host Lstat under the existing checked cfgtest metadata role:
+full4/body0, source3 and environment2/union19 remain independent.
+Borrowed static table64B/newreference16B/newliteral26B/first9B/second21B/third15B/total71B;
 Boolean growth0/Bodies200B/align8 without attributed padding, no new owned
-production strings or retained fields. Source61net=28authored+33formatter,
+production strings or retained fields. Source82net=38authored+44formatter,
 helper31net; independent STATIC and FINAL accepted the existing matrix delta.
 All310 source signatures unchanged;104names/106current native records,
-failed/superseded/currentcapture0. Native4.979550373s/210452KiB below256MiB.
+failed/superseded/currentcapture0. Native4.942964541s/209896KiB below256MiB.
 The actual next boundary and owner fields are frozen in both successor notes;
 metadata does not establish body/caller/closure/certificate proof.
 Borrow/transfer first; existing scoped interners when repeated retained
