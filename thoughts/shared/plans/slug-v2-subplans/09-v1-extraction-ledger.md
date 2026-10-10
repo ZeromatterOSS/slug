@@ -2918,7 +2918,8 @@ shares the already loaded first-seen recursive manifest projection.
 
 Do not add a map, interner, cache, global context, raw pointer, DICE owner or
 second retained copy. The slice never enters package results or semantic
-equality and is dropped on success, failure, retry or cancellation. Existing
+equality. Under that original packet it drops on success, failure, retry or
+cancellation; the bounded WP1099 lifetime amendment below now applies. Existing
 source/manifest fingerprints own invalidation. Proof must pin the None/nonempty
 Some invariant, source order, attempt isolation and same-DICE loaded-source
 A/B/A restoration; the external lexical mapping discriminator owns repository-
@@ -2926,7 +2927,28 @@ mapping correctness without a second mapping A/B/A test.
 `PackageRecorder` remains attempt scratch rather than a new retained
 Allocative owner. No benchmark is needed for this cold loading seam. Any
 no-load allocation, post-attempt retention, source inference, new owner or
-nonconstant clone returns `REPLAN`.
+nonconstant clone returned `REPLAN` under that original contract.
+
+`WP-7-311-m7a-package-attempt-provenance-sharing-r1` (WP1099) explicitly
+amends only the slice lifetime: one private lazy slot shares the existing
+optional full-provenance Arc table across glob retries in a single normal
+package-driver invocation with immutable loaded-module input. Parse and direct
+visibility checks still precede construction. Each recorder remains attempt
+scratch; standalone attempts get a fresh slot. The finite table survives glob
+awaits until the invocation ends, including Need, error and cancellation, and
+never enters package/DICE results or a global pool. This retention has no
+live-bank credit. Existing first-label order, full provenance and fail-closed
+ambiguity lookup remain exact. String-to-CompactString already moves/reuses
+storage; avoided work is repeated derivation/collection, not a second buffer
+copy. Current40 exact controls prove genuine two-glob table reuse, new scoped
+identity, precedence and table-only Weak release while modules/DICE remain live.
+Compiled inline slot24B/Arc16B/provenance-row192B are not total heap bounds.
+ONE unchanged-cap native prefix peaks at supervisor225.953125MiB and exact
+phase226.92578125MiB under256, with source252 and the same WorkDeadline7:296;
+frequency, savings, speed, full producer and whole-workload fit remain unproved.
+No donor import, new interner/cache/key, AST retention or semantic admission.
+The [WP1099 receipt](wp1099-package-attempt-provenance-sharing-2026-10-10.json)
+records DESIGN/source/prelaunch/FINAL and current gates.
 
 `WP-4-5-8-7A-native-genrule-imported-declaration-audit-r1` requires no V1 or
 Buck2 extraction. Reuse `CanonicalLabel`, `CompactString`, immutable Arc

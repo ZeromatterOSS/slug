@@ -743,11 +743,24 @@ fn host_package_attempt_source_name(input: &HostPackageAttemptInput<'_>) -> Stri
     )
 }
 
+type PackageBzlCallSources = Option<Arc<[(CompactString, BzlModuleSourceProvenance)]>>;
+// Outer None means uninitialized; Some(None) is the initialized no-load result.
+type PackageBzlCallSourcesSlot = Option<PackageBzlCallSources>;
+
 #[allow(dead_code)]
 fn evaluate_host_package_attempt(
     input: &HostPackageAttemptInput<'_>,
     prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
     repository_mapping: Arc<RunfilesRepositoryMapping>,
+) -> HostPackageAttemptStep {
+    evaluate_host_package_attempt_with_call_sources(input, prepared, repository_mapping, &mut None)
+}
+
+fn evaluate_host_package_attempt_with_call_sources(
+    input: &HostPackageAttemptInput<'_>,
+    prepared: Arc<SmallMap<HostGlobLoadingRequest, HostGlobPrepared>>,
+    repository_mapping: Arc<RunfilesRepositoryMapping>,
+    call_sources: &mut PackageBzlCallSourcesSlot,
 ) -> HostPackageAttemptStep {
     let source_name = host_package_attempt_source_name(input);
     let ast = match AstModule::parse_with_string_encoding(
@@ -786,7 +799,11 @@ fn evaluate_host_package_attempt(
     )
     .with_associated_module_metadata(input.associated_module_metadata.clone())
     .with_repository_features(input.repository_features.dupe())
-    .with_bzl_call_sources(package_bzl_call_sources(input.loaded_modules))
+    .with_bzl_call_sources(
+        call_sources
+            .get_or_insert_with(|| package_bzl_call_sources(input.loaded_modules))
+            .dupe(),
+    )
     .with_print_capture(print_capture.clone());
     let module = Module::new();
     let loader = LocalBzlLoader {
@@ -879,12 +896,19 @@ async fn evaluate_host_package_attempts_driver(
     repository_mapping: Arc<RunfilesRepositoryMapping>,
     boundary_scope: HostGlobBoundaryScope,
 ) -> HostPackageAttemptDriverOutcome {
+    // One immutable input owns this finite table until its driver invocation drops.
+    let mut call_sources = None;
     let mut prepared = Arc::new(SmallMap::new());
     let mut observations = PathObservationEpoch::empty();
     loop {
         // The synchronous attempt returns only compact terminal state or one
         // request, so no evaluator/module/recorder borrow can cross this await.
-        match evaluate_host_package_attempt(&input, prepared.dupe(), repository_mapping.dupe()) {
+        match evaluate_host_package_attempt_with_call_sources(
+            &input,
+            prepared.dupe(),
+            repository_mapping.dupe(),
+            &mut call_sources,
+        ) {
             HostPackageAttemptStep::Terminal(terminal) => {
                 return SourcePreparationOutcome::Complete(Ok((Arc::new(terminal), observations)));
             }

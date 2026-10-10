@@ -1,0 +1,218 @@
+{
+  "packet": "WP-7-311-m7a-package-attempt-provenance-sharing-r1",
+  "status": "ACCEPTED",
+  "baseline": "2ff84aca32867a6e3683f37f81d3c192994531c7",
+  "compatibility": "Slug-native invocation-local Arc sharing; admitted exact source/parse/visibility/full Label provenance/glob/order/error/events/certificates unchanged; Linux priority, Windows deferred.",
+  "decision": "Private lazy slot shares existing immutable optional full-provenance Arc table across normal glob retries in one driver; standalone attempt stays fresh. Construct after exact parse/visibility. No graph key, global interner or AST retention.",
+  "source": [
+    {
+      "path": "app/slug_loading_v2/src/bzl_module.rs",
+      "before_sha256": "93b59886cc11b3a51614cb3cad0072610daf473898360dc871094f81796deda3",
+      "after_sha256": "d23b479dc8ade343dcd774a79e18e5f62df6998612008dbc5b0e1cf432febe70",
+      "added": 26,
+      "deleted": 2
+    },
+    {
+      "path": "app/slug_loading_v2/src/host_package_attempt_tests.rs",
+      "before_sha256": "61cc3ff82024cb2954c98b7441a0dabe8970678e56229285467aa7069d80aca7",
+      "after_sha256": "7834cd7716a180b12783035b88c8a7b75986c3411eb0385d9a0e89df4494d918",
+      "added": 248,
+      "deleted": 0
+    }
+  ],
+  "unchanged_frozen_owners": 31,
+  "allocation": {
+    "layout": {
+      "slot": {
+        "size": 24,
+        "alignment": 8
+      },
+      "arc": {
+        "size": 16,
+        "alignment": 8
+      },
+      "provenance_row": {
+        "size": 192,
+        "alignment": 8
+      },
+      "rows": 1,
+      "retries": 2
+    },
+    "proof": "Actual-helper genuine two glob retries/strict full first-row provenance/current changed scope/empty state/error precedence/table-only Weak release; inherited actual normal driver controls pass.",
+    "discipline": "Borrow/move/share strings and existing scoped interners when lifetime/cleanup fit. CompactString already moves storage; one finite metadata table retained through driver awaits until invocation drops, no live-bank credit or totalheap/nativefrequency/savings/speed claim. Explicit narrow Stage9 amendment of old per-attempt slice-drop rule."
+  },
+  "focused": {
+    "selected": 40,
+    "passed": 40,
+    "families": {
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.12550868408288807
+      },
+      "loading": {
+        "selected": 20,
+        "passed": 20,
+        "elapsed_seconds": 0.22264989104587585
+      },
+      "core": {
+        "selected": 13,
+        "passed": 13,
+        "elapsed_seconds": 0.20394873595796525
+      }
+    },
+    "sha256": "b01459319fbc5be27c079600bbcbea1742037954e1d743b0cee67284c927afab"
+  },
+  "caps": {
+    "preparation_seconds": 60,
+    "preparation_rss_capped": false,
+    "native_seconds": 10,
+    "native_rss_mib": 256,
+    "native_address_space_mib": 512,
+    "work_seconds": 7,
+    "default_work_seconds": 5,
+    "lifetime_seconds": 8,
+    "cleanup_seconds": 3,
+    "live_transfer_mib": 16,
+    "decode_write_mib": 64,
+    "source_attempts": 256,
+    "registry_attempts": 128,
+    "object_mib": 1,
+    "admitted_mib": 16,
+    "directory_entries": 128,
+    "directory_name_bytes": 1024,
+    "directory_total_kib": 16,
+    "file_size_mib": 16,
+    "log_mib": 1,
+    "preparation_report_mib": 4
+  },
+  "goal_status": "ACTIVE",
+  "packet_timing": {
+    "draft_utc": "2026-10-10T22:18:36.955710+00:00",
+    "qualification": "Separate bounded preparation/body/native operations; no workflow speed claim.",
+    "native_completed_utc": "2026-10-10T22:20:29.464866+00:00",
+    "accepted_utc": "2026-10-10T22:21:52.100301+00:00"
+  },
+  "corrections": "No source/type/test/preparation corrections; current all40 pass on first generation.",
+  "checks": {
+    "pinned_format": "PASS",
+    "diff": "PASS",
+    "plan": "PASS",
+    "archive": "PASS"
+  },
+  "gates": {
+    "compile-bzlmod": {
+      "elapsed_seconds": 4.662466478999704,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "9a942a8ad5c8aecb426c2bcedead35cd7e85383fa5f345cc5983c77a460cc3c0"
+    },
+    "compile-loading": {
+      "elapsed_seconds": 18.083289361093193,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "45372248eb79f42231502931c21a55f92ba5dff48af4f5600c9c3791ef888201"
+    },
+    "compile-core": {
+      "elapsed_seconds": 33.864860040019266,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "e17ea2799cb81f6c8d8105378ec171bb9d934b9cc3770d00de3ee136efacf367"
+    },
+    "production-check": {
+      "elapsed_seconds": 11.010014969971962,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "9b59174706a9f6529863a39e76871e06775ef6ec96d1cc90e26d2e33b80bdfca"
+    },
+    "bzlmod-tests": {
+      "elapsed_seconds": 0.12550868408288807,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 7,
+      "pass_count": 7,
+      "operation_sha256": "80cae0d86cb43db168054085a3e9a2b246f42fbf1ef585441cb82ad4d665aa60"
+    },
+    "loading-tests": {
+      "elapsed_seconds": 0.22264989104587585,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 20,
+      "pass_count": 20,
+      "operation_sha256": "46c5dbe7351069d7df26edf5becc0d80face429d0b0cff4ac0956ad98af3e722"
+    },
+    "core-tests": {
+      "elapsed_seconds": 0.20394873595796525,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 13,
+      "pass_count": 13,
+      "operation_sha256": "f21e41835150e38507339c0766c7574d3c21dc4e69ae014d798027166fd9393b"
+    },
+    "native-list": {
+      "elapsed_seconds": 0.17945824598427862,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 0,
+      "pass_count": 0,
+      "operation_sha256": "489bd415f324cd84760e430513ac99689f14d7f0f3140f5229fc07dbe3f66e87"
+    },
+    "native": {
+      "elapsed_seconds": 7.86758409102913,
+      "exit_code": 0,
+      "stop_reason": null,
+      "selected_count": 1,
+      "pass_count": 1,
+      "operation_sha256": "c75683c96674de2526dceb0c377929d5d665ef461edacee88800adc6b9bad111"
+    }
+  },
+  "native": {
+    "selected": 1,
+    "passed": 1,
+    "elapsed_seconds": 7.86758409102913,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 126,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "observer_version": 2,
+    "status": 0,
+    "supervisor_peak_mib": 225.953125,
+    "phase_peak_mib": 226.92578125,
+    "frontier": "WorkDeadline",
+    "report_sha256": "ddc467a9d7757db9c4ef69d45c0e812cdac2ab6ab7c9bf8995324cdf406b89a1",
+    "stdout_sha256": "f9b5dd89aabf2ec4e87becc75c23809e52fa02c5c3b0c5ac275c79125126d6bb"
+  },
+  "claim_limits": "ONE changed-source candidate still reaches source_service WorkDeadline caller7 diagnostic.rs:296 before batch acquisition. Source252/decode55574923/write52796422/root333windows unchangedfromWP1098; no native tablefrequency/savings/speed/deadlinecause/frontieradvance inference. Full producer/time/wholefit/sourcecertificate/observations/analyses/actions/Rustc/bootstrap unproved. Originalcaps/vector/env unchanged.",
+  "next": "Resume broader normal compiler producer readiness: bounded borrowed original retry Need/context projection at first progress refusal, then select demanded capability from actual typed owner. No additional adjacent memory-cache packet or identical native replay.",
+  "reviews": {
+    "design-review.md": "52409104742d21f12aad4e1b7e666de525d29aadd2121afff2b76e51d3809236",
+    "source-review.md": "58d9b82c385c7b50d91aaa8b936eecf98d14a755596b409432ae8c1950c342e1",
+    "prelaunch-source.md": "8dad11b117f69cc42f4ca819eb596ba71c0ed1e0a9fb52d86a84f85a0435a990",
+    "prelaunch-evidence.md": "cea62c3fa40a4f68a56c541a21d20b158e90bff375b864c8798b062de3fbcc6c",
+    "prelaunch-review.md": "2adbfbf5b218ddf8970a35c9f7172d2dbaf72897afb8917f5c330e3602d920cf",
+    "final-source-review.md": "366a17336e004aa4321f69c367f880d8aed0feaeb1edcb8600e3273a3d0637b9",
+    "final-evidence-review.md": "077aede0a4b5009512dfd46fc5670c81fbb0f296d877db6e5c957151f46dfe5b"
+  },
+  "evidence": {
+    "source-freeze.json": "2ef9a7091408938920da1a9743f45106ed8a64adb4fb80baf863d9d49a6a6e08",
+    "focused-results.json": "b01459319fbc5be27c079600bbcbea1742037954e1d743b0cee67284c927afab",
+    "native-results.json": "ddc467a9d7757db9c4ef69d45c0e812cdac2ab6ab7c9bf8995324cdf406b89a1",
+    "root-helper-review.md": "462ec553ac22959cf8fc97b46a70e69fa27cc26ce9198205c2948523b60ed530",
+    "source-clarifications.md": "fc3211d6e6dfcca0b5f191d5181bad50a78925aed43d55a4702bbef1f3687aeb",
+    "broader-readiness.md": "10834c00a73be0121ac2f7231ffa3c761299ed2a3b725a96a250b798c66fd49c",
+    "next-owner-research.md": "e1a847774ed09873ca71837ee5132a4f2a548058a1513b30a1e1316b4954d5eb"
+  },
+  "publication_qualification": "Reviewed receipt bytes preserved as receipt-reviewed.json; publication changes candidate status to ACCEPTED and adds direct FINAL/research refs/acceptance timing only. No source/gates/caps/numbers changed. Old native-pending header corrected; no evidence replay."
+}

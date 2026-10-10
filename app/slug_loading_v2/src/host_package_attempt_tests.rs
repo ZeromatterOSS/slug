@@ -924,3 +924,251 @@ async fn terminal_failures_retain_typed_payload_and_only_the_print_prefix() {
     let package = complete(&outcome).result.as_ref().unwrap();
     assert!(filegroup_srcs(package, "empty").is_empty());
 }
+
+#[tokio::test]
+async fn package_attempt_call_sources_share_within_driver_scope() {
+    fn attempt_input<'a>(
+        modules: &'a [(String, FrozenBzlModule)],
+        source: &str,
+        package: &str,
+    ) -> HostPackageAttemptInput<'a> {
+        let package = PackagePath::parse(package).unwrap();
+        HostPackageAttemptInput {
+            repository_features: Arc::from([]),
+            associated_module_metadata: Some(("root".into(), "".into())),
+            workspace: path("/workspace"),
+            logical_package_root: path("/workspace"),
+            package: package.clone(),
+            package_identifier: PackageIdentifier::new(CanonicalRepoName::root(), package.clone()),
+            package_dir: package_dir(&package),
+            build_file: package_dir(&package).join("BUILD.bazel"),
+            source: Arc::new(source.to_owned()),
+            package_label: package.as_str().into(),
+            loaded_modules: modules,
+            capture_events: true,
+        }
+    }
+    const MACRO: &str = "def macro_glob():\n    print('macro')\n    return glob(['*.txt'])\n";
+    const BUILD: &str = "load(':defs.bzl', 'macro_glob')\nprint('attempt')\nfilegroup(name='macro', srcs=macro_glob())\nfilegroup(name='literal', srcs=glob(['a.txt']))\nprint('done')\n";
+    let macro_module = frozen_macro(MACRO);
+    // First fixture keeps its existing [0;32] marker; the duplicate supplies
+    // source-derived provenance so retaining the original first row is decisive.
+    let mut duplicate = macro_module.clone();
+    duplicate.manifest.reachable = Arc::from([BzlModuleSourceProvenance::new(
+        duplicate.manifest.root.clone(),
+        digest(MACRO),
+    )]);
+    let modules = vec![
+        (":defs.bzl".to_owned(), macro_module),
+        (":alias.bzl".to_owned(), duplicate),
+    ];
+    let input = attempt_input(&modules, BUILD, "pkg");
+    let mut script = prelude();
+    script.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![
+                (b"a.txt", PathDirectoryEntryKind::File),
+                (b"b.txt", PathDirectoryEntryKind::File),
+            ],
+        ),
+        present("/workspace/pkg/a.txt", PathNodeKind::RegularFile),
+        present("/workspace/pkg/b.txt", PathNodeKind::RegularFile),
+    ]);
+    let mut transaction = new_transaction(script).await;
+    let mapping = Arc::new(RunfilesRepositoryMapping::empty());
+    let mut prepared = Arc::new(SmallMap::new());
+    let mut sources: PackageBzlCallSourcesSlot = None;
+    let mut witness = None;
+    let mut retries = 0;
+    let terminal = loop {
+        let step = evaluate_host_package_attempt_with_call_sources(
+            &input,
+            prepared.dupe(),
+            mapping.dupe(),
+            &mut sources,
+        );
+        let table = sources.as_ref().unwrap().as_ref().unwrap();
+        assert_eq!(table.len(), 1);
+        assert_eq!(table[0].0.as_str(), "/workspace/pkg/defs.bzl");
+        assert_eq!(table[0].1, modules[0].1.manifest.reachable[0]);
+        assert_eq!(
+            Arc::strong_count(table),
+            1,
+            "attempt recorder releases its table handle"
+        );
+        let weak = witness.get_or_insert_with(|| Arc::downgrade(table));
+        assert!(
+            std::ptr::eq(weak.as_ptr(), Arc::as_ptr(table)),
+            "every real attempt uses the same scoped table"
+        );
+        match step {
+            HostPackageAttemptStep::Terminal(terminal) => break terminal,
+            HostPackageAttemptStep::Pending {
+                request,
+                event_batch,
+            } => {
+                assert_eq!(
+                    event_batch.events().len(),
+                    2,
+                    "discarded attempt has only its print prefix"
+                );
+                retries += 1;
+                assert!(retries <= 2, "two distinct actual glob requests settle");
+                let outcome = compute_host_glob_request(
+                    &mut transaction,
+                    input.workspace.dupe(),
+                    HostGlobBoundaryScope::Root,
+                    input.logical_package_root.dupe(),
+                    input.package.clone(),
+                    request.dupe(),
+                    false,
+                )
+                .await
+                .unwrap();
+                let SourcePreparationOutcome::Complete(Ok((value, observations))) = outcome else {
+                    panic!("fixture must supply the genuine prepared glob result");
+                };
+                assert!(observations.observations().is_empty());
+                assert!(value.as_ref().is_ok());
+                assert!(
+                    Arc::make_mut(&mut prepared)
+                        .insert(request, value)
+                        .is_none()
+                );
+            }
+        }
+    };
+    assert_eq!(retries, 2);
+    assert_eq!(events(&terminal), ["attempt", "macro", "done"]);
+    let package = terminal.result.as_ref().unwrap();
+    assert_eq!(
+        package
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["macro", "literal"]
+    );
+    assert_eq!(
+        filegroup_srcs(package, "macro"),
+        ["@@//pkg:a.txt", "@@//pkg:b.txt"]
+    );
+    assert_eq!(filegroup_srcs(package, "literal"), ["@@//pkg:a.txt"]);
+    let witness = witness.unwrap();
+    drop(terminal);
+    drop(prepared);
+    drop(sources);
+    assert!(
+        witness.upgrade().is_none(),
+        "table retires while original loaded modules and DICE remain alive"
+    );
+
+    // frozen_macro uses a [0;32] reachable marker. Replace the changed module's
+    // actual provenance with the digest of its genuine fixture evaluation source.
+    const CHANGED: &str = "def macro_glob():\n    print('macro')\n    return glob(['a.txt'])\n";
+    let mut changed = frozen_macro(CHANGED);
+    changed.manifest.reachable = Arc::from([BzlModuleSourceProvenance::new(
+        changed.manifest.root.clone(),
+        digest(CHANGED),
+    )]);
+    let changed_modules = vec![(":defs.bzl".to_owned(), changed)];
+    let changed_input = attempt_input(&changed_modules, BUILD, "pkg");
+    let mut fresh = None;
+    let pending = evaluate_host_package_attempt_with_call_sources(
+        &changed_input,
+        Arc::new(SmallMap::new()),
+        mapping.dupe(),
+        &mut fresh,
+    );
+    assert!(matches!(pending, HostPackageAttemptStep::Pending { .. }));
+    let table = fresh.as_ref().unwrap().as_ref().unwrap();
+    assert_ne!(table[0].1, modules[0].1.manifest.reachable[0]);
+    assert_eq!(table[0].1, changed_modules[0].1.manifest.reachable[0]);
+    let fresh_weak = Arc::downgrade(table);
+    // Original scope is already retired; compare identities while both table allocations live.
+    let mut independent = None;
+    let original_pending = evaluate_host_package_attempt_with_call_sources(
+        &input,
+        Arc::new(SmallMap::new()),
+        mapping.dupe(),
+        &mut independent,
+    );
+    assert!(matches!(
+        original_pending,
+        HostPackageAttemptStep::Pending { .. }
+    ));
+    assert!(!Arc::ptr_eq(
+        table,
+        independent.as_ref().unwrap().as_ref().unwrap()
+    ));
+    drop(pending);
+    drop(original_pending);
+    drop(independent);
+    drop(fresh);
+    assert!(fresh_weak.upgrade().is_none());
+
+    let no_loads = attempt_input(&[], "filegroup(name='empty')\n", "pkg");
+    let mut empty = None;
+    let HostPackageAttemptStep::Terminal(terminal) =
+        evaluate_host_package_attempt_with_call_sources(
+            &no_loads,
+            Arc::new(SmallMap::new()),
+            mapping.dupe(),
+            &mut empty,
+        )
+    else {
+        panic!("no-load BUILD terminates without a glob");
+    };
+    assert!(terminal.result.is_ok());
+    assert!(
+        matches!(empty, Some(None)),
+        "valid empty provenance is initialized once"
+    );
+
+    let private = vec![(
+        "//pkg:defs.bzl".to_owned(),
+        frozen_macro("visibility('private')\nEXPORTED = 1\n"),
+    )];
+    for (source, visibility) in [
+        ("[", false),
+        (
+            "load('//pkg:defs.bzl', 'EXPORTED')\nprint('must not run')\n",
+            true,
+        ),
+    ] {
+        let denied = attempt_input(&private, source, "consumer");
+        let mut untouched = None;
+        let HostPackageAttemptStep::Terminal(terminal) =
+            evaluate_host_package_attempt_with_call_sources(
+                &denied,
+                Arc::new(SmallMap::new()),
+                mapping.dupe(),
+                &mut untouched,
+            )
+        else {
+            panic!("parse/visibility failure cannot request a glob");
+        };
+        assert!(
+            untouched.is_none(),
+            "parse and visibility checks precede lazy construction"
+        );
+        assert!(events(&terminal).is_empty());
+        let Err(HostPackageAttemptError::Loading(error)) = &terminal.result else {
+            panic!("original typed loading error required");
+        };
+        assert_eq!(error.message.contains("is not visible"), visibility);
+        assert!(!error.message.contains("must not run"));
+    }
+    println!(
+        "WP1099_LAYOUT slot={}:{} arc={}:{} provenance_row={}:{} rows=1 retries={}",
+        std::mem::size_of::<PackageBzlCallSourcesSlot>(),
+        std::mem::align_of::<PackageBzlCallSourcesSlot>(),
+        std::mem::size_of::<Arc<[(CompactString, BzlModuleSourceProvenance)]>>(),
+        std::mem::align_of::<Arc<[(CompactString, BzlModuleSourceProvenance)]>>(),
+        std::mem::size_of::<(CompactString, BzlModuleSourceProvenance)>(),
+        std::mem::align_of::<(CompactString, BzlModuleSourceProvenance)>(),
+        retries
+    );
+}

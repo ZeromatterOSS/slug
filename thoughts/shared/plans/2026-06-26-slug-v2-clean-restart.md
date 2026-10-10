@@ -34,20 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-310-m7a-root-package-syntax-reuse-r1
-Status: accepted — 33 focused, production, native and FINAL review gates passed
+Packet: WP-7-311-m7a-package-attempt-provenance-sharing-r1
+Status: ACCEPTED — current40/production/ONE native/FINAL; broader producer successor ready
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records accepted normal
-root BUILD syntax reuse. [WP1098 receipt](./slug-v2-subplans/wp1098-root-package-syntax-reuse-2026-10-10.json)
-binds full source/key identity, current source-first observations, borrowed retry
-load names and deferred evaluator copies. Actual graph/storage retirement proofs
-pass; cold success still parses twice. Native supervisor226.44/phase227.53MiB stay
-under256, while source252/WorkDeadline caller7:296 remains. No speed, native savings,
-frontier advance or whole-workload fit is claimed. Full producer/time/certificates/
-Rustc/actions/bootstrap remain open. Next source-grounded normal-producer readiness
-selection is pending; no identical native replay or cap raise. Borrow/move/share
-strings and use existing scoped interners where owner and cleanup fit. Linux
-priority, Windows deferred. Goal ACTIVE.
+The [current manifest](./slug-v2-subplans/current-packet.md) and
+[WP1099 receipt](./slug-v2-subplans/wp1099-package-attempt-provenance-sharing-2026-10-10.json)
+accept private invocation-local sharing of the existing full loaded-Bzl
+provenance Arc across normal glob retries. All40 current controls, production,
+ONE native and FINAL pass; Stage9 explicitly amends only this finite lifetime.
+Observed supervisor225.953125MiB/exactphase226.92578125MiB remain under256;
+source252/decode55574923/write52796422/root333 and WorkDeadline7:296 unchanged.
+Next select broader normal compiler producer readiness from the original typed
+retry Need/context at first progress refusal, rather than another adjacent cache.
+Full producer/time/wholefit/certificates/Rustc/actions/bootstrap remain open.
+Borrow/move/share strings and use scoped interners where owner and cleanup fit;
+original caps unchanged. Linux priority, Windows deferred. Goal ACTIVE.
 
 ### Ready and blocked queue
 
