@@ -941,10 +941,15 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
     use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
     eprintln!(
-        "WP1054_SHELL_ENVIRONMENT_LAYOUT names={} row={} literal={}",
+        "WP1054_SHELL_ENVIRONMENT_LAYOUT names={} row={} literal={} apple_names={} apple_literal={}",
         std::mem::size_of_val(&RULES_SHELL_ENVIRONMENT_NAMES),
         std::mem::size_of::<&str>(),
         RULES_SHELL_ENVIRONMENT_NAMES
+            .iter()
+            .map(|name| name.len())
+            .sum::<usize>(),
+        std::mem::size_of_val(&APPLE_SUPPORT_ENVIRONMENT_NAMES),
+        APPLE_SUPPORT_ENVIRONMENT_NAMES
             .iter()
             .map(|name| name.len())
             .sum::<usize>()
@@ -958,6 +963,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
             .with_sixth(path("/cc"))
             .with_seventh(path("/license"))
             .with_eighth(path("/shell"))
+            .with_ninth(path("/apple"))
     };
     let need = |workspace: &str, names: &[&str]| {
         SourcePreparationNeeds::environment(
@@ -972,6 +978,9 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
             .unwrap(),
         )
     };
+    let apple = need("/fixture", &APPLE_SUPPORT_ENVIRONMENT_NAMES);
+    assert_eq!(apple.repository_environment().unwrap().names().len(), 2);
+    assert!(selected().admit(&apple).is_err());
     let all = need("/fixture", &RULES_CC_ENVIRONMENT_NAMES);
     assert_eq!(all.repository_environment().unwrap().names().len(), 14);
     assert!(selected().admit(&all).is_err());
@@ -991,6 +1000,17 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
                 enabled
             );
             assert!(shell_bodies.admit(&all).is_err());
+            assert!(bodies.admit(&apple).is_err());
+            assert!(shell_bodies.admit(&apple).is_err());
+            let apple_bodies = selected().with_apple_support_import_sources(registry, command);
+            assert_eq!(apple_bodies.apple_support_import_sources, enabled);
+            assert_eq!(apple_bodies.admit(&apple).is_ok(), enabled);
+            assert!(apple_bodies.admit(&all).is_err());
+            assert!(
+                apple_bodies
+                    .admit(&need("/fixture", &RULES_SHELL_ENVIRONMENT_NAMES))
+                    .is_err()
+            );
         }
     }
     let bodies = selected()
@@ -1050,60 +1070,122 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
     assert_eq!(shell.repository_environment().unwrap().names().len(), 3);
     let both = all.try_union(&shell).unwrap();
     assert_eq!(both.repository_environment().unwrap().names().len(), 17);
+    let combined = both.try_union(&apple).unwrap();
+    assert_eq!(combined.repository_environment().unwrap().names().len(), 19);
     for cc_enabled in [false, true] {
         for shell_enabled in [false, true] {
-            let mut candidate = selected();
-            if cc_enabled {
-                candidate = candidate.with_rules_cc_import_sources(
-                    RegistryChoice::PreparedFile,
-                    CommandChoice::PublicProbe,
-                );
-            }
-            if shell_enabled {
-                candidate = candidate.with_rules_shell_import_sources(
-                    RegistryChoice::PreparedFile,
-                    CommandChoice::PublicProbe,
-                );
-            }
-            assert_eq!(candidate.admit(&all).is_ok(), cc_enabled);
-            assert_eq!(candidate.admit(&shell).is_ok(), shell_enabled);
-            for name in RULES_SHELL_ENVIRONMENT_NAMES {
-                assert_eq!(
-                    candidate.admit(&need("/fixture", &[name])).is_ok(),
-                    shell_enabled
-                );
-            }
-            for mixed in [
-                all.try_union(&shell).unwrap(),
-                shell.try_union(&all).unwrap(),
-            ] {
-                assert_eq!(candidate.admit(&mixed).is_ok(), cc_enabled && shell_enabled);
-                if !(cc_enabled && shell_enabled) {
-                    let denied = candidate.admit(&mixed).unwrap_err();
-                    assert_eq!(denied.family, "environment");
-                    assert!(std::ptr::eq(
-                        candidate
-                            .environment_diagnostic(&mixed, &denied)
-                            .unwrap()
-                            .request,
-                        mixed.repository_environment().unwrap()
-                    ));
+            for apple_enabled in [false, true] {
+                let mut candidate = selected();
+                if cc_enabled {
+                    candidate = candidate.with_rules_cc_import_sources(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    );
+                }
+                if shell_enabled {
+                    candidate = candidate.with_rules_shell_import_sources(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    );
+                }
+                if apple_enabled {
+                    candidate = candidate.with_apple_support_import_sources(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    );
+                }
+                assert_eq!(candidate.admit(&all).is_ok(), cc_enabled);
+                assert_eq!(candidate.admit(&shell).is_ok(), shell_enabled);
+                for name in RULES_SHELL_ENVIRONMENT_NAMES {
+                    assert_eq!(
+                        candidate.admit(&need("/fixture", &[name])).is_ok(),
+                        shell_enabled
+                    );
+                }
+                for mixed in [
+                    all.try_union(&shell).unwrap(),
+                    shell.try_union(&all).unwrap(),
+                ] {
+                    assert_eq!(candidate.admit(&mixed).is_ok(), cc_enabled && shell_enabled);
+                    if !(cc_enabled && shell_enabled) {
+                        let denied = candidate.admit(&mixed).unwrap_err();
+                        assert_eq!(denied.family, "environment");
+                        assert!(std::ptr::eq(
+                            candidate
+                                .environment_diagnostic(&mixed, &denied)
+                                .unwrap()
+                                .request,
+                            mixed.repository_environment().unwrap()
+                        ));
+                    }
+                }
+                assert_eq!(candidate.admit(&apple).is_ok(), apple_enabled);
+                for name in APPLE_SUPPORT_ENVIRONMENT_NAMES {
+                    assert_eq!(
+                        candidate.admit(&need("/fixture", &[name])).is_ok(),
+                        apple_enabled
+                    );
+                }
+                for (left, right, permitted) in [
+                    (&all, &apple, cc_enabled && apple_enabled),
+                    (&shell, &apple, shell_enabled && apple_enabled),
+                    (&both, &apple, cc_enabled && shell_enabled && apple_enabled),
+                ] {
+                    for mixed in [
+                        left.try_union(right).unwrap(),
+                        right.try_union(left).unwrap(),
+                    ] {
+                        assert_eq!(candidate.admit(&mixed).is_ok(), permitted);
+                        if !permitted {
+                            let denied = candidate.admit(&mixed).unwrap_err();
+                            assert_eq!(denied.family, "environment");
+                            assert!(std::ptr::eq(
+                                candidate
+                                    .environment_diagnostic(&mixed, &denied)
+                                    .unwrap()
+                                    .request,
+                                mixed.repository_environment().unwrap()
+                            ));
+                        }
+                    }
                 }
             }
         }
     }
     let mut both_bodies = selected()
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_rules_shell_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_apple_support_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     for (slot, affected, unaffected) in [(2, &all, &shell), (4, &shell, &all)] {
-        both_bodies.additional[5] = both_bodies.additional[slot].take();
+        let module = both_bodies.additional[slot].take();
         assert!(both_bodies.admit(affected).is_err());
         assert!(both_bodies.admit(unaffected).is_ok());
         assert!(both_bodies.admit(&both).is_err());
-        both_bodies.additional[slot] = both_bodies.additional[5].take();
+        both_bodies.additional[slot] = module;
         assert!(both_bodies.admit(&both).is_ok());
     }
+    let module = both_bodies.additional[5].take().unwrap();
+    let displaced = both_bodies.additional[6].replace(module);
+    assert!(both_bodies.admit(&apple).is_err());
+    assert!(both_bodies.admit(&combined).is_err());
+    assert!(both_bodies.admit(&both).is_ok());
+    both_bodies.additional[5] = both_bodies.additional[6].take();
+    both_bodies.additional[6] = displaced;
+    assert!(both_bodies.admit(&combined).is_ok());
+    let foreign_apple = need("/foreign", &APPLE_SUPPORT_ENVIRONMENT_NAMES);
+    assert_eq!(
+        both_bodies.admit(&foreign_apple).unwrap_err().family,
+        "environment"
+    );
+    assert!(combined.try_union(&foreign_apple).is_err());
     for name in [
+        "bazel_no_apple_cpp_toolchain",
+        "BAZEL_NO_APPLE_CPP_TOOLCHAIN_suffix",
+        "bazel_use_cpp_only_toolchain",
+        "BAZEL_USE_CPP_ONLY_TOOLCHAIN_suffix",
         "bazel_sh",
         "BAZEL_SH_suffix",
         "path",
@@ -1112,7 +1194,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         "",
     ] {
         let bad = need("/fixture", &[name]);
-        for authorized in [&shell, &both] {
+        for authorized in [&shell, &both, &apple, &combined] {
             for mixed in [
                 authorized.try_union(&bad).unwrap(),
                 bad.try_union(authorized).unwrap(),
@@ -1170,7 +1252,7 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         .unwrap()
         .as_ptr();
     let mut progress = 0;
-    for environment in [&all, &both] {
+    for environment in [&all, &both, &apple, &combined] {
         for (excluded, family) in [
             (&local, "materialization"),
             (&excluded_path, "path"),
@@ -1250,6 +1332,37 @@ fn repository_environment_names_need_is_opt_in_exact_snapshot_frontier_only() {
         let observed = milestones.lock().unwrap();
         assert_eq!((observed.calls, observed.preparations), (0, 0));
     }
+    let combined_first = combined
+        .repository_environment()
+        .unwrap()
+        .names()
+        .iter()
+        .next()
+        .unwrap()
+        .as_ptr();
+    let SourcePreparationOutcome::Need(recovered_combined) = root.need(combined).unwrap() else {
+        panic!("all three authorized role frontiers must preserve their original Need");
+    };
+    assert_eq!(
+        recovered_combined
+            .repository_environment()
+            .unwrap()
+            .names()
+            .len(),
+        19
+    );
+    assert!(std::ptr::eq(
+        recovered_combined
+            .repository_environment()
+            .unwrap()
+            .names()
+            .iter()
+            .next()
+            .unwrap()
+            .as_ptr(),
+        combined_first
+    ));
+    drop(recovered_combined);
     let both_first = both
         .repository_environment()
         .unwrap()

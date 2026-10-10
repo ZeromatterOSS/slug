@@ -34,23 +34,24 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-osx-cc-configure-source-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-environment-readiness-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1065](./slug-v2-subplans/wp1065-apple-osx-cc-configure-source-2026-10-10.json) accepts exact original-root Apple
-Support crosstool/osx_cc_configure.bzl Host Lstat+FileBytes under the existing
-checked cfgtest role: metadata3/body3/ownNeed6; borrowed reference16B/literal30B,
-existing Boolean growth0, Bodies200B/align8 without attributed padding delta.
-Old309 source signatures exactprefix+9201BEND/310;Shell19/8 unchanged;
-104names/106native records plus currentraw0tests=107allphase. Native
-4.933742390s/209312KiB below256MiB, no new owned production strings.
-The actual next boundary requests two Apple toolchain environment names;
-values, permission and owner association remain unproved. Borrow/transfer
-first; existing scoped interners when retained lifetime and cleanup fit.
-Full Rustc/actions/certificates/producer/wholefit remain open. Frozen
-successor notes ground the next step. Windows minimal/deferred.
+[WP1066](./slug-v2-subplans/wp1066-apple-environment-readiness-2026-10-10.json) accepts the exact two Apple toolchain
+environment names under the existing checked cfgtest role: independent CC14,
+Shell3 and Apple2 compose to19; original authenticated inputs supply decoder
+context. Borrowed static table32B/literals56B, Boolean growth0,
+Bodies200B/align8 without attributed padding delta; no new owned production
+strings or retained fields. All310 source signatures unchanged;
+104names/106native/allphase records, current capture0. Native
+4.972682329s/210216KiB below256MiB. The next exact Apple
+crosstool/BUILD.bazel Host Lstat is frozen in the successor notes;
+file kind/body and environment values/cells/caller association remain unproved.
+Borrow/transfer first; existing scoped interners when repeated retained
+strings' owner lifetime and cleanup fit. Full Rustc/actions/certificates,
+normal producer and whole-workload fit remain open. Windows minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
