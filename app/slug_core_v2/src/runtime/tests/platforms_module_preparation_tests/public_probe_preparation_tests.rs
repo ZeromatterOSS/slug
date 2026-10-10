@@ -4376,13 +4376,18 @@ const GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER: (&str, &str, &str) = (
 #[test]
 fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
+    let apple_owner = (
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.0,
+        "@@apple_support+//crosstool:setup_internal.bzl",
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
+    );
     let shell_owner = (
         "rules_shell++sh_configure+local_config_shell",
         "@@rules_shell+//shell/private/repositories:sh_config.bzl",
         "sh_config",
     );
     eprintln!(
-        "WP1055_SHELL_DIAGNOSTIC_LAYOUT owner={} row={} literal={}",
+        "WP1055_SHELL_DIAGNOSTIC_LAYOUT owner={} row={} literal={} apple_owner={} apple_fresh_literal={} apple_reused_literal={} apple_label={} apple_label_literal={}",
         std::mem::size_of::<(&str, &str, &str, &str, &str)>(),
         std::mem::size_of::<&str>(),
         shell_owner.0.len()
@@ -4390,6 +4395,13 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             + "shell/private/repositories".len()
             + "sh_config.bzl".len()
             + shell_owner.2.len(),
+        std::mem::size_of_val(&APPLE_GENERATED_DIAGNOSTIC_OWNER),
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.0.len()
+            + APPLE_GENERATED_DIAGNOSTIC_OWNER.3.len()
+            + APPLE_GENERATED_DIAGNOSTIC_OWNER.4.len(),
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.1.len() + APPLE_GENERATED_DIAGNOSTIC_OWNER.2.len(),
+        std::mem::size_of_val(&apple_owner),
+        apple_owner.1.len(),
     );
     for (owner, &(canonical, defining_label, rule_name)) in GENERATED_DIAGNOSTIC_TEST_OWNERS
         .iter()
@@ -4397,6 +4409,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
         ))
         .chain(std::iter::once(&shell_owner))
+        .chain(std::iter::once(&apple_owner))
         .enumerate()
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
@@ -4434,6 +4447,11 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             .with_sixth(path("/cc"))
             .with_seventh(path("/license"))
             .with_eighth(path("/shell"))
+            .with_ninth(path("/apple"))
+            .with_apple_support_import_sources(
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+            )
             .with_rules_shell_import_sources(
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
@@ -4458,6 +4476,9 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         assert!(enabled.rules_rust_defs_import_sources);
         assert!(enabled.rules_cc_import_sources);
         assert!(enabled.rules_shell_import_sources);
+        assert!(enabled.apple_support_import_sources);
+        assert!(enabled.additional[5].is_some());
+        assert!(!bodies.apple_support_import_sources);
         assert!(enabled.additional[4].is_some());
         assert!(enabled.generated_features_file_effects);
         assert!(!bodies.rules_shell_import_sources);
@@ -4466,6 +4487,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         let permissive = enabled.admit_with_plan_matcher(&needs, &|_, _| true);
         if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len()
             || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 1
+            || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 2
         {
             assert_eq!(permissive.unwrap_err().family, "materialization");
             assert_eq!(
@@ -4474,6 +4496,27 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             );
         } else {
             assert!(permissive.is_ok());
+        }
+        let enabled_denied = enabled.admit(&needs).unwrap_err();
+        assert!(
+            enabled
+                .generated_plan_diagnostic(&needs, &enabled_denied)
+                .is_some()
+        );
+        if canonical == apple_owner.0 {
+            for changed in [
+                "Apple_cc_autoconf_toolchains",
+                "apple_cc_autoconf_toolchains_extra",
+            ] {
+                let mut request = request_for_plan(Plan::build([]).unwrap());
+                request.repo_spec.rule_id.rule_name = changed.into();
+                let near = SourcePreparationNeeds::repository(request);
+                assert!(
+                    bodies
+                        .generated_plan_diagnostic(&near, &bodies.admit(&near).unwrap_err())
+                        .is_none()
+                );
+            }
         }
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);
@@ -4607,6 +4650,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
             ))
             .chain(std::iter::once(&shell_owner))
+            .chain(std::iter::once(&apple_owner))
         {
             if other_canonical == canonical {
                 continue;
@@ -4758,6 +4802,11 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
 #[test]
 fn generated_plan_refusal_projection_is_bounded() {
     use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan as Plan;
+    let apple_owner = (
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.0,
+        "@@apple_support+//crosstool:setup_internal.bzl",
+        APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
+    );
     let shell_owner = (
         "rules_shell++sh_configure+local_config_shell",
         "@@rules_shell+//shell/private/repositories:sh_config.bzl",
@@ -4769,6 +4818,7 @@ fn generated_plan_refusal_projection_is_bounded() {
             &GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER,
         ))
         .chain(std::iter::once(&shell_owner))
+        .chain(std::iter::once(&apple_owner))
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);

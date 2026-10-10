@@ -34,27 +34,28 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-288-m7a-normal-rustc-apple-crosstool-toolchains-source-r1
+Packet: WP-7-288-m7a-normal-rustc-apple-generated-plan-diagnostic-r1
 Status: accepted — actual FINAL/post-FINAL operative receipt complete
 
 The [current manifest](./slug-v2-subplans/current-packet.md) continues normal
 retained Rustc readiness on the pinned Bazel9.2/rules_rust0.73 fixture.
-[WP1070](./slug-v2-subplans/wp1070-apple-crosstool-toolchains-source-2026-10-10.json) accepts the measured734B Apple
-crosstool/BUILD.toolchains source under the existing checked original-root role:
-full4/Need8, independent metadata4/body0 and environment2/union19.
-The fourth source entry shares metadata[3] literal storage: table64B/newreference16B,
-newliteral0B/logical referenced-name bytes103B; metadata64B/literals71B unchanged.
-Boolean growth0/Bodies200B/align8 without attributed padding, no new owned
-production strings or retained fields. Source106net=38authored+68formatter,
-helper78net; independent STATIC and FINAL accepted the matrix delta.
-Old310 ordered signatures preserved plus sole734B END311/[188,123]/6480266physical/
-12960532bracket.104names/106nativegate records plus rawcapture1zeroTests=107allphase;
-failed/superseded0. Native4.938802938s/209336KiB below256MiB.
-The actual next boundary and owner fields are frozen in both successor notes;
-finite source readiness does not establish normal kind/caller/closure/certificates.
-Borrow/transfer first; existing scoped interners when repeated retained
-strings' owner lifetime and cleanup fit. Full Rustc/actions/certificates,
-normal producer and whole-workload fit remain open. Windows minimal/deferred.
+[WP1071](./slug-v2-subplans/wp1071-apple-generated-plan-diagnostic-2026-10-10.json) extends the existing bounded
+borrowed generated-plan diagnostic to the exact original Apple owner.
+Original request/plan/content ownership is preserved; functional signatures,
+namespace grants and source/environment policies remain unchanged.
+Source63net=47authored+16formatter; helper108net.
+Identity literals168B before pooling; all added cfgtest quoted literal occurrences
+439B and removed57B, tuple80B/local triplet48B/reused identity23B.
+No new owned production strings or retained fields; source64B/metadata64B/literals71B/
+environment32B/literals56B/union19/Bodies200B/align8/Boolean growth0 unchanged.
+All311 ordered source signatures remain byteexact/[188,123]/6480266physical/
+12960532bracket.104names/106native and allphase records/currentcapture0,
+failed/superseded0. Native5.136283636s/211504KiB below256MiB.
+Actual diagnostic plan and next boundary are frozen in both successor notes;
+transport is not functional admission or fullSpec/mapping/current epoch proof.
+Borrow/transfer first; existing scoped interners for repeated retained strings
+when owner lifetime and cleanup fit. Full Rustc/actions/certificates, normal
+producer and whole-workload fit remain open. Windows minimal/deferred.
 
 Historical oracle bytes do not certify current sources; missing prerequisites stay
 typed, with no acquisition, source16/17/18/F3/fullroot retry or invented providers.
