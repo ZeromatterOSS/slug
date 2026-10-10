@@ -1766,7 +1766,7 @@ fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
 }
 #[tokio::test]
 async fn namespace_owner_read_uses_current_transaction() {
-    for owner in [0, 2, 3, 4, 5, 6] {
+    for owner in [0, 2, 3, 4, 5, 6, 7] {
         let bodies = namespace_test_bodies()
             .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
             .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
@@ -1781,8 +1781,26 @@ async fn namespace_owner_read_uses_current_transaction() {
         } else {
             bodies
         };
-        let request = if matches!(owner, 5 | 6) {
-            let (canonical, label, rule) = if owner == 6 {
+        let bodies = if owner == 7 {
+            bodies
+                .with_seventh(NormalizedAbsolutePath::new("/license").unwrap())
+                .with_eighth(NormalizedAbsolutePath::new("/shell").unwrap())
+                .with_ninth(NormalizedAbsolutePath::new("/apple").unwrap())
+                .with_apple_support_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                )
+        } else {
+            bodies
+        };
+        let request = if matches!(owner, 5 | 6 | 7) {
+            let (canonical, label, rule) = if owner == 7 {
+                (
+                    APPLE_GENERATED_DIAGNOSTIC_OWNER.0,
+                    "@@apple_support+//crosstool:setup_internal.bzl",
+                    APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
+                )
+            } else if owner == 6 {
                 (
                     "rules_shell++sh_configure+local_config_shell",
                     "@@rules_shell+//shell/private/repositories:sh_config.bzl",
@@ -1821,7 +1839,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                 "/generation/constraints.bzl"
             } else if owner == 3 {
                 "/generation/BUILD.bazel"
-            } else if matches!(owner, 5 | 6) {
+            } else if matches!(owner, 5 | 6 | 7) {
                 "/generation/BUILD"
             } else if owner == 4 {
                 "/generation/toolchains.bzl"
@@ -1903,7 +1921,7 @@ async fn namespace_owner_read_uses_current_transaction() {
                     matches!(owner, 3 | 4 | 5 | 6) && index != 1
                 );
             }
-            if matches!(owner, 4 | 5 | 6) {
+            if matches!(owner, 4 | 5 | 6 | 7) {
                 let candidate = PathObservationDemand::new(
                     PathObservationNamespace::Materialization(instance),
                     NormalizedAbsolutePath::new("/generation/BUILD.bazel").unwrap(),
@@ -2071,6 +2089,7 @@ fn small_namespace_plan_matches(
 ) -> bool {
     if std::ptr::eq(selected, &GENERATED_CC_TOOLCHAINS_FILES[..])
         || std::ptr::eq(selected, &GENERATED_SHELL_CONFIG_FILES[..])
+        || std::ptr::eq(selected, &GENERATED_APPLE_TOOLCHAINS_FILES[..])
     {
         return generated_features_plan_matches(
             plan,
@@ -2844,13 +2863,25 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         std::mem::size_of_val(&GENERATED_CC_TOOLCHAINS_FILES)
     );
     eprintln!(
-        "WP1056_SIGNATURE_LAYOUT signature={} shell={}",
+        "WP1056_SIGNATURE_LAYOUT signature={} shell={} apple={}",
         std::mem::size_of::<GeneratedFileSignature>(),
-        std::mem::size_of_val(&GENERATED_SHELL_CONFIG_FILES)
+        std::mem::size_of_val(&GENERATED_SHELL_CONFIG_FILES),
+        std::mem::size_of_val(&GENERATED_APPLE_TOOLCHAINS_FILES)
     );
-    for shell in [false, true] {
+    for owner in 0..3 {
+        let shell = owner == 1;
+        let apple = owner == 2;
         let configure = |bodies: Bodies| {
-            if shell {
+            if apple {
+                bodies
+                    .with_seventh(path("/license"))
+                    .with_eighth(path("/shell"))
+                    .with_ninth(path("/apple"))
+                    .with_apple_support_import_sources(
+                        RegistryChoice::PreparedFile,
+                        CommandChoice::PublicProbe,
+                    )
+            } else if shell {
                 bodies
                     .with_seventh(path("/license"))
                     .with_eighth(path("/shell"))
@@ -2862,13 +2893,28 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 bodies
             }
         };
-        let selected = if shell {
+        let selected = if apple {
+            &GENERATED_APPLE_TOOLCHAINS_FILES[..]
+        } else if shell {
             &GENERATED_SHELL_CONFIG_FILES[..]
         } else {
             &GENERATED_CC_TOOLCHAINS_FILES[..]
         };
-        let slot = if shell { 4 } else { 2 };
-        let (canonical, label, rule) = if shell {
+        let slot = if apple {
+            5
+        } else if shell {
+            4
+        } else {
+            2
+        };
+        let crossed_slot = if apple { 4 } else { 5 };
+        let (canonical, label, rule) = if apple {
+            (
+                APPLE_GENERATED_DIAGNOSTIC_OWNER.0,
+                "@@apple_support+//crosstool:setup_internal.bzl",
+                APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
+            )
+        } else if shell {
             (
                 "rules_shell++sh_configure+local_config_shell",
                 "@@rules_shell+//shell/private/repositories:sh_config.bzl",
@@ -2877,7 +2923,13 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         } else {
             GENERATED_CC_TOOLCHAINS_DIAGNOSTIC_TEST_OWNER
         };
-        let (repo, package, target) = if shell {
+        let (repo, package, target) = if apple {
+            (
+                APPLE_GENERATED_DIAGNOSTIC_OWNER.1,
+                APPLE_GENERATED_DIAGNOSTIC_OWNER.2,
+                APPLE_GENERATED_DIAGNOSTIC_OWNER.3,
+            )
+        } else if shell {
             (
                 "rules_shell+",
                 "shell/private/repositories",
@@ -2911,7 +2963,20 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 .unwrap(),
             selected
         ));
-        assert!(bodies.admit_with_plan_matcher(&valid, &matches).is_ok());
+        assert!(
+            bodies
+                .admit_with_plan_matcher(&valid, &|plan, signatures| {
+                    let RepositoryMaterializationKind::GeneratedFileEffects(original_plan) =
+                        &original.kind
+                    else {
+                        panic!("original generated plan");
+                    };
+                    assert!(std::ptr::eq(plan, original_plan));
+                    assert!(std::ptr::eq(signatures, selected));
+                    matches(plan, signatures)
+                })
+                .is_ok()
+        );
         assert!(bodies.admit(&valid).is_err());
         for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
             for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
@@ -2921,6 +2986,8 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                     .with_sixth(path("/cc"))
                     .with_seventh(path("/license"))
                     .with_eighth(path("/shell"))
+                    .with_ninth(path("/apple"))
+                    .with_apple_support_import_sources(registry, command)
                     .with_rules_shell_import_sources(registry, command)
                     .with_rules_cc_import_sources(registry, command)
                     .with_generated_features_file_effects(registry, command);
@@ -2932,7 +2999,10 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             }
         }
         let mut independent = configure(namespace_test_bodies());
-        if shell {
+        if apple {
+            independent.rules_cc_import_sources = false;
+            independent.rules_shell_import_sources = false;
+        } else if shell {
             independent.rules_cc_import_sources = false;
         } else {
             independent.rules_shell_import_sources = false;
@@ -2947,7 +3017,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             match index {
                 0 => closed.generated_features_file_effects = false,
                 1 => {
-                    if shell {
+                    if apple {
+                        closed.apple_support_import_sources = false;
+                    } else if shell {
                         closed.rules_shell_import_sources = false;
                     } else {
                         closed.rules_cc_import_sources = false;
@@ -2955,7 +3027,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 }
                 2 => closed.additional[slot] = None,
                 3 => closed.roots[0] = path("/other"),
-                4 => closed.additional[5] = closed.additional[slot].take(),
+                4 => closed.additional[crossed_slot] = closed.additional[slot].take(),
                 _ => unreachable!(),
             }
             let calls = std::cell::Cell::new(0);
@@ -2969,7 +3041,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             );
             assert_eq!(calls.get(), 0);
             if index == 4 {
-                closed.additional[slot] = closed.additional[5].take();
+                closed.additional[slot] = closed.additional[crossed_slot].take();
                 assert!(closed.admit_with_plan_matcher(&valid, &matches).is_ok());
             }
         }
@@ -2988,7 +3060,13 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 3 => {
                     wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(&format!(
                         "@@{repo}//{}:{target}",
-                        if shell { "shell/private" } else { "cc/private" }
+                        if apple {
+                            "other"
+                        } else if shell {
+                            "shell/private"
+                        } else {
+                            "cc/private"
+                        }
                     ))
                     .unwrap()
                 }
@@ -3055,12 +3133,17 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 &one
             ));
         }
-        for symlink in [false, true] {
+        for (symlink, trailing) in [(false, false), (true, false), (false, true), (true, true)] {
             let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
+            if trailing {
+                builder
+                    .push("BUILD".into(), Arc::from(&b"a"[..]), true)
+                    .unwrap();
+            }
             if symlink {
                 builder
                     .push_symlink(
-                        "BUILD".into(),
+                        if trailing { "extra" } else { "BUILD" }.into(),
                         slug_bzlmod_v2::HostRepositoryLabelPathValue::new(
                             path("/source"),
                             PathObservationNamespace::Host,
@@ -3085,6 +3168,47 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         let instance = slug_workspace_v2::PathObservationInstanceId::new(23);
         let epoch =
             namespace_test_epoch_at(&bodies, [original.clone()], instance, "/parent/generation");
+        for entries in [32, 33] {
+            let bounded = slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
+                bodies.roots[0].dupe(),
+                (0..entries).map(|index| {
+                    let request = if index == 0 {
+                        original.clone()
+                    } else {
+                        let mut other = original.as_ref().clone();
+                        other.id.canonical_repo =
+                            slug_identity_v2::CanonicalRepoName::new(&format!("other{index}+"))
+                                .unwrap();
+                        Arc::new(other)
+                    };
+                    slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
+                        request,
+                        result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
+                            slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
+                                source_identity: Arc::from("test"),
+                                generation_root: PathBuf::from("/parent/generation"),
+                                observation_instance: if index == 0 {
+                                    instance
+                                } else {
+                                    slug_workspace_v2::PathObservationInstanceId::new(24 + index)
+                                },
+                            },
+                        ),
+                    }
+                }),
+            )
+            .unwrap();
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Materialization(instance),
+                path("/parent/generation/BUILD"),
+                PathObservationOperation::FileBytes,
+            );
+            assert_eq!(
+                namespace_policy(&bodies, &demand, Some(&bounded), &matches)
+                    .admits(&demand.operation()),
+                entries == 32
+            );
+        }
         let need = |p, op| {
             SourcePreparationNeeds::path(NeedPathObservations::singleton(match op {
                 PathObservationOperation::WindowsLongPath => {
@@ -3147,11 +3271,16 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                             "/parent",
                             "/parent/generation",
                             "/parent/generation/BUILD",
-                            "/parent/generation/REPO.bazel",
-                            "/parent/generation/.bazelignore",
-                            "/parent/generation/BUILD.bazel",
                         ]
-                        .contains(&p))
+                        .contains(&p)
+                        || op == PathObservationOperation::Lstat
+                            && !apple
+                            && [
+                                "/parent/generation/REPO.bazel",
+                                "/parent/generation/.bazelignore",
+                                "/parent/generation/BUILD.bazel"
+                            ]
+                            .contains(&p))
                         || (op == PathObservationOperation::FileBytes
                             && p == "/parent/generation/BUILD")
                 );
@@ -3175,7 +3304,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             PathObservationOperation::Lstat,
         );
         let base_own = valid.try_union(&leaf).unwrap();
-        let own = if shell {
+        let own = if apple {
+            base_own.try_union(&features).unwrap()
+        } else if shell {
             base_own
                 .try_union(&marker)
                 .unwrap()
@@ -3237,6 +3368,24 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                 instance,
                 "/parent/generation",
             )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [],
+                instance,
+                "/parent/generation",
+            )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [original.clone()],
+                slug_workspace_v2::PathObservationInstanceId::new(0),
+                "/parent/generation",
+            )),
+            Some(namespace_test_epoch_at(
+                &bodies,
+                [original.clone()],
+                instance,
+                "relative-generation",
+            )),
         ];
         for unavailable in &unavailable_epochs {
             assert!(admit(&leaf, unavailable.as_ref()).is_err());
@@ -3285,14 +3434,17 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         (original_candidate, true, "package_marker"),
                     ] {
                         let policy = namespace_policy(&configured, demand, e, &matches);
-                        assert_eq!(policy.path_class, if enabled { class } else { "other" });
+                        assert_eq!(
+                            policy.path_class,
+                            if enabled && !apple { class } else { "other" }
+                        );
                         assert_eq!(policy.owner_plan_allowed, own_plan);
                         assert_eq!(
                             policy.admits(&PathObservationOperation::Lstat),
-                            enabled && own_plan
+                            enabled && own_plan && !apple
                         );
                         assert!(!policy.admits(&PathObservationOperation::FileBytes));
-                        if shell {
+                        if shell || apple {
                             let marker_need = match class {
                                 "repo_marker" => &marker,
                                 "ignore_marker" => &ignore,
@@ -3309,7 +3461,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                                                 .admits(&d.operation())
                                         })
                                         .is_ok(),
-                                    enabled && own_plan
+                                    enabled && own_plan && !apple
                                 );
                                 assert!(
                                     mixed
@@ -3317,7 +3469,7 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                                         .values()
                                         .any(|r| Arc::ptr_eq(r, original))
                                 );
-                                if !enabled || !own_plan {
+                                if !enabled || !own_plan || apple {
                                     let (first, _) = configured
                                         .first_denied_path_with_namespace_matcher(&mixed, &|d| {
                                             namespace_policy(&configured, d, e, &matches)
@@ -3344,6 +3496,9 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             PathObservationNamespace::Host,
             PathObservationNamespace::Materialization(
                 slug_workspace_v2::PathObservationInstanceId::new(24),
+            ),
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(0),
             ),
         ] {
             let demand = PathObservationDemand::new(
@@ -3971,7 +4126,14 @@ fn generated_features_materialization_is_opt_in_and_exact() {
 #[test]
 fn generated_features_materialization_refuses_mixed_need_before_progress() {
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
-    let bodies = namespace_test_bodies();
+    let bodies = namespace_test_bodies()
+        .with_seventh(path("/license"))
+        .with_eighth(path("/shell"))
+        .with_ninth(path("/apple"))
+        .with_apple_support_import_sources(
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+        );
     let matches = small_namespace_plan_matches;
     let version_request = |plan| {
         let mut request = generated_globals_request(&bodies, plan);
@@ -4045,6 +4207,18 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         .unwrap();
     let winsdk_weak = Arc::downgrade(winsdk_original);
     let winsdk_count = Arc::strong_count(winsdk_original);
+    let mut apple_request =
+        generated_globals_request(&bodies, small_generated_plan(&[("BUILD", b"a", true)]));
+    apple_request.id.canonical_repo =
+        slug_identity_v2::CanonicalRepoName::new(APPLE_GENERATED_DIAGNOSTIC_OWNER.0).unwrap();
+    apple_request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@apple_support+//crosstool:setup_internal.bzl").unwrap();
+    apple_request.repo_spec.rule_id.rule_name = APPLE_GENERATED_DIAGNOSTIC_OWNER.4.into();
+    apple_request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+    let apple = SourcePreparationNeeds::repository(apple_request);
+    let apple_original = apple.repository_materializations().values().next().unwrap();
+    let apple_weak = Arc::downgrade(apple_original);
+    let apple_count = Arc::strong_count(apple_original);
     for cohort in [
         valid
             .try_union(&version)
@@ -4054,8 +4228,12 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             .try_union(&hub)
             .unwrap()
             .try_union(&winsdk)
+            .unwrap()
+            .try_union(&apple)
             .unwrap(),
-        winsdk
+        apple
+            .try_union(&winsdk)
+            .unwrap()
             .try_union(&hub)
             .unwrap()
             .try_union(&host)
@@ -4072,6 +4250,7 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
             host_original,
             hub_original,
             winsdk_original,
+            apple_original,
         ] {
             let present = cohort
                 .repository_materializations()
@@ -4086,6 +4265,7 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
     assert_eq!(Arc::strong_count(host_original), host_count);
     assert_eq!(Arc::strong_count(hub_original), hub_count);
     assert_eq!(Arc::strong_count(winsdk_original), winsdk_count);
+    assert_eq!(Arc::strong_count(apple_original), apple_count);
     let cohort = valid
         .try_union(&version)
         .unwrap()
@@ -4094,6 +4274,8 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         .try_union(&hub)
         .unwrap()
         .try_union(&winsdk)
+        .unwrap()
+        .try_union(&apple)
         .unwrap();
     let local = SourcePreparationNeeds::repository(
         (*local_native_request(&bodies.roots[0], "platforms", "/platforms")).clone(),
@@ -4191,12 +4373,18 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         4,
         small_generated_plan(&[("BUILD", b"a", true), ("toolchains.bzl", b"x", true)]),
     ));
+    let mut changed_apple = apple_original.as_ref().clone();
+    changed_apple.kind = RepositoryMaterializationKind::GeneratedFileEffects(small_generated_plan(
+        &[("BUILD", b"x", true)],
+    ));
+    let changed_apple = SourcePreparationNeeds::repository(changed_apple);
     for changed in [
         changed,
         changed_version,
         changed_host,
         changed_hub,
         changed_winsdk,
+        changed_apple,
     ] {
         let accepted_sibling = if changed
             .repository_materializations()
@@ -4232,6 +4420,9 @@ fn generated_features_materialization_refuses_mixed_need_before_progress() {
         }
     }
     drop(cohort);
+    assert_eq!(Arc::strong_count(apple_original), apple_count);
+    drop(apple);
+    assert!(apple_weak.upgrade().is_none());
 
     let bodies = proxy_test_bodies();
     let proxy = SourcePreparationNeeds::repository(proxy_generated_request(

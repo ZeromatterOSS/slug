@@ -836,6 +836,16 @@ static GENERATED_SHELL_CONFIG_FILES: [GeneratedFileSignature; 1] = [(
         0x2e, 0x4e,
     ],
 )];
+static GENERATED_APPLE_TOOLCHAINS_FILES: [GeneratedFileSignature; 1] = [(
+    "BUILD",
+    734,
+    true,
+    [
+        0xd6, 0x34, 0xb8, 0x4b, 0x94, 0x48, 0xec, 0x60, 0xb6, 0x0d, 0xf1, 0xce, 0xce, 0x51, 0x07,
+        0xdc, 0x48, 0x8b, 0xe4, 0x80, 0x0f, 0xd6, 0x13, 0x3c, 0x68, 0x58, 0x49, 0x6d, 0x76, 0x5a,
+        0xcf, 0x2e,
+    ],
+)];
 fn generated_features_plan_matches(
     plan: &slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
     expected: &[GeneratedFileSignature],
@@ -975,6 +985,14 @@ impl Bodies {
                 && request.repo_spec.attributes.is_empty() =>
             {
                 Some(&GENERATED_SHELL_CONFIG_FILES)
+            }
+            owner
+                if owner == APPLE_GENERATED_DIAGNOSTIC_OWNER
+                    && self.apple_support_import_sources
+                    && self.additional[5].is_some()
+                    && request.repo_spec.attributes.is_empty() =>
+            {
+                Some(&GENERATED_APPLE_TOOLCHAINS_FILES)
             }
             _ => None,
         }
