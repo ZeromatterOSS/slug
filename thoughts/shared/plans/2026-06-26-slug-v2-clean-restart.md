@@ -34,19 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-358-m7a-rustfmt-build-metadata
-Status: preserved unaccepted — actual native RSS stop; allocation recovery selected next
+Packet: WP-7-359-m7a-host-child-carrier-borrowing
+Status: correcting — Rust gates pass; stale helper negative blocks native
 
-[WP1145 acceptance](./slug-v2-subplans/wp1145-host-load-key-borrowing-2026-10-11.json)
-proves borrowed Host load keys, fresh owner gates and captured-prefix budget fit
-at255.238MiB/256MiB. Broader work resumes with the exact captured root1 rustfmt
-BUILD marker Lstat. [Contract](./slug-v2-subplans/current-packet.md) keeps source34,
-normal identity, borrowing discipline and unchanged caps while adapting finite
-steady56 evidence; fresh cached Loading checks avoid added saved-runtime machinery.
+[WP1146 failed cohort](./slug-v2-subplans/wp1146-rustfmt-build-resource-failure-2026-10-11.json)
+is preserved unaccepted: ordinary gates pass; native RSS259.105MiB exceeded256MiB.
+The [current contract](./slug-v2-subplans/current-packet.md) retains child Arc results
+and borrows module views to bypass successful payload string/path clones. Last
+ACCEPT remains WP1145; exact rustfmt metadata candidate is coupled to allocation
+validation. No unchanged replay or cap lift; broader work waits for memory fit.
 Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
-WP1146 actual probe stopped RSS259.105MiB/256MiB after fresh ordinary gates passed;
-[failed cohort](./slug-v2-subplans/wp1146-rustfmt-build-resource-failure-2026-10-11.json)
-is preserved unaccepted. No terminal frontier/FIRST; bounded allocation recovery precedes broader progress.
 
 ### Ready and blocked queue
 

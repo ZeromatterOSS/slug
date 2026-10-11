@@ -32,6 +32,12 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
         )
         .as_bytes(),
     );
+    let leaf_source = format!(
+        "{}NAME = 'leaf'\ndef name():\n    return NAME\n",
+        (0..64)
+            .map(|i| format!("load(':other.bzl', ignored_{i}='NAME')\n"))
+            .collect::<String>(),
+    );
     let demand = |path: &str, operation| {
         PathObservationDemand::new(
             PathObservationNamespace::Host,
@@ -62,10 +68,7 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     for (path, bytes) in [
         ("/workspace/BUILD.bazel", Arc::<[u8]>::from(&b""[..])),
         ("/workspace/parent.bzl", source),
-        (
-            "/workspace/leaf.bzl",
-            Arc::from(&b"NAME = 'leaf'\ndef name():\n    return NAME\n"[..]),
-        ),
+        ("/workspace/leaf.bzl", Arc::from(leaf_source.as_bytes())),
         (
             "/workspace/other.bzl",
             Arc::from(&b"NAME = 'other'\ndef name():\n    return NAME\n"[..]),
@@ -87,6 +90,14 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
             PathObservationResult::FileBytes(PathOperationResult::Present(bytes)),
         ));
     }
+    let mut failure_rows = rows.clone();
+    failure_rows
+        .iter_mut()
+        .find(|(key, _)| *key == demand("/workspace/leaf.bzl", PathObservationOperation::FileBytes))
+        .unwrap()
+        .1 = PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+        &b"fail('child fixture failure')\n"[..],
+    )));
     let epoch = PathObservationEpoch::new(rows).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut updater = dice.updater_with_data(UserComputationData {
@@ -112,7 +123,7 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     let mut transaction = updater.commit().await;
     let label = resolve_host_load_label(&PackagePath::root(), ":parent.bzl").unwrap();
     let outcome = transaction
-        .compute(&HostBzlModuleEvalKey::new(workspace, label))
+        .compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label.clone()))
         .await
         .unwrap();
     let SourcePreparationOutcome::Complete(outcome) = outcome else {
@@ -158,6 +169,102 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
             Some(expected)
         );
     }
+    let leaf_label = resolve_host_load_label(&PackagePath::root(), ":leaf.bzl").unwrap();
+    let SourcePreparationOutcome::Complete(child) = transaction
+        .compute(&HostBzlModuleEvalKey::new(
+            workspace.dupe(),
+            leaf_label.clone(),
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("cached child returned Need")
+    };
+    let SourcePreparationOutcome::Complete(Ok(observed)) = transaction
+        .compute(&HostBzlModuleObservationKey::new(
+            workspace.dupe(),
+            leaf_label.clone(),
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("observed child returned Need/error")
+    };
+    for carrier in [&child, &observed.result] {
+        let borrowed = successful_host_bzl_module(carrier);
+        assert!(std::ptr::eq(borrowed, carrier.as_ref().as_ref().unwrap()));
+        assert_eq!(borrowed.loads, vec![":other.bzl"; 64]);
+        let independent: FrozenBzlModule = borrowed.clone();
+        assert_ne!(borrowed.loads.as_ptr(), independent.loads.as_ptr());
+        assert_ne!(borrowed.loads[0].as_ptr(), independent.loads[0].as_ptr());
+        assert_ne!(
+            borrowed.path.as_os_str().as_encoded_bytes().as_ptr(),
+            independent.path.as_os_str().as_encoded_bytes().as_ptr()
+        );
+        let scratch = vec![(":leaf.bzl", Arc::clone(carrier))];
+        let projected = successful_host_bzl_module(&scratch[0].1);
+        assert!(std::ptr::eq(projected, borrowed));
+        assert_eq!(projected.loads[0].as_ptr(), borrowed.loads[0].as_ptr());
+        assert_eq!(
+            projected.path.as_os_str().as_encoded_bytes().as_ptr(),
+            borrowed.path.as_os_str().as_encoded_bytes().as_ptr()
+        );
+        let closure = flattened_module_lifetime_closure([projected]);
+        drop(scratch);
+        assert_eq!(closure.len(), 2);
+        assert_eq!(
+            closure[0].module.get("NAME").unwrap().value().unpack_str(),
+            Some("leaf")
+        );
+    }
+    drop(observed);
+    drop(child);
+    let failure_epoch = PathObservationEpoch::new(failure_rows).unwrap();
+    let mut failed_updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(crate::bzl_load_cycle_detector()),
+        ..Default::default()
+    });
+    failed_updater
+        .changed_to(path_observation_shards(&failure_epoch))
+        .unwrap();
+    failed_updater
+        .changed_to(vec![(PathObservationEpochKey, failure_epoch)])
+        .unwrap();
+    let mut failed_transaction = failed_updater.commit().await;
+    let SourcePreparationOutcome::Complete(Ok(failed_parent)) = failed_transaction
+        .compute(&HostBzlModuleObservationKey::new(workspace.dupe(), label))
+        .await
+        .unwrap()
+    else {
+        panic!("failed parent returned Need/outer error")
+    };
+    let SourcePreparationOutcome::Complete(Ok(failed_child)) = failed_transaction
+        .compute(&HostBzlModuleObservationKey::new(
+            workspace,
+            leaf_label.clone(),
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("failed child returned Need/outer error")
+    };
+    let Err(HostBzlModuleError::Child { load, label, error }) = failed_parent.result() else {
+        panic!("child error was not wrapped")
+    };
+    assert_eq!(load.as_ref(), ":leaf.bzl");
+    assert_eq!(label, &leaf_label);
+    assert_eq!(error.as_ref(), failed_child.result().as_ref().unwrap_err());
+    for path in ["/workspace/parent.bzl", "/workspace/leaf.bzl"] {
+        assert!(
+            failed_parent
+                .observations()
+                .get(&demand(path, PathObservationOperation::FileBytes,))
+                .is_some()
+        );
+    }
+    drop(failed_child);
+    drop(failed_parent);
+    drop(failed_transaction);
     drop(outcome);
     drop(transaction);
     dice.wait_for_idle().await;

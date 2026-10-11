@@ -23,7 +23,7 @@ LOADING_TEST = 'app/slug_loading_v2/src/bzl_source_memory_tests.rs'
 LOADING_BEFORE = '95305bdf2fafc8440c0aa5ae17f46dc98314ff6448b84f39c58886bb9a1ac0b0'
 LOADING_TEST_BEFORE = 'ddc4136ed6e690045646499830bf0d3376cb95eb14bf52aaa1fbe4125e9faee4'
 LOADING_SELECTOR = 'bzl_module::bzl_source_memory_tests::host_load_keys_preserve_raw_alias_order_and_retained_exports'
-CURRENT_CHANGED = CHANGED
+CURRENT_CHANGED = CHANGED + [LOADING, LOADING_TEST]
 LOADING_CURRENT = '661ce7bebe20ba946f5323d36635ac651435c53cc6cc0f50fcdefd6b4ff43801'
 LOADING_TEST_CURRENT = '3633acfc20153924142ac272832220a9b1ee55e127cb8173e93d6129433616b9'
 LOADING_FREEZE = Path('target/wp1145/source-freeze.json')
@@ -101,7 +101,7 @@ def validate_roles(roles, root=None):
     assert roles['loading_test_selector'] == LOADING_SELECTOR
     assert len(roles['reader_test_selectors']) == len(set(roles['reader_test_selectors'])) == 7
     assert all(isinstance(s, str) for s in roles['reader_test_selectors'])
-    assert roles['source_counts'] == dict(current=56, unchanged=54, vector=361, callers=8, environment=18, backings=6)
+    assert roles['source_counts'] == dict(current=56, unchanged=52, vector=361, callers=8, environment=18, backings=6)
     assert roles['core_counts'] == dict(donor=59, extra=0, current=59, protected=7, focused=96)
     assert roles['loading_counts'] == dict(current=30)
     assert roles['fixture_counts'] == dict(selected=31, passed=31, deselected=3, objects=35, bytes=32440662)
@@ -167,7 +167,7 @@ def validate_transition(roles, freeze):
     assert len(before) == 56 and set(after) == set(before)
     assert roles['changed_allowlist'] == CURRENT_CHANGED
     assert [p for p in before if before[p] != after[p]] == freeze['changed'] == CURRENT_CHANGED
-    assert freeze['unchanged'] == 54
+    assert freeze['unchanged'] == 52
     assert freeze['new_authorities'] == roles['current_authorities'] == read(Path(roles['prior']) / 'source-freeze.json')['new_authorities']
     assert freeze['known_validation_sources_before'] == roles['known_validation_sources_before'] == {}
     assert freeze['new_gate_sources'] == roles['new_gate_sources'] == {}

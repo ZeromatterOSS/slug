@@ -603,7 +603,14 @@ fn validate_direct_bzl_load_visibilities<K>(
     importer: &PackageIdentifier,
     loaded_modules: &[(K, FrozenBzlModule)],
 ) -> Result<(), BzlLoadVisibilityError> {
-    for (_, module) in loaded_modules {
+    validate_module_bzl_load_visibilities(importer, loaded_modules.iter().map(|(_, module)| module))
+}
+
+fn validate_module_bzl_load_visibilities<'a>(
+    importer: &PackageIdentifier,
+    loaded_modules: impl IntoIterator<Item = &'a FrozenBzlModule>,
+) -> Result<(), BzlLoadVisibilityError> {
+    for module in loaded_modules {
         validate_bzl_load_visibility(
             importer,
             &module.manifest.root.label,
@@ -2945,6 +2952,13 @@ async fn complete_observed_host_bzl_cycle(
     host_bzl_complete(Err(HostBzlModuleError::Cycle(cycle.clone())), observations)
 }
 
+fn successful_host_bzl_module(carrier: &HostBzlModuleCarrier) -> &FrozenBzlModule {
+    carrier
+        .as_ref()
+        .as_ref()
+        .expect("Host scratch contains only checked successful carriers")
+}
+
 async fn compute_host_bzl_module(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
@@ -3059,7 +3073,7 @@ async fn compute_host_bzl_module(
                 );
                 match guard.guard_this(ctx.compute(&child)).await {
                     Ok(result) => host_dice_invariant(result)
-                        .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
+                        .map(|value| Ok((value, PathObservationEpoch::empty()))),
                     Err(cycle) => {
                         let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
                         return host_bzl_complete(
@@ -3085,7 +3099,7 @@ async fn compute_host_bzl_module(
                         }
                         SourcePreparationOutcome::Complete(Ok(value)) => {
                             SourcePreparationOutcome::Complete(Ok((
-                                value.result().clone(),
+                                value.result.dupe(),
                                 value.observations().dupe(),
                             )))
                         }
@@ -3127,20 +3141,18 @@ async fn compute_host_bzl_module(
                 }
             }
         };
-        let module = match child {
-            Ok(module) => module,
-            Err(error) => {
-                return host_bzl_complete(
-                    Err(HostBzlModuleError::Child {
-                        load: Arc::from(load.as_str()),
-                        label: child_label,
-                        error: Arc::new(error),
-                    }),
-                    observations,
-                );
-            }
-        };
-        loaded_modules.push((load.as_str(), module));
+        if let Err(error) = child.as_ref() {
+            return host_bzl_complete(
+                Err(HostBzlModuleError::Child {
+                    load: Arc::from(load.as_str()),
+                    label: child_label,
+                    error: Arc::new(error.clone()),
+                }),
+                observations,
+            );
+        }
+        // Only checked successful immutable carriers enter evaluation scratch.
+        loaded_modules.push((load.as_str(), child));
     }
 
     let module = Module::new();
@@ -3151,11 +3163,16 @@ async fn compute_host_bzl_module(
             repository_mapping: Arc::from([]),
         },
         digest(source_text),
-        loaded_modules.iter().map(|(_, module)| module),
+        loaded_modules
+            .iter()
+            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
     );
-    if let Err(error) =
-        validate_direct_bzl_load_visibilities(manifest.root.label.package(), &loaded_modules)
-    {
+    if let Err(error) = validate_module_bzl_load_visibilities(
+        manifest.root.label.package(),
+        loaded_modules
+            .iter()
+            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
+    ) {
         return host_bzl_complete(
             Err(HostBzlModuleError::Evaluation(LoadingError::new(
                 error.to_string(),
@@ -3166,7 +3183,7 @@ async fn compute_host_bzl_module(
     let loader = LocalBzlLoader {
         modules: loaded_modules
             .iter()
-            .map(|(load, module)| (*load, module.module.dupe()))
+            .map(|(load, carrier)| (*load, successful_host_bzl_module(carrier).module.dupe()))
             .collect(),
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
@@ -3219,7 +3236,12 @@ async fn compute_host_bzl_module(
         }
     };
     drop(loader);
-    let retained_bzl_modules = retained_module_closure(&loaded_modules);
+    let retained_bzl_modules = flattened_module_lifetime_closure(
+        loaded_modules
+            .iter()
+            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
+    )
+    .into();
     drop(loaded_modules);
     host_bzl_complete(
         Ok(FrozenBzlModule {
