@@ -1,0 +1,295 @@
+{
+  "packet": "WP-7-321-m7a-materialization-owner-lookup",
+  "baseline": "cd1c7f1c0",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "outcome": "Private current materialization association checkpoint128 preserves unchanged owner predicates and advances originalprobe from source262 associationrefusal to267 genuine WorkDeadline; no fullproducer completion.",
+  "compatibility": "Slug-native private Linux-test/probe lookup policy; exactowner predicates unchanged; Windows/JVM execution deferred.",
+  "source": {
+    "freeze_path": "target/wp1109/source-freeze.json",
+    "freeze_sha256": "4d1a2faaac150bc496ce74145428bcf160568c991b5daa11c999bfb536b9c260",
+    "authorities": 45,
+    "rust": 37,
+    "metadata": 8,
+    "changed": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs"
+    ],
+    "changed_sha256": "ca5f9060f1e97ff65284f04474477bd776c62e8805096f1edb0345a30b1058e9",
+    "same": 44,
+    "delta": "+70/-8 net62",
+    "caller_roles": "all8IDs/paths/digests unchanged",
+    "caller_sha256": "20ae502deadae15410f80308e11e036722a14a5178224b090207173f6b96c168"
+  },
+  "ownership_allocation": "Same borrowed generic lookup complete wholeepochbound/fullscan/ambiguity/request/root and Arcownership; scalar128 no retainedstorage/request/pathcopy/index/cache/interner/key/lock/API. Existing lexicalfixture owns bounded request/root allocations. Additional O128 scan over retainedepoch is bounded; no speed or measured wholeepoch cardinality claim.",
+  "focused": {
+    "selected": 63,
+    "passed": 63,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.31137701496481895,
+        "operation_sha256": "582b64f0862a533e59def1cb154a1dc7b1a40be801b74cc59def7e23bbfb7aed"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11727621010504663,
+        "operation_sha256": "e924c865cbff2cce6ecdc2d8425335b8b8fd2fb7604eb684b7b2f8e7b6696459"
+      },
+      "core": {
+        "selected": 30,
+        "passed": 30,
+        "elapsed_seconds": 0.237610503914766,
+        "operation_sha256": "d6935ca85ca4ab90137dda3b476a07c05947f2b24a04173da86cf47d3d08ded2"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod-r2": {
+        "seconds": 0.10608326201327145,
+        "deadline_seconds": null,
+        "operation_sha256": "e2fc10500797b00fdce6e1e80031a77b31b9a0984308dc78350a86b840e806c4",
+        "over_three_minutes": false
+      },
+      "compile-loading-r2": {
+        "seconds": 0.11739246104843915,
+        "deadline_seconds": null,
+        "operation_sha256": "5d882bbb8191185e2df5b28a6acf001b367a69ac7ad30a56adb45185996124a1",
+        "over_three_minutes": false
+      },
+      "compile-core-r2": {
+        "seconds": 27.218701188918203,
+        "deadline_seconds": null,
+        "operation_sha256": "8d57ad4f025ee96f00f0a61aba8e549fbe3a8f3b4d30b5869891d14ea4e49e3c",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Current changed Core artifact and cached current Bzlmod/Loading artifacts; direct production check.",
+    "memory": "Compiler RSS preparation only; not workload evidence.",
+    "corrections": "InitialCoreexit101 twofixturetyping errors corrected; retry FileExistsError beforechild fixed by fresh stems; all prior operations preserved.",
+    "frequency": "CurrentCore27.219s; recent10\u201340s common edits below180; no distribution/speed claim.",
+    "refactoring": "Packet source/review/integration exceeds180s; reuse finite scoping/scaffolding/focused reviewers, no repeated historical owner investigation. Current two invocation corrections indicate stem selection can be simplified in later bounded helper maintenance; no unmeasured speedup."
+  },
+  "production": {
+    "seconds": 7.427824501995929,
+    "operation_sha256": "932774694afd44454649c919b7df215de49b0169cb4c4612d5cd69948196e8e5"
+  },
+  "native": {
+    "operation_sha256": "431a49eb172f508ff87098ba2c98dc59d8d455e1c65cc29aba8384c7f72be7f0",
+    "stdout_sha256": "ea1c8db49f76967852afe4f88a9138cf7ce6a1ef6a6cbfcfbe2d1dabbab62008",
+    "elapsed_seconds": 7.643395210034214,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 224576,
+    "rss_mib": 219.3125,
+    "source_count": 267,
+    "decode_bytes": 55595715,
+    "write_bytes": 52817860,
+    "held_fds": 350,
+    "pins": 145,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 0,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 447,
+        "wall_ns": 187819708,
+        "process_cpu_ns": 187139392,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 447,
+        "wall_ns": 6753686168,
+        "process_cpu_ns": 6835963521,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 446,
+        "wall_ns": 185074320,
+        "process_cpu_ns": 184584637,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 447,
+        "wall_ns": 22364607,
+        "process_cpu_ns": 28685578,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=source_service preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(WorkDeadline) 105 235521 267 7021682 55595715 52817860 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=true origin=true site=1 domain=1 phase=1 return=1 overflow=false sticky=false caller=true caller_owner=7 caller_line=296",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=267 seen=267 emitted=267 admitted=267 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=41236 encoded_bytes=143397 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "phase_rss_kib": {
+      "after_runtime": 28724,
+      "after_command": 225580,
+      "after_terminal_drop": 225648,
+      "after_runtime_drop": 225648,
+      "after_scope_drop": 223592
+    },
+    "phase_peak_mib": 220.359375,
+    "config_sha256": "5fa1eb6a7f1291470882f2b2931f4737dd9cafe2b2d3d5a7c71d98a95df46b40",
+    "progress_refusal_record": {
+      "operation_sha256": "431a49eb172f508ff87098ba2c98dc59d8d455e1c65cc29aba8384c7f72be7f0",
+      "stdout_sha256": "ea1c8db49f76967852afe4f88a9138cf7ce6a1ef6a6cbfcfbe2d1dabbab62008",
+      "marker_sha256": "22ffce962b3b4db8611446f19273bad12d90188974e761a22b5a99baf84767c1",
+      "record": {
+        "version": 1,
+        "capture": "captured",
+        "refusal": "work_deadline",
+        "association": [
+          [
+            101,
+            "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+          ],
+          [
+            101,
+            "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365"
+          ],
+          [
+            [
+              11,
+              "2f2f706b673a70726f6265"
+            ]
+          ],
+          1,
+          447,
+          "unavailable"
+        ],
+        "families": [
+          [
+            "paths",
+            true,
+            1
+          ],
+          [
+            "scratch",
+            false,
+            0
+          ],
+          [
+            "root_bootstrap",
+            false,
+            0
+          ],
+          [
+            "environment",
+            false,
+            0
+          ],
+          [
+            "materializations",
+            false,
+            0
+          ],
+          [
+            "downloads",
+            false,
+            0
+          ],
+          [
+            "executes",
+            false,
+            0
+          ]
+        ],
+        "rows": [
+          [
+            [
+              1,
+              "2f"
+            ],
+            "lstat",
+            [
+              "materialization",
+              27
+            ],
+            [
+              "bounds_refused",
+              null
+            ]
+          ]
+        ]
+      },
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "namespace_frames": [],
+    "source_profile": {
+      "qualified": 512,
+      "census_events": 513,
+      "ordinary": 128,
+      "unqualified_native": 256,
+      "production": 64,
+      "unchanged": true
+    }
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1109/design-review.md",
+      "sha256": "9a7d5b9c5642e49b33fd9078851f3aaafe7f73f684565f333076823d59c04a65"
+    },
+    "helper-review.md": {
+      "path": "target/wp1109/helper-review.md",
+      "sha256": "81afbf8dafee3035ea1746d7056d1b24d75fbe5567a98d65d5227735f0e2f79d"
+    },
+    "source-worker.md": {
+      "path": "target/wp1109/source-worker.md",
+      "sha256": "eb81a9e3179a6b60768053ea3e99a9ee3db1addd28f2e24e6910c70ac99aa0a1"
+    },
+    "source-prelaunch-corrected-review.md": {
+      "path": "target/wp1109/source-prelaunch-corrected-review.md",
+      "sha256": "9807913a88cb5c798dba3a6988288e14e8a1859831ea1ef77df75bde65c36607"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1109/prelaunch-evidence.md",
+      "sha256": "761be85e4e0b5414f8e92b36988824f43b01c50fa15719f9a856010110902f2a"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1109/root-prelaunch.md",
+      "sha256": "ee7fb5b2ae9f98bc3bbb73d4beffb339842760b6feb5ed9afe15caa7029e9bb7"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1109/final-source-review.md",
+      "sha256": "3f22acfac5eb5946c0bc2a2e1450f0065d7cbac67d2520546e46b7f51bf176ee"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1109/final-evidence-review.md",
+      "sha256": "ca814d0f4e81221ea7e2140c4f1df20dc6a487cefe781327c1e16363ce18b8fa"
+    },
+    "next-source-research.md": {
+      "path": "target/wp1109/next-source-research.md",
+      "sha256": "8b89107dddc8f9cda64b6bff5f1fca4918003524b10b71fd5e90767ba04935f3"
+    }
+  },
+  "corrections": "InitialCorecompileexit101 E0308 at twofixturebound comparisons inferredu64; root added two asu64 casts. One repeat stoppedbeforechild at FileExists oldlistdirectory; helpers nownew-r2prep/-r1list/preflight/test stems with unchangedcmdprofiles/env/caps. Failed and earlierPASS operations preserved; initialhelper/config/sourcefreezebytes archived. Current63PASS/prod/singleton fresh. Secondcorrection reassessed as invocation typing/stem issues withinsame acceptedowner/design, notREPLAN. No failedgate/nativecredit, no identicalnative replay. FINAL evidence saved-note-reader1 assumed progress marker hash excludedLF; actualdecoder includesLF, corrected against savedschema. No writes/imports/execution/acquisition/replay before readererror; no native failure or credit. ",
+  "limits": "Original350ordered noninheritedFDsources/18env stable collectionnon-atomic, actual145strictpins. Native10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/cleanup3 andbyte/live/object/registry/directory/log caps unchanged; source512/census513 retained. Only callerassociation capacity32\u2192128 explicitlychanged. CompilerRSS preparationseparate.",
+  "claim_limit": "Actual source_serviceWorkDeadline267; first_work/origin/caller7line296 available. Originalcaptured path-only Need rawrootLstat Materialization27 has bounds_refused ownerprojection/null, cannotidentifycanonical/fullSpec/attrs/currentownereligibility orauthorizeacquisition. Noactualnamespacepolicyrefusal/header; nofirstSourceAttempts. Clearallobserverlanes mean selectednormalwindows only, allprocessCPU notexclusive/perkey/cause/speed/frequency. Supervisor219.3125MiB/phase220.359375MiB under256 prefix, notwholefit/heap. SourceWeakunseenexpiryvacuous;Scope/RecorderWeak/livebuffer retirementnarrow. Nofullproducer/certificate/analysis/actions/Rustc/M7A/bootstrap completion.",
+  "next": "Separate originalprogress owner epoch lookup128 while ROWS32/outputcaps unchanged; existing borrowed fullscan/identityprojection only; no CPUcause inference. Source research next-source-research.md recorded.",
+  "goal": "Active/incomplete; broader plan continues.",
+  "elapsed_since_design_binding_seconds": 620.809154,
+  "reviewed_candidate": {
+    "path": "target/wp1109/receipt-reviewed.json",
+    "sha256": "e644ae1874faac02134f3bb99d1befa5e4c0973651874a3befa746da07905c21"
+  }
+}

@@ -219,7 +219,7 @@ struct GuardedSingleton {
     bodies: Arc<Bodies>,
     milestones: Arc<Mutex<Milestones>>,
 }
-const MATERIALIZATION_NAMESPACE_ENTRIES: usize = 32;
+const MATERIALIZATION_NAMESPACE_ENTRIES: usize = 128;
 struct NamespaceDiagnostic<'a> {
     instance: slug_workspace_v2::PathObservationInstanceId,
     operation: &'static str,
@@ -5254,7 +5254,20 @@ fn generated_features_materialization_is_opt_in_and_exact() {
         let instance = slug_workspace_v2::PathObservationInstanceId::new(23);
         let epoch =
             namespace_test_epoch_at(&bodies, [original.clone()], instance, "/parent/generation");
-        for entries in [32, 33] {
+        for (entries, duplicate) in [
+            (32, false),
+            (33, false),
+            (128, false),
+            (129, false),
+            (128, true),
+        ] {
+            let mut original_root = Some(PathBuf::from("/parent/generation"));
+            let root_pointer = original_root
+                .as_ref()
+                .unwrap()
+                .as_os_str()
+                .as_encoded_bytes()
+                .as_ptr();
             let bounded = slug_bzlmod_v2::RepositoryMaterializationResultEpoch::new(
                 bodies.roots[0].dupe(),
                 (0..entries).map(|index| {
@@ -5262,9 +5275,21 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         original.clone()
                     } else {
                         let mut other = original.as_ref().clone();
-                        other.id.canonical_repo =
-                            slug_identity_v2::CanonicalRepoName::new(&format!("other{index}+"))
-                                .unwrap();
+                        other.id.canonical_repo = if duplicate && index == entries - 1 {
+                            slug_identity_v2::CanonicalRepoName::new("zzduplicate+").unwrap()
+                        } else {
+                            slug_identity_v2::CanonicalRepoName::new(&format!(
+                                "{}{index:03}+",
+                                if duplicate { "s" } else { "a" },
+                            ))
+                            .unwrap()
+                        };
+                        if duplicate {
+                            assert!(other.id.canonical_repo > original.id.canonical_repo);
+                            assert!(other.id.canonical_repo.as_str() <= "zzduplicate+");
+                        } else {
+                            assert!(other.id.canonical_repo < original.id.canonical_repo);
+                        }
                         Arc::new(other)
                     };
                     slug_bzlmod_v2::RepositoryMaterializationEpochEntry {
@@ -5272,8 +5297,14 @@ fn generated_features_materialization_is_opt_in_and_exact() {
                         result: slug_bzlmod_v2::RepositoryMaterializationResult::Success(
                             slug_bzlmod_v2::RepositoryMaterializationSuccess::Immutable {
                                 source_identity: Arc::from("test"),
-                                generation_root: PathBuf::from("/parent/generation"),
-                                observation_instance: if index == 0 {
+                                generation_root: if index == 0 {
+                                    original_root.take().unwrap()
+                                } else {
+                                    PathBuf::from("/parent/generation")
+                                },
+                                observation_instance: if index == 0
+                                    || (duplicate && index == entries - 1)
+                                {
                                     instance
                                 } else {
                                     slug_workspace_v2::PathObservationInstanceId::new(24 + index)
@@ -5292,8 +5323,39 @@ fn generated_features_materialization_is_opt_in_and_exact() {
             assert_eq!(
                 namespace_policy(&bodies, &demand, Some(&bounded), &matches)
                     .admits(&demand.operation()),
-                entries == 32
+                entries <= MATERIALIZATION_NAMESPACE_ENTRIES as u64 && !duplicate
             );
+            let owners = Arc::strong_count(original);
+            let view = bounded.borrowed_instance_for_namespace(
+                &bodies.roots[0],
+                instance,
+                MATERIALIZATION_NAMESPACE_ENTRIES,
+            );
+            if duplicate {
+                // Original owner sorts first; the last entry reuses its instance.
+                assert_eq!(
+                    view,
+                    Err(slug_bzlmod_v2::RepositoryMaterializationInstanceLookupError::AmbiguousInstance)
+                );
+            } else if entries <= MATERIALIZATION_NAMESPACE_ENTRIES as u64 {
+                // Every other canonical sorts before the original owner, so this scans to the end.
+                let view = view.unwrap().unwrap();
+                assert!(std::ptr::eq(view.request(), original.as_ref()));
+                assert_eq!(
+                    view.generation_root()
+                        .as_os_str()
+                        .as_encoded_bytes()
+                        .as_ptr(),
+                    root_pointer
+                );
+                assert_eq!(Arc::strong_count(original), owners);
+            } else {
+                assert_eq!(
+                    view,
+                    Err(slug_bzlmod_v2::RepositoryMaterializationInstanceLookupError::TooManyEntries)
+                );
+            }
+            assert_eq!(Arc::strong_count(original), owners);
         }
         let need = |p, op| {
             SourcePreparationNeeds::path(NeedPathObservations::singleton(match op {
