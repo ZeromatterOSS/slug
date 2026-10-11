@@ -6195,6 +6195,23 @@ async fn load_root_runfiles_repository_mapping(
     )))
 }
 
+fn root_package_load_origin(
+    cached: &mut Option<Arc<str>>,
+    package: &PackagePath,
+    relative_build: &[u8],
+) -> Arc<str> {
+    cached
+        .get_or_insert_with(|| {
+            let build_name: String = relative_build.iter().copied().map(char::from).collect();
+            Arc::from(if package.as_str().is_empty() {
+                build_name
+            } else {
+                format!("{package}/{build_name}")
+            })
+        })
+        .dupe()
+}
+
 async fn compute_root_package(
     key: &RootPackageLoadKey,
     ctx: &mut DiceComputations<'_>,
@@ -6312,6 +6329,7 @@ async fn compute_root_package(
         Err(error) => return root_package_driver_complete(Err(error.clone()), observations),
     };
     let mut loaded_modules = Vec::new();
+    let mut build_origin = None;
     for load in loads.iter().map(String::as_str) {
         let resolved = match resolve_root_package_direct_load(&key.package, &load) {
             Ok(label) => label,
@@ -6327,17 +6345,8 @@ async fn compute_root_package(
                 );
             }
         };
-        let build_name: String = source
-            .relative_path()
-            .iter()
-            .copied()
-            .map(char::from)
-            .collect();
-        let origin: Arc<str> = Arc::from(if key.package.as_str().is_empty() {
-            build_name
-        } else {
-            format!("{}/{build_name}", key.package)
-        });
+        let origin =
+            root_package_load_origin(&mut build_origin, &key.package, source.relative_path());
         let module = match resolved {
             RootPackageDirectLoad::Root(label) => {
                 load_root_package_host_bzl(key, ctx, mode, label, origin, &load, &mut observations)

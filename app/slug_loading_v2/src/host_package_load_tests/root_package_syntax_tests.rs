@@ -3,7 +3,13 @@ use std::sync::Weak;
 
 use slug_bzlmod_v2::RootPackageSourceObservationKey;
 
+use super::super::ExternalBzlModuleError;
+use super::super::HostRootBzlLabel;
+use super::super::RootPackageBzlTarget;
+use super::super::RootPackageLoadDiagnostic;
+use super::super::RootPackageLoadError;
 use super::super::RootPackageLoadErrorInner;
+use super::super::root_package_load_origin;
 use super::super::root_package_syntax::RootPackageSyntax;
 use super::super::root_package_syntax::RootPackageSyntaxKey;
 use super::super::root_package_syntax::RootPackageSyntaxOutcome;
@@ -12,6 +18,104 @@ use super::*;
 const BUILD_A: &str = "load(':one.bzl', 'NAME')\nprint('settled BUILD')\nexports_files([NAME])\n";
 const BUILD_B: &str =
     "load(':one.bzl', 'NAME')\nprint('settled BUILD')\nexports_files([NAME, 'b.txt'])\n";
+
+#[test]
+fn root_package_origin_reuses_only_within_driver_and_preserves_error_lifetime() {
+    for (package, path, expected) in [
+        ("", b"BUILD".as_slice(), "BUILD"),
+        ("", b"BUILD.bazel".as_slice(), "BUILD.bazel"),
+        ("pkg", b"BUILD".as_slice(), "pkg/BUILD"),
+        ("pkg", b"BUILD.bazel".as_slice(), "pkg/BUILD.bazel"),
+        ("", b"B\x80\xff".as_slice(), "B\u{80}\u{ff}"),
+        ("pkg", b"B\x80\xff".as_slice(), "pkg/B\u{80}\u{ff}"),
+    ] {
+        let package = PackagePath::parse(package).unwrap();
+        let mut cache = None;
+        assert!(cache.is_none());
+        let first = root_package_load_origin(&mut cache, &package, path);
+        let again = root_package_load_origin(&mut cache, &package, path);
+        assert_eq!(first.as_ref(), expected);
+        assert!(Arc::ptr_eq(&first, &again));
+        let mut other_cache = None;
+        let other = root_package_load_origin(&mut other_cache, &package, path);
+        assert_eq!(first, other);
+        assert!(!Arc::ptr_eq(&first, &other));
+        let weak = Arc::downgrade(&first);
+        drop((first, again));
+        assert!(weak.upgrade().is_some());
+        drop(cache);
+        assert!(weak.upgrade().is_none());
+        assert_eq!(other.as_ref(), expected);
+    }
+    let package = PackagePath::parse("pkg").unwrap();
+    let root_label = HostRootBzlLabel::new(
+        package.clone(),
+        RootPackageBzlTarget::parse("root.bzl").unwrap(),
+    );
+    let external_label = CanonicalLabel::parse("@@repo+//pkg:ext.bzl").unwrap();
+    let root_cause = Arc::new(HostBzlModuleError::Parse {
+        label: root_label.clone(),
+        message: "ROOT_CAUSE".into(),
+    });
+    let external_cause = Arc::new(ExternalBzlModuleError::Evaluation {
+        label: external_label.clone(),
+        message: "EXT_CAUSE".into(),
+    });
+    let root_weak = Arc::downgrade(&root_cause);
+    let external_weak = Arc::downgrade(&external_cause);
+    let mut cache = None;
+    let root_origin = root_package_load_origin(&mut cache, &package, b"BUILD");
+    let origin_weak = Arc::downgrade(&root_origin);
+    let root = RootPackageLoadError::new(RootPackageLoadErrorInner::Bzl {
+        origin: root_origin,
+        load: ":root.bzl".into(),
+        label: root_label,
+        error: root_cause,
+    });
+    let external = RootPackageLoadError::new(RootPackageLoadErrorInner::ExternalBzl {
+        origin: root_package_load_origin(&mut cache, &package, b"BUILD"),
+        load: "@repo//pkg:ext.bzl".into(),
+        label: external_label,
+        error: external_cause,
+    });
+    drop(cache);
+    let RootPackageLoadDiagnostic::Bzl {
+        origin,
+        load,
+        error,
+    } = root.diagnostic_view()
+    else {
+        panic!("root carrier")
+    };
+    assert_eq!((origin, load), ("pkg/BUILD", ":root.bzl"));
+    assert!(std::ptr::eq(error, root_weak.as_ptr()));
+    let root_origin_pointer = origin.as_ptr();
+    let RootPackageLoadDiagnostic::ExternalBzl {
+        origin,
+        load,
+        error,
+        ..
+    } = external.diagnostic_view()
+    else {
+        panic!("external carrier")
+    };
+    assert_eq!((origin, load), ("pkg/BUILD", "@repo//pkg:ext.bzl"));
+    assert_eq!(origin.as_ptr(), root_origin_pointer);
+    assert!(std::ptr::eq(error, external_weak.as_ptr()));
+    assert_eq!(
+        root.diagnostic().to_string(),
+        "bzl: pkg/BUILD load :root.bzl: RootBzl: Parse: ROOT_CAUSE"
+    );
+    assert_eq!(
+        external.diagnostic().to_string(),
+        "external_bzl: pkg/BUILD load @repo//pkg:ext.bzl @@repo+//pkg:ext.bzl: ExternalBzl: Evaluation: EXT_CAUSE"
+    );
+    drop(root);
+    assert!(root_weak.upgrade().is_none());
+    assert!(origin_weak.upgrade().is_some() && external_weak.upgrade().is_some());
+    drop(external);
+    assert!(origin_weak.upgrade().is_none() && external_weak.upgrade().is_none());
+}
 
 #[derive(Default)]
 struct SyntaxTracker {

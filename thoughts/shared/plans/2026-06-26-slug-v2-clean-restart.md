@@ -34,16 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-340-m7a-root-origin-sharing
-Status: ready — independent DESIGN pending
+Packet: WP-7-341-m7a-rust-package-marker-metadata
+Status: ready — design accepted; implementation and fresh validation pending
 
-[Accepted WP1127](./slug-v2-subplans/wp1127-capture-copy-traffic-2026-10-11.json)
-measures481successful source copies/8120409copied bytes; one20.652s native stays under
-256MiB with distinct phase254.31640625MiB. Traffic does not identify retained-memory
-cause; only1.68359375MiB headroom remains. The [current manifest](./slug-v2-subplans/current-packet.md)
-selects concrete invocation-local origin Arc sharing at the existing root-package
-producer. Preserve original spelling/error order/independent lifetime; no global
-interner or capability expansion. Actual DESIGN precedes implementation; all caps retained.
+[Accepted WP1128](./slug-v2-subplans/wp1128-root-origin-sharing-2026-10-11.json)
+shares one lazy root-package origin Arc per driver with exact spelling and independent
+error ownership. Fresh Loading29/Core47 passed; one native phase254.77734375MiB stays
+under256 with only1.22265625MiB headroom. Reuse is proved, whole-workload savings and
+future fit remain unmeasured. The [current manifest](./slug-v2-subplans/current-packet.md)
+selects exactly two original rules-rust package-marker Lstats under the existing
+qualified private role. DESIGN accepted; fresh Core48 includes the changed matrix.
+All memory/source/time caps remain strict; production semantics and Windows deferred.
 
 ### Ready and blocked queue
 
