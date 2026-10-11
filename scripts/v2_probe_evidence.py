@@ -18,7 +18,11 @@ MEMORY = 'app/slug_core_v2/src/runtime/source_service/regular_file.rs'
 READER = 'app/slug_core_v2/src/runtime/source_service/regular_file_tests.rs'
 MEMORY_BEFORE = '04413bdc878b65224556f24a8d8b56dc9fe289041bd3704f866035323394d48f'
 READER_BEFORE = '6da02db74f164389b00cb5c296cfeb84a644843481ffc724004bcadb8b536a55'
-CURRENT_CHANGED = CHANGED + [MEMORY, READER]
+CURRENT_CHANGED = CHANGED
+MEMORY_CURRENT = '5929faf89f78a2556a312636f8cc53fb703272c1ba281092866e4d4649227462'
+READER_CURRENT = 'ff2983bb5f0a00b34505d1deb3ec207c640e77b64af8048c33f00898b23892d1'
+READER_FREEZE = Path('target/wp1137/source-freeze.json')
+READER_FREEZE_SHA = 'e95bde703eec48c14652ad67e00ef05041171a45804c151911836d00c48bca0c'
 HISTORY = Path('target/wp1132')
 COMPILE_FREEZE = HISTORY / 'source-freeze.json'
 COMPILE_FREEZE_SHA = '915501cdb77e419ed592c03e7f26bd6221f8166bb3b3d9cadd84b315b8525510'
@@ -84,12 +88,11 @@ def validate_roles(roles, root=None):
     assert re.fullmatch('[0-9a-f]{40}', roles['baseline'])
     assert re.fullmatch('[0-9a-f]{64}', roles['contract_sha256'])
     assert roles['changed_allowlist'] == CURRENT_CHANGED
-    assert roles['known_validation_sources_before'] == {READER: READER_BEFORE}
-    assert set(sha_map(roles['new_gate_sources'])) == {READER}
+    assert roles['known_validation_sources_before'] == roles['new_gate_sources'] == {}
     assert len(roles['reader_test_selectors']) == len(set(roles['reader_test_selectors'])) == 7
     assert all(isinstance(s, str) for s in roles['reader_test_selectors'])
-    assert roles['source_counts'] == dict(current=55, unchanged=51, vector=361, callers=8, environment=18, backings=6)
-    assert roles['core_counts'] == dict(donor=52, extra=7, current=59, protected=36, focused=95)
+    assert roles['source_counts'] == dict(current=55, unchanged=53, vector=361, callers=8, environment=18, backings=6)
+    assert roles['core_counts'] == dict(donor=59, extra=0, current=59, protected=36, focused=95)
     assert roles['loading_counts'] == dict(current=29)
     assert roles['fixture_counts'] == dict(selected=31, passed=31, deselected=3, objects=35, bytes=32440662)
     assert roles['native_time_policy'] == TIME_POLICY
@@ -101,8 +104,8 @@ def validate_roles(roles, root=None):
     assert len(roles['current_before']) == 55 and len(roles['current_authorities']) == 6
     assert list(roles['current_authorities']) == roles['new_authorities']
     assert len(roles['existing_current_only_sources']) == 3
-    assert roles['existing_current_only_sources'][READER] == roles['current_before'][READER] == READER_BEFORE
-    assert roles['current_before'][MEMORY] == MEMORY_BEFORE
+    assert roles['existing_current_only_sources'][READER] == roles['current_before'][READER] == READER_CURRENT
+    assert roles['current_before'][MEMORY] == MEMORY_CURRENT
     for paths, mapping, count in [('historical_private_paths', 'private_core_before', 3),
                                   ('protected_diagnostic_paths', 'protected_diagnostic_before', 2),
                                   ('protected_loading_paths', 'protected_loading_before', 2)]:
@@ -148,15 +151,14 @@ def validate_transition(roles, freeze):
     assert digest(Path(roles['prior']) / 'source-freeze.json') == roles['immediate_pins'][str(Path(roles['prior']) / 'source-freeze.json')]
     before, after = sha_map(freeze['before']), sha_map(freeze['after_format'])
     accepted = read(Path(roles['prior']) / 'source-freeze.json')['after_format']
-    assert before == roles['current_before'] == {**accepted, READER: READER_BEFORE}
-    assert READER not in accepted and len(accepted) == 54
+    assert before == roles['current_before'] == accepted and len(accepted) == 55
     assert len(before) == 55 and set(after) == set(before)
     assert roles['changed_allowlist'] == CURRENT_CHANGED
     assert [p for p in before if before[p] != after[p]] == freeze['changed'] == CURRENT_CHANGED
-    assert freeze['unchanged'] == 51
+    assert freeze['unchanged'] == 53
     assert freeze['new_authorities'] == roles['current_authorities'] == read(Path(roles['prior']) / 'source-freeze.json')['new_authorities']
-    assert freeze['known_validation_sources_before'] == roles['known_validation_sources_before'] == {READER: READER_BEFORE}
-    assert freeze['new_gate_sources'] == roles['new_gate_sources'] == {READER: after[READER]}
+    assert freeze['known_validation_sources_before'] == roles['known_validation_sources_before'] == {}
+    assert freeze['new_gate_sources'] == roles['new_gate_sources'] == {}
     return after
 
 
@@ -166,7 +168,7 @@ def authenticate_current_checkpoint(roles, root=None, config_pins=None):
     freeze = read(root / 'source-freeze.json')
     assert checkpoint['verdict'] == 'ACCEPT'
     assert checkpoint['baseline'] == roles['baseline'] and checkpoint['contract_sha256'] == roles['contract_sha256']
-    mandatory = {str(root / 'roles.json'), roles['supervisor_path'], roles['evidence_path'], str(COMPILE_FREEZE)}
+    mandatory = {str(root / 'roles.json'), roles['supervisor_path'], roles['evidence_path'], str(COMPILE_FREEZE), str(READER_FREEZE)}
     assert mandatory <= checkpoint['source_pins'].keys() and mandatory <= freeze['helper_pins'].keys()
     for mapping in (checkpoint['source_pins'], freeze['helper_pins']):
         assert mapping[str(COMPILE_FREEZE)] == COMPILE_FREEZE_SHA
@@ -180,9 +182,27 @@ def authenticate_current_checkpoint(roles, root=None, config_pins=None):
     assert design['verdict'] == 'ACCEPT' and design['baseline'] == roles['baseline']
     assert design['contract_sha256'] == roles['contract_sha256']
     assert digest(root / 'design-review.md') == design['design_review_sha256']
+    _reader_introduction(roles, checkpoint, freeze)
     after = validate_transition(roles, freeze)
     assert all(checkpoint['source_pins'][path] == after[path] for path in CURRENT_CHANGED)
     return checkpoint
+
+
+def _reader_introduction(roles, checkpoint, freeze):
+    for mapping in (checkpoint['source_pins'], freeze['helper_pins']):
+        assert mapping[str(READER_FREEZE)] == READER_FREEZE_SHA
+    assert digest(READER_FREEZE) == READER_FREEZE_SHA
+    intro = read(READER_FREEZE)
+    before, after = sha_map(intro['before']), sha_map(intro['after_format'])
+    assert len(before) == len(after) == 55 and set(before) == set(after)
+    assert intro['changed'] == [p for p in before if before[p] != after[p]] == CHANGED + [MEMORY, READER]
+    assert intro['unchanged'] == 51 and intro['new_authorities'] == roles['current_authorities']
+    assert intro['known_validation_sources_before'] == {READER: READER_BEFORE} and before[READER] == READER_BEFORE
+    assert intro['new_gate_sources'] == {READER: READER_CURRENT} and after[READER] == READER_CURRENT
+    assert before[MEMORY] == MEMORY_BEFORE and after[MEMORY] == MEMORY_CURRENT
+    assert roles['current_before'][READER] == after[READER] and roles['current_before'][MEMORY] == after[MEMORY]
+    assert all(roles['current_before'][p] == h for p, h in after.items() if p not in CHANGED)
+    return intro
 
 
 def historical_compile_sources(roles):
@@ -193,11 +213,11 @@ def historical_compile_sources(roles):
     original = read(COMPILE_FREEZE)
     before = sha_map(original['after_format'])
     accepted = {p: h for p, h in roles['current_before'].items() if p != READER}
-    assert roles['current_before'][READER] == READER_BEFORE
+    _reader_introduction(roles, checkpoint, freeze)
     assert len(before) == 54 and set(before) == set(accepted)
-    assert before[MEMORY] == accepted[MEMORY] == MEMORY_BEFORE
+    assert before[MEMORY] == MEMORY_BEFORE and accepted[MEMORY] == MEMORY_CURRENT
     assert original['new_authorities'] == roles['current_authorities']
-    assert [p for p in before if before[p] != accepted[p]] == CHANGED
+    assert [p for p in before if before[p] != accepted[p]] == CHANGED + [MEMORY]
     return before
 
 
@@ -305,13 +325,13 @@ def native_policy_equivalent(roles, config):
                     'source-vector.json', 'core-selectors.json', 'caller-source-pins.json', 'slug_core_v2-executable.json', 'artifact-binding.json')}
     protected_artifacts = [read(Path(ROOTS[key]) / (family + '-executable.json')) for key, family in [('Q', 'slug_bzlmod_v2'), ('L', 'slug_loading_v2')]]
     required |= {a['path'] for a in protected_artifacts}
-    required |= {roles['supervisor_path'], roles['evidence_path'], str(COMPILE_FREEZE), config['executable']}
+    required |= {roles['supervisor_path'], roles['evidence_path'], str(COMPILE_FREEZE), str(READER_FREEZE), config['executable']}
     assert required <= set(config['pins']), sorted(required - set(config['pins']))
     assert not set(roles['historical_vector_pins']) & set(config['pins'])
     assert digest(config['executable']) == config['executable_sha256']
     pin_hashes = {path: digest(path) for path in config['pins']}
     after = validate_transition(roles, read(root / 'source-freeze.json'))
-    declared = {**roles['direct_pins'], **roles['immediate_pins'], **roles['historical_pins'], **after, **roles['current_authorities'], str(COMPILE_FREEZE): COMPILE_FREEZE_SHA}
+    declared = {**roles['direct_pins'], **roles['immediate_pins'], **roles['historical_pins'], **after, **roles['current_authorities'], str(COMPILE_FREEZE): COMPILE_FREEZE_SHA, str(READER_FREEZE): READER_FREEZE_SHA}
     for path in pin_hashes.keys() & declared.keys():
         assert pin_hashes[path] == declared[path], path
     assert all(pin_hashes[a['path']] == a['sha256'] for a in protected_artifacts)
@@ -485,8 +505,8 @@ def authenticate_last_native(roles, after):
         assert digest(prior / name) == roles['immediate_pins'][str(prior / name)]
     freeze, checkpoint = read(prior / 'source-freeze.json'), read(prior / roles['checkpoint_name'])
     original, native = freeze['after_format'], read(prior / 'native-config.json')
-    assert checkpoint['verdict'] == 'ACCEPT' and original == {p: h for p, h in roles['current_before'].items() if p != READER}
-    assert READER not in original and len(original) == 54 and original[MEMORY] == MEMORY_BEFORE
+    assert checkpoint['verdict'] == 'ACCEPT' and original == roles['current_before'] and len(original) == 55
+    assert original[MEMORY] == MEMORY_CURRENT and original[READER] == READER_CURRENT
     receipt_path = Path(roles['prior_receipt'])
     assert digest(receipt_path) == roles['immediate_pins'][str(receipt_path)]
     receipt = read(receipt_path)
@@ -526,7 +546,7 @@ def authenticate_last_native(roles, after):
         assert digest(p) == current_checkpoint['source_pins'][p]
     assert all(pins[p] == expected for p, expected in checkpoint['source_pins'].items())
     for p, expected in pins.items():
-        if p in CHANGED + [MEMORY]:
+        if p in CURRENT_CHANGED:
             assert expected == original[p] and digest(p) == after[p]
         elif p == artifact['path']:
             assert expected == artifact['sha256']  # Superseded Core executable is saved metadata only.
@@ -544,9 +564,9 @@ def _current_callers(roles, root, after):
     assert digest(prior) == roles['immediate_pins'][str(prior)]
     old, callers = read(prior), read(root / 'caller-source-pins.json')
     assert set(callers) == set(old) == {str(i) for i in range(1, 9)}
-    assert old['2'] == dict(path=MEMORY, sha256=MEMORY_BEFORE, bytes=15294)
+    assert old['2'] == dict(path=MEMORY, sha256=MEMORY_CURRENT, bytes=19055)
     assert roles['current_before'][MEMORY] == old['2']['sha256']
-    assert all(callers[i] == old[i] for i in old if i != '2')
+    assert callers == old
     assert callers['2']['path'] == old['2']['path'] == MEMORY
     for row in callers.values():
         assert set(row) == {'path', 'sha256', 'bytes'}
@@ -561,9 +581,10 @@ def _current_selectors(roles, root):
     donor, current = read(prior), read(root / 'core-selectors.json')
     assert set(current) == set(donor)
     assert all(current[k] == donor[k] for k in donor if k != 'ordinary')
-    assert len(donor['ordinary']) == len(set(donor['ordinary'])) == 52
+    assert current == donor
+    assert len(donor['ordinary']) == len(set(donor['ordinary'])) == 59
     ordinary = current['ordinary']
-    assert ordinary == donor['ordinary'] + roles['reader_test_selectors']
+    assert ordinary[52:] == roles['reader_test_selectors']
     assert len(ordinary) == len(set(ordinary)) == 59
     return ordinary
 
@@ -577,7 +598,7 @@ def qualify_direct_evidence(roles, root=None, current_freeze=None):
     P, Q, L, I = [Path(p) for p in (roles['prior'], ROOTS['Q'], ROOTS['L'], ROOTS['I'])]
     previous = read(P / 'source-freeze.json')
     current, historical = roles['current_before'], read(Q / 'source-freeze.json')['after_format']
-    assert {**previous['after_format'], READER: READER_BEFORE} == current and READER not in previous['after_format'] and len(historical) == 52
+    assert previous['after_format'] == current and len(current) == 55 and len(historical) == 52
     authenticate_current_checkpoint(roles, root)
     freeze = read(root / 'source-freeze.json')
     assert current_freeze is None or current_freeze == freeze
@@ -592,7 +613,7 @@ def qualify_direct_evidence(roles, root=None, current_freeze=None):
     intro = read(I / 'source-freeze.json')
     assert intro['known_validation_sources_before'] == {owner_test: '8f922912cb3e433c2ceb5772b41cdffec9ef7813d73f903b1a99d1435ff1bb27'}
     assert intro['after_format'][owner_test] == current[owner_test] == intro['known_validation_sources_before'][owner_test]
-    assert previous['known_validation_sources_before'] == {}
+    assert roles['current_before'][READER] == READER_CURRENT  # Introduction is separately fixed and pinned.
     exceptions = {**roles['private_core_before'], **roles['protected_diagnostic_before'], **roles['protected_loading_before']}
     assert exceptions == {p: historical[p] for p in exceptions}
     assert roles['current_private_before'] == {p: current[p] for p in roles['historical_private_paths']}

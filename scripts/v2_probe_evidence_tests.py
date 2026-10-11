@@ -98,7 +98,7 @@ class DirectEvidenceControls(unittest.TestCase):
             changed[key] = value
             with self.assertRaises((AssertionError, KeyError, ValueError)):
                 evidence.native_policy_equivalent(self.roles, changed)
-        for path in ('target/wp1131/source-freeze.json', str(evidence.COMPILE_FREEZE), 'scripts/v2_probe_evidence.py',
+        for path in ('target/wp1131/source-freeze.json', str(evidence.COMPILE_FREEZE), str(evidence.READER_FREEZE), 'scripts/v2_probe_evidence.py',
                      str(ROOT / 'root-source-checkpoint.json')):
             changed = copy.deepcopy(config)
             changed['pins'].remove(path)
@@ -118,7 +118,7 @@ class DirectEvidenceControls(unittest.TestCase):
             bad = copy.deepcopy(freeze); bad[field][key] = value
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
-        for key, value in [('changed', evidence.CURRENT_CHANGED[:3]), ('changed', list(reversed(evidence.CURRENT_CHANGED))), ('unchanged', 52), ('known_validation_sources_before', {third: '0' * 64}), ('new_gate_sources', {evidence.READER: evidence.READER_BEFORE})]:
+        for key, value in [('changed', evidence.CURRENT_CHANGED[:1]), ('changed', list(reversed(evidence.CURRENT_CHANGED))), ('unchanged', 52), ('known_validation_sources_before', {third: '0' * 64}), ('new_gate_sources', {evidence.READER: evidence.READER_BEFORE})]:
             bad = copy.deepcopy(freeze); bad[key] = value
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
@@ -132,6 +132,13 @@ class DirectEvidenceControls(unittest.TestCase):
             bad = copy.deepcopy(freeze); bad['after_format'][path] = bad['before'][path]
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
+        for path, old in ((evidence.MEMORY, evidence.MEMORY_BEFORE), (evidence.READER, evidence.READER_BEFORE)):
+            bad = copy.deepcopy(freeze); bad['after_format'][path] = old
+            with self.assertRaises(AssertionError):
+                evidence.validate_transition(self.roles, bad)
+            bad_roles = copy.deepcopy(self.roles); bad_roles['current_before'][path] = old
+            with self.assertRaises(AssertionError):
+                evidence.validate_roles(bad_roles)
         after = freeze['after_format']
         callers_path = ROOT / 'caller-source-pins.json'; callers = evidence._current_callers(self.roles, ROOT, after)
         for row, field, value in [('1', 'sha256', '0' * 64), ('2', 'path', callers['1']['path']),
@@ -169,17 +176,28 @@ class DirectEvidenceControls(unittest.TestCase):
         with self.replaced_record(path, bad), self.assertRaises(AssertionError):
             evidence.authenticate_operation(self.roles, gate, freeze)
         bad = evidence.read(path)
-        for p in evidence.CHANGED:
+        for p in evidence.CHANGED + [evidence.MEMORY]:
             bad['pins_before'][p] = bad['pins_after'][p] = self.roles['current_before'][p]
         with self.replaced_record(path, bad), self.assertRaises(AssertionError):
             evidence.authenticate_operation(self.roles, gate, freeze)
         original = evidence.digest
         with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if Path(p) == evidence.COMPILE_FREEZE else original(p)), self.assertRaises(AssertionError):
             evidence.historical_compile_sources(self.roles)
-        cp_path = ROOT / self.roles['checkpoint_name']; bad = evidence.read(cp_path)
-        del bad['source_pins'][str(evidence.COMPILE_FREEZE)]
-        with self.replaced_record(cp_path, bad), self.assertRaises((AssertionError, KeyError)):
-            evidence.authenticate_current_checkpoint(self.roles)
+        cp_path = ROOT / self.roles['checkpoint_name']
+        for required in (evidence.COMPILE_FREEZE, evidence.READER_FREEZE):
+            bad = evidence.read(cp_path); del bad['source_pins'][str(required)]
+            with self.replaced_record(cp_path, bad), self.assertRaises((AssertionError, KeyError)):
+                evidence.authenticate_current_checkpoint(self.roles)
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if Path(p) == evidence.READER_FREEZE else original(p)), self.assertRaises(AssertionError):
+            evidence.historical_compile_sources(self.roles)
+        for field, mapping in [('known_validation_sources_before', {evidence.READER: evidence.READER_CURRENT}),
+                               ('new_gate_sources', {evidence.READER: evidence.READER_BEFORE})]:
+            bad = evidence.read(evidence.READER_FREEZE); bad[field] = mapping
+            with self.replaced_record(evidence.READER_FREEZE, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_current_checkpoint(self.roles)
+        bad = evidence.read(evidence.COMPILE_FREEZE); bad['after_format'][evidence.MEMORY] = evidence.MEMORY_CURRENT
+        with self.replaced_record(evidence.COMPILE_FREEZE, bad), self.assertRaises(AssertionError):
+            evidence.historical_compile_sources(self.roles)
         prior = Path(self.roles['last_actual_native_root'])
         native_path = prior / 'native/operation.json'
         evidence.authenticate_last_native(self.roles, freeze['after_format'])
