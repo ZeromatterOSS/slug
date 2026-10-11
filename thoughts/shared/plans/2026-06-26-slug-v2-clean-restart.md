@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-316-m7a-local-jdk-root-marker-metadata
-Status: accepted — scoped root marker; ignore metadata successor ready
+Packet: WP-7-317-m7a-local-jdk-ignore-marker-metadata
+Status: accepted — local JDK metadata cleared; generated producer next
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-scoped local JDK root `REPO.bazel` metadata:55 proofs, production check and ONE
-native now reaching `.bazelignore` Lstat at215.09MiB phase peak. Same-profile
-small edit rebuilt Core in37.85s. Preparation time remains authorized; recurring
-work over three minutes receives necessity/refactoring assessment. Full
-producer/M7A/bootstrap completion remains open.
+local JDK root metadata:55 proofs, production check and ONE217.207MiB prefix,
+254sources. Next actual prerequisite is the generated remote JDK8 Linux toolchain
+configuration repository; original full request/plan assessment precedes any
+admission. Common-edit Core builds37.85/39.57s are below the recurring three-minute
+review signal. Full producer/M7A/bootstrap completion remains open.
 
 ### Ready and blocked queue
 

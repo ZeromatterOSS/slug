@@ -1,81 +1,64 @@
-# WP1104 local JDK root marker metadata
+# WP1105 local JDK ignore marker metadata
 
-Packet: WP-7-316-m7a-local-jdk-root-marker-metadata
-Status: accepted — scoped root marker;55 focused proofs and ONE actual native
-Baseline: b59c59fcc (WP1103 accepted readiness)
+Packet: WP-7-317-m7a-local-jdk-ignore-marker-metadata
+Status: accepted — both local JDK metadata boundaries cleared; generated producer next
+Baseline: 1b98110c6 (accepted WP1104)
 
-Outcome: admit only undeclared current-root-relative REPO.bazel Lstat for the
-already validated generated local JDK owner when repo_marker_metadata is enabled,
-then preserve the next actual normal producer terminal. Slug-native finite public
-probe observation policy; accepted exact semantics unchanged; Windows deferred.
+Outcome: recognize otherwise undeclared exact current-root-relative .bazelignore
+Lstat behind existing ignore_file_bytes role after declared-file precedence, then
+preserve next actual normal producer terminal. Slug-native private public-probe
+observation policy; accepted exact behavior unchanged; Windows deferred.
 
-Research: target/wp1103/next-metadata-research.md and FINAL source/evidence reviews;
-accepted receipt wp1103-normal-profile-producer-readiness-2026-10-10.json. Unique
-current Mat13 original local JDK request passed local_jdk_file_plan's full original
-workspace/Java MODULE binding/defs role/owner/file-only-plan guard. Diagnostic root
-bytes are unprojected; temporary path/header grants nothing. Existing Bzlmod
-repo_file.rs repository marker source semantics remain unchanged. This private
-observation-policy continuation makes no new Bazel parity claim or fixture.
+Inherit WP1104 contract/proofs/validation and cap/allocation/lifecycle limits from
+its commit current-packet.md and wp1104-local-jdk-root-marker-metadata-2026-10-10.json.
+Research target/wp1104/next-metadata-research.md: actual unique current Mat13
+original local JDK/full-plan guard passes; .bazelignore is classother because the
+local branch returns before generic ignore marker policy. Existing ignore_marker
+admits Lstat only despite flag name. Captured header/root suffix never grants
+fullSpec/path authority; original current generation_root and complete existing
+local_jdk_file_plan remain prerequisites. Bzlmod repo_file.rs ignore metadata
+semantics and DICE/source owner unchanged; no new Bazel parity claim or fixture.
 
-Owner: namespace_policy in existing public_probe_preparation_tests.rs, using
-borrowed_instance_for_namespace on original current workspace/unique instance,
-original request and local_jdk_file_plan. After declared-file precedence, use raw
-strip_prefix(current generation_root) equality to Path::new("REPO.bazel") and
-existing flag, return existing repo_marker class (Lstat only). No owned path join,
-string/body/request copy or retained value; existing scoped interning unchanged.
-No DICE key/equality/invalidation/cache/public API changes. SourceService and normal
-materializer own missing/present/error/retry; whole Need preflight remains atomic
-before progress, preserving borrowed first offender. No direct filesystem bypass.
+Allowlist: same existing Core public_probe_preparation_tests.rs child only plus
+scheduling/compact receipt. Add2 policy lines under existing role and exact borrowed
+Path equality; no join/String/request/body copies or retained storage/interner/
+cache/key/public API change. Extend existing local-JDK namespace fixture as paired
+marker cases, retaining independent flag/role defaults, current A/B/A, missing/
+foreign/ambiguous/stale/root/case/suffix/child/nested negatives, undeclared FileBytes/
+DirectoryEntries/FileDigest/ReadLink refusal and explicit declared-file precedence
+with flags disabled. Mixed whole Need preserves first original offender and zero
+progress in both orders; original strong-count/Weak checks and complete original
+owner/binding/defs/plan negative matrix reused. Existing owner remains cohesive:
+a narrow adjacent predicate and small matrix delta reuse the fixture; no unrelated
+large-module extraction or duplicated lifecycle harness. No package/body/newop/
+fixture/corpus/window/source-memory-cap changes. No global grant or filesystem bypass.
 
-Allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/
-public_probe_preparation_tests.rs only, plus scheduling and compact receipt.
-Large existing private test owner stays cohesive: narrow existing policy branch
-and adjacent extension of existing local-JDK fixture avoids another dispatcher,
-fixture copy or unrelated structural extraction. Expected policy3 lines and small
-focused matrix, review material growth. No parent/build/fixture/corpus edits.
+Serialize all source/helper/fixture writers and Cargo. Same pinned nightly and
+profiles Bzlmod/Core1, Loading0 ordinary/Loading1 native/production. Fresh current
+CargoJSON unique artifacts/list/exact batched preflight/body55 gates (Loading26/
+Bzlmod7/Core22), direct production check and standalone fresh-shell ignored
+singleton. Rebind current source44 with exactly1 named Rust hash change/43same,
+original350heldFD sources18env8callerroles; immutable old proof/maps never rewritten.
+Independent DESIGN before source, source/helper/config PRELAUNCH before ONE distinct
+normal native with allwritersSTOPPED. Runtime10s/RSS256MiB/AS512MiB, inner work7/
+default5/lifetime8/cleanup3 and all source/byte/object/attempt/directory/log caps
+unchanged; no identical replay or corpus/body/archive/envvalue inspection by agents.
+Preparation deadline null per human authority; report actual common-edit costs and
+examine recurring>180s necessity/refactor. Compiler RSS is not workload budget.
+FINAL actual diff/invariants/current gates/native qualifications, plan/diff/archive
+checks, compact receipt and commit; broad producer/M7A/bootstrap remain open.
+REPLAN only for new owner/operation/body or ownership decision, not routine gate
+correction or authorized task time. No speed/fullfit/fullproducer acceptance claim.
 
-Proofs: exact current B marker Lstat allowed; metadata-disabled/PreparedFile role
-prerequisites; full original owner/binding/defs/plan guards unchanged; stale A,
-foreign/missing/ambiguous instance, outside/sibling/nested/case/suffix/child marker
-refused. Undeclared marker FileBytes/DirectoryEntries/FileDigest/ReadLink refused;
-explicit declared leaf keeps fixed_file semantics. Mixed Need both orders has
-zero progress and original first-offender pointer; request/attributes/body strong
-counts unchanged and existing Weak retirement retained. Reuse malformed/collision
-and guard matrices; no duplicated full harness. Preserve existing exact51 gates plus four existing namespace controls (projection,
-current transaction, finite generated owner and mixed Need); add focused new
-source discriminators only as needed. No new bytes/signature/flag/path scan,
-.bazelignore/package markers, source cap, memory cap or runtime time change.
+Predecessor WP1104 1b98110c6 accepted REPO.bazel metadata2lines,55/55 proofs,
+production7.52s/common-edit Core37.85s, ONE4.54s current native215.09MiB phase
+peak and new .bazelignore Lstat refusal; root observer partial/source identity
+qualified. Current goal incomplete.
 
-Validation: pinned toolchain resolve; serialize CargoJSON no-run offline/locked/
-jobs1 same Bzlmod/Core1 profiles, Loading0 ordinary/Loading1 native/production,
-current unique artifact/list/exact batched preflight/nonzero bodies. Preserve
-current source-authority freeze36Rust+8metadata, original350 ordered heldFD sources,
-18env/8caller roles; update only named changed Rust pin. Independent DESIGN before
-source activation; FINAL actual diff/proofs; helper/config/prelaunch reviews before
-ONE distinct normal native after all writersSTOPPED. Fresh standalone shell native
-singleton. Original10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/cleanup3 and all
-source/byte/object/attempt/directory/log caps unchanged. No identical native replay,
-header-derived grant or corpus/body/archive/envvalue inspection by agents.
-Preparation deadline null per human authority; compiler RSS separate, no workload
-credit. Record recurring common-edit preparation duration, examine >180s necessity
-and structural refactor signal. Current prefix fit is not whole workload fit.
-
-Accept: actual scoped matrix + protected controls/direct production check + ONE
-current native typed terminal under strict pins/heldFD brackets, reviewed qualified
-receipt, plan/diff/archive checks and commit. Root owns scheduling/serial helpers;
-source worker owns only Rust after DESIGN ACCEPT. Native refusal selects next
-concrete owner; broader producer/certificate/action/Rustc/M7A/bootstrap stay open.
-REPLAN only if new owner/operation/body or ownership decision is required; routine
-selector/invocation/correction stays here. Task time is authorized, not a60s cap.
-
-Predecessor WP1103 b59c59fcc:51/51 current profile proofs, production pass and
-ONE4.44s native with214.258MiB phase peak, current local JDK REPO.bazel Lstat
-namespace refusal. Prep84/87/239s; Core first completed graph is not recurring
-common-edit evidence. Root observer partial; anonymous source identity qualified.
-
-Acceptance: [WP1104 receipt](./wp1104-local-jdk-root-marker-metadata-2026-10-10.json).
-Policy2lines/no retained copies;55/55 proofs, production7.52s, common-edit Core
-rebuild37.85s and ONE4.54s current native with215.09MiB phase peak. Actual next
-unique current local JDK prerequisite is root .bazelignore Lstat; existing role
-and ignore_marker operation gate provide a bounded successor. No full producer
-or whole-fit closure.
+Acceptance: [WP1105 receipt](./wp1105-local-jdk-ignore-marker-metadata-2026-10-10.json).
+Two borrowed policy lines/paired fixture net21,55/55 proofs, production7.36s and
+common-edit Core39.57s. ONE4.45s current native admits254sources, phasepeak
+217.207MiB/256. Next generated materialization header is rules_java toolchains
+remote_java_repository.bzl _toolchain_config / remote_jdk8_linux_toolchain_config_repo.
+Header omits fullRepoSpec/attrs/plan/outputbytes; no grant or producer/fullfit closure.
+Next original producer/plan assessment uses existing guards and bounded evidence.

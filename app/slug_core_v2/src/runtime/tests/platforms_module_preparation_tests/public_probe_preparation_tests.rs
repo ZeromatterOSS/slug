@@ -328,6 +328,8 @@ fn namespace_policy(
                 "fixed_file"
             } else if bodies.repo_marker_metadata && relative == Path::new("REPO.bazel") {
                 "repo_marker"
+            } else if bodies.ignore_file_bytes && relative == Path::new(".bazelignore") {
+                "ignore_marker"
             } else if plan
                 .effects()
                 .iter()
@@ -3171,7 +3173,8 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
 #[cfg(target_os = "linux")]
 fn local_jdk_namespace_is_current_and_declared_only() {
     let bodies = java_proxy_test_bodies()
-        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let content: Arc<[u8]> = Arc::from(&b"synthetic"[..]);
     let body_weak = Arc::downgrade(&content);
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
@@ -3201,13 +3204,14 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             namespace_policy(&bodies, d, epoch, &generated_features_plan_matches)
                 .admits(&d.operation())
         };
-    for (epoch, root, parent, leaf, marker) in [
+    for (epoch, root, parent, leaf, marker, ignore) in [
         (
             &epoch_a,
             "/parent/A",
             "/parent/A/nested",
             "/parent/A/nested/BUILD",
             "/parent/A/REPO.bazel",
+            "/parent/A/.bazelignore",
         ),
         (
             &epoch_b,
@@ -3215,6 +3219,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             "/parent/B/nested",
             "/parent/B/nested/BUILD",
             "/parent/B/REPO.bazel",
+            "/parent/B/.bazelignore",
         ),
         (
             &epoch_a,
@@ -3222,6 +3227,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             "/parent/A/nested",
             "/parent/A/nested/BUILD",
             "/parent/A/REPO.bazel",
+            "/parent/A/.bazelignore",
         ),
     ] {
         for path in ["/", "/parent", root, parent] {
@@ -3248,18 +3254,20 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         ] {
             assert!(admits(&demand(materialized, leaf, operation), Some(epoch)));
         }
-        let marker = demand(materialized, marker, PathObservationOperation::Lstat);
-        assert_eq!(
-            namespace_policy(
-                &bodies,
-                &marker,
-                Some(epoch),
-                &generated_features_plan_matches
-            )
-            .path_class,
-            "repo_marker"
-        );
-        assert!(admits(&marker, Some(epoch)));
+        for (path, class) in [(marker, "repo_marker"), (ignore, "ignore_marker")] {
+            let marker = demand(materialized, path, PathObservationOperation::Lstat);
+            assert_eq!(
+                namespace_policy(
+                    &bodies,
+                    &marker,
+                    Some(epoch),
+                    &generated_features_plan_matches
+                )
+                .path_class,
+                class
+            );
+            assert!(admits(&marker, Some(epoch)));
+        }
     }
     let valid_demand = demand(
         materialized,
@@ -3288,39 +3296,71 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         "/parent/B/REPO.bazel",
         PathObservationOperation::Lstat,
     );
+    let ignore_marker = demand(
+        materialized,
+        "/parent/B/.bazelignore",
+        PathObservationOperation::Lstat,
+    );
     for epoch in [
         None,
         Some(&epoch_a),
         Some(&wrong_workspace),
         Some(&ambiguous),
     ] {
-        assert!(!admits(&marker, epoch));
+        for marker in [&marker, &ignore_marker] {
+            assert!(!admits(marker, epoch));
+        }
     }
-    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
-        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
-            let roles = java_proxy_test_bodies().with_repo_marker_metadata(registry, command);
+    for (repo, ignore) in [(false, false), (false, true), (true, false), (true, true)] {
+        let mut flags = java_proxy_test_bodies();
+        flags.repo_marker_metadata = repo;
+        flags.ignore_file_bytes = ignore;
+        for (marker, enabled) in [(&marker, repo), (&ignore_marker, ignore)] {
             assert_eq!(
                 namespace_policy(
-                    &roles,
-                    &marker,
+                    &flags,
+                    marker,
                     Some(&epoch_b),
                     &generated_features_plan_matches
                 )
                 .admits(&marker.operation()),
-                matches!(registry, RegistryChoice::PreparedFile)
-                    && matches!(command, CommandChoice::PublicProbe)
+                enabled
             );
+        }
+    }
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let roles = java_proxy_test_bodies()
+                .with_repo_marker_metadata(registry, command)
+                .with_ignore_file_bytes(registry, command);
+            for marker in [&marker, &ignore_marker] {
+                assert_eq!(
+                    namespace_policy(
+                        &roles,
+                        marker,
+                        Some(&epoch_b),
+                        &generated_features_plan_matches
+                    )
+                    .admits(&marker.operation()),
+                    matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe)
+                );
+            }
         }
     }
     // An explicit leaf retains its prior body authority even without the marker role.
     {
         let disabled = java_proxy_test_bodies()
-            .with_repo_marker_metadata(RegistryChoice::DefaultBcr, CommandChoice::Modules);
+            .with_repo_marker_metadata(RegistryChoice::DefaultBcr, CommandChoice::Modules)
+            .with_ignore_file_bytes(RegistryChoice::DefaultBcr, CommandChoice::Modules);
         let declared = namespace_test_epoch_at(
             &disabled,
             [Arc::new(local_jdk_test_request(
                 &disabled,
-                small_generated_plan(&[("REPO.bazel", b"synthetic", false)]),
+                small_generated_plan(&[
+                    ("REPO.bazel", b"synthetic", false),
+                    (".bazelignore", b"synthetic", false),
+                ]),
             ))],
             instance,
             "/parent/B",
@@ -3329,15 +3369,17 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             PathObservationOperation::Lstat,
             PathObservationOperation::FileBytes,
         ] {
-            let leaf = demand(materialized, "/parent/B/REPO.bazel", operation);
-            let policy = namespace_policy(
-                &disabled,
-                &leaf,
-                Some(&declared),
-                &generated_features_plan_matches,
-            );
-            assert_eq!(policy.path_class, "fixed_file");
-            assert!(policy.admits(&leaf.operation()));
+            for path in ["/parent/B/REPO.bazel", "/parent/B/.bazelignore"] {
+                let leaf = demand(materialized, path, operation.dupe());
+                let policy = namespace_policy(
+                    &disabled,
+                    &leaf,
+                    Some(&declared),
+                    &generated_features_plan_matches,
+                );
+                assert_eq!(policy.path_class, "fixed_file");
+                assert!(policy.admits(&leaf.operation()));
+            }
         }
     }
     // A malformed successful epoch must not turn a file-parent collision into path authority.
@@ -3357,6 +3399,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             "/parent/B/a/b",
             "/parent",
             "/parent/B/REPO.bazel",
+            "/parent/B/.bazelignore",
         ] {
             assert!(!admits(
                 &demand(materialized, path, PathObservationOperation::Lstat),
@@ -3365,7 +3408,8 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         }
     }
     let mut closed = java_proxy_test_bodies()
-        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     closed.java_offline_archive = None;
     assert!(
         !namespace_policy(
@@ -3376,29 +3420,34 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         )
         .admits(&valid_demand.operation())
     );
-    assert!(
-        !namespace_policy(
-            &closed,
-            &marker,
-            Some(&epoch_b),
-            &generated_features_plan_matches
-        )
-        .admits(&marker.operation())
-    );
+    for marker in [&marker, &ignore_marker] {
+        assert!(
+            !namespace_policy(
+                &closed,
+                marker,
+                Some(&epoch_b),
+                &generated_features_plan_matches
+            )
+            .admits(&marker.operation())
+        );
+    }
     let mut no_defs = java_proxy_test_bodies()
-        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     no_defs.rules_rust_defs_import_sources = false;
-    assert!(
-        !namespace_policy(
-            &no_defs,
-            &marker,
-            Some(&epoch_b),
-            &generated_features_plan_matches
-        )
-        .admits(&marker.operation())
-    );
+    for marker in [&marker, &ignore_marker] {
+        assert!(
+            !namespace_policy(
+                &no_defs,
+                marker,
+                Some(&epoch_b),
+                &generated_features_plan_matches
+            )
+            .admits(&marker.operation())
+        );
+    }
     let valid = SourcePreparationNeeds::path(
-        NeedPathObservations::try_from_iter([valid_demand, marker]).unwrap(),
+        NeedPathObservations::try_from_iter([valid_demand, marker, ignore_marker]).unwrap(),
     );
     let admit_need = |needs: &SourcePreparationNeeds| {
         bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|d| {
@@ -3447,71 +3496,6 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         ),
         (
             materialized,
-            "/parent/B/REPO.bazel",
-            PathObservationOperation::FileBytes,
-        ),
-        (
-            materialized,
-            "/parent/B/REPO.bazel",
-            PathObservationOperation::DirectoryEntries,
-        ),
-        (
-            materialized,
-            "/parent/B/REPO.bazel",
-            PathObservationOperation::FileDigest,
-        ),
-        (
-            materialized,
-            "/parent/B/REPO.bazel",
-            PathObservationOperation::ReadLink,
-        ),
-        (
-            materialized,
-            "/parent/B/repo.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/B/REPO.bazel.bak",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/B/REPO.bazel/child",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/B/nested/REPO.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/B-sibling/REPO.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/outside/REPO.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/A/REPO.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            foreign,
-            "/parent/B/REPO.bazel",
-            PathObservationOperation::Lstat,
-        ),
-        (
-            materialized,
-            "/parent/B/.bazelignore",
-            PathObservationOperation::FileBytes,
-        ),
-        (
-            materialized,
             "/parent/B-sibling/nested/BUILD",
             PathObservationOperation::Lstat,
         ),
@@ -3531,7 +3515,44 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             "/parent/B/nested/BUILD",
             PathObservationOperation::FileBytes,
         ),
-    ] {
+    ]
+    .into_iter()
+    .chain(
+        ["/parent/B/REPO.bazel", "/parent/B/.bazelignore"]
+            .into_iter()
+            .flat_map(|path| {
+                [
+                    PathObservationOperation::FileBytes,
+                    PathObservationOperation::DirectoryEntries,
+                    PathObservationOperation::FileDigest,
+                    PathObservationOperation::ReadLink,
+                ]
+                .into_iter()
+                .map(move |operation| (materialized, path, operation))
+            }),
+    )
+    .chain(
+        [
+            (materialized, "/parent/B/repo.bazel"),
+            (materialized, "/parent/B/.BAZELIGNORE"),
+            (materialized, "/parent/B/REPO.bazel.bak"),
+            (materialized, "/parent/B/.bazelignore.bak"),
+            (materialized, "/parent/B/REPO.bazel/child"),
+            (materialized, "/parent/B/.bazelignore/child"),
+            (materialized, "/parent/B/nested/REPO.bazel"),
+            (materialized, "/parent/B/nested/.bazelignore"),
+            (materialized, "/parent/B-sibling/REPO.bazel"),
+            (materialized, "/parent/B-sibling/.bazelignore"),
+            (materialized, "/outside/REPO.bazel"),
+            (materialized, "/outside/.bazelignore"),
+            (materialized, "/parent/A/REPO.bazel"),
+            (materialized, "/parent/A/.bazelignore"),
+            (foreign, "/parent/B/REPO.bazel"),
+            (foreign, "/parent/B/.bazelignore"),
+        ]
+        .into_iter()
+        .map(|(namespace, path)| (namespace, path, PathObservationOperation::Lstat)),
+    ) {
         let bad = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand(
             namespace,
             path,

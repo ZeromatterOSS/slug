@@ -1,0 +1,207 @@
+{
+  "packet": "WP-7-317-m7a-local-jdk-ignore-marker-metadata",
+  "baseline": "1b98110c6",
+  "status": "accepted \u2014 scoped ignore marker and actual next generated producer boundary",
+  "outcome": "Exact local JDK current-root .bazelignore Lstat metadata under existing independent role, declared-file precedence unchanged. Next actual generated materialization refusal is original remote_jdk8_linux_toolchain_config_repo / rules_java toolchains remote_java_repository.bzl _toolchain_config. Normal producer/certificate/analyses/actions/Rustc completion unavailable.",
+  "compatibility": {
+    "changed_policy": "Slug-native private public-probe observation policy",
+    "accepted_exact_semantics": "unchanged",
+    "windows": "deferred"
+  },
+  "source": {
+    "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+    "sha256": "691cb91d68db729f06a7f83a49f073f0e3cdb45c9a7384b972f12a7f04d27a94",
+    "delta": "+141/-120 net21;2 policy lines and shared paired existing fixture matrix",
+    "freeze_path": "target/wp1105/source-freeze.json",
+    "freeze_sha256": "fb2ae941bda92ccfd7da5a754e24ca57ac76c3b060269c8d36c483d50709a4d5",
+    "rust": 36,
+    "metadata": 8,
+    "changed_authorities": 1
+  },
+  "allocation": "Policy borrows original request/root/Path, no owned copies/retained value/interner/cache/key change. Test iterator chains reuse tiny existing synthetic fixture; no collected marker path table.",
+  "focused": {
+    "selected": 55,
+    "passed": 55,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.310830513946712,
+        "operation_sha256": "114a6cec62de2ad9ff5d5fce000db96d3bf7ffafe618d68ae363efd7929cc6b5"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.12059009494259953,
+        "operation_sha256": "c862913af4f24ecdaccbc3a6f1e5cad9245cbed7460b0294448fc9a162cc969e"
+      },
+      "core": {
+        "selected": 22,
+        "passed": 22,
+        "elapsed_seconds": 0.21532676799688488,
+        "operation_sha256": "ab98e6ae7898aaa6a30739dd7de051b774d175f362144285b4239b7006fb9df8"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 0.10674636391922832,
+        "deadline_seconds": null,
+        "operation_sha256": "c8ead670bd78c1fa344f84362caf76e1c126489b4c9e81298509228f9767b90c",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 0.11694680899381638,
+        "deadline_seconds": null,
+        "operation_sha256": "aeeb1712fb886eb15f5304ee17136e6ba76b77be3f826bdccf5fe21f634695e3",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 39.56540938199032,
+        "deadline_seconds": null,
+        "operation_sha256": "4c6928f225851452fa2fca57aa9ba0b695b2a27a0a1a3095dac44edb62dd8f2c",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Fresh current CargoJSON operations required for source-changed Core artifact/current profiles and independent gate binding.",
+    "frequency": "Second same-profile small policy/test edit: Core39.565s following WP1104 common-edit37.852s; both below180s. Cached Bzlmod/Loading0.107/0.117s. Two examples are not a recurrence distribution or workflow/runtime speed benchmark.",
+    "refactoring": "No recurring-over180s signal from two current small-edit examples; preserve cohesive owner and reconsider build/test extraction only for a measured recurring cost/necessity signal.",
+    "memory": "Compiler RSS uncapped preparation only, no workload budget credit."
+  },
+  "production_check": {
+    "seconds": 7.361451560049318,
+    "operation_sha256": "20aa232eab807bceb71536a100a9ec53eebccfdbd7c9685969628170ff2bb423"
+  },
+  "native": {
+    "operation_sha256": "912eb12ec312073acc49a8282a797c281735001aee4ee653777087f61552669e",
+    "stdout_sha256": "d9adb1bab04e7bb339e1bf2c638104d2cb7a9d2b7d6795565261cb5d34b80d63",
+    "elapsed_seconds": 4.449590208008885,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 221524,
+    "rss_mib": 216.33203125,
+    "source_count": 254,
+    "decode_bytes": 55576941,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 139,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 342,
+        "wall_ns": 120441514,
+        "process_cpu_ns": 120183716,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 342,
+        "wall_ns": 3663484610,
+        "process_cpu_ns": 3683867932,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 341,
+        "wall_ns": 156979137,
+        "process_cpu_ns": 156542046,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 342,
+        "wall_ns": 12999770,
+        "process_cpu_ns": 17600066,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=materialization path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 254 7021682 55576941 52796422 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=254 seen=254 emitted=254 admitted=254 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40885 encoded_bytes=139653 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "phase_rss_kib": {
+      "after_runtime": 30528,
+      "after_command": 222420,
+      "after_terminal_drop": 222420,
+      "after_runtime_drop": 222420,
+      "after_scope_drop": 220364
+    },
+    "phase_peak_mib": 217.20703125,
+    "config_sha256": "3c7279404dfd5d7ac9fa1fbe203a39e8dcc3e90fccb5022f57e83535dbef4a36",
+    "progress_refusal_record": {
+      "operation_sha256": "912eb12ec312073acc49a8282a797c281735001aee4ee653777087f61552669e",
+      "stdout_sha256": "d9adb1bab04e7bb339e1bf2c638104d2cb7a9d2b7d6795565261cb5d34b80d63",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "materialization_frames": [
+      "WP982_MATERIALIZATION capture=captured kind=generated_file_effects reason=generated_kind workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=62 canonical_hex=72756c65735f6a6176612b2b746f6f6c636861696e732b72656d6f74655f6a646b385f6c696e75785f746f6f6c636861696e5f636f6e6669675f7265706f rule_repo_len=11 rule_repo_hex=72756c65735f6a6176612b rule_package_len=10 rule_package_hex=746f6f6c636861696e73 rule_target_len=26 rule_target_hex=72656d6f74655f6a6176615f7265706f7369746f72792e627a6c rule_name_len=17 rule_name_hex=5f746f6f6c636861696e5f636f6e666967 logical_root_len=none logical_root_hex=none"
+    ],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1105/design-review.md",
+      "sha256": "00602a07b3c0f6413b165c5103f2a29e495403e5781cd1aacb5994eee819ea05"
+    },
+    "helper-review.md": {
+      "path": "target/wp1105/helper-review.md",
+      "sha256": "cbe17109152bff0305b92e2f4dd72352580881a1fa407351e31b041bf04a9a44"
+    },
+    "source-worker.md": {
+      "path": "target/wp1105/source-worker.md",
+      "sha256": "10d21f5053a0fb646f361172bacfea502d40ebc6e2e6b1ade7ecc8a24967fe11"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1105/source-prelaunch-review.md",
+      "sha256": "39a34854eedca4bac29b0d311f2f33982471051a39f27f63166ea829d2445a75"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1105/prelaunch-evidence.md",
+      "sha256": "e5c3053b8ba708c8bd6d410b8466eeb64575255411205c18c642c76bb76959a2"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1105/root-prelaunch.md",
+      "sha256": "46d10c54da282deddf8506f6cb859056801212ca1f8e0dd95d32ac573b1f5e97"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1105/final-source-review.md",
+      "sha256": "cf09e2bd5aaac9f8c16cf3cc2fd102f0e2e0a5d7ec399da4152e5939467e5686"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1105/final-evidence-review.md",
+      "sha256": "e6e7083a6c0714cc4c293a67d94e9f4da1ab0084941ce914e802c9d516729726"
+    }
+  },
+  "corrections": "No Rust/test/gate correction. Helpers ROOT-rebound; redundant helper-design role aliased to current helper-review (137configured/139actual). All source/prelaunch roles bound before candidate; prior evidence immutable. Read-only prospective note lookup misses give no execution credit.",
+  "claim_limit": "Current scoped marker proof and actual next generated-kind materialization boundary only. Original bounded header omits fullRepoSpec/attrs/plan/output bytes and is no grant. Source254, original350stable bracketednoninheritedFDs/18env139stablepins; collection notatomic. Root observer aborted_partial/all-thread sums no speed/cause/exclusiveCPU. Phase prefix peak217.20703125MiB fits256 but no wholefit/wholeheap/producer success. SourceWeak unseen expiry vacuous; Scope/Recorder/livebuffer narrow; anonymous source identity and charge-before-body-completion limitations persist.",
+  "next": "Source-only bounded original remote JDK toolchain-config owner/full generated plan assessment; independent design before new materialization admission.",
+  "goal": "Incomplete; broader configured producer/certificate/analysis/actions/Rustc/M7A/bootstrap remain open.",
+  "elapsed_since_design_binding_seconds": 364.317188,
+  "reviewed_candidate": {
+    "path": "target/wp1105/receipt-reviewed.json",
+    "sha256": "ff74de8f34cdaf026daade3ed6dab09a018ad9f4dfeee65d23fc7a20b338dae7"
+  }
+}
