@@ -165,9 +165,9 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     drop(dice);
     tokio::task::yield_now().await;
     assert!(source_weak.upgrade().is_none());
+    let answer = held.module.get("answer").unwrap();
     let caller = Module::new();
     let mut evaluator = Evaluator::new(&caller);
-    let answer = held.module.get("answer").unwrap();
     assert_eq!(
         evaluator
             .eval_function(answer.value(), &[], &[])

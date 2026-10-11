@@ -34,18 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-355-m7a-host-bzl-load-key-borrow
-Status: selected — independent DESIGN accepted; bounded implementation
+Packet: WP-7-356-m7a-host-bzl-load-key-test-lifetime
+Status: selected — routine compile correction, SOURCE pending
 
-The packet borrows temporary Host bzl load keys from existing owned load storage,
-keeping retained strings and module closures independently owned. Fresh Loading30,
-Core59, qualified Q7/fixture31 and current helper routing precede ONE representative
-memory check under the unchanged256MiB cap. No savings or cause attribution is made.
-[Contract](./slug-v2-subplans/current-packet.md) binds the exact four-source transition.
-WP1142 remains preserved and unaccepted: phase256.15625MiB exceeded256by160KiB;
-its ONE/FIRST failure evidence is immutable. Last accepted native remains WP1141.
-Broader metadata work waits for representative fit. Producer/actions/Rustc/full
-bootstrap remain open; Windows deferred.
+WP1143 allocation/helper source passed independent DESIGN and SOURCE; its first
+Loading compile caught a test guard Drop-order error. The preserved failure has
+no native/FIRST execution. Current packet corrects only declaration order while
+reusing approved scratch ownership and finite fresh Loading/Core validation.
+[Contract](./slug-v2-subplans/current-packet.md) retains all unchanged memory limits.
+Last accepted native remains WP1141; broader work waits for representative fit.
+Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
 
 ### Ready and blocked queue
 
