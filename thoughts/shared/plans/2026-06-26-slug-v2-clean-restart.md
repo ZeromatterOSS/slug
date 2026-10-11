@@ -34,21 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-346-m7a-rust-private-marker-metadata
-Status: accepted
+Packet: WP-7-347-m7a-rust-runfiles-component-metadata
+Status: accepted — independent FINAL and compact receipt recorded
 
-[Accepted WP1134](./slug-v2-subplans/wp1134-rust-private-marker-metadata-2026-10-11.json)
-admits the two borrowed private BUILD-marker Lstat rows: source34 unchanged,
-metadata9 and Need77. Fresh Core52 and13 helper controls passed; protected36 and
-fixture31 retain qualified evidence. ONE native passed20.650s with stable361
-held-source brackets and cleanup; immutable FIRST and independent FINAL passed.
-Observed phase peak255.84765625MiB leaves0.15234375MiB under256, so whole/future
-workload fit remains unproved and allocation discipline continues.
-
-The [current manifest](./slug-v2-subplans/current-packet.md) records acceptance
-and the next captured root1 `rust/runfiles` Lstat boundary. Next contract selection
-must use the stopped normal-source readiness and reuse stable evidence tooling;
-marker/body/producer/bootstrap closure remains open. Windows remains deferred.
+[Accepted WP1135](./slug-v2-subplans/wp1135-rust-runfiles-component-metadata-2026-10-11.json)
+admits one borrowed runfiles component Lstat: metadata10/Need78/source34 unchanged.
+Fresh Core52/13 controls/default Core+CLI and PRE/ONE/FIRST/FINAL passed. ONE20.776s,
+phase255.0859375MiB/headroom0.9140625 under256; whole/future fit remains unproved.
+Actual next root1 rust/rust_analyzer Lstat206B has no original owner headers. Stopped
+normal-source readiness supports only that next component. The workflow advisory
+examines recurring >180s helper preparation and proposes explicit predecessor roles
+and exact config-plus-two closure instead of packet literals; no speedup is claimed.
+[Current manifest](./slug-v2-subplans/current-packet.md) records exact evidence.
+Producer/actions/Rustc/bootstrap closure remains open; caps and Windows deferral stay.
 
 ### Ready and blocked queue
 

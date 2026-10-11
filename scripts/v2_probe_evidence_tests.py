@@ -12,7 +12,7 @@ import v2_probe_supervisor as supervisor
 import v2_probe_evidence as evidence
 
 
-ROOT = Path('target/wp1134')
+ROOT = Path('target/wp1135')
 SHARED = ('scripts/v2_probe_supervisor.py', 'scripts/v2_probe_evidence.py',
           'scripts/v2_probe_evidence_tests.py')
 
@@ -28,6 +28,8 @@ class DirectEvidenceControls(unittest.TestCase):
     def test_fixed_role_schema_counts_and_introduction(self):
         evidence.validate_roles(self.roles)
         for key, value in (('extra_owner', 'invented'), ('owner_test_introduction_root', 'target/wp1132'),
+                           ('historical_compile_root', 'target/wp1134'), ('last_actual_native_root', 'target/wp1133'),
+                           ('prior', 'target/wp1133'),
                            ('core_counts', {**self.roles['core_counts'], 'current': 51}),
                            ('native_time_policy', {**self.roles['native_time_policy'], 'native_outer_seconds': 33})):
             changed = copy.deepcopy(self.roles)
@@ -37,11 +39,11 @@ class DirectEvidenceControls(unittest.TestCase):
 
     def test_current_root_seam_and_escape_refusal(self):
         changed = copy.deepcopy(self.roles)
-        changed['root'] = 'target/wp1135'
-        self.assertEqual(evidence.validate_roles(changed, Path('target/wp1135')), Path('target/wp1135'))
+        changed['root'] = 'target/wp1136'
+        self.assertEqual(evidence.validate_roles(changed, Path('target/wp1136')), Path('target/wp1136'))
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed, ROOT)
-        changed['root'] = 'target/wp1134/../wp1135'
+        changed['root'] = 'target/wp1135/../wp1136'
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed)
 
@@ -72,7 +74,7 @@ class DirectEvidenceControls(unittest.TestCase):
             changed[key] = value
             with self.assertRaises((AssertionError, KeyError, ValueError)):
                 evidence.native_policy_equivalent(self.roles, changed)
-        for path in ('target/wp1131/source-freeze.json', 'scripts/v2_probe_evidence.py',
+        for path in ('target/wp1131/source-freeze.json', str(evidence.COMPILE_FREEZE), 'scripts/v2_probe_evidence.py',
                      str(ROOT / 'root-source-checkpoint.json')):
             changed = copy.deepcopy(config)
             changed['pins'].remove(path)
@@ -126,6 +128,42 @@ class DirectEvidenceControls(unittest.TestCase):
         del bad['pins_before'][missing]; del bad['pins_after'][missing]
         with self.replaced_record(path, bad), self.assertRaises(AssertionError):
             evidence.authenticate_operation(self.roles, gate, freeze)
+        bad = evidence.read(path)
+        for p in evidence.CHANGED:
+            bad['pins_before'][p] = bad['pins_after'][p] = self.roles['current_before'][p]
+        with self.replaced_record(path, bad), self.assertRaises(AssertionError):
+            evidence.authenticate_operation(self.roles, gate, freeze)
+        original = evidence.digest
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if Path(p) == evidence.COMPILE_FREEZE else original(p)), self.assertRaises(AssertionError):
+            evidence.historical_compile_sources(self.roles)
+        cp_path = ROOT / self.roles['checkpoint_name']; bad = evidence.read(cp_path)
+        del bad['source_pins'][str(evidence.COMPILE_FREEZE)]
+        with self.replaced_record(cp_path, bad), self.assertRaises((AssertionError, KeyError)):
+            evidence.authenticate_current_checkpoint(self.roles)
+        prior = Path(self.roles['last_actual_native_root'])
+        native_path = prior / 'native/operation.json'
+        evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        for p in (evidence.CHANGED[0], str(Path(self.roles['supervisor_path']).resolve())):
+            bad = evidence.read(native_path)
+            del bad['pins_before'][p]; del bad['pins_after'][p]
+            with self.replaced_record(native_path, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        for record, field, p in [(prior / self.roles['checkpoint_name'], 'source_pins', 'scripts/v2_probe_evidence.py'),
+                                 (prior / 'source-freeze.json', 'helper_pins', 'scripts/v2_probe_evidence_tests.py')]:
+            bad = evidence.read(record); bad[field][p] = '0' * 64
+            with self.replaced_record(record, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        # No arbitrary third source/helper exception, even when the recorded maps agree.
+        third = 'scripts/v2_test_preflight.py'; bad = evidence.read(native_path)
+        bad['pins_before'][third] = bad['pins_after'][third] = '0' * 64
+        cp = evidence.read(prior / self.roles['checkpoint_name']); cp['source_pins'][third] = '0' * 64
+        original_read = evidence.read
+        replacements = {native_path: bad, prior / self.roles['checkpoint_name']: cp}
+        with mock.patch.object(evidence, 'read', side_effect=lambda p: copy.deepcopy(replacements[Path(p)]) if Path(p) in replacements else original_read(p)), self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        bad = evidence.read(prior / 'slug_core_v2-executable.json'); bad['sha256'] = '0' * 64
+        with self.replaced_record(prior / 'slug_core_v2-executable.json', bad), self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(self.roles, freeze['after_format'])
         gate = next(g for g in self.roles['gates'] if g['kind'] == 'loading' and g['stem'] == 'loading-tests')
         artifact = evidence.read(Path(evidence.ROOTS['L']) / 'slug_loading_v2-executable.json')
         original = evidence.digest
