@@ -1,0 +1,754 @@
+{
+  "packet": "WP-7-337-m7a-skylib-collections-closure",
+  "work_packet": "WP1125",
+  "baseline": "dc58a43e8a2414b13c775587efa48335900f54de",
+  "status": "accepted",
+  "final_review": {
+    "path": "target/wp1125/final-evidence-review.md",
+    "sha256": "da858016498a8b201e8ed32a67de23446b31674be5831d398fa28bb3a4883440",
+    "verdict": "ACCEPT",
+    "pending_candidate_sha256": "abd55d29a4ce22d5866f92179e97fda44dd7e010a6b8dd00b1dd61698bf04756",
+    "qualification": "Actual terminal independent FINAL; pending candidate unchanged. Publication adds terminal review/research and root workflow only; no runtime evidence rewrite."
+  },
+  "compatibility": "Slug-native private Linux-test exact qualified Skylib collections source continuation; production/default semantics unchanged; Windows deferred",
+  "implementation": "Only the independently inspected and original Host-qualified lib/collections.bzl row extends the exact private Skylib source table14 to15; metadata13 remains fixed, shared Need matrix39 becomes41. Existing mixed/default/role/first-offender controls refreshed. No new production namespace, fields, scheduling, resource or environment authority.",
+  "preparation": {
+    "operations": {
+      "target/wp1119/compile-bzlmod": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "b0d6209beb412dabb8d221730d29fbe4a1f04b37e0e8580e17ac1e642b9796fa",
+        "elapsed_seconds": 0.11878690693993121,
+        "child_rusage_peak_kib": 77564,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/bzlmod-list": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "8989af94cd89a666445d23a7d465bd0a2a4f1f0be236ec856ef7b0245c1664b1",
+        "elapsed_seconds": 0.13365282805170864,
+        "child_rusage_peak_kib": 10756,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/bzlmod-preflight": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "5b7407088b728db960bd434497681d62180997076eab439ba9909ed94331c70c",
+        "elapsed_seconds": 0.155163315939717,
+        "child_rusage_peak_kib": 14224,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/bzlmod-tests": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "cd70dc6862b829e2579a7f8df9518b79446e325ca9f0f798724cc54826bf88e3",
+        "elapsed_seconds": 0.13209707103669643,
+        "child_rusage_peak_kib": 14656,
+        "selected_count": 7,
+        "pass_count": 7
+      },
+      "target/wp1119/compile-loading": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "87d38311c5d2c0c6d2ff50e61417ea03178f39b7fc74c8a0e0f05c4640039cda",
+        "elapsed_seconds": 0.12859228590968996,
+        "child_rusage_peak_kib": 79296,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/loading-list": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "e87baf8b4191af90dfc6f91ac5aca1e223e055c55de4744fd97bdc120cfae5b8",
+        "elapsed_seconds": 0.15875862003304064,
+        "child_rusage_peak_kib": 11296,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/loading-preflight": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "fa08e47029b95ea7a001991e0176bc30e7cb87a7f866a5c1430ef5ec8428ae21",
+        "elapsed_seconds": 0.1800383870722726,
+        "child_rusage_peak_kib": 14248,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1119/loading-tests": {
+        "evidence": "qualified-reused",
+        "operation_sha256": "5ec34ab4ee538fbf3a59a5370aa83644dd47b830340fbdfcf8dbefc02c057480",
+        "elapsed_seconds": 0.3210190950194374,
+        "child_rusage_peak_kib": 51412,
+        "selected_count": 26,
+        "pass_count": 26
+      },
+      "target/wp1125/compile-core": {
+        "evidence": "current-fresh",
+        "operation_sha256": "02a1d19c45aa5024d92999b7f0201a433167dff1b7a35b6128016708d923d766",
+        "elapsed_seconds": 23.895828226930462,
+        "child_rusage_peak_kib": 1838688,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1125/core-list": {
+        "evidence": "current-fresh",
+        "operation_sha256": "60ac263a367debcba1fdd53548be2965cf50c7e2f2a412d8409a607935749ac7",
+        "elapsed_seconds": 0.1800617390545085,
+        "child_rusage_peak_kib": 15264,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1125/core-preflight": {
+        "evidence": "current-fresh",
+        "operation_sha256": "9983af0f2e9bd25b54fdbc47b71e0a29155de6fcc51a961cc86185cf9213a07f",
+        "elapsed_seconds": 0.20246401603799313,
+        "child_rusage_peak_kib": 15392,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1125/core-tests": {
+        "evidence": "current-fresh",
+        "operation_sha256": "071b6cb2a96143601ed9699fca7fa75ec1d1b95d318e1058a5c589ffda10dfdf",
+        "elapsed_seconds": 0.31370736297685653,
+        "child_rusage_peak_kib": 60176,
+        "selected_count": 45,
+        "pass_count": 45
+      },
+      "target/wp1125/production-check": {
+        "evidence": "current-fresh",
+        "operation_sha256": "b7b3d0610f35758db3530c5ac315dc7ec1b5eab2613c3f5db6b78badfa599623",
+        "elapsed_seconds": 7.401852820068598,
+        "child_rusage_peak_kib": 644500,
+        "selected_count": 0,
+        "pass_count": 0
+      },
+      "target/wp1125/native-list": {
+        "evidence": "current-fresh",
+        "operation_sha256": "ca7f7193b3b7003b581286ed7115a992ea4e7be60e9aa1288c0d3c9e8da1e4f5",
+        "elapsed_seconds": 0.18044391903094947,
+        "child_rusage_peak_kib": 15004,
+        "selected_count": 0,
+        "pass_count": 0
+      }
+    },
+    "qualification": "Current fresh Core45 exactly preserves saved donor45 order including both mandatory existing projection controls, extra0; production/singleton fresh. Protected33 and fixture31 strictly qualified reused, focused78=45+33. One measured original collections source qualified and appended to preserved359-prefix; compiler memory separate."
+  },
+  "focused": {
+    "selected": 78,
+    "passed": 78,
+    "current_fresh": 45,
+    "qualified_reused": 33,
+    "families": {
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "operation_sha256": "cd70dc6862b829e2579a7f8df9518b79446e325ca9f0f798724cc54826bf88e3",
+        "evidence": "qualified-reused"
+      },
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "operation_sha256": "5ec34ab4ee538fbf3a59a5370aa83644dd47b830340fbdfcf8dbefc02c057480",
+        "evidence": "qualified-reused"
+      },
+      "core": {
+        "selected": 45,
+        "passed": 45,
+        "operation_sha256": "071b6cb2a96143601ed9699fca7fa75ec1d1b95d318e1058a5c589ffda10dfdf",
+        "evidence": "current-fresh"
+      }
+    },
+    "private_core_before": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "8904bec8db51f88a7b55de9c9bbf34945763e1d9773576a2aabe1e0b2c8b17ff",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "deab4a160dd4b7d57b0475f1bb48527b93fd34b501805ef27a2e7ae949e732f6",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "64cce57a46a03ddd296007a7d5f3fff61469d2dfe5d4c37c5c660b4335dd7b46"
+    },
+    "private_core_after": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "a9e562df912ce59456eefc453f14e98c0e366c3c5215b9da677a9e41c652a6e8",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "994f202589ed166591d8a2da1b9f489d561de0934c50583130398c578eac5c2b",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "b4547f046a8842b81985daa4af6be8dac1d42b50e1204bf8a8b0fb6ed61cfcec"
+    },
+    "qualification": "Core45 current fresh, exact saved donor45 order including both mandatory existing projection controls, extra0. Protected Bzlmod7/Loading26 strictly qualified reused. Fixture31 qualified reused; portable3 remain missing-strace unproved."
+  },
+  "fixture": {
+    "selected": 31,
+    "passed": 31,
+    "deselected": 3,
+    "evidence": "qualified-reused",
+    "object_count": 35,
+    "source_bytes": 32440662,
+    "inventory_sha256": "6895d4ffee1075659d9db5709bf4a1418b0cc772ac7d95cbeaf472c14c669538",
+    "operation_sha256": "9607445d2729cc7c36c4d5addd6479d362597850383cb13e8f2ebeeb9723ceb8",
+    "stdout_sha256": "79f8bf1f23acdbeae4ea257007d441daae50a05fb7ffdf03aea47fe6ff6065ca",
+    "unproved": "Known portable3 missing-strace controls; no replay without environment change.",
+    "current_source_freeze": "source-freeze.json",
+    "private_core_before": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "8904bec8db51f88a7b55de9c9bbf34945763e1d9773576a2aabe1e0b2c8b17ff",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "deab4a160dd4b7d57b0475f1bb48527b93fd34b501805ef27a2e7ae949e732f6",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "64cce57a46a03ddd296007a7d5f3fff61469d2dfe5d4c37c5c660b4335dd7b46"
+    },
+    "private_core_after": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "a9e562df912ce59456eefc453f14e98c0e366c3c5215b9da677a9e41c652a6e8",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "994f202589ed166591d8a2da1b9f489d561de0934c50583130398c578eac5c2b",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "b4547f046a8842b81985daa4af6be8dac1d42b50e1204bf8a8b0fb6ed61cfcec"
+    }
+  },
+  "layout": {
+    "raw_lines": [
+      "test runtime::dice::progress_refusal_diagnostic::tests::progress_refusal_path_projection_preserves_typed_identity_and_bounds ... WP1100_LAYOUT view=48:8 bounded_sink=16:8",
+      "test runtime::dice::source_service::source_charge_census::tests::source_charge_census_is_bounded_borrowed_and_honest ... WP1033_CENSUS_LAYOUT state=120 option=120 old_state=160 new_state=280 old_scope=328 new_scope=488",
+      "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_cohort_preserves_original_identity_and_defaults ... WP1084_COHORT_LAYOUT scope=488/8 binding=16/8 bodies=304/8 descriptor=136/8 rows=5",
+      "WP1117_PATCHED_BINDING_LAYOUT binding=24/8 option=24/8 table=680 backing=56/8 slots=40/8",
+      "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_guard_preserves_roles_order_and_last_drop ... WP1080_OFFLINE_LAYOUT backing=56 backing_align=8 bodies=304 bodies_align=8",
+      "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::local_jdk_file_effects_are_bounded_and_opt_in ... WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+      "test runtime::repository_io::tests::selected_bcr_offline_cohort_materializes_original_https_and_retires ... WP1084_OFFLINE_COHORT_LAYOUT backing=56/8 slots=40/8 scope=488/8",
+      "test runtime::repository_io::tests::selected_bcr_offline_session_materializes_original_https_and_reuses_deleted_sources ... WP1080_OFFLINE_ARCHIVE_LAYOUT backing_bytes=56 backing_align=8 scope_bytes=488 scope_align=8 optional_backing_bytes=8 path_bytes=8"
+    ],
+    "operation_sha256": "071b6cb2a96143601ed9699fca7fa75ec1d1b95d318e1058a5c589ffda10dfdf",
+    "stdout_sha256": "05d326d4a434b47dbeeb532655d4b41ee088df9336e32e480d8916800e33087d",
+    "stderr_sha256": "79041f8f0192163fc962b0de5f3b5503631f2fc7959beb47bc6196d03db95345",
+    "stderr_lines": [
+      "WP1122_SWIFT_FILE_PLAN_LAYOUT owner=80 Bodies=304 Scope=488"
+    ],
+    "skylib_stderr_lines": [
+      "WP1085_SKYLIB_SOURCE_LAYOUT bodies=304/8 scope=488/8 row=16/8 sources=240 metadata=208"
+    ],
+    "qualification": "Actual current compiled proof lines from fresh45; no predicted layout or speed credit.",
+    "skylib_static_sources": 15,
+    "skylib_metadata_rows": 13,
+    "skylib_need_matrix": 41
+  },
+  "frontier": {
+    "next-frontier.json": {
+      "path": "target/wp1125/next-frontier.json",
+      "sha256": "b1f0dbe89e936a32aad6ea5fd2ac128df7cfe03906843a9b00582d793e0df932",
+      "report": {
+        "operation_sha256": "cd5d35734cd95a5ac7776d5aadc6b1f79caf6c46b8aa543358dc90cc0161ee65",
+        "stdout_sha256": "365912b69a2e8e320f5d237c9ac19f6d2b19e4b9dd31a502425f5d3f70413f70",
+        "kind": "path",
+        "identity": {
+          "captured_root": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+          "relative": "rust/BUILD.bazel",
+          "qualification": "Original current request spelling plus captured path equality; no body/full Spec/certificate or canonical owner inference."
+        },
+        "denied": {
+          "family": "path",
+          "path_len": "204",
+          "path_hex": "2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f336634393533633231363966656461343531303738633034373863626636313663306230326334343337616238616265336361626531353064376663386332352f34323761363835662d386232612d346239382d616166352d6434353338633933323539612f727573742f4255494c442e62617a656c",
+          "capture": "captured",
+          "path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a/rust/BUILD.bazel"
+        },
+        "metadata": {
+          "enabled": "true",
+          "denied_operation": "lstat"
+        },
+        "result": {
+          "stage": "native_refusal",
+          "kind": "computation",
+          "preparation": "complete",
+          "dispatch": "singleton",
+          "policy_checked": "true",
+          "certificate": "unavailable",
+          "observations": "unavailable",
+          "analyses": "unavailable",
+          "actions": "unavailable",
+          "rustc": "unavailable"
+        },
+        "raw_markers": [
+          "WP942_REQUEST workspace=/run/media/system/Colossus/dev/slug/tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace rules_root=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a platforms_root=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0 registry=file:///run/media/system/Colossus/dev/slug/target/wp954/registry lockfile=off local_overrides=true",
+          "WP942_DENIED family=path path_len=204 path_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f336634393533633231363966656461343531303738633034373863626636313663306230326334343337616238616265336361626531353064376663386332352f34323761363835662d386232612d346239382d616166352d6434353338633933323539612f727573742f4255494c442e62617a656c capture=captured",
+          "WP957_METADATA enabled=true denied_operation=lstat",
+          "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable"
+        ],
+        "marker_sha256": "6117dda15ba5d797325e44f78025f74437b3770d7e5e69179f179543652f43e7",
+        "qualification": "Actual original Host Lstat path refusal only; prior collections boundary crossed/no first_work timeout/progress frame. No body/file existence/hash/source identity/fullproducer/wholefit or additional capability inferred. Phase254.15625MiB near256 requires allocation/headroom examination before expansion; no capraise or causal memory attribution."
+      }
+    },
+    "qualification": "Root-derived current original frames are opaque hash-bound reports; headers do not grant caller/value/source authority.",
+    "environment_qualification": "No current original environment frontier report; no completeness or predecessor inference."
+  },
+  "inspected_source": {
+    "member": {
+      "path": "lib/collections.bzl",
+      "bytes": 2176,
+      "sha256": "89533929b5b22427531df5505aef56b9e6876bd91b4a56df56b94f0d9c33a1de"
+    },
+    "source_records": 1,
+    "load_edges": 0,
+    "closure_sha256": "33f28ac7003b6e2888023e11eba865f79a8ec20b9f03a44ee16f8ffae7968be6",
+    "host_qualification_sha256": "90ba008ec6c06047e1c9b67fb73ac48ea86f2d626372257bf0ef81066bdf1bd1",
+    "cohort_review_sha256": "2f4cb0ff12f9ac0bc5ea6b286d4e6a57aed9c4dbf03aed5569d1d2d26ab77992"
+  },
+  "complexity": {
+    "actual_rust_numstat": "2\t1\tapp/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs\n29\t1\tapp/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+    "rust_net_lines": 29,
+    "policy_net_lines": 1,
+    "proof_net_lines": 28,
+    "estimate_assessment": "Static15th borrowed &str and count updates; shared existing matrix expands to41 uniqueNeeds with seven collections near-miss/unsupported operations checked bothorders/firstpointer/zero progress. Within estimate2\u201320policy/10\u201340proof. Cohesive private exact table/shared matrix; no newselector/copiedsuite/production responsibility.",
+    "memory": "One static16B descriptor plus19literalbytes, no new policy String/Vec/path/request/plan/content copies, retained fields/cache/pool/interner/key/lock/API. Existing scoped Host input identity and output ownership unchanged. Selected inspection/qualification scratch ends before runtime. Explicit runtime memory and separate cumulative bytecaps unchanged.",
+    "actual_compiled_layout": {
+      "raw_lines": [
+        "test runtime::dice::progress_refusal_diagnostic::tests::progress_refusal_path_projection_preserves_typed_identity_and_bounds ... WP1100_LAYOUT view=48:8 bounded_sink=16:8",
+        "test runtime::dice::source_service::source_charge_census::tests::source_charge_census_is_bounded_borrowed_and_honest ... WP1033_CENSUS_LAYOUT state=120 option=120 old_state=160 new_state=280 old_scope=328 new_scope=488",
+        "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_cohort_preserves_original_identity_and_defaults ... WP1084_COHORT_LAYOUT scope=488/8 binding=16/8 bodies=304/8 descriptor=136/8 rows=5",
+        "WP1117_PATCHED_BINDING_LAYOUT binding=24/8 option=24/8 table=680 backing=56/8 slots=40/8",
+        "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::immutable_archive_preparation::tests::immutable_archive_guard_preserves_roles_order_and_last_drop ... WP1080_OFFLINE_LAYOUT backing=56 backing_align=8 bodies=304 bodies_align=8",
+        "test runtime::dice::tests::rules_rust_public_source_prerequisite_tests::platforms_module_preparation_tests::public_probe_preparation_tests::local_jdk_file_effects_are_bounded_and_opt_in ... WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "WP1095_LAYOUT bodies=304/8 scope=488/8 borrowed_paths=128/8",
+        "test runtime::repository_io::tests::selected_bcr_offline_cohort_materializes_original_https_and_retires ... WP1084_OFFLINE_COHORT_LAYOUT backing=56/8 slots=40/8 scope=488/8",
+        "test runtime::repository_io::tests::selected_bcr_offline_session_materializes_original_https_and_reuses_deleted_sources ... WP1080_OFFLINE_ARCHIVE_LAYOUT backing_bytes=56 backing_align=8 scope_bytes=488 scope_align=8 optional_backing_bytes=8 path_bytes=8"
+      ],
+      "operation_sha256": "071b6cb2a96143601ed9699fca7fa75ec1d1b95d318e1058a5c589ffda10dfdf",
+      "stdout_sha256": "05d326d4a434b47dbeeb532655d4b41ee088df9336e32e480d8916800e33087d",
+      "stderr_sha256": "79041f8f0192163fc962b0de5f3b5503631f2fc7959beb47bc6196d03db95345",
+      "stderr_lines": [
+        "WP1122_SWIFT_FILE_PLAN_LAYOUT owner=80 Bodies=304 Scope=488"
+      ],
+      "skylib_stderr_lines": [
+        "WP1085_SKYLIB_SOURCE_LAYOUT bodies=304/8 scope=488/8 row=16/8 sources=240 metadata=208"
+      ],
+      "qualification": "Actual current compiled proof lines from fresh45; no predicted layout or speed credit."
+    },
+    "current_durations_seconds": {
+      "compile-core": 23.895828226930462,
+      "core-list": 0.1800617390545085,
+      "core-preflight": 0.20246401603799313,
+      "core-tests": 0.31370736297685653,
+      "production-check": 7.401852820068598,
+      "native-list": 0.18044391903094947
+    },
+    "source_only_corrections": "None current; actual inspector/qualifier/freeze/currentgates allpassed once; no native launched.",
+    "recurring_time_review": "Inspector source prep207s and cohortreview195.197s: necessary original member/Host/FD authority verification; reuse accepted parser/lease facts and reduce repeated inventory notes. Quartet measured229s (initialreads/finalnote excluded): new exact359\u2192360 exception/owner binding; finite qualified_sources reused rather than framework. Finalizer217s includes waiting for quartetSTOP/schema190s; active vswait notisolated. Future use accepted finite source policy/cohort schema/checkpoints. DESIGN44.093/setupreview74.075; actual inspector.002036/qualifier.012959/compile23.896/Core45.314/production7.402/native expected<=32. Neededtimeauthorized, recurring>180s examination signal/no permissiondeadline/speedclaim.",
+    "fixture_hygiene": "Current fixture corpus35objects/177registryentries/32440662B unchanged, WP1124 sixth-checkpoint accepted fullSHA/finite31 controls reused. No new fixture asset/body template; original configured Host collections leaf2176B alone joined vector360 after cohortACCEPT.",
+    "scope": "Private exact qualified Skylib collections source15/meta13; work26/cleanup29/outer32/default5/8ordinary10/constructor27tail3 and all other caps unchanged. No fullproducer/wholefit/completion claim."
+  },
+  "native": {
+    "operation_sha256": "cd5d35734cd95a5ac7776d5aadc6b1f79caf6c46b8aa543358dc90cc0161ee65",
+    "stdout_sha256": "365912b69a2e8e320f5d237c9ac19f6d2b19e4b9dd31a502425f5d3f70413f70",
+    "elapsed_seconds": 20.802352269995026,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 258900,
+    "rss_mib": 252.83203125,
+    "source_count": 390,
+    "decode_bytes": 89876568,
+    "write_bytes": 108470552,
+    "held_fds": 360,
+    "pins": 226,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 769,
+        "wall_ns": 433024553,
+        "process_cpu_ns": 430040391,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 769,
+        "wall_ns": 19359850019,
+        "process_cpu_ns": 19567133438,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 768,
+        "wall_ns": 395147747,
+        "process_cpu_ns": 393992416,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 769,
+        "wall_ns": 54795034,
+        "process_cpu_ns": 66336486,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=path path_len=204 path_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f336634393533633231363966656461343531303738633034373863626636313663306230326334343337616238616265336361626531353064376663386332352f34323761363835662d386232612d346239382d616166352d6434353338633933323539612f727573742f4255494c442e62617a656c capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 390 31463857 89876568 108470552 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=390 seen=390 emitted=390 admitted=390 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=46682 encoded_bytes=183101 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Live-memory/source caps unchanged; reviewed time-only26/29/32 policy. Unchanged qualified Kotlin transfer32MiB/decodedwritten128MiB profile with complete optional Swift binding, native32s/work26/qualifiedcleanup29; default5/8/ordinary10 unchanged.",
+    "phase_rss": [
+      {
+        "phase": "after_runtime",
+        "rss_kib": 30544
+      },
+      {
+        "phase": "after_command",
+        "rss_kib": 260240
+      },
+      {
+        "phase": "after_terminal_drop",
+        "rss_kib": 260256
+      },
+      {
+        "phase": "after_runtime_drop",
+        "rss_kib": 260256
+      },
+      {
+        "phase": "after_scope_drop",
+        "rss_kib": 258200
+      }
+    ],
+    "phase_peak_rss_kib": 260256,
+    "retirement": [
+      "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+    ],
+    "next_boundary_headers": [],
+    "progress_refusal": {
+      "operation_sha256": "cd5d35734cd95a5ac7776d5aadc6b1f79caf6c46b8aa543358dc90cc0161ee65",
+      "stdout_sha256": "365912b69a2e8e320f5d237c9ac19f6d2b19e4b9dd31a502425f5d3f70413f70",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "disk_file_limit_bytes": 33554432,
+    "phase_peak_rss_mib": 254.15625
+  },
+  "native_time_policy": {
+    "qualified_work_seconds": 26,
+    "qualified_cleanup_seconds": 29,
+    "native_outer_seconds": 32,
+    "default_work_seconds": 5,
+    "default_cleanup_seconds": 8,
+    "ordinary_outer_seconds": 10,
+    "qualification": "Accepted predecessor time policy26/29/32 and defaults5/8/ordinary10 unchanged; one distinct native observation, no completion/speed guarantee or deadline origin reset. Sources change only by the approved qualified suffix; all other non-command/executable/pin native policy fields remain identical."
+  },
+  "predecessor_post_run_metadata": {
+    "sha256": {
+      "target/wp1124/compile-core/operation.json": "1f5bcaa4f657da82f5df0f59b82c9e05faa0ae90c723842aae8c77937728e506",
+      "target/wp1124/compile-core/stdout": "0fa5051131220f475e9cd2f8bce88860657e0bee287e5edfb1856ac2d7eb750a",
+      "target/wp1124/compile-core/stderr": "5b7862e2e5c86a1863901a1e65140a5c95cb87a75337108bb1eda0d39509cb79",
+      "/run/media/system/Colossus/dev/slug/target/wp1124/run_gate.py": "84632e205117a76c21a52ffdf4db597845c6459f737f98db91c93dfc540dd916",
+      "target/wp1124/toolchain-resolution.json": "e0b363bd42b88a3e40d8b7f12f78c10e6beec9a174d26d82d29dee78c5018882",
+      "target/wp1124/setup-review.md": "ea2e855f555640bbf1903be8e380a4160f1702b67352722c2cdfbc6c3aafc6bc",
+      "target/wp1124/design-binding.json": "f03d85356d9e491b9c9b50db03885713d7dc52328b970a2eee74f3c6479e70cc",
+      "target/wp1124/design-review.md": "9edba5d08148e73bdeb694b9887675825880d7d9f769d164c0f7cff30830d699",
+      "target/wp1124/utility-design.md": "293f8cd88f5eacdff6a226bffe3c8456c124cf825e92b282307332c44d7b366c",
+      "target/wp1124/packet-contract.md": "1505b9e7644911290172ea090ff0a2a77c8484ecd30d49df272641184d5009f9",
+      "target/wp1124/time-authorization.json": "2f604f499a7ac59d9980f0f8c54d57f78fa1befe5baf1680d4bdcff0585a3f53",
+      "target/wp1124/implementation-worker.md": "9ac5225181af0fb8ec8a2cbb96c15eb2428fe0d245090a97cd385c25be8c0f7d",
+      "target/wp1124/baseline.json": "ae844ac31de0de48e84967bd5cd4e05b4429460fed22e482bf2ec3abc4c74998",
+      "target/wp1124/proof-readiness.md": "b5bf5cde6c206f04c6172036232bdb037dffecc4242617783f97ea1d77e58fb0",
+      "target/wp1124/core-list-config.json": "80621d57f7c1fc98696b6264938368cb5e0d93ce4a3063f7819f9874feea05fd",
+      "target/wp1124/core-list/operation.json": "b7cda366b76428208810138bd575318277762d1d6ba7215a09b1c08bac50795d",
+      "target/wp1124/core-list/stdout": "c906038a30e54f2d67b01e84c9e1681eea940a7d4a2f79d4f37ef8f30c730a6c",
+      "target/wp1124/core-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target/wp1124/core-preflight-config.json": "2a6b37bdfe4afa262fe131d435e2160fc5d9fea9932b68f287296d6eed99aff0",
+      "target/wp1124/core-preflight/operation.json": "8d59717712dbf5fa20a53c97046c950a9bc05f3f3fbf389eb7d92ce3ff3b619f",
+      "target/wp1124/core-preflight/stdout": "78e7a73e071bc0a4551d650b3c98c2606c33b842c96e6d745f2196773e7984ac",
+      "target/wp1124/core-preflight/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target/wp1124/core-tests-config.json": "9ebc8914d19c48f96dd690760e82a76478199c48d7b8201c71b3a656495bc254",
+      "target/wp1124/core-tests/operation.json": "acedf2fd993d8248c5f6cb37c8ca9eb546212ad894eef41afc1ce3927e498eae",
+      "target/wp1124/core-tests/stdout": "b5f69527d7dcf14e20d59bcfaa3b983efd3b86d74f4e046c8ebf06a683e6db4f",
+      "target/wp1124/core-tests/stderr": "631c0baafb1924f5f1a02ad728e3ca2552ec21a608834114b8acf4a1ba6fbe55",
+      "target/wp1124/production-check/operation.json": "e3f03d885b533e4a93c1253f50af5f0dea332aaf3a2cf8d991fcb0d23b62c427",
+      "target/wp1124/production-check/stdout": "880e74230b5a4900998ce9342ba979084d5b059067458f4792012dfe2688a747",
+      "target/wp1124/production-check/stderr": "5548abadd31c2b2ac86133d5425351cb2f32f446c5e3ee0f02e079a76d01c7a4",
+      "target/wp1124/native-list-config.json": "10e88d993f6dfaff44bff6b6d4444b7248ea4196fa492c7d6423e5024e816afe",
+      "target/wp1124/native-list/operation.json": "fdd1346788a9fceab6d229e3fbccc9434bf3c9cf391ff76e6b5337688d09007d",
+      "target/wp1124/native-list/stdout": "3ec6982b4f7c7428a5b864e8aff82e3444e13436896de3ec50dc658047241bcb",
+      "target/wp1124/native-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "target/wp1124/layout-results.json": "7dfdfd4da4c48f937f1f7d4e49d1d071e3a301158249edde62fcab012d8556b4"
+    },
+    "qualification": "Full current SHA checked after native only; these uncredited predecessor Core contextual files were not in current native pin brackets. Prior factory/prelaunch qualification is separately bound; no current runtime or protected gate credit."
+  },
+  "predecessor_nested_post_run_metadata": {
+    "sha256": {
+      "target/wp1123/source-freeze.json": "f86e606c9f600b1d3b196f5de0f4bea04c75c497faaeec9aaad900ae3cae8daf",
+      "target/wp1123/caller-source-pins.json": "0c06252800cb55f0e8d265887e67e93f5fe6caecc696c2266c19176a11ec17cf",
+      "target/wp1123/native-config.json": "f75d97b6279f7f1efcd04860b544f30470043af2df2ddd06d6934bc34f186a57",
+      "target/wp1123/source-vector.json": "0d7792c8096cf980a67c79f7da5f09e6758b78dfd0e6605efc94b2329ca29701",
+      "target/wp1123/compile-core-config.json": "93adf1d3efc0648c4db2b615599f702f73dd4b818e1684572ab8760bdb2c7caf",
+      "target/wp1123/production-check-config.json": "3b9be44cfe1c31e8d5d0fe4378a482c47ca51c01042235c70348255d1c358bd4",
+      "target/wp1123/core-selectors.json": "02c0e3794e85e019357040eb4f46ddba99187cb3b1ee17bc901cf8451d102fb3",
+      "target/wp1123/roles.json": "7703848204db3abd50d506fc207caa45d09bd393feb14d5cbe9368b47541b508",
+      "target/wp1123/setup_packet.py": "a43a207cb7d5f39598eb9234b310f05bfdc4963c2e11791078f4392acb1d0b9a",
+      "target/wp1123/run_gate.py": "a2511bb5a1a3509618ea376367654fa9d46620c39fc09c4a27b735b12e3a8fbb",
+      "target/wp1123/setup-worker.md": "eb97fe334ddedae6e5823bccc3900020295b6811c5ce62ae3719d8600323d6fc",
+      "target/wp1123/qualification-pins.json": "df8a8f2b024bcdd53b53102f35a8c1034e6e3ebbe6a07bb764a644a86255ffbf",
+      "target/wp1123/focused-results.json": "a7269d6a4a35f6b528309a5ba1de078478a264d3a07e890fa338e2ba889e8be8",
+      "target/wp1123/fixture-results.json": "176117b5e4c5d68b8dd82c4543cbf2b3ad6c49678ea84e17b8d9b71264bb424d",
+      "target/wp1123/final-evidence-review.md": "61fa5ab263a4de4a1819b55afa95d83b8cf9ed91c17e711ec91c7ece2b345015",
+      "target/wp1123/slug_core_v2-executable.json": "5e595aec82c7a36e2752bf856abf9bfb988fa54d2d599fb546c549d5114b05ee",
+      "target/wp1123/next-capability-research.md": "285be38e62f6f41b88f3eec6139d7c3ca385c887f5af00cc157801833978cdb5",
+      "target/wp1123/acceptance-receipt-pending.json": "c00754ddde5d2099bfb366f33c60d14ebdc019fdb154d053d2fcb0ffa61a07e8",
+      "thoughts/shared/plans/slug-v2-subplans/wp1123-swift-package-metadata-2026-10-11.json": "5e2ab797561e246818012c608cc24cbd01f1670c659a5c94480b537c13dbb796"
+    },
+    "qualification": "Only exact original path spellings/digests declared by current-native-pinned predecessor roles.inherited_pins; full current SHA checked after native only. Uncredited nested context metadata, no current native brackets, gate credit, recursive history replay or old Core executable credit."
+  },
+  "authority": {
+    "frozen_paths": 52,
+    "changed_paths": 2,
+    "unchanged_paths": 50,
+    "callers": 8,
+    "additional_authorities": 6,
+    "held_sources": 360,
+    "environment_entries": 18,
+    "pins": 226
+  },
+  "limits": "Accepted qualified work26/cleanup29/native outer32 remains unchanged; default5/8/ordinary10 and production constructor max27/cleanup-tail3 unchanged. RSS256MiB/AS512MiB/live16MiB/source512/census513 fixed. Qualified fifth profile transfer32MiB/separate cumulative decoded128MiB and cumulative written128MiB; fixture total+archive32MiB/small+member+retained16MiB. Ordinary per-file16MiB; reviewed fixture-only/native per-file32MiB. Only the inspected original Host leaf2176bytes is appended;359 original sources remain unchanged.",
+  "preserved_failures": {
+    "archived_design": [],
+    "current_preservations": [],
+    "qualification": "Only actual current preserved records above are current failure history; predecessor failed DESIGN/Core records remain inherited accepted history, no new failure/replay credit."
+  },
+  "allocation": "Existing borrowed original request/plan/File getters, stack8 bounded validation, scoped paths and unchanged output ownership; no policy/request/plan/content/value clone, new retained field/pool/cache/global interner. Actual layout is compiled proof metadata, not whole-heap ownership or speed estimate.",
+  "workflow": "Core45 current fresh includes both mandatory existing projection controls; focused78=45+33. Protected33 and fixture31 strictly qualified reused. Existing3 portable missing-strace cases remain unproved. Serial compilation is separate from runtime; actual durations and resource records above replace prior timing claims. Source-helper recurring preparation necessity is recorded in worker notes; no replay or speed claim.",
+  "claims": "Observed bounded native prefix only. Current capability is limited to the reviewed exact original Skylib collections source row; raw headers and opaque frontier metadata grant no additional namespace/body/full-Spec/full-plan authority. Literal File content, typed attribute values and nonFile Archive/Symlink metadata beyond tags remain unavailable. Absent/partial frontier frames remain unproved. Aborted-partial retired interval sums and windowed all-thread CPU are not complete/per-key/cause/speed evidence. Census accounting does not imply complete identity. Weak expiry/zero final live-buffer observations are narrow cleanup facts; an unseen owner gives vacuous expiry, never whole-heap fit. Headers/projections do not supply full Specs or authorize a next source. Producer/certificate/observations/analyses/actions/Rustc/M7A/bootstrap/whole-fit and output parity remain unproved.",
+  "evidence_sha256": {
+    "/run/media/system/Colossus/dev/slug/target/wp1124/run_gate.py": "84632e205117a76c21a52ffdf4db597845c6459f737f98db91c93dfc540dd916",
+    "target/wp1119/bzlmod-list-config.json": "ca55ab4aa6ff9bb9d6128d67fa5826925bc7d2bf30d4b300b72bb6654e26a221",
+    "target/wp1119/bzlmod-list/operation.json": "8989af94cd89a666445d23a7d465bd0a2a4f1f0be236ec856ef7b0245c1664b1",
+    "target/wp1119/bzlmod-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/bzlmod-list/stdout": "b7181f58374a207d68e277ea054362802fabd037f196d10d02f6ec277f8c83a8",
+    "target/wp1119/bzlmod-preflight-config.json": "39ca42e8e9802bd1fb8ffdaaf939ff780a7f2cad7e2cae124e4c782ffb65dc78",
+    "target/wp1119/bzlmod-preflight/operation.json": "5b7407088b728db960bd434497681d62180997076eab439ba9909ed94331c70c",
+    "target/wp1119/bzlmod-preflight/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/bzlmod-preflight/stdout": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520",
+    "target/wp1119/bzlmod-selectors.json": "683bc31d29e496983455ed56e4aebb70885070a69f651d457160e17316164496",
+    "target/wp1119/bzlmod-tests-config.json": "f06c2827d16e1718ad43d9626cb27bcd8b2d783d4651042d85b6ae7d296c924b",
+    "target/wp1119/bzlmod-tests/operation.json": "cd70dc6862b829e2579a7f8df9518b79446e325ca9f0f798724cc54826bf88e3",
+    "target/wp1119/bzlmod-tests/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/bzlmod-tests/stdout": "7a0f2ca6e118607177304a964166fc2d918fd0fd6b0552671783a8aa67aca488",
+    "target/wp1119/caller-source-pins.json": "0c06252800cb55f0e8d265887e67e93f5fe6caecc696c2266c19176a11ec17cf",
+    "target/wp1119/compile-bzlmod-config.json": "3f33f728b28b3f2275196f1d8c930608dc6b73fdc714ba584445dcf6fb83a301",
+    "target/wp1119/compile-bzlmod/operation.json": "b0d6209beb412dabb8d221730d29fbe4a1f04b37e0e8580e17ac1e642b9796fa",
+    "target/wp1119/compile-bzlmod/stderr": "5ed4d317ff1d576d34d13e95550fd166de51c01baaf178723c91cabc688ea812",
+    "target/wp1119/compile-bzlmod/stdout": "5cd3ec1536bcfa9f2c7a9b6d88627ae65d554a7e2ab091c42ca60ab2fd221eff",
+    "target/wp1119/compile-core-config.json": "6de354c5c11f19176c6a02662efcd6401812b4e35926322718e2e15832edb154",
+    "target/wp1119/compile-loading-config.json": "e54d54280dc111d6bf56ad080931e0e39a7d90bdd91b24e44e3af8d2001e38be",
+    "target/wp1119/compile-loading/operation.json": "87d38311c5d2c0c6d2ff50e61417ea03178f39b7fc74c8a0e0f05c4640039cda",
+    "target/wp1119/compile-loading/stderr": "5ed4d317ff1d576d34d13e95550fd166de51c01baaf178723c91cabc688ea812",
+    "target/wp1119/compile-loading/stdout": "e522330e41cd6a14e1dd7a2c04cdf1ab9560f474b8b8d8b9787455c79730c7a6",
+    "target/wp1119/core-selectors.json": "62a937b84d717f408d804257ef4e5c7c370904daa7decddcd0e95ca4bca3acde",
+    "target/wp1119/final-evidence-review.md": "0ced4b61a651b93b3160dafbe0928adf7c28734676d414deccbbc0b1cb37aef0",
+    "target/wp1119/fixture-import.json": "b9e22d65f7e4ed98fb2bb952b2cbb96cd65b0340ac1e9a68bfa3c0c984530b14",
+    "target/wp1119/fixture-results.json": "e4424c0de3b636c44bbb7e52c59a2ec1543bdddd007cc435290f81bf1ecf262d",
+    "target/wp1119/fixture-tests-config.json": "b1c51fb1f0db9b444fe7d6a7b34555a55bf08ea8424664e5dd17740485121cf2",
+    "target/wp1119/fixture-tests/operation.json": "9607445d2729cc7c36c4d5addd6479d362597850383cb13e8f2ebeeb9723ceb8",
+    "target/wp1119/fixture-tests/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/fixture-tests/stdout": "79f8bf1f23acdbeae4ea257007d441daae50a05fb7ffdf03aea47fe6ff6065ca",
+    "target/wp1119/focused-results.json": "7a12678b5b470905ced40efcf632720b8b4cee1ed7ae1bceef6506ddb1639194",
+    "target/wp1119/loading-list-config.json": "7478a9a8e3707b6865339e1288c727b78353e6dbb3615b5f9232b70a4f1c4a23",
+    "target/wp1119/loading-list/operation.json": "e87baf8b4191af90dfc6f91ac5aca1e223e055c55de4744fd97bdc120cfae5b8",
+    "target/wp1119/loading-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/loading-list/stdout": "3f41fd6021116f2aadbd92b28aa98b5af03feb1f6ddc1645aa0e01ab0e41cad3",
+    "target/wp1119/loading-preflight-config.json": "e2b99f6a02f2a54c308e8739ef801bb6c263f37996ef9fd9a4334cdbae123db6",
+    "target/wp1119/loading-preflight/operation.json": "fa08e47029b95ea7a001991e0176bc30e7cb87a7f866a5c1430ef5ec8428ae21",
+    "target/wp1119/loading-preflight/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1119/loading-preflight/stdout": "87486a3730622b41c21bb2cab9c6f5b8bb43036a806afe37c559957a46a1642b",
+    "target/wp1119/loading-selectors.json": "2d1ba3807fc35675350084765793194aec789ea7693563136880a45b44959b00",
+    "target/wp1119/loading-tests-config.json": "6a821e8941968cb6c17f7eaa6ffec8689ae8f817a528c7d92426adaa71231e7f",
+    "target/wp1119/loading-tests/operation.json": "5ec34ab4ee538fbf3a59a5370aa83644dd47b830340fbdfcf8dbefc02c057480",
+    "target/wp1119/loading-tests/stderr": "c0c00333465dc403609f8a997640812f16a31806de9354ac700f0e27db00ce58",
+    "target/wp1119/loading-tests/stdout": "a8f5e8e7dce2965d4d3c5040cb2acadbc72faa86f1e80cb79c4e06cc9cdc0e7b",
+    "target/wp1119/native-config.json": "dbedebb1c4c97f9f8c9ddecf27fb5a93af0000d1e11e45c95645366275956d6f",
+    "target/wp1119/production-check-config.json": "5b234ff37fbaafd7548683c420be11d77fb7376252bd24dfe8bcb62eae848941",
+    "target/wp1119/roles.json": "24d32cf95584a3da399803ac90e1c1a1744fc57fe94b99b02bc0042632087d89",
+    "target/wp1119/run_gate.py": "24a04fdef04ebfb2cf98ca218e2aafbbab18c333a873bd70adc4da409a16efc6",
+    "target/wp1119/setup-worker.md": "8d85d1a711ec606f1fb9f559edee3324bcc76be4f3dc7dcddd2915e4a750dee0",
+    "target/wp1119/setup_packet.py": "1279ed142f3fc549e5a8e8e87615e481f7515f836d37f7ede9c387723174bf38",
+    "target/wp1119/slug_bzlmod_v2-executable.json": "0df819ffda485c5951c666f11535eed76cc082576690cf277bb99a3df2df4e4a",
+    "target/wp1119/slug_loading_v2-executable.json": "5841b415f7e1f9e2b1538f5228b5f06fd1420fadfbf99fc0a1f36a8df9d8b209",
+    "target/wp1119/source-freeze.json": "9e1dd25b602bb9831414a2b2f169f149fb020669395733cee7732bc9686d206b",
+    "target/wp1119/source-vector.json": "0d7792c8096cf980a67c79f7da5f09e6758b78dfd0e6605efc94b2329ca29701",
+    "target/wp1123/acceptance-receipt-pending.json": "c00754ddde5d2099bfb366f33c60d14ebdc019fdb154d053d2fcb0ffa61a07e8",
+    "target/wp1123/caller-source-pins.json": "0c06252800cb55f0e8d265887e67e93f5fe6caecc696c2266c19176a11ec17cf",
+    "target/wp1123/compile-core-config.json": "93adf1d3efc0648c4db2b615599f702f73dd4b818e1684572ab8760bdb2c7caf",
+    "target/wp1123/core-selectors.json": "02c0e3794e85e019357040eb4f46ddba99187cb3b1ee17bc901cf8451d102fb3",
+    "target/wp1123/final-evidence-review.md": "61fa5ab263a4de4a1819b55afa95d83b8cf9ed91c17e711ec91c7ece2b345015",
+    "target/wp1123/fixture-results.json": "176117b5e4c5d68b8dd82c4543cbf2b3ad6c49678ea84e17b8d9b71264bb424d",
+    "target/wp1123/focused-results.json": "a7269d6a4a35f6b528309a5ba1de078478a264d3a07e890fa338e2ba889e8be8",
+    "target/wp1123/native-config.json": "f75d97b6279f7f1efcd04860b544f30470043af2df2ddd06d6934bc34f186a57",
+    "target/wp1123/next-capability-research.md": "285be38e62f6f41b88f3eec6139d7c3ca385c887f5af00cc157801833978cdb5",
+    "target/wp1123/production-check-config.json": "3b9be44cfe1c31e8d5d0fe4378a482c47ca51c01042235c70348255d1c358bd4",
+    "target/wp1123/qualification-pins.json": "df8a8f2b024bcdd53b53102f35a8c1034e6e3ebbe6a07bb764a644a86255ffbf",
+    "target/wp1123/roles.json": "7703848204db3abd50d506fc207caa45d09bd393feb14d5cbe9368b47541b508",
+    "target/wp1123/run_gate.py": "a2511bb5a1a3509618ea376367654fa9d46620c39fc09c4a27b735b12e3a8fbb",
+    "target/wp1123/setup-worker.md": "eb97fe334ddedae6e5823bccc3900020295b6811c5ce62ae3719d8600323d6fc",
+    "target/wp1123/setup_packet.py": "a43a207cb7d5f39598eb9234b310f05bfdc4963c2e11791078f4392acb1d0b9a",
+    "target/wp1123/slug_core_v2-executable.json": "5e595aec82c7a36e2752bf856abf9bfb988fa54d2d599fb546c549d5114b05ee",
+    "target/wp1123/source-freeze.json": "f86e606c9f600b1d3b196f5de0f4bea04c75c497faaeec9aaad900ae3cae8daf",
+    "target/wp1123/source-vector.json": "0d7792c8096cf980a67c79f7da5f09e6758b78dfd0e6605efc94b2329ca29701",
+    "target/wp1124/acceptance-receipt-pending.json": "e5eb1bee8ad3244442b45ff69db029495fdf98f304d5b736d1c31420450d002e",
+    "target/wp1124/baseline.json": "ae844ac31de0de48e84967bd5cd4e05b4429460fed22e482bf2ec3abc4c74998",
+    "target/wp1124/caller-source-pins.json": "0c06252800cb55f0e8d265887e67e93f5fe6caecc696c2266c19176a11ec17cf",
+    "target/wp1124/compile-core-config.json": "1241c9e30635617b02428006ab0aa762c622af87329088f23e9bd2d6e19da779",
+    "target/wp1124/compile-core/operation.json": "1f5bcaa4f657da82f5df0f59b82c9e05faa0ae90c723842aae8c77937728e506",
+    "target/wp1124/compile-core/stderr": "5b7862e2e5c86a1863901a1e65140a5c95cb87a75337108bb1eda0d39509cb79",
+    "target/wp1124/compile-core/stdout": "0fa5051131220f475e9cd2f8bce88860657e0bee287e5edfb1856ac2d7eb750a",
+    "target/wp1124/core-list-config.json": "80621d57f7c1fc98696b6264938368cb5e0d93ce4a3063f7819f9874feea05fd",
+    "target/wp1124/core-list/operation.json": "b7cda366b76428208810138bd575318277762d1d6ba7215a09b1c08bac50795d",
+    "target/wp1124/core-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1124/core-list/stdout": "c906038a30e54f2d67b01e84c9e1681eea940a7d4a2f79d4f37ef8f30c730a6c",
+    "target/wp1124/core-preflight-config.json": "2a6b37bdfe4afa262fe131d435e2160fc5d9fea9932b68f287296d6eed99aff0",
+    "target/wp1124/core-preflight/operation.json": "8d59717712dbf5fa20a53c97046c950a9bc05f3f3fbf389eb7d92ce3ff3b619f",
+    "target/wp1124/core-preflight/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1124/core-preflight/stdout": "78e7a73e071bc0a4551d650b3c98c2606c33b842c96e6d745f2196773e7984ac",
+    "target/wp1124/core-selectors.json": "02c0e3794e85e019357040eb4f46ddba99187cb3b1ee17bc901cf8451d102fb3",
+    "target/wp1124/core-tests-config.json": "9ebc8914d19c48f96dd690760e82a76478199c48d7b8201c71b3a656495bc254",
+    "target/wp1124/core-tests/operation.json": "acedf2fd993d8248c5f6cb37c8ca9eb546212ad894eef41afc1ce3927e498eae",
+    "target/wp1124/core-tests/stderr": "631c0baafb1924f5f1a02ad728e3ca2552ec21a608834114b8acf4a1ba6fbe55",
+    "target/wp1124/core-tests/stdout": "b5f69527d7dcf14e20d59bcfaa3b983efd3b86d74f4e046c8ebf06a683e6db4f",
+    "target/wp1124/design-binding.json": "f03d85356d9e491b9c9b50db03885713d7dc52328b970a2eee74f3c6479e70cc",
+    "target/wp1124/design-review.md": "9edba5d08148e73bdeb694b9887675825880d7d9f769d164c0f7cff30830d699",
+    "target/wp1124/final-evidence-review.md": "b75cdaf79883f806fbfc1751274b3ab5ea26ea06e1f3c7b54a30e52fa53f3357",
+    "target/wp1124/fixture-results.json": "6495dbdb4354abf241597c7472f59f86a071055ccfe60cc0004fe4aed3b786f3",
+    "target/wp1124/focused-results.json": "a8c9f306578c628faf7d1153685ce90eb23845ba57a949f583c36caedd996a0f",
+    "target/wp1124/implementation-worker.md": "9ac5225181af0fb8ec8a2cbb96c15eb2428fe0d245090a97cd385c25be8c0f7d",
+    "target/wp1124/layout-results.json": "7dfdfd4da4c48f937f1f7d4e49d1d071e3a301158249edde62fcab012d8556b4",
+    "target/wp1124/native-config.json": "dc57b15e3ad67355feb76d90353c1d35ff89a3e1491941b9b6a62f39fc5b4536",
+    "target/wp1124/native-list-config.json": "10e88d993f6dfaff44bff6b6d4444b7248ea4196fa492c7d6423e5024e816afe",
+    "target/wp1124/native-list/operation.json": "fdd1346788a9fceab6d229e3fbccc9434bf3c9cf391ff76e6b5337688d09007d",
+    "target/wp1124/native-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1124/native-list/stdout": "3ec6982b4f7c7428a5b864e8aff82e3444e13436896de3ec50dc658047241bcb",
+    "target/wp1124/next-capability-research.md": "f2a420d9b9f5bb066a4b571c2daa028bdcce2c6da45054a9c3af25c28449b2b2",
+    "target/wp1124/packet-contract.md": "1505b9e7644911290172ea090ff0a2a77c8484ecd30d49df272641184d5009f9",
+    "target/wp1124/production-check-config.json": "bf0896031d963ac4d0aa02e67573a85e4904e94fb34935f8ff8fd86bee923091",
+    "target/wp1124/production-check/operation.json": "e3f03d885b533e4a93c1253f50af5f0dea332aaf3a2cf8d991fcb0d23b62c427",
+    "target/wp1124/production-check/stderr": "5548abadd31c2b2ac86133d5425351cb2f32f446c5e3ee0f02e079a76d01c7a4",
+    "target/wp1124/production-check/stdout": "880e74230b5a4900998ce9342ba979084d5b059067458f4792012dfe2688a747",
+    "target/wp1124/proof-readiness.md": "b5bf5cde6c206f04c6172036232bdb037dffecc4242617783f97ea1d77e58fb0",
+    "target/wp1124/qualification-pins.json": "86f660095f11d9bb11fbb2354b9b1c4b71846808e25885bae74ccd8c5b5b1fba",
+    "target/wp1124/roles.json": "5717329cddea40fa298629af77b8bbda936f11153ba6f5919f00e492ce1f8c03",
+    "target/wp1124/run_gate.py": "84632e205117a76c21a52ffdf4db597845c6459f737f98db91c93dfc540dd916",
+    "target/wp1124/setup-review.md": "ea2e855f555640bbf1903be8e380a4160f1702b67352722c2cdfbc6c3aafc6bc",
+    "target/wp1124/setup-worker.md": "be64db8f19c2771f5441f497bb8b6e588233e25892025be030f75257274e9da4",
+    "target/wp1124/setup_packet.py": "c200345d6898a54d183e5bb059df535d56b01417562954407f2f0c07a6dfd8b4",
+    "target/wp1124/slug_core_v2-executable.json": "c1b3a93e01e3b76493bf88c9699a4e88276264c987e20aa5355f751c76a53818",
+    "target/wp1124/source-freeze.json": "0741c6ecebb05c2f09af3cfdfd97abd17c891a9c2af252480c4c5ca5cd46d66f",
+    "target/wp1124/source-vector.json": "0d7792c8096cf980a67c79f7da5f09e6758b78dfd0e6605efc94b2329ca29701",
+    "target/wp1124/time-authorization.json": "2f604f499a7ac59d9980f0f8c54d57f78fa1befe5baf1680d4bdcff0585a3f53",
+    "target/wp1124/toolchain-resolution.json": "e0b363bd42b88a3e40d8b7f12f78c10e6beec9a174d26d82d29dee78c5018882",
+    "target/wp1124/utility-design.md": "293f8cd88f5eacdff6a226bffe3c8456c124cf825e92b282307332c44d7b366c",
+    "target/wp1125/baseline.json": "a93e8f0db4a40436f518f2d580a6292537d732c345d400af996998c22d1eb22a",
+    "target/wp1125/caller-source-pins.json": "0c06252800cb55f0e8d265887e67e93f5fe6caecc696c2266c19176a11ec17cf",
+    "target/wp1125/cohort-review.md": "2f4cb0ff12f9ac0bc5ea6b286d4e6a57aed9c4dbf03aed5569d1d2d26ab77992",
+    "target/wp1125/compile-core-config.json": "1c40907b6eb8070f2a9cfd4fcbe801842a26a4d02327605aeeab969a0fc72343",
+    "target/wp1125/compile-core/operation.json": "02a1d19c45aa5024d92999b7f0201a433167dff1b7a35b6128016708d923d766",
+    "target/wp1125/compile-core/stderr": "29c87ad0cd0c97138b1d3384b19ba1947c18cf27d09d4a6dcb702525a2ac2d53",
+    "target/wp1125/compile-core/stdout": "90712240b07e8ead32e968d6a1fb2b865f51dc4a6aea4de8cb71c8b45875ca18",
+    "target/wp1125/complexity-assessment.json": "bf90a21c65b760ed46743e355c6fdd4ef681898b0c1e73d1e10fee51c4752ac5",
+    "target/wp1125/core-list-config.json": "c7d376607d6aa39fe3f7e35823476c99900b64bbee915edbf22e09af567d01a2",
+    "target/wp1125/core-list/operation.json": "60ac263a367debcba1fdd53548be2965cf50c7e2f2a412d8409a607935749ac7",
+    "target/wp1125/core-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1125/core-list/stdout": "c906038a30e54f2d67b01e84c9e1681eea940a7d4a2f79d4f37ef8f30c730a6c",
+    "target/wp1125/core-preflight-config.json": "4e222d96ab5345b194c53d3be480f9fd5ae7f0df72c3938bccf978b35e918ab6",
+    "target/wp1125/core-preflight/operation.json": "9983af0f2e9bd25b54fdbc47b71e0a29155de6fcc51a961cc86185cf9213a07f",
+    "target/wp1125/core-preflight/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1125/core-preflight/stdout": "78e7a73e071bc0a4551d650b3c98c2606c33b842c96e6d745f2196773e7984ac",
+    "target/wp1125/core-selectors.json": "02c0e3794e85e019357040eb4f46ddba99187cb3b1ee17bc901cf8451d102fb3",
+    "target/wp1125/core-tests-config.json": "6bdaeb517e41d201c60d611d850616e6398f6007bf4d34b20e2978564ca8b15b",
+    "target/wp1125/core-tests/operation.json": "071b6cb2a96143601ed9699fca7fa75ec1d1b95d318e1058a5c589ffda10dfdf",
+    "target/wp1125/core-tests/stderr": "79041f8f0192163fc962b0de5f3b5503631f2fc7959beb47bc6196d03db95345",
+    "target/wp1125/core-tests/stdout": "05d326d4a434b47dbeeb532655d4b41ee088df9336e32e480d8916800e33087d",
+    "target/wp1125/decode_native.py": "5f75ffd97d002d4364d6cd5182473efd5b4c7731daf39e58bcbe431112403d0f",
+    "target/wp1125/decode_progress_refusal.py": "281e52d23ed58b33a17871e857a84603c32556a183226a5c4477912650b0d9ba",
+    "target/wp1125/design-binding.json": "179d309879f31854b437cdf2e43bcc48568fdbf76eaaf1197a22229b407212a5",
+    "target/wp1125/design-review.md": "031419944fa1c5da515b9ad2bc319eb223b54106b50ce8075bb10798e3748db8",
+    "target/wp1125/finalize_packet.py": "7d86197a53ee5bf6201d54fdabf2d1e28878d57f89b7629470d5d63a61d54c72",
+    "target/wp1125/finalizer-worker.md": "7277238ec9c7766b44c2a740b25d69aa3f74ca36492ccf1d99f9edd99c9764f7",
+    "target/wp1125/fixture-results.json": "0d09d41f50a5a0c2588b67434ef2b5b5ad1078b054b0ba4d03a8d144107400a8",
+    "target/wp1125/focused-results.json": "7615005e21c628f99513f52aa40cd351676c3b94ff1477d6fd9f1e4cbb2d63a3",
+    "target/wp1125/gate-source-paths.json": "6fc5105a611c3a8b7f0e6f99960a51c3cd7aab9df9e0d27bcb3bac50def28fcb",
+    "target/wp1125/host-source-qualification.json": "90ba008ec6c06047e1c9b67fb73ac48ea86f2d626372257bf0ef81066bdf1bd1",
+    "target/wp1125/implementation-worker.md": "ddc633cb4a1c811f8c2f9e747d33d7d67bc1d52f1608d996f20d54aa94e20afb",
+    "target/wp1125/inspect_skylib_closure.py": "4b3923d11027749ddfb15445f67e4163beeea4fe4b089d312d96f7830e37db4e",
+    "target/wp1125/inspection-source-checkpoint.json": "78753ed2da7800432a75821db183c42e968efc508817f1e777b645dba6128bd1",
+    "target/wp1125/inspection-worker.md": "d189cc12ce45444d0f7088cbff9631d10cd1033f8ea8b91e8ee40c9e74bea69f",
+    "target/wp1125/layout-results.json": "564b5a2f5ecf7220c1b361fd1dd1a96217e6690fc8478e224f82efd9a8c6de26",
+    "target/wp1125/native-config.json": "c54463ef5d1112de2259c9d53a9ab33f388035d2b9a9a894199d28d7b06690d2",
+    "target/wp1125/native-list-config.json": "16ab2dd5733365f35a779fdd328c3e43415a3da342490e179664af8c3d40f54d",
+    "target/wp1125/native-list/operation.json": "ca7f7193b3b7003b581286ed7115a992ea4e7be60e9aa1288c0d3c9e8da1e4f5",
+    "target/wp1125/native-list/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1125/native-list/stdout": "3ec6982b4f7c7428a5b864e8aff82e3444e13436896de3ec50dc658047241bcb",
+    "target/wp1125/native-results.json": "842c716ba1c552857c7d3c372e2cb767f64b81307379ec6eb85d6116c4cb0204",
+    "target/wp1125/native/operation.json": "cd5d35734cd95a5ac7776d5aadc6b1f79caf6c46b8aa543358dc90cc0161ee65",
+    "target/wp1125/native/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1125/native/stdout": "365912b69a2e8e320f5d237c9ac19f6d2b19e4b9dd31a502425f5d3f70413f70",
+    "target/wp1125/next-frontier.json": "b1f0dbe89e936a32aad6ea5fd2ac128df7cfe03906843a9b00582d793e0df932",
+    "target/wp1125/packet-contract.md": "c974cd674713271f7e5771eb36362589bc648b05ba9c6078168a4a0d40993a98",
+    "target/wp1125/prelaunch-evidence.md": "f787478030fa5d934a9af87b4f43507f8bf2a70f8db1058d12722b83f723a805",
+    "target/wp1125/production-check-config.json": "5f935308aba8e2a67d47638c673d0122c2263748c841868429c30aa654289f18",
+    "target/wp1125/production-check/operation.json": "b7b3d0610f35758db3530c5ac315dc7ec1b5eab2613c3f5db6b78badfa599623",
+    "target/wp1125/production-check/stderr": "d53c83b5f0bf077e7d6553a592dcae6da14902c4ec487b3cbbe40641d161b801",
+    "target/wp1125/production-check/stdout": "febf9a881baec2dfe05bd09deb81038c2e440089878e2af8d940c14112236825",
+    "target/wp1125/progress-refusal-results.json": "8f77d8dfd49163c207f00cedd8231c7c7ef0e28d7182a97107251b517abdeecf",
+    "target/wp1125/proof-readiness.md": "d9d4e1df0e846c9053aab64eabd414d9daad1026e9b6d26095d9d29b491093cc",
+    "target/wp1125/qualification-pins.json": "0c2436864608bec8a2ea938158c46c33b61d457e7da1049dab06c51d1cf1b912",
+    "target/wp1125/qualify_skylib_sources.py": "217417fbdc6eaf877637cd92126855b5c6be2856d70bfbf044505f413596dbf8",
+    "target/wp1125/roles.json": "6ec0b4e25f5b49b0219ab3b3a9c965ddd2bf0d4ab65fd94941393ef60b872ad6",
+    "target/wp1125/root-prelaunch.md": "1e309ddc4a5966ccac1e0687438a550913d42f7bec6c510645801a3fa26409a4",
+    "target/wp1125/run_gate.py": "e30634562f324aac3ed70df0701dea3a60431b9142437db9fe7cc8f9ac66c42b",
+    "target/wp1125/setup-review.md": "d9d92fa62e5dfa270a36b9751407ec82463493a4d602bd842e4e7f54f71a483b",
+    "target/wp1125/setup-worker.md": "742397f6c7d283beaaa3dfb86f66c2bfa0bec2f6906bc3218e35e8c85f04abb6",
+    "target/wp1125/setup_packet.py": "e3fab4214a95fa5ff15df08fdd225afcd20fce1b437cb0151f37742caf684122",
+    "target/wp1125/skylib-closure-evidence.json": "33f28ac7003b6e2888023e11eba865f79a8ec20b9f03a44ee16f8ffae7968be6",
+    "target/wp1125/slug_core_v2-executable.json": "98d55a09923607007a6c16f641a0af907edd7aa07b3a47bd64fb463580aea016",
+    "target/wp1125/source-freeze.json": "97cf0a1f38ce415e3a1352d566dc6a10b367f6c33a516f28f545900faa0cf543",
+    "target/wp1125/source-vector.json": "15ba34f920c57bfeedcf6b82d1f05eaf56c6f367f16d8f50ed53eb82f85654ce",
+    "target/wp1125/time-authorization.json": "0e8da17da98ea61468210b8c634dd99b005af9b890d5301c49be746a9cf39b72",
+    "target/wp1125/toolchain-resolution.json": "e0b363bd42b88a3e40d8b7f12f78c10e6beec9a174d26d82d29dee78c5018882",
+    "target/wp1125/utility-design.md": "3516a8eeca7ebbdf4894bdd7e392244095b947509ee8a27f60a66cce3bd4f576",
+    "thoughts/shared/plans/slug-v2-subplans/wp1123-swift-package-metadata-2026-10-11.json": "5e2ab797561e246818012c608cc24cbd01f1670c659a5c94480b537c13dbb796",
+    "thoughts/shared/plans/slug-v2-subplans/wp1124-qualified-work-time-2026-10-11.json": "e6fa37dc363a9f2c7603a87e138a8c6fef41d55d51ae57b5633d935d1323c0a6"
+  },
+  "next_research": {
+    "capability": {
+      "path": "target/wp1125/next-capability-research.md",
+      "sha256": "83e935f00deb8a4b88061bb4ce6666a1b3c2d844a72333b147da1c23335ed978",
+      "qualification": "Source-only exact rust BUILD.bazel/BUILD Lstat-pair proposal; deferred pending allocation readiness. No payload/admission/runtime credit."
+    },
+    "allocation": {
+      "path": "target/wp1125/allocation-headroom-research.md",
+      "sha256": "424cd8adc5b4995b840a3e671a4a0cccc23f65b39cbd05db6b46646d349ca911",
+      "qualification": "Source-only retained-owner investigation. No attributed memory cause or proven removable copy; select bounded accounting design before expanding admission. No runtime credit."
+    }
+  },
+  "root_workflow": {
+    "observed_contract_file_mtime_utc": "2026-10-11T07:47:37.233945+00:00",
+    "accepted_publication_utc": "2026-10-11T08:16:20.899778+00:00",
+    "observed_contract_mtime_to_publication_seconds": 1723.665833,
+    "qualification": "Observed mtime-to-publication includes model/review/waits, excludes earlier authoring; no speed claim.",
+    "review_seconds": {
+      "design": 44.093,
+      "cohort": 195.197,
+      "helper_checkpoint": 74.075,
+      "prelaunch": 137.089,
+      "final": 164.918
+    },
+    "finalizer_first_main_seconds": 0.361680342,
+    "recurring_time_examination": "Source inspector preparation207s, cohort195.197s, setup segment229s, finalizer note217s and allocation research216s examined for necessity. Required provenance, original FD ownership and exact vector exception justified work; reuse finite accepted schemas, narrow repeated searches and shorten duplicate inventories. Native20.802s remains infrequent; compilation23.896s separate from workload memory. Needed task time is authorized, recurring>180s a refactoring signal.",
+    "observable_gate_advanced": "Original qualified collections source admitted (census event386); next genuine Host Lstat rust/BUILD.bazel refused. No identical native replay.",
+    "resource_boundary": "Phase254.15625MiB leaves1.84375MiB under256. Allocation readiness selected before further source/metadata expansion. No future-fit, causal delta, savings or cap-raise claim.",
+    "incidental_discovery_corrections": "Root source lookup initially used nonexistent Core bzl_module path and then narrowed rg to actual Loading owner. Read-only discovery corrections; no gate/helper/native failure."
+  }
+}

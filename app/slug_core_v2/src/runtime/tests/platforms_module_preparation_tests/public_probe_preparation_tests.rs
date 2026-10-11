@@ -11200,7 +11200,7 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 39);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 41);
     assert!(bodies.admit(&all).is_ok());
     assert_eq!(
         bodies
@@ -11209,6 +11209,34 @@ fn bazel_skylib_import_sources_need_is_opt_in_exact_table_only() {
         16
     );
     for (excluded, operation) in [
+        (
+            "/skylib/lib/Collections.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/lib/collections.bzl.bak",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/lib/collections.bzl/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            "/features/lib/collections.bzl",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            "/skylib/lib/collections.bzl",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            "/skylib/lib/collections.bzl",
+            PathObservationOperation::ReadLink,
+        ),
+        (
+            "/skylib/lib/collections.bzl",
+            PathObservationOperation::DirectoryEntries,
+        ),
         (
             "/skylib/lib/Selects.bzl",
             PathObservationOperation::FileBytes,

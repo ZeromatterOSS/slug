@@ -1,87 +1,68 @@
-# WP1125 Skylib collections literal-load closure
+# WP1126 retained allocation readiness
 
-Packet: WP-7-337-m7a-skylib-collections-closure
-Status: ready — independent DESIGN before selected-source inspection
+Packet: WP-7-338-m7a-retained-allocation-readiness
+Status: ready
 
-Outcome: inspect and qualify the finite original Skylib literal-load closure seeded
-at lib/collections.bzl, then admit its exact source rows in the existing private
-Host table and observe ONE distinct native continuation. Slug-native private Linux
-source-policy slice; exact production/source identity unchanged, Windows deferred.
-Producer/certificate/actions/Rustc/M7A/bootstrap/parity/whole-workload fit remain open.
+Outcome: select an implementable, bounded retained-allocation diagnostic at an
+existing semantic owner before admitting more native workload. This packet resolves
+safe diagnostic placement and memory/report bounds through source proof and independent
+review; root then activates the concrete implementation contract. Slug-native Linux
+instrumentation; exact semantics unchanged, Windows deferred. M7A completion remains open.
 
-Basis: [accepted WP1124](./wp1124-qualified-work-time-2026-10-11.json), actual native
-operation269272231b4b5dc8e61d8c04fb51774329550b8f85cf80246a17520ae12086d7/stdout
-a49399e6b07e51745e8e1ee4d1f9e98194eb43bd097950463cf7ad7fd0379474. Fresh45+production,
-qualified protected33/fixture31 passed; ONE20.323s/source383/phase246.9453125MiB under256,
-217pins/359source brackets/18env stable. Earlier work20 boundary crossed; original
-Host Lstat denied exact configured Skylib root/lib/collections.bzl, no first_work
-or progress frame. Root-derived frontier is opaque captured metadata, no presence,
-body/source identity/fullSpec or next capability inference. Terminal source-only
-research target/wp1124/next-capability-research.md SHA
-f2a420d9b9f5bb066a4b571c2daa028bdcce2c6da45054a9c3af25c28449b2b2 identifies missing
-static source row and original-source-vector entry. WP1115 selects-only zero-load
-closure cannot prove collections. Existing14 Skylib rows/13metadata and lib package
-metadata suffice for the seed; closure shape and other package metadata unknown.
+Basis: [accepted WP1125](./wp1125-skylib-collections-closure-2026-10-11.json) admits the
+sole independently qualified2176-byte collections source. Fresh45/production and
+protected33/fixture31 pass. ONE20.802s native/source390, phase254.15625MiB under256,
+360 original source brackets/226pins/18env stable, next Host Lstat rust/BUILD.bazel
+refused. Remaining1.84375MiB is insufficient evidence of future fit. Terminal source-only
+allocation research target/wp1125/allocation-headroom-research.md SHA
+424cd8adc5b4995b840a3e671a4a0cccc23f65b39cbd05db6b46646d349ca911 traces Capture→Arc,
+DICE retained inputs, parser CodeMap owned source copies and heap-owned interners.
+It establishes no attributed regression or proven removable retained copy. Capability
+research83e935f00deb8a4b88061bb4ce6666a1b3c2d844a72333b147da1c23335ed978 proposes
+exact rust BUILD.bazel/BUILD metadata pair, queued until allocation readiness.
 
-Decision: reuse bounded WP1115 inspect_skylib_closure.py/qualify_skylib_sources.py
-mechanics; seed collections, stop at CURRENT14 admitted source rows. Original fixture
-Skylib1.8.2 archive44667B/SHA6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446
-is the sole selected-body inspection authority. DESIGN precedes opening it. Stream
-held regular nonfollowing/noninherited FD fullEOF SHA64KiB before/after, retain named/
-held identity brackets. Data-only AST literal-load parsing; no Starlark execution,
-extraction/acquisition or guessed imports. Existing caps entries4096/path256/components32/
-32newmembers/128KiB each/1MiB selectedsources/2MiB report/nodes100000/edges512/expression1024,
-2MiB decoded per pass/32passes/64MiB total. Reject foreign/dynamic/unresolved labels,
-unsupported tar/path/type/identity changes or limit violation; root technical decision
-before broadening. No archive/corpus download, unrelated body or environment-value read.
+Decision: inspect the existing DICE Allocative CoreStateHandle visitor and native
+post-command lifecycle for a quiescent, bounded scalar owner report. Reuse existing
+Allocative/Arc/Dupe and owner diagnostics; classify existing utility as leaf reuse,
+upstream ownership tests as concept/test evidence. Read docs/developers/dice.md before
+any locking/owner decision. MakeAvailableForAllocative actor handshake must release
+its temporary Arc and completion sender before resuming the actor. No compute or
+held owner lock may span that pause. Disclose imperfect shared accounting. An unbounded
+FlameGraphBuilder/name tree or wholegraph pointer set is not presumed safe under the
+remaining headroom. If bounded traversal/report retention cannot be established,
+select the smallest producer-owned scalar seam (e.g. parser attempt/source byte count)
+with explicit scope and missing attribution instead. Root resolves this technical
+choice within existing authorization; no automatic user-permission stop.
 
-After actual inspection, independently qualify each selected ORIGINAL configured
-Host regular leaf against its exact archive-member bytes/SHA with accepted anchored
-source FD lease/fullEOF/leaf+parent identities. Sequential/non-atomic/noncertificate
-proof; preserve all359 original vector rows/encoded prefix and append only new qualified
-rows. Root cohort review authenticates exact members/import edges/new metadata needs/
-Host equality/vector provenance BEFORE Rust activation/native. Metadata absent files
-and body identity cannot be guessed from frontier or substituted by archive/temp paths.
+Natural owners: retained WorkspaceRuntime/Dice/source scope and parser input/CodeMap
+or evaluator heap, as genuinely accessible. Diagnostic facts are nonsemantic and
+cannot affect keys, equality, invalidation, publication, Need/error, request snapshots,
+source identity, demand order or cleanup. Preserve independent AST/source lifetimes.
+Intern immutable repeats only within suitable existing owner scope; no global pool,
+label representation change or speculative zero-copy conversion. Source Weak unseen
+expiry is vacuous. RSS, Allocative visited bytes, arena bytes and cumulative credits
+remain distinct metrics; no cause/savings/wholefit claim.
 
-Natural owners: existing original immutable command root/additional[1], private
-PreparedFile/PublicProbe opt-in static borrowed table, whole-Need validator and DICE
-Host input/materialization identity; no keys/production policy/discovery bypass.
-Rust allowlist only platforms_module_preparation_tests.rs static source/necessary
-metadata rows and its public_probe_preparation_tests.rs existing
-bazel_skylib_import_sources_need_is_opt_in_exact_table_only proof. All existing default/
-role/root guards, original demand ordering/first pointer/no progress on mixed refusal,
-unsupported FileDigest/ReadLink/directory operations and restoration remain unchanged.
-Extend generic row matrix and mixed both-order collections case/suffix/child/foreignroot
-negatives; actual unique Need count derived from observed source/metadata overlap.
-Existing selected proof/no new selector or lifecycle suite. Static &str16B+literal each;
-Bodies304/Scope488 and compiled table size emitted by current proof; no policy String/
-Vec/path/content/request copies, fields/cache/pool/interner/API/lock. Existing bounded
-inspection scratch released before runtime; no semantic retained body side store.
+Source-only allowlist: target/wp1126 allocation-design, lifecycle-readiness,
+independent-design-review and root-decision notes plus frozen contract/baseline/hash
+metadata. Workers edit disjoint named notes only. Read only current native lifecycle,
+existing allocation visitor/producer code and matching Stage9 rows. No payload/archive/
+corpus/environment-value acquisition, helper main/import, Cargo/gate/native replay,
+Rust/config change or new fixture. Root owns canonical/current scheduling and receipt.
+No accepted predecessor evidence rewritten. Baseline is the accepted WP1125 HEAD,
+resolved after publication commit before delegating. Source notes bounded to the exact
+owner/API and evidence question, not a new broad audit or framework.
 
-Estimate source-table/net2–20, proof10–40 pending actual <=32 closure; large private
-owners cohesive exact table and shared parameterized Need matrix, no production merge.
-Changed shape beyond bounds needs technical reassessment, not silent broad grant.
-Target-only helper/inspection/report/qualifier/vector/setup/runner/decoder/finalizer
-allowed under target/wp1125; accepted predecessor evidence immutable. Compact receipt/
-Stage9/canonical/current scheduling allowed. Root resolves accepted WP1124 HEAD before
-writers; independent DESIGN then helper source checkpoint/freeze/PRELAUNCH and FINAL.
-Reuse finite accepted scaffolding/exact aliases/currentQ qualifications, not history
-recursion or oldCoreexecutable credit. Current52 exactly2changed50same expected; historical
-Qthree-private exceptions separate. Fresh rustup pinned nightly2025-09-14, serial offline
-locked jobs1 CargoJSONno-run/list/exact batch preflight/body saved45 with projection2 and
-timeprofile2 and Skylib matrix once +production/singleton; protected33/fixture31 strict
-Q reuse. No extra selectors without a gap. Fixture35/177/32440662 unchanged source corpus;
-WP1124 sixth checkpoint accepted, no copied assets/new materialization backing.
-
-Retain qualified work26/cleanup29/outer32/default5/8/ordinary10/constructor27tail3,
-RSS256MiB/AS512/live16/source512/census513/transfer32MiB/SEPARATE cumulative decoded128MiB
-and written128MiB, ordinaryFSIZE16/native32/exact Kotlin FDexception, six authority files/
-eight caller sources/original command18env. New held-source count is only359+actual
-qualified closure, explicit reviewed vector delta, no other resource increase. Separate
-fresh invocation for every setup/compile/artifact/list/preflight/runtime, streamed SHA.
-One infrequent authentic <=32s native distinguishes actual changed-cohort continuation;
-tiny row controls cannot prove it, no completion guarantee. Needed task time authorized;
-recurring>180s examined for necessity/refactoring. Genuine caps/Need/refusal preserved;
-no identical replay. New source owner/fullSpec/body capability beyond this closure,
-production/namespace/time/memory/identity change or unavailable original Host prerequisite
-requires new technical DESIGN/REPLAN. No speed or whole-workload-fit claim.
+Acceptance: exact owner and lifecycle/API anchors, finite scratch/report growth and
+traversal/timeout behavior, concrete subsequent Rust allowlist and discriminating
+success/error/cancellation/last-drop tests, independent DESIGN review, root decision
+and source/plan/archive/diff checks. Existing large owner modules require a cohesive
+local seam or bounded child module; estimate diagnostics20–80/proof20–80 lines subject
+to actual API. No optimization threshold is claimed for diagnostic work. Runtime
+validation requires a concrete revised implementation contract and independent review;
+it is not authorized by a source note alone. Future native diagnostic observation must
+be distinct, keep current memory/time/source/byte caps, preserve any hard-cap refusal,
+and cannot be substituted for representative fit evidence. User permits needed task
+time; recurring>180s examined for necessity/refactoring. No repeated Cargo/native or
+identical failure. More capability, production ownership/interner changes, unbounded
+reporting or inaccessible safe owner requires technical reassessment.
