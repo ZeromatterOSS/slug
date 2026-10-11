@@ -1,68 +1,94 @@
-# WP1126 retained allocation readiness
+# WP1127 bounded Capture conversion traffic
 
-Packet: WP-7-338-m7a-retained-allocation-readiness
+Packet: WP-7-339-m7a-capture-copy-traffic
 Status: ready
 
-Outcome: select an implementable, bounded retained-allocation diagnostic at an
-existing semantic owner before admitting more native workload. This packet resolves
-safe diagnostic placement and memory/report bounds through source proof and independent
-review; root then activates the concrete implementation contract. Slug-native Linux
-instrumentation; exact semantics unchanged, Windows deferred. M7A completion remains open.
+Outcome: add the independently selected fixed Capture conversion-traffic diagnostic,
+prove its real error/drop isolation, then observe ONE distinct native diagnostic prefix
+under unchanged caps. Slug-native private Linux-test instrumentation; production semantics
+and exact source identity unchanged; Windows deferred. Retained bytes and M7A remain open.
 
-Basis: [accepted WP1125](./wp1125-skylib-collections-closure-2026-10-11.json) admits the
-sole independently qualified2176-byte collections source. Fresh45/production and
-protected33/fixture31 pass. ONE20.802s native/source390, phase254.15625MiB under256,
-360 original source brackets/226pins/18env stable, next Host Lstat rust/BUILD.bazel
-refused. Remaining1.84375MiB is insufficient evidence of future fit. Terminal source-only
-allocation research target/wp1125/allocation-headroom-research.md SHA
-424cd8adc5b4995b840a3e671a4a0cccc23f65b39cbd05db6b46646d349ca911 traces Capture→Arc,
-DICE retained inputs, parser CodeMap owned source copies and heap-owned interners.
-It establishes no attributed regression or proven removable retained copy. Capability
-research83e935f00deb8a4b88061bb4ce6666a1b3c2d844a72333b147da1c23335ed978 proposes
-exact rust BUILD.bazel/BUILD metadata pair, queued until allocation readiness.
+Basis: [accepted WP1126 source readiness](./wp1126-retained-allocation-readiness-2026-10-11.json)
+rejects current Allocative shared traversal as unbounded, selects the original Capture
+producer seam and no Dice count report. Reuse target/wp1126 allocation-design0f6a6a7e29e77b6629185ca477d8b859c329f4c5dabecfb15c3b04666a87545c,
+lifecycle9592672f59c0328aa234e0c196ad8059e55cf351b616500e2069d526a91d4e34 and
+independent reviewcde443630f254d6e34738b7a08612b3f6f327405775a5fdd10e98322755bbf7f.
+WP1125 is the direct runtime/evidence donor: fresh45/production, protected33/fixture31,
+ONE20.802s/source390/phase254.15625MiB,360brackets/226pins/18env stable; next exact
+rust/BUILD.bazel Lstat refused. Different prefix from WP1124 proves no causal memory delta.
+Remaining1.84375MiB is no future-fit guarantee; metadata/source expansion stays queued.
 
-Decision: inspect the existing DICE Allocative CoreStateHandle visitor and native
-post-command lifecycle for a quiescent, bounded scalar owner report. Reuse existing
-Allocative/Arc/Dupe and owner diagnostics; classify existing utility as leaf reuse,
-upstream ownership tests as concept/test evidence. Read docs/developers/dice.md before
-any locking/owner decision. MakeAvailableForAllocative actor handshake must release
-its temporary Arc and completion sender before resuming the actor. No compute or
-held owner lock may span that pause. Disclose imperfect shared accounting. An unbounded
-FlameGraphBuilder/name tree or wholegraph pointer set is not presumed safe under the
-remaining headroom. If bounded traversal/report retention cannot be established,
-select the smallest producer-owned scalar seam (e.g. parser attempt/source byte count)
-with explicit scope and missing attribution instead. Root resolves this technical
-choice within existing authorization; no automatic user-permission stop.
+Decision/natural owner: original Capture::finish checks scope, reserves len+64 overlap,
+materializes Arc<[u8]> from Vec slice, checks scope again, drops Capture and returns Arc.
+Add cfg(all(test,target_os="linux")) CopyCounts child state to existing ScopeState mutex;
+explicit arming, default disabled. Five u64 fields created/returned/len_sum/max_len/
+max_capture_capacity and armed/overflow flags, state and copied snapshot<=64B. No payload,
+path, label, pointer, Arc or collection retained. Record created/len/capacity immediately
+AFTER materialization and BEFORE secondcheck; returned AFTER secondcheck success. Failed
+firstcheck/reservation reports zero. Cumulative len is copied slice length, capacity is
+source Vec capacity, never Arc allocator/RSS/retained bytes. Checked sticky saturation
+cannot poison scope, modify errors/charge/credit/publication/admission or enable a retry.
+Brief existing mutex updates; none spans allocation/IO/compute/await/formatting.
 
-Natural owners: retained WorkspaceRuntime/Dice/source scope and parser input/CodeMap
-or evaluator heap, as genuinely accessible. Diagnostic facts are nonsemantic and
-cannot affect keys, equality, invalidation, publication, Need/error, request snapshots,
-source identity, demand order or cleanup. Preserve independent AST/source lifetimes.
-Intern immutable repeats only within suitable existing owner scope; no global pool,
-label representation change or speculative zero-copy conversion. Source Weak unseen
-expiry is vacuous. RSS, Allocative visited bytes, arena bytes and cumulative credits
-remain distinct metrics; no cause/savings/wholefit claim.
+Expose no public production API. If deterministic post-materialization cancellation
+proof needs a hook, one private zero-state generic finish helper may accept an empty
+production closure and an injected test closure at that exact point; no callback storage,
+registry/new owner or alternate conversion/check path. Review actual helper before use.
+Only cfg(test/Linux) owner/hooks/report alter storage; production finish behavior remains
+same original checks/reservation/Arc/drop. Independent returned-source/AST lifetimes,
+DICE keys/equality/invalidation/Need/request snapshots/source certificate remain unchanged.
 
-Source-only allowlist: target/wp1126 allocation-design, lifecycle-readiness,
-independent-design-review and root-decision notes plus frozen contract/baseline/hash
-metadata. Workers edit disjoint named notes only. Read only current native lifecycle,
-existing allocation visitor/producer code and matching Stage9 rows. No payload/archive/
-corpus/environment-value acquisition, helper main/import, Cargo/gate/native replay,
-Rust/config change or new fixture. Root owns canonical/current scheduling and receipt.
-No accepted predecessor evidence rewritten. Baseline is the accepted WP1125 HEAD,
-resolved after publication commit before delegating. Source notes bounded to the exact
-owner/API and evidence question, not a new broad audit or framework.
+At the existing outer synchronous native after_command point, copy snapshot then unlock,
+stream one fixed ASCII WP1127_CAPTURE_COPY record<=512B via format_args/writeln into
+existing writer; no owned report String or per-object rows. Explicit traffic_only and
+retained_bytes=unavailable/armed/overflow qualifications. Snapshot mutex linearization
+is separate from RSS. Arm original source scope before work; never reset counters after
+work, clear poison or run extra cleanup. Pending cancellation drain does not imply whole
+heap disposal. SourceWeak unseen expiry remains vacuous. No Allocative/DICE actor pause,
+introspection, count report, interner/label/CodeMap rewrite, global pool or semantic side store.
 
-Acceptance: exact owner and lifecycle/API anchors, finite scratch/report growth and
-traversal/timeout behavior, concrete subsequent Rust allowlist and discriminating
-success/error/cancellation/last-drop tests, independent DESIGN review, root decision
-and source/plan/archive/diff checks. Existing large owner modules require a cohesive
-local seam or bounded child module; estimate diagnostics20–80/proof20–80 lines subject
-to actual API. No optimization threshold is claimed for diagnostic work. Runtime
-validation requires a concrete revised implementation contract and independent review;
-it is not authorized by a source note alone. Future native diagnostic observation must
-be distinct, keep current memory/time/source/byte caps, preserve any hard-cap refusal,
-and cannot be substituted for representative fit evidence. User permits needed task
-time; recurring>180s examined for necessity/refactoring. No repeated Cargo/native or
-identical failure. More capability, production ownership/interner changes, unbounded
-reporting or inaccessible safe owner requires technical reassessment.
+Rust allowlist only app/slug_core_v2/src/runtime/source_service/scope.rs,
+source_service/regular_file.rs, new source_service/copy_counts.rs declared as a cohesive
+scope child via #[path], and runtime/tests/platforms_module_preparation_tests.rs. Scope
+1035L/Capture502L remain cohesive owner-local; large private native parent gains only
+arming/report glue, no copied harness. Estimate diagnostic20–80/proof20–80 plus small
+hooks/report; root reviews actual growth. Existing SourceServiceScope test layout488
+must change and be measured/rebound, production storage unchanged; Bodies304 stays.
+Current donor52source paths retain49 unchanged/3changed plus sole new child=53; historical
+Qthree-private exceptions remain distinct and strict, oldCoreexecutable no gate credit.
+
+Proofs: default/unarmed/zero; real success exact copied lengths versus spare capacity;
+initial poison/reservation refusal zero; materialized-but-cancelled created1/returned0
+with exact existing error and credit release; ordinary cancellation/no buffer retention;
+concurrent updates/no lost count/maxima; synthetic u64 overflow sticky/nonsemantic;
+Copy state/snapshot<=64B and maximum numeric report<=512; returned Arc survives Capture
+and scope Drop, lastArc Drop unchanged, separate scopes, cumulative after lastDrop. Reuse
+existing lifecycle/source controls, add only demonstrated missing scalar/real Capture
+selectors (expected1–2 extra) to saved45 in one preflight/body batch. Actual selectedcount
+must match saved order plus exact declared suffix, never silently lose projection/time
+controls. Fresh Core no-run/list/preflight/body+production/singleton; protected33/fixture31
+strict qualified WP1119 reuse, fixture35/177/32440662 unchanged. No new fixture assets.
+
+Root resolves accepted WP1126 HEAD before writers. Independent DESIGN on THIS contract
+before Rust; disjoint source implementation and target-only quartet/finalizer preparation,
+root full source deltas/checkpoints before factory/main, stopped writers/freeze, serial
+gates, actual PRELAUNCH before one native, actual FINAL before accepted receipt/commit.
+Reuse donorWP1125 quartet/decoders with exact finite source/layout/selector/donor deltas,
+no repeated archive inspector/qualifier execution or source-body acquisition: same360
+vector and exact runtime profile. Finite current/protected maps; no recursive history.
+Fresh pinned nightly2025-09-14 resolved cargo/rustc/rustdoc/rustfmt; offline locked jobs1
+CargoJSON no-run, separate fresh invocation every compile/artifact/list/preflight/runtime,
+64KiB streamed executable/source hashes. Target/wp1127 helpers/notes/config/receipt allowed;
+root owns canonical/current/Stage9/accepted receipt and local commit, predecessors immutable.
+
+Unchanged caps qualified26work/29cleanup/32outer/default5/8/ordinary10/constructor27tail3,
+RSS256MiB/AS512/live16/source512/census513/transfer32MiB, SEPARATE cumulative decoded128MiB
+and written128MiB, ordinaryFSIZE16/native32/exact Kotlin FDexception, six backings/eight
+callers/original18env. Same360held original sources, no new authority/body capability.
+One infrequent changed diagnostic native run is necessary for representative conversion
+traffic; tiny fixtures cannot establish that traffic or workload fit. Preserve a genuine
+memory/time/refusal boundary; no identical replay, capraise, speed or retained-byte cause
+claim. No memory reduction is predicted. Needed task time authorized; recurring>180s
+examined for necessity/refactoring, reuse accepted source/API proof instead of another
+wide audit. Different source/production memory/ownership/interner or unbounded report
+needs technical DESIGN/REPLAN. No user permission stop inferred from these packet gates.

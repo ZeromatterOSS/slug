@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-338-m7a-retained-allocation-readiness
+Packet: WP-7-339-m7a-capture-copy-traffic
 Status: ready
 
-[Accepted WP1125](./slug-v2-subplans/wp1125-skylib-collections-closure-2026-10-11.json)
-admits the original qualified collections source; fresh45/production and protected33/
-fixture31 pass. ONE20.802s/source390/phase254.15625MiB under256 progresses to genuine
-rust/BUILD.bazel Lstat refusal. Remaining1.84375MiB prompts allocation readiness before
-further admission. The [current manifest](./slug-v2-subplans/current-packet.md) selects
-bounded retained-owner diagnostic design, preserving all caps and exact semantics.
-Producer/wholefit remains open; no causal allocation or optimization claim.
+[Accepted WP1126 source readiness](./slug-v2-subplans/wp1126-retained-allocation-readiness-2026-10-11.json)
+selects fixed scope-owned Capture conversion counts; current public retained-DICE
+Allocative traversal lacks bounded scratch/stop APIs. WP1125 remains runtime donor:
+source390/phase254.15625MiB under256, next rust/BUILD.bazel Lstat refused. The
+[current manifest](./slug-v2-subplans/current-packet.md) selects a bounded traffic
+diagnostic with independent DESIGN before activation; retained bytes/cause/wholefit
+remain unproved and capability expansion queued. All resource limits retained.
 
 ### Ready and blocked queue
 

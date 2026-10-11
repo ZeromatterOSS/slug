@@ -1,0 +1,29 @@
+{
+  "packet": "WP-7-338-m7a-retained-allocation-readiness",
+  "work_packet": "WP1126",
+  "baseline": "7de017c9639d9534e516723c65e04cd232873b4c",
+  "status": "accepted-source-readiness",
+  "compatibility": "Slug-native Linux diagnostic design; exact semantics unchanged; Windows deferred",
+  "decision": "Reject current public Allocative backend for bounded shared retained-DICE bytes. Select test-only explicitly armed fixed Capture conversion-traffic scalars under existing ScopeState mutex, materialized-before-secondcheck and returned-after-check, <=64B state/snapshot and <=512B streamed report. No DICE count report. Concrete implementation follows separately.",
+  "measurement_limits": "No actual runtime or memory measurement in WP1126; counters will measure cumulative conversions, not retainedArc/RSS bytes, allocation cause/savings or whole-fit. Accepted WP1125 leaves sampled1.84375MiB under256; caps unchanged and more capability deferred.",
+  "evidence_sha256": {
+    "target/wp1126/packet-contract.md": "e053f5d5e5b0137617ccc872ba3e673c9be2daadedf0c01f4196b8198cf3fe10",
+    "target/wp1126/baseline.json": "b0f97f9a72bd6dd7278ee690b735e13b4c71ead582a244ab5482a27584078ec1",
+    "target/wp1126/allocation-design.md": "0f6a6a7e29e77b6629185ca477d8b859c329f4c5dabecfb15c3b04666a87545c",
+    "target/wp1126/lifecycle-readiness.md": "9592672f59c0328aa234e0c196ad8059e55cf351b616500e2069d526a91d4e34",
+    "target/wp1126/independent-design-review.md": "cde443630f254d6e34738b7a08612b3f6f327405775a5fdd10e98322755bbf7f",
+    "target/wp1126/root-source-pins.json": "34de19c2098f8e5049beb1ec87e0cbfa82e460bf52d4e82c000bcf391dcdb00c"
+  },
+  "validation": "Actual independent source DESIGN ACCEPT; root read complete notes/current Capture/scope/backend/lifecycle code. No Cargo/gates/native/helper import/main/payload acquisition/Rust changes. Plan/archive/diff checks at publication.",
+  "workflow": {
+    "allocation_source_checkpoint_seconds": 159,
+    "allocation_note_total_seconds": 253,
+    "lifecycle_total_seconds": 288.783,
+    "independent_review_wall_seconds": 386.51,
+    "review_wait_seconds_at_least": 120,
+    "recurring_time_examination": "One-off exact backend visibility/shared coverage/actor lease/current-thread placement required source research. Repeat packets must reuse these anchors instead of a fresh wide audit; review wait not separately active work. Source-only decision avoids an unsafe instrumentation run.",
+    "incidental_discovery": "Read-only nonexistent guessed paths corrected by rg; no gate/runtime failures or replays.",
+    "published_utc": "2026-10-11T08:26:51.492884+00:00"
+  },
+  "successor": "WP1127 bounded Capture conversion traffic implementation, independently reviewed concrete contract required before Rust activation."
+}
