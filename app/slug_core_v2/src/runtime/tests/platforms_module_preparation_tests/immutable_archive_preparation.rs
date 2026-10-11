@@ -209,6 +209,18 @@ pub(super) fn native_python_environment_binding(bodies: &Bodies) -> bool {
         .as_ref()
         .is_some_and(|binding| native_patched_binding(project, &ARCHIVES[2], binding))
 }
+pub(super) fn native_kotlin_capabilities_binding(bodies: &Bodies) -> bool {
+    let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+    else {
+        return false;
+    };
+    bodies
+        .kotlin_offline_archive
+        .as_ref()
+        .is_some_and(|binding| native_patched_binding(project, &ARCHIVES[3], binding))
+}
 pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
     let Some(project) = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()

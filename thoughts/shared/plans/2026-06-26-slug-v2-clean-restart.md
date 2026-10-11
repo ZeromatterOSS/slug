@@ -34,17 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-330-m7a-kotlin-capabilities-file-plan
-Status: ready — independent DESIGN required before implementation
+Packet: WP-7-331-m7a-swift-immutable-cohort
+Status: ready — DESIGN before acquisition; verified prerequisite before Rust
 
-The [accepted Kotlin cohort packet](./slug-v2-subplans/wp1117-kotlin-immutable-cohort-2026-10-11.json)
-admits the exact original archive/MODULE/patch through complete borrowed request and
-current-epoch gates. Current76 Rust+31 fixture/production checks and ONE18.712s/source357/
-phase242.547MiB under256 passed; exact356sources/18env stable. Archives use bounded
-held-file streaming. The [current manifest](./slug-v2-subplans/current-packet.md) selects
-only the demanded Kotlin capabilities File-only repository with an independently
-qualified Kotlin context and unchanged memory/time/profile caps. Source inspection
-is complete; live output eligibility and producer/certificate/actions/Rustc/M7A remain open.
+The [accepted Kotlin capabilities packet](./slug-v2-subplans/wp1118-kotlin-capabilities-file-plan-2026-10-11.json)
+passes the exact generated File-only owner with unchanged layouts and resource caps.
+Current43 fresh Core/protected33 and fixture31 qualified reuse, production check and
+ONE18.979s/source358/phase243.8125MiB under256 passed;356source/18env brackets stable.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects only the actually
+demanded Swift immutable archive: verify original archive/patch availability and fit
+before fifth-cohort admission. Fixture residual1,440,218B and memory/time/profile caps
+remain explicit. Normal producer/certificate/actions/Rustc/M7A and whole fit stay open.
 
 ### Ready and blocked queue
 

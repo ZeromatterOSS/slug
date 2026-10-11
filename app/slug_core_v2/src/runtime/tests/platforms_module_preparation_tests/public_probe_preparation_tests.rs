@@ -2845,12 +2845,39 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
 }
 #[cfg(target_os = "linux")]
 fn python_test_bodies() -> Bodies {
+    patched_file_test_bodies(false)
+}
+#[cfg(target_os = "linux")]
+fn kotlin_test_bodies() -> Bodies {
+    patched_file_test_bodies(true)
+}
+#[cfg(target_os = "linux")]
+fn patched_file_test_bodies(kotlin: bool) -> Bodies {
     use immutable_archive_preparation::ArchiveBinding;
+    use immutable_archive_preparation::KOTLIN_DIGEST;
+    use immutable_archive_preparation::KOTLIN_PREPARED_MODULE;
+    use immutable_archive_preparation::KOTLIN_PREPARED_PATCH;
+    use immutable_archive_preparation::KOTLIN_URL;
     use immutable_archive_preparation::PYTHON_DIGEST;
     use immutable_archive_preparation::PYTHON_PREPARED_MODULE;
     use immutable_archive_preparation::PYTHON_PREPARED_PATCH;
     use immutable_archive_preparation::PYTHON_URL;
     use immutable_archive_preparation::PatchedArchiveBinding;
+    let (url, digest, module, patch) = if kotlin {
+        (
+            KOTLIN_URL,
+            KOTLIN_DIGEST,
+            KOTLIN_PREPARED_MODULE,
+            KOTLIN_PREPARED_PATCH,
+        )
+    } else {
+        (
+            PYTHON_URL,
+            PYTHON_DIGEST,
+            PYTHON_PREPARED_MODULE,
+            PYTHON_PREPARED_PATCH,
+        )
+    };
     let project = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -2858,57 +2885,75 @@ fn python_test_bodies() -> Bodies {
         .unwrap();
     let mut bodies = namespace_test_bodies();
     bodies.rules_cc_import_sources = false;
-    bodies.python_offline_archive = Some(PatchedArchiveBinding {
+    let binding = Some(PatchedArchiveBinding {
         archive: ArchiveBinding {
             backing: OfflineArchiveBacking::new(
-                PYTHON_URL,
-                PYTHON_DIGEST,
+                url,
+                digest,
                 NormalizedAbsolutePath::new(
                     project
                         .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
-                        .join(PYTHON_URL.strip_prefix("https://").unwrap()),
+                        .join(url.strip_prefix("https://").unwrap()),
                 )
                 .unwrap(),
             ),
-            module: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_MODULE)).unwrap(),
+            module: NormalizedAbsolutePath::new(project.join(module)).unwrap(),
         },
-        patch: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_PATCH)).unwrap(),
+        patch: NormalizedAbsolutePath::new(project.join(patch)).unwrap(),
     });
+    if kotlin {
+        bodies.kotlin_offline_archive = binding;
+    } else {
+        bodies.python_offline_archive = binding;
+    }
     bodies
 }
 #[cfg(target_os = "linux")]
 fn python_test_bodies_with_invalid_binding(case: usize) -> Bodies {
+    patched_file_test_bodies_with_invalid_binding(case, false)
+}
+#[cfg(target_os = "linux")]
+fn patched_file_test_bodies_with_invalid_binding(case: usize, kotlin: bool) -> Bodies {
     use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::KOTLIN_DIGEST;
+    use immutable_archive_preparation::KOTLIN_URL;
     use immutable_archive_preparation::PYTHON_DIGEST;
     use immutable_archive_preparation::PYTHON_URL;
+    let (url, digest) = if kotlin {
+        (KOTLIN_URL, KOTLIN_DIGEST)
+    } else {
+        (PYTHON_URL, PYTHON_DIGEST)
+    };
     let path = |s| NormalizedAbsolutePath::new(s).unwrap();
-    let mut closed = python_test_bodies();
+    let mut closed = patched_file_test_bodies(kotlin);
+    let slot = if kotlin {
+        &mut closed.kotlin_offline_archive
+    } else {
+        &mut closed.python_offline_archive
+    };
     match case {
-        0 => closed.python_offline_archive = None,
+        0 => *slot = None,
         6 => closed.rules_rust_defs_import_sources = false,
         _ => {
-            let binding = closed.python_offline_archive.as_mut().unwrap();
+            let binding = slot.as_mut().unwrap();
             match case {
                 1 => {
                     binding.archive.backing = OfflineArchiveBacking::new(
                         JAVA_URL,
-                        PYTHON_DIGEST,
+                        digest,
                         binding.archive.backing.path().dupe(),
                     )
                 }
                 2 => {
                     binding.archive.backing = OfflineArchiveBacking::new(
-                        PYTHON_URL,
+                        url,
                         [0; 32],
                         binding.archive.backing.path().dupe(),
                     )
                 }
                 3 => {
-                    binding.archive.backing = OfflineArchiveBacking::new(
-                        PYTHON_URL,
-                        PYTHON_DIGEST,
-                        path("/foreign/python.tar.gz"),
-                    )
+                    binding.archive.backing =
+                        OfflineArchiveBacking::new(url, digest, path("/foreign/python.tar.gz"))
                 }
                 4 => binding.archive.module = path("/foreign/MODULE.bazel"),
                 _ => binding.patch = path("/foreign/module.patch"),
@@ -3141,14 +3186,31 @@ fn python_uv_file_plan_test_request(
     request.repo_spec.rule_id.rule_name = "uv_toolchains_repo".into();
     request
 }
+#[cfg(target_os = "linux")]
+fn kotlin_file_plan_test_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = python_file_plan_test_request(bodies, plan);
+    request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+        "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin",
+    )
+    .unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_kotlin+//src/main/starlark/core/repositories:compiler.bzl")
+            .unwrap();
+    request.repo_spec.rule_id.rule_name = "kotlin_capabilities_repository".into();
+    request
+}
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
     for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_file_effects_are_bounded_and_opt_in(remote);
     }
-    assert_python_file_effects_are_bounded_and_opt_in(false);
-    assert_python_file_effects_are_bounded_and_opt_in(true);
+    assert_patched_file_effects_are_bounded_and_opt_in(false, false);
+    assert_patched_file_effects_are_bounded_and_opt_in(true, false);
+    assert_patched_file_effects_are_bounded_and_opt_in(false, true);
 }
 #[cfg(target_os = "linux")]
 fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
@@ -3416,16 +3478,23 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
     );
 }
 #[cfg(target_os = "linux")]
-fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
+fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
     let make_request: fn(
         &Bodies,
         slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest = if uv {
+    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest = if kotlin {
+        kotlin_file_plan_test_request
+    } else if uv {
         python_uv_file_plan_test_request
     } else {
         python_file_plan_test_request
     };
-    let mut bodies = python_test_bodies();
+    let selected_bodies: fn() -> Bodies = if kotlin {
+        kotlin_test_bodies
+    } else {
+        python_test_bodies
+    };
+    let mut bodies = selected_bodies();
     assert!(bodies.offline_archive.is_none() && bodies.java_offline_archive.is_none());
     let valid = SourcePreparationNeeds::repository(make_request(
         &bodies,
@@ -3439,20 +3508,39 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
     let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &original.kind else {
         panic!()
     };
+    let backing_weak = Arc::downgrade(
+        &(if kotlin {
+            &bodies.kotlin_offline_archive
+        } else {
+            &bodies.python_offline_archive
+        })
+        .as_ref()
+        .unwrap()
+        .archive
+        .backing,
+    );
     let counts = (
         Arc::strong_count(original),
         Arc::strong_count(&original.repo_spec.attributes),
         Arc::strong_count(
-            &bodies
-                .python_offline_archive
-                .as_ref()
-                .unwrap()
-                .archive
-                .backing,
+            &(if kotlin {
+                &bodies.kotlin_offline_archive
+            } else {
+                &bodies.python_offline_archive
+            })
+            .as_ref()
+            .unwrap()
+            .archive
+            .backing,
         ),
     );
     assert!(std::ptr::eq(
-        bodies.qualified_python_file_plan(original).unwrap(),
+        (if kotlin {
+            bodies.qualified_kotlin_file_plan(original)
+        } else {
+            bodies.qualified_python_file_plan(original)
+        })
+        .unwrap(),
         plan
     ));
     assert!(std::ptr::eq(
@@ -3465,6 +3553,13 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
             .is_none()
     );
     assert!(bodies.admit(&valid).is_ok());
+    if kotlin {
+        assert!(bodies.python_offline_archive.is_none());
+        let mut unrelated = selected_bodies();
+        unrelated.python_offline_archive =
+            python_test_bodies_with_invalid_binding(2).python_offline_archive;
+        assert!(unrelated.admit(&valid).is_ok());
+    }
     let mut changed = original.as_ref().clone();
     changed.kind = RepositoryMaterializationKind::GeneratedFileEffects(small_generated_plan(&[(
         "BUILD.bazel",
@@ -3490,7 +3585,7 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
     for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
         for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
             for defs in [false, true] {
-                let mut selected = python_test_bodies()
+                let mut selected = selected_bodies()
                     .with_generated_features_file_effects(registry, command)
                     .with_rules_rust_defs_import_sources(registry, command);
                 selected.rules_rust_defs_import_sources &= defs;
@@ -3503,14 +3598,14 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
         }
     }
     for case in 0..7 {
-        let closed = python_test_bodies_with_invalid_binding(case);
+        let closed = patched_file_test_bodies_with_invalid_binding(case, kotlin);
         assert!(
             closed
                 .admit_with_plan_matcher(&valid, &|_, _| true)
                 .is_err()
         );
     }
-    let mut no_generated = python_test_bodies();
+    let mut no_generated = selected_bodies();
     no_generated.generated_features_file_effects = false;
     assert!(
         no_generated
@@ -3525,6 +3620,24 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
         small_generated_plan(&java_proxy_literal_rows()),
     ));
     assert!(bodies.admit(&allowed).is_ok());
+    for case in 0..7 {
+        let mut closed = patched_file_test_bodies_with_invalid_binding(case, kotlin);
+        closed.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
+        assert!(closed.admit(&allowed).is_ok());
+        for mixed in [
+            allowed.try_union(&valid).unwrap(),
+            valid.try_union(&allowed).unwrap(),
+        ] {
+            let mut progress = 0;
+            if closed.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            let (first, reason) = closed.first_denied_materialization(&mixed).unwrap();
+            assert_eq!(reason, "generated_kind");
+            assert!(std::ptr::eq(first, original.as_ref()));
+        }
+    }
     let reject = |bad: SourcePreparationNeeds| {
         let offender = bad.repository_materializations().values().next().unwrap();
         for mixed in [
@@ -3542,12 +3655,14 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
             assert!(std::ptr::eq(first, offender.as_ref()));
         }
     };
-    for case in 0..9 {
+    for case in 0..if kotlin { 10 } else { 9 } {
         let mut wrong = original.as_ref().clone();
         match case {
             0 => wrong.id.workspace = NormalizedAbsolutePath::new("/foreign").unwrap(),
             1 => {
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if uv {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                    "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_extra"
+                } else if uv {
                     "rules_python++uv+uv_extra"
                 } else {
                     "rules_python++python+pythons_hub_extra"
@@ -3555,7 +3670,9 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .unwrap()
             }
             2 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                    "@@other+//src/main/starlark/core/repositories:compiler.bzl"
+                } else if uv {
                     "@@other+//python/uv/private:uv_toolchains_repo.bzl"
                 } else {
                     "@@other+//python/private:pythons_hub.bzl"
@@ -3563,7 +3680,9 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .unwrap()
             }
             3 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                    "@@rules_kotlin+//src/main/starlark/core:compiler.bzl"
+                } else if uv {
                     "@@rules_python+//python/uv:uv_toolchains_repo.bzl"
                 } else {
                     "@@rules_python+//python:pythons_hub.bzl"
@@ -3571,7 +3690,9 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .unwrap()
             }
             4 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                    "@@rules_kotlin+//src/main/starlark/core/repositories:Compiler.bzl"
+                } else if uv {
                     "@@rules_python+//python/uv/private:Uv_toolchains_repo.bzl"
                 } else {
                     "@@rules_python+//python/private:Pythons_hub.bzl"
@@ -3579,7 +3700,9 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .unwrap()
             }
             5 => {
-                wrong.repo_spec.rule_id.rule_name = if uv {
+                wrong.repo_spec.rule_id.rule_name = if kotlin {
+                    "kotlin_compiler_git_repository"
+                } else if uv {
                     "uv_toolchains_repo_extra"
                 } else {
                     "hub_repo_extra"
@@ -3587,7 +3710,9 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .into()
             }
             7 => {
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if uv {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                    "rules_python++python+pythons_hub"
+                } else if uv {
                     "rules_python++python+pythons_hub"
                 } else {
                     "rules_python++uv+uv"
@@ -3595,14 +3720,29 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 .unwrap()
             }
             8 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                    "@@rules_kotlin+//src/main/starlark/core/repositories:compiler_git.bzl"
+                } else if uv {
                     "@@rules_python+//python/private:pythons_hub.bzl"
                 } else {
                     "@@rules_python+//python/uv/private:uv_toolchains_repo.bzl"
                 })
                 .unwrap();
-                wrong.repo_spec.rule_id.rule_name =
-                    if uv { "hub_repo" } else { "uv_toolchains_repo" }.into();
+                wrong.repo_spec.rule_id.rule_name = if kotlin {
+                    "kotlin_capabilities_repository"
+                } else if uv {
+                    "hub_repo"
+                } else {
+                    "uv_toolchains_repo"
+                }
+                .into();
+            }
+            9 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_git",
+                )
+                .unwrap();
+                wrong.repo_spec.rule_id.rule_name = "kotlin_compiler_git_repository".into();
             }
             _ => {
                 let mut mapping = slug_identity_v2::RepositoryMapping::new(
@@ -3610,15 +3750,23 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
                 );
                 mapping.insert(
                     slug_identity_v2::ApparentRepoName::new("python").unwrap(),
-                    slug_identity_v2::CanonicalRepoName::new("rules_python+").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                        "rules_kotlin+"
+                    } else {
+                        "rules_python+"
+                    })
+                    .unwrap(),
                 );
-                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(if uv {
-                    "@python//python/uv/private:uv_toolchains_repo.bzl"
-                } else {
-                    "@python//python/private:pythons_hub.bzl"
-                })
-                .unwrap()
-                .resolve(&mapping);
+                wrong.repo_spec.rule_id.bzl_file =
+                    slug_identity_v2::ApparentLabel::parse(if kotlin {
+                        "@python//src/main/starlark/core/repositories:compiler.bzl"
+                    } else if uv {
+                        "@python//python/uv/private:uv_toolchains_repo.bzl"
+                    } else {
+                        "@python//python/private:pythons_hub.bzl"
+                    })
+                    .unwrap()
+                    .resolve(&mapping);
             }
         }
         let bad = SourcePreparationNeeds::repository(wrong);
@@ -3631,21 +3779,28 @@ fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
             Arc::strong_count(original),
             Arc::strong_count(&original.repo_spec.attributes),
             Arc::strong_count(
-                &bodies
-                    .python_offline_archive
-                    .as_ref()
-                    .unwrap()
-                    .archive
-                    .backing
+                &(if kotlin {
+                    &bodies.kotlin_offline_archive
+                } else {
+                    &bodies.python_offline_archive
+                })
+                .as_ref()
+                .unwrap()
+                .archive
+                .backing
             )
         ),
         counts
     );
-    if uv {
+    if kotlin {
+        eprintln!("WP1118_KOTLIN_FILE_PLAN complete");
+    } else if uv {
         eprintln!("WP1116_UV_FILE_PLAN complete");
     } else {
         eprintln!("WP1114_PYTHON_FILE_PLAN complete");
     }
+    drop(bodies);
+    assert!(backing_weak.upgrade().is_none());
 }
 #[cfg(target_os = "linux")]
 fn assert_bounded_file_plan_shapes(
@@ -3774,6 +3929,11 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         &python_uv_file_plan_test_request,
     );
     eprintln!("WP1116_UV_NAMESPACE complete");
+    assert_generated_namespace_is_current_and_declared_only(
+        kotlin_test_bodies,
+        &kotlin_file_plan_test_request,
+    );
+    eprintln!("WP1118_KOTLIN_NAMESPACE complete");
 }
 #[cfg(target_os = "linux")]
 fn assert_generated_namespace_is_current_and_declared_only(
@@ -4042,13 +4202,37 @@ fn assert_generated_namespace_is_current_and_declared_only(
             ));
         }
     }
+    if bodies.kotlin_offline_archive.is_some() {
+        for case in 0..7 {
+            let closed = patched_file_test_bodies_with_invalid_binding(case, true)
+                .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+                .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+            for d in [
+                &valid_demand,
+                &marker,
+                &ignore_marker,
+                &demand(materialized, "/parent/B", PathObservationOperation::Lstat),
+            ] {
+                assert!(
+                    !namespace_policy(&closed, d, Some(&epoch_b), &generated_features_plan_matches)
+                        .admits(&d.operation())
+                );
+            }
+        }
+    }
     let mut closed = make_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-    assert!(closed.java_offline_archive.is_some() ^ closed.python_offline_archive.is_some());
+    assert_eq!(
+        usize::from(closed.java_offline_archive.is_some())
+            + usize::from(closed.python_offline_archive.is_some())
+            + usize::from(closed.kotlin_offline_archive.is_some()),
+        1
+    );
     assert!(closed.qualified_generated_file_plan(&request).is_some());
     closed.java_offline_archive = None;
     closed.python_offline_archive = None;
+    closed.kotlin_offline_archive = None;
     assert!(
         !namespace_policy(
             &closed,

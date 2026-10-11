@@ -1,82 +1,106 @@
-# WP1118 Kotlin capabilities File-only plan
+# WP1119 Swift immutable prerequisite and bounded cohort
 
-Packet: WP-7-330-m7a-kotlin-capabilities-file-plan
-Status: ready — independent DESIGN required before implementation
+Packet: WP-7-331-m7a-swift-immutable-cohort
+Status: ready — DESIGN before acquisition; verified prerequisite before Rust
 
-WP1118 Kotlin capabilities File-only plan DESIGN
+Outcome: qualify only the actually demanded rules_swift3.1.2 archive and original
+patch, establish fit under current explicit limits, then add a fifth exact scoped
+backing and observe ONE fresh native frontier. Slug-native private Linux-test
+capability; exact original source and normal RepoSpec/materializer/DICE semantics
+retained. Windows deferred. Compiler producer/certificate/actions/Rustc/M7A/bootstrap
+and whole-closure fit remain open.
 
-Outcome: admit only the exact generated Kotlin capabilities repository demanded by
-WP1117's normal compiler producer, then preserve the next actual bounded native
-outcome. Slug-native private Linux-test capability; exact original source and normal
-RepoSpec/extension/producer/DICE/materialization semantics unchanged. Windows deferred.
-No producer/certificate/actions/Rustc/bootstrap/M7A or full-closure fit claim.
+Basis: accepted WP1118 receipt wp1118-kotlin-capabilities-file-plan-2026-10-11.json;
+actual native operation25f6f039e7c4bad3e63874f6b7a6ba5e9c99e034cdf0036ca907739a196012ba,
+stdout01f5a280afd3c8337f09763db1ff1f1339946f73c77507fe9c7dd498f8297070;
+18.979s/source358/phase243.8125MiB under256. Terminal source research
+b1adfdfe46bd5f05a26c5a01cc0cf72445f10aafa9d8c1074f1bd4ee93da5633 and report
+ea5369d2a0d91ef9ec483b42f9e0a2d3ca0a60b0c243f5f113d263626199b2f3 bind
+complete typed9 diagnostic to existing source.json/MODULE metadata. Fixture prerequisite note cd27537ee60295f2c83c10098fda093f37d7cdb9686a65272a0d6ab626765bb5 confirms generic streaming reuse and fixture-only FSIZE32 policy before freeze. Header/projection
+does not authorize a guessed source or replace the full live request predicate.
+Reuse accepted Bazel9.2 IndexRegistry/RepoSpec http_archive/patch source regressions
+and normal Rust Loading archive parser/realizer; no semantic producer rewrite.
 
-Basis: accepted WP1117 receipt, native operation e72caa4cfa895166f4742d7159a23e0d199a85855293e8e7cf6d16374f0b15f0,
-stdout055ac5e2d15e0afb74dc07cb89534a33f7ed80d40d3dcdb536b733b37616a8ae;
-18.712s/source357/phase242.547MiB under256, current76 Rust+31 fixture checks.
-Terminal next-owner-research.md SHA50df921ec0732a35ba5225c8dedc64504aba59f6d2a94de60488f2d9225cea2e
-and source report SHA668fae9b22b457f805ebbf4b94eee68d7d9397c94ecdf66278f3c74b63f4ecbc
-qualify ONE held original compiler.bzl inspection .078531s; no source execution. Member src/main/starlark/core/repositories/compiler.bzl,
-4259B SHA6c012b09fb51019f25523b7249e5a44ddbac32bf06a09376e821182cab407b1a.
-_kotlin_capabilities_impl18–42 produces WORKSPACE File and three templates. Existing
-Loading repository_rule_context.rs972–1025 turns real LabelPath/RepositorySource
-Needs into bounded File effects; no template body/attribute/output eligibility is
-inferred. Separate compiler_git download repository is excluded. Existing pinned
-Bazel9.2 repository File/template source regressions and exact normal pipeline reused.
+Archive https://github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz
+SHA5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa;
+patch https://bcr.bazel.build/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch
+SHA4386831f878dc47f89103c2359aa36b880391cdcf05b7d0758d01a807b70198c;
+prepared MODULE target/wp954/registry/modules/rules_swift/3.1.2/MODULE.bazel
+2834B SHA72c8f5cf9d26427cee6c76c8e3853eb46ce6b0412a081b2b6db6e8ad56267400.
+Empty strip_prefix/remote_file maps, patch_strip1 and single paired patch/MODULE
+URLs+SRI must match original request; unrelated Swift versions excluded.
 
-Add separate qualified_kotlin_file_plan sharing complete bounded_file_only_plan,
-and dispatch it through qualified_generated_file_plan. Exact canonical
-rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin, original unmapped
-rules_kotlin+ //src/main/starlark/core/repositories:compiler.bzl rule_name
-kotlin_capabilities_repository, current workspace and existing diagnostic/import flags.
-Add native_kotlin_capabilities_binding in immutable child using existing original
-patched binding validator/descriptor index3; absent or any malformed backing/module/
-patch path/SRI refuses, ordinary/default polarity unchanged. No new stored state.
+Prerequisite after independent DESIGN: reuse accepted WP1117 preparation/fixture
+streaming owners, adapting only exact URL/hash/path/limits/observations. Fetch ONLY
+these two public originals into exclusive packet staging with TLS,64KiB streaming
+fullEOF/SHA, request timeout30s and archive<=32MiB/patch<=8KiB. Record actual sizes,
+redirects/failures; no credential headers or environment-value inspection. No archive
+execution/evaluation/general extraction. Held regular nofollow/CLOEXEC FD fullSHA and
+before/after named+fstat/EOF identity; whole gzip framing/CRC/EOF decoded<=64MiB,
+tar<=8192entries, header<=4096B/name<=1KiB, normal confined ./ normalization,
+unique supported entry types, inventory<=512KiB. Interpret only metadata plus root
+MODULE<=16KiB and patch<=8KiB as data. Apply existing unified patch helper once and
+compare full result to original prepared MODULE. Account every parser header; retain
+any failed/superseded attempt. Independent prerequisite review before source activation.
 
-Natural semantic owner is already evaluated GeneratedRepositoryFileEffectPlan and
-normal current-epoch repository namespace/SourceService acquisition. Guard borrows
-whole original plan and validates every ordered effect is File; reuse all current
-bounds: rows8/path512/sum2048/content1MiB/sum4MiB, confined unique paths, executable
-bits preserved, no Source/Directory/Download/Symlink/Scratch/Execute or mixed effects.
-Original offender/pointer and zero progress on any mixed unsupported Need both orders.
-Current namespace family/file/lstat/digest/direct child enumeration/restoration/stale
-or foreign generation/duplicate root/ArcWeak/lastDrop gates unchanged; no manual
-output images, path-header grants, fallback traversal, DICE/key/lock/publicAPI changes.
+Fit gate: fixture current32114214/33554432 leaves1440218B; native transfer31134575/
+33554432 leaves2419857B, decode87567644/134217728 leaves46650084B, written106574162/
+134217728 leaves27643566B. Verified archive+patch and conservative normal materializer
+copies must fit those residuals. Unknown/oversized/wronghash/new effect is a precise
+prerequisite or REPLAN before activation; do not silently raise a cap. Preparation
+32MiB is a fetch bound, not permission to publish above fixture budget. Existing
+archive32MiB/small+member+retained16MiB/native disk32MiB unchanged. Actual RSS256MiB/
+AS512MiB/live16MiB/work20/cleanup23/outer26/source512/census513 remain explicit;
+future quota refusal is bounded evidence, not completion or permission stop.
 
-Exact three Rust allowlist:
-app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs;
-app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs;
-app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs. Parent
-~45 lines qualifier/dispatch; immutable helper~15; adapt existing Java/Python proof
-factories and shared generic bounds/current namespace checks for Kotlin without
-copied suite/new Rust selectors. Exact tuple/wrong canonical/repo/package/target/rule/
-mapping/workspace/flags/type/absent malformed binding/control oldowner successes/
-compiler_git negative/cross-owner mismatches mandatory. Shared bounded factory
-parameterization expected~100net proof lines; examine growth/cohesion in actual diff.
-Stage9 borrowed File-only owner reuse record + compact receipt/scheduling only.
+After verified fit, natural owner is existing fixed-cohort SourceServiceScope Arc
+transport, original immutable RepoSpec, normal SourceService acquisition and unique
+current-epoch namespace. Extend optional slots4→5/descriptor4→5/shared PatchedArchiveBinding;
+constructor rejects all10 duplicate URL pairs (including different integrity), exact
+borrowed URL+digest lookup unchanged, no setter/global registry. Swift binding must
+participate atomically in existing profile predicate: absent preserves old context,
+invalid-present refuses; independent Java/Python/Kotlin generated qualifiers remain
+independent of Swift presence. Complete live9attr immutable predicate checks original
+workspace/roles/unmapped http_archive/backing path/SRI/module/patch/strip/empty overlays.
+Reuse original offender pointer/zero progress on mixed Needs in both orders, standard
+confined IO operations/current epoch/namespace freshness and ArcWeak lastDrop controls.
+No DICE key/lock/publicAPI/fallback scan, header-derived namespace or output synthesis.
 
-No new runtime owned policyString/requestclone/Vec/key/cache/global interner. Existing
-normalized-path interning/borrowed path scratch and independent retained effect bytes
-preserve ownership. Bodies280/Scope480/static descriptor table544 unchanged. Synthetic
-clones are test-local and covered by original ArcWeak controls. No fixture growth,
-source acquisition/source-vector/environment/profile cap change. Original356sources,
-18env, RSS256/AS512/live16/transfer32/decodedwritten128/nativeFSIZE32/source512/census513/
-work20/cleanup23/outer26 retained; gate helpers must inspect imported resource owners
-and enforce the accepted sourceFD Kotlin exact exception before actual child.
+Memory: existing Stage9 Arc/Dupe/lastDrop/interned-path/borrowed descriptor disposition.
+Predicted Scope+8B480→488/Bodies+24B280→304/table+136B544→680, present backing56B;
+measure actual layout and reference lifetime. Independent retained paths/effect bytes
+stay owned. No new runtime owned policyString/requestclone/Vec/cache/globalinterner.
+Production source owners>2k/test functions>150 remain existing bounded cohesive
+transport/identity/session matrices; share parameterized proofs, estimated policy<120
+net/proof<250net, assess actual growth. No speed or isolated allocation savings claim.
 
-Validation: DESIGN review before Rust, serial pinned nightly2025-09-14 offline locked
-jobs1 JSON no-run Corecompile +production Core/CLI check; current43 Core selectors
-exactfresh list/preflight/execution. Protected33 and fixture31 reuse only if unchanged
-production/tool/fixture and explicit qualification of three private-test hash deltas;
-otherwise run missing exact gates. No gate credit from counts alone. Native singleton
-ignored list/current executable streamedSHA/prelaunch actualsource/helpers/gates,
-then ONE fresh supervised native and FINAL actual evidence before acceptance. Compiler
-memory separate from runtime; no identical replay, preserve invocation/resource failures.
-No broad suites required outside milestone close. Required time allowed; recurrent
->180s examined. Source boundary contradiction/new ownership decision REPLAN, routine
-invocation fixes stay scoped. Larger live output or future frontier remains unproved.
+Allowlist sixRust: app/slug_core_v2/src/runtime/source_service/{scope.rs,offline_archive.rs};
+runtime/tests/platforms_module_preparation_tests.rs and children immutable_archive_preparation.rs,
+public_probe_preparation_tests.rs; runtime/tests/repository_archive_file_session_tests.rs.
+Fixture allowlist configured-cli-authentic/fixture.toml plus exact archive mirror and
+registry patch leaves; test_configured_cli_fixture.py only current inventory/size/identity
+expectations and discriminating fifth missing/corrupt controls. Preserve prior rows/order/
+bytes; add2 payloads, verify provenance/hash/size and one original MODULE patch_check.
+Stage9 row/compact receipt/canonical/manifest; packet target-only setup/evidence. No
+new helper framework/sourcefamily/schema/dependency/Windows work. Append only qualified
+archive/fixturepatch/preparedpatch to inherited356 ordered source rows, keep original18env.
 
-Immediate predecessor: WP1117 accepted; receipt wp1117-kotlin-immutable-cohort-2026-10-11.json.
-Current76 Rust+31 fixture/production and ONE18.712s/source357/phase242.547MiB under256
-passed; Kotlin immutable archive admitted. Generated capabilities header is the
-next bounded demand, with normal producer/certificate/actions/Rustc/M7A still open.
+Validation: independent DESIGN before acquisition, prerequisite/effect review before
+Rust, actual source/helpers/gates PRELAUNCH before ONE native, FINAL actual change and
+raw evidence. Resolve pinned nightly2025-09-14 tools; serial offline locked jobs1
+JSON no-run compile then exact executable list/batched preflight/tests. Fresh Bzlmod7/
+Loading26/Core43 because fixture/scope source changes invalidate old universal maps;
+reuse selectors, add only real missing proof. Production Core/CLI check. Fixture verify
+and focused31 controls; three missing-strace controls explicit unproved. Existing
+cohort real archive+patch/MODULE, default/roles/fullbinding/absent-invalid/cross-owner,
+all10duplicates/mutation/cancel/restoration/mixed/currentnamespace/ArcWeak covered.
+Fixture-only FSIZE32MiB reuses accepted WP1117 policy for the verified32MiB bundle; ordinary16MiB/native32MiB unchanged. Freeze explicit successor source/fixture maps before gates; private-only reuse is invalid for the shared transport/fixture changes. Runtime invocations separate from compile/setup;64KiB executable hash. Frozen helpers
+must inspect imported limit owners and retain accepted WP1117 fd_source_r7 exact Kotlin
+exception before child. No identical native replay or credit for zero selected/failure.
+User allows required time; recurring>180s examined for necessity/refactoring, no hard
+permission deadline. Invocation/compiler/format/assertion corrections stay scoped;
+new source/ownership/resource decision requires explicit technical contract review.
+
+Immediate predecessor: WP1118 accepted43 fresh Core+33 protected/31 fixture qualified
+reuse, production check and ONE18.979s/source358/phase243.8125MiB; Kotlin capabilities
+File-only demand crossed. Normal compiler producer and full closure remain unproved.
