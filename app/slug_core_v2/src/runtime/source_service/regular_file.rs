@@ -164,10 +164,23 @@ impl Capture {
         self,
         scope: &Arc<SourceServiceScope>,
     ) -> Result<Arc<[u8]>, SourceServiceError> {
+        self.finish_with(scope, |_| {})
+    }
+    // One conversion path; production supplies an empty, zero-state closure.
+    pub(super) fn finish_with(
+        self,
+        scope: &Arc<SourceServiceScope>,
+        after_created: impl FnOnce(&Arc<[u8]>),
+    ) -> Result<Arc<[u8]>, SourceServiceError> {
         scope.check()?;
         let _conversion = scope.reserve_buffer_at(self.bytes.len() + 64, self.policy.arc_site())?;
         let result = Arc::<[u8]>::from(self.bytes.as_slice());
+        #[cfg(all(test, target_os = "linux"))]
+        scope.copy_created_for_test(self.bytes.len(), self.bytes.capacity());
+        after_created(&result);
         scope.check()?;
+        #[cfg(all(test, target_os = "linux"))]
+        scope.copy_returned_for_test();
         drop(self);
         Ok(result)
     }

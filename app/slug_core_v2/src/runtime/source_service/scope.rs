@@ -7,6 +7,10 @@ use std::time::Instant;
 use slug_workspace_v2::NormalizedAbsolutePath;
 
 #[cfg(all(test, target_os = "linux"))]
+#[path = "copy_counts.rs"]
+mod copy_counts;
+
+#[cfg(all(test, target_os = "linux"))]
 use super::buffer_provenance::SourceBufferKind;
 #[cfg(all(test, target_os = "linux"))]
 use super::buffer_provenance::SourceBufferOrigin;
@@ -172,6 +176,8 @@ impl SourceServiceCounters {
 }
 #[derive(Default)]
 struct ScopeState {
+    #[cfg(all(test, target_os = "linux"))]
+    copy_counts: copy_counts::CopyCounts,
     counters: SourceServiceCounters,
     first: Option<SourceServiceError>,
     closed: bool,
@@ -529,6 +535,24 @@ impl SourceServiceScope {
     pub(in crate::runtime) fn cancel(&self) {
         self.poison(SourceServiceError::Cancelled);
         self.cancelled.send_replace(true);
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn arm_copy_counts_for_test(&self) {
+        self.state().copy_counts.armed = true;
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(in crate::runtime) fn copy_counts_for_test(&self) -> copy_counts::CopyCounts {
+        self.state().copy_counts
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn copy_created_for_test(&self, length: usize, capacity: usize) {
+        self.state()
+            .copy_counts
+            .created(length as u64, capacity as u64);
+    }
+    #[cfg(all(test, target_os = "linux"))]
+    pub(super) fn copy_returned_for_test(&self) {
+        self.state().copy_counts.returned();
     }
     pub(in crate::runtime) fn snapshot(&self) -> SourceServiceCounters {
         self.state().counters

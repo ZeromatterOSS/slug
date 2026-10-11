@@ -3800,6 +3800,7 @@ fn observe_native_command(
         true,
     )
     .unwrap();
+    scope.arm_copy_counts_for_test();
     let allowance = scope.known_shas_allowance_for_test();
     assert_eq!(allowance.is_some(), bodies.rules_rust_defs_import_sources);
     if let Some((selected_root, _)) = allowance {
@@ -4144,6 +4145,10 @@ fn observe_native_command(
     #[cfg(feature = "native-probe-observer")]
     runtime_activity::report_timeout(recorder.as_deref());
     resources("after_command", budgets.as_ref());
+    scope
+        .copy_counts_for_test()
+        .write(&mut std::io::stdout().lock())
+        .unwrap();
     drop(outcome);
     drop(constructor_error);
     drop(milestones);

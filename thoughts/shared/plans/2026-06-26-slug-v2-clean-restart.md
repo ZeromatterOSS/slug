@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-339-m7a-capture-copy-traffic
-Status: ready
+Packet: WP-7-340-m7a-root-origin-sharing
+Status: ready — independent DESIGN pending
 
-[Accepted WP1126 source readiness](./slug-v2-subplans/wp1126-retained-allocation-readiness-2026-10-11.json)
-selects fixed scope-owned Capture conversion counts; current public retained-DICE
-Allocative traversal lacks bounded scratch/stop APIs. WP1125 remains runtime donor:
-source390/phase254.15625MiB under256, next rust/BUILD.bazel Lstat refused. The
-[current manifest](./slug-v2-subplans/current-packet.md) selects a bounded traffic
-diagnostic with independent DESIGN before activation; retained bytes/cause/wholefit
-remain unproved and capability expansion queued. All resource limits retained.
+[Accepted WP1127](./slug-v2-subplans/wp1127-capture-copy-traffic-2026-10-11.json)
+measures481successful source copies/8120409copied bytes; one20.652s native stays under
+256MiB with distinct phase254.31640625MiB. Traffic does not identify retained-memory
+cause; only1.68359375MiB headroom remains. The [current manifest](./slug-v2-subplans/current-packet.md)
+selects concrete invocation-local origin Arc sharing at the existing root-package
+producer. Preserve original spelling/error order/independent lifetime; no global
+interner or capability expansion. Actual DESIGN precedes implementation; all caps retained.
 
 ### Ready and blocked queue
 
