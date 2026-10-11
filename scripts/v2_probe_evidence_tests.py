@@ -99,7 +99,7 @@ class DirectEvidenceControls(unittest.TestCase):
             changed[key] = value
             with self.assertRaises((AssertionError, KeyError, ValueError)):
                 evidence.native_policy_equivalent(self.roles, changed)
-        for path in ('target/wp1131/source-freeze.json', str(evidence.COMPILE_FREEZE), str(evidence.READER_FREEZE), 'scripts/v2_probe_evidence.py',
+        for path in ('target/wp1131/source-freeze.json', str(evidence.COMPILE_FREEZE), str(evidence.READER_FREEZE), str(evidence.LOADING_FREEZE), 'scripts/v2_probe_evidence.py',
                      str(ROOT / 'loading-artifact-binding.json'), str(ROOT / 'loading-selectors.json'),
                      str(ROOT / 'loading-tests/operation.json'),
                      str(ROOT / 'root-source-checkpoint.json')):
@@ -135,7 +135,8 @@ class DirectEvidenceControls(unittest.TestCase):
             bad = copy.deepcopy(freeze); bad['after_format'][path] = bad['before'][path]
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
-        for path, old in ((evidence.MEMORY, evidence.MEMORY_BEFORE), (evidence.READER, evidence.READER_BEFORE)):
+        for path, old in ((evidence.MEMORY, evidence.MEMORY_BEFORE), (evidence.READER, evidence.READER_BEFORE),
+                          (evidence.LOADING, evidence.LOADING_BEFORE), (evidence.LOADING_TEST, evidence.LOADING_TEST_BEFORE)):
             bad = copy.deepcopy(freeze); bad['after_format'][path] = old
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
@@ -224,7 +225,7 @@ class DirectEvidenceControls(unittest.TestCase):
         with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if Path(p) == evidence.COMPILE_FREEZE else original(p)), self.assertRaises(AssertionError):
             evidence.historical_compile_sources(self.roles)
         cp_path = ROOT / self.roles['checkpoint_name']
-        for required in (evidence.COMPILE_FREEZE, evidence.READER_FREEZE):
+        for required in (evidence.COMPILE_FREEZE, evidence.READER_FREEZE, evidence.LOADING_FREEZE):
             bad = evidence.read(cp_path); del bad['source_pins'][str(required)]
             with self.replaced_record(cp_path, bad), self.assertRaises((AssertionError, KeyError)):
                 evidence.authenticate_current_checkpoint(self.roles)
@@ -235,6 +236,17 @@ class DirectEvidenceControls(unittest.TestCase):
             bad = evidence.read(evidence.READER_FREEZE); bad[field] = mapping
             with self.replaced_record(evidence.READER_FREEZE, bad), self.assertRaises(AssertionError):
                 evidence.authenticate_current_checkpoint(self.roles)
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if Path(p) == evidence.LOADING_FREEZE else original(p)), self.assertRaises(AssertionError):
+            evidence.authenticate_current_checkpoint(self.roles)
+        for field, value in [('changed', evidence.CHANGED), ('unchanged', 54),
+                             ('known_validation_sources_before', {}), ('new_gate_sources', {evidence.LOADING_TEST: evidence.LOADING_TEST_BEFORE})]:
+            bad = evidence.read(evidence.LOADING_FREEZE); bad[field] = value
+            with self.replaced_record(evidence.LOADING_FREEZE, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_current_checkpoint(self.roles)
+        for path, value in ((evidence.LOADING, evidence.LOADING_BEFORE), (evidence.LOADING_TEST, evidence.LOADING_TEST_BEFORE)):
+            bad = evidence.read(evidence.LOADING_FREEZE); bad['after_format'][path] = value
+            with self.replaced_record(evidence.LOADING_FREEZE, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_current_checkpoint(self.roles)
         bad = evidence.read(evidence.COMPILE_FREEZE); bad['after_format'][evidence.MEMORY] = evidence.MEMORY_CURRENT
         with self.replaced_record(evidence.COMPILE_FREEZE, bad), self.assertRaises(AssertionError):
             evidence.historical_compile_sources(self.roles)
@@ -244,6 +256,17 @@ class DirectEvidenceControls(unittest.TestCase):
         prior = Path(self.roles['last_actual_native_root'])
         native_path = prior / 'native/operation.json'
         evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        old_loading = evidence.read(Path(evidence.ROOTS['L']) / 'slug_loading_v2-executable.json')
+        with self.replaced_record(prior / 'slug_loading_v2-executable.json', old_loading), self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        prior_binding = prior / 'loading-artifact-binding.json'
+        for field, value in [('profile', {**evidence.read(prior_binding)['cargo_artifact']['profile'], 'opt_level': '1'}), ('features', ['default'])]:
+            bad = evidence.read(prior_binding); bad['cargo_artifact'][field] = value
+            with self.replaced_record(prior_binding, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        bad = evidence.read(prior_binding); bad['compile_operation_sha256'] = '0' * 64
+        with self.replaced_record(prior_binding, bad), self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(self.roles, freeze['after_format'])
         for p in (evidence.CHANGED[0], str(Path(self.roles['supervisor_path']).resolve())):
             bad = evidence.read(native_path)
             del bad['pins_before'][p]; del bad['pins_after'][p]

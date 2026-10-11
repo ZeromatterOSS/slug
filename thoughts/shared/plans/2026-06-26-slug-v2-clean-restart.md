@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-357-m7a-host-load-key-retained-export
-Status: accepted — Loading/Core and representative resource gates; independent FINAL
+Packet: WP-7-358-m7a-rustfmt-build-metadata
+Status: preserved unaccepted — actual native RSS stop; allocation recovery selected next
 
-Host temporary load keys borrow existing storage; retained frozen values remain
-independently owned. [Receipt](./slug-v2-subplans/wp1145-host-load-key-borrowing-2026-10-11.json)
-records fresh Loading30/Core59/default production/helper13, qualified Q7/fixture31,
-and one20.512s captured prefix at255.238MiB/256MiB. Source graph final-owner
-retirement and future/full-workload fit remain unproved. Broader work resumes at
-the captured rust/rustfmt/BUILD.bazel metadata request after finite steady56 routing
-is ready. [Contract](./slug-v2-subplans/current-packet.md) preserves explicit caps.
+[WP1145 acceptance](./slug-v2-subplans/wp1145-host-load-key-borrowing-2026-10-11.json)
+proves borrowed Host load keys, fresh owner gates and captured-prefix budget fit
+at255.238MiB/256MiB. Broader work resumes with the exact captured root1 rustfmt
+BUILD marker Lstat. [Contract](./slug-v2-subplans/current-packet.md) keeps source34,
+normal identity, borrowing discipline and unchanged caps while adapting finite
+steady56 evidence; fresh cached Loading checks avoid added saved-runtime machinery.
 Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
+WP1146 actual probe stopped RSS259.105MiB/256MiB after fresh ordinary gates passed;
+[failed cohort](./slug-v2-subplans/wp1146-rustfmt-build-resource-failure-2026-10-11.json)
+is preserved unaccepted. No terminal frontier/FIRST; bounded allocation recovery precedes broader progress.
 
 ### Ready and blocked queue
 
