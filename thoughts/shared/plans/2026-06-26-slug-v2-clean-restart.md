@@ -34,19 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-342-m7a-rust-build-source
-Status: ready — source authority correction and design checkpoint pending
+Packet: WP-7-343-m7a-rust-root-directory
+Status: ready — independent DESIGN and stopped source checkpoint pending
 
-[Accepted WP1129](./slug-v2-subplans/wp1129-rust-package-marker-metadata-2026-10-11.json)
-admits two exact package-marker Lstats under the existing qualified private role.
-FreshCore48/production and qualifiedLoading29/Bzlmod7/fixture31 passed; one native
-advanced original rust/BUILD.bazel to a FileBytes request. Distinct phase255.2265625
-MiB remains under256 with only0.7734375MiB headroom; future fit remains unproved.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects authentic one-leaf
-source inspection/FD qualification before body activation. DESIGN first requires
-correcting the unestablished archive assumption using accepted original provenance;
-no body acquisition or activation has occurred. Preserve existing source
-ownership/interner discipline and all resource caps; production and Windows unchanged.
+[Accepted WP1130](./slug-v2-subplans/wp1130-rust-build-source-2026-10-11.json)
+admits the qualified original564-byte Rust BUILD source through one borrowed static
+entry. FreshCore48/production and qualifiedLoading29/Bzlmod7/fixture31 passed; one
+native reached source391 and the original Rust directory listing boundary. Phase
+253.94140625MiB remains below256; future/whole fit is unproved. The
+[current manifest](./slug-v2-subplans/current-packet.md) selects exact root1/rust
+DirectoryEntries using the existing bounded Host/DICE reader and role, with four
+existing reader controls added to fresh validation. All361 source rows, allocation
+owners and resource caps stay unchanged; production and Windows unchanged.
 
 ### Ready and blocked queue
 

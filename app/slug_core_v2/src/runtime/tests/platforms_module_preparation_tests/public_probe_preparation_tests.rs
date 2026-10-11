@@ -10345,7 +10345,11 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
     for (relative, selected, spellings) in metadata {
         assert_exact_root_file_role(
             relative,
-            &[PathObservationOperation::Lstat],
+            if relative == "rust/BUILD.bazel" {
+                &operations
+            } else {
+                &[PathObservationOperation::Lstat]
+            },
             Bodies::with_rules_rust_defs_import_sources,
             |b| b.rules_rust_defs_import_sources,
             &spellings,
@@ -10384,7 +10388,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 71);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 72);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -10497,7 +10501,12 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                     PathObservationOperation::DirectoryEntries,
                     PathObservationOperation::ReadLink,
                 ]
-                .map(|operation| (selected, operation)),
+                .into_iter()
+                .filter(move |operation| {
+                    selected != "/rules/rust/BUILD.bazel"
+                        || !matches!(operation, PathObservationOperation::FileBytes)
+                })
+                .map(move |operation| (selected, operation)),
             )
     })) {
         let expected_family = match &operation {
