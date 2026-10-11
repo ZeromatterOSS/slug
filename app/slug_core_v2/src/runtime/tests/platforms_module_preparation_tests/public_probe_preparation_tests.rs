@@ -330,6 +330,10 @@ fn namespace_policy(
                 "repo_marker"
             } else if bodies.ignore_file_bytes && relative == Path::new(".bazelignore") {
                 "ignore_marker"
+            } else if relative == Path::new("BUILD.bazel")
+                && bodies.qualified_swift_file_plan(request).is_some()
+            {
+                "package_marker"
             } else if plan
                 .effects()
                 .iter()
@@ -4474,6 +4478,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
     let bodies = make_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    let swift = bodies.swift_offline_archive.is_some();
     let content: Arc<[u8]> = Arc::from(&b"synthetic"[..]);
     let body_weak = Arc::downgrade(&content);
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
@@ -4571,6 +4576,22 @@ fn assert_generated_namespace_is_current_and_declared_only(
                 ));
             }
         }
+        let package = demand(
+            materialized,
+            &format!("{root}/BUILD.bazel"),
+            PathObservationOperation::Lstat,
+        );
+        let policy = namespace_policy(
+            &bodies,
+            &package,
+            Some(epoch),
+            &generated_features_plan_matches,
+        );
+        assert_eq!(
+            policy.path_class,
+            if swift { "package_marker" } else { "other" }
+        );
+        assert_eq!(policy.admits(&package.operation()), swift);
         for (path, class) in [(marker, "repo_marker"), (ignore, "ignore_marker")] {
             let marker = demand(materialized, path, PathObservationOperation::Lstat);
             assert_eq!(
@@ -4590,6 +4611,11 @@ fn assert_generated_namespace_is_current_and_declared_only(
         materialized,
         "/parent/B/nested/BUILD",
         PathObservationOperation::FileBytes,
+    );
+    let package_marker = demand(
+        materialized,
+        "/parent/B/BUILD.bazel",
+        PathObservationOperation::Lstat,
     );
     assert!(!admits(&valid_demand, None));
     assert!(!admits(&valid_demand, Some(&epoch_a)));
@@ -4619,6 +4645,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
         let wrong_owner_epoch =
             namespace_test_epoch_at(&bodies, [Arc::new(wrong_owner)], instance, "/parent/B");
         assert!(!admits(&valid_demand, Some(&wrong_owner_epoch)));
+        assert!(!admits(&package_marker, Some(&wrong_owner_epoch)));
     }
     let mut other = request.as_ref().clone();
     other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
@@ -4645,7 +4672,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
         Some(&wrong_workspace),
         Some(&ambiguous),
     ] {
-        for marker in [&marker, &ignore_marker] {
+        for marker in [&marker, &ignore_marker, &package_marker] {
             assert!(!admits(marker, epoch));
         }
     }
@@ -4653,6 +4680,16 @@ fn assert_generated_namespace_is_current_and_declared_only(
         let mut flags = make_bodies();
         flags.repo_marker_metadata = repo;
         flags.ignore_file_bytes = ignore;
+        assert_eq!(
+            namespace_policy(
+                &flags,
+                &package_marker,
+                Some(&epoch_b),
+                &generated_features_plan_matches
+            )
+            .admits(&package_marker.operation()),
+            swift
+        );
         for (marker, enabled) in [(&marker, repo), (&ignore_marker, ignore)] {
             assert_eq!(
                 namespace_policy(
@@ -4671,6 +4708,31 @@ fn assert_generated_namespace_is_current_and_declared_only(
             let roles = make_bodies()
                 .with_repo_marker_metadata(registry, command)
                 .with_ignore_file_bytes(registry, command);
+            assert_eq!(
+                namespace_policy(
+                    &roles,
+                    &package_marker,
+                    Some(&epoch_b),
+                    &generated_features_plan_matches
+                )
+                .admits(&package_marker.operation()),
+                swift
+            );
+            let source_roles = make_bodies()
+                .with_generated_features_file_effects(registry, command)
+                .with_rules_rust_defs_import_sources(registry, command);
+            assert_eq!(
+                namespace_policy(
+                    &source_roles,
+                    &package_marker,
+                    Some(&epoch_b),
+                    &generated_features_plan_matches
+                )
+                .admits(&package_marker.operation()),
+                swift
+                    && matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
             for marker in [&marker, &ignore_marker] {
                 assert_eq!(
                     namespace_policy(
@@ -4698,6 +4760,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
                 small_generated_plan(&[
                     ("REPO.bazel", b"synthetic", false),
                     (".bazelignore", b"synthetic", false),
+                    ("BUILD.bazel", b"synthetic", false),
                 ]),
             ))],
             instance,
@@ -4707,7 +4770,11 @@ fn assert_generated_namespace_is_current_and_declared_only(
             PathObservationOperation::Lstat,
             PathObservationOperation::FileBytes,
         ] {
-            for path in ["/parent/B/REPO.bazel", "/parent/B/.bazelignore"] {
+            for path in [
+                "/parent/B/REPO.bazel",
+                "/parent/B/.bazelignore",
+                "/parent/B/BUILD.bazel",
+            ] {
                 let leaf = demand(materialized, path, operation.dupe());
                 let policy = namespace_policy(
                     &disabled,
@@ -4719,6 +4786,63 @@ fn assert_generated_namespace_is_current_and_declared_only(
                 assert!(policy.admits(&leaf.operation()));
             }
         }
+    }
+    // A declared child preserves parent metadata-only rights for every original owner.
+    {
+        let child = namespace_test_epoch_at(
+            &bodies,
+            [Arc::new(make_request(
+                &bodies,
+                small_generated_plan(&[("BUILD.bazel/child", b"synthetic", false)]),
+            ))],
+            instance,
+            "/parent/B",
+        );
+        let policy = namespace_policy(
+            &bodies,
+            &package_marker,
+            Some(&child),
+            &generated_features_plan_matches,
+        );
+        assert_eq!(
+            policy.path_class,
+            if swift { "package_marker" } else { "ancestor" }
+        );
+        assert!(policy.admits(&package_marker.operation()));
+        assert!(!policy.admits(&PathObservationOperation::FileBytes));
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ] {
+            let leaf = demand(materialized, "/parent/B/BUILD.bazel/child", operation);
+            let policy = namespace_policy(
+                &bodies,
+                &leaf,
+                Some(&child),
+                &generated_features_plan_matches,
+            );
+            assert_eq!(policy.path_class, "fixed_file");
+            assert!(policy.admits(&leaf.operation()));
+        }
+    }
+    if swift {
+        let java = java_proxy_test_bodies();
+        let request = java_file_plan_test_request(
+            &java,
+            small_generated_plan(&[("BUILD", b"synthetic", false)]),
+            Some(SWIFT_GENERATED_DIAGNOSTIC_OWNER.0),
+        );
+        assert!(java.qualified_java_file_plan(&request).is_some());
+        let epoch = namespace_test_epoch_at(&java, [Arc::new(request)], instance, "/parent/B");
+        assert!(
+            !namespace_policy(
+                &java,
+                &package_marker,
+                Some(&epoch),
+                &generated_features_plan_matches
+            )
+            .admits(&package_marker.operation())
+        );
     }
     // A malformed successful epoch must not turn a file-parent collision into path authority.
     for plan in [
@@ -4738,6 +4862,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
             "/parent",
             "/parent/B/REPO.bazel",
             "/parent/B/.bazelignore",
+            "/parent/B/BUILD.bazel",
         ] {
             assert!(!admits(
                 &demand(materialized, path, PathObservationOperation::Lstat),
@@ -4774,6 +4899,16 @@ fn assert_generated_namespace_is_current_and_declared_only(
         )
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        assert_eq!(
+            namespace_policy(
+                &selected,
+                &package_marker,
+                Some(&epoch_b),
+                &generated_features_plan_matches
+            )
+            .admits(&package_marker.operation()),
+            swift && case == 1
+        );
         for d in [&valid_demand, &marker, &ignore_marker] {
             assert_eq!(
                 namespace_policy(
@@ -4812,7 +4947,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
         )
         .admits(&valid_demand.operation())
     );
-    for marker in [&marker, &ignore_marker] {
+    for marker in [&marker, &ignore_marker, &package_marker] {
         assert!(
             !namespace_policy(
                 &closed,
@@ -4827,7 +4962,7 @@ fn assert_generated_namespace_is_current_and_declared_only(
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     no_defs.rules_rust_defs_import_sources = false;
-    for marker in [&marker, &ignore_marker] {
+    for marker in [&marker, &ignore_marker, &package_marker] {
         assert!(
             !namespace_policy(
                 &no_defs,
@@ -4839,7 +4974,12 @@ fn assert_generated_namespace_is_current_and_declared_only(
         );
     }
     let valid = SourcePreparationNeeds::path(
-        NeedPathObservations::try_from_iter([valid_demand, marker, ignore_marker]).unwrap(),
+        NeedPathObservations::try_from_iter(
+            [valid_demand, marker, ignore_marker]
+                .into_iter()
+                .chain(swift.then_some(package_marker)),
+        )
+        .unwrap(),
     );
     let admit_need = |needs: &SourcePreparationNeeds| {
         bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|d| {
@@ -4910,21 +5050,34 @@ fn assert_generated_namespace_is_current_and_declared_only(
     ]
     .into_iter()
     .chain(
-        ["/parent/B/REPO.bazel", "/parent/B/.bazelignore"]
+        [
+            "/parent/B/REPO.bazel",
+            "/parent/B/.bazelignore",
+            "/parent/B/BUILD.bazel",
+        ]
+        .into_iter()
+        .flat_map(|path| {
+            [
+                PathObservationOperation::FileBytes,
+                PathObservationOperation::DirectoryEntries,
+                PathObservationOperation::FileDigest,
+                PathObservationOperation::ReadLink,
+            ]
             .into_iter()
-            .flat_map(|path| {
-                [
-                    PathObservationOperation::FileBytes,
-                    PathObservationOperation::DirectoryEntries,
-                    PathObservationOperation::FileDigest,
-                    PathObservationOperation::ReadLink,
-                ]
-                .into_iter()
-                .map(move |operation| (materialized, path, operation))
-            }),
+            .map(move |operation| (materialized, path, operation))
+        }),
     )
     .chain(
         [
+            (materialized, "/parent/B/build.bazel"),
+            (materialized, "/parent/B/BUILD.bazel.bak"),
+            (materialized, "/parent/B/BUILD.bazel/child"),
+            (materialized, "/parent/B/nested/BUILD.bazel"),
+            (materialized, "/parent/B-sibling/BUILD.bazel"),
+            (materialized, "/outside/BUILD.bazel"),
+            (materialized, "/parent/A/BUILD.bazel"),
+            (foreign, "/parent/B/BUILD.bazel"),
+            (PathObservationNamespace::Host, "/parent/B/BUILD.bazel"),
             (materialized, "/parent/B/repo.bazel"),
             (materialized, "/parent/B/.BAZELIGNORE"),
             (materialized, "/parent/B/REPO.bazel.bak"),

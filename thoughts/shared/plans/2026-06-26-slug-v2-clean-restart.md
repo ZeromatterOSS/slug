@@ -34,18 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-335-m7a-swift-package-metadata
+Packet: WP-7-336-m7a-qualified-work-time
 Status: ready for DESIGN
 
-The [accepted Swift File-only capability](./slug-v2-subplans/wp1122-swift-file-plan-2026-10-11.json)
-passes freshCore45/production and qualified protected33/fixture31. ONE20.098s/source366/
-phase247.05078125MiB under256;217pins/359source/18env stable. The original Swift File
-boundary is crossed; root BUILD.bazel Lstat remains refused. No retained string or
-field growth; Bodies304/Scope488 unchanged. Producer/whole-workload fit remain open.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects only this exact
-Swift generated-root package metadata lookup through the full original typed guard
-and unique current epoch. Declared-leaf precedence remains; no new body/flags/source
-acquisition or Windows work. Independent DESIGN precedes activation.
+The [accepted Swift package metadata](./slug-v2-subplans/wp1123-swift-package-metadata-2026-10-11.json)
+passes freshCore45/production and qualified protected33/fixture31. ONE20.579s/source377/
+phase246.8671875MiB under256;217pins/359source/18env stable. Prior root BUILD.bazel
+boundary crossed; genuine work20 deadline captures8 late immutableSwift path demands.
+No new retained strings or fields; Bodies304/Scope488 unchanged. Producer/wholefit open.
+The [current manifest](./slug-v2-subplans/current-packet.md) proposes reviewed qualified
+work26/cleanup29/outer32 within unchanged constructor ceiling27/tail3, retaining all
+memory/byte/source/input caps. No new namespace/body/source/Windows capability.
+Independent DESIGN precedes time-policy activation; original deadline result preserved.
 
 ### Ready and blocked queue
 
