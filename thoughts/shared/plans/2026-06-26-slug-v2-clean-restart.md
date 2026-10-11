@@ -34,16 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-328-m7a-python-uv-file-plan
-Status: accepted — next Kotlin availability/binding prerequisite selected
+Packet: WP-7-330-m7a-kotlin-capabilities-file-plan
+Status: ready — independent DESIGN required before implementation
 
-The [accepted UV file-plan packet](./slug-v2-subplans/wp1116-python-uv-file-plan-2026-10-11.json)
-admits its exact owner through unchanged complete borrowed File-only/current-epoch
-namespace gates. CurrentCore43 and production compile passed; protected33 reused.
-ONE17.039s/source321/phase239.270MiB under256 crossed generated UV BUILD/dependency
-reads into rules_kotlin+ immutable refusal. Original353sources/18env/caps remain.
-The [current manifest](./slug-v2-subplans/current-packet.md) records the next bounded
-archive/patch availability and fixed transport/binding decision; producer/M7A open.
+The [accepted Kotlin cohort packet](./slug-v2-subplans/wp1117-kotlin-immutable-cohort-2026-10-11.json)
+admits the exact original archive/MODULE/patch through complete borrowed request and
+current-epoch gates. Current76 Rust+31 fixture/production checks and ONE18.712s/source357/
+phase242.547MiB under256 passed; exact356sources/18env stable. Archives use bounded
+held-file streaming. The [current manifest](./slug-v2-subplans/current-packet.md) selects
+only the demanded Kotlin capabilities File-only repository with an independently
+qualified Kotlin context and unchanged memory/time/profile caps. Source inspection
+is complete; live output eligibility and producer/certificate/actions/Rustc/M7A remain open.
 
 ### Ready and blocked queue
 

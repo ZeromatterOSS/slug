@@ -765,6 +765,7 @@ fn selected_bcr_offline_session_refuses_mismatch_foreign_cancel_and_resource_lim
 fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     const SECOND_URL: &str = "https://example.invalid/original/second.tar.gz";
     const THIRD_URL: &str = "https://example.invalid/original/third.tar.gz";
+    const FOURTH_URL: &str = "https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz";
     let (first, first_backing) = selected_bcr_offline_session_fixture();
     let (mut second, _) = selected_bcr_offline_session_fixture();
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -819,14 +820,78 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     // Preserve its original overlay -> strip1 patch -> prepared MODULE pipeline.
     let third_patch = std::fs::read(&third.patch).unwrap();
     let third_overlay = std::fs::read(&third.overlay).unwrap();
-    let transform_bytes = (third_patch.len() + third_overlay.len()) as u64;
+    let mut transform_bytes = (third_patch.len() + third_overlay.len()) as u64;
     let third_backing = OfflineArchiveBacking::new(
         THIRD_URL,
         sha2::Sha256::digest(&third.archive_bytes).into(),
         NormalizedAbsolutePath::new(third.archive.clone()).unwrap(),
     );
-    let fixtures = [first, second, third];
-    let backings = [first_backing, second_backing, third_backing];
+    // Synthetic Kotlin-shaped source, through the normal archive -> strip1 patch -> MODULE pipeline.
+    let mut fourth = selected_bcr_file_session_fixture();
+    let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+    encoder
+        .write_all(&ustar(
+            &[
+                TarEntry {
+                    name: b"value.txt",
+                    prefix: b"",
+                    typeflag: b'0',
+                    data: b"archive\n",
+                },
+                TarEntry {
+                    name: b"MODULE.bazel",
+                    prefix: b"",
+                    typeflag: b'0',
+                    data: b"archive module\n",
+                },
+            ],
+            true,
+        ))
+        .unwrap();
+    fourth.archive_bytes = encoder.finish().unwrap();
+    fourth.module_bytes = b"module(name = 'kotlin_file_registry')\n".to_vec();
+    fourth.patched_value = b"kotlin patched\n".to_vec();
+    let fourth_patch =
+        b"--- a/value.txt\n+++ b/value.txt\n@@ -1 +1 @@\n-archive\n+kotlin patched\n";
+    std::fs::write(&fourth.archive, &fourth.archive_bytes).unwrap();
+    std::fs::write(&fourth.module, &fourth.module_bytes).unwrap();
+    std::fs::write(&fourth.patch, fourth_patch).unwrap();
+    let attrs = Arc::make_mut(&mut fourth.spec.attributes);
+    attrs.shift_remove("type");
+    attrs.insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([selected_bcr_file_session_value(FOURTH_URL)])),
+    );
+    attrs.insert(
+        "integrity".into(),
+        selected_bcr_file_session_value(selected_bcr_file_session_sri(&fourth.archive_bytes)),
+    );
+    attrs.insert("strip_prefix".into(), selected_bcr_file_session_value(""));
+    attrs.insert(
+        "remote_module_file_integrity".into(),
+        selected_bcr_file_session_value(selected_bcr_file_session_sri(&fourth.module_bytes)),
+    );
+    attrs.insert(
+        "remote_patches".into(),
+        OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+            OverrideAttributeKey::String(selected_bcr_file_session_url(&fourth.patch)),
+            selected_bcr_file_session_value(selected_bcr_file_session_sri(fourth_patch)),
+        )]))),
+    );
+    for key in ["remote_file_urls", "remote_file_integrity"] {
+        attrs.insert(
+            key.into(),
+            OverrideAttributeValue::Map(Arc::new(SmallMap::new())),
+        );
+    }
+    transform_bytes += fourth_patch.len() as u64;
+    let fourth_backing = OfflineArchiveBacking::new(
+        FOURTH_URL,
+        sha2::Sha256::digest(&fourth.archive_bytes).into(),
+        NormalizedAbsolutePath::new(fourth.archive.clone()).unwrap(),
+    );
+    let fixtures = [first, second, third, fourth];
+    let backings = [first_backing, second_backing, third_backing, fourth_backing];
     assert_ne!(backings[0].integrity(), backings[1].integrity());
     let weak_backings = backings.each_ref().map(Arc::downgrade);
     let workspace_root = tempfile::tempdir().unwrap();
@@ -847,7 +912,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             false,
         )
     };
-    for (left, right) in [(0, 1), (0, 2), (1, 2)] {
+    for (left, right) in [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)] {
         for duplicate in [
             backings[left].clone(),
             OfflineArchiveBacking::new(
@@ -856,7 +921,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
                 backings[right].path().clone(),
             ),
         ] {
-            let mut slots = [None, None, None];
+            let mut slots = [None, None, None, None];
             slots[left] = Some(backings[left].clone());
             slots[right] = Some(duplicate);
             assert_eq!(
@@ -871,13 +936,34 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         );
     }
     let previous = make_scope(
-        [Some(backings[0].clone()), Some(backings[1].clone()), None],
+        [
+            Some(backings[0].clone()),
+            Some(backings[1].clone()),
+            None,
+            None,
+        ],
         limits,
     )
     .unwrap();
     assert!(
         previous
             .offline_archive_path_for_test(THIRD_URL, backings[2].integrity())
+            .is_none()
+    );
+    drop(previous);
+    let previous = make_scope(
+        [
+            Some(backings[0].clone()),
+            Some(backings[1].clone()),
+            Some(backings[2].clone()),
+            None,
+        ],
+        limits,
+    )
+    .unwrap();
+    assert!(
+        previous
+            .offline_archive_path_for_test(FOURTH_URL, backings[3].integrity())
             .is_none()
     );
     drop(previous);
@@ -910,10 +996,16 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             )
             .is_none()
     );
+    assert!(
+        scope
+            .offline_archive_path_for_test(FOURTH_URL, &[0; 32])
+            .is_none()
+    );
     let requests = [
         selected_bcr_file_session_request(&workspace, "cohort-a", fixtures[0].spec.clone()),
         selected_bcr_file_session_request(&workspace, "cohort-b", fixtures[1].spec.clone()),
         selected_bcr_file_session_request(&workspace, "cohort-c", fixtures[2].spec.clone()),
+        selected_bcr_file_session_request(&workspace, "cohort-d", fixtures[3].spec.clone()),
     ];
     let request_weaks = requests.each_ref().map(Arc::downgrade);
     let runtime = selected_bcr_file_session_runtime();
@@ -935,7 +1027,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             .unwrap();
         let (root, instance) = immutable_result(&materializer, request.id.canonical_repo.as_str());
         let view = epoch
-            .borrowed_instance_for_namespace(&workspace, instance, 3)
+            .borrowed_instance_for_namespace(&workspace, instance, 4)
             .unwrap()
             .unwrap();
         assert!(std::ptr::eq(view.request(), request.as_ref()));
@@ -952,7 +1044,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             match index {
                 0 => b"archive\n".as_slice(),
                 1 => b"second archive\n".as_slice(),
-                _ => fixtures[2].patched_value.as_slice(),
+                _ => fixtures[index].patched_value.as_slice(),
             }
         );
         if index == 0 {
@@ -965,8 +1057,11 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     assert_ne!(roots[0].1, roots[1].1);
     assert_ne!(roots[0].1, roots[2].1);
     assert_ne!(roots[1].1, roots[2].1);
+    for root in &roots[..3] {
+        assert_ne!(root.1, roots[3].1);
+    }
     let counters = scope.snapshot();
-    assert_eq!(counters.source_attempts, 8);
+    assert_eq!(counters.source_attempts, 11);
     assert_eq!(
         counters.transferred_bytes,
         fixtures
@@ -984,6 +1079,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     }
     std::fs::remove_file(&fixtures[2].patch).unwrap();
     std::fs::remove_file(&fixtures[2].overlay).unwrap();
+    std::fs::remove_file(&fixtures[3].patch).unwrap();
     let reuse = begin_empty(&materializer);
     for (index, request) in requests.iter().enumerate() {
         materializer
@@ -1022,6 +1118,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     }
     std::fs::write(&fixtures[2].patch, &third_patch).unwrap();
     std::fs::write(&fixtures[2].overlay, &third_overlay).unwrap();
+    std::fs::write(&fixtures[3].patch, fourth_patch).unwrap();
     let first = first_counters.unwrap();
     let counter_value = |snapshot: crate::runtime::dice::source_service::SourceServiceCounters,
                          counter| match counter {
@@ -1030,7 +1127,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         SourceCounter::WrittenBytes => snapshot.written_bytes,
         _ => unreachable!(),
     };
-    for case in 0..5 {
+    for case in 0..7 {
         let mut constrained = limits;
         let counter = [
             SourceCounter::TransferBytes,
@@ -1047,7 +1144,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         let weak_owner = Arc::downgrade(&owner);
         let failed = RepositoryMaterializer::new_scoped(workspace.clone(), owner.clone()).unwrap();
         let session = begin_empty(&failed);
-        let held_root = if case == 3 {
+        let held_root = if case == 3 || case == 6 {
             owner.cancel();
             None
         } else {
@@ -1066,32 +1163,33 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             );
             Some(immutable_result(&failed, "cohort-a").0)
         };
-        if case == 4 {
-            std::fs::write(&fixtures[1].archive, b"corrupt archive").unwrap();
+        let selected = if case == 5 || case == 6 { 3 } else { 1 };
+        if case == 4 || case == 5 {
+            std::fs::write(&fixtures[selected].archive, b"corrupt archive").unwrap();
         }
         let result = failed.materialize_native_with_runtime(
             session,
-            requests[1].clone(),
+            requests[selected].clone(),
             RepositoryMaterializationGeneration(3),
             &runtime,
             Some(&owner),
         );
-        if case == 4 {
+        if case == 4 || case == 5 {
             result.unwrap();
             assert!(matches!(
-                active_result(&failed, "cohort-b"),
+                active_result(&failed, requests[selected].id.canonical_repo.as_str()),
                 RepositoryMaterializationResult::TransportError { .. }
             ));
             assert_eq!(owner.check(), Ok(()));
         } else {
-            let expected = if case == 3 {
+            let expected = if case == 3 || case == 6 {
                 SourceServiceError::Cancelled
             } else {
                 SourceServiceError::Limit(counter)
             };
             assert_eq!(result, Err(RepositorySessionError::SourceService(expected)));
             assert_eq!(owner.check(), Err(expected));
-            if case == 3 {
+            if case == 3 || case == 6 {
                 assert_eq!(owner.snapshot().source_attempts, 0);
             }
         }
@@ -1108,8 +1206,8 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         "WP1084_OFFLINE_COHORT_LAYOUT backing={}/{} slots={}/{} scope={}/{}",
         std::mem::size_of::<OfflineArchiveBacking>(),
         std::mem::align_of::<OfflineArchiveBacking>(),
-        std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 3]>(),
-        std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 3]>(),
+        std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 4]>(),
+        std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 4]>(),
         std::mem::size_of::<SourceServiceScope>(),
         std::mem::align_of::<SourceServiceScope>()
     );

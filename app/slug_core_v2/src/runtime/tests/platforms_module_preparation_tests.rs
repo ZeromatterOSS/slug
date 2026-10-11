@@ -565,7 +565,8 @@ struct Bodies {
     offline_archive: Option<Arc<OfflineArchiveBacking>>,
     offline_archive_module: Option<NormalizedAbsolutePath>,
     java_offline_archive: Option<immutable_archive_preparation::ArchiveBinding>,
-    python_offline_archive: Option<immutable_archive_preparation::PythonArchiveBinding>,
+    python_offline_archive: Option<immutable_archive_preparation::PatchedArchiveBinding>,
+    kotlin_offline_archive: Option<immutable_archive_preparation::PatchedArchiveBinding>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1489,6 +1490,7 @@ impl Bodies {
             offline_archive_module: None,
             java_offline_archive: None,
             python_offline_archive: None,
+            kotlin_offline_archive: None,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1903,6 +1905,12 @@ impl Bodies {
                 limits.source_attempts = 512;
                 limits.decoded_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
                 limits.written_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
+                if self.kotlin_offline_archive.is_some() {
+                    limits.transferred_bytes =
+                        immutable_archive_preparation::KOTLIN_NATIVE_TRANSFER_BUDGET;
+                    limits.decoded_bytes = immutable_archive_preparation::KOTLIN_NATIVE_BYTE_BUDGET;
+                    limits.written_bytes = immutable_archive_preparation::KOTLIN_NATIVE_BYTE_BUDGET;
+                }
             }
         }
         limits
@@ -1933,6 +1941,7 @@ impl Bodies {
         if self.offline_archive.is_some()
             || self.java_offline_archive.is_some()
             || self.python_offline_archive.is_some()
+            || self.kotlin_offline_archive.is_some()
         {
             return SourceServiceScope::new_for_test_with_offline_archives(
                 workspace,
@@ -1947,6 +1956,9 @@ impl Bodies {
                         .as_ref()
                         .map(|b| b.backing.clone()),
                     self.python_offline_archive
+                        .as_ref()
+                        .map(|b| b.archive.backing.clone()),
+                    self.kotlin_offline_archive
                         .as_ref()
                         .map(|b| b.archive.backing.clone()),
                 ],
@@ -3590,6 +3602,33 @@ fn observe_native_command(
             )
             .unwrap(),
         );
+        bodies = immutable_archive_preparation::configure_kotlin(
+            bodies,
+            registry_choice,
+            command,
+            OfflineArchiveBacking::new(
+                immutable_archive_preparation::KOTLIN_URL,
+                immutable_archive_preparation::KOTLIN_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                        .join(
+                            immutable_archive_preparation::KOTLIN_URL
+                                .strip_prefix("https://")
+                                .unwrap(),
+                        ),
+                )
+                .unwrap(),
+            ),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::KOTLIN_PREPARED_MODULE),
+            )
+            .unwrap(),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::KOTLIN_PREPARED_PATCH),
+            )
+            .unwrap(),
+        );
     }
     let bodies = Arc::new(bodies);
     println!(
@@ -3629,6 +3668,10 @@ fn observe_native_command(
                 .map(|b| b.backing.clone()),
             bodies
                 .python_offline_archive
+                .as_ref()
+                .map(|b| b.archive.backing.clone()),
+            bodies
+                .kotlin_offline_archive
                 .as_ref()
                 .map(|b| b.archive.backing.clone()),
         ],

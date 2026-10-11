@@ -195,7 +195,7 @@ pub(in crate::runtime) struct SourceServiceScope {
     #[cfg(all(test, target_os = "linux"))]
     known_shas_root: Option<NormalizedAbsolutePath>,
     #[cfg(all(test, target_os = "linux"))]
-    offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 3],
+    offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 4],
 }
 impl SourceServiceScope {
     pub(super) fn new(
@@ -228,7 +228,7 @@ impl SourceServiceScope {
             #[cfg(all(test, target_os = "linux"))]
             known_shas_root: None,
             #[cfg(all(test, target_os = "linux"))]
-            offline_archives: [None, None, None],
+            offline_archives: [None, None, None, None],
         }))
     }
     #[cfg(test)]
@@ -292,7 +292,7 @@ impl SourceServiceScope {
             cleanup_deadline,
             limits,
             known_shas_root,
-            [offline_archive, None, None],
+            [offline_archive, None, None, None],
             source_charge_census,
         )
     }
@@ -303,7 +303,7 @@ impl SourceServiceScope {
         cleanup_deadline: Instant,
         limits: SourceServiceLimits,
         known_shas_root: Option<NormalizedAbsolutePath>,
-        offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 3],
+        offline_archives: [Option<Arc<super::OfflineArchiveBacking>>; 4],
         source_charge_census: bool,
     ) -> Result<Arc<Self>, SourceServiceError> {
         if !super::offline_archive::cohort_has_unique_urls(&offline_archives) {

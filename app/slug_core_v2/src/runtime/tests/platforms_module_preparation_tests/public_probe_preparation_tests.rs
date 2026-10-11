@@ -2850,7 +2850,7 @@ fn python_test_bodies() -> Bodies {
     use immutable_archive_preparation::PYTHON_PREPARED_MODULE;
     use immutable_archive_preparation::PYTHON_PREPARED_PATCH;
     use immutable_archive_preparation::PYTHON_URL;
-    use immutable_archive_preparation::PythonArchiveBinding;
+    use immutable_archive_preparation::PatchedArchiveBinding;
     let project = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
@@ -2858,7 +2858,7 @@ fn python_test_bodies() -> Bodies {
         .unwrap();
     let mut bodies = namespace_test_bodies();
     bodies.rules_cc_import_sources = false;
-    bodies.python_offline_archive = Some(PythonArchiveBinding {
+    bodies.python_offline_archive = Some(PatchedArchiveBinding {
         archive: ArchiveBinding {
             backing: OfflineArchiveBacking::new(
                 PYTHON_URL,

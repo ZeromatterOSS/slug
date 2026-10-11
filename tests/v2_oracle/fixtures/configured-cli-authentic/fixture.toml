@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 9024310
+total_source_bytes = 32114214
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -305,3 +305,26 @@ member = "rules_python-1.7.0/MODULE.bazel"
 patch = "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
 expected = "modules/rules_python/1.7.0/MODULE.bazel"
 preimage_sha256 = "66055eda07edd4446faaa3fa7868810cafc0c9224c929be04dfc433194c007de"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"
+destination = "mirror/github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"
+sha256 = "3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43"
+size = 23089629
+source_url = "https://github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "registry/modules/rules_kotlin/1.9.6/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/rules_kotlin/1.9.6/patches/module_dot_bazel_version.patch"
+sha256 = "0f3709e770aa0ea0fe0226e8025f13ab6fdf2894579f48393b68385107cbadb1"
+size = 275
+source_url = "https://bcr.bazel.build/modules/rules_kotlin/1.9.6/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazelbuild/rules_kotlin/releases/download/v1.9.6/rules_kotlin-v1.9.6.tar.gz"
+member = "MODULE.bazel"
+patch = "registry/modules/rules_kotlin/1.9.6/patches/module_dot_bazel_version.patch"
+expected = "modules/rules_kotlin/1.9.6/MODULE.bazel"
+preimage_sha256 = "6c0830dd56507fd71ee43bc60435a6761c3b8c00a2a6e157013b74def25fd22a"

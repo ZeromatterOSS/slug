@@ -17,9 +17,10 @@ import sys
 import tarfile
 import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, Iterator
 
 try:
     import tomllib
@@ -35,7 +36,10 @@ DRIVER = REPO_ROOT / "tools" / "v2_oracle" / "run_payload_demand_probe.sh"
 SHA256_RE = re.compile(r"[0-9a-f]{64}")
 HUNK_RE = re.compile(r"@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
 MAX_OBJECT_BYTES = 16 << 20
-MAX_FIXTURE_BYTES = 16 << 20
+MAX_ARCHIVE_OBJECT_BYTES = 32 << 20
+MAX_FIXTURE_BYTES = 32 << 20
+MAX_RETAINED_BYTES = 16 << 20
+ARCHIVE_CHUNK_BYTES = 64 << 10
 
 
 class FixtureError(ValueError):
@@ -71,10 +75,18 @@ class Object:
 
 
 @dataclass(frozen=True)
+class VerifiedArchive:
+    item: Object
+    identity: tuple[int, ...]
+    ancestors: tuple[tuple[int, ...], ...]
+
+
+@dataclass(frozen=True)
 class VerifiedFixture:
     root: Path
     objects: tuple[Object, ...]
     bytes_by_source: dict[str, bytes]
+    archives_by_source: dict[str, VerifiedArchive]
     total_bytes: int
     inventory_sha256: str
     registry_entries: dict[str, bytes]
@@ -116,7 +128,8 @@ def _load_manifest(root: Path) -> tuple[dict[str, Any], tuple[Object, ...]]:
         kind = row.get("kind")
         if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
             raise FixtureError(f"objects[{index}].sha256 must be lowercase SHA-256")
-        if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= MAX_OBJECT_BYTES:
+        limit = MAX_ARCHIVE_OBJECT_BYTES if kind == "archive" else MAX_OBJECT_BYTES
+        if not isinstance(size, int) or isinstance(size, bool) or not 0 <= size <= limit:
             raise FixtureError(f"objects[{index}].size is outside the object limit")
         if not isinstance(source_url, str) or not source_url:
             raise FixtureError(f"objects[{index}].source_url must be non-empty")
@@ -154,12 +167,115 @@ def _read_object(root: Path, item: Object) -> bytes:
         data = path.read_bytes()
     except OSError as error:
         raise FixtureError(f"cannot read fixture object {item.source}: {error}") from error
+    if len(data) != item.size:
+        raise FixtureError(f"size mismatch for {item.source}: read length changed")
     digest = hashlib.sha256(data).hexdigest()
     if digest != item.sha256:
         raise FixtureError(
             f"hash mismatch for {item.source}: expected {item.sha256}, got {digest}"
         )
     return data
+
+
+def _identity(metadata: os.stat_result, *, directory: bool = False) -> tuple[int, ...]:
+    identity = (metadata.st_dev, metadata.st_ino, metadata.st_mode)
+    return identity if directory else identity + (
+        metadata.st_size, metadata.st_mtime_ns, metadata.st_ctime_ns
+    )
+
+
+@contextmanager
+def _held_archive(
+    root: Path, item: Object, expected: VerifiedArchive | None = None
+) -> Iterator[tuple[BinaryIO, VerifiedArchive]]:
+    """Anchor every component, retain descriptors only during this consumption."""
+    descriptors: list[int] = []
+    directories: list[tuple[int, str, int, tuple[int, ...]]] = []
+    try:
+        flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+        anchor = os.open("/", flags | os.O_DIRECTORY)
+        descriptors.append(anchor)
+        anchor_identity = _identity(os.fstat(anchor), directory=True)
+        parent = anchor
+        for name in root.parts[1:] + Path(item.source).parts[:-1]:
+            named = os.stat(name, dir_fd=parent, follow_symlinks=False)
+            if not stat.S_ISDIR(named.st_mode):
+                raise FixtureError(f"archive ancestor is not a directory: {item.source}")
+            held = os.open(name, flags | os.O_DIRECTORY, dir_fd=parent)
+            descriptors.append(held)
+            identity = _identity(os.fstat(held), directory=True)
+            if identity != _identity(named, directory=True):
+                raise FixtureError(f"archive ancestor identity changed: {item.source}")
+            directories.append((parent, name, held, identity))
+            parent = held
+        leaf = Path(item.source).name
+        named = os.stat(leaf, dir_fd=parent, follow_symlinks=False)
+        if not stat.S_ISREG(named.st_mode):
+            raise FixtureError(f"fixture object is not a regular file: {item.source}")
+        descriptor = os.open(leaf, flags, dir_fd=parent)
+        descriptors.append(descriptor)
+        identity = _identity(os.fstat(descriptor))
+        if identity != _identity(named):
+            raise FixtureError(f"archive identity changed: {item.source}")
+        if named.st_size != item.size:
+            raise FixtureError(f"size mismatch for {item.source}: expected {item.size}, got {named.st_size}")
+        snapshot = VerifiedArchive(item, identity, (anchor_identity,) + tuple(
+            entry[3] for entry in directories
+        ))
+        if expected is not None and snapshot != expected:
+            raise FixtureError(f"archive identity changed: {item.source}")
+
+        def check_identity() -> None:
+            if (_identity(os.stat("/", follow_symlinks=False), directory=True) != anchor_identity
+                    or _identity(os.fstat(anchor), directory=True) != anchor_identity):
+                raise FixtureError(f"archive root identity changed: {item.source}")
+            for directory_parent, name, held, original in directories:
+                named_identity = _identity(os.stat(name, dir_fd=directory_parent, follow_symlinks=False), directory=True)
+                if (named_identity != original
+                        or _identity(os.fstat(held), directory=True) != original):
+                    raise FixtureError(f"archive ancestor identity changed: {item.source}")
+            if (_identity(os.stat(leaf, dir_fd=parent, follow_symlinks=False)) != identity
+                    or _identity(os.fstat(descriptor)) != identity):
+                raise FixtureError(f"archive identity changed: {item.source}")
+
+        check_identity()
+        # One close owner for all descriptors, including the unbuffered leaf.
+        with os.fdopen(descriptor, "rb", buffering=0, closefd=False) as stream:
+            yield stream, snapshot
+        check_identity()
+    except OSError as error:
+        raise FixtureError(f"cannot read or missing fixture object {item.source}: {error}") from error
+    finally:
+        for descriptor in reversed(descriptors):
+            os.close(descriptor)
+
+
+def _stream_archive(stream: BinaryIO, item: Object, output: BinaryIO | None = None) -> None:
+    """Prove exact full EOF and SHA while optionally copying bounded chunks."""
+    digest = hashlib.sha256()
+    remaining = item.size
+    while remaining:
+        data = stream.read(min(ARCHIVE_CHUNK_BYTES, remaining))
+        if not data:
+            raise FixtureError(f"size mismatch for {item.source}: short archive EOF")
+        remaining -= len(data)
+        digest.update(data)
+        if output is not None and output.write(data) != len(data):
+            raise FixtureError(f"incomplete staged archive write: {item.source}")
+    if stream.read(1):
+        raise FixtureError(f"size mismatch for {item.source}: archive exceeds expected length")
+    actual = digest.hexdigest()
+    if actual != item.sha256:
+        raise FixtureError(f"hash mismatch for {item.source}: expected {item.sha256}, got {actual}")
+
+
+def _source_totals(objects: tuple[Object, ...]) -> int:
+    total = sum(item.size for item in objects)
+    if total > MAX_FIXTURE_BYTES:
+        raise FixtureError("fixture exceeds the total byte limit")
+    if sum(item.size for item in objects if item.kind != "archive") > MAX_RETAINED_BYTES:
+        raise FixtureError("fixture exceeds the retained small byte limit")
+    return total
 
 
 def _apply_unified_patch(original: bytes, patch: bytes) -> bytes:
@@ -223,28 +339,38 @@ def _verify_patch(raw: dict[str, Any], verified: VerifiedFixture) -> None:
         if not isinstance(preimage, str) or not SHA256_RE.fullmatch(preimage):
             raise FixtureError(f"{prefix}.preimage_sha256 must be lowercase SHA-256")
         try:
-            archive_path = verified.root / archive
-            with tarfile.open(archive_path, mode="r:gz") as bundle:
-                info = bundle.getmember(member)
-                if not info.isfile() or info.size > MAX_OBJECT_BYTES:
-                    raise FixtureError("patch archive member is not a bounded regular file")
-                stream = bundle.extractfile(info)
-                if stream is None:
-                    raise FixtureError("patch archive member could not be opened")
-                original = stream.read(MAX_OBJECT_BYTES + 1)
-        except (OSError, KeyError, tarfile.TarError) as error:
-            raise FixtureError(f"cannot verify patch archive member: {error}") from error
-        if hashlib.sha256(original).hexdigest() != preimage:
-            raise FixtureError("patch archive member preimage hash mismatch")
-        try:
-            patched = _apply_unified_patch(original, verified.bytes_by_source[patch])
-            expected_bytes = verified.bytes_by_source.get(expected)
-            if expected_bytes is None:
-                expected_bytes = verified.registry_entries[expected]
+            listed = verified.archives_by_source[archive]
         except KeyError as error:
-            raise FixtureError(f"patch check references an unlisted object: {error}") from error
-        if patched != expected_bytes:
-            raise FixtureError("patched archive member does not equal pinned registry metadata")
+            raise FixtureError(f"patch check references an unlisted archive: {archive}") from error
+        try:
+            with _held_archive(verified.root, listed.item, listed) as (held, _):
+                _stream_archive(held, listed.item)
+                held.seek(0)
+                with tarfile.open(fileobj=held, mode="r:gz") as bundle:
+                    info = bundle.getmember(member)
+                    if not info.isfile() or info.size > MAX_OBJECT_BYTES:
+                        raise FixtureError("patch archive member is not a bounded regular file")
+                    stream = bundle.extractfile(info)
+                    if stream is None:
+                        raise FixtureError("patch archive member could not be opened")
+                    original = stream.read(MAX_OBJECT_BYTES + 1)
+                    if len(original) != info.size:
+                        raise FixtureError("patch archive member size mismatch")
+                if hashlib.sha256(original).hexdigest() != preimage:
+                    raise FixtureError("patch archive member preimage hash mismatch")
+                try:
+                    patched = _apply_unified_patch(original, verified.bytes_by_source[patch])
+                    expected_bytes = verified.bytes_by_source.get(expected)
+                    if expected_bytes is None:
+                        expected_bytes = verified.registry_entries[expected]
+                except KeyError as error:
+                    raise FixtureError(f"patch check references an unlisted object: {error}") from error
+                if patched != expected_bytes:
+                    raise FixtureError("patched archive member does not equal pinned registry metadata")
+                held.seek(0)
+                _stream_archive(held, listed.item)
+        except (OSError, KeyError, tarfile.TarError, EOFError) as error:
+            raise FixtureError(f"cannot verify patch archive member: {error}") from error
 
 
 def _verify_registry_bundle(
@@ -333,17 +459,19 @@ def _verify_registry_bundle(
 
 
 def verify_fixture(root: Path = DEFAULT_FIXTURE_ROOT) -> VerifiedFixture:
-    root = root.resolve()
+    root = Path(os.path.abspath(root))
     raw, objects = _load_manifest(root)
-    total = 0
+    total = _source_totals(objects)
     bytes_by_source: dict[str, bytes] = {}
+    archives_by_source: dict[str, VerifiedArchive] = {}
     inventory = hashlib.sha256()
     for item in objects:
-        data = _read_object(root, item)
-        total += len(data)
-        if total > MAX_FIXTURE_BYTES:
-            raise FixtureError("fixture exceeds the total byte limit")
-        bytes_by_source[item.source] = data
+        if item.kind == "archive":
+            with _held_archive(root, item) as (stream, snapshot):
+                _stream_archive(stream, item)
+            archives_by_source[item.source] = snapshot
+        else:
+            bytes_by_source[item.source] = _read_object(root, item)
         inventory.update(
             (
                 json.dumps(
@@ -367,12 +495,13 @@ def verify_fixture(root: Path = DEFAULT_FIXTURE_ROOT) -> VerifiedFixture:
             f"fixture total mismatch: manifest declares {expected_total}, verified {total}"
         )
     verified = VerifiedFixture(
-        root, objects, bytes_by_source, total, inventory.hexdigest(), {}
+        root, objects, bytes_by_source, archives_by_source, total, inventory.hexdigest(), {}
     )
     verified = VerifiedFixture(
         root,
         objects,
         bytes_by_source,
+        archives_by_source,
         total,
         inventory.hexdigest(),
         _verify_registry_bundle(raw, verified),
@@ -396,7 +525,11 @@ def assemble(destination: Path, root: Path = DEFAULT_FIXTURE_ROOT) -> dict[str, 
             output = temporary / item.destination
             output.parent.mkdir(parents=True, exist_ok=True)
             with output.open("xb") as stream:
-                stream.write(verified.bytes_by_source[item.source])
+                if item.kind == "archive":
+                    with _held_archive(verified.root, item, verified.archives_by_source[item.source]) as (source, _):
+                        _stream_archive(source, item, stream)
+                else:
+                    stream.write(verified.bytes_by_source[item.source])
             output.chmod(0o644)
         for relative, data in verified.registry_entries.items():
             output = temporary / "registry" / relative

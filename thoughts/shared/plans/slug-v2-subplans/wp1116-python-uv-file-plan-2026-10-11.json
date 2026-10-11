@@ -303,7 +303,7 @@
     "target/wp1116/acceptance-receipt-pending.json": "e3b1d340d979ebe74e7412ef3cc30042b8884c2d19c164d67f639e4af8aa1bc0",
     "target/wp1116/final-evidence-review.md": "d882f25849419a2383933b96cde08e33369465748cc837de377e67a26930e658",
     "target/wp1116/uv-progress.json": "bee00999a22dcd91536adcf75a5e884ab60340905bdf5e51e33a6b770056be46",
-    "target/wp1116/next-owner-research.md": "1c1f6ea864bb99005a0edf5bca6511da11dd5bb19a44fd80add918736ebdb00a"
+    "target/wp1116/next-owner-research.md": "0b9e55cb4ce15f7386d3a8565a600460748f1e172968a1b31f1a83af6ac91450"
   },
   "uv_progress": {
     "events": [
@@ -314,7 +314,12 @@
   },
   "next_owner_research": {
     "path": "target/wp1116/next-owner-research.md",
-    "sha256": "1c1f6ea864bb99005a0edf5bca6511da11dd5bb19a44fd80add918736ebdb00a",
+    "sha256": "0b9e55cb4ce15f7386d3a8565a600460748f1e172968a1b31f1a83af6ac91450",
     "decision": "Bounded original Kotlin archive/patch availability and fixed4 offline transport/guard binding decision before activation; actual archive/decoded sizes and eligibility unknown; unchanged caps."
+  },
+  "metadata_pin_correction": {
+    "previous": "1c1f6ea864bb99005a0edf5bca6511da11dd5bb19a44fd80add918736ebdb00a",
+    "final": "0b9e55cb4ce15f7386d3a8565a600460748f1e172968a1b31f1a83af6ac91450",
+    "reason": "Root pinned research note after textual STOPPED but before worker final completion notification/final metadata write. Actual runtime/source/evidence pins unchanged. Worker terminal notification nowauthoritative. Originalacceptedreceipt in826939b5 retained inGit; no test invalidation."
   }
 }
