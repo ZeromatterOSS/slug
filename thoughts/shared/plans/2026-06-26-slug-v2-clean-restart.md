@@ -35,17 +35,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 ### Current packet
 
 Packet: WP-7-345-m7a-probe-evidence-reuse
-Status: ready — independent DESIGN and stopped source checkpoint pending
+Status: accepted — FINAL passed; next private marker pair pending rollover
 
-[Accepted WP1132](./slug-v2-subplans/wp1132-rust-platform-marker-metadata-2026-10-11.json)
-admits only two exact platform BUILD-marker Lstat rows under the existing role.
-FreshCore52/production and qualifiedLoading29/Bzlmod7/fixture31 passed. ONE20.753s
-reached source391 and original rust/private/BUILD.bazel Lstat; phase255.10546875MiB
-under256 leaves0.89453125MiB, without future/whole-fit credit. Repeated helper
-copy/review and growing143→169 context declarations exceeded180s and were examined.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects bounded pinned
-supervisor/direct-evidence reuse before the next private marker pair. Rust,
-production, source361 and all workload caps stay unchanged; no native replay.
+[Accepted WP1133](./slug-v2-subplans/wp1133-probe-evidence-reuse-2026-10-11.json)
+reuses one pinned supervisor and fixed direct evidence instead of predecessor
+context unions. Ten helper controls and fresh52 passed; qualifiedLoading29/Bzlmod7/
+fixture31 and unchanged compilation/production were authenticated. Rust54,
+source361 and caps stay unchanged; no native replay or new whole-fit credit.
+The [current manifest](./slug-v2-subplans/current-packet.md) is accepted after
+independent FINAL. The exact private BUILD-marker pair is next; its changed-Rust
+role/source transition and actual PRE/ONE/FIRST/FINAL remain required.
 
 ### Ready and blocked queue
 

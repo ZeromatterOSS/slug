@@ -1,7 +1,7 @@
 # WP1133 bounded probe evidence reuse
 
 Packet: WP-7-345-m7a-probe-evidence-reuse
-Status: ready — independent DESIGN and stopped source checkpoint pending
+Status: accepted — FINAL passed; next private marker pair pending rollover
 
 Outcome: remove repeated private probe supervisor copies and stop automatic
 predecessor-context accumulation while preserving the exact validation authority,
