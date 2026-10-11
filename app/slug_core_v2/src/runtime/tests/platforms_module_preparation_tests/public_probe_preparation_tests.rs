@@ -2846,15 +2846,25 @@ fn java_proxy_generated_request(
     request
 }
 #[cfg(target_os = "linux")]
+const JAVA_FILE_PLAN_TEST_CANONICALS: [Option<&str>; 7] = [
+    None, // Exact named local source rule.
+    Some("rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo"),
+    Some("rules_java++toolchains+remote_jdk8_linux_aarch64_toolchain_config_repo"),
+    Some("renamed_descriptor+"),
+    Some("rules_java++toolchains+remote_jdk11_linux_toolchain_config_repo"),
+    Some("rules_java++toolchains+remote_jdk8_windows_toolchain_config_repo"),
+    Some("rules_java++toolchains+local_jdk"), // Remote source rule, distinct full request.
+];
+#[cfg(target_os = "linux")]
 fn java_file_plan_test_request(
     bodies: &Bodies,
     plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-    remote: bool,
+    remote: Option<&str>,
 ) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
     let mut request = java_proxy_generated_request(bodies, plan);
-    let (canonical, label, rule) = if remote {
+    let (canonical, label, rule) = if let Some(canonical) = remote {
         (
-            "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo",
+            canonical,
             "@@rules_java+//toolchains:remote_java_repository.bzl",
             "_toolchain_config",
         )
@@ -2882,12 +2892,12 @@ fn java_file_plan_test_request(
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
-    for remote in [false, true] {
+    for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_file_effects_are_bounded_and_opt_in(remote);
     }
 }
 #[cfg(target_os = "linux")]
-fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
+fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
     let make_request = |bodies: &Bodies, plan| java_file_plan_test_request(bodies, plan, remote);
     use immutable_archive_preparation::JAVA_DIGEST;
     use immutable_archive_preparation::JAVA_URL;
@@ -2920,6 +2930,25 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
             .is_none()
     );
     assert!(bodies.admit(&valid).is_ok());
+    if remote.is_some() {
+        let mut renamed = original.as_ref().clone();
+        renamed.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+            if original.id.canonical_repo.as_str() == "renamed_descriptor+" {
+                "another_descriptor+"
+            } else {
+                "renamed_descriptor+"
+            },
+        )
+        .unwrap();
+        assert_eq!(original.repo_spec, renamed.repo_spec);
+        assert_eq!(original.kind, renamed.kind);
+        assert_ne!(original.as_ref(), &renamed);
+        assert!(
+            bodies
+                .admit(&SourcePreparationNeeds::repository(renamed))
+                .is_ok()
+        );
+    }
     let mut changed = make_request(
         &bodies,
         small_generated_plan(&[("BUILD", b"different valid content", true)]),
@@ -3042,6 +3071,9 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
         }
     };
     for case in 0..11 {
+        if remote.is_some() && matches!(case, 1 | 7..=10) {
+            continue; // Canonical spelling selects identity, not remote rule capability.
+        }
         let mut wrong = original.as_ref().clone();
         match case {
             0 => wrong.id.workspace = path("/other"),
@@ -3051,7 +3083,7 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                         .unwrap()
             }
             2 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote.is_some() {
                     "@@other+//toolchains:remote_java_repository.bzl"
                 } else {
                     "@@other+//toolchains:local_java_repository.bzl"
@@ -3059,7 +3091,7 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                 .unwrap()
             }
             3 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote.is_some() {
                     "@@rules_java+//private:remote_java_repository.bzl"
                 } else {
                     "@@rules_java+//private:local_java_repository.bzl"
@@ -3067,7 +3099,7 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                 .unwrap()
             }
             4 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote.is_some() {
                     "@@rules_java+//toolchains:Remote_java_repository.bzl"
                 } else {
                     "@@rules_java+//toolchains:Local_java_repository.bzl"
@@ -3075,7 +3107,7 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                 .unwrap()
             }
             5 => {
-                wrong.repo_spec.rule_id.rule_name = if remote {
+                wrong.repo_spec.rule_id.rule_name = if remote.is_some() {
                     "_toolchain_config_extra"
                 } else {
                     "_local_java_repository_rule_extra"
@@ -3091,7 +3123,7 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                     slug_identity_v2::CanonicalRepoName::new("rules_java+").unwrap(),
                 );
                 wrong.repo_spec.rule_id.bzl_file =
-                    slug_identity_v2::ApparentLabel::parse(if remote {
+                    slug_identity_v2::ApparentLabel::parse(if remote.is_some() {
                         "@java//toolchains:remote_java_repository.bzl"
                     } else {
                         "@java//toolchains:local_java_repository.bzl"
@@ -3108,12 +3140,10 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
                 .unwrap();
             }
             _ => {
-                // Either valid tuple's canonical name with the other tuple's rule is closed.
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if remote {
-                    "rules_java++toolchains+local_jdk"
-                } else {
-                    "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo"
-                })
+                // The local source rule still requires its exact named canonical owner.
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo",
+                )
                 .unwrap();
             }
         }
@@ -3230,12 +3260,12 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_namespace_is_current_and_declared_only() {
-    for remote in [false, true] {
+    for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_namespace_is_current_and_declared_only(remote);
     }
 }
 #[cfg(target_os = "linux")]
-fn assert_java_namespace_is_current_and_declared_only(remote: bool) {
+fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
     let make_request = |bodies: &Bodies, plan| java_file_plan_test_request(bodies, plan, remote);
     let bodies = java_proxy_test_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)

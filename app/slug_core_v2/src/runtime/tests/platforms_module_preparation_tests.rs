@@ -994,7 +994,7 @@ impl Bodies {
                     "local_java_repository.bzl",
                     "_local_java_repository_rule",
                 ) | (
-                    "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo",
+                    _,
                     "rules_java+",
                     "toolchains",
                     "remote_java_repository.bzl",

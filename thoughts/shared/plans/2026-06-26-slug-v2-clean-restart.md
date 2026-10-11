@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-318-m7a-java-linux-toolchain-file-plan
-Status: accepted — qualified Java File plan; FINAL source/evidence ACCEPT
+Packet: WP-7-319-m7a-java-descriptor-file-capability
+Status: accepted — qualified source-rule File capability; FINAL ACCEPT
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-shared borrowed File-plan validation for the two qualified Java owners. Current
-55 proofs/prod7.373s/Core28.738s and ONE4.668s/source255/217.492MiB phase prefix
-reach the next original AArch64 configuration descriptor. The successor examines
-a cohesive producer-owned descriptor capability. Full producer/M7A/bootstrap
-completion remains open.
+The [current manifest](./slug-v2-subplans/current-packet.md) records one cohesive
+qualified Java descriptor File capability, preserving original full identity and
+complete bounded plans/current namespace. Current55 proofs/prod/Core10.725s and
+ONE5.124s/217.676MiB phase prefix reach genuine source quota firstlimit257 after256
+admitted. Quota-owner/finite closure assessment selects successor; current limits
+are unchanged. Full producer/M7A/bootstrap remains open.
 
 ### Ready and blocked queue
 

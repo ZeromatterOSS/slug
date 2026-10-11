@@ -1,0 +1,215 @@
+{
+  "packet": "WP-7-319-m7a-java-descriptor-file-capability",
+  "baseline": "a73c99080",
+  "status": "accepted \u2014 qualified source-rule File capability and genuine source quota boundary",
+  "outcome": "One exact qualified remote Java source-rule File-only descriptor capability replaces instance-name patches, retaining exact local-JDK tuple, full original request identity and complete borrowed plan/current namespace validation. Actual normal probe reaches genuine SourceAttempts quota at257 after256 admitted; no full producer completion.",
+  "compatibility": {
+    "changed_capability": "Slug-native bounded private observation policy for descriptor File metadata on Linux regardless original canonical spelling",
+    "accepted_exact_semantics": "unchanged",
+    "output_literal_parity": "not claimed",
+    "windows": "host/path/JVM/download/execution deferred; metadata does not select execution"
+  },
+  "source": {
+    "freeze_path": "target/wp1107/source-freeze.json",
+    "freeze_sha256": "159ffc61ae0da9efe8e690899beb6799346b6d69794d8a69ec54f0992d5a4db9",
+    "rust": 36,
+    "metadata": 8,
+    "changed_authorities": 2,
+    "files": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+        "sha256": "84a4572c58f4e5b0359ed25792d2aaa8d15d0017d1c51700273f94975d81ea48",
+        "delta": "+1/-1 net0"
+      },
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+        "sha256": "65dc28dfb40de72026cb9e8baa0d8cc1994b519a0d816e63277a294ff26a0f35",
+        "delta": "+48/-18 net30"
+      }
+    }
+  },
+  "allocation": "One borrowed tuple component, no policy allocation/retained String/request/path/body copy/interner/cache/flag/API/key/lock change. Seven-case static synthetic inputs share complete old matrices and bounded temporary request identity assertions.",
+  "focused": {
+    "selected": 55,
+    "passed": 55,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.3085688069695607,
+        "operation_sha256": "e1b229555a33d13d7f5841f45457636e2ec375f85e9429893eebb51b27b75e3a"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11756948393303901,
+        "operation_sha256": "2880f55c7c5ec3057ea3bdb83b84fea4945415021336ae4491d466eeb19fbc92"
+      },
+      "core": {
+        "selected": 22,
+        "passed": 22,
+        "elapsed_seconds": 0.2254127439809963,
+        "operation_sha256": "9c8787666827801e20b5839a7ec158d3c806238302cb19248c75ff0fbdbdccf9"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 0.10676541703287512,
+        "deadline_seconds": null,
+        "operation_sha256": "8ace39f6d0cbbe8c2c28f22d9ce1cf945443c791700340c85569a6c608c0d64c",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 0.11651584797073156,
+        "deadline_seconds": null,
+        "operation_sha256": "e5c230fa9ec7ca3deb635fb5438d91ae70bd8d85980187add5d8c4ba3f6f82c8",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 10.72476694197394,
+        "deadline_seconds": null,
+        "operation_sha256": "d93b829c886cb4853e2888a8a78858744b7ecc6c04ecec943186d0d8427f3a67",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Fresh current source-changed Core artifact/profile authority plus cached current Loading/Bzlmod and direct production check.",
+    "frequency": "Current Core10.725s; prior small-edit examples37.852/39.565/28.738s under180, not recurrence distribution/speed/cause benchmark.",
+    "refactoring": "One source-rule capability replaces recurring name patches, retaining one validator and shared proofs; no compiler extraction needed from current common-edit examples.",
+    "memory": "Compiler RSS uncapped preparation only, no workload memory credit."
+  },
+  "production_check": {
+    "seconds": 7.365910111926496,
+    "operation_sha256": "294e59b4f1d7460844ce18db30104300dc3c259687aeffc14928d0160cc4705b"
+  },
+  "native": {
+    "operation_sha256": "2077f00c42079ae19a90f00e74ae380cc70fe7d171d7389de74c80f979fbe895",
+    "stdout_sha256": "15f9152d2917d04a3c5f1ebb7cb034a9b0d2e31706e44c0ec1e4e2c3a20d71cc",
+    "elapsed_seconds": 5.1238785199820995,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 221540,
+    "rss_mib": 216.34765625,
+    "source_count": 256,
+    "decode_bytes": 55579827,
+    "write_bytes": 52801015,
+    "held_fds": 350,
+    "pins": 141,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 2147483648,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 365,
+        "wall_ns": 135175261,
+        "process_cpu_ns": 134676456,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 365,
+        "wall_ns": 4314877844,
+        "process_cpu_ns": 4360874356,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 365,
+        "wall_ns": 164021794,
+        "process_cpu_ns": 163598418,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 365,
+        "wall_ns": 16300634,
+        "process_cpu_ns": 21630270,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=repository preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=none path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE Some(Limit(SourceAttempts)) 105 235521 256 7021682 55579827 52801015 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=256 seen=257 emitted=257 admitted=256 first_limit=257 in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40966 encoded_bytes=140525 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "phase_rss_kib": {
+      "after_runtime": 30352,
+      "after_command": 222900,
+      "after_terminal_drop": 222900,
+      "after_runtime_drop": 222900,
+      "after_scope_drop": 220844
+    },
+    "phase_peak_mib": 217.67578125,
+    "config_sha256": "89a32d3aa13786ffaa6c8e5ffc8298c16625c7ab9c19a41effe6d3d52a53ed33",
+    "progress_refusal_record": {
+      "operation_sha256": "2077f00c42079ae19a90f00e74ae380cc70fe7d171d7389de74c80f979fbe895",
+      "stdout_sha256": "15f9152d2917d04a3c5f1ebb7cb034a9b0d2e31706e44c0ec1e4e2c3a20d71cc",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "materialization_frames": [],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "source_limit_event": "WP1033_SOURCE_CHARGE event=257 amount=1 before=256 after=256 next=257 outcome=first_source_limit first_created=true domain=host phase=need_paths capture=captured namespace=materialization instance=16 operation=file_bytes path_len=27 path_hex=2f746d702f2e746d705354396738632f4255494c442e62617a656c"
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1107/design-review.md",
+      "sha256": "565bb16dadeb27579708b7aa011ecd0a2d90e8f3b778ee81a7ce1574f5511a80"
+    },
+    "helper-review.md": {
+      "path": "target/wp1107/helper-review.md",
+      "sha256": "023106834b4ddf27049ce681c53e9840b94c8bcc21493842be8e30874ef07acd"
+    },
+    "source-worker.md": {
+      "path": "target/wp1107/source-worker.md",
+      "sha256": "f792fca963e25d4a2ae5c8ee3ade04520f4e0a1775b40841b6eac9cf62fbc713"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1107/source-prelaunch-review.md",
+      "sha256": "cf8700c37c670e10c4f1e4819a1f27b840c93755907166550642a6accdd4c5f6"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1107/prelaunch-evidence.md",
+      "sha256": "75dcc4f3ee4b0b9192e9934edcdaf14d50e4d91f87668f95e7d318fbb137c060"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1107/root-prelaunch.md",
+      "sha256": "b52aa9bb12da0e146517950c3513f895ff0d27499bfcbbc43d6537d381a5f95e"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1107/final-source-review.md",
+      "sha256": "b4ee532cd115cb07a5a6b4be3d307aaa61a4ab4d794e0624cc60895c1bfd0d89"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1107/final-evidence-review.md",
+      "sha256": "ed74b70d7f5350a8078e198f8edfd54875493731006bb1c44f12e3cfb684fa09"
+    }
+  },
+  "corrections": "No source/test/gate correction. ROOT-only helpers/config rebinding and2source/correction/research roles beforeONE. One initial toolchain TOML whole-file resolution error launched no compile/gate/native; correct channel resolutions then current gates passed. Prospective research/design note lookups before creation gave no gate credit. Decoder26malformed self-tests pass without workload credit.",
+  "claim_limit": "Current141strictstablepins/350orderedstable noninheritedFDbrackets/18env collectionnon-atomic. Actual repository native_refusal ScopeLimitSourceAttempts,257thattemptmaterializationinstance16FileBytes BUILD.bazel is path/instance-only; no originalfullRepoSpec/attrs/plan/canonicalowner certificate/header/progressprojection. rootlane clear but acquisition aborted_partial; all-thread windows no exclusiveCPU/perkey/cause/speed/frequency. Phaseprefix217.67578125MiB under256, no wholefit/fullproducer/wholeheap. Source accountingcomplete=true identitycomplete=false/charge-beforebodycompletion; SourceWeak unseenexpiryvacuous and Scope/Recorder/livebuffer narrow.",
+  "next": "Source-only quota-owner/current censused metadata assessment: preserve genuine256quota, avoid canonical inference from temporary root, resets or semantic dedup to evade accounting; select bounded next contract after review.",
+  "goal": "Active/incomplete; broader configured producer/certificate/analysis/actions/Rustc/M7A/bootstrap remain open.",
+  "elapsed_since_design_binding_seconds": 341.708495,
+  "reviewed_candidate": {
+    "path": "target/wp1107/receipt-reviewed.json",
+    "sha256": "ee8e97c459a25fb0a17cfe08dfa20e52d1704d7e1a1c2073ac824abbb2cffaf6"
+  },
+  "accepted_at_utc": "2026-10-11T00:52:56.307463+00:00"
+}
