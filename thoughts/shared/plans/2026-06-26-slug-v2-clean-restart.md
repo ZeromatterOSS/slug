@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-341-m7a-rust-package-marker-metadata
-Status: ready — design accepted; implementation and fresh validation pending
+Packet: WP-7-342-m7a-rust-build-source
+Status: ready — source authority correction and design checkpoint pending
 
-[Accepted WP1128](./slug-v2-subplans/wp1128-root-origin-sharing-2026-10-11.json)
-shares one lazy root-package origin Arc per driver with exact spelling and independent
-error ownership. Fresh Loading29/Core47 passed; one native phase254.77734375MiB stays
-under256 with only1.22265625MiB headroom. Reuse is proved, whole-workload savings and
-future fit remain unmeasured. The [current manifest](./slug-v2-subplans/current-packet.md)
-selects exactly two original rules-rust package-marker Lstats under the existing
-qualified private role. DESIGN accepted; fresh Core48 includes the changed matrix.
-All memory/source/time caps remain strict; production semantics and Windows deferred.
+[Accepted WP1129](./slug-v2-subplans/wp1129-rust-package-marker-metadata-2026-10-11.json)
+admits two exact package-marker Lstats under the existing qualified private role.
+FreshCore48/production and qualifiedLoading29/Bzlmod7/fixture31 passed; one native
+advanced original rust/BUILD.bazel to a FileBytes request. Distinct phase255.2265625
+MiB remains under256 with only0.7734375MiB headroom; future fit remains unproved.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects authentic one-leaf
+source inspection/FD qualification before body activation. DESIGN first requires
+correcting the unestablished archive assumption using accepted original provenance;
+no body acquisition or activation has occurred. Preserve existing source
+ownership/interner discipline and all resource caps; production and Windows unchanged.
 
 ### Ready and blocked queue
 

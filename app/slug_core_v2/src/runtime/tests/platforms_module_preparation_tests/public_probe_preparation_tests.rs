@@ -10290,7 +10290,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             Some("/rules"),
         );
     }
-    for (relative, selected, spellings) in [
+    let metadata = [
         (
             "rust/private",
             "/rules/rust/private",
@@ -10321,7 +10321,28 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                 "/rules-other/rust/settings",
             ],
         ),
-    ] {
+        (
+            "rust/BUILD.bazel",
+            "/rules/rust/BUILD.bazel",
+            [
+                "/rules/rust/BUILD.bazel/child",
+                "/rules/rust/build.bazel",
+                "/rules/rust/BUILD.bazel-extra",
+                "/rules-other/rust/BUILD.bazel",
+            ],
+        ),
+        (
+            "rust/BUILD",
+            "/rules/rust/BUILD",
+            [
+                "/rules/rust/BUILD/child",
+                "/rules/rust/build",
+                "/rules/rust/BUILD-extra",
+                "/rules-other/rust/BUILD",
+            ],
+        ),
+    ];
+    for (relative, selected, spellings) in metadata {
         assert_exact_root_file_role(
             relative,
             &[PathObservationOperation::Lstat],
@@ -10363,7 +10384,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 69);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 71);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -10463,7 +10484,28 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             "/rules/rust/private/repository_utils_unknown.bzl",
             PathObservationOperation::FileBytes,
         ),
-    ] {
+    ]
+    .into_iter()
+    .chain(metadata.into_iter().flat_map(|(_, selected, spellings)| {
+        spellings
+            .into_iter()
+            .map(|spelling| (spelling, PathObservationOperation::Lstat))
+            .chain(
+                [
+                    PathObservationOperation::FileBytes,
+                    PathObservationOperation::FileDigest,
+                    PathObservationOperation::DirectoryEntries,
+                    PathObservationOperation::ReadLink,
+                ]
+                .map(|operation| (selected, operation)),
+            )
+    })) {
+        let expected_family = match &operation {
+            PathObservationOperation::DirectoryEntries | PathObservationOperation::ReadLink => {
+                "operation"
+            }
+            _ => "path",
+        };
         let excluded_need = need(Path::new(excluded), operation.dupe());
         for mixed in [
             all.try_union(&excluded_need).unwrap(),
@@ -10480,7 +10522,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                 .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
                 .unwrap();
             assert!(std::ptr::eq(first, expected));
-            assert_eq!(family, "path");
+            assert_eq!(family, expected_family);
             let mut progress = 0;
             if bodies.admit(&mixed).is_ok() {
                 progress += 1;
@@ -10488,7 +10530,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             progress += usize::from(guarded.check_need(&mixed).is_ok());
             assert_eq!(progress, 0);
             let denied = bodies.admit(&mixed).unwrap_err();
-            assert_eq!(denied.family, "path");
+            assert_eq!(denied.family, expected_family);
             assert_eq!(denied.operation, path_operation_code(&operation));
             assert_eq!(denied.path.unwrap().as_path(), Path::new(excluded));
             let recorded = milestones.lock().unwrap();

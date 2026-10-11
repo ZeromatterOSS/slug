@@ -1,58 +1,85 @@
-# WP1129 exact rules-rust package-marker metadata
+# WP1130 original rules-rust BUILD source
 
-Packet: WP-7-341-m7a-rust-package-marker-metadata
-Status: ready — design accepted; implementation and fresh validation pending
+Packet: WP-7-342-m7a-rust-build-source
+Status: ready — source authority correction and design checkpoint pending
 
-Outcome: let the existing qualified defs-import role observe the exact original
-rust/BUILD.bazel and rust/BUILD metadata, preserving normal package-marker ordering
-and subsequent unsupported boundaries. Slug-native private Linux-test capability;
-named metadata behavior follows existing Bazel9.2 source/pinned-source controls,
-production unchanged, Windows deferred.
+Outcome: inspect and qualify the one authentic requested rust/BUILD.bazel leaf,
+then admit that exact body under the existing qualified private defs-import role.
+Slug-native Linux-test capability; existing Bazel9.2 source/Host package semantics
+remain unchanged, production unchanged, Windows deferred. No body is admitted by
+this ready status or by the predecessor's opaque refusal header.
 
-Reuse accepted WP1125 next-capability source research83e935f00deb8a4b88061bb4ce6666a1b
-3c2d844a72333b147da1c23335ed978, not a new archive/body inspection. Existing host_package
-probes BUILD.bazel then BUILD; root driver/source/epoch/certificate owners remain normal
-DICE. Exact original-root1 plus defs-import flag/policy selects metadata-only Lstat;
-source and digest/list/readlink observations remain unchanged. Add these two borrowed
-static strings to RULES_RUST_IMPORT_METADATA3→5. Presence/absence comes from the normal
-Host owner; never force it or infer bodies from opaque refusal headers.
+Basis: accepted WP1129 receipt62fac1e5134aabe7f6130aa5578c0707bb4f4d2dc21dbd9aa00e12d14963ac8b,
+FINAL5b0066aed6299d1a7ca1a4bbae264104903191c4bb185040e8cc1c3b77ec80e7.
+Its sole native20.712701318s/390sources advanced the exact original rust/BUILD.bazel
+refusal from Lstat to FileBytes. Supervisor254.05078125MiB/distinct phase255.2265625
+under256 leaves0.7734375MiB headroom. Prior scoped origin sharing is retained;
+frequency, allocation savings, retained-byte cause and future/whole fit unmeasured.
+Reuse accepted current360/O1124 original359/Skylib collection source provenance,
+normal Host package marker/read owner, existing FD qualification/supervisor and
+current static-table/Need/lifecycle proofs. No repeated archive or producer audit.
 
-Allowlist only app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
-and its existing public_probe_preparation_tests.rs. Estimate policy1–5/proof10–40 net
-lines. Extend existing rules_rust_defs_import_sources_need_is_opt_in_exact_table_only
-shared matrix69→71 and negative both-order/root/role/case/suffix/child/op controls,
-original offending pointer and zero-progress guarantees. Keep source33 and defaults,
-budget/source limits, generic request/epoch/rollback/Weak controls. No added field,
-owned policy String/Vec, plan/request/body clone, interner/pool/key/API/lock or fixture.
-Static descriptors add32B+26literal bytes; that does not bound later graph RSS.
+Independent DESIGN requested a source authority correction before acquisition:
+current fixture manifest and source360 vector contain no rules_rust archive row.
+Identify the existing accepted original source authority in provenance metadata,
+or review a bounded acquisition prerequisite; do not infer an archive from Host
+root spelling. Preserve the original reviewed draft and REVISE note under
+target/wp1130/r0-design. The actual inspector and authority binding require an
+accepted revised DESIGN and helper source checkpoint before import/main or body read.
+Inspect exactly rust/BUILD.bazel under that authenticated authority; an archive,
+if established, requires full digest and exact single regular member. Stream with existing bounded readers;
+retain at most64KiB for this seed, enforce inherited archive/transfer/decoded/file caps,
+record complete body length/SHA and literal-load metadata. Do not recursively inspect
+or admit referenced files. Any later source demand retains its own original boundary.
+Source-inspector/qualifier code is reviewed before first import/main. Compare the
+entire exact original Host leaf against that member through the existing held-FD
+owner, identity/full-read/EOF/before-after SHA brackets; retain non-atomic collection
+and source_certificate=false qualifications. No path repair, copied replacement,
+ambient environment lookup, downloaded source or header-only equality is allowed.
+Actual independent cohort acceptance precedes Rust body activation/vector append.
 
-Independent DESIGN before activation; root full delta/helper checkpoint before freeze,
-fresh Core48 list/preflight/body (saved47 order plus the existing changed matrix
-selector, absent from saved47) and production/singleton, strict qualified unchanged
-Loading29/Bzlmod7/fixture31 with finite historical/current source maps and no oldCore
-credit. Same360source rows/eightcallerpaths/18env/sixbackings; no source vector append
-or body/inspector/qualifier execution. Actual PRELAUNCH before ONE changed-capability
-native, actual FINAL before acceptance/commit. Reuse accepted finite two-family/metadata
-schemas and source/API anchors; no repeated broad audit or duplicated suite.
+After actual source evidence, preserve all360 current ordered vector rows and encoded
+prefix; append ONLY the authenticated one original leaf row (361 total). Its body
+length/hash come from the actual source evidence, not a guessed BUILD or donor text.
+Six backing identities/eight unchanged caller paths/eighteen configured entries stay
+strict. Natural semantic owners remain original Host/DICE source observations and
+current request/epoch/charged independent Arc source/parser/error lifetimes. New
+source transfers use existing ownership and budgets; borrow/transfer/share/intern
+under existing owners where appropriate, no global pool or scratch-backed retention.
 
-Memory prerequisite is satisfied by accepted WP1128 capped observation, never source proof
-or predicted string savings. A passing admitted prefix allows this bounded continuation
-under the existing hard cap; it gives no future-fit guarantee. Preserve a genuine
-hard-cap/Need/timeout boundary and investigate its concrete owner if it occurs. No
-identical replay/capraise. Qualified26/29/32/default5/8/ordinary10/constructor27tail3,
-RSS256MiB/AS512/live16/source512/census513/transfer32/separate cumulative decoded128+
-written128MiB/FSIZE16-native32/exact Kotlin FD exception remain strict. Needed time
-authorized; recurring>180s prompts necessity/refactoring review rather than permission.
+Rust allowlist only Core parent platforms_module_preparation_tests.rs and its existing
+public_probe_preparation_tests.rs. Add one borrowed static rust/BUILD.bazel source row:
+RULES_RUST_DEFS_IMPORTS33→34, metadata5 unchanged. Exact root1/PreparedFile/PublicProbe
+role admits only existing Lstat and FileBytes; no FileDigest/list/readlink, recursive
+prefix, rust/BUILD body, other namespace or assumed presence. Existing metadata already
+admits this Lstat, so shared distinct Need71→72, not73. Preserve defaults/root/role,
+wrong op/case/suffix/child/foreign root and both-order original offender/pointer/path/op/
+zero-progress controls; preserve original materialization Arc/Weak retirement. Adjust
+only this seed's positive/negative FileBytes expectation while retaining all other
+metadata FileBytes negatives. No new test selector/harness/fixture/API/key/lock/field,
+owned policy String/Vec, request/plan/content clone or new interner/cache. Estimate
+policy1–5/proof10–45 lines; existing two large private-test owners remain cohesive.
+One static descriptor adds16B using the already-named literal; compiler literal pooling
+and whole-heap contribution are not assumed. Current Scope536/Copy48/Bodies304 stay.
 
-REPLAN if normal semantic identity/root/role/lifecycle cannot hold or another owner/
-capability/resource decision is required. Subsequent FileBytes or package work remains
-a new observed prerequisite, not pre-admitted continuation. Full producer/certificate/
-actions/Rustc/M7A/bootstrap/parity/retained-byte cause/whole-fit remain open.
+Root full stopped Rust/helper/cohort deltas and actual source checkpoint before freeze.
+Fresh pinned-toolchain offline/locked/jobs1 Core48 retains current saved48 exact order,
+including changed matrix/byte-budget/projection/time/Capture controls; exact fresh list/
+preflight/body and production/singleton. Strict qualified unchanged current Loading29/
+Bzlmod7/fixture31 under exact finite historical/current maps, no old Core/QLoading26
+credit; portable3 missingstrace remain unproved. Reuse finite donor/source-exception
+schema rather than repeated broad history or mechanically rebuilt assertions.
 
-Accepted predecessor: [WP1128](./wp1128-root-origin-sharing-2026-10-11.json), receipt
-SHA256c13b89c0e73a0b61a1369155a7b99a45da64150474a97699c02357cd147f6d1e.
-Actual FINALfb833a2da22f7acb2aed913493e9c3c6de82663c4981e95d2f96cc1aba2a3cf9
-accepted scoped sharing and sole native20.803s/phase254.77734375MiB under256.
-Conditional DESIGN915e007f23025387bcfe41d10eab4754be425300ebd05583fd63fe8ed6904d60
-reviewed draft2b3a851d974b868c1f5db563e08efa687019a791d07e9a274f9eebf7325782c3;
-predecessor acceptance prerequisite is now met, other semantics/gates unchanged.
+Actual PRELAUNCH before ONE distinct changed-body native; actual FINAL/receipt/local
+commit before acceptance. Compile/inspection preparation is separate from runtime.
+Qualified work26/cleanup29/outer32/default5/8/ordinary10/constructor27tail3; RSS256MiB/
+AS512/live16/source512/census513/transfer32/separate cumulative decoded128+written128MiB,
+FSIZE16/native32/exact Kotlin FD exception unchanged. Necessary time authorized;
+recurring>180s is necessity/refactoring signal, not deadline. Preserve genuine source,
+resource, Need or timeout failure; no identical replay/capraise or future-fit promise.
+
+REPLAN for missing/mismatched authentic archive/member/Host evidence, an unbounded
+source/helper operation, or identity/role/lifecycle/capability changes outside this
+one leaf. Resolve technical decisions within existing authorization; no inferred
+permission stop. Later source/body/evaluator work, full producer/certificate/actions/
+Rustc/M7A/bootstrap/parity/whole fit stay open until actual evidence.
