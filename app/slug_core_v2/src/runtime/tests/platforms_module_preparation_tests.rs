@@ -567,6 +567,7 @@ struct Bodies {
     java_offline_archive: Option<immutable_archive_preparation::ArchiveBinding>,
     python_offline_archive: Option<immutable_archive_preparation::PatchedArchiveBinding>,
     kotlin_offline_archive: Option<immutable_archive_preparation::PatchedArchiveBinding>,
+    swift_offline_archive: Option<immutable_archive_preparation::PatchedArchiveBinding>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1521,6 +1522,7 @@ impl Bodies {
             java_offline_archive: None,
             python_offline_archive: None,
             kotlin_offline_archive: None,
+            swift_offline_archive: None,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1972,6 +1974,7 @@ impl Bodies {
             || self.java_offline_archive.is_some()
             || self.python_offline_archive.is_some()
             || self.kotlin_offline_archive.is_some()
+            || self.swift_offline_archive.is_some()
         {
             return SourceServiceScope::new_for_test_with_offline_archives(
                 workspace,
@@ -1989,6 +1992,9 @@ impl Bodies {
                         .as_ref()
                         .map(|b| b.archive.backing.clone()),
                     self.kotlin_offline_archive
+                        .as_ref()
+                        .map(|b| b.archive.backing.clone()),
+                    self.swift_offline_archive
                         .as_ref()
                         .map(|b| b.archive.backing.clone()),
                 ],
@@ -3659,6 +3665,33 @@ fn observe_native_command(
             )
             .unwrap(),
         );
+        bodies = immutable_archive_preparation::configure_swift(
+            bodies,
+            registry_choice,
+            command,
+            OfflineArchiveBacking::new(
+                immutable_archive_preparation::SWIFT_URL,
+                immutable_archive_preparation::SWIFT_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                        .join(
+                            immutable_archive_preparation::SWIFT_URL
+                                .strip_prefix("https://")
+                                .unwrap(),
+                        ),
+                )
+                .unwrap(),
+            ),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::SWIFT_PREPARED_MODULE),
+            )
+            .unwrap(),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::SWIFT_PREPARED_PATCH),
+            )
+            .unwrap(),
+        );
     }
     let bodies = Arc::new(bodies);
     println!(
@@ -3702,6 +3735,10 @@ fn observe_native_command(
                 .map(|b| b.archive.backing.clone()),
             bodies
                 .kotlin_offline_archive
+                .as_ref()
+                .map(|b| b.archive.backing.clone()),
+            bodies
+                .swift_offline_archive
                 .as_ref()
                 .map(|b| b.archive.backing.clone()),
         ],

@@ -2152,6 +2152,125 @@ fn namespace_test_epoch_at(
     )
     .unwrap()
 }
+#[cfg(target_os = "linux")]
+pub(super) fn assert_swift_namespace_is_current_and_borrowed(
+    bodies: &Bodies,
+    original: &slug_bzlmod_v2::RepositoryMaterializationRequest,
+) {
+    let request = Arc::new(original.clone());
+    let weak = Arc::downgrade(&request);
+    let instance = slug_workspace_v2::PathObservationInstanceId::new(19);
+    let a = namespace_test_epoch_at(bodies, [request.clone()], instance, "/swift/A");
+    let b = namespace_test_epoch_at(bodies, [request.clone()], instance, "/swift/B");
+    let mut other = original.clone();
+    other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
+    let ambiguous = namespace_test_epoch_at(
+        bodies,
+        [request.clone(), Arc::new(other)],
+        instance,
+        "/swift/B",
+    );
+    let count = Arc::strong_count(&request);
+    let attr_count = Arc::strong_count(&request.repo_spec.attributes);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let demand = |namespace, raw: &str, operation| {
+        PathObservationDemand::new(
+            namespace,
+            NormalizedAbsolutePath::new(raw).unwrap(),
+            operation,
+        )
+    };
+    for (epoch, root, stale) in [
+        (&a, "/swift/A", "/swift/B/file"),
+        (&b, "/swift/B", "/swift/A/file"),
+        (&a, "/swift/A", "/swift/B/file"),
+    ] {
+        let view = epoch
+            .borrowed_instance_for_namespace(
+                &bodies.roots[0],
+                instance,
+                MATERIALIZATION_NAMESPACE_ENTRIES,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(std::ptr::eq(view.request(), request.as_ref()));
+        assert_eq!(view.generation_root(), Path::new(root));
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+            PathObservationOperation::FileDigest,
+            PathObservationOperation::DirectoryEntries,
+            PathObservationOperation::ReadLink,
+        ] {
+            let d = demand(namespace, root, operation);
+            let policy =
+                namespace_policy(bodies, &d, Some(epoch), &generated_features_plan_matches);
+            assert_eq!(policy.path_class, "immutable_tree");
+            assert!(policy.owner_plan_allowed && policy.admits(&d.operation()));
+        }
+        let valid = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand(
+            namespace,
+            root,
+            PathObservationOperation::Lstat,
+        )));
+        assert!(admit_with_materialization_epoch(bodies, &valid, Some(epoch)).is_ok());
+        for (space, raw) in [
+            (namespace, stale),
+            (namespace, "/outside"),
+            (
+                PathObservationNamespace::Materialization(
+                    slug_workspace_v2::PathObservationInstanceId::new(20),
+                ),
+                root,
+            ),
+        ] {
+            let bad = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand(
+                space,
+                raw,
+                PathObservationOperation::FileBytes,
+            )));
+            for mixed in [
+                valid.try_union(&bad).unwrap(),
+                bad.try_union(&valid).unwrap(),
+            ] {
+                let mut progress = 0;
+                if admit_with_materialization_epoch(bodies, &mixed, Some(epoch)).is_ok() {
+                    progress += 1;
+                }
+                assert_eq!(progress, 0);
+                let denied = bodies
+                    .first_denied_path_with_namespace_matcher(&mixed, &|d| {
+                        namespace_policy(bodies, d, Some(epoch), &generated_features_plan_matches)
+                            .admits(&d.operation())
+                    })
+                    .unwrap()
+                    .0;
+                let offender = mixed
+                    .path_observations()
+                    .unwrap()
+                    .demands()
+                    .iter()
+                    .find(|d| d.namespace() == space && d.path().as_path() == Path::new(raw))
+                    .unwrap();
+                assert!(std::ptr::eq(denied, offender));
+            }
+        }
+    }
+    let d = demand(namespace, "/swift/B", PathObservationOperation::Lstat);
+    for epoch in [None, Some(&ambiguous)] {
+        assert!(
+            !namespace_policy(bodies, &d, epoch, &generated_features_plan_matches)
+                .admits(&d.operation())
+        );
+    }
+    assert_eq!(Arc::strong_count(&request), count);
+    assert_eq!(Arc::strong_count(&request.repo_spec.attributes), attr_count);
+    drop(ambiguous);
+    drop(a);
+    drop(b);
+    drop(request);
+    assert!(weak.upgrade().is_none());
+}
 #[test]
 fn namespace_refusal_projection_preserves_first_offender_and_borrowed_owner() {
     let path = |s| NormalizedAbsolutePath::new(s).unwrap();
@@ -2909,6 +3028,63 @@ fn patched_file_test_bodies(kotlin: bool) -> Bodies {
     bodies
 }
 #[cfg(target_os = "linux")]
+fn generated_test_bodies_with_swift(mut bodies: Bodies, case: usize) -> Bodies {
+    use immutable_archive_preparation::ArchiveBinding;
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PatchedArchiveBinding;
+    use immutable_archive_preparation::SWIFT_DIGEST;
+    use immutable_archive_preparation::SWIFT_PREPARED_MODULE;
+    use immutable_archive_preparation::SWIFT_PREPARED_PATCH;
+    use immutable_archive_preparation::SWIFT_URL;
+    if case == 0 {
+        return bodies;
+    }
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let path = |relative: &str| NormalizedAbsolutePath::new(project.join(relative)).unwrap();
+    let mut swift = PatchedArchiveBinding {
+        archive: ArchiveBinding {
+            backing: OfflineArchiveBacking::new(
+                SWIFT_URL,
+                SWIFT_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                        .join(SWIFT_URL.strip_prefix("https://").unwrap()),
+                )
+                .unwrap(),
+            ),
+            module: path(SWIFT_PREPARED_MODULE),
+        },
+        patch: path(SWIFT_PREPARED_PATCH),
+    };
+    match case {
+        2 => {
+            swift.archive.backing = OfflineArchiveBacking::new(
+                JAVA_URL,
+                SWIFT_DIGEST,
+                swift.archive.backing.path().dupe(),
+            )
+        }
+        3 => {
+            swift.archive.backing =
+                OfflineArchiveBacking::new(SWIFT_URL, [0; 32], swift.archive.backing.path().dupe())
+        }
+        4 => {
+            swift.archive.backing =
+                OfflineArchiveBacking::new(SWIFT_URL, SWIFT_DIGEST, path("foreign/archive.tar.gz"))
+        }
+        5 => swift.archive.module = path("foreign/MODULE.bazel"),
+        6 => swift.patch = path("foreign/version.patch"),
+        _ => (),
+    }
+    bodies.swift_offline_archive = Some(swift);
+    bodies
+}
+#[cfg(target_os = "linux")]
 fn python_test_bodies_with_invalid_binding(case: usize) -> Bodies {
     patched_file_test_bodies_with_invalid_binding(case, false)
 }
@@ -3246,6 +3422,13 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
             .is_none()
     );
     assert!(bodies.admit(&valid).is_ok());
+    for case in 0..7 {
+        let selected = generated_test_bodies_with_swift(java_proxy_test_bodies(), case);
+        assert!(
+            selected.admit(&valid).is_ok(),
+            "Java independent Swift {case}"
+        );
+    }
     if remote.is_some() {
         let mut renamed = original.as_ref().clone();
         renamed.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
@@ -3553,6 +3736,13 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
             .is_none()
     );
     assert!(bodies.admit(&valid).is_ok());
+    for case in 0..7 {
+        let selected = generated_test_bodies_with_swift(selected_bodies(), case);
+        assert!(
+            selected.admit(&valid).is_ok(),
+            "patched generated owner independent Swift {case}"
+        );
+    }
     if kotlin {
         assert!(bodies.python_offline_archive.is_none());
         let mut unrelated = selected_bodies();
@@ -4218,6 +4408,23 @@ fn assert_generated_namespace_is_current_and_declared_only(
                         .admits(&d.operation())
                 );
             }
+        }
+    }
+    for case in 0..7 {
+        let selected = generated_test_bodies_with_swift(make_bodies(), case)
+            .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        for d in [&valid_demand, &marker, &ignore_marker] {
+            assert!(
+                namespace_policy(
+                    &selected,
+                    d,
+                    Some(&epoch_b),
+                    &generated_features_plan_matches
+                )
+                .admits(&d.operation()),
+                "namespace independent Swift {case}"
+            );
         }
     }
     let mut closed = make_bodies()

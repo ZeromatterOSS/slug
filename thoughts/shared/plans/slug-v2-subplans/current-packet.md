@@ -1,106 +1,93 @@
-# WP1119 Swift immutable prerequisite and bounded cohort
+# WP1120 observed environment request
 
-Packet: WP-7-331-m7a-swift-immutable-cohort
-Status: ready — DESIGN before acquisition; verified prerequisite before Rust
+Packet: WP-7-332-m7a-observed-environment-request
+Status: ready — independent DESIGN before implementation
 
-Outcome: qualify only the actually demanded rules_swift3.1.2 archive and original
-patch, establish fit under current explicit limits, then add a fifth exact scoped
-backing and observe ONE fresh native frontier. Slug-native private Linux-test
-capability; exact original source and normal RepoSpec/materializer/DICE semantics
-retained. Windows deferred. Compiler producer/certificate/actions/Rustc/M7A/bootstrap
-and whole-closure fit remain open.
+Outcome: admit only the complete observed original workspace/name tuple
+CC, Path, ProgramData through the existing scoped environment snapshot owner,
+then observe ONE fresh native frontier. Slug-native private Linux-test capability;
+normal production environment/DICE semantics and exact source bytes unchanged.
+Windows implementation deferred; name queries preserve normal Linux host presence
+or absence without Windows emulation or forced values. Producer/certificate/actions/
+Rustc/M7A/bootstrap and whole closure fit remain open.
 
-Basis: accepted WP1118 receipt wp1118-kotlin-capabilities-file-plan-2026-10-11.json;
-actual native operation25f6f039e7c4bad3e63874f6b7a6ba5e9c99e034cdf0036ca907739a196012ba,
-stdout01f5a280afd3c8337f09763db1ff1f1339946f73c77507fe9c7dd498f8297070;
-18.979s/source358/phase243.8125MiB under256. Terminal source research
-b1adfdfe46bd5f05a26c5a01cc0cf72445f10aafa9d8c1074f1bd4ee93da5633 and report
-ea5369d2a0d91ef9ec483b42f9e0a2d3ca0a60b0c243f5f113d263626199b2f3 bind
-complete typed9 diagnostic to existing source.json/MODULE metadata. Fixture prerequisite note cd27537ee60295f2c83c10098fda093f37d7cdb9686a65272a0d6ab626765bb5 confirms generic streaming reuse and fixture-only FSIZE32 policy before freeze. Header/projection
-does not authorize a guessed source or replace the full live request predicate.
-Reuse accepted Bazel9.2 IndexRegistry/RepoSpec http_archive/patch source regressions
-and normal Rust Loading archive parser/realizer; no semantic producer rewrite.
+Basis: accepted wp1119-swift-immutable-cohort-2026-10-11.json, actual operation
+d969ca9bc09d40ff6ce4623a07389fbb9c3c1d5270c6346695a082f969b6aeb1,
+stdout77e45ed423f2fb063c5c08a5c593422de22a034e0a213447ebcdb6496bd9c59e.
+ONE19.711s/source366/supervisor244.640625MiB/phase245.88671875MiB under256,
+359full source brackets/175pins/18env stable; current76Rust/31fixture+production
+passed. Actual WP1024 lines384–387 capture original workspace101B and exact
+three case-sensitive names/17B. Missing WP942 path projection is not missing
+environment capture. Source-only terminal next-diagnostic-research.md SHA
+bc599dcc0e9872719baf126e00541a3652ab7a0a29793de47d038cd0883931c3 proves
+typed NeedRepositoryEnvironmentNames contains workspace+canonical names only;
+caller/values are unavailable and not inferred from five preceding Swift imports.
+Reuse accepted wp1024-environment-name-diagnostic, wp1025-environment-snapshot-readiness,
+wp1113-python-environment-cohort, original Bazel9.2 getenv/environ-name source
+regressions and normal Rust tracked environment snapshot/cutoff/restoration proofs.
+No new diagnostic or source-body discovery is needed for this request-defined slice.
 
-Archive https://github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz
-SHA5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa;
-patch https://bcr.bazel.build/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch
-SHA4386831f878dc47f89103c2359aa36b880391cdcf05b7d0758d01a807b70198c;
-prepared MODULE target/wp954/registry/modules/rules_swift/3.1.2/MODULE.bazel
-2834B SHA72c8f5cf9d26427cee6c76c8e3853eb46ce6b0412a081b2b6db6e8ad56267400.
-Empty strip_prefix/remote_file maps, patch_strip1 and single paired patch/MODULE
-URLs+SRI must match original request; unrelated Swift versions excluded.
+Decision: separate exact full-tuple branch in Bodies::admits_repository_environment,
+not three independently combinable additions to global name tables. Require original
+roots[0] workspace, complete case-sensitive canonical names exactly CC/Path/ProgramData,
+existing PreparedFile/PublicProbe definitions role, and borrowed fully qualified
+original Swift binding via descriptor4/native_patched_binding (URL/digest/mirror/
+prepared MODULE/patch identity). A Some-only test is insufficient. Other archive
+owners need not be present; old Java/Python/etc qualifiers remain independent.
+Existing old environment branches retain behavior; subsets, supersets (including
+old-name union), suffix/case changes, foreign workspace, disabled role, absent/
+malformed/crossed Swift binding refuse. The whole mixed Need stays atomic with
+original first offender and zero acquisition progress in both orders. No namespace
+change: this family owns workspace/names, not a materialization path or caller.
 
-Prerequisite after independent DESIGN: reuse accepted WP1117 preparation/fixture
-streaming owners, adapting only exact URL/hash/path/limits/observations. Fetch ONLY
-these two public originals into exclusive packet staging with TLS,64KiB streaming
-fullEOF/SHA, request timeout30s and archive<=32MiB/patch<=8KiB. Record actual sizes,
-redirects/failures; no credential headers or environment-value inspection. No archive
-execution/evaluation/general extraction. Held regular nofollow/CLOEXEC FD fullSHA and
-before/after named+fstat/EOF identity; whole gzip framing/CRC/EOF decoded<=64MiB,
-tar<=8192entries, header<=4096B/name<=1KiB, normal confined ./ normalization,
-unique supported entry types, inventory<=512KiB. Interpret only metadata plus root
-MODULE<=16KiB and patch<=8KiB as data. Apply existing unified patch helper once and
-compare full result to original prepared MODULE. Account every parser header; retain
-any failed/superseded attempt. Independent prerequisite review before source activation.
+Natural owner: existing normal scoped repository-environment observation/acquisition
+and tracked NameFrontier/CellKey snapshot feed; discovery/dependencies stay DICE-owned.
+DESIGN must confirm exact batch interaction and normal snapshot authority before
+activation. Observe actual requested values/absence through existing owner, retain
+independent snapshot storage as required, validate/publish or retry, restore initial
+input on completion/refusal/cancel and preserve equality cutoff/revocation/A-B-A.
+Do not fabricate values, infer absence/platform intent, replay a historical mutable
+host snapshot, or inspect unrelated environment/credentials. No direct-filesystem/
+fresh-graph bypass, key/lock/result cache/public API/error carrier/producer change.
 
-Fit gate: fixture current32114214/33554432 leaves1440218B; native transfer31134575/
-33554432 leaves2419857B, decode87567644/134217728 leaves46650084B, written106574162/
-134217728 leaves27643566B. Verified archive+patch and conservative normal materializer
-copies must fit those residuals. Unknown/oversized/wronghash/new effect is a precise
-prerequisite or REPLAN before activation; do not silently raise a cap. Preparation
-32MiB is a fetch bound, not permission to publish above fixture budget. Existing
-archive32MiB/small+member+retained16MiB/native disk32MiB unchanged. Actual RSS256MiB/
-AS512MiB/live16MiB/work20/cleanup23/outer26/source512/census513 remain explicit;
-future quota refusal is bounded evidence, not completion or permission stop.
+Memory: existing Stage9 borrowed static identities/Arc/Dupe/interned paths and
+normal snapshot ownership. Exact tuple3 staticstr descriptors48B/17 literalB at
+most; compare borrowed canonical names without String/Vec/request/Arc copies.
+No retained field/new pool/cache/interner. Scope488/Bodies304 expected unchanged;
+measure actual compiled witness and narrow lifetime behavior. Independent retained
+environment values remain owned by normal snapshot, never borrowed command scratch.
+Current large private owner/matrix stays cohesive; policy estimate<45net/proof<140net,
+share existing environment fixture/lifecycle helpers and selectors; assess growth.
 
-After verified fit, natural owner is existing fixed-cohort SourceServiceScope Arc
-transport, original immutable RepoSpec, normal SourceService acquisition and unique
-current-epoch namespace. Extend optional slots4→5/descriptor4→5/shared PatchedArchiveBinding;
-constructor rejects all10 duplicate URL pairs (including different integrity), exact
-borrowed URL+digest lookup unchanged, no setter/global registry. Swift binding must
-participate atomically in existing profile predicate: absent preserves old context,
-invalid-present refuses; independent Java/Python/Kotlin generated qualifiers remain
-independent of Swift presence. Complete live9attr immutable predicate checks original
-workspace/roles/unmapped http_archive/backing path/SRI/module/patch/strip/empty overlays.
-Reuse original offender pointer/zero progress on mixed Needs in both orders, standard
-confined IO operations/current epoch/namespace freshness and ArcWeak lastDrop controls.
-No DICE key/lock/publicAPI/fallback scan, header-derived namespace or output synthesis.
+Allowlist three existing Rust files: app/slug_core_v2/src/runtime/tests/
+platforms_module_preparation_tests.rs, its immutable_archive_preparation.rs and
+public_probe_preparation_tests.rs children. Target-only frozen helper/review/evidence,
+compact receipt/Stage9/canonical/current manifest. No fixture/transport/scope/diagnostic/
+production changes, source payload acquisitions/body substitutions, alternate roots,
+flags/env exports or Windows work. Current source52 keys should change exactly3
+private owners/49same; six extra authorities and359physical source rows/env18 unchanged.
 
-Memory: existing Stage9 Arc/Dupe/lastDrop/interned-path/borrowed descriptor disposition.
-Predicted Scope+8B480→488/Bodies+24B280→304/table+136B544→680, present backing56B;
-measure actual layout and reference lifetime. Independent retained paths/effect bytes
-stay owned. No new runtime owned policyString/requestclone/Vec/cache/globalinterner.
-Production source owners>2k/test functions>150 remain existing bounded cohesive
-transport/identity/session matrices; share parameterized proofs, estimated policy<120
-net/proof<250net, assess actual growth. No speed or isolated allocation savings claim.
+Validation: independent DESIGN and actual source/helper PRELAUNCH before ONE native,
+actual FINAL before acceptance. Resolve nightly2025-09-14 tools; serial offline locked
+jobs1 Core JSON no-run observer compile, exact fresh list/batched preflight/current43.
+Extend existing selected environment matrix: complete tuple/binding/role/workspace/
+case/subset/superset/cross-binding/old-owner independence and original borrowed request;
+normal observed snapshot/cutoff/retry/restoration and whole mixed Need controls via
+existing scaffolding. Current production Core/CLI check. Protected Bzlmod7/Loading26
+and fixture31 can be reused ONLY strict source/fixture/executable/options/caller maps
+prove unchanged owners after exact3private changes; otherwise run missing fresh gates.
+Known portable missing-strace3 unproved. Compile/setup separate from every runtime;
+64KiB executable fullSHA, fixed helpers frozen before first gate, accepted r7heldFD
+owner exact Kotlin23089629B exception unchanged. Native359source/18env/PRELAUNCH context
+all actual, only intended future review note may be missing at config generation.
 
-Allowlist sixRust: app/slug_core_v2/src/runtime/source_service/{scope.rs,offline_archive.rs};
-runtime/tests/platforms_module_preparation_tests.rs and children immutable_archive_preparation.rs,
-public_probe_preparation_tests.rs; runtime/tests/repository_archive_file_session_tests.rs.
-Fixture allowlist configured-cli-authentic/fixture.toml plus exact archive mirror and
-registry patch leaves; test_configured_cli_fixture.py only current inventory/size/identity
-expectations and discriminating fifth missing/corrupt controls. Preserve prior rows/order/
-bytes; add2 payloads, verify provenance/hash/size and one original MODULE patch_check.
-Stage9 row/compact receipt/canonical/manifest; packet target-only setup/evidence. No
-new helper framework/sourcefamily/schema/dependency/Windows work. Append only qualified
-archive/fixturepatch/preparedpatch to inherited356 ordered source rows, keep original18env.
-
-Validation: independent DESIGN before acquisition, prerequisite/effect review before
-Rust, actual source/helpers/gates PRELAUNCH before ONE native, FINAL actual change and
-raw evidence. Resolve pinned nightly2025-09-14 tools; serial offline locked jobs1
-JSON no-run compile then exact executable list/batched preflight/tests. Fresh Bzlmod7/
-Loading26/Core43 because fixture/scope source changes invalidate old universal maps;
-reuse selectors, add only real missing proof. Production Core/CLI check. Fixture verify
-and focused31 controls; three missing-strace controls explicit unproved. Existing
-cohort real archive+patch/MODULE, default/roles/fullbinding/absent-invalid/cross-owner,
-all10duplicates/mutation/cancel/restoration/mixed/currentnamespace/ArcWeak covered.
-Fixture-only FSIZE32MiB reuses accepted WP1117 policy for the verified32MiB bundle; ordinary16MiB/native32MiB unchanged. Freeze explicit successor source/fixture maps before gates; private-only reuse is invalid for the shared transport/fixture changes. Runtime invocations separate from compile/setup;64KiB executable hash. Frozen helpers
-must inspect imported limit owners and retain accepted WP1117 fd_source_r7 exact Kotlin
-exception before child. No identical native replay or credit for zero selected/failure.
-User allows required time; recurring>180s examined for necessity/refactoring, no hard
-permission deadline. Invocation/compiler/format/assertion corrections stay scoped;
-new source/ownership/resource decision requires explicit technical contract review.
-
-Immediate predecessor: WP1118 accepted43 fresh Core+33 protected/31 fixture qualified
-reuse, production check and ONE18.979s/source358/phase243.8125MiB; Kotlin capabilities
-File-only demand crossed. Normal compiler producer and full closure remain unproved.
+Limits unchanged: RSS256MiB/AS512MiB/live16MiB/work20/cleanup23/outer26/source512/
+census513; qualified Kotlin transfer32MiB/cumulative decoded+written128MiB;
+fixture total+archive32MiB/small+member+retained16MiB; ordinaryFSIZE16/native32.
+No native replay without changed implementation/environment hypothesis; preserve any
+failure. Genuine Need/quota/deadline frontier is bounded evidence, not whole-fit or
+producer completion. Missing/unattributed gate is unproved. New semantic ownership,
+source prerequisite or resource requirement needs technical DESIGN/REPLAN; routine
+invocation/test/assertion correction stays scoped and invalidates affected gates.
+User permits necessary time; recurring>180s examined for necessity/refactoring, not
+permission deadline. Reuse original captured frame instead of generic error serializer.

@@ -347,7 +347,14 @@ def _verify_patch(raw: dict[str, Any], verified: VerifiedFixture) -> None:
                 _stream_archive(held, listed.item)
                 held.seek(0)
                 with tarfile.open(fileobj=held, mode="r:gz") as bundle:
-                    info = bundle.getmember(member)
+                    info = None
+                    for candidate in bundle:
+                        if candidate.name in (member, "./" + member):
+                            if info is not None:
+                                raise FixtureError("patch archive member is ambiguous")
+                            info = candidate
+                    if info is None:
+                        raise FixtureError("patch archive member is missing")
                     if not info.isfile() or info.size > MAX_OBJECT_BYTES:
                         raise FixtureError("patch archive member is not a bounded regular file")
                     stream = bundle.extractfile(info)

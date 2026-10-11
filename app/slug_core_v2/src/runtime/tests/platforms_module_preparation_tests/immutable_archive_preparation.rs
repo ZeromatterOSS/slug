@@ -50,6 +50,19 @@ pub(super) const KOTLIN_DIGEST: [u8; 32] = [
     0x3b, 0x77, 0x29, 0x76, 0xfe, 0xc7, 0xbd, 0xcd, 0xa1, 0xd8, 0x4b, 0x9d, 0x39, 0xb1, 0x76, 0x58,
     0x94, 0x24, 0xc0, 0x47, 0xeb, 0x21, 0x75, 0xbe, 0xd0, 0x9a, 0xac, 0x63, 0x0e, 0x50, 0xaf, 0x43,
 ];
+pub(super) const SWIFT_URL: &str =
+    "https://github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz";
+pub(super) const SWIFT_PREPARED_MODULE: &str =
+    "target/wp954/registry/modules/rules_swift/3.1.2/MODULE.bazel";
+pub(super) const SWIFT_PREPARED_PATCH: &str =
+    "target/wp954/registry/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch";
+const SWIFT_SRI: &str = "sha256-Xv9xfBi7UTKFtJmt1o8jMVCc1OQR/whelqhrM0LB5ao=";
+const SWIFT_MODULE_SRI: &str = "sha256-csj1z50mQnzubHbI44U+tGzmsEEqCBsrbbborVYmdAA=";
+const SWIFT_PATCH_SRI: &str = "sha256-Q4aDH4eNxH+JEDwjWao2uIA5HNzwW30HWNAagHtwGYw=";
+pub(super) const SWIFT_DIGEST: [u8; 32] = [
+    0x5e, 0xff, 0x71, 0x7c, 0x18, 0xbb, 0x51, 0x32, 0x85, 0xb4, 0x99, 0xad, 0xd6, 0x8f, 0x23, 0x31,
+    0x50, 0x9c, 0xd4, 0xe4, 0x11, 0xff, 0x08, 0x5e, 0x96, 0xa8, 0x6b, 0x33, 0x42, 0xc1, 0xe5, 0xaa,
+];
 pub(super) struct ArchiveBinding {
     pub(super) backing: Arc<OfflineArchiveBacking>,
     pub(super) module: NormalizedAbsolutePath,
@@ -69,7 +82,7 @@ struct ArchiveDescriptor {
     patch_integrity: Option<&'static str>,
     prepared_patch: Option<&'static str>,
 }
-static ARCHIVES: [ArchiveDescriptor; 4] = [
+static ARCHIVES: [ArchiveDescriptor; 5] = [
     ArchiveDescriptor {
         canonical: "protobuf+",
         url: PROTOBUF_URL,
@@ -114,6 +127,17 @@ static ARCHIVES: [ArchiveDescriptor; 4] = [
         patch_integrity: Some(KOTLIN_PATCH_SRI),
         prepared_patch: Some(KOTLIN_PREPARED_PATCH),
     },
+    ArchiveDescriptor {
+        canonical: "rules_swift+",
+        url: SWIFT_URL,
+        digest: &SWIFT_DIGEST,
+        integrity: SWIFT_SRI,
+        strip_prefix: "",
+        module_integrity: SWIFT_MODULE_SRI,
+        prepared_module: SWIFT_PREPARED_MODULE,
+        patch_integrity: Some(SWIFT_PATCH_SRI),
+        prepared_patch: Some(SWIFT_PREPARED_PATCH),
+    },
 ];
 fn binding(
     bodies: &Bodies,
@@ -136,6 +160,10 @@ fn binding(
             .kotlin_offline_archive
             .as_ref()
             .map(|b| (&b.archive.backing, &b.archive.module)),
+        4 => bodies
+            .swift_offline_archive
+            .as_ref()
+            .map(|b| (&b.archive.backing, &b.archive.module)),
         _ => None,
     }
 }
@@ -143,6 +171,7 @@ fn patched_binding(bodies: &Bodies, index: usize) -> Option<&PatchedArchiveBindi
     match index {
         2 => bodies.python_offline_archive.as_ref(),
         3 => bodies.kotlin_offline_archive.as_ref(),
+        4 => bodies.swift_offline_archive.as_ref(),
         _ => None,
     }
 }
@@ -244,6 +273,10 @@ pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
             .kotlin_offline_archive
             .as_ref()
             .is_none_or(|b| native_patched_binding(project, &ARCHIVES[3], b))
+        && bodies
+            .swift_offline_archive
+            .as_ref()
+            .is_none_or(|b| native_patched_binding(project, &ARCHIVES[4], b))
 }
 
 fn string_is(value: Option<&OverrideAttributeValue>, expected: &str) -> bool {
@@ -370,6 +403,23 @@ pub(super) fn configure_kotlin(
     bodies
 }
 
+pub(super) fn configure_swift(
+    mut bodies: Bodies,
+    registry: RegistryChoice,
+    command: CommandChoice,
+    backing: Arc<OfflineArchiveBacking>,
+    module: NormalizedAbsolutePath,
+    patch: NormalizedAbsolutePath,
+) -> Bodies {
+    if public_probe_preparation_tests::offline_archive_native_role(registry, command) {
+        bodies.swift_offline_archive = Some(PatchedArchiveBinding {
+            archive: ArchiveBinding { backing, module },
+            patch,
+        });
+    }
+    bodies
+}
+
 #[cfg(test)]
 mod tests {
     use compact_str::CompactString;
@@ -466,10 +516,12 @@ mod tests {
         let module_url = [
             "file:///prepared/python/MODULE.bazel",
             "file:///prepared/kotlin/MODULE.bazel",
+            "file:///prepared/swift/MODULE.bazel",
         ][index - 2];
         let patch_url = [
             "file:///prepared/python/version.patch",
             "file:///prepared/kotlin/version.patch",
+            "file:///prepared/swift/version.patch",
         ][index - 2];
         let mut python = request();
         python.id.canonical_repo = CanonicalRepoName::new(descriptor.canonical).unwrap();
@@ -521,11 +573,20 @@ mod tests {
             path("/prepared/kotlin/MODULE.bazel"),
             path("/prepared/kotlin/version.patch"),
         );
+        let bodies = configure_swift(
+            bodies,
+            RegistryChoice::PreparedFile,
+            CommandChoice::PublicProbe,
+            OfflineArchiveBacking::new(SWIFT_URL, SWIFT_DIGEST, path("/swift.tar.gz")),
+            path("/prepared/swift/MODULE.bazel"),
+            path("/prepared/swift/version.patch"),
+        );
         let original = [
             request(),
             java_request(),
             patched_request(2),
             patched_request(3),
+            patched_request(4),
         ];
         for r in &original {
             let attrs = r.repo_spec.attributes.clone();
@@ -539,15 +600,18 @@ mod tests {
             assert!(Arc::ptr_eq(&attrs, &r.repo_spec.attributes));
             assert_eq!(Arc::strong_count(&attrs), owners);
         }
-        for index in [2, 3] {
+        for index in [2, 3, 4] {
             let descriptor = &ARCHIVES[index];
+            let donor = if index == 2 { 3 } else { 2 };
             let python = &original[index];
             let patch_url = [
                 "file:///prepared/python/version.patch",
                 "file:///prepared/kotlin/version.patch",
+                "file:///prepared/swift/version.patch",
             ][index - 2];
             let other_patch = [
                 "file:///prepared/kotlin/version.patch",
+                "file:///prepared/python/version.patch",
                 "file:///prepared/python/version.patch",
             ][index - 2];
             for key in python.repo_spec.attributes.keys() {
@@ -602,7 +666,7 @@ mod tests {
                     patch(
                         patch_key(patch_url),
                         OverrideAttributeValue::String(
-                            ARCHIVES[5 - index].patch_integrity.unwrap().into(),
+                            ARCHIVES[donor].patch_integrity.unwrap().into(),
                         ),
                     ),
                 ),
@@ -640,6 +704,47 @@ mod tests {
                 let mut wrong = python.clone();
                 Arc::make_mut(&mut wrong.repo_spec.attributes).insert(key.into(), value);
                 assert!(!matches(&bodies, &wrong), "python crossed {key}");
+            }
+            if index == 4 {
+                for donor in [2, 3] {
+                    for (key, value) in [
+                        (
+                            "remote_patches",
+                            patch(
+                                patch_key(patch_url),
+                                OverrideAttributeValue::String(
+                                    ARCHIVES[donor].patch_integrity.unwrap().into(),
+                                ),
+                            ),
+                        ),
+                        (
+                            "remote_patches",
+                            original[donor]
+                                .repo_spec
+                                .attributes
+                                .get("remote_patches")
+                                .unwrap()
+                                .clone(),
+                        ),
+                        (
+                            "remote_module_file_urls",
+                            original[donor]
+                                .repo_spec
+                                .attributes
+                                .get("remote_module_file_urls")
+                                .unwrap()
+                                .clone(),
+                        ),
+                        (
+                            "remote_module_file_integrity",
+                            OverrideAttributeValue::String(ARCHIVES[donor].module_integrity.into()),
+                        ),
+                    ] {
+                        let mut wrong = python.clone();
+                        Arc::make_mut(&mut wrong.repo_spec.attributes).insert(key.into(), value);
+                        assert!(!matches(&bodies, &wrong));
+                    }
+                }
             }
             for reverse in [false, true] {
                 let mut rows = [
@@ -761,6 +866,14 @@ mod tests {
                 path("/prepared/kotlin/MODULE.bazel"),
                 path("/prepared/kotlin/version.patch"),
             );
+            let disabled = configure_swift(
+                disabled,
+                registry,
+                command,
+                OfflineArchiveBacking::new(SWIFT_URL, SWIFT_DIGEST, path("/swift.tar.gz")),
+                path("/prepared/swift/MODULE.bazel"),
+                path("/prepared/swift/version.patch"),
+            );
             assert!(disabled.java_offline_archive.is_none());
             assert!(!matches(&disabled, &original[0]));
             assert!(!matches(&disabled, &original[1]));
@@ -768,12 +881,15 @@ mod tests {
             assert!(!matches(&disabled, &original[2]));
             assert!(disabled.kotlin_offline_archive.is_none());
             assert!(!matches(&disabled, &original[3]));
+            assert!(disabled.swift_offline_archive.is_none());
+            assert!(!matches(&disabled, &original[4]));
         }
         let single = configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
         assert!(matches(&single, &original[0]));
         assert!(!matches(&single, &original[1]));
         assert!(!matches(&single, &original[2]));
         assert!(!matches(&single, &original[3]));
+        assert!(!matches(&single, &original[4]));
         let bad = SourcePreparationNeeds::repository(crossed);
         let previous = SourcePreparationNeeds::repository(original[0].clone())
             .try_union(&SourcePreparationNeeds::repository(original[1].clone()))
@@ -782,6 +898,8 @@ mod tests {
             .try_union(&SourcePreparationNeeds::repository(original[2].clone()))
             .unwrap()
             .try_union(&SourcePreparationNeeds::repository(original[3].clone()))
+            .unwrap()
+            .try_union(&SourcePreparationNeeds::repository(original[4].clone()))
             .unwrap();
         assert!(bodies.admit(&good).is_ok());
         let mut wrong_patch = original[2].clone();
@@ -792,10 +910,15 @@ mod tests {
         Arc::make_mut(&mut wrong_kotlin.repo_spec.attributes)
             .insert("remote_patch_strip".into(), OverrideAttributeValue::Int(0));
         let bad_kotlin = SourcePreparationNeeds::repository(wrong_kotlin);
+        let mut wrong_swift = original[4].clone();
+        Arc::make_mut(&mut wrong_swift.repo_spec.attributes)
+            .insert("remote_patch_strip".into(), OverrideAttributeValue::Int(0));
+        let bad_swift = SourcePreparationNeeds::repository(wrong_swift);
         for (good, bad) in [
             (&good, &bad),
             (&previous, &bad_patch),
             (&previous, &bad_kotlin),
+            (&previous, &bad_swift),
         ] {
             for mixed in [good.try_union(bad).unwrap(), bad.try_union(good).unwrap()] {
                 let denied = bodies.first_denied_materialization(&mixed).unwrap().0;
@@ -819,6 +942,10 @@ mod tests {
                 assert_eq!(calls.get(), 0);
             }
         }
+        public_probe_preparation_tests::assert_swift_namespace_is_current_and_borrowed(
+            &bodies,
+            &original[4],
+        );
         let owners = [
             Arc::downgrade(bodies.offline_archive.as_ref().unwrap()),
             Arc::downgrade(&bodies.java_offline_archive.as_ref().unwrap().backing),
@@ -833,6 +960,14 @@ mod tests {
             Arc::downgrade(
                 &bodies
                     .kotlin_offline_archive
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .backing,
+            ),
+            Arc::downgrade(
+                &bodies
+                    .swift_offline_archive
                     .as_ref()
                     .unwrap()
                     .archive
@@ -875,8 +1010,8 @@ mod tests {
             std::mem::size_of_val(&ARCHIVES),
             std::mem::size_of::<OfflineArchiveBacking>(),
             std::mem::align_of::<OfflineArchiveBacking>(),
-            std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 4]>(),
-            std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 4]>()
+            std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 5]>(),
+            std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 5]>()
         );
     }
 
@@ -1250,15 +1385,39 @@ mod tests {
         );
         assert_eq!(Arc::strong_count(&kotlin.archive.backing), kotlin_count);
         assert_eq!(kotlin.patch.as_path() as *const Path, kotlin_patch);
-        for index in [2, 3] {
+        let mut swift_only = make();
+        swift_only.swift_offline_archive = Some(valid_patched(4));
+        assert_eq!(native(&swift_only), expected);
+        assert_eq!(
+            swift_only.native_source_work_duration(PreparedFile, PublicProbe),
+            Duration::from_secs(20)
+        );
+        let swift = valid_patched(4);
+        let swift_weak = Arc::downgrade(&swift.archive.backing);
+        let swift_count = Arc::strong_count(&swift.archive.backing);
+        let swift_patch = swift.patch.as_path() as *const Path;
+        kotlin_cohort.swift_offline_archive = Some(swift);
+        assert_eq!(native(&kotlin_cohort), kotlin_expected);
+        let swift = kotlin_cohort.swift_offline_archive.as_ref().unwrap();
+        assert_eq!(Arc::strong_count(&swift.archive.backing), swift_count);
+        assert_eq!(swift.patch.as_path() as *const Path, swift_patch);
+        assert_eq!(
+            kotlin_cohort.native_source_work_duration(PreparedFile, PublicProbe),
+            Duration::from_secs(20)
+        );
+        for index in [2, 3, 4] {
             let descriptor = &ARCHIVES[index];
-            for case in 0..8 {
+            let original_donor = if index == 2 { 3 } else { 2 };
+            for case in 0..if index == 4 { 11 } else { 8 } {
+                let donor = if case >= 8 { 3 } else { original_donor };
                 let mut b = make();
                 b.java_offline_archive = Some(valid_java());
                 b.python_offline_archive = Some(valid_patched(2));
                 b.kotlin_offline_archive = Some(valid_patched(3));
+                b.swift_offline_archive = Some(valid_patched(4));
                 let mut patched = valid_patched(index);
-                match case {
+                let mutation = if case >= 8 { case - 3 } else { case };
+                match mutation {
                     0 => {
                         patched.archive.backing = backing(
                             JAVA_URL,
@@ -1285,27 +1444,29 @@ mod tests {
                     5 => {
                         patched.archive.backing = backing(
                             descriptor.url,
-                            *ARCHIVES[5 - index].digest,
+                            *ARCHIVES[donor].digest,
                             patched.archive.backing.path().dupe(),
                         )
                     }
                     6 => {
                         patched.patch = NormalizedAbsolutePath::new(
-                            project.join(ARCHIVES[5 - index].prepared_patch.unwrap()),
+                            project.join(ARCHIVES[donor].prepared_patch.unwrap()),
                         )
                         .unwrap()
                     }
                     _ => {
                         patched.archive.module = NormalizedAbsolutePath::new(
-                            project.join(ARCHIVES[5 - index].prepared_module),
+                            project.join(ARCHIVES[donor].prepared_module),
                         )
                         .unwrap()
                     }
                 }
                 if index == 2 {
                     b.python_offline_archive = Some(patched);
-                } else {
+                } else if index == 3 {
                     b.kotlin_offline_archive = Some(patched);
+                } else {
+                    b.swift_offline_archive = Some(patched);
                 }
                 assert_eq!(
                     native(&b),
@@ -1321,6 +1482,9 @@ mod tests {
                 );
             }
         }
+        kotlin_cohort.swift_offline_archive = None;
+        assert!(swift_weak.upgrade().is_none());
+        assert_eq!(native(&kotlin_cohort), kotlin_expected);
         cohort.python_offline_archive = None;
         assert_eq!(native(&cohort), expected);
         let ordinary = bodies.source_limits(PreparedFile);
@@ -1331,6 +1495,7 @@ mod tests {
             b.java_offline_archive = Some(valid_java());
             b.python_offline_archive = Some(valid_patched(2));
             b.kotlin_offline_archive = Some(valid_patched(3));
+            b.swift_offline_archive = Some(valid_patched(4));
             match case {
                 0 => b.offline_archive = None,
                 1 => b.offline_archive_module = None,

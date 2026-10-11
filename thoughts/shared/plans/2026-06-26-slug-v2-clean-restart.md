@@ -34,17 +34,19 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-331-m7a-swift-immutable-cohort
-Status: ready — DESIGN before acquisition; verified prerequisite before Rust
+Packet: WP-7-332-m7a-observed-environment-request
+Status: ready — independent DESIGN before implementation
 
-The [accepted Kotlin capabilities packet](./slug-v2-subplans/wp1118-kotlin-capabilities-file-plan-2026-10-11.json)
-passes the exact generated File-only owner with unchanged layouts and resource caps.
-Current43 fresh Core/protected33 and fixture31 qualified reuse, production check and
-ONE18.979s/source358/phase243.8125MiB under256 passed;356source/18env brackets stable.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects only the actually
-demanded Swift immutable archive: verify original archive/patch availability and fit
-before fifth-cohort admission. Fixture residual1,440,218B and memory/time/profile caps
-remain explicit. Normal producer/certificate/actions/Rustc/M7A and whole fit stay open.
+The [accepted Swift cohort](./slug-v2-subplans/wp1119-swift-immutable-cohort-2026-10-11.json)
+passes current76Rust/31fixture+production and ONE19.711s/source366 with measured
+supervisor244.640625MiB/phase245.88671875MiB under256.359source/175pins/18env
+brackets stable; original Swift archive and five imports crossed. Scoped retirement
+is narrow; producer/certificate/actions/Rustc/M7A and whole fit remain open.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects only the captured
+original environment request CC/Path/ProgramData through normal scoped snapshots,
+qualified current Swift context and complete original tuple. Values/caller are not
+inferred; Windows implementation remains deferred, all resource caps unchanged.
+Independent DESIGN settles snapshot authority and batch interaction before activation.
 
 ### Ready and blocked queue
 

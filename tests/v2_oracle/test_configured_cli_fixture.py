@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import tarfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -74,19 +75,19 @@ def test_portable_driver_receives_checked_deadline_limits(deadline: int) -> None
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
     verified = verify_fixture()
-    assert len(verified.objects) == 33
+    assert len(verified.objects) == 35
     assert len(verified.registry_entries) == 177
-    assert verified.total_bytes == 32_114_214
+    assert verified.total_bytes == 32_440_662
     assert (
         verified.inventory_sha256
-        == "faa15b1b7f6b1414352c6124e1809c824c602a5d7750b216cb20ae107c40d3d7"
+        == "6895d4ffee1075659d9db5709bf4a1418b0cc772ac7d95cbeaf472c14c669538"
     )
 
     destination = tmp_path / "assembled"
     receipt = assemble(destination)
-    assert receipt["object_count"] == 33
+    assert receipt["object_count"] == 35
     assert receipt["registry_metadata_count"] == 177
-    assert receipt["source_bytes"] == 32_114_214
+    assert receipt["source_bytes"] == 32_440_662
     assert receipt["inventory_sha256"] == verified.inventory_sha256
     assert "local_path_override" not in (destination / "workspace/MODULE.bazel").read_text()
     assert (destination / "workspace/BUILD.bazel").read_text().endswith(
@@ -147,10 +148,24 @@ def test_authentic_fixture_rejects_missing_and_corrupt_objects(tmp_path: Path) -
     with pytest.raises(FixtureError, match="missing fixture object"):
         verify_fixture(missing)
 
+    platform = "mirror/github.com/bazelbuild/platforms/releases/download/1.0.0/platforms-1.0.0.tar.gz"
+    swift = "mirror/github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz"
+    shutil.copy2(DEFAULT_FIXTURE_ROOT / platform, missing / platform)
+    (missing / swift).unlink()
+    with pytest.raises(FixtureError, match="missing fixture object.*rules_swift"):
+        verify_fixture(missing)
+
     corrupt = _copy_fixture(tmp_path / "corrupt")
     build = corrupt / "workspace/BUILD.bazel"
     build.write_bytes(build.read_bytes() + b"# corrupt\n")
     with pytest.raises(FixtureError, match="size mismatch"):
+        verify_fixture(corrupt)
+    shutil.copy2(DEFAULT_FIXTURE_ROOT / "workspace/BUILD.bazel", build)
+    with (corrupt / swift).open("r+b") as stream:
+        first = stream.read(1)
+        stream.seek(0)
+        stream.write(bytes([first[0] ^ 1]))
+    with pytest.raises(FixtureError, match="hash mismatch.*rules_swift"):
         verify_fixture(corrupt)
 
 
@@ -332,3 +347,26 @@ def test_patch_requires_listed_archive_and_preserves_member_limit(tmp_path: Path
     monkeypatch.setattr(fixture_tool, "MAX_OBJECT_BYTES", 13)
     with pytest.raises(FixtureError, match="bounded regular"):
         fixture_tool._verify_patch(raw, verified)
+    monkeypatch.setattr(fixture_tool, "MAX_OBJECT_BYTES", 14)
+    archive_path = root / "archives/source.tar.gz"
+    original = b'version = "0"\n'
+    for names in [("./MODULE.bazel",), ("MODULE.bazel", "./MODULE.bazel"),
+                  ("MODULE.bazel", "MODULE.bazel"), ("elsewhere/MODULE.bazel",)]:
+        with tarfile.open(archive_path, "w:gz") as archive:
+            for name in names:
+                info = tarfile.TarInfo(name)
+                info.size = len(original)
+                archive.addfile(info, io.BytesIO(original))
+        # Only this tiny synthetic archive is resident; authentic archives stay streamed.
+        data = archive_path.read_bytes()
+        item = replace(
+            verified.archives_by_source["archives/source.tar.gz"].item,
+            size=len(data), sha256=hashlib.sha256(data).hexdigest(),
+        )
+        with fixture_tool._held_archive(root, item) as (_, snapshot):
+            verified.archives_by_source[item.source] = snapshot
+        if len(names) == 1 and names[0] == "./MODULE.bazel":
+            fixture_tool._verify_patch(raw, verified)
+        else:
+            with pytest.raises(FixtureError, match="ambiguous|missing"):
+                fixture_tool._verify_patch(raw, verified)

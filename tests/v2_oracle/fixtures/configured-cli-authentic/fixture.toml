@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 32114214
+total_source_bytes = 32440662
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -328,3 +328,26 @@ member = "MODULE.bazel"
 patch = "registry/modules/rules_kotlin/1.9.6/patches/module_dot_bazel_version.patch"
 expected = "modules/rules_kotlin/1.9.6/MODULE.bazel"
 preimage_sha256 = "6c0830dd56507fd71ee43bc60435a6761c3b8c00a2a6e157013b74def25fd22a"
+
+[[objects]]
+source = "mirror/github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz"
+destination = "mirror/github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz"
+sha256 = "5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa"
+size = 326090
+source_url = "https://github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "registry/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch"
+sha256 = "4386831f878dc47f89103c2359aa36b880391cdcf05b7d0758d01a807b70198c"
+size = 358
+source_url = "https://bcr.bazel.build/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazelbuild/rules_swift/releases/download/3.1.2/rules_swift.3.1.2.tar.gz"
+member = "MODULE.bazel"
+patch = "registry/modules/rules_swift/3.1.2/patches/module_dot_bazel_version.patch"
+expected = "modules/rules_swift/3.1.2/MODULE.bazel"
+preimage_sha256 = "5e412fafa1373df80c72bc9de891dd0281b174d693cedad5987c85d59aab572a"
