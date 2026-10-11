@@ -6,6 +6,179 @@ use crate::keys::WorkspaceSnapshot;
 use crate::keys::WorkspaceSnapshotKey;
 
 #[tokio::test]
+async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
+    use dice::UserComputationData;
+    use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::inject_root_package_policy_inputs;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
+    use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+    use slug_workspace_v2::path_observation_shards;
+    use starlark::eval::FileLoader;
+
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let source: Arc<[u8]> = Arc::from(
+        concat!(
+            "load(':leaf.bzl', left='name')\n",
+            "load('//:leaf.bzl', alias='name')\n",
+            "load(':leaf.bzl', repeated='name')\n",
+            "load(':other.bzl', other='name')\n",
+            "def answer():\n    return left() + ':' + alias() + ':' + repeated() + ':' + other()\n",
+        )
+        .as_bytes(),
+    );
+    let source_weak = Arc::downgrade(&source);
+    let demand = |path: &str, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let mut rows = Vec::new();
+    for path in ["/", "/workspace"] {
+        rows.push((
+            demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::Directory,
+                1,
+                1,
+                1,
+                1,
+                0o755,
+            ))),
+        ));
+    }
+    for path in ["/workspace/REPO.bazel", "/workspace/.bazelignore"] {
+        rows.push((
+            demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        ));
+    }
+    for (path, bytes) in [
+        ("/workspace/BUILD.bazel", Arc::<[u8]>::from(&b""[..])),
+        ("/workspace/parent.bzl", source),
+        (
+            "/workspace/leaf.bzl",
+            Arc::from(&b"NAME = 'leaf'\ndef name():\n    return NAME\n"[..]),
+        ),
+        (
+            "/workspace/other.bzl",
+            Arc::from(&b"NAME = 'other'\ndef name():\n    return NAME\n"[..]),
+        ),
+    ] {
+        rows.push((
+            demand(path, PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o644,
+            ))),
+        ));
+        rows.push((
+            demand(path, PathObservationOperation::FileBytes),
+            PathObservationResult::FileBytes(PathOperationResult::Present(bytes)),
+        ));
+    }
+    let epoch = PathObservationEpoch::new(rows).unwrap();
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        cycle_detector: Some(crate::bzl_load_cycle_detector()),
+        ..Default::default()
+    });
+    updater.changed_to(path_observation_shards(&epoch)).unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            workspace.clone(),
+            [workspace.clone()],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let label = resolve_host_load_label(&PackagePath::root(), ":parent.bzl").unwrap();
+    let outcome = transaction
+        .compute(&HostBzlModuleEvalKey::new(workspace, label))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(outcome) = outcome else {
+        panic!("complete Host fixture returned Need")
+    };
+    let held = outcome.as_ref().as_ref().unwrap().clone();
+    assert_eq!(
+        held.loads,
+        [":leaf.bzl", "//:leaf.bzl", ":leaf.bzl", ":other.bzl"]
+    );
+    assert_eq!(held.manifest.direct_children.len(), 2);
+    assert_eq!(held.retained_bzl_modules.len(), 2);
+    assert_eq!(
+        held.retained_bzl_modules[0].identity.label.to_string(),
+        "@@//:leaf.bzl"
+    );
+    assert_eq!(
+        held.retained_bzl_modules[1].identity.label.to_string(),
+        "@@//:other.bzl"
+    );
+    // Distinct genuinely evaluated child heaps discriminate first-match order.
+    for (first, second, expected) in [(0, 1, "leaf"), (1, 0, "other")] {
+        let loader = LocalBzlLoader {
+            modules: vec![
+                (
+                    ":duplicate.bzl",
+                    held.retained_bzl_modules[first].module.dupe(),
+                ),
+                (
+                    ":duplicate.bzl",
+                    held.retained_bzl_modules[second].module.dupe(),
+                ),
+            ],
+        };
+        assert_eq!(
+            loader
+                .load(":duplicate.bzl")
+                .unwrap()
+                .get("NAME")
+                .unwrap()
+                .value()
+                .unpack_str(),
+            Some(expected)
+        );
+    }
+    drop(outcome);
+    drop(transaction);
+    dice.wait_for_idle().await;
+    drop(dice);
+    tokio::task::yield_now().await;
+    assert!(source_weak.upgrade().is_none());
+    let caller = Module::new();
+    let mut evaluator = Evaluator::new(&caller);
+    let answer = held.module.get("answer").unwrap();
+    assert_eq!(
+        evaluator
+            .eval_function(answer.value(), &[], &[])
+            .unwrap()
+            .unpack_str(),
+        Some("leaf:leaf:leaf:other")
+    );
+    assert_eq!(held.loads[1], "//:leaf.bzl");
+}
+
+#[tokio::test]
 async fn parsed_source_shares_workspace_storage_and_survives_its_owners() {
     let workspace = PathBuf::from("/workspace");
     let path = workspace.join("shared.bzl");

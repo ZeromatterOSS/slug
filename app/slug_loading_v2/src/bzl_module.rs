@@ -599,9 +599,9 @@ impl FrozenBzlModule {
     }
 }
 
-fn validate_direct_bzl_load_visibilities(
+fn validate_direct_bzl_load_visibilities<K>(
     importer: &PackageIdentifier,
-    loaded_modules: &[(String, FrozenBzlModule)],
+    loaded_modules: &[(K, FrozenBzlModule)],
 ) -> Result<(), BzlLoadVisibilityError> {
     for (_, module) in loaded_modules {
         validate_bzl_load_visibility(
@@ -3140,7 +3140,7 @@ async fn compute_host_bzl_module(
                 );
             }
         };
-        loaded_modules.push((load.clone(), module));
+        loaded_modules.push((load.as_str(), module));
     }
 
     let module = Module::new();
@@ -3166,7 +3166,7 @@ async fn compute_host_bzl_module(
     let loader = LocalBzlLoader {
         modules: loaded_modules
             .iter()
-            .map(|(load, module)| (load.as_str(), module.module.dupe()))
+            .map(|(load, module)| (*load, module.module.dupe()))
             .collect(),
     };
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
@@ -3218,12 +3218,15 @@ async fn compute_host_bzl_module(
             );
         }
     };
+    drop(loader);
+    let retained_bzl_modules = retained_module_closure(&loaded_modules);
+    drop(loaded_modules);
     host_bzl_complete(
         Ok(FrozenBzlModule {
             module,
             path: source.logical_path().as_path().to_path_buf(),
             loads,
-            retained_bzl_modules: retained_module_closure(&loaded_modules),
+            retained_bzl_modules,
             bzl_load_visibility: evaluation_context.bzl_load_visibility(),
             manifest,
         }),
@@ -8324,18 +8327,24 @@ fn package_bzl_call_sources(
     (!sources.is_empty()).then(|| sources.into())
 }
 
-fn retained_module_closure(
-    loaded_modules: &[(String, FrozenBzlModule)],
+fn retained_module_closure<K>(
+    loaded_modules: &[(K, FrozenBzlModule)],
 ) -> Arc<[FrozenBzlLifetimeEntry]> {
-    flattened_lifetime_closure(loaded_modules).into()
+    flattened_module_lifetime_closure(loaded_modules.iter().map(|(_, module)| module)).into()
 }
 
 fn flattened_lifetime_closure(
     loaded_modules: &[(String, FrozenBzlModule)],
 ) -> Vec<FrozenBzlLifetimeEntry> {
+    flattened_module_lifetime_closure(loaded_modules.iter().map(|(_, module)| module))
+}
+
+fn flattened_module_lifetime_closure<'a>(
+    loaded_modules: impl IntoIterator<Item = &'a FrozenBzlModule>,
+) -> Vec<FrozenBzlLifetimeEntry> {
     let mut seen_labels = SmallSet::new();
     let mut entries = Vec::new();
-    for (_, loaded_module) in loaded_modules {
+    for loaded_module in loaded_modules {
         for (identity, module) in loaded_module.lifetime_modules() {
             if seen_labels.insert(&identity.label) {
                 entries.push(FrozenBzlLifetimeEntry {
