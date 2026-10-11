@@ -34,18 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-314-m7a-normal-profile-producer-readiness-r1
-Status: REPLAN — optimized preparation exceeds skill60s; FINAL record ACCEPT
+Packet: WP-7-315-m7a-normal-profile-producer-readiness-r2
+Status: accepted — normal-profile readiness; scoped metadata successor ready
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records an incomplete
-Core1/Bzlmod0 build-readiness experiment. Three optimized preparation stages hit
-the skill60s cap; no candidate native ran. Current33 controls and Core1 production
-check pass; [FINAL receipt](./slug-v2-subplans/wp1102-producer-profile-preparation-limit-2026-10-10.json)
-accepts only that qualified record. A compilation-only180s exception was requested;
-existing caps remain pending explicit user response. WP1101 allocation-safe
-batching remains accepted,51 proofs pass, original observed prefix227.863MiB fits
-256 but full producer remains at WorkDeadline7/source252/root333. No unsupported
-runtime/cache/admission repair was identified. Linux priority and minimal Windows persist.
+The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
+normal-profile readiness:51 fresh focused proofs, production check and ONE native
+reaching current local JDK `REPO.bazel` Lstat refusal at214.258MiB phase peak.
+The next bounded prerequisite is scoped root marker metadata. User-authorized
+preparation time is separate from workload memory; recurring work over three
+minutes receives necessity/refactoring assessment. Full producer/M7A/bootstrap
+completion remains open.
 
 ### Ready and blocked queue
 
@@ -62,6 +60,9 @@ remaining priorities stay queued until concrete prerequisites and owners are rea
 | 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
 | 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
 
+The user permits the time required for a task; examine recurring work over three
+minutes for necessity and possible refactoring. Compilation and runtime memory
+measurements remain separate. Historical short time guidelines are not user caps.
 The user treats 12 seconds as a guideline, not an exact test rule. Keep tests
 as small as the semantic boundary allows; anything over a few seconds should
 run infrequently, and a test over roughly 30 seconds needs serious necessity

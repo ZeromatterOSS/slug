@@ -1,0 +1,195 @@
+{
+  "packet": "WP-7-315-m7a-normal-profile-producer-readiness-r2",
+  "baseline": "0009a0fd5fb089aa436554b4b8935bb305fcd5d2",
+  "status": "accepted \u2014 current normal-profile readiness and typed metadata boundary",
+  "outcome": "Fresh original Bzlmod/Core1 profile graph reaches computation namespace refusal for generated repository root REPO.bazel Lstat, rather than prior WorkDeadline. Producer/certificate/actions/Rustc completion remains unavailable.",
+  "compatibility": {
+    "existing_semantics": "exact unchanged accepted slices",
+    "resource_observer": "Slug-native",
+    "windows": "deferred"
+  },
+  "runtime_changes": 0,
+  "allocation": "No new strings/cache/interner/key/retained storage; existing scoped borrowing/interning unchanged.",
+  "user_time_guidance": "Time required per task allowed; recurring operations above180s examined for necessity/refactoring. Persisted AGENTS/SKILL.",
+  "focused": {
+    "selected": 51,
+    "passed": 51,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.307710194028914,
+        "operation_sha256": "35244ee93120e17afeb95cc118774cbec2de6b00a17761cbfae6113bd494931f"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11672302591614425,
+        "operation_sha256": "c94c8e943f40159f99c7e78adac859b190e03381d90cdac0d56ca9dee082e03f"
+      },
+      "core": {
+        "selected": 18,
+        "passed": 18,
+        "elapsed_seconds": 0.21877776901237667,
+        "operation_sha256": "19b8b7964bdbaad38d2015035a988b14f4edf59694aee756f41ae9bdd32279db"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 84.06903342693113,
+        "deadline_seconds": null,
+        "operation_sha256": "2ceeb2e27486dd256a7dfc1610242d329379faa6f489464083cc274fe155d11c",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 87.31122151797172,
+        "deadline_seconds": null,
+        "operation_sha256": "baf01d850936a93f64d9becefc3008e67ce99738c58596425b59f42c08fde38a",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 239.02513061498757,
+        "deadline_seconds": null,
+        "operation_sha256": "7282b941ed2284e1f7841bf24e7004268220cb5cbdf271141ee566df65b3aeee",
+        "over_three_minutes": true
+      }
+    },
+    "necessity": "Fresh artifacts at originally reviewed Bzlmod/Core1; native Core graph must include rebuilt dependency/profile identities and observer feature. No prior-profile artifact can establish current runtime readiness.",
+    "frequency": "First completed preparations of selected profile graphs; prior capped attempts/cached prerequisites exist, so no guaranteed cold-build claim. No same-profile common-edit or recurring-over180s measurement.",
+    "refactoring": "Core command239.025s exceeds180 threshold; preparation includes dependency codegen and test artifact, not isolated Core CPU. Large inline owner/test surfaces are already identified as potential split boundaries by preparation-assessment.md. Keep profile stable; evaluate common-edit rebuilds if this recurs before structural crate/test extraction.",
+    "memory": "Compiler RSS uncapped and not workload budget evidence."
+  },
+  "production_check": {
+    "seconds": 38.348488232004456,
+    "operation_sha256": "d070c73c74a8782f7728b9a3cbdc99788cbb7f502ef09bfa6028b57fd4096010"
+  },
+  "native": {
+    "operation_sha256": "949c802d6b9b38529c7363921dee133cdef774ed16790c0b8e96f3c631cd385d",
+    "config_sha256": "8cc256df9d7a24523594f9f8f04423ba6a09e33437ed47145d07f2c9ee85d865",
+    "stdout_sha256": "1d0d35f5e84fc48479cf5927f6d08e7651bd47745b8b1140f24045d770858754",
+    "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "elapsed_seconds": 4.441434290027246,
+    "selected": 1,
+    "passed": 1,
+    "supervisor_rss_kib": 218124,
+    "child_rusage_peak_kib": 218124,
+    "phase_rss_kib": {
+      "after_runtime": 28556,
+      "after_command": 219340,
+      "after_terminal_drop": 219400,
+      "after_runtime_drop": 219400,
+      "after_scope_drop": 217344
+    },
+    "phase_peak_mib": 214.2578125,
+    "held_fds": 350,
+    "actual_stable_pins": 137,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 336,
+        "wall_ns": 117524432,
+        "process_cpu_ns": 117285216,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 336,
+        "wall_ns": 3645625822,
+        "process_cpu_ns": 3664369168,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 335,
+        "wall_ns": 174278970,
+        "process_cpu_ns": 154584166,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 336,
+        "wall_ns": 12861497,
+        "process_cpu_ns": 17449855,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=namespace path_len=26 path_hex=2f746d702f2e746d7069304455584e2f5245504f2e62617a656c capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 252 7021682 55574923 52796422 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=252 seen=252 emitted=252 admitted=252 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40818 encoded_bytes=139051 accounting_complete=true identity_complete=false"
+    },
+    "progress_refusal_record": null,
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "claim_limit": "New actual typed namespace Lstat refusal is a source-frontier discriminator, not a speed/CPU-cause or full producer/whole-fit proof. Root_compute lane aborted_partial makes its scoped sum partial; other3 lanes clear. WP938_SCOPE235521 registrybytes neverRSS. SourceWeak unseen makes expiry vacuous; Scope/Recorder Weak release narrow. accounting_complete=true/identity_complete=false; anonymous archive identity and charge-before-body-completion limitations persist."
+  },
+  "source_freeze": {
+    "path": "target/wp1103/source-freeze.json",
+    "sha256": "807d11045f734387f9e3fc21a49814e72b7e615d23be968f91da1c359dd9148b",
+    "rust": 36,
+    "metadata": 8
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1103/design-review.md",
+      "sha256": "5b5a1fe839786301e745a72c42e0bfa52927f4c3801ed3978103410a3b8a8afb"
+    },
+    "helper-review.md": {
+      "path": "target/wp1103/helper-review.md",
+      "sha256": "0c9830486a5000985972d96303616a581fe735cfcebc9fe5ddb99db093f81926"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1103/source-prelaunch-review.md",
+      "sha256": "45e68e48f795e92fd4180ebccf31959dcde3d301ab0bbe355dec6bf5aecd2972"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1103/prelaunch-evidence.md",
+      "sha256": "dc0577baea166fe8a11deb92bde565bf3988f970cd68276766beaa21944d2de7"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1103/root-prelaunch.md",
+      "sha256": "ed1e3bb0ceef4c811820f22d603dc150fce2bb6603ef49d0fd44953d2da1c269"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1103/final-source-review.md",
+      "sha256": "2c9eec6feae3fa2ff397de0c6c9349c1f969814b8c917fc2516dbe8fcc99b2c5"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1103/final-evidence-review.md",
+      "sha256": "671e71dda2438183fadfa7b8e8241fc75cdacac6c4bb6d487556298d78d0ed69"
+    },
+    "next-metadata-research.md": {
+      "path": "target/wp1103/next-metadata-research.md",
+      "sha256": "340e75a0e787f1c4a49a92d47d8a32fdca8b19803f49b3c68aa8a0a4d7036eaa"
+    }
+  },
+  "corrections": "No Rust/test/gate correction. Explicit user time authorization removes preparation deadline; native caps unchanged. native_setup added preparation/source-review strict roles before prelaunch.",
+  "next": "Existing unique current materialization local JDK branch passed original full-plan guard. Review narrow current-root-relative REPO.bazel Lstat under existing repo_marker_metadata flag; captured header/temp path alone grants nothing.",
+  "goal": "Incomplete; M7A/M8/actions/Rustc/fullfit remain open.",
+  "elapsed_since_design_binding_seconds": 816.54489,
+  "reviewed_candidate": {
+    "path": "target/wp1103/receipt-reviewed.json",
+    "sha256": "3107b4d088e7a64fbcea9d807810311bca90d3a2422deb0de438679c94ddbf1d"
+  }
+}

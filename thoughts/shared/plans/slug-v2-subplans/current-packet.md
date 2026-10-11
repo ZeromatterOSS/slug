@@ -1,84 +1,64 @@
-# WP1102 Core-profile producer readiness
+# WP1103 normal-profile producer readiness
 
-Packet: WP-7-314-m7a-normal-profile-producer-readiness-r1
-Status: REPLAN — optimized preparation exceeds skill60s; FINAL record ACCEPT
-Baseline: ba157b80300b87d400c211d23c0d65a18e4f6ca4 (WP1101 accepted)
+Packet: WP-7-315-m7a-normal-profile-producer-readiness-r2
+Status: accepted — 51 focused proofs; ONE current native reaches typed metadata boundary
+Baseline: 0009a0fd5fb089aa436554b4b8935bb305fcd5d2 (WP1102 preservation record)
 
-Outcome: execute the existing original normal compiler producer at an explicitly
-changed build configuration and preserve its actual next typed terminal under
-unchanged resource limits. This is functional readiness, with no timing/speed or
-CPU-cause acceptance claim. Existing exact semantic slices remain exact;
-resource/native observer evidence is Slug-native; Windows deferred.
+Outcome: run the original normal compiler producer at the previously reviewed
+Bzlmod/Core opt1 configuration and preserve its next actual typed terminal. The
+user grants the time required per task; recurring work over three minutes must
+be examined for necessity/refactoring. Compilation has no elapsed deadline;
+measure it separately from workload memory. Existing exact semantics stay exact;
+native resource evidence is Slug-native; Windows deferred. No speed/CPU-cause
+acceptance claim or M7A/M8/fullfit closure from a passing observer test.
 
-Basis: Cargo.toml profile.dev.opt-level=1, while accepted original native config
-had Bzlmod/Core overrides0 (Loading already1). Reviewed proposal/design:
-target/wp1101/profile-proposal.md and profile-design-review.md; their decision
-remains valid after WP1101 same source252/root333/WorkDeadline7 and under256MiB.
-Current source hashes equal accepted WP1101. Restore only Core override to1; retain Bzlmod0 in ignored preparation configurations; debug0/all other package settings,
-features, request/source/admission, DICE owners and allocation representation
-stay unchanged. No new semantic/cache/key/interner/retained storage or strings.
-Actual next terminal selects further normal producer work, never a new source
-grant from a projected owner header.
+Reuse target/wp1101/profile-design-review.md and WP1102 design/source/evidence
+reviews. WP1102's Core-only refinement was solely60s preparation feasibility;
+the user removed that prerequisite. Restore original Bzlmod/Core1, Loading1 for
+native/production and Loading0 for ordinary Loading tests. Other profiles/debug0,
+features, pinnednightly2025-09-14 and source/metadata remain unchanged. Same DICE
+semantic/source owners, borrowed/shared scoped interners; no retained strings,
+cache/key/storage change or new source/namespace authority. The current original
+local_jdk Lstat already has the admitted SourceService route; actual next terminal
+rather than a speculative producer repair determines subsequent implementation.
 
-Allowlist: scheduling manifest/canonical status and one compact receipt. Ignored
-target/wp1102 holds rebound helpers/configuration/compile/test/review/evidence.
-No Rust, Cargo/lock/toolchain, fixtures, original corpus or runtime cap edits.
-Reuse WP1101 runner/decoders with ROOT-only rebinding and original exact selectors;
-source vector350, env18 and callers remain original. No donor/parity change or
-new fixture; reuse existing source/graph/lifecycle proofs and admission owners.
-Allocation discipline remains AGENTS-owned; observed prefix memory is not whole
-producer/interner/history fit or native source-body retirement evidence.
+Allowlist: AGENTS.md and orchestration SKILL.md to persist user time guidance;
+manifest/canonical scheduling and compact receipt. Ignored target/wp1103 contains
+rebound helpers/configs/compile/test/review evidence. No Rust/Cargo/lock/toolchain,
+corpus/fixtures or source admission edits. Source36Rust+8metadata, original350
+ordered heldFD vector/18env and8caller pins unchanged. No body/envvalue/archive
+inspection by agents. Runner may accept explicit null preparation deadline only
+in preparation mode and records actual deadline; runtime caps stay unchanged.
 
-Gates: serial pinnednightly2025-09-14 CargoJSON no-run offline/locked/jobs1,
-separate60s preparation with compiler RSS uncapped/no workload-memory credit.
-Fresh Bzlmod7 test artifact at accepted Bzlmod0; fresh Loading26 at its
-original Loading0/Bzlmod0; Core18 native-observer artifact with Loading1/Bzlmod0/
-Core1; current unique artifact/list/batched preflight/nonzero exact bodies.
-Direct production Loading/Core/CLI check uses Core1/Bzlmod0/Loading1.
-Preparation may split successful prerequisites from a remaining distinct stage;
-cap/failed stage has zero artifact credit, no identical indefinite retry.
-Standalone fresh-shell ignored singleton list and ONE candidate native only
-after independent design/config/prelaunch review/allwritersSTOPPED. Preserve
-10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/cleanup3 and all byte/attempt/
-object/directory/log/source ceilings. Same350ordered heldFD before/after brackets
-and18env, source/caller/helper/current artifact hashes; no body/envvalue/archive
-inspection by agents. Authenticate streams/pin maps before exact strictdecode.
-No smaller authentic-root substitute, unchanged replay, capraise or source-policy
-fallback. SourceAttempts256 remains and actual refusal may name the next gate.
+Gates: serial CargoJSON no-run/offline/locked/jobs1 current artifacts/list/exact
+batched preflight and nonzero Loading26/Bzlmod7/Core18 bodies, production direct
+Loading/Core/CLI check. Preparation no workload RSS credit; elapsed>180s triggers
+frequency/necessity assessment, never automatic task refusal. Keep prior failed
+WP1102 records immutable/no artifact credit. Current newly compiled graph is
+required; old-profile artifacts cannot supply current-profile authority. Strict
+native binding couples actual artifact compile command/environment to selected
+profile. Fresh-shell standalone ignored singleton list, allwritersSTOPPED and
+independent configuration/prelaunch review before ONE original candidate native.
+Original10s/RSS256MiB/AS512/work7/default5/lifetime8/cleanup3 and all source/byte/
+object/attempt/directory/log caps remain. Stable strict pins/350heldFD brackets,
+clear exact-framed decoders; absence/refusal unproved. No unchanged native replay,
+smaller root, deadline reset or source grant from a projected owner header.
 
-REPLAN when readiness needs a new source admission/semantic owner or altered
-resource decision; an actual resource refusal is preserved without pretending
-semantic success. A natural next typed boundary may be selected under existing
-authorization. Review actual current config/proofs/native outcome at FINAL; diff/
-archive/plan checks and compact commit. Goal ACTIVE; no M7A/M8/certificate/actions/
-Rustc/fullfit claim until corresponding real terminal evidence is available.
+Independent DESIGN/config delta before gates; FINAL actual diff/proofs/evidence,
+plan/diff/archive checks and compact receipt/commit. A typed runtime refusal may
+select further normal producer work under the user's general time authorization,
+but this controlled experiment changes only profiles/preparation timing. Explicit
+memory/admission limits remain. Goal incomplete; producer/certificate/actions/
+Rustc/M7A/bootstrap closure requires actual respective terminal evidence.
 
-Predecessor: WP1101 ba157b803 accepted observed definition-frontier batching,
-51 current original-profile proofs/prod/ONE native. Prefix227.863MiB; producer
-same WorkDeadline7 at source252/root333; compact accepted receipt in
-wp1101-extension-definition-frontier-2026-10-10.json.
+Predecessor: WP1102 0009a0fd5 preserved33 ordinary passes/production check and
+three capped preparations; no optimized Core artifact/native. WP1101 ba157b803
+accepted definition-frontier batching,51 proofs and original prefix227.863MiB,
+still WorkDeadline7/source252/root333. Prior evidence is not new-profile proof.
 
-Design delta: both original Bzlmod1 test60.061s and distinct library60.033s
-preparation stages reached deadline, joined/empty and no Bzlmod artifact credit.
-Preserve their original configurations/streams, never retry them. Narrow to the
-explicitly different Core1/Bzlmod0 configuration (all other settings unchanged).
-Only named *-core-only preparation stages may execute after delta DESIGN review.
-Native remains ONE and unexecuted; no runtime memory/correctness inference from
-compiler cap. This is a preparation feasibility refinement in the same readiness
-outcome; any Core preparation cap also stops its unchanged stage.
-
-Recorded outcome: [compact receipt](./wp1102-producer-profile-preparation-limit-2026-10-10.json).
-Three capped preparations: Bzlmod1 test60.061s/library60.033s and Core1 test60.066s;
-each joins/empties owned group, has53unavailable after-pins and zero affected
-artifact credit. Current Bzlmod7/Loading26 pass (accepted profile), production
-Core1 check16.939s passes. No Core18/current native singleton/native probe ran.
-Independent FINAL source/evidence accept only this unsuccessful readiness record.
-Source research found no supported current-demand runtime correction: original
-local_jdk '/' Lstat already has an admitted scoped SourceService route. Do not
-invent a cache/frontier/admission fix or replay capped stages unchanged. User
-exception requested for compilation-only180s because orchestration skill says
-"Compile separately, with preparation bounded to 60 seconds." No exception yet;
-existing cap remains. If authorized, use a new explicitly180s remaining Core-only
-test preparation, all runtime/memory/source/admission caps unchanged, then missing
-Core18/singleton/prod binding and one native with fresh independent prelaunch.
-Goal ACTIVE; M7A/M8/fullfit incomplete.
+Acceptance: [WP1103 receipt](./wp1103-normal-profile-producer-readiness-2026-10-10.json).
+Fresh preparations84/87/239s, production38s,51/51 proofs and ONE4.44s native.
+Phase peak214.258MiB fits256; terminal is unique current local JDK namespace
+REPO.bazel Lstat refusal, original owner_plan_allowed=true/path_class=other.
+Full producer and whole-fit remain open. Next: bounded existing root marker
+metadata predicate after original full-plan/current-instance validation.

@@ -100,6 +100,10 @@ computation.
 
 ## Validation expectations
 
+- Allow the time required for each task. Examine recurring work over three
+  minutes for necessity and possible refactoring. Keep compilation separate from
+  workload memory measurements, and preserve explicit memory/resource limits.
+
 - Every parity change needs accepted discriminating Bazel 9.2 oracle evidence
   or a pinned-source regression. Reuse existing evidence; add coverage only for
   a demonstrated gap.
