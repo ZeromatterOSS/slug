@@ -1,0 +1,320 @@
+{
+  "packet": "WP-7-328-m7a-python-uv-file-plan",
+  "work_packet": "WP1116",
+  "baseline": "f863f0dd5ab20197e824fd90da0660d37f64e941",
+  "status": "accepted",
+  "compatibility": "Slug-native private Linux-test exact owner capability; source bytes and normal producer/RepoSpec/DICE semantics unchanged; Windows deferred",
+  "implementation": "Exact UV canonical/source/rule tuple shares existing borrowed complete File-only validator/current-epoch namespace. Hub/Java remain independent. No fields, keys, locks, runtime owned strings, new pool, source-vector or resource-cap growth.",
+  "source_inspection": {
+    "member": {
+      "path": "python/uv/private/uv_toolchains_repo.bzl",
+      "bytes": 2468,
+      "sha256": "eef9a7b8c60accbb6f9a97a6d73ef49099814a3b784a6503b5152471d84cdf8d",
+      "lines": 59
+    },
+    "archive": {
+      "path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz",
+      "sha256": "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+      "bytes": 1007915,
+      "identity": [
+        66308,
+        161093116,
+        1007915,
+        1791683321604151492,
+        1791683321604151492
+      ],
+      "before_after_stable": true
+    },
+    "effect": "One repository_ctx.file BUILD.bazel from pure attribute rendering; helper evidence reused; actual live plan/output/default eligibility not certified by source alone",
+    "entries": 2550,
+    "decoded_bytes": 5969920,
+    "elapsed_seconds": 0.04584321391303092,
+    "attempts": 1,
+    "failures": 0
+  },
+  "proof": "Parameterized existing complete Python binding/identity/bounds/original-pointer/mixed-order/zero-progress proofs for hub and UV; added atomic cross-owner negatives; reused full current-epoch namespace/ArcWeak matrix. Same43 selectors; oldhub/newUV markers exactlyonce.",
+  "complexity": {
+    "diff": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+        "added": 21,
+        "deleted": 12,
+        "net": 9,
+        "lines": 4060
+      },
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+        "added": 91,
+        "deleted": 20,
+        "net": 71,
+        "lines": 12884
+      }
+    },
+    "authored": "Parent+9net/child+20net beforeformat; rustfmt expansion parentnet9 childnet71.",
+    "cohesion": "Existing private large file and >150line proof-family triggers examined. Only exact borrowed tuple selection in parent; finite factory parameterization of same Python complete proof and one shared namespace invocation in child. Existing generic bound and namespace helpers unchanged; no suite copy/new module/selector. Splitting this delta would duplicate complete lifecycle/binding ownership.",
+    "memory": "No runtime representation/field/ownedpolicyString/requestclone/key/lock/cache/interner change. Existing8borrowedpath scratch128B and Bodies256/8/Scope472/8 expected; validate actual layout markers. Fixturefactory temporary cloning remains synthetic only and drops under existing strongcount/Weak checks; no wholefit/speed claim.",
+    "helper": "setup_packet explicit immutable roles and accepted64KiB streaminghash; independent setup-review ACCEPT. Fresh separate per-gate execution preserves workload accounting. No caps/profile/sourcevector/env growth.",
+    "fixture_growth": 0,
+    "failures": 0
+  },
+  "gates": {
+    "focused": {
+      "selected": 76,
+      "passed": 76,
+      "current_core": 43,
+      "reused_protected": 33,
+      "families": {
+        "bzlmod": {
+          "selected": 7,
+          "passed": 7,
+          "elapsed_seconds": 0.12153167207725346,
+          "operation_sha256": "b7a36250efc8a6b13509603318664120d2f838ca6ceb9dd9917856bd5fb9cdad",
+          "evidence": "qualified unchangedprotected original3historical Core-test hashes only"
+        },
+        "loading": {
+          "selected": 26,
+          "passed": 26,
+          "elapsed_seconds": 0.30930458998773247,
+          "operation_sha256": "a681e542444b037d9ff678c1b0eb022aa3ec32451f7914070c022ba3b5ca5098",
+          "evidence": "qualified unchangedprotected original3historical Core-test hashes only"
+        },
+        "core": {
+          "selected": 43,
+          "passed": 43,
+          "elapsed_seconds": 0.2607151430565864,
+          "operation_sha256": "2083b413b0adeb62bfce44c2128466e574e2e5f8c88d2a5d3982c277c98aaba0",
+          "evidence": "current"
+        }
+      },
+      "qualification": "Onecurrent43batch plus qualifiedprotected33; not76fresh. Fixture7 reused/3portable missingstraceunproved."
+    },
+    "preparation": {
+      "operations": {
+        "compile-core": {
+          "elapsed_seconds": 29.432639293023385,
+          "exit_code": 0,
+          "stop_reason": null,
+          "joined": true,
+          "owned_group_empty": true,
+          "monitored_rss_kib": 2498452,
+          "child_rusage_peak_kib": 1902764,
+          "deadline_seconds": null,
+          "operation_sha256": "712883ee5cae3be54b20a9c7510ae96a501579471579a4d47a8f9b9dcf95c2a4",
+          "over_three_minutes": false
+        },
+        "production-check": {
+          "elapsed_seconds": 7.411262052017264,
+          "exit_code": 0,
+          "stop_reason": null,
+          "joined": true,
+          "owned_group_empty": true,
+          "monitored_rss_kib": 729748,
+          "child_rusage_peak_kib": 644288,
+          "deadline_seconds": null,
+          "operation_sha256": "d75d03742bc8628570339323bde5ab13b8e7cb6170d488953898fcc982ad3b73",
+          "over_three_minutes": false
+        }
+      },
+      "qualification": "Bothcurrent gates successful; compiler memory separate. No task individually over180s; no speedup claim."
+    },
+    "fixture": "7 unchanged proofs reused; 3 missing-strace portable proofs unproved"
+  },
+  "native": {
+    "operation_sha256": "c170ab1745bbe3efb79022482e396f77348561419de03b9f8359bf4058e72c0b",
+    "stdout_sha256": "402201772e9ca71d97d06f160469d18ecd04b36e254f20f27adfab977b3963e1",
+    "elapsed_seconds": 17.039179363055155,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 243676,
+    "rss_mib": 237.96484375,
+    "source_count": 321,
+    "decode_bytes": 61908304,
+    "write_bytes": 57991884,
+    "held_fds": 353,
+    "pins": 148,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 688,
+        "wall_ns": 365466988,
+        "process_cpu_ns": 363921322,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 688,
+        "wall_ns": 15832599063,
+        "process_cpu_ns": 15953011489,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 687,
+        "wall_ns": 286272200,
+        "process_cpu_ns": 285317901,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 688,
+        "wall_ns": 44976464,
+        "process_cpu_ns": 54701907,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=materialization path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 321 8043568 61908304 57991884 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=321 seen=321 emitted=321 admitted=321 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=43266 encoded_bytes=160100 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Memory/byte/source caps unchanged; explicit native26s/work20/qualifiedcleanup23 time checkpoint.",
+    "phase_rss": [
+      {
+        "phase": "after_runtime",
+        "rss_kib": 30348
+      },
+      {
+        "phase": "after_command",
+        "rss_kib": 245012
+      },
+      {
+        "phase": "after_terminal_drop",
+        "rss_kib": 245012
+      },
+      {
+        "phase": "after_runtime_drop",
+        "rss_kib": 245012
+      },
+      {
+        "phase": "after_scope_drop",
+        "rss_kib": 242956
+      }
+    ],
+    "phase_peak_rss_kib": 245012,
+    "phase_peak_rss_mib": 239.26953125,
+    "next_boundary": {
+      "headers": [
+        "WP982_MATERIALIZATION capture=captured kind=immutable reason=immutable_kind workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=13 canonical_hex=72756c65735f6b6f746c696e2b rule_repo_len=11 rule_repo_hex=62617a656c5f746f6f6c73 rule_package_len=21 rule_package_hex=746f6f6c732f6275696c645f646566732f7265706f rule_target_len=8 rule_target_hex=687474702e627a6c rule_name_len=12 rule_name_hex=687474705f61726368697665 logical_root_len=none logical_root_hex=none"
+      ],
+      "identity": {
+        "workspace": "/run/media/system/Colossus/dev/slug/tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace",
+        "canonical": "rules_kotlin+",
+        "rule_repo": "bazel_tools",
+        "rule_package": "tools/build_defs/repo",
+        "rule_target": "http.bzl",
+        "rule_name": "http_archive"
+      },
+      "progress_refusal": {
+        "operation_sha256": "c170ab1745bbe3efb79022482e396f77348561419de03b9f8359bf4058e72c0b",
+        "stdout_sha256": "402201772e9ca71d97d06f160469d18ecd04b36e254f20f27adfab977b3963e1",
+        "marker_sha256": null,
+        "record": null,
+        "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+      },
+      "qualification": "Header/Need identity projections only; no actual new producer effect, body or plan authority."
+    },
+    "retirement": [
+      "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+    ],
+    "lifecycle_qualification": "SourceWeak unseen expiry is vacuous; livebuffer/scope/recorder retirement is narrow, not wholegraph/output lifetime proof."
+  },
+  "authority": {
+    "current_frozen_paths": 51,
+    "current_changed": 2,
+    "current_unchanged": 49,
+    "callers": 8,
+    "held_sources": 353,
+    "environment_entries": 18,
+    "pins": 148,
+    "historical": "Protected33 uses only originalWP1111three Core-test hashes viaWP1112before, strict elsewhere",
+    "limits": "RSS256MiB/AS512MiB/source512/census513/decodedwritten64MiB/all other byte-object limits; work20/cleanup23/outer26,ordinary10/nullprep/grace3/profiles unchanged"
+  },
+  "reviews": {
+    "design_seconds": 34,
+    "source_seconds": 34,
+    "prelaunch_seconds": 57,
+    "final": {
+      "verdict": "ACCEPT",
+      "seconds": 59,
+      "path": "target/wp1116/final-evidence-review.md",
+      "sha256": "d882f25849419a2383933b96cde08e33369465748cc837de377e67a26930e658"
+    }
+  },
+  "failures": {
+    "inspection": 0,
+    "compile": 0,
+    "current_ordinary": 0,
+    "native": 0,
+    "read_only_discoveries": "Absent prior decoder/progress filenames corrected to authoritative versions; early read of pending next-research note absent. No execution or gate credit; originals retained. Nextresearch corrected two absent Bzlmod path names to actual Core owners. No operational failure."
+  },
+  "performance": {
+    "tracked_window_seconds": 510.243735,
+    "qualification": "Trackedwindow startsaftercontractauthoring/DESIGNstart; no fullpacketelapsedclaim. Roleshelper source/gate semantics reused, no timing speedupclaim.",
+    "assessment": "Recurring packet workflow over180s examined: explicit immutable roles replaces copied filename substitutions, consolidated43selection avoids omitted proof,64KiBstreaming hashes avoid wholebinary allocation. Necessary source/design/current-gate reviews retained. No individual measured compilation/test/source review exceeded180s; no measured speedup or whole-fit claim.",
+    "tracked_window_through_publication_seconds": 702.519849
+  },
+  "claims": "Normal producer/certificate/observations/analyses/actions/Rustc/M7A/bootstrap remain unproved; observed bounded prefix only.",
+  "evidence_sha256": {
+    "target/wp1116/packet-contract.md": "0c2a9f4cfbc8ffc226ba9050d4bc69d24a911360dd0b8c06e737d74ad0bc59f9",
+    "target/wp1116/design-binding.json": "38d8b592a2099949995f4d354987ba1e861d9627c3a5c557db2b1fba65aa703b",
+    "target/wp1116/design-review.md": "5f2d5be6b2408e1511e3afad27003cfd823b82c7b00912b3402c57b622280722",
+    "target/wp1116/producer-source-review.md": "fd0b98ba17c840c92a141c7ed9b6c341d5692a14a84b34c3ce53625c223005b0",
+    "target/wp1116/producer-review.json": "b0d2be11e98dfd99f876f37ddfb60372703f4468e11bed9325ee322ba8ec13f0",
+    "target/wp1116/python-uv-source-evidence.json": "7fe64a651c5e05030550d50f66cf79bc06db3a9bdb18eaf23f6dc7db67380eeb",
+    "target/wp1116/inspect_python_uv.py": "244a93958d008296dab69fa96d4ded331a42fb23ee858c63f8be9259e3bb3f40",
+    "target/wp1116/inspection-worker.md": "850c8a73448eb5664963885452e30fc459e1f55d292557df1317a0c04181a13d",
+    "target/wp1116/proof-plan.md": "08c92fe7b53214e21c68624d920dc9a5cecba3acd60deac07b0706d9f15b0b6c",
+    "target/wp1116/implementation-worker.md": "a4aa494a2cc48495514c42727c173e0d6384da941526329a824e16514469236e",
+    "target/wp1116/setup-review.md": "44f1c244955b18b8a673e64ce4b27159b8261abe26b66703083661bec88cbb80",
+    "target/wp1116/roles.json": "35792493169d32af7573d8ca42b01cf8a849634159b48b5767aef5f195b0012a",
+    "target/wp1116/setup_packet.py": "f1a1cc45baa4d8db9de7febe417d0bc4916a1a8d67a588d02e4fb0bdbc45be98",
+    "target/wp1116/source-vector.json": "fb9bfe98005eb87cec095da6dc217b15530439daf0ae520244d6ef1cb19aaf74",
+    "target/wp1116/source-freeze.json": "de59e39a579fb5f985a49d49146a73ff4be8aaddec03e075d10937ac38133987",
+    "target/wp1116/caller-source-pins.json": "cab555f0901aeb6237157fb5ac6e6e037ec20ac119aa12330dd0be855c74c00f",
+    "target/wp1116/complexity-assessment.json": "85cd7dd46282430de13579c41eb76e7122f76d46027e7834b069ce8c798add71",
+    "target/wp1116/preparation-results.json": "af60b8168a129b79f97b635ad12193694fd5a5b32576ba3da8689917a84e864d",
+    "target/wp1116/focused-results.json": "fdb9ca6f248469f89395b34c0ac4d22f807b2bfe7bdadfc3eaf6d69a3667594a",
+    "target/wp1116/root-prelaunch.md": "ddd67023ff142961015465430aa3035d469f2bc5f764981e0464a83fb02f23f0",
+    "target/wp1116/prelaunch-evidence.md": "7a29da4b0f40fe2e32f59e51895cca79be34381816850ecaaa6b38398ad0c2c8",
+    "target/wp1116/native-config.json": "9e096b08f64746978df1780a83b4f5d203d9bc6873740bb70d0fd16e5c57de98",
+    "target/wp1116/native/operation.json": "c170ab1745bbe3efb79022482e396f77348561419de03b9f8359bf4058e72c0b",
+    "target/wp1116/native/stdout": "402201772e9ca71d97d06f160469d18ecd04b36e254f20f27adfab977b3963e1",
+    "target/wp1116/native/stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "target/wp1116/native-results-decoded.json": "c52014648ec077741fd2cec77703b768f6b2bb1672339a19194b4e548d768202",
+    "target/wp1116/native-results.json": "2ab18243ca7271c4f33f424e0df696d6f146a2d6a2a69c84e3cb62dc02c2bb08",
+    "target/wp1116/progress-refusal-results.json": "51759d94ba65a262fa83aba153de757dc16165cef4ee5f9874e9c13cc8073fe0",
+    "target/wp1116/toolchain-resolution.json": "e0b363bd42b88a3e40d8b7f12f78c10e6beec9a174d26d82d29dee78c5018882",
+    "target/wp1116/finalize_evidence.py": "49ce3d61527e26873aaaf729f9753e98a49f110b4a6aeeee4d8567103d993cc6",
+    "target/wp1116/acceptance-receipt-pending.json": "e3b1d340d979ebe74e7412ef3cc30042b8884c2d19c164d67f639e4af8aa1bc0",
+    "target/wp1116/final-evidence-review.md": "d882f25849419a2383933b96cde08e33369465748cc837de377e67a26930e658",
+    "target/wp1116/uv-progress.json": "bee00999a22dcd91536adcf75a5e884ab60340905bdf5e51e33a6b770056be46",
+    "target/wp1116/next-owner-research.md": "1c1f6ea864bb99005a0edf5bca6511da11dd5bb19a44fd80add918736ebdb00a"
+  },
+  "uv_progress": {
+    "events": [
+      "WP1033_SOURCE_CHARGE event=320 amount=1 before=319 after=320 next=320 outcome=admitted first_created=false domain=host phase=need_paths capture=captured namespace=materialization instance=53 operation=file_bytes path_len=27 path_hex=2f746d702f2e746d703870773976672f4255494c442e62617a656c",
+      "WP1033_SOURCE_CHARGE event=321 amount=1 before=320 after=321 next=321 outcome=admitted first_created=false domain=host phase=need_paths capture=captured namespace=materialization instance=51 operation=file_bytes path_len=52 path_hex=2f746d702f2e746d704b474872796a2f707974686f6e2f75762f707269766174652f746f6f6c636861696e735f6875622e627a6c"
+    ],
+    "qualification": "Normal admitted FileBytes after prior UV generated-kind refusal: generated namespace53 BUILD and originalPythonnamespace51 toolchains_hub body, followed by Kotlin immutable refusal. No synthetic bytes/completeUVoutput or finalcertificate proof."
+  },
+  "next_owner_research": {
+    "path": "target/wp1116/next-owner-research.md",
+    "sha256": "1c1f6ea864bb99005a0edf5bca6511da11dd5bb19a44fd80add918736ebdb00a",
+    "decision": "Bounded original Kotlin archive/patch availability and fixed4 offline transport/guard binding decision before activation; actual archive/decoded sizes and eligibility unknown; unchanged caps."
+  }
+}

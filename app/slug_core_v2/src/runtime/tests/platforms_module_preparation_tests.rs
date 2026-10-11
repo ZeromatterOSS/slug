@@ -1025,18 +1025,27 @@ impl Bodies {
             || !self.rules_rust_defs_import_sources
             || request.id.workspace != self.roots[0]
             || label.mapping_id().is_some()
-            || (
-                request.id.canonical_repo.as_str(),
-                label.package().repo().as_str(),
-                label.package().package().as_str(),
-                label.target().as_str(),
-                request.repo_spec.rule_id.rule_name.as_str(),
-            ) != (
-                "rules_python++python+pythons_hub",
-                "rules_python+",
-                "python/private",
-                "pythons_hub.bzl",
-                "hub_repo",
+            || !matches!(
+                (
+                    request.id.canonical_repo.as_str(),
+                    label.package().repo().as_str(),
+                    label.package().package().as_str(),
+                    label.target().as_str(),
+                    request.repo_spec.rule_id.rule_name.as_str(),
+                ),
+                (
+                    "rules_python++python+pythons_hub",
+                    "rules_python+",
+                    "python/private",
+                    "pythons_hub.bzl",
+                    "hub_repo",
+                ) | (
+                    "rules_python++uv+uv",
+                    "rules_python+",
+                    "python/uv/private",
+                    "uv_toolchains_repo.bzl",
+                    "uv_toolchains_repo",
+                )
             )
             || !immutable_archive_preparation::native_python_environment_binding(self)
         {

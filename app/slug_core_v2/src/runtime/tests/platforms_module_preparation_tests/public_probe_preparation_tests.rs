@@ -3128,13 +3128,27 @@ fn python_file_plan_test_request(
     request.repo_spec.rule_id.rule_name = "hub_repo".into();
     request
 }
+#[cfg(target_os = "linux")]
+fn python_uv_file_plan_test_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = python_file_plan_test_request(bodies, plan);
+    request.id.canonical_repo =
+        slug_identity_v2::CanonicalRepoName::new("rules_python++uv+uv").unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_python+//python/uv/private:uv_toolchains_repo.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "uv_toolchains_repo".into();
+    request
+}
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
     for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_file_effects_are_bounded_and_opt_in(remote);
     }
-    assert_python_file_effects_are_bounded_and_opt_in();
+    assert_python_file_effects_are_bounded_and_opt_in(false);
+    assert_python_file_effects_are_bounded_and_opt_in(true);
 }
 #[cfg(target_os = "linux")]
 fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
@@ -3402,10 +3416,18 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
     );
 }
 #[cfg(target_os = "linux")]
-fn assert_python_file_effects_are_bounded_and_opt_in() {
+fn assert_python_file_effects_are_bounded_and_opt_in(uv: bool) {
+    let make_request: fn(
+        &Bodies,
+        slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest = if uv {
+        python_uv_file_plan_test_request
+    } else {
+        python_file_plan_test_request
+    };
     let mut bodies = python_test_bodies();
     assert!(bodies.offline_archive.is_none() && bodies.java_offline_archive.is_none());
-    let valid = SourcePreparationNeeds::repository(python_file_plan_test_request(
+    let valid = SourcePreparationNeeds::repository(make_request(
         &bodies,
         small_generated_plan(&[
             ("BUILD.bazel", b"synthetic", false),
@@ -3520,30 +3542,68 @@ fn assert_python_file_effects_are_bounded_and_opt_in() {
             assert!(std::ptr::eq(first, offender.as_ref()));
         }
     };
-    for case in 0..7 {
+    for case in 0..9 {
         let mut wrong = original.as_ref().clone();
         match case {
             0 => wrong.id.workspace = NormalizedAbsolutePath::new("/foreign").unwrap(),
             1 => {
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
-                    "rules_python++python+pythons_hub_extra",
-                )
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if uv {
+                    "rules_python++uv+uv_extra"
+                } else {
+                    "rules_python++python+pythons_hub_extra"
+                })
                 .unwrap()
             }
             2 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@other+//python/private:pythons_hub.bzl").unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                    "@@other+//python/uv/private:uv_toolchains_repo.bzl"
+                } else {
+                    "@@other+//python/private:pythons_hub.bzl"
+                })
+                .unwrap()
             }
             3 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@rules_python+//python:pythons_hub.bzl").unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                    "@@rules_python+//python/uv:uv_toolchains_repo.bzl"
+                } else {
+                    "@@rules_python+//python:pythons_hub.bzl"
+                })
+                .unwrap()
             }
             4 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@rules_python+//python/private:Pythons_hub.bzl")
-                        .unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                    "@@rules_python+//python/uv/private:Uv_toolchains_repo.bzl"
+                } else {
+                    "@@rules_python+//python/private:Pythons_hub.bzl"
+                })
+                .unwrap()
             }
-            5 => wrong.repo_spec.rule_id.rule_name = "hub_repo_extra".into(),
+            5 => {
+                wrong.repo_spec.rule_id.rule_name = if uv {
+                    "uv_toolchains_repo_extra"
+                } else {
+                    "hub_repo_extra"
+                }
+                .into()
+            }
+            7 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if uv {
+                    "rules_python++python+pythons_hub"
+                } else {
+                    "rules_python++uv+uv"
+                })
+                .unwrap()
+            }
+            8 => {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if uv {
+                    "@@rules_python+//python/private:pythons_hub.bzl"
+                } else {
+                    "@@rules_python+//python/uv/private:uv_toolchains_repo.bzl"
+                })
+                .unwrap();
+                wrong.repo_spec.rule_id.rule_name =
+                    if uv { "hub_repo" } else { "uv_toolchains_repo" }.into();
+            }
             _ => {
                 let mut mapping = slug_identity_v2::RepositoryMapping::new(
                     slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
@@ -3552,9 +3612,11 @@ fn assert_python_file_effects_are_bounded_and_opt_in() {
                     slug_identity_v2::ApparentRepoName::new("python").unwrap(),
                     slug_identity_v2::CanonicalRepoName::new("rules_python+").unwrap(),
                 );
-                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
-                    "@python//python/private:pythons_hub.bzl",
-                )
+                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(if uv {
+                    "@python//python/uv/private:uv_toolchains_repo.bzl"
+                } else {
+                    "@python//python/private:pythons_hub.bzl"
+                })
                 .unwrap()
                 .resolve(&mapping);
             }
@@ -3563,7 +3625,7 @@ fn assert_python_file_effects_are_bounded_and_opt_in() {
         assert!(bodies.admit_with_plan_matcher(&bad, &|_, _| true).is_err());
         reject(bad);
     }
-    assert_bounded_file_plan_shapes(&bodies, &python_file_plan_test_request, &reject);
+    assert_bounded_file_plan_shapes(&bodies, &make_request, &reject);
     assert_eq!(
         (
             Arc::strong_count(original),
@@ -3579,7 +3641,11 @@ fn assert_python_file_effects_are_bounded_and_opt_in() {
         ),
         counts
     );
-    eprintln!("WP1114_PYTHON_FILE_PLAN complete");
+    if uv {
+        eprintln!("WP1116_UV_FILE_PLAN complete");
+    } else {
+        eprintln!("WP1114_PYTHON_FILE_PLAN complete");
+    }
 }
 #[cfg(target_os = "linux")]
 fn assert_bounded_file_plan_shapes(
@@ -3703,6 +3769,11 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         &python_file_plan_test_request,
     );
     eprintln!("WP1114_PYTHON_NAMESPACE complete");
+    assert_generated_namespace_is_current_and_declared_only(
+        python_test_bodies,
+        &python_uv_file_plan_test_request,
+    );
+    eprintln!("WP1116_UV_NAMESPACE complete");
 }
 #[cfg(target_os = "linux")]
 fn assert_generated_namespace_is_current_and_declared_only(
