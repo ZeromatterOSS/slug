@@ -284,7 +284,7 @@ const RULES_RUST_DEFS_IMPORTS: [&str; 34] = [
     "rust/private/known_shas.bzl",
     "rust/BUILD.bazel",
 ];
-const RULES_RUST_IMPORT_METADATA: [&str; 12] = [
+const RULES_RUST_IMPORT_METADATA: [&str; 13] = [
     "rust/private",
     "rust/platform",
     "rust/settings",
@@ -297,6 +297,7 @@ const RULES_RUST_IMPORT_METADATA: [&str; 12] = [
     "rust/runfiles",
     "rust/rust_analyzer",
     "rust/rustfmt",
+    "rust/settings/BUILD.bazel",
 ];
 const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
     "features.bzl",
