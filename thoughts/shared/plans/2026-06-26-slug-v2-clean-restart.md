@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-326-m7a-python-hub-file-plan
-Status: accepted — independent FINAL ACCEPT; Skylib closure successor ready
+Packet: WP-7-327-m7a-skylib-import-closure
+Status: accepted — FINAL ACCEPT; Python UV file-plan successor ready
 
-The [accepted Python hub file plan](./slug-v2-subplans/wp1114-python-hub-file-plan-2026-10-11.json)
-crossed original generated pythons_hub to Skylib lib/selects.bzl Lstat at311sources/
-phase237.258MiB under256 in16.312s. CurrentCore42/prod passed; protected33 reused.
-The [current manifest](./slug-v2-subplans/current-packet.md) and source-only research
-select bounded same-owner literal import-closure inspection as successor; nextbody/
-closure/admission unproved. All caps/352heldsources/18env unchanged; producer/M7A open.
+The [accepted Skylib import closure](./slug-v2-subplans/wp1115-skylib-import-closure-2026-10-11.json)
+admits one verified9458B leaf with no imports. CurrentCore43/prod passed;
+protected33 reused. ONE16.583s/source319/phase237.520MiB under256 crossed selects
+into original rules_python++uv+uv generated-file-plan refusal. The
+[current manifest](./slug-v2-subplans/current-packet.md) and source-only research
+select bounded UV producer inspection as the next prerequisite; complete plan/
+effects remain unproved. Held353sources/18env/caps unchanged; producer/M7A open.
 
 ### Ready and blocked queue
 

@@ -295,8 +295,9 @@ const BAZEL_FEATURES_IMPORTS: [&str; 8] = [
     "private/version_repo.bzl",
 ];
 const BAZEL_FEATURES_IMPORT_METADATA: [&str; 1] = ["private"];
-const BAZEL_SKYLIB_IMPORTS: [&str; 13] = [
+const BAZEL_SKYLIB_IMPORTS: [&str; 14] = [
     "lib/paths.bzl",
+    "lib/selects.bzl",
     "lib/structs.bzl",
     "rules/common_settings.bzl",
     "lib/modules.bzl",
