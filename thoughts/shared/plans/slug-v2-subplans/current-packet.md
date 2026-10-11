@@ -1,52 +1,62 @@
-# WP1144 Host load-key test lifetime correction
+# WP1145 Host load-key retained-export correction
 
-Packet: WP-7-356-m7a-host-bzl-load-key-test-lifetime
-Status: selected — correction SOURCE pending; no fresh gate dispatched
+Packet: WP-7-357-m7a-host-load-key-retained-export
+Status: accepted — all gates, representative budget and independent FINAL passed
 
-Detailed contract target/wp1144/packet-contract.md SHAdef7d6987605a392de7b1e72195e880e0900c530e804de691ba9cc09765346ec
+Detailed contract target/wp1145/packet-contract.md SHA55f41eee44d7f43c14f08f30f61ec7c712f74cff83e066066dd1db3391fa9813
 
-Baseline: dda6678a1eec72ecaf65878c3eca591e83aa4e8b, preservation of unaccepted WP1143 allocation/helper candidate.
+Baseline: ad569123e75c59742b3ddd48ae005347a9afab57 (unaccepted WP1144 preservation).
 Inherit target/wp1143/packet-contract.md SHAa2c918464d60a1384b2752ef69b266e4a0af7b5487b748c37f2446d492cfa72a
-and accepted original independent DESIGN+OptionB correction and stopped SOURCE.
-Last accepted source/native projection remains WP1141; WP1142 phase failure and
-WP1143 compile failure remain immutable preservation, never runtime authority.
-WP1143 failed first Loading compile E0597 because callable guard answer was declared
-after evaluator. Correct only this declaration order so evaluator drops before the
-guard. Same Host driver, borrowed keys, independent retained closure, discriminator,
-helper/interfaces/controls and logical before56/four-change/52-unchanged contract.
-No new ownership or semantic decision; routine compiler correction reuses accepted
-DESIGN. Current independent SOURCE reviews correction and mechanically rebound
-root roles/wrappers before new frozen checkpoint or any helper/factory import.
+and its accepted independent DESIGN, OptionB correction, and full SOURCE for
+unchanged production borrowing and finite evidence helper boundaries.
+Last accepted semantic/native projection remains WP1141. WP1142 resource failure,
+WP1143 compile failure and WP1144 runtime test failure remain immutable evidence.
 
-Outcome/compatibility: Slug-native private scratch-key borrowing with exact normal
-load/identity semantics, fresh Loading30/Core59/Q7 focused96/fixture31 and ONE
-representative unchanged256MiB memory run. Native was never executed for WP1143.
-No sourcegrant, interner/cache/key/lock/API/retained representation/Windows change.
-Implementation allowlist: sole statement reorder in existing bzl_source_memory_tests.rs;
-all Loading owner/helper/controls/pending Core2 unchanged preserved WP1143. Root
-current contract/design binding/roles/factory/FIRST/checkpoint/evidence/scheduling
-records rebind only packet/root/baseline/text. Source361/caller8/Core59/Loading30
-exactbytes reused. Fresh gates/artifacts needed; old failed compile has no credit.
-No new copied fixture, traversal or helper. Large owner unchanged. The previously
-reviewed173-line owned normal Host test remains one discriminator; compilation
-error itself proves guard drop ordering needs this correction.
+The second correction is reassessed against target/wp1144/test-retirement-readiness.md
+SHA05bb2efdaa31cb6ad53195b8f2b2cb88ef79007ba05a7f9e18d4f54589a1ad47.
+Injected epoch/shard values retain source bytes in DICE CoreState's persistent graph.
+wait_for_idle drains cancellation observers; dropping public Dice does not join the
+slug-dice OS graph thread. The test's synchronous raw-source Weak expiry assertion
+was unsupported. Amend the claim explicitly: preserve normal Host raw alias order,
+canonical two-child first-seen retained closure, actual evaluated first-match heaps,
+and callable retained exports after transaction drop/cancellation drainage/public
+Dice drop. Original injected-source final-owner retirement remains UNPROVED.
+Remove only source Weak tracking, Tokio yield and the unsupported Weak assertion;
+add a precise lifecycle comment. No sleep/poll/observer, DICE lifecycle API, custom
+runtime, ownership or production change. Independent correction DESIGN precedes
+implementation; targeted actual SOURCE precedes helper/factory import/checkpoint.
 
-Reuse full independent SOURCE target/wp1143/source-review.md
-SHA63cd56220426868b4112157cc1bd7992ef820496e639119f25331e4e1c2334b0
-for unchanged owner/helper/control decisions. Correction SOURCE verifies exact
-current hashes/bindings and actual declaration move; no full history reconstruction.
-The failed compile receipt thoughts/shared/plans/slug-v2-subplans/wp1143-test-compile-failure-2026-10-11.json
-SHAa42e41ec7bb99238512d6950f1a88fb0bef68d1158c5ae144e9da1f9c59f347b
-preserves old full sources,103checkpointpins, operation/JOIN/stablepins/exit101,
-5.816s compile and no native/FIRST. Old target/wp1143 files remain untouched.
+Compatibility: Slug-native private evaluation scratch borrowing with unchanged
+normal load semantics. Retained identity/loads and FrozenModule ownership remain
+independent and exact for the admitted slice. No namespace/body/Spec/producer/action/
+Rustc/bootstrap expansion; Windows deferred. No global pool/interner/key/lock/API
+or retained-representation change. Borrow existing temporary keys rather than intern
+unique scratch; continue existing compact deterministic retained closure utilities.
 
-All inherited fresh serial CargoJSON Loading/Core/default Core+slug production,
-separate list/preflight/body30/59/singleton/helper13, current Loading exact artifact
-and historical L metadata-only routing, qualified Q7/fixture31, rootPRE+guard,
-ONE native/JOIN/FIRST once/independent FINAL/coupled commit remain mandatory.
-All explicit resource caps and source361/caller8/env18/backings6 remain unchanged.
-Every factory/gate/artifact/list/preflight/body/native/FIRST is a distinct tool cell.
-Allow required task time; recurring>180s is refactoring signal not limit. Keep this
-routine correction/source review narrow and preserve all failure evidence. No memory
-fit, saving, cause or bootstrap completion claim before actual results. Broader plan
-waits for representative budget fit. Producer/actions/Rustc/full bootstrap open.
+Allowlist: existing app/slug_loading_v2/src/bzl_source_memory_tests.rs lifecycle
+claim correction only. Production Loading owner, helper/controls, pending Core2 and
+all other Rust remain byte-exact WP1144. Rebind root contract/roles/wrappers/baseline/
+worker/evidence/scheduling metadata to this fresh root. Logical source56/four changed/
+52 unchanged, source361/caller8/env18/backings6 and Core59/Loading30/Q7/focused96/
+fixture31 remain fixed. Exact selector and old Loading29 prefix unchanged. The
+single173-line normal Host discriminator stays in its existing source owner;
+no copied fixture/framework or monolithic production growth. Original borrowed-key
+DESIGN/OptionB/infallible-OOM order decisions remain unchanged.
+
+Validation: fresh serial Cargo JSON Loading/Core compilation and exact artifact
+bindings/profiles; separate lists/preflights/bodies30/59; default Core+slug production;
+ignored native singleton selection; helper13 controls and finite Q7/fixture31
+qualification; root PRE all11 actual gates then strict source/executable guard;
+ONE unchanged-cap representative native; JOIN then immutable FIRST exactly once;
+independent FINAL and coupled acceptance only if all actual rawphase RSS<=262144KiB.
+Each factory/gate/artifact/list/preflight/body/native/FIRST uses a distinct tool cell.
+No failed cohort gate credit, native replay or cap lift. Compilation remains separate
+from ordinary/native caps; required task time allowed, recurring>180s examined for
+necessity/refactoring. Do not reconstruct unchanged history or repeat actor audit.
+
+Broader plan waits for representative workload budget fit. Structural clone removal
+alone proves no measured memory savings, RSS cause or future/full-workload fit.
+Preserve all resource/identity/census/copy-traffic/partial-profile residuals from
+WP1143. Any further failure requires a new actual diagnosis before correction.
+
+Acceptance: [receipt](wp1145-host-load-key-borrowing-2026-10-11.json), rawphase261364KiB/262144,780KiB margin. Next captured rust/rustfmt/BUILD.bazel metadata row is source-ready; finite steady56 routing readiness precedes successor implementation.

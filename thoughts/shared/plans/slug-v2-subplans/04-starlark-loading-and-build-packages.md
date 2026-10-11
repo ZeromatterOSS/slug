@@ -21,6 +21,15 @@ agreement between this observed digest, the evaluated caller span and the pinned
 source SHA. Imported helper authentication can consume the same carrier when
 its callback family is separately admitted.
 
+Host `.bzl` evaluation borrows temporary raw load keys from the retained owned
+load vector. After successful freeze it builds the independently owned, first-seen
+frozen-module closure, drops the loader and temporary child map, then moves the
+owned loads into the result. Raw spelling/aliases, duplicate order, first-match
+lookup and retained callable exports stay unchanged; no temporary key escapes.
+DICE cancellation drainage does not synchronously retire its persistent graph.
+[Validation](wp1145-host-load-key-borrowing-2026-10-11.json) proves this bounded
+ownership slice and captured-prefix budget fit, without a memory-savings claim.
+
 ## Generated-owner cycle boundary
 
 WP885's synchronous short-lock graph bridges complete concrete owner, certificate,

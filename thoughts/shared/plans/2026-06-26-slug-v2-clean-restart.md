@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-356-m7a-host-bzl-load-key-test-lifetime
-Status: selected — routine compile correction, SOURCE pending
+Packet: WP-7-357-m7a-host-load-key-retained-export
+Status: accepted — Loading/Core and representative resource gates; independent FINAL
 
-WP1143 allocation/helper source passed independent DESIGN and SOURCE; its first
-Loading compile caught a test guard Drop-order error. The preserved failure has
-no native/FIRST execution. Current packet corrects only declaration order while
-reusing approved scratch ownership and finite fresh Loading/Core validation.
-[Contract](./slug-v2-subplans/current-packet.md) retains all unchanged memory limits.
-Last accepted native remains WP1141; broader work waits for representative fit.
+Host temporary load keys borrow existing storage; retained frozen values remain
+independently owned. [Receipt](./slug-v2-subplans/wp1145-host-load-key-borrowing-2026-10-11.json)
+records fresh Loading30/Core59/default production/helper13, qualified Q7/fixture31,
+and one20.512s captured prefix at255.238MiB/256MiB. Source graph final-owner
+retirement and future/full-workload fit remain unproved. Broader work resumes at
+the captured rust/rustfmt/BUILD.bazel metadata request after finite steady56 routing
+is ready. [Contract](./slug-v2-subplans/current-packet.md) preserves explicit caps.
 Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
 
 ### Ready and blocked queue
