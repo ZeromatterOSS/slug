@@ -34,16 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-352-m7a-rust-toolchain-build-metadata
+Packet: WP-7-353-m7a-rust-runfiles-build-metadata
 Status: accepted — fresh gates, root PRE, ONE native, immutable FIRST and independent FINAL
 
-Accepted exact root1 rust/toolchain/BUILD.bazel Lstat under the existing table.
-[Receipt](./slug-v2-subplans/wp1140-rust-toolchain-build-metadata-2026-10-11.json)
-records fresh59/helper13/production, qualified36/fixture31, ONE20.846s and phase
-255.14453125MiB under unchanged256MiB, stable361 sources, FIRST/FINAL acceptance.
+Accepted exact root1 rust/runfiles/BUILD.bazel Lstat under the existing borrowed table.
+[Receipt](./slug-v2-subplans/wp1141-rust-runfiles-build-metadata-2026-10-11.json)
+records fresh59/helper13/production, qualified36/fixture31, ONE20.886s and phase
+255.390625MiB under unchanged256MiB, stable361 sources, FIRST/FINAL acceptance.
 No new owned strings/retained storage; steady helper unchanged. Next observed
-rust/runfiles/BUILD.bazel Lstat is source-ready. Source34 package closure adds only
-one fallback marker; broader batching needs finite package-request evidence.
+rust/rust_analyzer/BUILD.bazel Lstat is source-ready. Existing request records do
+not establish finite transitive package authority for broader marker batching.
+Recurring packet overhead examined; closed evidence and scaffolding remain reused.
 Producer/actions/Rustc/full bootstrap and future fit remain open; Windows deferred.
 
 ### Ready and blocked queue

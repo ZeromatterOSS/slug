@@ -1,27 +1,27 @@
-# WP1140 exact toolchain BUILD metadata
+# WP1141 exact runfiles BUILD metadata
 
-Packet: WP-7-352-m7a-rust-toolchain-build-metadata
+Packet: WP-7-353-m7a-rust-runfiles-build-metadata
 Status: accepted — fresh gates, root PRE, ONE native, immutable FIRST and independent FINAL
 
-Frozen detailed contract: target/wp1140/packet-contract.md
-SHA25f26014204a1ceca09cdcaaef2017b62130265606de7dd1d18d007830e11df9
+Frozen detailed contract: target/wp1141/packet-contract.md
+SHAd65512a0cee8ae273582a08f52c2eb5a43ef43fc321c9460a5570acac6c1232e
 
-Baseline: 8afcb928314170ca050156cc8b4fc76b6575b7e1, accepted WP1139.
-Inherit target/wp1139/packet-contract.md SHA40b03835c019baf85f1cf3a04401bcaf341d7ac2df38a3654c7e5132477efd96
+Baseline: d49bf5224edb79fea13719e8e1131eaa644cbc49, accepted WP1140.
+Inherit target/wp1140/packet-contract.md SHA25f26014204a1ceca09cdcaaef2017b62130265606de7dd1d18d007830e11df9
 except the explicit current bindings and workflow below. Accepted receipt
-thoughts/shared/plans/slug-v2-subplans/wp1139-rust-settings-build-metadata-2026-10-11.json
-SHAa7322efcfa9b831d2e48b0e9010547711ab55c35a4820ef94a7b94366bf06ee1.
+thoughts/shared/plans/slug-v2-subplans/wp1140-rust-toolchain-build-metadata-2026-10-11.json
+SHAeaca72c27ff27f478b209ea7efa490948e6da35c862b4d36d2c5ffb12cc48c49.
 
-Outcome: ONE appended borrowed literal rust/toolchain/BUILD.bazel in root1 metadata
-under SAME exact PreparedFile/PublicProbe defs-import predicate. Metadata13→14,
-Need81→82, source34/order/bytes unchanged. Only Lstat; exact path/role/operation and
+Outcome: ONE appended borrowed literal rust/runfiles/BUILD.bazel in root1 metadata
+under SAME exact PreparedFile/PublicProbe defs-import predicate. Metadata14→15,
+Need82→83, source34/order/bytes unchanged. Only Lstat; exact path/role/operation and
 normal Host/current PathObservationKey/epoch/DICE identity/errors remain exact.
 Compatibility: Slug-native private admission around exact normal semantics;
 Windows deferred. No sibling BUILD/body/directory/kind/existence/caller inference.
-Actual saved frontier214B/headerless operation8fa2f260ee5704ecb55b8a173efb3f7493584137c111876bd72d8ca4d310807f,
-stdoute8c376f5f19a1a02dba46569d02e2d89673a97fdb631399afa7ad4c41aba1290.
-Source basis target/wp1139/next-metadata-readiness.md
-SHA52e3f7897615d5e5dc971a71b4139ad8ad2fb25a76471410182a1c6e9319fce0.
+Actual saved frontier213B/headerless operationb1a9d6e67f2c254ecccb3f3e9d57ba18f5db75d0186605dce0da13af49081e38,
+stdout25eca9ae49c9b012b1d4455342ece0e9dc482f0f45be80095aebce47a9d53401.
+Source basis target/wp1140/next-metadata-readiness.md
+SHA0f7bc2a059f5e6472bb846d1fdf7fc10c77c173869831c5e6eff68d2c42f796f.
 Reuse its pinned three generic normal owner anchors and existing tuple matrix.
 One tuple covers child/case/suffix/foreign-root; existing role/namespace/operations,
 mixed-both-order/borrowed-offender/zeroProgress/ArcWeak/budgets remain. No new
@@ -36,11 +36,11 @@ sources/auth6 unchanged. Rust delta estimate one static row/one10line tuple/net1
 wrappers only doc/root/base/module/packet/implementation text, ≤20net lines.
 Existing large proof keeps one cohesive policy/discriminator; no new harness.
 
-Finite steady bindings: current_before full accepted WP1139.after55, after55
+Finite steady bindings: current_before full accepted WP1140.after55, after55
 ordered Rust2 only/53unchanged/empty known-new maps. Caller8/selector59/source361
 JSON whole-byte equal prior. Current59/donor59+extra0/protected36/focused95.
-Immediate12=actual WP1139 elevenfacts+receipt. Historical15=fixed P1132nine plus
-actual WP1139native6; direct103 originalmaps remain unchanged. Fixed reader intro
+Immediate12=actual WP1140 elevenfacts+receipt. Historical15=fixed P1132nine plus
+actual WP1140native6; direct103 originalmaps remain unchanged. Fixed reader intro
 WP1137e95 remains mandatory in helper/checkpoint/everyconfig; originalcompile54
 and its Rust2+memory differences, Q7/namedL-P2memory exceptions stay distinct.
 Prior actual native full55; current memory/reader physical strict. Preserve all
@@ -69,8 +69,8 @@ checks saved root PRE and actual results, then compact tracked receipt/localcomm
 
 Caps all unchanged26/29/32/default5/8/ordinary10/constructor27+tail3,RSS256/AS512/
 live16/source512/census513/transfer32/separate decoded128/written128,FSIZE16/native32/
-Kotlin-only FD exception. Source361/caller8/env18/backings6. WP1139 phase255.55859375MiB
-has0.44140625MiB margin; no future/whole fit/savings/cause/sourcecertificate/producer/
+Kotlin-only FD exception. Source361/caller8/env18/backings6. WP1140 phase255.14453125MiB
+has0.85546875MiB margin; no future/whole fit/savings/cause/sourcecertificate/producer/
 actions/Rustc/bootstrap/parity completion. Rejected WP1136 and all frozen evidence
 remain immutable. Recurring>180s examined for necessity/refactoring, notdeadline;
 unchanged helper and accepted design reuse remove repeated authoring/investigation.
@@ -78,9 +78,14 @@ No measured workflow speedup. REPLAN only contradictory owner/authority/compatib
 ordinary invocation corrections remain within scope. Source/body acquisition is
 limited to already authorized native held-FD sources; this packet adds metadata only.
 
-Accepted receipt: thoughts/shared/plans/slug-v2-subplans/wp1140-rust-toolchain-build-metadata-2026-10-11.json
-SHAeaca72c27ff27f478b209ea7efa490948e6da35c862b4d36d2c5ffb12cc48c49. Fresh59+qualified36=95/helper13/production pass; ONE20.846s
-phase255.14453125MiB/JOIN/266pins/full361brackets; FIRSTonce/FINAL ACCEPT.
-Next exact rust/runfiles/BUILD.bazel Lstat is source-ready; full bootstrap open.
-Source34 closure alone is too small for useful grouping; finite package-request
-authority is required before broader metadata batching.
+Grouped scope remains unselected: stopped target/wp1140/package-request-readiness.md
+SHA7c5ecbd60fa6f8652e910bd5576b0a1420061d70c865b67446ef429b01d593c2
+finds no finite transitive original-root package-request authority. This exact
+captured row alone remains ready; no additional diagnostic or request fixture.
+
+Immediate predecessor WP1140 accepted at d49bf5224edb79fea13719e8e1131eaa644cbc49; fresh59/qualified36/helper13/production pass, native20.846s phase255.14453125MiB/JOIN266/full361. Bootstrap remains open.
+
+Accepted receipt: thoughts/shared/plans/slug-v2-subplans/wp1141-rust-runfiles-build-metadata-2026-10-11.json
+SHA352052b2f73c84bd3e2c97117a6bb1d30e7c6d692aa6a224856b5b39c31885e6. Fresh59+qualified36=95/helper13/production pass; ONE20.886s
+phase255.390625MiB/JOIN/267pins/full361brackets; FIRSTonce/FINAL ACCEPT.
+Next exact rust/rust_analyzer/BUILD.bazel Lstat is source-ready; full bootstrap open.
