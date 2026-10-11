@@ -1,0 +1,217 @@
+{
+  "packet": "WP-7-316-m7a-local-jdk-root-marker-metadata",
+  "baseline": "b59c59fccaa18221076c31c0d54bc89cee02008c",
+  "status": "accepted \u2014 exact scoped root marker metadata and next typed ignore marker boundary",
+  "outcome": "Exact existing local JDK current-root REPO.bazel Lstat metadata predicate; next actual current unique local JDK .bazelignore Lstat namespace refusal. No completed producer/certificate/analyses/actions/Rustc.",
+  "compatibility": {
+    "changed_policy": "Slug-native finite public probe observation",
+    "accepted_exact_semantics": "unchanged",
+    "windows": "deferred"
+  },
+  "source": {
+    "path": "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+    "sha256": "49b0e84e09a308d42d7963491ec8913eb6949c0fa402177a557a5f98eb425681",
+    "delta": "+171/-5;2 policy lines and existing focused matrix extension",
+    "freeze_path": "target/wp1104/source-freeze.json",
+    "freeze_sha256": "82fe6da7fef0bc5539b30ad067034291fabd000614992cccd2165c0c45a35e0f",
+    "rust": 36,
+    "metadata": 8,
+    "changed_authorities": 1
+  },
+  "allocation": "Policy borrows original request/root/Path; no owned String/path/body/request copies, retained data/cache/key/interner change. Tiny existing synthetic test-plan allocations only.",
+  "focused": {
+    "selected": 55,
+    "passed": 55,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.31160086195450276,
+        "operation_sha256": "861e06b0a4e0a1bfd515b68f10ffd8137ac9ea35046037495f85abb5178e3516"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11981726007070392,
+        "operation_sha256": "34a8ad66bc2a9e1e453cab1cf64f8df63372d5e43397b40361b4452c7f672703"
+      },
+      "core": {
+        "selected": 22,
+        "passed": 22,
+        "elapsed_seconds": 0.22119410999584943,
+        "operation_sha256": "2a2988dc6fed0c432ff498d87c6cc0aeee8fe8e573f0b05a00e46c2ef4491cb8"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 0.10626444104127586,
+        "deadline_seconds": null,
+        "operation_sha256": "a108d684511232f7d8ef2a2c21fad98a67fed14c89f76c06f3d54a4615d118d3",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 0.11721020902041346,
+        "deadline_seconds": null,
+        "operation_sha256": "06f2f3234205a8306279d53605c27c366ea0003ffb53399f2a6b493abd0078e4",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 37.852007897919975,
+        "deadline_seconds": null,
+        "operation_sha256": "892fb41ce2885b42a07e8827a473e0da230e879535283ca234e7438cf876e997",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Fresh successful current CargoJSON operations authenticate unchanged profiles and changed Core policy/test owner; no stale artifact authority.",
+    "frequency": "Same selected profiles reused. Loading/Bzlmod cache preparations below1s; changed Core artifact37.852s. This common-edit sample is below180s, unlike prior239s first completed graph preparation. One sample is not a recurrence distribution.",
+    "refactoring": "No recurring-over180s signal in current common-edit preparation. Keep profiles/owner boundary stable; inspect necessity and extraction if recurring work exceeds180s.",
+    "memory": "Compiler RSS uncapped, separate from workload budget evidence."
+  },
+  "production_check": {
+    "seconds": 7.516507541993633,
+    "operation_sha256": "9ff529e7f15a421c9660fdac3a98642b047d8b3ab3c84f4b6db36419f6a0fb13"
+  },
+  "native": {
+    "operation_sha256": "f0f2f51b88ae6305cfc97a418a280238f69c5eaa2f34290b50c6990385c9814c",
+    "stdout_sha256": "3a954517c359a4ce7fa4c1141bafbaa94cbe0ee233e92240f2d34bde03ebe053",
+    "elapsed_seconds": 4.535833364003338,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 219280,
+    "rss_mib": 214.140625,
+    "source_count": 252,
+    "decode_bytes": 55574923,
+    "write_bytes": 52796422,
+    "held_fds": 350,
+    "pins": 140,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 337,
+        "wall_ns": 120851209,
+        "process_cpu_ns": 120288663,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 337,
+        "wall_ns": 3752624181,
+        "process_cpu_ns": 3760573780,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 336,
+        "wall_ns": 156538900,
+        "process_cpu_ns": 155311597,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 337,
+        "wall_ns": 13741245,
+        "process_cpu_ns": 18479006,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=namespace path_len=28 path_hex=2f746d702f2e746d706868715657532f2e62617a656c69676e6f7265 capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 252 7021682 55574923 52796422 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=252 seen=252 emitted=252 admitted=252 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40818 encoded_bytes=139051 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "phase_rss_kib": {
+      "after_runtime": 28136,
+      "after_command": 220188,
+      "after_terminal_drop": 220252,
+      "after_runtime_drop": 220252,
+      "after_scope_drop": 218196
+    },
+    "phase_peak_mib": 215.08984375,
+    "config_sha256": "3ee8a71e87cdccedcb26865e012c17a67fe28243cdfdf1094f39f9a6e74cb4f2",
+    "progress_refusal_record": {
+      "operation_sha256": "f0f2f51b88ae6305cfc97a418a280238f69c5eaa2f34290b50c6990385c9814c",
+      "stdout_sha256": "3a954517c359a4ce7fa4c1141bafbaa94cbe0ee233e92240f2d34bde03ebe053",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "namespace_frames": [
+      "WP987_NAMESPACE association=unique namespace=materialization instance=13 operation=lstat",
+      "WP987_NAMESPACE_OWNER capture=captured kind=generated_file_effects reason=observation_instance workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=32 canonical_hex=72756c65735f6a6176612b2b746f6f6c636861696e732b6c6f63616c5f6a646b rule_repo_len=11 rule_repo_hex=72756c65735f6a6176612b rule_package_len=10 rule_package_hex=746f6f6c636861696e73 rule_target_len=25 rule_target_hex=6c6f63616c5f6a6176615f7265706f7369746f72792e627a6c rule_name_len=27 rule_name_hex=5f6c6f63616c5f6a6176615f7265706f7369746f72795f72756c65 logical_root_len=none logical_root_hex=none",
+      "WP988_NAMESPACE_POLICY owner_plan_allowed=true path_class=other"
+    ],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1104/design-review.md",
+      "sha256": "80a0c8e7a00c07ea4b59b73d49edfd57c465d3942d2183be66c813f3724586f1"
+    },
+    "helper-design.md": {
+      "path": "target/wp1104/helper-design.md",
+      "sha256": "9b2f27b1f1bfd0c65e54fc2b4138c3130a3e910304dafc8302ccb3ae8239c43f"
+    },
+    "helper-review.md": {
+      "path": "target/wp1104/helper-review.md",
+      "sha256": "4b0a839f30e59c8403cc97489198695e4164d31504e06fb0eb4cd94b18c564b6"
+    },
+    "source-worker.md": {
+      "path": "target/wp1104/source-worker.md",
+      "sha256": "b3fa3705ae0d44fb0108fff025ca43b81e5fea437af37d6091c3f680370c8ee8"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1104/source-prelaunch-review.md",
+      "sha256": "ab11d876e3093e60cfb8518c0d9155a621a9792c4d078d51a1a61faaef45f1d2"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1104/prelaunch-evidence.md",
+      "sha256": "911319ae9d0485cb7a2fadd2f8d4ca5b0f7923af21eff7c2922bcc5c18f49c11"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1104/root-prelaunch.md",
+      "sha256": "a50ab17b78895902b379e7d717cfa9ba8943e1688a8d9befa2df9916b6f76ddb"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1104/final-source-review.md",
+      "sha256": "64d56d802b46ad39165413a59a62cbaf232c06ef7d1adff29b236f946ad06e8c"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1104/final-evidence-review.md",
+      "sha256": "8f468b49f354607d9a137e545980fa982124105229c0f0212f5de1834ab27e92"
+    },
+    "next-metadata-research.md": {
+      "path": "target/wp1104/next-metadata-research.md",
+      "sha256": "50d6322572b7b6086e95e735beee83e5b6f10fd52e653bf0a813fd6c0217d164"
+    }
+  },
+  "corrections": "No Rust/test/gate correction. Rebound helpers retain current profiles/caps; four protected namespace selectors and source/helper roles added before prelaunch. Read-only missing-note lookups qualified in review notes, no execution credit.",
+  "claim_limit": "Current scoped marker predicate/proofs and actual new typed .bazelignore Lstat boundary only. Source252, original350stable bracketedFDs/18env and actual140stablepins; collection not atomic. Root observer aborted_partial; all-thread windows not timing/cause proof. Phase peak215.08984375MiB prefix is not whole-fit. SourceWeak unseen expiry vacuous; Scope/Recorder/livebuffer narrow. Anonymous source identity and charge-before-body-completion qualifications preserved.",
+  "next": "Review same original scoped local JDK root .bazelignore Lstat under existing role; no body, package marker or header-derived authority.",
+  "goal": "Incomplete; broad M7A/bootstrap producer/certificate/analysis/actions/Rustc remain open.",
+  "elapsed_since_design_binding_seconds": 295.338286,
+  "reviewed_candidate": {
+    "path": "target/wp1104/receipt-reviewed.json",
+    "sha256": "612bfa31eebd92ff1717d81cef6299a21ffd85947a155a023605168bc49bc827"
+  }
+}

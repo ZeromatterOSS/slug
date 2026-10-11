@@ -326,6 +326,8 @@ fn namespace_policy(
                 .any(|file| relative == Path::new(file.path()))
             {
                 "fixed_file"
+            } else if bodies.repo_marker_metadata && relative == Path::new("REPO.bazel") {
+                "repo_marker"
             } else if plan
                 .effects()
                 .iter()
@@ -3168,7 +3170,8 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_namespace_is_current_and_declared_only() {
-    let bodies = java_proxy_test_bodies();
+    let bodies = java_proxy_test_bodies()
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let content: Arc<[u8]> = Arc::from(&b"synthetic"[..]);
     let body_weak = Arc::downgrade(&content);
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
@@ -3198,18 +3201,27 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             namespace_policy(&bodies, d, epoch, &generated_features_plan_matches)
                 .admits(&d.operation())
         };
-    for (epoch, root, parent, leaf) in [
+    for (epoch, root, parent, leaf, marker) in [
         (
             &epoch_a,
             "/parent/A",
             "/parent/A/nested",
             "/parent/A/nested/BUILD",
+            "/parent/A/REPO.bazel",
         ),
         (
             &epoch_b,
             "/parent/B",
             "/parent/B/nested",
             "/parent/B/nested/BUILD",
+            "/parent/B/REPO.bazel",
+        ),
+        (
+            &epoch_a,
+            "/parent/A",
+            "/parent/A/nested",
+            "/parent/A/nested/BUILD",
+            "/parent/A/REPO.bazel",
         ),
     ] {
         for path in ["/", "/parent", root, parent] {
@@ -3236,6 +3248,18 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         ] {
             assert!(admits(&demand(materialized, leaf, operation), Some(epoch)));
         }
+        let marker = demand(materialized, marker, PathObservationOperation::Lstat);
+        assert_eq!(
+            namespace_policy(
+                &bodies,
+                &marker,
+                Some(epoch),
+                &generated_features_plan_matches
+            )
+            .path_class,
+            "repo_marker"
+        );
+        assert!(admits(&marker, Some(epoch)));
     }
     let valid_demand = demand(
         materialized,
@@ -3259,6 +3283,63 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         "/parent/B",
     );
     assert!(!admits(&valid_demand, Some(&ambiguous)));
+    let marker = demand(
+        materialized,
+        "/parent/B/REPO.bazel",
+        PathObservationOperation::Lstat,
+    );
+    for epoch in [
+        None,
+        Some(&epoch_a),
+        Some(&wrong_workspace),
+        Some(&ambiguous),
+    ] {
+        assert!(!admits(&marker, epoch));
+    }
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            let roles = java_proxy_test_bodies().with_repo_marker_metadata(registry, command);
+            assert_eq!(
+                namespace_policy(
+                    &roles,
+                    &marker,
+                    Some(&epoch_b),
+                    &generated_features_plan_matches
+                )
+                .admits(&marker.operation()),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    // An explicit leaf retains its prior body authority even without the marker role.
+    {
+        let disabled = java_proxy_test_bodies()
+            .with_repo_marker_metadata(RegistryChoice::DefaultBcr, CommandChoice::Modules);
+        let declared = namespace_test_epoch_at(
+            &disabled,
+            [Arc::new(local_jdk_test_request(
+                &disabled,
+                small_generated_plan(&[("REPO.bazel", b"synthetic", false)]),
+            ))],
+            instance,
+            "/parent/B",
+        );
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ] {
+            let leaf = demand(materialized, "/parent/B/REPO.bazel", operation);
+            let policy = namespace_policy(
+                &disabled,
+                &leaf,
+                Some(&declared),
+                &generated_features_plan_matches,
+            );
+            assert_eq!(policy.path_class, "fixed_file");
+            assert!(policy.admits(&leaf.operation()));
+        }
+    }
     // A malformed successful epoch must not turn a file-parent collision into path authority.
     for plan in [
         small_generated_plan(&[("a", b"", false), ("a/b", b"", false)]),
@@ -3270,14 +3351,21 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             instance,
             "/parent/B",
         );
-        for path in ["/parent/B", "/parent/B/a", "/parent/B/a/b", "/parent"] {
+        for path in [
+            "/parent/B",
+            "/parent/B/a",
+            "/parent/B/a/b",
+            "/parent",
+            "/parent/B/REPO.bazel",
+        ] {
             assert!(!admits(
                 &demand(materialized, path, PathObservationOperation::Lstat),
                 Some(&malformed)
             ));
         }
     }
-    let mut closed = java_proxy_test_bodies();
+    let mut closed = java_proxy_test_bodies()
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     closed.java_offline_archive = None;
     assert!(
         !namespace_policy(
@@ -3288,7 +3376,30 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         )
         .admits(&valid_demand.operation())
     );
-    let valid = SourcePreparationNeeds::path(NeedPathObservations::singleton(valid_demand));
+    assert!(
+        !namespace_policy(
+            &closed,
+            &marker,
+            Some(&epoch_b),
+            &generated_features_plan_matches
+        )
+        .admits(&marker.operation())
+    );
+    let mut no_defs = java_proxy_test_bodies()
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    no_defs.rules_rust_defs_import_sources = false;
+    assert!(
+        !namespace_policy(
+            &no_defs,
+            &marker,
+            Some(&epoch_b),
+            &generated_features_plan_matches
+        )
+        .admits(&marker.operation())
+    );
+    let valid = SourcePreparationNeeds::path(
+        NeedPathObservations::try_from_iter([valid_demand, marker]).unwrap(),
+    );
     let admit_need = |needs: &SourcePreparationNeeds| {
         bodies.admit_with_matchers(needs, &generated_features_plan_matches, &|d| {
             admits(d, Some(&epoch_b))
@@ -3336,6 +3447,61 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         ),
         (
             materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::FileBytes,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::DirectoryEntries,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::FileDigest,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel",
+            PathObservationOperation::ReadLink,
+        ),
+        (
+            materialized,
+            "/parent/B/repo.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel.bak",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/REPO.bazel/child",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B/nested/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/B-sibling/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/outside/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            materialized,
+            "/parent/A/REPO.bazel",
+            PathObservationOperation::Lstat,
+        ),
+        (
+            foreign,
             "/parent/B/REPO.bazel",
             PathObservationOperation::Lstat,
         ),

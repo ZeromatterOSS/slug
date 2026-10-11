@@ -34,16 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-315-m7a-normal-profile-producer-readiness-r2
-Status: accepted — normal-profile readiness; scoped metadata successor ready
+Packet: WP-7-316-m7a-local-jdk-root-marker-metadata
+Status: accepted — scoped root marker; ignore metadata successor ready
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-normal-profile readiness:51 fresh focused proofs, production check and ONE native
-reaching current local JDK `REPO.bazel` Lstat refusal at214.258MiB phase peak.
-The next bounded prerequisite is scoped root marker metadata. User-authorized
-preparation time is separate from workload memory; recurring work over three
-minutes receives necessity/refactoring assessment. Full producer/M7A/bootstrap
-completion remains open.
+scoped local JDK root `REPO.bazel` metadata:55 proofs, production check and ONE
+native now reaching `.bazelignore` Lstat at215.09MiB phase peak. Same-profile
+small edit rebuilt Core in37.85s. Preparation time remains authorized; recurring
+work over three minutes receives necessity/refactoring assessment. Full
+producer/M7A/bootstrap completion remains open.
 
 ### Ready and blocked queue
 
