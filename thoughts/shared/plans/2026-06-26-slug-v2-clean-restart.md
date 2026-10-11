@@ -34,20 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-334-m7a-swift-file-plan
-Status: ready — independent DESIGN before implementation
+Packet: WP-7-335-m7a-swift-package-metadata
+Status: ready for DESIGN
 
-The [accepted Swift diagnostic](./slug-v2-subplans/wp1121-swift-generated-plan-capture-2026-10-11.json)
-passes currentCore43+extra2 projection controls/production and qualified protected33/
-fixture31. ONE19.739s/source366/phase245.296875MiB under256;233pins/359source/18env
-stable. Original plan metadata captures one executable BUILD File1094B, unmapped
-label/empty attrs; literal body/fullSpec unavailable. No new retained strings/fields;
-Bodies304/Scope488 unchanged. Producer/whole fit remain open.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects an exact Swift
-original File-only qualifier over existing bounded validation and current declared-
-leaf namespace. Original request/bytes/structural DICE identity remain the owner;
-no copied template, source acquisition or Windows work. Independent DESIGN precedes
-activation; current metadata grants no capability by itself.
+The [accepted Swift File-only capability](./slug-v2-subplans/wp1122-swift-file-plan-2026-10-11.json)
+passes freshCore45/production and qualified protected33/fixture31. ONE20.098s/source366/
+phase247.05078125MiB under256;217pins/359source/18env stable. The original Swift File
+boundary is crossed; root BUILD.bazel Lstat remains refused. No retained string or
+field growth; Bodies304/Scope488 unchanged. Producer/whole-workload fit remain open.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects only this exact
+Swift generated-root package metadata lookup through the full original typed guard
+and unique current epoch. Declared-leaf precedence remains; no new body/flags/source
+acquisition or Windows work. Independent DESIGN precedes activation.
 
 ### Ready and blocked queue
 

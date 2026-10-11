@@ -3595,15 +3595,35 @@ fn kotlin_file_plan_test_request(
     request.repo_spec.rule_id.rule_name = "kotlin_capabilities_repository".into();
     request
 }
+#[cfg(target_os = "linux")]
+fn swift_file_plan_test_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = java_file_plan_test_request(bodies, plan, None);
+    request.id.canonical_repo =
+        slug_identity_v2::CanonicalRepoName::new(SWIFT_GENERATED_DIAGNOSTIC_OWNER.0).unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_swift+//swift/internal:swift_autoconfiguration.bzl")
+            .unwrap();
+    request.repo_spec.rule_id.rule_name = SWIFT_GENERATED_DIAGNOSTIC_OWNER.4.into();
+    request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+    request
+}
+#[cfg(target_os = "linux")]
+fn swift_file_plan_test_bodies() -> Bodies {
+    generated_test_bodies_with_swift(namespace_test_bodies(), 1)
+}
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
     for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_file_effects_are_bounded_and_opt_in(remote);
     }
-    assert_patched_file_effects_are_bounded_and_opt_in(false, false);
-    assert_patched_file_effects_are_bounded_and_opt_in(true, false);
-    assert_patched_file_effects_are_bounded_and_opt_in(false, true);
+    assert_patched_file_effects_are_bounded_and_opt_in(false, false, false);
+    assert_patched_file_effects_are_bounded_and_opt_in(true, false, false);
+    assert_patched_file_effects_are_bounded_and_opt_in(false, true, false);
+    assert_patched_file_effects_are_bounded_and_opt_in(false, false, true);
 }
 #[cfg(target_os = "linux")]
 fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
@@ -3878,18 +3898,22 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
     );
 }
 #[cfg(target_os = "linux")]
-fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
+fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool, swift: bool) {
     let make_request: fn(
         &Bodies,
         slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
-    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest = if kotlin {
+    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest = if swift {
+        swift_file_plan_test_request
+    } else if kotlin {
         kotlin_file_plan_test_request
     } else if uv {
         python_uv_file_plan_test_request
     } else {
         python_file_plan_test_request
     };
-    let selected_bodies: fn() -> Bodies = if kotlin {
+    let selected_bodies: fn() -> Bodies = if swift {
+        swift_file_plan_test_bodies
+    } else if kotlin {
         kotlin_test_bodies
     } else {
         python_test_bodies
@@ -3905,11 +3929,14 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         ]),
     ));
     let original = valid.repository_materializations().values().next().unwrap();
+    let request_weak = Arc::downgrade(original);
     let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &original.kind else {
         panic!()
     };
     let backing_weak = Arc::downgrade(
-        &(if kotlin {
+        &(if swift {
+            &bodies.swift_offline_archive
+        } else if kotlin {
             &bodies.kotlin_offline_archive
         } else {
             &bodies.python_offline_archive
@@ -3923,7 +3950,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         Arc::strong_count(original),
         Arc::strong_count(&original.repo_spec.attributes),
         Arc::strong_count(
-            &(if kotlin {
+            &(if swift {
+                &bodies.swift_offline_archive
+            } else if kotlin {
                 &bodies.kotlin_offline_archive
             } else {
                 &bodies.python_offline_archive
@@ -3935,7 +3964,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         ),
     );
     assert!(std::ptr::eq(
-        (if kotlin {
+        (if swift {
+            bodies.qualified_swift_file_plan(original)
+        } else if kotlin {
             bodies.qualified_kotlin_file_plan(original)
         } else {
             bodies.qualified_python_file_plan(original)
@@ -3954,10 +3985,18 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
     );
     assert!(bodies.admit(&valid).is_ok());
     for case in 0..7 {
-        let selected = generated_test_bodies_with_swift(selected_bodies(), case);
-        assert!(
+        let selected = generated_test_bodies_with_swift(
+            if swift {
+                namespace_test_bodies()
+            } else {
+                selected_bodies()
+            },
+            case,
+        );
+        assert_eq!(
             selected.admit(&valid).is_ok(),
-            "patched generated owner independent Swift {case}"
+            !swift || case == 1,
+            "patched generated owner Swift binding {case}"
         );
     }
     if kotlin {
@@ -3965,6 +4004,17 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         let mut unrelated = selected_bodies();
         unrelated.python_offline_archive =
             python_test_bodies_with_invalid_binding(2).python_offline_archive;
+        assert!(unrelated.admit(&valid).is_ok());
+    }
+    if swift {
+        let mut unrelated = selected_bodies();
+        unrelated.python_offline_archive =
+            python_test_bodies_with_invalid_binding(2).python_offline_archive;
+        unrelated.kotlin_offline_archive =
+            patched_file_test_bodies_with_invalid_binding(2, true).kotlin_offline_archive;
+        let mut java = java_proxy_test_bodies().java_offline_archive.unwrap();
+        java.module = NormalizedAbsolutePath::new("/foreign/MODULE.bazel").unwrap();
+        unrelated.java_offline_archive = Some(java);
         assert!(unrelated.admit(&valid).is_ok());
     }
     let mut changed = original.as_ref().clone();
@@ -3975,6 +4025,11 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
     )]));
     assert_eq!(changed.repo_spec, original.repo_spec);
     assert_ne!(&changed, original.as_ref());
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(changed.clone()))
+            .is_ok()
+    );
     changed.repo_spec.attributes = Arc::new(
         [(
             compact_str::CompactString::new("different"),
@@ -3984,10 +4039,11 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         .collect(),
     );
     assert_ne!(&changed, original.as_ref());
-    assert!(
+    assert_eq!(
         bodies
             .admit(&SourcePreparationNeeds::repository(changed))
-            .is_ok()
+            .is_ok(),
+        !swift
     );
     for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
         for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
@@ -4004,8 +4060,28 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
             }
         }
     }
+    let invalid_bodies = |case| {
+        if swift {
+            let mut closed = generated_test_bodies_with_swift(
+                namespace_test_bodies(),
+                if case == 0 {
+                    0
+                } else if case == 6 {
+                    1
+                } else {
+                    case + 1
+                },
+            );
+            if case == 6 {
+                closed.rules_rust_defs_import_sources = false;
+            }
+            closed
+        } else {
+            patched_file_test_bodies_with_invalid_binding(case, kotlin)
+        }
+    };
     for case in 0..7 {
-        let closed = patched_file_test_bodies_with_invalid_binding(case, kotlin);
+        let closed = invalid_bodies(case);
         assert!(
             closed
                 .admit_with_plan_matcher(&valid, &|_, _| true)
@@ -4028,7 +4104,7 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
     ));
     assert!(bodies.admit(&allowed).is_ok());
     for case in 0..7 {
-        let mut closed = patched_file_test_bodies_with_invalid_binding(case, kotlin);
+        let mut closed = invalid_bodies(case);
         closed.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
         assert!(closed.admit(&allowed).is_ok());
         for mixed in [
@@ -4062,12 +4138,14 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
             assert!(std::ptr::eq(first, offender.as_ref()));
         }
     };
-    for case in 0..if kotlin { 10 } else { 9 } {
+    for case in 0..if kotlin || swift { 10 } else { 9 } {
         let mut wrong = original.as_ref().clone();
         match case {
             0 => wrong.id.workspace = NormalizedAbsolutePath::new("/foreign").unwrap(),
             1 => {
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if swift {
+                    "rules_swift++non_module_deps+build_bazel_rules_swift_local_config_extra"
+                } else if kotlin {
                     "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin_extra"
                 } else if uv {
                     "rules_python++uv+uv_extra"
@@ -4077,7 +4155,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .unwrap()
             }
             2 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if swift {
+                    "@@other+//swift/internal:swift_autoconfiguration.bzl"
+                } else if kotlin {
                     "@@other+//src/main/starlark/core/repositories:compiler.bzl"
                 } else if uv {
                     "@@other+//python/uv/private:uv_toolchains_repo.bzl"
@@ -4087,7 +4167,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .unwrap()
             }
             3 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if swift {
+                    "@@rules_swift+//swift:swift_autoconfiguration.bzl"
+                } else if kotlin {
                     "@@rules_kotlin+//src/main/starlark/core:compiler.bzl"
                 } else if uv {
                     "@@rules_python+//python/uv:uv_toolchains_repo.bzl"
@@ -4097,7 +4179,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .unwrap()
             }
             4 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if swift {
+                    "@@rules_swift+//swift/internal:Swift_autoconfiguration.bzl"
+                } else if kotlin {
                     "@@rules_kotlin+//src/main/starlark/core/repositories:Compiler.bzl"
                 } else if uv {
                     "@@rules_python+//python/uv/private:Uv_toolchains_repo.bzl"
@@ -4107,7 +4191,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .unwrap()
             }
             5 => {
-                wrong.repo_spec.rule_id.rule_name = if kotlin {
+                wrong.repo_spec.rule_id.rule_name = if swift {
+                    "swift_autoconfiguration_extra"
+                } else if kotlin {
                     "kotlin_compiler_git_repository"
                 } else if uv {
                     "uv_toolchains_repo_extra"
@@ -4117,7 +4203,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .into()
             }
             7 => {
-                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if swift {
+                    "rules_kotlin++rules_kotlin_extensions+com_github_jetbrains_kotlin"
+                } else if kotlin {
                     "rules_python++python+pythons_hub"
                 } else if uv {
                     "rules_python++python+pythons_hub"
@@ -4127,7 +4215,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 .unwrap()
             }
             8 => {
-                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if kotlin {
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if swift {
+                    "@@rules_kotlin+//src/main/starlark/core/repositories:compiler.bzl"
+                } else if kotlin {
                     "@@rules_kotlin+//src/main/starlark/core/repositories:compiler_git.bzl"
                 } else if uv {
                     "@@rules_python+//python/private:pythons_hub.bzl"
@@ -4135,7 +4225,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                     "@@rules_python+//python/uv/private:uv_toolchains_repo.bzl"
                 })
                 .unwrap();
-                wrong.repo_spec.rule_id.rule_name = if kotlin {
+                wrong.repo_spec.rule_id.rule_name = if swift {
+                    "kotlin_capabilities_repository"
+                } else if kotlin {
                     "kotlin_capabilities_repository"
                 } else if uv {
                     "hub_repo"
@@ -4143,6 +4235,16 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                     "uv_toolchains_repo"
                 }
                 .into();
+            }
+            9 if swift => {
+                wrong.repo_spec.attributes = Arc::new(
+                    [(
+                        compact_str::CompactString::new("unexpected"),
+                        OverrideAttributeValue::Bool(false),
+                    )]
+                    .into_iter()
+                    .collect(),
+                );
             }
             9 => {
                 wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
@@ -4157,7 +4259,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                 );
                 mapping.insert(
                     slug_identity_v2::ApparentRepoName::new("python").unwrap(),
-                    slug_identity_v2::CanonicalRepoName::new(if kotlin {
+                    slug_identity_v2::CanonicalRepoName::new(if swift {
+                        "rules_swift+"
+                    } else if kotlin {
                         "rules_kotlin+"
                     } else {
                         "rules_python+"
@@ -4165,7 +4269,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
                     .unwrap(),
                 );
                 wrong.repo_spec.rule_id.bzl_file =
-                    slug_identity_v2::ApparentLabel::parse(if kotlin {
+                    slug_identity_v2::ApparentLabel::parse(if swift {
+                        "@python//swift/internal:swift_autoconfiguration.bzl"
+                    } else if kotlin {
                         "@python//src/main/starlark/core/repositories:compiler.bzl"
                     } else if uv {
                         "@python//python/uv/private:uv_toolchains_repo.bzl"
@@ -4186,7 +4292,9 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
             Arc::strong_count(original),
             Arc::strong_count(&original.repo_spec.attributes),
             Arc::strong_count(
-                &(if kotlin {
+                &(if swift {
+                    &bodies.swift_offline_archive
+                } else if kotlin {
                     &bodies.kotlin_offline_archive
                 } else {
                     &bodies.python_offline_archive
@@ -4199,7 +4307,14 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
         ),
         counts
     );
-    if kotlin {
+    if swift {
+        eprintln!(
+            "WP1122_SWIFT_FILE_PLAN_LAYOUT owner={} Bodies={} Scope={}",
+            std::mem::size_of_val(&SWIFT_GENERATED_DIAGNOSTIC_OWNER),
+            std::mem::size_of::<Bodies>(),
+            std::mem::size_of::<SourceServiceScope>()
+        );
+    } else if kotlin {
         eprintln!("WP1118_KOTLIN_FILE_PLAN complete");
     } else if uv {
         eprintln!("WP1116_UV_FILE_PLAN complete");
@@ -4208,6 +4323,8 @@ fn assert_patched_file_effects_are_bounded_and_opt_in(uv: bool, kotlin: bool) {
     }
     drop(bodies);
     assert!(backing_weak.upgrade().is_none());
+    drop(valid);
+    assert!(request_weak.upgrade().is_none());
 }
 #[cfg(target_os = "linux")]
 fn assert_bounded_file_plan_shapes(
@@ -4341,6 +4458,10 @@ fn local_jdk_namespace_is_current_and_declared_only() {
         &kotlin_file_plan_test_request,
     );
     eprintln!("WP1118_KOTLIN_NAMESPACE complete");
+    assert_generated_namespace_is_current_and_declared_only(
+        swift_file_plan_test_bodies,
+        &swift_file_plan_test_request,
+    );
 }
 #[cfg(target_os = "linux")]
 fn assert_generated_namespace_is_current_and_declared_only(
@@ -4478,12 +4599,27 @@ fn assert_generated_namespace_is_current_and_declared_only(
     )
     .unwrap();
     assert!(!admits(&valid_demand, Some(&wrong_workspace)));
-    let mut wrong_owner = request.as_ref().clone();
-    wrong_owner.repo_spec.rule_id.rule_name = "wrong_owner".into();
-    let wrong_owner_epoch =
-        namespace_test_epoch_at(&bodies, [Arc::new(wrong_owner)], instance, "/parent/B");
-    assert!(!admits(&valid_demand, Some(&wrong_owner_epoch)));
-    drop(wrong_owner_epoch);
+    for nonempty_attributes in [false, true] {
+        if nonempty_attributes && bodies.swift_offline_archive.is_none() {
+            continue;
+        }
+        let mut wrong_owner = request.as_ref().clone();
+        if nonempty_attributes {
+            wrong_owner.repo_spec.attributes = Arc::new(
+                [(
+                    compact_str::CompactString::new("unexpected"),
+                    OverrideAttributeValue::Bool(false),
+                )]
+                .into_iter()
+                .collect(),
+            );
+        } else {
+            wrong_owner.repo_spec.rule_id.rule_name = "wrong_owner".into();
+        }
+        let wrong_owner_epoch =
+            namespace_test_epoch_at(&bodies, [Arc::new(wrong_owner)], instance, "/parent/B");
+        assert!(!admits(&valid_demand, Some(&wrong_owner_epoch)));
+    }
     let mut other = request.as_ref().clone();
     other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
     let ambiguous = namespace_test_epoch_at(
@@ -4628,11 +4764,18 @@ fn assert_generated_namespace_is_current_and_declared_only(
         }
     }
     for case in 0..7 {
-        let selected = generated_test_bodies_with_swift(make_bodies(), case)
-            .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
-            .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+        let selected = generated_test_bodies_with_swift(
+            if bodies.swift_offline_archive.is_some() {
+                namespace_test_bodies()
+            } else {
+                make_bodies()
+            },
+            case,
+        )
+        .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
+        .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
         for d in [&valid_demand, &marker, &ignore_marker] {
-            assert!(
+            assert_eq!(
                 namespace_policy(
                     &selected,
                     d,
@@ -4640,7 +4783,8 @@ fn assert_generated_namespace_is_current_and_declared_only(
                     &generated_features_plan_matches
                 )
                 .admits(&d.operation()),
-                "namespace independent Swift {case}"
+                bodies.swift_offline_archive.is_none() || case == 1,
+                "namespace Swift binding {case}"
             );
         }
     }
@@ -4650,13 +4794,15 @@ fn assert_generated_namespace_is_current_and_declared_only(
     assert_eq!(
         usize::from(closed.java_offline_archive.is_some())
             + usize::from(closed.python_offline_archive.is_some())
-            + usize::from(closed.kotlin_offline_archive.is_some()),
+            + usize::from(closed.kotlin_offline_archive.is_some())
+            + usize::from(closed.swift_offline_archive.is_some()),
         1
     );
     assert!(closed.qualified_generated_file_plan(&request).is_some());
     closed.java_offline_archive = None;
     closed.python_offline_archive = None;
     closed.kotlin_offline_archive = None;
+    closed.swift_offline_archive = None;
     assert!(
         !namespace_policy(
             &closed,
@@ -7949,7 +8095,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
             request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(defining_label).unwrap();
             request.repo_spec.rule_id.rule_name = rule_name.into();
-            if matches!(owner, 2 | 4) {
+            if matches!(owner, 2 | 4) || canonical == swift_owner.0 {
                 request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
             }
             request
@@ -8022,7 +8168,6 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len()
             || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 1
             || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 2
-            || canonical == swift_owner.0
         {
             assert_eq!(permissive.unwrap_err().family, "materialization");
             assert_eq!(
@@ -8032,12 +8177,23 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         } else {
             assert!(permissive.is_ok());
         }
-        let enabled_denied = enabled.admit(&needs).unwrap_err();
-        assert!(
-            enabled
-                .generated_plan_diagnostic(&needs, &enabled_denied)
-                .is_some()
-        );
+        let disabled_denied = bodies.admit(&needs).unwrap_err();
+        if canonical == swift_owner.0 {
+            assert!(enabled.admit(&needs).is_ok());
+            // This is the authentic disabled-context refusal, not an enabled live refusal.
+            assert!(
+                enabled
+                    .generated_plan_diagnostic(&needs, &disabled_denied)
+                    .is_none()
+            );
+        } else {
+            let enabled_denied = enabled.admit(&needs).unwrap_err();
+            assert!(
+                enabled
+                    .generated_plan_diagnostic(&needs, &enabled_denied)
+                    .is_some()
+            );
+        }
         if canonical == apple_owner.0 {
             for changed in [
                 "Apple_cc_autoconf_toolchains",
@@ -8113,11 +8269,13 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         assert!(std::ptr::eq(view.plan, plan));
         assert_eq!(Arc::strong_count(original), 1);
         let encoded = view.to_string();
-        assert!(encoded.contains(if matches!(owner, 2 | 4) {
-            "attribute_count=0"
-        } else {
-            "attribute_count=1"
-        }));
+        assert!(
+            encoded.contains(if matches!(owner, 2 | 4) || canonical == swift_owner.0 {
+                "attribute_count=0"
+            } else {
+                "attribute_count=1"
+            })
+        );
         assert!(
             bodies
                 .generated_plan_diagnostic(
@@ -8305,11 +8463,13 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             .generated_plan_diagnostic(&mapped, &denied)
             .unwrap()
             .to_string();
-        assert!(mapped_text.contains(if matches!(owner, 2 | 4) {
-            "attribute_count=1"
-        } else {
-            "attribute_count=2"
-        }));
+        assert!(
+            mapped_text.contains(if matches!(owner, 2 | 4) || canonical == swift_owner.0 {
+                "attribute_count=1"
+            } else {
+                "attribute_count=2"
+            })
+        );
         assert!(!mapped_text.contains("not a diagnostic payload"));
         let bad = SourcePreparationNeeds::repository(
             (*local_native_request(&bodies.roots[0], "unknown+", "/features")).clone(),
@@ -8429,6 +8589,9 @@ fn generated_plan_refusal_projection_is_bounded() {
                 slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
             request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(defining_label).unwrap();
             request.repo_spec.rule_id.rule_name = rule_name.into();
+            if canonical == swift_owner.0 {
+                request.repo_spec.attributes = Arc::new(starlark_map::small_map::SmallMap::new());
+            }
             request
         };
         let check = |lengths: &[usize], content_size: usize, captured: bool| {

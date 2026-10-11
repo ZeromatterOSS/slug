@@ -1,113 +1,86 @@
-# WP1122 Swift original File-only capability
+# WP1123 Swift generated-root package metadata
 
-Packet: WP-7-334-m7a-swift-file-plan
-Status: ready — independent DESIGN before implementation
+Packet: WP-7-335-m7a-swift-package-metadata
+Status: ready for DESIGN
 
-Outcome: admit the original selected Swift generated File-only request through
-existing borrowed bounded-plan validation and current declared-leaf namespace;
-then ONE fresh native observation. Slug-native private Linux-test capability only.
-Existing exact source/production semantics remain unchanged; Windows deferred.
-Full producer/certificate/actions/Rustc/M7A/bootstrap/output parity/whole fit open.
+Outcome: permit only root-relative BUILD.bazel Lstat for an already fully
+qualified original Swift File-only request in its unique current materialization
+epoch, then ONE fresh native observation. Slug-native private Linux-test capability;
+exact source/production semantics unchanged, Windows deferred. Producer/certificate/
+actions/Rustc/M7A/bootstrap/output parity/whole-workload fit remain open.
 
-Basis: accepted [WP1121](./wp1121-swift-generated-plan-capture-2026-10-11.json),
-actual operation351b0fdedeb8fe9f3e97197b62e976d27352b5b855ebe707fa179bee81fc6829
-and stdout45ec4d91552e4cf07022cf25125bcc5bb92a3eb2f81317d14f455b967c0da687.
-ONE19.739s/source366/supervisor244.02734375MiB/phase245.296875MiB under256;
-233pins/359source brackets/18env stable. Current freshCore43+extra2 projection
-controls/production and protected33/fixture31 strictly qualified reuse passed.
-Original complete bounded metadata: exactly one File ordinal0, BUILD5B, content
-1094B SHA625aa6a71321ab68d7b496c018255d3663834e50920bec747f48f4c9b7a78b83,
-executabletrue, mappingNone, attribute_count0. Literal bytes/fullSpec/unprojected
-attributes/nonFile metadata unavailable; no namespace demand or path-progress frame.
-Terminal target/wp1121/next-capability-research.md
-SHA1737eddd72c7d8f59e2c6fd7dd765f49f8ab050fcf000245151daa7819c12ea9
-establishes an implementable original typed-request guard, not a body template.
+Basis: accepted [WP1122](./wp1122-swift-file-plan-2026-10-11.json), actual operation
+02edd27482c6f6e968c910e1bd1ab67960ca7e5ff6ebf7c908c1ec5dc14eb69c and stdout
+d7eacf786a16a12bdab6504046aa65d29214b97b09c1bcefd3aed7e0b7d40343; ONE20.098s,
+source366/supervisor245.921875MiB/phase247.05078125MiB under256,217pins/359source
+brackets/18env stable. Exact Swift instance57 owner_plan_allowed=true but root
+BUILD.bazel Lstat path_class=other refused. No missing-file result, original body,
+full Spec or generation-root serialization inferred. Original epoch supplies root.
+Source-only target/wp1122/next-capability-research.md SHA
+301b204e261db3bad32e5779cf00663cbb29826e2817ff4dd4f175b614380fc1 recommends this
+bounded continuation. Production app/slug_bzlmod_v2/src/host_package.rs755 normal
+tracked lookup orders BUILD.bazel then BUILD; this is source support, no callstack
+attribution. Existing precise static owners already use Lstat-only package_marker.
 
-Decision for DESIGN: append an independent qualified_swift_file_plan to the
-existing qualified_generated_file_plan dispatcher. Require generated-features and
-rules-rust-definitions PreparedFile/PublicProbe roles, original roots[0] workspace,
-unmapped label, empty original RepoSpec attributes, exact existing five-part
-SWIFT_GENERATED_DIAGNOSTIC_OWNER tuple and full borrowed descriptor4 through
-native_swift_environment_binding/native_patched_binding. No canonical wildcard,
-Some-only grant or independently combinable other-owner allowance. Empty attrs
-chooses the observed scope; nonempty attrs remain refused rather than inferred.
-Borrow actual original GeneratedFileEffects and use unchanged bounded_file_only_plan.
-Permit valid changed original content/paths/executable within the qualified bounded
-File-only owner, retaining complete structural identity; no fixed digest/body/template
-match or replacement request. Existing Java/Python/Kotlin polarity unchanged.
+DESIGN decision: in existing qualified-generated namespace branch, classify exact
+root-relative BUILD.bazel as existing package_marker only when complete
+bodies.qualified_swift_file_plan(request).is_some(). Full original workspace,
+unmapped five-part tuple, empty attrs, generated+defs roles, descriptor4 full
+binding and bounded original File-only plan remain mandatory. Canonical name alone
+is insufficient: Java remote qualifier accepts arbitrary canonical names. Retain
+unique bounded128 current workspace/instance epoch/generation-root authority.
+Place after exact declared leaf and existing REPO/ignore marker precedence, before
+lexical declared-child ancestor classification. Explicitly declared BUILD.bazel
+stays fixed_file Lstat/FileBytes; undeclared BUILD.bazel gets only Lstat. For declared
+BUILD.bazel/child, parent class package_marker and child fixed_file preserve parent
+Lstat-only semantics. No nested/case/suffix/sibling/outside/host/stale/foreign/
+ambiguous/absent grant. Existing old Java/Python/Kotlin undeclared BUILD.bazel
+refusers and independent REPO/ignore flags unchanged; no new flag.
 
-Natural owner remains original RepositoryMaterializationRequest/RepoSpec/Arc-backed
-ordered plan under normal DICE and materializer. Complete original bytes/modes/
-attributes/mapping own equality/invalidation. No command-side reconstruction,
-fresh graph/direct filesystem bypass, result cache/key/lock/API change or producer
-repair. Existing service/session/credit/cancellation/error/restoration controls and
-last-Drop ownership unchanged. Original independent output bytes stay producer-owned.
-No literal source/body/archive/corpus or environment-value acquisition needed.
+Natural owner/identity/allocation/bounds/lifecycle/cancellation/join/error/restoration
+and unchanged IO/DICE/materializer contracts inherit target/wp1122/packet-contract.md
+SHA303f011c6df605861dbd59c55ccdc0fbf2465624868129318968de7960846526. Borrow original
+request/plan/paths/current view; no policy owned strings/Vec/Arc/request/content
+copies, retained fields/pool/cache/globalinterner/key/lock/API, replacement body or
+filesystem bypass. Bodies304/Scope488 unchanged actual compiled witness required.
 
-The existing namespace_policy shared dispatcher observes this same qualified plan.
-DESIGN explicitly reviews this prospective continuation: unique bounded current
-workspace/instance epoch, current generation root, only declared exact File leaves
-Lstat/FileBytes, root/lexical ancestors Lstat only; no list/digest/readlink/sibling/
-undeclared content. StaleA/currentB/foreign workspace/instance/ambiguous/absent request
-stay closed. Existing REPO.bazel/.bazelignore Lstat flags remain independent after
-exact declared-leaf precedence; no new marker flag/permission. Current native has
-no such demand; actual next use remains unproved until the changed native run.
+Rust allowlist ONE public_probe_preparation_tests.rs under
+app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/. Parent,
+immutable helpers/production/other owners/formatter/scopes/fixtures unchanged.
+Estimate policy3–5net/proof30–100 via shared selected namespace matrix, no newselector
+or copied fullqualification/lifecycle suite. Large private test owner remains cohesive
+for this bounded delta; assess actual growth. Target-only helpers/evidence and compact
+receipt/Stage9/scheduling permitted. Current52keys exactly1changed/51same; historical
+Q=WP1119 three private exception hashes separately bound. Six extra authorities,
+eight caller bindings, originalordered359sources/native18env unchanged. Baseline root
+resolves actual accepted WP1122 HEAD before implementation.
 
-Allocation: borrowed original request/plan/CompactString/Arcbytes, existing stack
-8path validator, scoped interned paths and unchanged output ownership. No policy
-String/Vec/request/plan/content clone, retained field/global interner/pool/cache.
-Nonempty File-only rows<=8; path<=512B/sum2048B, content<=1MiB/sum4MiB. Existing
-empty/dot/parent/absolute/backslash/NUL/ancestor-collision and nonFile rejection
-unchanged. No new digest-signature table. Bodies304/Scope488 expected unchanged;
-actual compiled witness required. Estimate policy25–40net/proof80–150net via existing
-File/namespace matrices, not a copied suite. Growth and recurring>180s are review
-signals; examine responsibility boundaries before any larger expansion.
+Validation inherits WP1122 serial offline locked jobs1/pinnednightly2025-09-14 actual
+rustup resolution/JSON no-run/fresh Core45 list+batchedpreflight+body/productionCoreCLI/
+unique ignored singletonlist; old43+mandatoryprojection2 remain union45, no duplicate
+selection. Shared local_jdk_namespace_is_current_and_declared_only must cover exact
+Swift marker positive independently REPO/ignore flags, A/B/A current/stale/wrong/absent/
+ambiguous namespace, full binding/roles/attrs rejection, every unsupported operation,
+nested/case/suffix/outside refusers, oldowner polarity, declared BUILD.bazel FileBytes
+and declared-child precedence. Include supported marker with unsupported demand both
+orders preserving first original demand and zero progress; request/body Arccounts/Weak
+retirement unchanged. File-only/projection controls remain selected. Protected33 and
+fixture31 strictly reuse Q unchanged operations/options/fullmaps/artifacts only; old
+Coreexe uncredited. Missing proofs fresh, compiler memory separate. Actual DESIGN,
+helper source checkpoint/freeze, PRELAUNCH before ONE native, FINAL before acceptance.
+Reuse finite WP1122 helpers/current45 selection; no old failure-specific assumptions
+or replay, no framework/history recursion. All helpers frozen before gates; native
+prelaunch complete. Exact spelling/equalSHAalias and ordinary/native env separation,
+explicit postrun-only predecessor contextual metadata categories retained.
 
-Allowlist exactly parent app/slug_core_v2/src/runtime/tests/
-platforms_module_preparation_tests.rs and child public_probe_preparation_tests.rs.
-Immutable descriptor helper/formatter/scopes/transport/fixtures/production/other
-owners unchanged. Target-only helper/review/evidence; compact receipt/Stage9 and
-scheduling updates. Current52keys change exactly2/50same; six extra authorities/
-eight caller bindings/ordered359source rows/18env unchanged. Baseline is actual
-accepted WP1121 HEAD following integration; root passes resolved revision to workers.
-
-Validation: independent DESIGN plus actual helper/source PRELAUNCH before ONE
-native; actual FINAL before acceptance. Fresh rustup-resolve pinned nightly2025-09-14;
-serial offline locked jobs1 Core observer JSON no-run/list/batched exact preflight
-and current45 (old43 PLUS two existing projection selectors, no missing coverage),
-production Core/CLI and unique ignored singleton list. Parameterize existing
-local_jdk_file_effects_are_bounded_and_opt_in and
-local_jdk_namespace_is_current_and_declared_only with Swift, reuse existing factory.
-Cover full tuple/workspace/role/flags/absent/wrong URL/digest/archive/MODULE/patch/
-cross-owner binding, mapping/nonempty attrs, nonFile/empty/mixed plan, exact bounds/
-invalid path/collision, original request/plan pointers/ArcWeak retirement, changed
-valid plan/hash/executable identity and current/stale/declared-only namespace.
-Whole mixed Need retains first original offender/zero progress in both orders.
-Keep both generated_plan_refusal_projection selectors explicitly selected; adapt
-newly admitted Swift diagnostic polarity transparently while preserving original
-formatter/old-owner/first-offender/bounds proofs. No fabricated live refusal/body.
-
-Protected33/fixture31 may strictly reuse actual Q=WP1119 operations/options/full
-maps/artifacts via accepted WP1121 qualification if all nonprivate bytes remain
-identical; original historical3 private digests separately bound to currentafter3
-including immutable child unchanged from WP1121. Current2 edits are distinct from
-historical3 exceptions. No old Core executable credit; missing proof runs fresh.
-Source-only helper checkpoint before freeze reuses finite accepted scaffolding.
-Retain exact configured spellings plus equal-SHA supervisor alias; ordinary env
-compared to ordinary config, native18 separately; omitted uncredited P=WP1121 Core
-context can only be explicitly post-run hash-bound metadata, never native bracket
-or protected credit. Reuse corrected finite finalization logic, do not carry old
-failure-specific hardcoded assertions into the successor. Every compile/setup/
-list/preflight/runtime separate fresh invocation; executable SHA streams64KiB.
-
-Limits unchanged: RSS256MiB/AS512MiB/live16MiB/work20/cleanup23/outer26/source512/
-census513/transfer32MiB; SEPARATE cumulative decoded128MiB and written128MiB caps.
-Ordinary FSIZE16/native32; accepted heldFD exact Kotlinpath+23089629B exception
-unchanged, Swift default16. Freeze helpers before gates. All current qualification/
-compiled layout/context before nativefactory; only future PRELAUNCH note may be
-absent at config generation, actual complete note required before execution.
-No identical native replay or silent cap raise. Genuine bounds/quota/Need/deadline
-is bounded evidence, no producer/whole-fit claim. New ownership/source/resource or
-unsupported prerequisite requires technical DESIGN/REPLAN; routine invocation/
-proof/receipt corrections preserve failures and affected evidence only. User permits
-needed time; frequent>3min prompts necessity/refactor review, not permission stop.
+Limits unchanged RSS256MiB/AS512MiB/live16MiB/work20/cleanup23/outer26/source512/
+census513/transfer32MiB; SEPARATE cumulative decoded128 and written128MiB, ordinary
+FSIZE16/native32, exact accepted Kotlinpath+23089629B heldFDexception only. Every
+compile/setup/list/preflight/runtime separate fresh invocation, executableSHAstream64KiB.
+No original body/archive/corpus/environment-value acquisition. Genuine bounds/Need/
+quota/deadline preserved, no identical native replay or silentcapraise; original
+producer/wholefit remains unproved. New owner/source/resource/unsupported prerequisite
+requires technical DESIGN/REPLAN, routine corrections preserve affected evidence.
+User permits necessary duration; recurring>180s examined for necessity/refactor, not
+permission deadline. Reuse accepted review checkpoints and inspect actual changed
+invariants/maps; no speed or whole-fit claim.

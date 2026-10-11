@@ -1093,6 +1093,30 @@ impl Bodies {
         Self::bounded_file_only_plan(request)
     }
     #[cfg(target_os = "linux")]
+    fn qualified_swift_file_plan<'a>(
+        &self,
+        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
+        let label = &request.repo_spec.rule_id.bzl_file;
+        if !self.generated_features_file_effects
+            || !self.rules_rust_defs_import_sources
+            || request.id.workspace != self.roots[0]
+            || label.mapping_id().is_some()
+            || !request.repo_spec.attributes.is_empty()
+            || (
+                request.id.canonical_repo.as_str(),
+                label.package().repo().as_str(),
+                label.package().package().as_str(),
+                label.target().as_str(),
+                request.repo_spec.rule_id.rule_name.as_str(),
+            ) != SWIFT_GENERATED_DIAGNOSTIC_OWNER
+            || !immutable_archive_preparation::native_swift_environment_binding(self)
+        {
+            return None;
+        }
+        Self::bounded_file_only_plan(request)
+    }
+    #[cfg(target_os = "linux")]
     fn qualified_generated_file_plan<'a>(
         &self,
         request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
@@ -1100,6 +1124,7 @@ impl Bodies {
         self.qualified_java_file_plan(request)
             .or_else(|| self.qualified_python_file_plan(request))
             .or_else(|| self.qualified_kotlin_file_plan(request))
+            .or_else(|| self.qualified_swift_file_plan(request))
     }
     #[cfg(target_os = "linux")]
     fn bounded_file_only_plan(
