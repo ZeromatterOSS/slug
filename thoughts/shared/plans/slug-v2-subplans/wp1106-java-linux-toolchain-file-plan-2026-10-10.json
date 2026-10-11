@@ -1,0 +1,216 @@
+{
+  "packet": "WP-7-318-m7a-java-linux-toolchain-file-plan",
+  "baseline": "bf61091ac",
+  "status": "accepted \u2014 shared qualified Java complete File plan and actual next descriptor boundary",
+  "outcome": "Shared qualified Java borrowed complete File-only validator admits the original local-JDK or one exact Linux JDK8 configuration owner. Actual normal probe advances to next generated-kind materialization remote_jdk8_linux_aarch64_toolchain_config_repo under same rules_java toolchains remote_java_repository.bzl _toolchain_config. No full producer/certificate/analyses/actions/Rustc completion.",
+  "compatibility": {
+    "changed_capability": "Slug-native bounded private observation policy",
+    "accepted_exact_semantics": "unchanged",
+    "output_literal_parity": "not claimed",
+    "windows": "deferred"
+  },
+  "source": {
+    "freeze_path": "target/wp1106/source-freeze.json",
+    "freeze_sha256": "a546dbd9f316e65d19db1b07be2c7cf8ad090418a0e5a8863ddf27a78dbc299e",
+    "rust": 36,
+    "metadata": 8,
+    "changed_authorities": 2,
+    "files": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+        "sha256": "9e4ac11fb058dd2b49503e51bb61ac11d88e6335fe1b16a91682c35d3aa3cdba",
+        "delta": "+23/-14 net9"
+      },
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+        "sha256": "44bbb27ecf4414bd125362012aa6fdf7f3f61855f72601dcf9b48b401fed347a",
+        "delta": "+103/-38 net65"
+      }
+    }
+  },
+  "allocation": "Shared predicate borrows original request/rule/Path/plan/content and stack8path validator. No owned request/body/path/String copies, retained storage/cache/interner/DICE/publicAPI change. Synthetic both-owner fixtures reuse original bodies and bound controls.",
+  "focused": {
+    "selected": 55,
+    "passed": 55,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.3079789140028879,
+        "operation_sha256": "ce067b77c540768ae3485f61e7bda52d4efc61fa9a22a985101c84ef1666f720"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11783169500995427,
+        "operation_sha256": "c2252737d164ce6452b246bd14568d61d55f3a487bbc59edf6a18adbf1b924fd"
+      },
+      "core": {
+        "selected": 22,
+        "passed": 22,
+        "elapsed_seconds": 0.21447008603718132,
+        "operation_sha256": "f5ba773b3ebb077332efb4568bc45802920a35e21a8274f77f7689b861c255ca"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 0.10590006201528013,
+        "deadline_seconds": null,
+        "operation_sha256": "58a50b5b21ec4edb3c628a6c023eccb8fe201c9af435736d8e45c20b01c7866c",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 0.11694966000504792,
+        "deadline_seconds": null,
+        "operation_sha256": "3f01cd6b07b13a756ef7ad943c978c72ad8fe31481d554558e9bf7a94ca2f50a",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 28.73835835896898,
+        "deadline_seconds": null,
+        "operation_sha256": "0c4c91f2a50535ad2973fcae7c1a283f40515252b9dd2b8e16b702872e12f48b",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Current complete source-changed Core test artifact/profile authority; fresh current cached Loading/Bzlmod operations and direct production compile.",
+    "frequency": "Current small-edit Core28.738s; preceding same-profile examples37.852/39.565s. All3 below180, not a distribution/speed/cause benchmark. Cached Bzlmod/Loading0.106/0.117s.",
+    "refactoring": "No recurring-over180s common-edit signal from current examples; keep cohesive validator and shared test body, evaluate measured recurring cost if it appears.",
+    "memory": "Compiler RSS uncapped preparation only; no workload budget credit."
+  },
+  "production_check": {
+    "seconds": 7.37317182298284,
+    "operation_sha256": "ff98fdde3c439457ab7a191a9a0475fff23d2baee0be4503a5ce8682a469a5ca"
+  },
+  "native": {
+    "operation_sha256": "3e495d2178d7307c068b2ade41ad25b5d8ac91d1798f6566838c1df4025461eb",
+    "stdout_sha256": "1e358590bfed7d6280970b2038bc55dc73bdd1dee1a0b2f5ce0ce8e24b5c106c",
+    "elapsed_seconds": 4.667721583973616,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 221288,
+    "rss_mib": 216.1015625,
+    "source_count": 255,
+    "decode_bytes": 55578375,
+    "write_bytes": 52797939,
+    "held_fds": 350,
+    "pins": 139,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 350,
+        "wall_ns": 126464876,
+        "process_cpu_ns": 125963045,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 350,
+        "wall_ns": 3868612876,
+        "process_cpu_ns": 3890167720,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 349,
+        "wall_ns": 159035252,
+        "process_cpu_ns": 158598551,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 350,
+        "wall_ns": 13730471,
+        "process_cpu_ns": 18601561,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=materialization path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 255 7021682 55578375 52797939 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=256 source=255 seen=255 emitted=255 admitted=255 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=40912 encoded_bytes=139941 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. All caps unchanged.",
+    "phase_rss_kib": {
+      "after_runtime": 30612,
+      "after_command": 222712,
+      "after_terminal_drop": 222712,
+      "after_runtime_drop": 222712,
+      "after_scope_drop": 220656
+    },
+    "phase_peak_mib": 217.4921875,
+    "config_sha256": "815ac2909a1757cdaa4502bc78fba6f8368a94744b849de024be91a2e2711d11",
+    "progress_refusal_record": {
+      "operation_sha256": "3e495d2178d7307c068b2ade41ad25b5d8ac91d1798f6566838c1df4025461eb",
+      "stdout_sha256": "1e358590bfed7d6280970b2038bc55dc73bdd1dee1a0b2f5ce0ce8e24b5c106c",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "materialization_frames": [
+      "WP982_MATERIALIZATION capture=captured kind=generated_file_effects reason=generated_kind workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=70 canonical_hex=72756c65735f6a6176612b2b746f6f6c636861696e732b72656d6f74655f6a646b385f6c696e75785f616172636836345f746f6f6c636861696e5f636f6e6669675f7265706f rule_repo_len=11 rule_repo_hex=72756c65735f6a6176612b rule_package_len=10 rule_package_hex=746f6f6c636861696e73 rule_target_len=26 rule_target_hex=72656d6f74655f6a6176615f7265706f7369746f72792e627a6c rule_name_len=17 rule_name_hex=5f746f6f6c636861696e5f636f6e666967 logical_root_len=none logical_root_hex=none"
+    ],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true"
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1106/design-review.md",
+      "sha256": "5103114fb6c204c66f20f315f2d9d7dfa48af58cfae6357b7739de072210cb4f"
+    },
+    "helper-review.md": {
+      "path": "target/wp1106/helper-review.md",
+      "sha256": "1119ec722c7845a5ffafbc0df8d51b27ecc74d4efecb708f93f22ac13e70c166"
+    },
+    "source-worker.md": {
+      "path": "target/wp1106/source-worker.md",
+      "sha256": "e55444cf06a3feb720275030828e0a8473e1d99fbd25a9420e208b879bcc02fe"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1106/source-prelaunch-review.md",
+      "sha256": "16df79a4dd0e3edfbe5e1c510018879835edb79c14d96ddae4326b82d4c766da"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1106/prelaunch-evidence.md",
+      "sha256": "12a1c9522cddc8923cf19d178d94e01edd49fae3c13b934dfb32959299023921"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1106/root-prelaunch.md",
+      "sha256": "dfa56abeac282b5cad31262c8b6e41a90cfa498c271b3c77cacd11da5c266160"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1106/final-source-review.md",
+      "sha256": "af5c969b1f1f11106b157d0522297e2c520c9a10eacf6243faf612b4325298e3"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1106/final-evidence-review.md",
+      "sha256": "5a5a794f05064194066357dde63d02b11b96d4a2809cb0d0811cf52fbb2f8ca4"
+    }
+  },
+  "corrections": "No source/test/gate correction; exact same profiles/caps/55 selectors, role supplements beforeONE. Two original proof bodies reused for both owners; fullplan/request identity explicit. Helpers ROOT-only rebind, prior maps/operations immutable. Reader note misses give no proof credit.",
+  "claim_limit": "Actual new original AArch64 generated-kind header omits fullSpec/attrs/ordered plan/path/content/root and grantsnothing. Source255, current139strictstablepins/350stable noninheritedFDbrackets/18env; collection notatomic. Root_compute aborted_partial/allthread windows not speed/cause/exclusiveCPU. Phase prefix 217.4921875MiB fits256 but not wholefit/wholeheap/producer completion. SourceWeak unseen expiry vacuous; Scope/Recorder/livebuffer narrow. Anonymous source identity and charge-before-body-completion limitations persist.",
+  "next": "Examine repeated same-rule toolchain descriptor variants for cohesive source-owned bounded capability rather than name-by-name patches; maintain original fullplan/binding/currentnamespace, platform execution scope and resource limits.",
+  "goal": "Active/incomplete; broader configured producer/certificate/analysis/actions/Rustc/M7A/bootstrap remain open.",
+  "elapsed_since_design_binding_seconds": 576.843384,
+  "reviewed_candidate": {
+    "path": "target/wp1106/receipt-reviewed.json",
+    "sha256": "570937b4f599c237e1582c8c338fb2b970b4e1fbc07cae0cf6aedd7e703a7266"
+  },
+  "accepted_at_utc": "2026-10-11T00:43:11.119033+00:00"
+}

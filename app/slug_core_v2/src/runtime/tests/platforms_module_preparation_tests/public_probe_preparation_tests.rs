@@ -312,7 +312,7 @@ fn namespace_policy(
         return policy;
     }
     #[cfg(target_os = "linux")]
-    if let Some(plan) = bodies.local_jdk_file_plan(request) {
+    if let Some(plan) = bodies.qualified_java_file_plan(request) {
         let path = demand.path().as_path();
         let root = view.generation_root();
         let path_class = if path == root {
@@ -2846,16 +2846,28 @@ fn java_proxy_generated_request(
     request
 }
 #[cfg(target_os = "linux")]
-fn local_jdk_test_request(
+fn java_file_plan_test_request(
     bodies: &Bodies,
     plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    remote: bool,
 ) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
     let mut request = java_proxy_generated_request(bodies, plan);
-    request.id.canonical_repo =
-        slug_identity_v2::CanonicalRepoName::new("rules_java++toolchains+local_jdk").unwrap();
-    request.repo_spec.rule_id.bzl_file =
-        CanonicalLabel::parse("@@rules_java+//toolchains:local_java_repository.bzl").unwrap();
-    request.repo_spec.rule_id.rule_name = "_local_java_repository_rule".into();
+    let (canonical, label, rule) = if remote {
+        (
+            "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo",
+            "@@rules_java+//toolchains:remote_java_repository.bzl",
+            "_toolchain_config",
+        )
+    } else {
+        (
+            "rules_java++toolchains+local_jdk",
+            "@@rules_java+//toolchains:local_java_repository.bzl",
+            "_local_java_repository_rule",
+        )
+    };
+    request.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(canonical).unwrap();
+    request.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(label).unwrap();
+    request.repo_spec.rule_id.rule_name = rule.into();
     // Synthetic semantic attributes are retained, not guessed native attribute filters.
     request.repo_spec.attributes = Arc::new(
         [(
@@ -2870,12 +2882,19 @@ fn local_jdk_test_request(
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
+    for remote in [false, true] {
+        assert_java_file_effects_are_bounded_and_opt_in(remote);
+    }
+}
+#[cfg(target_os = "linux")]
+fn assert_java_file_effects_are_bounded_and_opt_in(remote: bool) {
+    let make_request = |bodies: &Bodies, plan| java_file_plan_test_request(bodies, plan, remote);
     use immutable_archive_preparation::JAVA_DIGEST;
     use immutable_archive_preparation::JAVA_URL;
     use immutable_archive_preparation::PROTOBUF_URL;
     let path = |s| NormalizedAbsolutePath::new(s).unwrap();
     let bodies = java_proxy_test_bodies();
-    let valid = SourcePreparationNeeds::repository(local_jdk_test_request(
+    let valid = SourcePreparationNeeds::repository(make_request(
         &bodies,
         small_generated_plan(&[
             ("BUILD", b"synthetic", false),
@@ -2892,7 +2911,7 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
         panic!();
     };
     assert!(std::ptr::eq(
-        bodies.local_jdk_file_plan(original).unwrap(),
+        bodies.qualified_java_file_plan(original).unwrap(),
         original_plan
     ));
     assert!(
@@ -2901,10 +2920,16 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
             .is_none()
     );
     assert!(bodies.admit(&valid).is_ok());
-    let mut changed = local_jdk_test_request(
+    let mut changed = make_request(
         &bodies,
         small_generated_plan(&[("BUILD", b"different valid content", true)]),
     );
+    assert_eq!(original.repo_spec, changed.repo_spec);
+    let RepositoryMaterializationKind::GeneratedFileEffects(changed_plan) = &changed.kind else {
+        panic!();
+    };
+    assert_ne!(original_plan, changed_plan);
+    assert_ne!(original.as_ref(), &changed); // Plan changes are full request identity.
     changed.repo_spec.attributes = Arc::new(
         [(
             compact_str::CompactString::new("different"),
@@ -3016,7 +3041,7 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
             assert!(std::ptr::eq(first, offender.as_ref()));
         }
     };
-    for case in 0..7 {
+    for case in 0..11 {
         let mut wrong = original.as_ref().clone();
         match case {
             0 => wrong.id.workspace = path("/other"),
@@ -3026,21 +3051,38 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
                         .unwrap()
             }
             2 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@other+//toolchains:local_java_repository.bzl").unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                    "@@other+//toolchains:remote_java_repository.bzl"
+                } else {
+                    "@@other+//toolchains:local_java_repository.bzl"
+                })
+                .unwrap()
             }
             3 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@rules_java+//private:local_java_repository.bzl")
-                        .unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                    "@@rules_java+//private:remote_java_repository.bzl"
+                } else {
+                    "@@rules_java+//private:local_java_repository.bzl"
+                })
+                .unwrap()
             }
             4 => {
-                wrong.repo_spec.rule_id.bzl_file =
-                    CanonicalLabel::parse("@@rules_java+//toolchains:Local_java_repository.bzl")
-                        .unwrap()
+                wrong.repo_spec.rule_id.bzl_file = CanonicalLabel::parse(if remote {
+                    "@@rules_java+//toolchains:Remote_java_repository.bzl"
+                } else {
+                    "@@rules_java+//toolchains:Local_java_repository.bzl"
+                })
+                .unwrap()
             }
-            5 => wrong.repo_spec.rule_id.rule_name = "_local_java_repository_rule_extra".into(),
-            _ => {
+            5 => {
+                wrong.repo_spec.rule_id.rule_name = if remote {
+                    "_toolchain_config_extra"
+                } else {
+                    "_local_java_repository_rule_extra"
+                }
+                .into()
+            }
+            6 => {
                 let mut mapping = slug_identity_v2::RepositoryMapping::new(
                     slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
                 );
@@ -3048,11 +3090,31 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
                     slug_identity_v2::ApparentRepoName::new("java").unwrap(),
                     slug_identity_v2::CanonicalRepoName::new("rules_java+").unwrap(),
                 );
-                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
-                    "@java//toolchains:local_java_repository.bzl",
-                )
-                .unwrap()
-                .resolve(&mapping);
+                wrong.repo_spec.rule_id.bzl_file =
+                    slug_identity_v2::ApparentLabel::parse(if remote {
+                        "@java//toolchains:remote_java_repository.bzl"
+                    } else {
+                        "@java//toolchains:local_java_repository.bzl"
+                    })
+                    .unwrap()
+                    .resolve(&mapping);
+            }
+            7..=9 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(match case {
+                    7 => "rules_java++toolchains+remote_jdk8_windows_toolchain_config_repo",
+                    8 => "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo_extra",
+                    _ => "rules_java++toolchains+remote_jdk11_linux_toolchain_config_repo",
+                })
+                .unwrap();
+            }
+            _ => {
+                // Either valid tuple's canonical name with the other tuple's rule is closed.
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(if remote {
+                    "rules_java++toolchains+local_jdk"
+                } else {
+                    "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo"
+                })
+                .unwrap();
             }
         }
         let bad = SourcePreparationNeeds::repository(wrong);
@@ -3060,7 +3122,7 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
         reject(bad);
     }
     let reject_plan = |plan| {
-        reject(SourcePreparationNeeds::repository(local_jdk_test_request(
+        reject(SourcePreparationNeeds::repository(make_request(
             &bodies, plan,
         )))
     };
@@ -3099,19 +3161,15 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
     };
     let short: Vec<_> = (0..9).map(|i| format!("f{i}")).collect();
     let empty: Arc<[u8]> = Arc::from(&b""[..]);
-    let max_rows = SourcePreparationNeeds::repository(local_jdk_test_request(
-        &bodies,
-        make_plan(&short[..8], &empty),
-    ));
+    let max_rows =
+        SourcePreparationNeeds::repository(make_request(&bodies, make_plan(&short[..8], &empty)));
     assert!(bodies.admit(&max_rows).is_ok());
     reject_plan(make_plan(&short, &empty));
     let long: Vec<_> = (0..5)
         .map(|i| format!("{}{i}", "x".repeat(GENERATED_PLAN_PATH_BYTES - 1)))
         .collect();
-    let exact = SourcePreparationNeeds::repository(local_jdk_test_request(
-        &bodies,
-        make_plan(&long[..4], &shared),
-    ));
+    let exact =
+        SourcePreparationNeeds::repository(make_request(&bodies, make_plan(&long[..4], &shared)));
     assert!(bodies.admit(&exact).is_ok()); // Exact per-field and aggregate ceilings, sharing one body.
     let mut sum_over = long[..4].to_vec();
     sum_over.push("y".to_owned()); // Exact path sum ceiling plus one.
@@ -3172,6 +3230,13 @@ fn local_jdk_file_effects_are_bounded_and_opt_in() {
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_namespace_is_current_and_declared_only() {
+    for remote in [false, true] {
+        assert_java_namespace_is_current_and_declared_only(remote);
+    }
+}
+#[cfg(target_os = "linux")]
+fn assert_java_namespace_is_current_and_declared_only(remote: bool) {
+    let make_request = |bodies: &Bodies, plan| java_file_plan_test_request(bodies, plan, remote);
     let bodies = java_proxy_test_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
@@ -3179,7 +3244,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
     let body_weak = Arc::downgrade(&content);
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
     builder.push("nested/BUILD".into(), content, false).unwrap();
-    let request = Arc::new(local_jdk_test_request(&bodies, builder.finish()));
+    let request = Arc::new(make_request(&bodies, builder.finish()));
     let request_weak = Arc::downgrade(&request);
     let attributes_weak = Arc::downgrade(&request.repo_spec.attributes);
     let instance = slug_workspace_v2::PathObservationInstanceId::new(17);
@@ -3355,7 +3420,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
             .with_ignore_file_bytes(RegistryChoice::DefaultBcr, CommandChoice::Modules);
         let declared = namespace_test_epoch_at(
             &disabled,
-            [Arc::new(local_jdk_test_request(
+            [Arc::new(make_request(
                 &disabled,
                 small_generated_plan(&[
                     ("REPO.bazel", b"synthetic", false),
@@ -3389,7 +3454,7 @@ fn local_jdk_namespace_is_current_and_declared_only() {
     ] {
         let malformed = namespace_test_epoch_at(
             &bodies,
-            [Arc::new(local_jdk_test_request(&bodies, plan))],
+            [Arc::new(make_request(&bodies, plan))],
             instance,
             "/parent/B",
         );

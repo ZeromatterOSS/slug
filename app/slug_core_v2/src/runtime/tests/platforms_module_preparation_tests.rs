@@ -969,7 +969,7 @@ impl Bodies {
         self.first_denied_materialization_with_plan_matcher(needs, &generated_features_plan_matches)
     }
     #[cfg(target_os = "linux")]
-    fn local_jdk_file_plan<'a>(
+    fn qualified_java_file_plan<'a>(
         &self,
         request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
     ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
@@ -979,18 +979,27 @@ impl Bodies {
             || !self.rules_rust_defs_import_sources
             || request.id.workspace != self.roots[0]
             || label.mapping_id().is_some()
-            || (
-                request.id.canonical_repo.as_str(),
-                label.package().repo().as_str(),
-                label.package().package().as_str(),
-                label.target().as_str(),
-                request.repo_spec.rule_id.rule_name.as_str(),
-            ) != (
-                "rules_java++toolchains+local_jdk",
-                "rules_java+",
-                "toolchains",
-                "local_java_repository.bzl",
-                "_local_java_repository_rule",
+            || !matches!(
+                (
+                    request.id.canonical_repo.as_str(),
+                    label.package().repo().as_str(),
+                    label.package().package().as_str(),
+                    label.target().as_str(),
+                    request.repo_spec.rule_id.rule_name.as_str(),
+                ),
+                (
+                    "rules_java++toolchains+local_jdk",
+                    "rules_java+",
+                    "toolchains",
+                    "local_java_repository.bzl",
+                    "_local_java_repository_rule",
+                ) | (
+                    "rules_java++toolchains+remote_jdk8_linux_toolchain_config_repo",
+                    "rules_java+",
+                    "toolchains",
+                    "remote_java_repository.bzl",
+                    "_toolchain_config",
+                )
             )
             || !immutable_archive_preparation::native_java_proxy_binding(self)
         {
@@ -1185,7 +1194,7 @@ impl Bodies {
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
                     #[cfg(target_os = "linux")]
-                    if self.local_jdk_file_plan(request).is_some() {
+                    if self.qualified_java_file_plan(request).is_some() {
                         continue;
                     }
                     if self

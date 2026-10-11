@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-317-m7a-local-jdk-ignore-marker-metadata
-Status: accepted — local JDK metadata cleared; generated producer next
+Packet: WP-7-318-m7a-java-linux-toolchain-file-plan
+Status: accepted — qualified Java File plan; FINAL source/evidence ACCEPT
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-local JDK root metadata:55 proofs, production check and ONE217.207MiB prefix,
-254sources. Next actual prerequisite is the generated remote JDK8 Linux toolchain
-configuration repository; original full request/plan assessment precedes any
-admission. Common-edit Core builds37.85/39.57s are below the recurring three-minute
-review signal. Full producer/M7A/bootstrap completion remains open.
+shared borrowed File-plan validation for the two qualified Java owners. Current
+55 proofs/prod7.373s/Core28.738s and ONE4.668s/source255/217.492MiB phase prefix
+reach the next original AArch64 configuration descriptor. The successor examines
+a cohesive producer-owned descriptor capability. Full producer/M7A/bootstrap
+completion remains open.
 
 ### Ready and blocked queue
 
