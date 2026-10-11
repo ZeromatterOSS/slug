@@ -70,19 +70,19 @@ def test_portable_driver_receives_checked_deadline_limits(deadline: int) -> None
 
 def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> None:
     verified = verify_fixture()
-    assert len(verified.objects) == 28
+    assert len(verified.objects) == 31
     assert len(verified.registry_entries) == 177
-    assert verified.total_bytes == 8_004_740
+    assert verified.total_bytes == 9_024_310
     assert (
         verified.inventory_sha256
-        == "4337d0756cefc0971a76e12bbeea54ee40c24beb0ff943a4c3bdc60d88ed764f"
+        == "d6d047c1f454671f4258aedbb7a55193115aaefc60a789a0ac9a1ce6b045f06a"
     )
 
     destination = tmp_path / "assembled"
     receipt = assemble(destination)
-    assert receipt["object_count"] == 28
+    assert receipt["object_count"] == 31
     assert receipt["registry_metadata_count"] == 177
-    assert receipt["source_bytes"] == 8_004_740
+    assert receipt["source_bytes"] == 9_024_310
     assert receipt["inventory_sha256"] == verified.inventory_sha256
     assert "local_path_override" not in (destination / "workspace/MODULE.bazel").read_text()
     assert (destination / "workspace/BUILD.bazel").read_text().endswith(
@@ -111,6 +111,14 @@ def test_authentic_fixture_verifies_and_assembles_offline(tmp_path: Path) -> Non
     assert (
         destination
         / "mirror/github.com/bazelbuild/rules_java/releases/download/9.1.0/rules_java-9.1.0.tar.gz"
+    ).is_file()
+    assert (
+        destination
+        / "mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz"
+    ).is_file()
+    assert (
+        destination
+        / "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
     ).is_file()
     assert json.loads((destination / "inventory.json").read_text()) == receipt
     with pytest.raises(FixtureError, match="already exists"):

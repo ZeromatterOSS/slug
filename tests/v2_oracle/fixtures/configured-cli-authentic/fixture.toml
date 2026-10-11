@@ -20,7 +20,7 @@ verification_command = "python3 tools/v2_oracle/configured_cli_fixture.py prove 
 
 [authentic]
 inventory_version = 1
-total_source_bytes = 8004740
+total_source_bytes = 9024310
 historical_probe_sha256 = "8eef40138afa23caa2601b89e6006de40f7e6d139f40124f4c2c430ae5fdf0a2"
 candidate_commit = "27e9e9c0c"
 candidate_patch_sha256 = "90c725e40a7aa46f5f0e81112bfe5f91a429679d9bd3824ae7dda9417725d94e"
@@ -274,3 +274,34 @@ sha256 = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
 size = 11358
 source_url = "https://github.com/bazelbuild/rules_shell/releases/download/v0.6.1/rules_shell-v0.6.1.tar.gz#rules_shell-0.6.1/LICENSE"
 kind = "license"
+
+[[objects]]
+source = "mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz"
+destination = "mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz"
+sha256 = "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da"
+size = 1007915
+source_url = "https://github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz"
+kind = "archive"
+
+[[objects]]
+source = "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
+destination = "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
+sha256 = "a9ffb62ba1d8e9ebad5225bd2cde6e8ff20688060fff8d14133ca9bb237fb48b"
+size = 298
+source_url = "https://bcr.bazel.build/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
+kind = "patch"
+
+[[objects]]
+source = "licenses/rules_python-LICENSE"
+destination = "licenses/rules_python-LICENSE"
+sha256 = "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+size = 11357
+source_url = "https://github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz#rules_python-1.7.0/LICENSE"
+kind = "license"
+
+[[patch_checks]]
+archive = "mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz"
+member = "rules_python-1.7.0/MODULE.bazel"
+patch = "registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch"
+expected = "modules/rules_python/1.7.0/MODULE.bazel"
+preimage_sha256 = "66055eda07edd4446faaa3fa7868810cafc0c9224c929be04dfc433194c007de"

@@ -1,0 +1,384 @@
+{
+  "packet": "WP-7-323-m7a-python-archive-preparation",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "baseline": "30e1e0089975f83587671aebe5718dbaf3dbc8fe",
+  "compatibility": "Slug-native finite private Linux-test admission/backing; existing normal verified patch-before-MODULE/exact source integrity unchanged; Windows/JVM deferred.",
+  "outcome": "Original qualified probe crossed rules_python+ immutable archive boundary and reached next genuine environment Need RULES_PYTHON_BZLMOD_DEBUG.",
+  "source": {
+    "authorities": 51,
+    "changed": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/source_service/offline_archive.rs",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs",
+      "tests/v2_oracle/test_configured_cli_fixture.py",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/fixture.toml",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/licenses/rules_python-LICENSE"
+    ],
+    "unchanged": 41,
+    "sha256": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "824ea1f56e521b9230cb6fc9f21f79b5479caa5ee7f87822388774121e4214d1",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "ca5f9060f1e97ff65284f04474477bd776c62e8805096f1edb0345a30b1058e9",
+      "app/slug_core_v2/src/runtime/source_service/offline_archive.rs": "da10ff8a94d6acae47cde80c8a509c3e320f4ec56fc2706abafcdc63eebfe089",
+      "app/slug_core_v2/src/runtime/source_service/scope.rs": "95c8c39555ac3e197e081dcf3ea2b2c9b74f9d4e259d176f835fad699c6e471c",
+      "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": "c349008bb6af9a5c04fea351a032746bfaf37f36628aa0f0dae5fab20c7e6bec",
+      "app/slug_core_v2/src/runtime/repository_archive_realize.rs": "be7e8886710456279d436d7abc2eb1e3d0669cef419d2b41bdfd0e3cffff543b",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "2271f7413efc6d3062007f56f2731e151a41338b21fa04751f5b1b3f910bfd4b",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/immutable_archive_namespace.rs": "5fe5d6122ef25b0e5bbf48b056fdccfae9e92c34746b9ffaf4d3877f74e2080d",
+      "app/slug_loading_v2/src/bzl_module.rs": "40e48c5123de15c6f40ec1e5976b4894eef8d6096daa48009ad95fd85e39f7bc",
+      "app/slug_loading_v2/src/bzl_module/external_bzl_syntax.rs": "f4aac200f3367bf7a633f6967e5812622d7bbef9552de3c2797d936864689294",
+      "app/slug_loading_v2/src/host_package_load_tests/external_bzl_frontier_tests.rs": "a7de68d3a1e3858e5f2cba5ecdd851a76e1c1a373d7ac9e62c16fbdff1b0f826",
+      "app/slug_core_v2/src/runtime/probe_observer.rs": "6c3b2b7446e676281d0a4643c62a094db02e75dda491af0c7e9c06a15096f357",
+      "app/slug_core_v2/src/runtime/probe_observer/mapping.rs": "a65ab2f8f5b3f693cda65f3187350e503f775828bb8838720bfe33aa947eec2d",
+      "app/slug_core_v2/src/runtime/tests/probe_observer_tests.rs": "4b38ca52251b7c88a66b5d2e6d298225f590d39976beab15dbae5ffd78335525",
+      "app/slug_core_v2/src/runtime/dice.rs": "d09dd15814e74bd7bc5d08ba0d62e8e918ff66315fda8179a427805927fe17ee",
+      "app/slug_loading_v2/src/host_package_load_tests.rs": "a726e7833dfced5b43d1d17d82fd1b76065431008a0558791019e701544a70f7",
+      "app/slug_core_v2/src/runtime/source_service/regular_file.rs": "7e2f8f89dad916f30144bb53a70fab3054bc3e835638f9f914116461b6c10016",
+      "app/slug_core_v2/src/runtime/path_observation.rs": "c478a7c0b5bcc1eacca84e2c8b9e1c6ae45d8d58e4a82fc1b166445c66834b83",
+      "app/slug_core_v2/src/runtime/path_observation/scoped_directory.rs": "f9c0ed8553a963102a6fbd692cf52d055cf0a1efee57de83525c6aa7e1d990ee",
+      "app/slug_core_v2/src/runtime/input_image_bridge.rs": "8412150c5e2f4ad00ceed3e30a8bc0d84f5636e3215d2b7415f275de311761a8",
+      "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+      "app/slug_core_v2/src/runtime/source_service/timeout_provenance/tests.rs": "6419cfb29331221ee8bed723e95dbf7fa1f0287ea6e147db02ec94d3aa89fe09",
+      "app/slug_core_v2/src/runtime/repository_host_input.rs": "88564e5b2e9639b8d0d905d8a547c1e3c05759459d2b41fbfc45808469cd2774",
+      "app/slug_core_v2/src/runtime/tests/repository_host_input_tests.rs": "a7c349439c9cec36f0ef5a12aeb041ca2f8551725c1ba8284c93e76eaeab159a",
+      "app/slug_core_v2/src/runtime/repository_io.rs": "5ffd3ded81841588752e494e95454663c4d1bb7a247df7297007421228573893",
+      "app/slug_loading_v2/src/module_extension_repository_file_effect.rs": "81875333ac139a6b4bc516dd0d0ac0ea045fad583904d83a419b6d4ce350319a",
+      "app/slug_bzlmod_v2/src/source_preparation.rs": "1866efa21e23c21ea48cb42891f46bb64600429b41af1a8b8b733c5eda28ed57",
+      "app/slug_bzlmod_v2/src/selected_extension_download.rs": "44c676a94fa0bd7f300f4c508c7d45f12c5a783db89b477dfd8c457ec023dea9",
+      "app/slug_bzlmod_v2/src/repository_execute.rs": "6759efe76818e5fb0dc00edf86d596d7e19160b4f38b16c64801efa98a0361f8",
+      "app/slug_bzlmod_v2/src/selected_extension_tool_sources.rs": "c00002c821b97d9978067895957331afd0355eea61b33ee4b4657f94ea527400",
+      "app/slug_loading_v2/src/bzl_module/root_package_syntax.rs": "e177ec072c16eeafb76cbb34660e7116a1319ce337966241b7b841e5e0cf58a2",
+      "app/slug_loading_v2/src/host_package_load_tests/root_package_syntax_tests.rs": "ff6e0f1b6fb2639f187cb33f5682114153787a377ccb8ae8dd5d41dd74e037bb",
+      "app/slug_loading_v2/src/host_package_attempt_tests.rs": "7834cd7716a180b12783035b88c8a7b75986c3411eb0385d9a0e89df4494d918",
+      "app/slug_core_v2/src/runtime/progress_refusal_diagnostic.rs": "faa3dfa5f94f130a8f637b7244e2d95f10ff6288cb7396a5b3ee4b0babfa55fe",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests/progress_refusal_tests.rs": "3c8184b3c1af8334fd318eef40872e62bc5f8e7851b1359ea29c3ec721f9a793",
+      "app/slug_loading_v2/src/bzl_module/module_extension_definition_loading_tests/frontier_tests.rs": "0a83568c3bc15aef53156670a5b07d058664413b693836a73e07dccf872ac52a",
+      "Cargo.lock": "9d9c8304f87f98e20627a2af4e41864ebe190c7f6eb21c290c49f6c7ca441242",
+      "Cargo.toml": "9dc646f397f638644d5967a47fb4b7319bcbe8f6360824ff390b82518330495b",
+      "rust-toolchain": "05fa54110629eb712d06ba6dd76a2e286f741500dccc5e9a6bfd1a25200b8a28",
+      ".cargo/config.toml": "c2350bb8e87a9b5bfc8a3ebc7e5a0c5b42d96be6888c59b039a1fc841c611abf",
+      "app/slug_bzlmod_v2/Cargo.toml": "7924949d4515fa69e1e3f9f0a9647ac43b5f3dd33f39bfaf009cca70ff52c12e",
+      "app/slug_loading_v2/Cargo.toml": "5af8ae9fffd743c683605ca78d9b9b9c8c29ebd7af6ec40a7fc2da4f4a16d06c",
+      "app/slug_core_v2/Cargo.toml": "805c8b2f2a138a7dc59b3a9e92303fa98bfc16e3c48ed70a7e582879364daadb",
+      "app/slug_cli_v2/Cargo.toml": "afad59f2c37c7d078f699453c7651cc6a88d49791204b7a238a521dd449f7f31",
+      "app/slug_core_v2/src/runtime/source_service/source_charge_census.rs": "17e433cbf831f12558da16dce439224e98b13b9e25c8d4b198106c08512f9026",
+      "app/slug_core_v2/src/runtime/tests/repository_archive_file_session_tests.rs": "9677ea90c72a13fa0c7762899357fcaa05ba66e454277c997ebc8e610eea827f",
+      "tests/v2_oracle/test_configured_cli_fixture.py": "07b6d46dd6fd2f045675763214c9c58ed745fdf4d15603c3133e1d37fee4bcac",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/fixture.toml": "c06e46b9f6a8235b2e873038d8dacc6958d4b13497fcca9e1b11bfd2ed43d881",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz": "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch": "a9ffb62ba1d8e9ebad5225bd2cde6e8ff20688060fff8d14133ca9bb237fb48b",
+      "tests/v2_oracle/fixtures/configured-cli-authentic/licenses/rules_python-LICENSE": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1"
+    },
+    "caller_ids": 8,
+    "changed_caller": [
+      "1"
+    ],
+    "retention": "Scope472/8 (+8B fixedslot), Bodies256/8, Pythonbinding24/8, slots24/8, ArchiveBacking56/8; constructor-owned Arc/sharedpaths released at Scope lastDrop. No policyStrings/requestcopy/newcache/interner/key/lock. Existing normal executionplanString ownership retained."
+  },
+  "inputs": {
+    "source_prefix": 350,
+    "held_sources": 352,
+    "environment_entries": 18,
+    "source_vector_sha256": "a649e5535126ca84c1bff29d84384150ced79b01e7de7b398d26d4da6cfb8a48",
+    "fixture": {
+      "added_files": 3,
+      "added_bytes": 1019570,
+      "total_source_bytes": 9024310,
+      "original_held_sources": 350,
+      "extended_held_sources": 352,
+      "patch_prepared": "target/wp954/registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch",
+      "provenance": "Verbatim exact public archive/patch and archive LICENSE; existing bundle MODULE reused; four patch checks. No synthesized archive, Spec rewrite or duplicate selected metadata."
+    },
+    "preparation": {
+      "inputs": [
+        {
+          "path": "/run/media/system/Colossus/dev/slug/target/wp1111/rules_python-1.7.0.tar.gz",
+          "sha256": "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+          "bytes": 1007915,
+          "identity": [
+            66308,
+            161360912,
+            1007915,
+            1791683275009218944,
+            1791683275009218944
+          ]
+        },
+        {
+          "path": "/run/media/system/Colossus/dev/slug/target/wp1111/module_dot_bazel_version.patch",
+          "sha256": "a9ffb62ba1d8e9ebad5225bd2cde6e8ff20688060fff8d14133ca9bb237fb48b",
+          "bytes": 298,
+          "identity": [
+            66308,
+            161360928,
+            298,
+            1791683275161168237,
+            1791683275161168237
+          ]
+        },
+        {
+          "path": "/run/media/system/Colossus/dev/slug/target/wp954/registry/modules/rules_python/1.7.0/MODULE.bazel",
+          "sha256": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
+          "bytes": 13673,
+          "identity": [
+            66308,
+            160958218,
+            13673,
+            1791337778487185994,
+            1791337778487185994
+          ]
+        },
+        {
+          "path": "/run/media/system/Colossus/dev/slug/target/wp954/registry/modules/rules_python/1.7.0/source.json",
+          "sha256": "028a084b65dcf8f4dc4f82f8778dbe65df133f234b316828a82e060d81bdce32",
+          "bytes": 369,
+          "identity": [
+            66308,
+            160958649,
+            369,
+            1791337779045180420,
+            1791337779045180420
+          ]
+        }
+      ],
+      "decoded_bytes": 5969920,
+      "decoded_upper_bound": 5983891,
+      "regular_payload_bytes": 4082911,
+      "written_upper_bound": 5118470,
+      "remaining_decoded": 11478463,
+      "remaining_written": 14255765,
+      "module_preimage_sha256": "66055eda07edd4446faaa3fa7868810cafc0c9224c929be04dfc433194c007de",
+      "patched_module_sha256": "d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8",
+      "license_sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+      "qualification": "Whole gzip stream and conservative incremental transform bounds only; existing graph remainder and whole workload fit unproved. Initial written bound omitted one MODULE installation; use explicit accounting_correction.corrected_archive_transform_written_bound=5132143. Original captured record preserved.",
+      "full_record_sha256": "f2a7fa31805186d55dc3b957bdd933a5d3a40a38e3230db9a7adc29838b4eafc"
+    },
+    "accounting_correction": {
+      "original_helper_sha256": "8f3eb02060530f380d84537ab53f88009854a618c3a58ce05bb8d9fe5a4a8158",
+      "original_feasibility_sha256": "f2a7fa31805186d55dc3b957bdd933a5d3a40a38e3230db9a7adc29838b4eafc",
+      "error": "Initial conservative written bound counted verified MODULE capture and patch rewrite but omitted separate final MODULE installation.",
+      "omitted_module_install_bytes": 13673,
+      "original_written_bound": 5118470,
+      "corrected_archive_transform_written_bound": 5132143,
+      "remaining_written": 14255765,
+      "native_written_delta": 5132143,
+      "arithmetic_only": true,
+      "qualification": "Original helper/feasibility/config/operations/logs remain frozen. Saved-metadata correction only; no helper rerun, new acquisition, source/cap change or native replay. Corrected bound still feasible; actual native309sources/decoded61853085/written57985242 below64MiB. Later Loading decoded-source reads are additional to archive-only estimate and remain scope-accounted."
+    }
+  },
+  "validation": {
+    "focused": {
+      "selected": 74,
+      "passed": 74,
+      "families": {
+        "loading": {
+          "selected": 26,
+          "passed": 26,
+          "elapsed_seconds": 0.30930458998773247,
+          "operation_sha256": "a681e542444b037d9ff678c1b0eb022aa3ec32451f7914070c022ba3b5ca5098"
+        },
+        "bzlmod": {
+          "selected": 7,
+          "passed": 7,
+          "elapsed_seconds": 0.12153167207725346,
+          "operation_sha256": "b7a36250efc8a6b13509603318664120d2f838ca6ceb9dd9917856bd5fb9cdad"
+        },
+        "core": {
+          "selected": 41,
+          "passed": 41,
+          "elapsed_seconds": 0.23671020695474,
+          "operation_sha256": "29a5a01ca3d36483c3c1a76503e11197e9f8a4b3d2a3d37b3e2ad13904d90a59"
+        }
+      },
+      "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+    },
+    "fixture_tests": {
+      "full_batch": {
+        "selected": 10,
+        "passed": 7,
+        "failed": 3,
+        "stdout_sha256": "78e8a245ee768e40a8f00f658b0433c70a4cd32bdf7f25d1ca1b448cc35239ac"
+      },
+      "focused": {
+        "selected": 7,
+        "passed": 7,
+        "deselected": 3,
+        "elapsed_seconds": 0.23,
+        "stdout_sha256": "ded8d4a4c8c00c3252d64cd4bfb98fc81f1e7aa64d3883e7bab8fc6cbd3c4a57"
+      },
+      "unproved": "Unchanged portable_driver_receives_checked_deadline_limits[1,12,30]: script preflight requires strace, absent in PATH; separate non-native limits-only invocation exited1 before output. No driverchange/install/fake tool or native credit.",
+      "invocation_recovery": "System and bundledPython lackedpytest; use existing cached pure-Python pytest with PYTHONDONTWRITEBYTECODE=1 and explicitPYTHONPATH; no packageinstall."
+    },
+    "preparation": {
+      "operations": {
+        "compile-bzlmod-r1": {
+          "seconds": 0.10691380000207573,
+          "deadline_seconds": null,
+          "operation_sha256": "f3602032349539dcd17b7ab8910313e861e3c83e54c1ad4856b3186de235c235",
+          "over_three_minutes": false
+        },
+        "compile-loading": {
+          "seconds": 0.11794470704626292,
+          "deadline_seconds": null,
+          "operation_sha256": "0ad4e1109fa9daddd92ff4ae249206a86457cd37f3a1718dcf2503954a91aa11",
+          "over_three_minutes": false
+        },
+        "compile-core": {
+          "seconds": 53.78057068400085,
+          "deadline_seconds": null,
+          "operation_sha256": "95c1c3f71f73f156553a5873952e62cf874438cab8d854666807d065198fdd94",
+          "over_three_minutes": false
+        },
+        "production-check": {
+          "seconds": 7.558252576971427,
+          "deadline_seconds": null,
+          "operation_sha256": "076cca2ace118b994eb3fd65536d2996492c234fe7dd9810fb4758f292d34c80",
+          "over_three_minutes": false
+        }
+      },
+      "compiler_memory": "Preparation only; runtimecap256MiB unchanged.",
+      "workflow": "Source/review/bookkeeping routinely exceeds180s; reuse existingcohort/8filetests/scaffolding and batch controls. Actualsource/Corecompile53.781s+prod7.558s, sourcepolicy117lines/test298plus transport57net. Three rootfreeze count assertions corrected before currentgates; earlycachedBzlmod compile hasnoacceptancecredit; selectornamespace corrected and newr1gates preserveoldlogs. No identicalnative replay."
+    },
+    "native": {
+      "operation_sha256": "78e52ae1eb71034d1361dc5d65f2a9403b3de2d77211bb5e22a2c7e3ed70b455",
+      "stdout_sha256": "7b7a3cd30190b2698d3c49360a9d6e430b02166202b10db4f29835830d43adcb",
+      "elapsed_seconds": 15.673620727029629,
+      "selected": 1,
+      "passed": 1,
+      "rss_kib": 236368,
+      "rss_mib": 230.828125,
+      "source_count": 309,
+      "decode_bytes": 61853085,
+      "write_bytes": 57985242,
+      "held_fds": 352,
+      "pins": 154,
+      "pins_stable": true,
+      "source_brackets_stable": true,
+      "collection_atomic": false,
+      "joined": true,
+      "owned_group_empty": true,
+      "observer_version": 2,
+      "status": 524288,
+      "intervals": [
+        {
+          "category": "injection_revision",
+          "interval_count": 655,
+          "wall_ns": 340275166,
+          "process_cpu_ns": 338839354,
+          "qualifications": [],
+          "qualified": false
+        },
+        {
+          "category": "root_compute",
+          "interval_count": 655,
+          "wall_ns": 14506372050,
+          "process_cpu_ns": 14639429266,
+          "qualifications": [
+            "aborted_partial"
+          ],
+          "qualified": true
+        },
+        {
+          "category": "acquisition_merge",
+          "interval_count": 654,
+          "wall_ns": 277055669,
+          "process_cpu_ns": 276307965,
+          "qualifications": [],
+          "qualified": false
+        },
+        {
+          "category": "idle_drain",
+          "interval_count": 655,
+          "wall_ns": 42093965,
+          "process_cpu_ns": 51476364,
+          "qualifications": [],
+          "qualified": false
+        }
+      ],
+      "facts": {
+        "WP942_STAGE": "WP942_STAGE native_refusal",
+        "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+        "WP942_DENIED": "WP942_DENIED family=environment path_len=none path_hex=none capture=missing",
+        "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+        "WP938_SCOPE": "WP938_SCOPE None 105 235521 309 8043568 61853085 57985242 2114200 11679580",
+        "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+        "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=309 seen=309 emitted=309 admitted=309 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=42574 encoded_bytes=155916 accounting_complete=true identity_complete=false"
+      },
+      "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Memory/byte/source caps unchanged; explicit native26s/work20/qualifiedcleanup23 time checkpoint.",
+      "phase_rss_kib": {
+        "after_runtime": 28684,
+        "after_command": 237864,
+        "after_terminal_drop": 237864,
+        "after_runtime_drop": 237864,
+        "after_scope_drop": 235808
+      },
+      "phase_peak_mib": 232.2890625,
+      "config_sha256": "022fef266a1d5f217faedd4cf2555498c8749e54ee42c3648cce75fbd4f84f38",
+      "progress_refusal_record": {
+        "operation_sha256": "78e52ae1eb71034d1361dc5d65f2a9403b3de2d77211bb5e22a2c7e3ed70b455",
+        "stdout_sha256": "7b7a3cd30190b2698d3c49360a9d6e430b02166202b10db4f29835830d43adcb",
+        "marker_sha256": null,
+        "record": null,
+        "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+      },
+      "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+      "materialization_frames": [],
+      "environment_frames": [
+        "WP1024_ENVIRONMENT capture=captured workspace_matches=true workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 names_count=1 names_bytes=25",
+        "WP1024_ENVIRONMENT_NAME ordinal=1 name_len=25 name_hex=52554c45535f505954484f4e5f425a4c4d4f445f4445425547"
+      ],
+      "next_boundary": {
+        "family": "environment",
+        "names": [
+          "RULES_PYTHON_BZLMOD_DEBUG"
+        ],
+        "values": "not acquired by root; header alone grants no admission"
+      }
+    }
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1111/design-review.md",
+      "sha256": "1e9a245a9ea5ca74b3e7fe50c850fd6e7fa6ca5dab22360fb54ae09113508b5b"
+    },
+    "helper-review.md": {
+      "path": "target/wp1111/helper-review.md",
+      "sha256": "f26641507671c997fb3550b77e4fca04bce046fcf9d8f5aab29e89615df23045"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1111/source-prelaunch-review.md",
+      "sha256": "22ac2977ed6c5cc5f51c375de7ac36bfbdf9391ced17486516c4cb83eba0c30e"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1111/prelaunch-evidence.md",
+      "sha256": "d4b116706b8b2dff5bf5ebf49794769b5d64bb277e381d9116f6829b5275db47"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1111/root-prelaunch.md",
+      "sha256": "7554b3d226cf99e5ec5c06a14b512132153cc755cdb3571433fda82bf365e37b"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1111/final-evidence-review.md",
+      "sha256": "f1bf2c2ad346c795cbbdcdd7cbbb01f2cfc57e2dc3ce40e496dfae9968e4a8d1"
+    }
+  },
+  "limits": "Unchanged RSS256MiB/AS512MiB/source512/census513/decodedwritten64MiB/all transfer/live/registry/directory/logcaps; work20/scope23/outer26, ordinary10/prepnull/grace3. No quota/time/RSS growth.",
+  "failures_and_corrections": [
+    "Default publicfetch DNS failure, approved networkexception exactpublicinputs success; no auto-review rejection.",
+    "System and bundledPython lackedpytest; cached read-onlypurePython runtime recovered. Full10fixturebatch7pass/3unchanged portablepreflight failures from missingstrace; focused7pass, three remainunproved.",
+    "Rootfreeze count/missingfixturemanifest assertions corrected beforecurrent51freeze; accidentalearlycachedBzlmod operationnoacceptancecredit, freshcompile-r1.",
+    "Corefile-test namespace selector corrected beforepreflight; oldmaps/logs preserved, fresh r1strictfamilypins.",
+    "Preparationwritten arithmetic omitted finalMODULEinstallation13673B; originalhelpers/config/operationmaps frozen; savedcorrection5132143<remaining14255765, nativeactualtotal57985242<64MiB; no replay orsource/capchange.",
+    "PRELAUNCH reviewer metadatareader indentationerror1 beforeevaluation, corrected reader only; no workloadcredit."
+  ],
+  "residual": "Full compilerproducer/certificate/observations/analysis/actions/Rustc/M7A/bootstrap/whole-workload fit unproved. ActualsourceWeak unseen, expiry vacuous; Scope/recorder expiry+livebufferzero narrow. Observer partialroot all-thread intervals notexclusive/perkey/cause/frequency/speed. Environmentname projection grantsno authority orabsence/value; originalnormalowner remains. Three unrelatedportable-driver tests environment-unproved.",
+  "packet_elapsed_seconds": 1011.4788272380829,
+  "reviewed_receipt_sha256": "d11a7245fa1b30b708a38ecd957ddad5a598d66f9d07ddce698c37cd117ee348",
+  "next_research": {
+    "path": "target/wp1111/next-owner-research.md",
+    "sha256": "b052f5cb01e2fb3ad0b51f0c5daa07a6dbba2afa2cd613925908d41ace1cec04",
+    "next": "Exact qualified RULES_PYTHON_BZLMOD_DEBUG name capability using existing transaction snapshot/retry/restoration owners; source-only research, independentDESIGN pending. No ambient value read or forcedabsence."
+  }
+}

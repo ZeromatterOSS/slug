@@ -557,6 +557,7 @@ struct Bodies {
     offline_archive: Option<Arc<OfflineArchiveBacking>>,
     offline_archive_module: Option<NormalizedAbsolutePath>,
     java_offline_archive: Option<immutable_archive_preparation::ArchiveBinding>,
+    python_offline_archive: Option<immutable_archive_preparation::PythonArchiveBinding>,
 }
 #[derive(Debug)]
 struct Denied {
@@ -1423,6 +1424,7 @@ impl Bodies {
             offline_archive: None,
             offline_archive_module: None,
             java_offline_archive: None,
+            python_offline_archive: None,
         }
     }
     fn with_visible_lockfile_metadata(mut self, choice: RegistryChoice) -> Self {
@@ -1864,7 +1866,10 @@ impl Bodies {
         cleanup_deadline: Instant,
         limits: SourceServiceLimits,
     ) -> Result<Arc<SourceServiceScope>, SourceServiceError> {
-        if self.offline_archive.is_some() || self.java_offline_archive.is_some() {
+        if self.offline_archive.is_some()
+            || self.java_offline_archive.is_some()
+            || self.python_offline_archive.is_some()
+        {
             return SourceServiceScope::new_for_test_with_offline_archives(
                 workspace,
                 work_deadline,
@@ -1877,6 +1882,9 @@ impl Bodies {
                     self.java_offline_archive
                         .as_ref()
                         .map(|b| b.backing.clone()),
+                    self.python_offline_archive
+                        .as_ref()
+                        .map(|b| b.archive.backing.clone()),
                 ],
                 false,
             );
@@ -3491,6 +3499,33 @@ fn observe_native_command(
             ),
             module,
         );
+        bodies = immutable_archive_preparation::configure_python(
+            bodies,
+            registry_choice,
+            command,
+            OfflineArchiveBacking::new(
+                immutable_archive_preparation::PYTHON_URL,
+                immutable_archive_preparation::PYTHON_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                        .join(
+                            immutable_archive_preparation::PYTHON_URL
+                                .strip_prefix("https://")
+                                .unwrap(),
+                        ),
+                )
+                .unwrap(),
+            ),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::PYTHON_PREPARED_MODULE),
+            )
+            .unwrap(),
+            NormalizedAbsolutePath::new(
+                project.join(immutable_archive_preparation::PYTHON_PREPARED_PATCH),
+            )
+            .unwrap(),
+        );
     }
     let bodies = Arc::new(bodies);
     println!(
@@ -3528,6 +3563,10 @@ fn observe_native_command(
                 .java_offline_archive
                 .as_ref()
                 .map(|b| b.backing.clone()),
+            bodies
+                .python_offline_archive
+                .as_ref()
+                .map(|b| b.archive.backing.clone()),
         ],
         true,
     )

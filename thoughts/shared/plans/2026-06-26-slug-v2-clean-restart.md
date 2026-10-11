@@ -34,16 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-322-m7a-qualified-native-readiness-window
-Status: accepted — FINAL source/evidence ACCEPT; next Python archive provenance
+Packet: WP-7-323-m7a-python-archive-preparation
+Status: accepted — FINAL source/evidence ACCEPT; next Python environment capability
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records the accepted
-[qualified readiness window](./slug-v2-subplans/wp1110-qualified-native-readiness-window-2026-10-11.json).
-Actual63 proofs/prod passed; ONE14.960s/source291/phase229.672MiB under256 reached
-immutable rules_python+ archive materialization. No quota/WorkDeadline; exacttyped
-projection has a nonempty remoteMODULEpatch/strip1, requiring byte/provenance gates.
-Explicit20/23/26 timecheckpoint, all memory/byte/source caps unchanged. Fullproducer/
-M7A remains open.
+The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
+[Python archive preparation](./slug-v2-subplans/wp1111-python-archive-preparation-2026-10-11.json).
+Current74 Rustproofs/productioncompile and7relevantfixturetests passed. ONE15.674s/
+source309/phase232.289MiB under256 crossed the exact original Pythonarchive/patch;
+next genuine Need is RULES_PYTHON_BZLMOD_DEBUG. All memory/byte/source/time caps
+unchanged; source-only environment capability research ready. Full producer/M7A open.
 
 ### Ready and blocked queue
 

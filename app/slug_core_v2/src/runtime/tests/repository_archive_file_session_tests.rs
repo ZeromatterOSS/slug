@@ -764,6 +764,7 @@ fn selected_bcr_offline_session_refuses_mismatch_foreign_cancel_and_resource_lim
 #[test]
 fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     const SECOND_URL: &str = "https://example.invalid/original/second.tar.gz";
+    const THIRD_URL: &str = "https://example.invalid/original/third.tar.gz";
     let (first, first_backing) = selected_bcr_offline_session_fixture();
     let (mut second, _) = selected_bcr_offline_session_fixture();
     let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
@@ -808,8 +809,24 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         sha2::Sha256::digest(&second.archive_bytes).into(),
         NormalizedAbsolutePath::new(second.archive.clone()).unwrap(),
     );
-    let fixtures = [first, second];
-    let backings = [first_backing, second_backing];
+    let mut third = selected_bcr_file_session_fixture();
+    let attrs = Arc::make_mut(&mut third.spec.attributes);
+    attrs.shift_remove("type");
+    attrs.insert(
+        "urls".into(),
+        OverrideAttributeValue::Iterable(Arc::new([selected_bcr_file_session_value(THIRD_URL)])),
+    );
+    // Preserve its original overlay -> strip1 patch -> prepared MODULE pipeline.
+    let third_patch = std::fs::read(&third.patch).unwrap();
+    let third_overlay = std::fs::read(&third.overlay).unwrap();
+    let transform_bytes = (third_patch.len() + third_overlay.len()) as u64;
+    let third_backing = OfflineArchiveBacking::new(
+        THIRD_URL,
+        sha2::Sha256::digest(&third.archive_bytes).into(),
+        NormalizedAbsolutePath::new(third.archive.clone()).unwrap(),
+    );
+    let fixtures = [first, second, third];
+    let backings = [first_backing, second_backing, third_backing];
     assert_ne!(backings[0].integrity(), backings[1].integrity());
     let weak_backings = backings.each_ref().map(Arc::downgrade);
     let workspace_root = tempfile::tempdir().unwrap();
@@ -830,19 +847,40 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             false,
         )
     };
-    for duplicate in [
-        backings[0].clone(),
-        OfflineArchiveBacking::new(
-            backings[0].original_url(),
-            *backings[1].integrity(),
-            backings[1].path().clone(),
-        ),
-    ] {
-        assert_eq!(
-            make_scope([Some(backings[0].clone()), Some(duplicate)], limits).err(),
-            Some(SourceServiceError::InvalidLimits)
+    for (left, right) in [(0, 1), (0, 2), (1, 2)] {
+        for duplicate in [
+            backings[left].clone(),
+            OfflineArchiveBacking::new(
+                backings[left].original_url(),
+                [0; 32],
+                backings[right].path().clone(),
+            ),
+        ] {
+            let mut slots = [None, None, None];
+            slots[left] = Some(backings[left].clone());
+            slots[right] = Some(duplicate);
+            assert_eq!(
+                make_scope(slots, limits).err(),
+                Some(SourceServiceError::InvalidLimits)
+            );
+        }
+        assert!(
+            backings
+                .iter()
+                .all(|backing| Arc::strong_count(backing) == 1)
         );
     }
+    let previous = make_scope(
+        [Some(backings[0].clone()), Some(backings[1].clone()), None],
+        limits,
+    )
+    .unwrap();
+    assert!(
+        previous
+            .offline_archive_path_for_test(THIRD_URL, backings[2].integrity())
+            .is_none()
+    );
+    drop(previous);
     let scope = make_scope(backings.each_ref().map(|b| Some(b.clone())), limits).unwrap();
     let weak_scope = Arc::downgrade(&scope);
     for backing in &backings {
@@ -861,6 +899,11 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     );
     assert!(
         scope
+            .offline_archive_path_for_test(THIRD_URL, &[0; 32])
+            .is_none()
+    );
+    assert!(
+        scope
             .offline_archive_path_for_test(
                 "https://example.invalid/unknown.tar.gz",
                 backings[0].integrity()
@@ -870,6 +913,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
     let requests = [
         selected_bcr_file_session_request(&workspace, "cohort-a", fixtures[0].spec.clone()),
         selected_bcr_file_session_request(&workspace, "cohort-b", fixtures[1].spec.clone()),
+        selected_bcr_file_session_request(&workspace, "cohort-c", fixtures[2].spec.clone()),
     ];
     let request_weaks = requests.each_ref().map(Arc::downgrade);
     let runtime = selected_bcr_file_session_runtime();
@@ -891,7 +935,7 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
             .unwrap();
         let (root, instance) = immutable_result(&materializer, request.id.canonical_repo.as_str());
         let view = epoch
-            .borrowed_instance_for_namespace(&workspace, instance, 2)
+            .borrowed_instance_for_namespace(&workspace, instance, 3)
             .unwrap()
             .unwrap();
         assert!(std::ptr::eq(view.request(), request.as_ref()));
@@ -905,10 +949,10 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         );
         assert_eq!(
             std::fs::read(root.join("value.txt")).unwrap(),
-            if index == 0 {
-                b"archive\n".as_slice()
-            } else {
-                b"second archive\n".as_slice()
+            match index {
+                0 => b"archive\n".as_slice(),
+                1 => b"second archive\n".as_slice(),
+                _ => fixtures[2].patched_value.as_slice(),
             }
         );
         if index == 0 {
@@ -919,14 +963,17 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         .each_ref()
         .map(|r| immutable_result(&materializer, r.id.canonical_repo.as_str()));
     assert_ne!(roots[0].1, roots[1].1);
+    assert_ne!(roots[0].1, roots[2].1);
+    assert_ne!(roots[1].1, roots[2].1);
     let counters = scope.snapshot();
-    assert_eq!(counters.source_attempts, 4);
+    assert_eq!(counters.source_attempts, 8);
     assert_eq!(
         counters.transferred_bytes,
         fixtures
             .iter()
             .map(|f| (f.archive_bytes.len() + f.module_bytes.len()) as u64)
             .sum::<u64>()
+            + transform_bytes
     );
     assert_eq!(counters.live_buffer_bytes, 0);
     assert_eq!(scope.check(), Ok(()));
@@ -935,6 +982,8 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         std::fs::remove_file(&fixture.archive).unwrap();
         std::fs::remove_file(&fixture.module).unwrap();
     }
+    std::fs::remove_file(&fixtures[2].patch).unwrap();
+    std::fs::remove_file(&fixtures[2].overlay).unwrap();
     let reuse = begin_empty(&materializer);
     for (index, request) in requests.iter().enumerate() {
         materializer
@@ -971,6 +1020,8 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         std::fs::write(&fixture.archive, &fixture.archive_bytes).unwrap();
         std::fs::write(&fixture.module, &fixture.module_bytes).unwrap();
     }
+    std::fs::write(&fixtures[2].patch, &third_patch).unwrap();
+    std::fs::write(&fixtures[2].overlay, &third_overlay).unwrap();
     let first = first_counters.unwrap();
     let counter_value = |snapshot: crate::runtime::dice::source_service::SourceServiceCounters,
                          counter| match counter {
@@ -1057,8 +1108,8 @@ fn selected_bcr_offline_cohort_materializes_original_https_and_retires() {
         "WP1084_OFFLINE_COHORT_LAYOUT backing={}/{} slots={}/{} scope={}/{}",
         std::mem::size_of::<OfflineArchiveBacking>(),
         std::mem::align_of::<OfflineArchiveBacking>(),
-        std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 2]>(),
-        std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 2]>(),
+        std::mem::size_of::<[Option<Arc<OfflineArchiveBacking>>; 3]>(),
+        std::mem::align_of::<[Option<Arc<OfflineArchiveBacking>>; 3]>(),
         std::mem::size_of::<SourceServiceScope>(),
         std::mem::align_of::<SourceServiceScope>()
     );

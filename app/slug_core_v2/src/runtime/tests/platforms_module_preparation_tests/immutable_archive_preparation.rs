@@ -24,9 +24,25 @@ pub(super) const JAVA_DIGEST: [u8; 32] = [
     0x4e, 0x1a, 0x28, 0xa2, 0x5c, 0x2e, 0xfa, 0x53, 0x50, 0x0c, 0x92, 0x8d, 0x22, 0xce, 0xff, 0xbc,
     0x50, 0x5d, 0xd9, 0x5b, 0x33, 0x5a, 0x2d, 0x02, 0x58, 0x36, 0xa2, 0x93, 0xb5, 0x92, 0x21, 0x2f,
 ];
+pub(super) const PYTHON_URL: &str = "https://github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz";
+const PYTHON_SRI: &str = "sha256-9gnzQdbpCQuYGz9FMk0FqBn9elpWQ0+EnHYZcc4sR9o=";
+const PYTHON_MODULE_SRI: &str = "sha256-0B+ZXs0Ter8wI4rZzpf4/DrFconIskvQv1MyTZN6FPg=";
+const PYTHON_PATCH_SRI: &str = "sha256-qf+2K6HY6eutUiW9LN5uj/IGiAYP/40UEzypuyN/tIs=";
+pub(super) const PYTHON_PREPARED_MODULE: &str =
+    "target/wp954/registry/modules/rules_python/1.7.0/MODULE.bazel";
+pub(super) const PYTHON_PREPARED_PATCH: &str =
+    "target/wp954/registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch";
+pub(super) const PYTHON_DIGEST: [u8; 32] = [
+    0xf6, 0x09, 0xf3, 0x41, 0xd6, 0xe9, 0x09, 0x0b, 0x98, 0x1b, 0x3f, 0x45, 0x32, 0x4d, 0x05, 0xa8,
+    0x19, 0xfd, 0x7a, 0x5a, 0x56, 0x43, 0x4f, 0x84, 0x9c, 0x76, 0x19, 0x71, 0xce, 0x2c, 0x47, 0xda,
+];
 pub(super) struct ArchiveBinding {
     pub(super) backing: Arc<OfflineArchiveBacking>,
     pub(super) module: NormalizedAbsolutePath,
+}
+pub(super) struct PythonArchiveBinding {
+    pub(super) archive: ArchiveBinding,
+    pub(super) patch: NormalizedAbsolutePath,
 }
 struct ArchiveDescriptor {
     canonical: &'static str,
@@ -36,8 +52,9 @@ struct ArchiveDescriptor {
     strip_prefix: &'static str,
     module_integrity: &'static str,
     prepared_module: &'static str,
+    patch_integrity: Option<&'static str>,
 }
-static ARCHIVES: [ArchiveDescriptor; 2] = [
+static ARCHIVES: [ArchiveDescriptor; 3] = [
     ArchiveDescriptor {
         canonical: "protobuf+",
         url: PROTOBUF_URL,
@@ -46,6 +63,7 @@ static ARCHIVES: [ArchiveDescriptor; 2] = [
         strip_prefix: "protobuf-33.4",
         module_integrity: MODULE_SRI,
         prepared_module: PREPARED_MODULE,
+        patch_integrity: None,
     },
     ArchiveDescriptor {
         canonical: "rules_java+",
@@ -55,6 +73,17 @@ static ARCHIVES: [ArchiveDescriptor; 2] = [
         strip_prefix: "",
         module_integrity: JAVA_MODULE_SRI,
         prepared_module: JAVA_PREPARED_MODULE,
+        patch_integrity: None,
+    },
+    ArchiveDescriptor {
+        canonical: "rules_python+",
+        url: PYTHON_URL,
+        digest: &PYTHON_DIGEST,
+        integrity: PYTHON_SRI,
+        strip_prefix: "rules_python-1.7.0",
+        module_integrity: PYTHON_MODULE_SRI,
+        prepared_module: PYTHON_PREPARED_MODULE,
+        patch_integrity: Some(PYTHON_PATCH_SRI),
     },
 ];
 fn binding(
@@ -70,8 +99,24 @@ fn binding(
             .java_offline_archive
             .as_ref()
             .map(|b| (&b.backing, &b.module)),
+        2 => bodies
+            .python_offline_archive
+            .as_ref()
+            .map(|b| (&b.archive.backing, &b.archive.module)),
         _ => None,
     }
+}
+fn native_python_binding(project: &Path, binding: &PythonArchiveBinding) -> bool {
+    native_binding(
+        project,
+        &ARCHIVES[2],
+        &binding.archive.backing,
+        &binding.archive.module,
+    ) && binding
+        .patch
+        .as_path()
+        .strip_prefix(project)
+        .is_ok_and(|relative| relative == Path::new(PYTHON_PREPARED_PATCH))
 }
 fn native_binding(
     project: &Path,
@@ -118,6 +163,10 @@ pub(super) fn native_byte_budget_backing(bodies: &Bodies) -> bool {
             .java_offline_archive
             .as_ref()
             .is_none_or(|b| native_binding(project, &ARCHIVES[1], &b.backing, &b.module))
+        && bodies
+            .python_offline_archive
+            .as_ref()
+            .is_none_or(|b| native_python_binding(project, b))
 }
 
 fn string_is(value: Option<&OverrideAttributeValue>, expected: &str) -> bool {
@@ -149,6 +198,19 @@ pub(super) fn matches(
     };
     let label = &request.repo_spec.rule_id.bzl_file;
     let attrs = &request.repo_spec.attributes;
+    let patches_match = match descriptor.patch_integrity {
+        None => matches!(attrs.get("remote_patches"), Some(OverrideAttributeValue::Map(values)) if values.is_empty())
+            && matches!(attrs.get("remote_patch_strip"), Some(OverrideAttributeValue::Int(0))),
+        Some(integrity) => bodies.python_offline_archive.as_ref().is_some_and(|binding| {
+            matches!(attrs.get("remote_patches"), Some(OverrideAttributeValue::Map(values)) if values.len() == 1
+                && values.iter().all(|(key, value)| {
+                    matches!(key, slug_bzlmod_v2::OverrideAttributeKey::String(url)
+                        if url.as_str().strip_prefix("file://").is_some_and(|path| Some(path) == binding.patch.as_path().to_str()))
+                        && string_is(Some(value), integrity)
+                }))
+                && matches!(attrs.get("remote_patch_strip"), Some(OverrideAttributeValue::Int(1)))
+        }),
+    };
     request.id.workspace == bodies.roots[0]
         && matches!(&request.kind, RepositoryMaterializationKind::Immutable)
         && label.mapping_id().is_none()
@@ -161,13 +223,13 @@ pub(super) fn matches(
         && singleton(attrs.get("urls")) == Some(descriptor.url)
         && string_is(attrs.get("integrity"), descriptor.integrity)
         && string_is(attrs.get("strip_prefix"), descriptor.strip_prefix)
-        && ["remote_patches", "remote_file_urls", "remote_file_integrity"].into_iter().all(|key| {
+        && patches_match
+        && ["remote_file_urls", "remote_file_integrity"].into_iter().all(|key| {
             matches!(attrs.get(key), Some(OverrideAttributeValue::Map(values)) if values.is_empty())
         })
         && singleton(attrs.get("remote_module_file_urls")).and_then(|url| url.strip_prefix("file://"))
             .is_some_and(|path| Some(path) == module.as_path().to_str())
         && string_is(attrs.get("remote_module_file_integrity"), descriptor.module_integrity)
-        && matches!(attrs.get("remote_patch_strip"), Some(OverrideAttributeValue::Int(0)))
 }
 
 pub(super) fn configure(
@@ -193,6 +255,22 @@ pub(super) fn configure_java(
 ) -> Bodies {
     if public_probe_preparation_tests::offline_archive_native_role(registry, command) {
         bodies.java_offline_archive = Some(ArchiveBinding { backing, module });
+    }
+    bodies
+}
+pub(super) fn configure_python(
+    mut bodies: Bodies,
+    registry: RegistryChoice,
+    command: CommandChoice,
+    backing: Arc<OfflineArchiveBacking>,
+    module: NormalizedAbsolutePath,
+    patch: NormalizedAbsolutePath,
+) -> Bodies {
+    if public_probe_preparation_tests::offline_archive_native_role(registry, command) {
+        bodies.python_offline_archive = Some(PythonArchiveBinding {
+            archive: ArchiveBinding { backing, module },
+            patch,
+        });
     }
     bodies
 }
@@ -288,16 +366,53 @@ mod tests {
         java
     }
 
+    fn python_request() -> RepositoryMaterializationRequest {
+        let mut python = request();
+        python.id.canonical_repo = CanonicalRepoName::new("rules_python+").unwrap();
+        let string = |s: &str| OverrideAttributeValue::String(s.into());
+        let list = |s: &str| OverrideAttributeValue::Iterable(Arc::new([string(s)]));
+        for (key, value) in [
+            ("urls", list(PYTHON_URL)),
+            ("integrity", string(PYTHON_SRI)),
+            ("strip_prefix", string("rules_python-1.7.0")),
+            (
+                "remote_module_file_urls",
+                list("file:///prepared/python/MODULE.bazel"),
+            ),
+            ("remote_module_file_integrity", string(PYTHON_MODULE_SRI)),
+            (
+                "remote_patches",
+                OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(
+                    slug_bzlmod_v2::OverrideAttributeKey::String(
+                        "file:///prepared/python/version.patch".into(),
+                    ),
+                    string(PYTHON_PATCH_SRI),
+                )]))),
+            ),
+            ("remote_patch_strip", OverrideAttributeValue::Int(1)),
+        ] {
+            Arc::make_mut(&mut python.repo_spec.attributes).insert(key.into(), value);
+        }
+        python
+    }
+
     #[test]
     fn immutable_archive_cohort_preserves_original_identity_and_defaults() {
-        let bodies = configure_java(
-            configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+        let bodies = configure_python(
+            configure_java(
+                configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe),
+                RegistryChoice::PreparedFile,
+                CommandChoice::PublicProbe,
+                OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
+                path("/prepared/java/MODULE.bazel"),
+            ),
             RegistryChoice::PreparedFile,
             CommandChoice::PublicProbe,
-            OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
-            path("/prepared/java/MODULE.bazel"),
+            OfflineArchiveBacking::new(PYTHON_URL, PYTHON_DIGEST, path("/python.tar.gz")),
+            path("/prepared/python/MODULE.bazel"),
+            path("/prepared/python/version.patch"),
         );
-        let original = [request(), java_request()];
+        let original = [request(), java_request(), python_request()];
         for r in &original {
             let attrs = r.repo_spec.attributes.clone();
             let owners = Arc::strong_count(&attrs);
@@ -309,6 +424,152 @@ mod tests {
             );
             assert!(Arc::ptr_eq(&attrs, &r.repo_spec.attributes));
             assert_eq!(Arc::strong_count(&attrs), owners);
+        }
+        let python = &original[2];
+        for key in python.repo_spec.attributes.keys() {
+            for replacement in [Some(OverrideAttributeValue::Bool(false)), None] {
+                let mut wrong = python.clone();
+                let attrs = Arc::make_mut(&mut wrong.repo_spec.attributes);
+                if let Some(value) = replacement {
+                    attrs.insert(key.clone(), value);
+                } else {
+                    attrs.shift_remove(key);
+                }
+                assert!(!matches(&bodies, &wrong), "python {key}");
+            }
+        }
+        let patch_key = |s: &str| slug_bzlmod_v2::OverrideAttributeKey::String(s.into());
+        let sri = || OverrideAttributeValue::String(PYTHON_PATCH_SRI.into());
+        let patch = |key: slug_bzlmod_v2::OverrideAttributeKey, value: OverrideAttributeValue| {
+            OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter([(key, value)])))
+        };
+        for (key, value) in [
+            (
+                "urls",
+                original[1]
+                    .repo_spec
+                    .attributes
+                    .get("urls")
+                    .unwrap()
+                    .clone(),
+            ),
+            ("integrity", OverrideAttributeValue::String(JAVA_SRI.into())),
+            (
+                "strip_prefix",
+                OverrideAttributeValue::String("rules_python-1.7.0/".into()),
+            ),
+            (
+                "remote_module_file_urls",
+                original[1]
+                    .repo_spec
+                    .attributes
+                    .get("remote_module_file_urls")
+                    .unwrap()
+                    .clone(),
+            ),
+            (
+                "remote_module_file_integrity",
+                OverrideAttributeValue::String(JAVA_MODULE_SRI.into()),
+            ),
+            ("remote_patch_strip", OverrideAttributeValue::Int(0)),
+            ("remote_patch_strip", OverrideAttributeValue::Int(2)),
+            (
+                "remote_patches",
+                OverrideAttributeValue::Map(Arc::new(SmallMap::new())),
+            ),
+            (
+                "remote_patches",
+                patch(patch_key("file:///prepared/foreign.patch"), sri()),
+            ),
+            (
+                "remote_patches",
+                patch(
+                    patch_key("file:///prepared/python/version.patch"),
+                    OverrideAttributeValue::String(JAVA_SRI.into()),
+                ),
+            ),
+            (
+                "remote_patches",
+                patch(
+                    patch_key("file:///prepared/python/version.patch"),
+                    OverrideAttributeValue::Bool(false),
+                ),
+            ),
+            (
+                "remote_patches",
+                patch(
+                    slug_bzlmod_v2::OverrideAttributeKey::Label(
+                        CanonicalLabel::parse("@@r//p:f").unwrap(),
+                    ),
+                    sri(),
+                ),
+            ),
+        ] {
+            let mut wrong = python.clone();
+            Arc::make_mut(&mut wrong.repo_spec.attributes).insert(key.into(), value);
+            assert!(!matches(&bodies, &wrong), "python crossed {key}");
+        }
+        for reverse in [false, true] {
+            let mut rows = [
+                (patch_key("file:///prepared/python/version.patch"), sri()),
+                (patch_key("file:///prepared/extra.patch"), sri()),
+            ];
+            if reverse {
+                rows.swap(0, 1);
+            }
+            let mut wrong = python.clone();
+            Arc::make_mut(&mut wrong.repo_spec.attributes).insert(
+                "remote_patches".into(),
+                OverrideAttributeValue::Map(Arc::new(SmallMap::from_iter(rows))),
+            );
+            assert!(!matches(&bodies, &wrong));
+        }
+        for case in 0..9 {
+            let mut wrong = python.clone();
+            match case {
+                0 => wrong.id.workspace = path("/foreign"),
+                1 => {
+                    wrong.id.canonical_repo = CanonicalRepoName::new("rules_python_other+").unwrap()
+                }
+                2 => wrong.repo_spec.rule_id.rule_name = "other".into(),
+                3 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@other//tools/build_defs/repo:http.bzl").unwrap()
+                }
+                4 => {
+                    Arc::make_mut(&mut wrong.repo_spec.attributes)
+                        .insert("extra".into(), OverrideAttributeValue::None);
+                }
+                5 => {
+                    wrong.kind = RepositoryMaterializationKind::Local {
+                        logical_root: path("/python"),
+                    }
+                }
+                6 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@bazel_tools//other:http.bzl").unwrap()
+                }
+                7 => {
+                    wrong.repo_spec.rule_id.bzl_file =
+                        CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:other.bzl")
+                            .unwrap()
+                }
+                _ => {
+                    let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                        slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                    );
+                    mapping.insert(
+                        slug_identity_v2::ApparentRepoName::new("bazel_tools").unwrap(),
+                        CanonicalRepoName::new("bazel_tools").unwrap(),
+                    );
+                    wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                        "@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap()
+                    .resolve(&mapping);
+                }
+            }
+            assert!(!matches(&bodies, &wrong), "python identity {case}");
         }
         for (key, value) in [
             (
@@ -347,40 +608,76 @@ mod tests {
             (RegistryChoice::DefaultBcr, CommandChoice::PublicProbe),
             (RegistryChoice::PreparedFile, CommandChoice::Modules),
         ] {
-            let disabled = configure_java(
-                configured(registry, command),
+            let disabled = configure_python(
+                configure_java(
+                    configured(registry, command),
+                    registry,
+                    command,
+                    OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
+                    path("/prepared/java/MODULE.bazel"),
+                ),
                 registry,
                 command,
-                OfflineArchiveBacking::new(JAVA_URL, JAVA_DIGEST, path("/java.tar.gz")),
-                path("/prepared/java/MODULE.bazel"),
+                OfflineArchiveBacking::new(PYTHON_URL, PYTHON_DIGEST, path("/python.tar.gz")),
+                path("/prepared/python/MODULE.bazel"),
+                path("/prepared/python/version.patch"),
             );
             assert!(disabled.java_offline_archive.is_none());
             assert!(!matches(&disabled, &original[0]));
             assert!(!matches(&disabled, &original[1]));
+            assert!(disabled.python_offline_archive.is_none());
+            assert!(!matches(&disabled, &original[2]));
         }
         let single = configured(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
         assert!(matches(&single, &original[0]));
         assert!(!matches(&single, &original[1]));
+        assert!(!matches(&single, &original[2]));
         let bad = SourcePreparationNeeds::repository(crossed);
-        let good = SourcePreparationNeeds::repository(original[0].clone())
+        let previous = SourcePreparationNeeds::repository(original[0].clone())
             .try_union(&SourcePreparationNeeds::repository(original[1].clone()))
             .unwrap();
+        let good = previous
+            .try_union(&SourcePreparationNeeds::repository(original[2].clone()))
+            .unwrap();
         assert!(bodies.admit(&good).is_ok());
-        for mixed in [good.try_union(&bad).unwrap(), bad.try_union(&good).unwrap()] {
-            let calls = std::cell::Cell::new(0);
-            assert!(
-                bodies
-                    .admit_with_plan_matcher(&mixed, &|_, _| {
-                        calls.set(calls.get() + 1);
-                        false
-                    })
-                    .is_err()
-            );
-            assert_eq!(calls.get(), 0);
+        let mut wrong_patch = python.clone();
+        Arc::make_mut(&mut wrong_patch.repo_spec.attributes)
+            .insert("remote_patch_strip".into(), OverrideAttributeValue::Int(0));
+        let bad_patch = SourcePreparationNeeds::repository(wrong_patch);
+        for (good, bad) in [(&good, &bad), (&previous, &bad_patch)] {
+            for mixed in [good.try_union(bad).unwrap(), bad.try_union(good).unwrap()] {
+                let denied = bodies.first_denied_materialization(&mixed).unwrap().0;
+                assert!(std::ptr::eq(
+                    denied,
+                    bad.repository_materializations()
+                        .values()
+                        .next()
+                        .unwrap()
+                        .as_ref()
+                ));
+                let calls = std::cell::Cell::new(0);
+                assert!(
+                    bodies
+                        .admit_with_plan_matcher(&mixed, &|_, _| {
+                            calls.set(calls.get() + 1);
+                            false
+                        })
+                        .is_err()
+                );
+                assert_eq!(calls.get(), 0);
+            }
         }
         let owners = [
             Arc::downgrade(bodies.offline_archive.as_ref().unwrap()),
             Arc::downgrade(&bodies.java_offline_archive.as_ref().unwrap().backing),
+            Arc::downgrade(
+                &bodies
+                    .python_offline_archive
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .backing,
+            ),
         ];
         let start = Instant::now();
         let scope = bodies
@@ -408,6 +705,11 @@ mod tests {
             std::mem::size_of::<ArchiveDescriptor>(),
             std::mem::align_of::<ArchiveDescriptor>(),
             ARCHIVES.len()
+        );
+        println!(
+            "WP1111_PYTHON_BINDING_LAYOUT binding={}/{}",
+            std::mem::size_of::<PythonArchiveBinding>(),
+            std::mem::align_of::<PythonArchiveBinding>()
         );
     }
 
@@ -708,6 +1010,80 @@ mod tests {
             );
         }
         cohort.java_offline_archive = None;
+        assert_eq!(native(&cohort), expected);
+        let valid_python = || PythonArchiveBinding {
+            archive: ArchiveBinding {
+                backing: backing(
+                    PYTHON_URL,
+                    PYTHON_DIGEST,
+                    NormalizedAbsolutePath::new(
+                        project
+                            .join(ARCHIVE_MIRROR)
+                            .join(PYTHON_URL.strip_prefix("https://").unwrap()),
+                    )
+                    .unwrap(),
+                ),
+                module: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_MODULE)).unwrap(),
+            },
+            patch: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_PATCH)).unwrap(),
+        };
+        cohort.java_offline_archive = Some(valid_java());
+        cohort.python_offline_archive = Some(valid_python());
+        let python = cohort.python_offline_archive.as_ref().unwrap();
+        let python_count = Arc::strong_count(&python.archive.backing);
+        let patch_pointer = python.patch.as_path() as *const Path;
+        assert_eq!(native(&cohort), expected);
+        assert_eq!(
+            cohort.native_source_work_duration(PreparedFile, PublicProbe),
+            Duration::from_secs(20)
+        );
+        assert_eq!(Arc::strong_count(&python.archive.backing), python_count);
+        assert_eq!(
+            cohort
+                .python_offline_archive
+                .as_ref()
+                .unwrap()
+                .patch
+                .as_path() as *const Path,
+            patch_pointer
+        );
+        for case in 0..5 {
+            let mut b = make();
+            let mut python = valid_python();
+            match case {
+                0 => {
+                    python.archive.backing = backing(
+                        JAVA_URL,
+                        PYTHON_DIGEST,
+                        python.archive.backing.path().dupe(),
+                    )
+                }
+                1 => {
+                    python.archive.backing =
+                        backing(PYTHON_URL, [0; 32], python.archive.backing.path().dupe())
+                }
+                2 => {
+                    python.archive.backing =
+                        backing(PYTHON_URL, PYTHON_DIGEST, path("/foreign/python.tar.gz"))
+                }
+                3 => python.archive.module = path("/foreign/MODULE.bazel"),
+                _ => python.patch = path("/foreign/version.patch"),
+            }
+            b.python_offline_archive = Some(python);
+            assert_eq!(
+                native(&b),
+                SourceServiceLimits {
+                    source_attempts: 256,
+                    ..b.source_limits(PreparedFile)
+                },
+                "python binding {case}"
+            );
+            assert_eq!(
+                b.native_source_work_duration(PreparedFile, PublicProbe),
+                Duration::from_secs(5)
+            );
+        }
+        cohort.python_offline_archive = None;
         assert_eq!(native(&cohort), expected);
         let ordinary = bodies.source_limits(PreparedFile);
         assert_eq!(ordinary.decoded_bytes, 16 << 20);
