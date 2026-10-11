@@ -2590,17 +2590,26 @@ fn java_proxy_test_bodies() -> Bodies {
     bodies
 }
 #[cfg(target_os = "linux")]
+fn environment_test_need(
+    workspace: &NormalizedAbsolutePath,
+    names: &[&str],
+) -> SourcePreparationNeeds {
+    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    SourcePreparationNeeds::environment(
+        NeedRepositoryEnvironmentNames::new(
+            workspace.dupe(),
+            RepositoryEnvironmentNameFrontier::from_unsorted(names.iter().copied().map(Into::into)),
+        )
+        .unwrap(),
+    )
+}
+#[cfg(target_os = "linux")]
 #[test]
 fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
     use immutable_archive_preparation::JAVA_DIGEST;
     use immutable_archive_preparation::JAVA_URL;
     use immutable_archive_preparation::PROTOBUF_URL;
-    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
-    use slug_bzlmod_v2::RepositoryEnvironmentCell;
-    use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
-    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
-    use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
-    use slug_bzlmod_v2::RepositoryHostInputTransaction;
     let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let selected = || {
         let mut bodies = java_proxy_test_bodies().with_rules_rust_defs_import_sources(
@@ -2610,17 +2619,7 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
         bodies.rules_cc_import_sources = false;
         bodies
     };
-    let need = |workspace: &NormalizedAbsolutePath, names: &[&str]| {
-        SourcePreparationNeeds::environment(
-            NeedRepositoryEnvironmentNames::new(
-                workspace.dupe(),
-                RepositoryEnvironmentNameFrontier::from_unsorted(
-                    names.iter().copied().map(Into::into),
-                ),
-            )
-            .unwrap(),
-        )
-    };
+    let need = environment_test_need;
     let bodies = selected();
     let java = need(&bodies.roots[0], &RULES_JAVA_ENVIRONMENT_NAMES);
     assert!(bodies.admit(&java).is_ok());
@@ -2628,8 +2627,9 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
         RULES_CC_ENVIRONMENT_NAMES.len()
             + RULES_SHELL_ENVIRONMENT_NAMES.len()
             + APPLE_SUPPORT_ENVIRONMENT_NAMES.len()
-            + RULES_JAVA_ENVIRONMENT_NAMES.len(),
-        20
+            + RULES_JAVA_ENVIRONMENT_NAMES.len()
+            + RULES_PYTHON_ENVIRONMENT_NAMES.len(),
+        21
     );
     eprintln!(
         "WP1093_JAVA_ENVIRONMENT_LAYOUT table={} row={} literal={} bodies={}/{}",
@@ -2735,16 +2735,25 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
     assert!(no_java.admit(&cc_need).is_ok());
     assert_eq!(no_java.admit(&java).unwrap_err().family, "environment");
 
+    assert_environment_frontier_observes_empty_snapshot(selected(), &RULES_JAVA_ENVIRONMENT_NAMES);
+}
+
+#[cfg(target_os = "linux")]
+fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, names: &[&str]) {
+    use slug_bzlmod_v2::RepositoryEnvironmentCell;
+    use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
+    use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
+    use slug_bzlmod_v2::RepositoryHostInputTransaction;
+    let need = environment_test_need;
     // Exercise the normal command/frontier owner with the accepted empty snapshot.
     let workspace = tempfile::tempdir().unwrap();
     let runtime = test_runtime(workspace.path()).unwrap();
     let normalized = NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap();
     let accepted = accepted_native_snapshot(&runtime);
     assert!(accepted.inputs.request.repository_environment.is_empty());
-    let mut current = selected();
     current.roots[0] = normalized.dupe();
-    let java = need(&normalized, &RULES_JAVA_ENVIRONMENT_NAMES);
-    current.admit(&java).unwrap();
+    let admitted = need(&normalized, names);
+    current.admit(&admitted).unwrap();
     let mut guard = NativeDemandAbortGuard::new(
         runtime
             .begin_native_demand_command_with_inputs(
@@ -2754,7 +2763,10 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
             .into_command(),
     );
     let bad = need(&normalized, &["UNKNOWN"]);
-    for mixed in [java.try_union(&bad).unwrap(), bad.try_union(&java).unwrap()] {
+    for mixed in [
+        admitted.try_union(&bad).unwrap(),
+        bad.try_union(&admitted).unwrap(),
+    ] {
         let denied = current.admit(&mixed).unwrap_err();
         assert!(std::ptr::eq(
             current
@@ -2771,25 +2783,24 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
             !guard
                 .command()
                 .repository_environment_frontier
-                .contains(RULES_JAVA_ENVIRONMENT_NAMES[0])
+                .contains(names[0])
         );
     }
     assert_eq!(
-        guard.progress(&java).unwrap(),
+        guard.progress(&admitted).unwrap(),
         NativeDemandProgress::Environment
     );
     assert!(matches!(
-        guard.progress(&java),
+        guard.progress(&admitted),
         Err(NativeDemandSessionError::EnvironmentInternalNonProgress)
     ));
     guard.begin_attempt().unwrap();
-    let cell =
-        RepositoryEnvironmentCellKey::new(normalized.dupe(), RULES_JAVA_ENVIRONMENT_NAMES[0]);
+    let cell = RepositoryEnvironmentCellKey::new(normalized.dupe(), names[0]);
     runtime.runtime.block_on(async {
         let data = guard.attempt_user_computation_data().unwrap();
         let carrier = data.data.get::<RepositoryHostInputTransaction>().unwrap();
         assert!(carrier.snapshot().is_empty());
-        assert!(carrier.frontier().contains(RULES_JAVA_ENVIRONMENT_NAMES[0]));
+        assert!(carrier.frontier().contains(names[0]));
         let mut updater = runtime.dice.updater_with_data(data);
         guard.inject_attempt(&mut updater).unwrap();
         let mut tx = updater.commit().await;
@@ -2807,11 +2818,7 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
     });
     let restored = guard.discard().unwrap();
     assert!(restored.snapshot().is_empty());
-    assert!(
-        !restored
-            .frontier()
-            .contains(RULES_JAVA_ENVIRONMENT_NAMES[0])
-    );
+    assert!(!restored.frontier().contains(names[0]));
     assert_current_native_snapshot(&runtime, &accepted);
     runtime.runtime.block_on(async {
         let data = runtime.user_computation_data(None).unwrap();
@@ -2829,6 +2836,178 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
         );
     });
 }
+#[cfg(target_os = "linux")]
+#[test]
+fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
+    use immutable_archive_preparation::ArchiveBinding;
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PYTHON_DIGEST;
+    use immutable_archive_preparation::PYTHON_PREPARED_MODULE;
+    use immutable_archive_preparation::PYTHON_PREPARED_PATCH;
+    use immutable_archive_preparation::PYTHON_URL;
+    use immutable_archive_preparation::PythonArchiveBinding;
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap();
+    let selected = || {
+        let mut bodies = namespace_test_bodies();
+        bodies.rules_cc_import_sources = false;
+        bodies.python_offline_archive = Some(PythonArchiveBinding {
+            archive: ArchiveBinding {
+                backing: OfflineArchiveBacking::new(
+                    PYTHON_URL,
+                    PYTHON_DIGEST,
+                    NormalizedAbsolutePath::new(
+                        project
+                            .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                            .join(PYTHON_URL.strip_prefix("https://").unwrap()),
+                    )
+                    .unwrap(),
+                ),
+                module: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_MODULE)).unwrap(),
+            },
+            patch: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_PATCH)).unwrap(),
+        });
+        bodies
+    };
+    let need = environment_test_need;
+    use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
+    use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
+    let bodies = selected();
+    assert!(
+        NeedRepositoryEnvironmentNames::new(
+            bodies.roots[0].dupe(),
+            RepositoryEnvironmentNameFrontier::default()
+        )
+        .is_err()
+    );
+    let python = need(&bodies.roots[0], &RULES_PYTHON_ENVIRONMENT_NAMES);
+    assert!(bodies.offline_archive.is_none() && bodies.java_offline_archive.is_none());
+    bodies.admit(&python).unwrap();
+    eprintln!(
+        "WP1112_PYTHON_ENVIRONMENT_LAYOUT table={} row={} literal={} bodies={}/{}",
+        std::mem::size_of_val(&RULES_PYTHON_ENVIRONMENT_NAMES),
+        std::mem::size_of::<&str>(),
+        RULES_PYTHON_ENVIRONMENT_NAMES[0].len(),
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            assert_eq!(
+                selected()
+                    .with_rules_rust_defs_import_sources(registry, command)
+                    .admit(&python)
+                    .is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    for case in 0..7 {
+        let mut closed = selected();
+        match case {
+            0 => closed.python_offline_archive = None,
+            6 => closed.rules_rust_defs_import_sources = false,
+            _ => {
+                let binding = closed.python_offline_archive.as_mut().unwrap();
+                match case {
+                    1 => {
+                        binding.archive.backing = OfflineArchiveBacking::new(
+                            JAVA_URL,
+                            PYTHON_DIGEST,
+                            binding.archive.backing.path().dupe(),
+                        )
+                    }
+                    2 => {
+                        binding.archive.backing = OfflineArchiveBacking::new(
+                            PYTHON_URL,
+                            [0; 32],
+                            binding.archive.backing.path().dupe(),
+                        )
+                    }
+                    3 => {
+                        binding.archive.backing = OfflineArchiveBacking::new(
+                            PYTHON_URL,
+                            PYTHON_DIGEST,
+                            path("/foreign/python.tar.gz"),
+                        )
+                    }
+                    4 => binding.archive.module = path("/foreign/MODULE.bazel"),
+                    _ => binding.patch = path("/foreign/module.patch"),
+                }
+            }
+        }
+        let denied = closed.admit(&python).unwrap_err();
+        assert_eq!(denied.family, "environment");
+        assert!(std::ptr::eq(
+            closed
+                .environment_diagnostic(&python, &denied)
+                .unwrap()
+                .request,
+            python.repository_environment().unwrap()
+        ));
+    }
+    assert_eq!(
+        Bodies::new(bodies.roots.clone())
+            .admit(&python)
+            .unwrap_err()
+            .family,
+        "environment"
+    );
+    assert_eq!(
+        bodies
+            .admit(&need(&path("/foreign"), &RULES_PYTHON_ENVIRONMENT_NAMES))
+            .unwrap_err()
+            .family,
+        "environment"
+    );
+    for name in [
+        "rules_python_bzlmod_debug",
+        "RULES_PYTHON_BZLMOD_DEBUG_suffix",
+        "",
+        "UNKNOWN",
+        "JAVA_HOME",
+        "TEMP",
+        "PATH",
+    ] {
+        let bad = need(&bodies.roots[0], &[name]);
+        for mixed in [
+            python.try_union(&bad).unwrap(),
+            bad.try_union(&python).unwrap(),
+        ] {
+            let denied = bodies.admit(&mixed).unwrap_err();
+            assert_eq!(denied.family, "environment");
+            assert!(denied.path.is_none());
+            assert!(std::ptr::eq(
+                bodies
+                    .environment_diagnostic(&mixed, &denied)
+                    .unwrap()
+                    .request,
+                mixed.repository_environment().unwrap()
+            ));
+        }
+    }
+    let mut combined = selected()
+        .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    combined.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
+    let java = need(&combined.roots[0], &RULES_JAVA_ENVIRONMENT_NAMES);
+    let cc = need(&combined.roots[0], &RULES_CC_ENVIRONMENT_NAMES);
+    combined
+        .admit(&python.try_union(&java).unwrap().try_union(&cc).unwrap())
+        .unwrap();
+    combined.python_offline_archive = None;
+    combined.admit(&java.try_union(&cc).unwrap()).unwrap();
+    assert_eq!(combined.admit(&python).unwrap_err().family, "environment");
+    assert_environment_frontier_observes_empty_snapshot(
+        selected(),
+        &RULES_PYTHON_ENVIRONMENT_NAMES,
+    );
+}
+
 #[cfg(target_os = "linux")]
 fn java_proxy_generated_request(
     bodies: &Bodies,

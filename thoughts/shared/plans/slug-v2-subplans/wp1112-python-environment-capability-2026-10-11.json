@@ -1,0 +1,219 @@
+{
+  "packet": "WP-7-324-m7a-python-environment-capability",
+  "status": "accepted \u2014 independentFINAL source/evidence ACCEPT",
+  "baseline": "1f0579968f9c9b56290367411265ed9e69235744",
+  "compatibility": "Slug-native private Linux-test exact-name capability; normal immutable snapshot/DICE environment/frontier semantics unchanged. Windows/JVM deferred.",
+  "outcome": "Original requested-root probe crossed RULES_PYTHON_BZLMOD_DEBUG capability and reached next original environment Need RULES_PYTHON_REPO_DEBUG. Fullproducer/M7A open.",
+  "source": {
+    "authorities": 51,
+    "changed": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs"
+    ],
+    "unchanged": 48,
+    "sha256": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "f32d58bc48cbcec3c89bbaf90954684a49e7d55a13c0d607e78592183d7291b9",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "78ccd7c7adbaf1dfac26575bb08b61cc0aecee97d014f2eab826787f83a52164",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": "3e7fadb7235e6d6bd901ed2f6b892c4661eb11013f64249039e4451ceae6c446"
+    },
+    "caller_ids_paths_digests": "All8 unchanged",
+    "policy_net_lines": 17,
+    "proof_net_lines": 179,
+    "complexity": "19lines above160estimate; compact finite Python-negative matrix plus sharedJava/Python typedNeed/lifecycle helpers; independent PRELAUNCH accepted cohesive existing owner.",
+    "ownership": "Static16B reference row/25Bliteral; Bodies256/align8 unchanged, no ownedString/request/path clone,newretainedfield/cache/interner/key/lock. Full Python qualifiedbinding borrows existingArc/path; unrelatedJava/protobuf absent positive. Scope/normalcells owners unchanged."
+  },
+  "semantic_proofs": {
+    "admission": "Exact name/workspace/wholefrontier only; defs PreparedFile/PublicProbe + full Python URL/digest/mirror/MODULE/patch qualification. Missing/malformed/source/role/foreignworkspace/case/suffix/empty/unknown/ungatedJavaCC negatives; both-order originaldiagnostic ptr/no guardmutation. Combinedindependentcapabilities stillqualify; removingPythonpreservesJava/CC.",
+    "lifecycle": "Shared existingJava/Python guard progress/nonprogress/retry; accepted syntheticempty snapshot observedNone then discardUnauthorized/fullacceptedrestore. No inference aboutactual nativevalue. Existing3runtime snapshot A/B/A/cutoff/Needretry controls executed among42."
+  },
+  "inputs": {
+    "held_sources": 352,
+    "environment_entries": 18,
+    "source_vector_sha256": "a649e5535126ca84c1bff29d84384150ced79b01e7de7b398d26d4da6cfb8a48",
+    "exact_prior_vector": "Exact ordered equality toWP1111; no inputgrowth/acquisition/corpusbody/envvalue inspection/spec rewrite."
+  },
+  "validation": {
+    "focused": {
+      "selected": 75,
+      "passed": 75,
+      "families": {
+        "bzlmod": {
+          "selected": 7,
+          "passed": 7,
+          "elapsed_seconds": 0.12153167207725346,
+          "operation_sha256": "b7a36250efc8a6b13509603318664120d2f838ca6ceb9dd9917856bd5fb9cdad",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "loading": {
+          "selected": 26,
+          "passed": 26,
+          "elapsed_seconds": 0.30930458998773247,
+          "operation_sha256": "a681e542444b037d9ff678c1b0eb022aa3ec32451f7914070c022ba3b5ca5098",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "core": {
+          "selected": 42,
+          "passed": 42,
+          "elapsed_seconds": 0.25188793207053095,
+          "operation_sha256": "948c125b6045e328ab73fa7e663c50f0f7832bdadf55c6cb28162f809da25419",
+          "evidence": "current"
+        }
+      },
+      "current_core": 42,
+      "reused_protected": 33,
+      "qualification": "CurrentCore42 actual passes/directproductioncompile; unchanged protected Bzlmod7/Loading26 evidence retained. No native completion/frequency/speed credit."
+    },
+    "preparation": {
+      "operations": {
+        "compile-core": {
+          "seconds": 46.058664574986324,
+          "deadline_seconds": null,
+          "operation_sha256": "908fa42da64b0759d9ef8147664972164315df42f41bf44f4a4424d2ad45de09",
+          "over_three_minutes": false
+        },
+        "production-check": {
+          "seconds": 7.408657597959973,
+          "deadline_seconds": null,
+          "operation_sha256": "b57fc7640dfa0e86df01aac3ff4702fa2da5e77ae8bdb8676818e9b0f6482732",
+          "over_three_minutes": false
+        }
+      },
+      "compiler_memory": "Compilation only; runtime256MiB cap unchanged.",
+      "workflow": "CurrentCore/prod only; reuse33protected and7fixture proofs without replay. Compilation46.059s/production7.409s; recurring packet authoring/review overhead exceeds180s and remains refactor signal; one shared lifecycle instead of copying, one reviewerdelta, no performance savings claim."
+    },
+    "fixture": "Reuse unchanged prior7relevant proofs, full10notpassed;3portable driver rows remain missingstrace unproved; fixture/tool/sourceobjects unchanged.",
+    "current_core": "42 current actualPASS .251887932s; unique currentfeature CargoJSONartifact/list/exactbatchedpreflight; inner testbody .08s. Directproductioncompile passed7.408658s. Protected33 qualifiedreuse; aggregate75isnot75fresh.",
+    "checks": "Planchecker/archivechecker/diffcheckPASS after currentsource; first guessed nonexistent pythonarchivecheckerpath uncredited, discovered actual scripts/v2_archive_status.sh passed; no sourcecorrection/extra Rusttest/native replay. Prior upstream patchcontextwhitespace remains pinnedverbatim; currentdiffclean."
+  },
+  "native": {
+    "operation_sha256": "444ca40ae3ae935061158c06eb584366c022e6c5ff3efe841ae018ae5f570104",
+    "stdout_sha256": "be50f78ede48432be4a579f9a76d41d15773eed8b0d0f674ec1976bda2085170",
+    "elapsed_seconds": 15.794156798045151,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 238600,
+    "rss_mib": 233.0078125,
+    "source_count": 309,
+    "decode_bytes": 61853085,
+    "write_bytes": 57985242,
+    "held_fds": 352,
+    "pins": 144,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 656,
+        "wall_ns": 343116204,
+        "process_cpu_ns": 341195987,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 656,
+        "wall_ns": 14615558187,
+        "process_cpu_ns": 14693906788,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 655,
+        "wall_ns": 280189151,
+        "process_cpu_ns": 277571260,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 656,
+        "wall_ns": 40610641,
+        "process_cpu_ns": 50273263,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=environment path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 309 8043568 61853085 57985242 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=309 seen=309 emitted=309 admitted=309 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=42574 encoded_bytes=155916 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Memory/byte/source caps unchanged; explicit native26s/work20/qualifiedcleanup23 time checkpoint.",
+    "phases_kib": {
+      "after_runtime": 30600,
+      "after_command": 240232,
+      "after_terminal_drop": 240232,
+      "after_runtime_drop": 240232,
+      "after_scope_drop": 238176
+    },
+    "phase_peak_mib": 234.6015625,
+    "environment_frames": [
+      "WP1024_ENVIRONMENT capture=captured workspace_matches=true workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 names_count=1 names_bytes=23",
+      "WP1024_ENVIRONMENT_NAME ordinal=1 name_len=23 name_hex=52554c45535f505954484f4e5f5245504f5f4445425547"
+    ],
+    "next_name": "RULES_PYTHON_REPO_DEBUG",
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "limits_qualification": "None scopeerror/firstworkfalse/no limit;309seen/emitted/admitted. Accountingcomplete true, identitycomplete false. No fullheap/producer/wholefit or nativeenvironmentvalue claim; unseenSourceWeak expiryvacuous; narrow scope/recorder/livebuffer retirement only."
+  },
+  "limits": {
+    "rss_mib": 256,
+    "as_mib": 512,
+    "qualified_source": 512,
+    "census_rows": 513,
+    "decoded_written_mib": 64,
+    "qualified_work_scope_outer_seconds": [
+      20,
+      23,
+      26
+    ],
+    "ordinary_outer_seconds": 10,
+    "preparation_seconds": null,
+    "external_grace_seconds": 3,
+    "inherited": "All transfer/live/bank/object/registry/directory/logcaps and exactoptimizationprofiles unchanged. CompilationRSS separate. No capgrowth/smallerroot/identicalnative replay."
+  },
+  "reviews": {
+    "design": {
+      "path": "target/wp1112/design-review.md",
+      "sha256": "d8b4f9f97b38d3c96920022b49592459df16425ce3909c4ee241668e339b45c1",
+      "verdict": "ACCEPT"
+    },
+    "source_helper_evidence_prelaunch": {
+      "path": "target/wp1112/prelaunch-evidence.md",
+      "sha256": "e91824c83a94f62ac779f696a3149351e8f64046d348cf89bea625a03a5ceca7",
+      "verdict": "ACCEPT"
+    },
+    "final": {
+      "path": "target/wp1112/final-evidence-review.md",
+      "sha256": "895ba48ab146ed26239d2580075782e09a20a7c2aaa7dcb184dbf5a2549212aa",
+      "verdict": "ACCEPT"
+    },
+    "review_draft_sha256": "6786f7a87d949b3a8ffdc61fa72abb9a3d5e02e47bad0e7aa43f87db52b08c5e"
+  },
+  "workflow": {
+    "elapsed_seconds_at_review_draft": 398.7799128489569,
+    "review_elapsed": "DESIGN and FINAL each self-reported approximately2min; PRELAUNCH not separatelyclocked; no exclusive attribution or measuredfrequency claim.",
+    "three_minute_signal": "Measured packet elapsed exceeds180s. Gate operations46.059sCore/7.409sprod/.252sproof/15.794snative are eachbelow180s. Remaining authoring/review/bookkeeping time notseparatelyclocked/attributed. Two sequentialPython singletonNeeds suggest source-supported finitecohort contract to reduce repeatedpacket overhead; protected33 and sharedlifecycle alreadyreused. No measuredspeedup or fabricatedfrequency claim. Frozen preparation-results overhead wording is necessity/refactor interpretation, notisolated timing evidence.",
+    "elapsed_seconds_at_publication": 507.7058736049803
+  },
+  "remaining": "NextoriginalPythonREPODEBUGcapturedname only; source-only finitecohort proposalready, newcontract/DESIGN required beforebounded sourcearchivebodyinspection/nameadmission. Certificates/observations/analyses/actions/Rustc/M7A unproved; goalactive.",
+  "next_research": {
+    "path": "target/wp1112/next-owner-research.md",
+    "sha256": "74fd63e07e14c6ccd3fba726211ba5a1acf50cd5cf06ef4346ffc740f6d4cdd7",
+    "status": "READY/source-only; no payload/archive/envvalue/execution",
+    "decision": "New bounded verifiedarchive Starlark literalcohort inspection DESIGN before adding more finitePythonnames; no producer/valueauthority or capgrant inferred.",
+    "metadata_pin_qualification": "Research note native-results SHA161995c158c4d0fa9799c7cd870760ab991a75b06f770ecaeb4900d29d489682 was intermediate unenriched decoder output. Final enriched actualfile SHAd2e61220f9d9046aba1cffe980ad0b3db870890d9c3fcea77add433b6f5ede1a is independently reviewed; researchstdout/source pins unchanged and proposal uses those. Originalnote preserved, no native replay."
+  }
+}

@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-323-m7a-python-archive-preparation
-Status: accepted — FINAL source/evidence ACCEPT; next Python environment capability
+Packet: WP-7-324-m7a-python-environment-capability
+Status: accepted — independentFINAL ACCEPT; finite Python cohort research ready
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-[Python archive preparation](./slug-v2-subplans/wp1111-python-archive-preparation-2026-10-11.json).
-Current74 Rustproofs/productioncompile and7relevantfixturetests passed. ONE15.674s/
-source309/phase232.289MiB under256 crossed the exact original Pythonarchive/patch;
-next genuine Need is RULES_PYTHON_BZLMOD_DEBUG. All memory/byte/source/time caps
-unchanged; source-only environment capability research ready. Full producer/M7A open.
+[Python environment capability](./slug-v2-subplans/wp1112-python-environment-capability-2026-10-11.json).
+CurrentCore42/productioncompile passed and protected33 proofs reused. ONE15.794s/
+source309/phase234.602MiB under256 crossed PythonBzlmoddebug and reached the next
+original RULES_PYTHON_REPO_DEBUG Need. All caps/352heldsources/18env unchanged;
+finitePythoncohort source-onlyresearch ready before another singletonpacket.
+Full producer/M7A remains open; prior3portable-driver rows missingstrace unproved.
 
 ### Ready and blocked queue
 

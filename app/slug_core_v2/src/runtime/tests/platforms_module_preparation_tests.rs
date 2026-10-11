@@ -343,6 +343,7 @@ const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
 ];
 const RULES_SHELL_ENVIRONMENT_NAMES: [&str; 3] = ["BAZEL_SH", "PATH", "WINDIR"];
 const RULES_JAVA_ENVIRONMENT_NAMES: [&str; 1] = ["JAVA_HOME"];
+const RULES_PYTHON_ENVIRONMENT_NAMES: [&str; 1] = ["RULES_PYTHON_BZLMOD_DEBUG"];
 const APPLE_SUPPORT_ENVIRONMENT_NAMES: [&str; 2] = [
     "BAZEL_NO_APPLE_CPP_TOOLCHAIN",
     "BAZEL_USE_CPP_ONLY_TOOLCHAIN",
@@ -1257,6 +1258,7 @@ impl Bodies {
                     + RULES_SHELL_ENVIRONMENT_NAMES.len()
                     + APPLE_SUPPORT_ENVIRONMENT_NAMES.len()
                     + RULES_JAVA_ENVIRONMENT_NAMES.len()
+                    + RULES_PYTHON_ENVIRONMENT_NAMES.len()
             && request.names().iter().all(|name| {
                 (self.rules_cc_import_sources
                     && self.additional[2].is_some()
@@ -1270,6 +1272,9 @@ impl Bodies {
                     || (self.rules_rust_defs_import_sources
                         && immutable_archive_preparation::native_java_proxy_binding(self)
                         && RULES_JAVA_ENVIRONMENT_NAMES.contains(&name.as_str()))
+                    || (self.rules_rust_defs_import_sources
+                        && immutable_archive_preparation::native_python_environment_binding(self)
+                        && RULES_PYTHON_ENVIRONMENT_NAMES.contains(&name.as_str()))
             })
     }
     fn environment_diagnostic<'a>(

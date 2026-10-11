@@ -1,101 +1,100 @@
-# WP1111 exact Python archive preparation
+# WP1112 exact Python environment capability
 
-Packet: WP-7-323-m7a-python-archive-preparation
-Status: accepted — FINAL source/evidence ACCEPT; next Python environment capability
-Baseline: 30e1e0089 (accepted WP1110)
+Packet: WP-7-324-m7a-python-environment-capability
+Status: accepted — independentFINAL ACCEPT; finite Python cohort research ready
+Baseline: 1f0579968 (accepted WP1111)
 
-Outcome: verify and prepare the exact rules_python1.7.0 archive and version patch
-that blocked the original requested-root probe, then admit only that complete
-original immutable request through the existing scoped offline materializer.
-Slug-native private probe policy; production archive transformation semantics and
-all accepted exact surfaces remain unchanged. Linux only; Windows/JVM deferred.
+Outcome: admit the exact RULES_PYTHON_BZLMOD_DEBUG environment-name frontier
+only for the qualified prepared Python binding and use the normal immutable
+request snapshot/progress/retry owner. Observe the next actual boundary in ONE
+original requested-root native probe under unchanged resource limits.
+Slug-native private Linux-test policy. Production environment semantics and all
+accepted exact surfaces unchanged; Windows/JVM remain deferred.
 
-Basis: wp1110-qualified-native-readiness-window-2026-10-11.json and
- target/wp1110/next-owner-research.md (87e00b746621d4a5281608fdf5aa1f33fddb532b3e7be584581f5c46f4e86e04).
-Actual291sources/14.960s/phase229.672MiB under256; no deadline/quota.
-Selected Spec producer selected_repo_spec.rs:906-944 owns original9attributes.
-Normal repository_archive.rs:85-225 and repository_archive_realize.rs:68-98
-already capture verified ordered patches, apply strip1, then replace MODULE;
-selected_bcr_source_association owns full transform identity. Never skip the patch.
-Pinned Bazel9.2 IndexRegistry/RepoSpecFunction anchors in existing fixture suffice
-for unchanged ordering; existing patch/file-session controls are discriminators.
+Basis: wp1111-python-archive-preparation-2026-10-11.json and
+ target/wp1111/next-owner-research.md (b052f5cb01e2fb3ad0b51f0c5daa07a6dbba2afa2cd613925908d41ace1cec04).
+Original captured name/workspace only proves the demanded name; it grants no
+source/repository/extension producer or environment-value authority. Selecting
+this exact static name is the explicit private probe policy decision.
 
-Prerequisite authority explicitly extends WP1110's source-only/body-read policy:
-root may acquire only the exact public release archive and exact BCR versionpatch
-named by the captured request, verify full SHA256 and file identity, and inspect
-bounded tar/patch/MODULE bytes for feasibility and fixture provenance. Archive URL
-https://github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz
-SHA256 f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da;
-patch URL https://bcr.bazel.build/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch
-SHA256 a9ffb62ba1d8e9ebad5225bd2cde6e8ff20688060fff8d14133ca9bb237fb48b.
-Existing manifest-listed fixture bodies may be read by the normal verifier after
-preparation; no unrelated corpus/envvalue read. Fetch capped8MiB archive/64KiB patch, streaming
-64KiB scratch; no extracted filesystem payload except original prepared patch.
-Inspect gzip stream with total decoded cap11,478,463 (remaining64MiB), bounded
-inventory; conservative write bound14,255,765 including patch and preparedMODULE.
-Inspect only archived MODULE and LICENSE bodies (each<=64KiB) for patch proof and
-license attribution. Existing preparedMODULE13673B/d01f995ecd137abf30238ad9ce97f8fc3ac57289c8b24bd0bf53324d937a14f8
-and selected source.json369B/028a084b65dcf8f4dc4f82f8778dbe65df133f234b316828a82e060d81bdce32
-may be bracket-hashed/read to verify exact Spec/source provenance. No runtime Spec
-rewrites, public URL replacement or wildcard admission. Feasibility failure stops
-activation under unchanged caps; preserve exact evidence and select bounded replan.
+Owners: Bodies admits the whole original Need before any progress. Require
+original workspace, nonempty bounded frontier and every enabled exact name.
+Python additionally requires defs + PreparedFile/PublicProbe qualification and
+optional full Python backing URL/digest/mirror/preparedMODULE/preparedpatch
+binding. Reuse native_python_binding via a borrowed boolean wrapper; do not
+require unrelated protobuf/Java qualification or bypass normal DICE discovery.
+Existing Bzlmod repository_host_input.rs frontier sorted union and Loading
+module_extension.rs/module_extension_repository_file_effect.rs retry keep the
+same immutable snapshot. Core dice.rs/repository_host_input.rs inject existing
+snapshot cells; unauthorized and observed absence remain distinct; discard
+restores accepted frontier/snapshot. These owners and structural equality are
+unchanged. Reuse docs/developers/dice.md and accepted existing runtime tests for
+A/B/A/empty revisions, unrelated-change cutoff, Need retry and rejection restore.
+No ambient environment-value read, forced absence, snapshot replacement, normal
+API/key/lock/cache/interner/retained-field change or public capability is selected.
 
-After DESIGN and feasible authority: fixed Linux-test third constructor-owned
-optional Arc backing (production/nonLinux unchanged), borrowed URL+digest lookup,
-all pairwise duplicate-URL rejection before publication. Bodies owns optional
-Python backing/MODULE/patch paths; exact borrowed matcher requires canonical,
-workspace, unmapped http_archive label,9attrs, singleton URL/SRI/strip_prefix,
-exact String-key/String-value singletonpatch/SRI, Int1, exact preparedMODULE URL/SRI,
-empty overlay maps and binding. Optional absent preserves prior policy; malformed
-present bindings never qualify. Scope owns handles until lastDrop; no postpublication
-setter, new key/lock/cache/interner, payload copy or policy String allocation.
-Existing normal execution plan retains its owned transformation strings unchanged.
+Allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
+(static single-name table, bound and admission arm); child
+immutable_archive_preparation.rs (borrowed full-binding wrapper); child
+public_probe_preparation_tests.rs (compact focused proof). Target-only helpers,
+configuration/reviews/receipt plus scheduling documents. No fixture/corpus/source
+vector/environment/profile/cap/observer change or new acquisition/body read.
+Static one &str row only; no request/path/String clone or policy allocation.
+Existing scoped Arc/shared paths and runtime cell allocation/retention owners
+unchanged. No donor/import or new utility; Stage9 existing owner disposition.
+Test owners are large but cohesive private preparation-family owners; reuse
+existing Java guard lifecycle as a shared test helper instead of copying its
+snapshot harness. Estimated policy/wiring<25lines, net proof growth<160lines;
+size is a review trigger, not authorization/acceptance evidence.
 
-Rust allowlist: platforms_module_preparation_tests.rs and child
-immutable_archive_preparation.rs; source_service/offline_archive.rs and scope.rs;
-tests/repository_archive_file_session_tests.rs (all under app/slug_core_v2/src/runtime/).
-Fixture allowlist: configured-cli-authentic/fixture.toml, exact Python mirrorarchive,
-registry/modules/rules_python/1.7.0/patches/module_dot_bazel_version.patch and
-licenses/rules_python-LICENSE. Reuse registry_bundle MODULE, no duplicate metadata.
-Target-only prepared patch at original target/wp954 URI, helpers/evidence/scheduling.
-Fixture test owner tests/v2_oracle/test_configured_cli_fixture.py updates only
-exact inventory pins and prepared Python path checks; no fixture tool/parser/realizer changes. Estimated<120wiring/policylines and cohesive
-existing controls; no copied lifecycle harness. Cohesive large testowners remain
-existing family owners. Fixture growth3objects; review provenance/duplicates before
-publication. Existing fixture verifier/patch check proves patched originalMODULE
-matches selected preparedMODULE. No donor imports; existing Arc/path sharing and
-interners retained (Stage9 existing source owner disposition).
+Controls: exact positive qualification with unrelated Java/protobuf absent;
+missing/wrong Python URL/digest/mirror/MODULE/patch, missing defs, all registry/
+command roles, foreign workspace; name case/suffix/empty/unknown, ungranted
+Java/CC names; independent Java/CC enablement; both-order mixed frontiers preserve
+original diagnostic pointer and zero guard mutations. Shared real command guard
+progress/nonprogress/retry observes synthetic accepted empty snapshot as
+Observed(None) then discard restores Unauthorized, using existing runtime API.
+Reuse current Python exact archive/profile proof and existing three runtime
+snapshot/revision/restoration controls. No copied lifecycle harness or full
+producer/certificate/analysis/actions/Rustc/M7A completion claim.
 
-Controls: third optional slot preserves two-slot successes; all duplicate pairs,
-borrowed original paths/Arc counts/fullhash, missing/wrong source/SRI/patch/strip,
-extra/wrongtypedpatch and wrongMODULE/role negatives; original firstoffender/zero
-progress and namespace/current epoch remain. Reuse normal file-session patchthenMODULE,
-A/B/A integrity, quota/cancel/warmreuse/stale generation and Weak retirement tests.
-Fresh current ordinary63+new controls, direct productioncompile, CargoJSON no-run/
-list/batchedpreflight and actual bodies. Freeze prior37Rust+metadata plus changed
-file-session owner and fixture objects; caller8 IDs/paths unchanged, changed Scope
-pin explicit. Source350 predecessor order unchanged plus exactarchive/patch bindings;
-18env unchanged; original heldFDowner remains sole native sourcehashreader.
+Validation: serial pinned toolchain/offline/locked/jobs1 current Core no-run
+CargoJSON/executable/list/batchedpreflight/nonzero bodies (prior41+Python proof),
+one direct production compile; reuse unchanged predecessor Bzlmod7/Loading26
+proofs rather than replaying protected code. Exactly352 ordered
+held source descriptors and18environment entries unchanged, same8caller pins.
+Freeze all predecessor51authorities and3changed Rustfiles; test-only changes
+refresh current Core/production artifact and strict source/helper pins. Rebind
+frozen supervisor/selection/native/decode scaffolding only for root/current
+metadata and add exact new selector. No supervisor weakening. Independent source/
+helper/config PRELAUNCH before ONE distinct freshshell native; independent FINAL
+actualdiff/current proof/typed terminal/strictpins/limits. Never identical replay.
 
-Inherit WP1110 RSS256MiB/AS512MiB/qualifiedsource512/census513/decodedwritten64MiB,
-all transfer/live/object/registry/directory/log limits and time20/23/26 unchanged;
-compilerRSS separate, prepnull/ordinary10/grace3. Fresh pinned toolchain/offline/
-locked/jobs1, no concurrentCargo; allwriters stopped before ONE distinct freshshell
-native after source/helper/config PRELAUNCH. FINAL actualdiff/proofs/typedterminal/
-limits; plan/archive/diff checks and acceptedcommit. No identical native replay,
-smallerroot, automaticcapgrowth or fullproducer/M7A completion claim. Recurring
->180s is necessity/refactor signal; reuse frozen scaffolding and review only changed
-invariants. DESIGN checkpoint precedes acquisition/source; FINAL independent.
+Inherit WP1111 RSS256MiB/AS512MiB/source512/census513/decodedwritten64MiB and all
+transfer/live/object/registry/directory/log caps; qualified work20/cleanup23/outer26,
+ordinary10/preparationnull/grace3 and optimization profiles unchanged. Runtime
+RSS measured separately from compiler. Quota/deadline refusal preserves evidence
+and chooses next bounded owner; it never automatically raises a cap or shrinks
+requested roots. Header/name capture never grants additional producer/value access.
+DESIGN review before source edits, FINAL before acceptance. Plan/archive/diff
+checks and compact accepted commit. Recurring>180s examined for necessity; record
+compile/test/review/packet timings, reuse independent review deltas and avoid
+repeated unchanged protected gates. Upstream pinned patch context whitespace is
+verbatim integrity data in WP1111; no alteration or false diff-check PASS claim.
 
-Predecessor: accepted WP1110 30e1e0089;63proofs, productioncompile, bounded original
-native prefix. Full compiler producer/certificate/analysis/actions/Rustc/M7A open.
+Immediate predecessor: accepted WP1111 1f0579968;74Rustproofs/productioncompile,
+7fixture proofs, original15.674s/309sources/phase232.289MiB under256 crossed
+Pythonarchive. Three unchanged portable-driver rows remain missing-strace
+unproved. Broader producer and M7A remain open.
 
-Accepted receipt: wp1111-python-archive-preparation-2026-10-11.json. Current74
-Rustproofs/productioncompile and7relevantfixturetests pass;3unchangedportable-driver
-rows environment-unproved (missingstrace). ONE15.674s/source309/phase232.289MiB
-under256 crossed the Pythonarchive; nextoriginalNeed RULES_PYTHON_BZLMOD_DEBUG.
-Decoded61853085/written57985242 under64MiB; noquota/deadline;154strictstablepins/
-352orderednoninheritedheldFDbrackets. Corrected prereq writebound5132143 includes
-omitted finalMODULE13673B and remains feasible; frozen originalartifacts preserved,
-no replay/cap/source change. IndependentFINAL accepted this correction. Source-only
-next-owner-research.md ready; no value/producer authority inferred. M7A remains open.
+Accepted receipt: wp1112-python-environment-capability-2026-10-11.json.
+CurrentCore42/productioncompile passed; protectedBzlmod7/Loading26 proofs reused,
+aggregate75not75fresh. ONE15.794s/309sources/phase234.602MiB under256 crossed
+PythonBzlmoddebug and nextcaptured RULES_PYTHON_REPO_DEBUG23. Noquota/deadline;
+144strictstablepins/352orderedheldFDbrackets/18env unchanged. Decoded61853085/
+written57985242 under64MiB. IndependentFINAL accepted actualsource/evidence.
+Source-only finitecohort successorresearch ready; any boundedarchive Starlarkbody
+inspection/nameexpansion needs a newexplicitcontract/DESIGN. No inferredvalue/
+producerauthority or M7A closure. Measured packettotal>180s; gateoperations each
+below180, remainingtime unisolated. Repeatedone-namepacket overhead is a process
+signal; cohortsourceevidence proposed without speedup/frequencyclaim.
