@@ -34,19 +34,23 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-347-m7a-rust-runfiles-component-metadata
-Status: accepted — independent FINAL and compact receipt recorded
+Packet: WP-7-348-m7a-rust-analyzer-component-and-routing
+Status: resource correction in preparation — frozen WP1136 native rejected
 
-[Accepted WP1135](./slug-v2-subplans/wp1135-rust-runfiles-component-metadata-2026-10-11.json)
-admits one borrowed runfiles component Lstat: metadata10/Need78/source34 unchanged.
-Fresh Core52/13 controls/default Core+CLI and PRE/ONE/FIRST/FINAL passed. ONE20.776s,
-phase255.0859375MiB/headroom0.9140625 under256; whole/future fit remains unproved.
-Actual next root1 rust/rust_analyzer Lstat206B has no original owner headers. Stopped
-normal-source readiness supports only that next component. The workflow advisory
-examines recurring >180s helper preparation and proposes explicit predecessor roles
-and exact config-plus-two closure instead of packet literals; no speedup is claimed.
-[Current manifest](./slug-v2-subplans/current-packet.md) records exact evidence.
-Producer/actions/Rustc/bootstrap closure remains open; caps and Windows deferral stay.
+Accepted WP1135 33699afa7 admits runfiles component Lstat and passes fresh52/13,
+PRE/ONE/FIRST/FINAL. Phase255.0859375MiB leaves0.9140625 under256; future fit open.
+[Current manifest](./slug-v2-subplans/current-packet.md) selects only actual next
+root1 rust/rust_analyzer component Lstat (metadata10→11/Need78→79/source34 unchanged)
+and the stopped workflow advisory's explicit predecessor/root and full config+2
+routing seam. Fixed compile history/current/native identities and all caps stay.
+Marker/body/producer/actions/Rustc/bootstrap closure remains open; Windows deferred.
+WP1136 fresh52/13/default production passed; actual phase262180KiB exceeded
+256MiB by36KiB and immutable FIRST once rejected acceptance. The
+[failure receipt](./slug-v2-subplans/wp1136-resource-failure-2026-10-11.json)
+preserves candidate/evidence; last accepted native stays WP1135. Source-only
+allocation readiness identifies Host Vec-to-Arc duplication for separately
+reviewed correction. No cap lift/identical replay or allocation-cause claim;
+broader expansion waits for representative workload fit.
 
 ### Ready and blocked queue
 

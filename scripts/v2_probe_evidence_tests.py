@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import re
 import sys
 import tempfile
 import time
@@ -12,13 +13,23 @@ import v2_probe_supervisor as supervisor
 import v2_probe_evidence as evidence
 
 
-ROOT = Path('target/wp1135')
+ROOT = None
 SHARED = ('scripts/v2_probe_supervisor.py', 'scripts/v2_probe_evidence.py',
           'scripts/v2_probe_evidence_tests.py')
 
 
 def dump(path, value):
     Path(path).write_text(json.dumps(value, indent=2) + '\n')
+
+
+def control_root(args):
+    assert len(args) == 1 and isinstance(args[0], str)
+    root = Path(args[0])
+    assert str(root) == args[0] and re.fullmatch(r'target/wp[1-9][0-9]*', args[0])
+    roles = evidence.read(root / 'roles.json')
+    assert roles['root'] == str(root)
+    evidence.authenticate_current_checkpoint(roles, root)
+    return root
 
 
 class DirectEvidenceControls(unittest.TestCase):
@@ -29,7 +40,7 @@ class DirectEvidenceControls(unittest.TestCase):
         evidence.validate_roles(self.roles)
         for key, value in (('extra_owner', 'invented'), ('owner_test_introduction_root', 'target/wp1132'),
                            ('historical_compile_root', 'target/wp1134'), ('last_actual_native_root', 'target/wp1133'),
-                           ('prior', 'target/wp1133'),
+                           ('prior', 'target/wp1133'), ('prior_receipt', 'thoughts/shared/plans/slug-v2-subplans/wp1133-invented.json'),
                            ('core_counts', {**self.roles['core_counts'], 'current': 51}),
                            ('native_time_policy', {**self.roles['native_time_policy'], 'native_outer_seconds': 33})):
             changed = copy.deepcopy(self.roles)
@@ -39,13 +50,25 @@ class DirectEvidenceControls(unittest.TestCase):
 
     def test_current_root_seam_and_escape_refusal(self):
         changed = copy.deepcopy(self.roles)
-        changed['root'] = 'target/wp1136'
-        self.assertEqual(evidence.validate_roles(changed, Path('target/wp1136')), Path('target/wp1136'))
+        alternate = Path('target/wp9999999999999999999')
+        assert alternate != ROOT and not alternate.exists()
+        changed['root'] = str(alternate)
+        self.assertEqual(evidence.validate_roles(changed, alternate), alternate)
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed, ROOT)
-        changed['root'] = 'target/wp1135/../wp1136'
+        changed['root'] = str(ROOT) + '/../wp9999999999999999999'
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed)
+        self.assertEqual(control_root([str(ROOT)]), ROOT)
+        for args in ([], [str(ROOT), str(ROOT)], ['./' + str(ROOT)], [str(ROOT) + '/../wp1']):
+            with self.assertRaises(AssertionError):
+                control_root(args)
+        changed = copy.deepcopy(self.roles); changed['root'] = str(alternate)
+        with self.replaced_record(ROOT / 'roles.json', changed), self.assertRaises(AssertionError):
+            control_root([str(ROOT)])
+        cp = evidence.read(ROOT / self.roles['checkpoint_name']); cp['verdict'] = 'REJECT'
+        with self.replaced_record(ROOT / self.roles['checkpoint_name'], cp), self.assertRaises(AssertionError):
+            control_root([str(ROOT)])
 
     def test_direct_pin_missing_and_wrong_alias_digest(self):
         changed = copy.deepcopy(self.roles)
@@ -164,6 +187,23 @@ class DirectEvidenceControls(unittest.TestCase):
         bad = evidence.read(prior / 'slug_core_v2-executable.json'); bad['sha256'] = '0' * 64
         with self.replaced_record(prior / 'slug_core_v2-executable.json', bad), self.assertRaises(AssertionError):
             evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        receipt_path = Path(self.roles['prior_receipt'])
+        for field, value in [('verdict', 'REJECT'), ('baseline', self.roles['baseline']),
+                             ('contract_sha256', self.roles['contract_sha256']), ('source_pins', {})]:
+            bad = evidence.read(receipt_path); bad[field] = value
+            with self.replaced_record(receipt_path, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        bad = evidence.read(receipt_path); bad['native']['operation_sha256'] = '0' * 64
+        with self.replaced_record(receipt_path, bad), self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(self.roles, freeze['after_format'])
+        bad_roles = copy.deepcopy(self.roles); bad_roles['immediate_pins'][str(receipt_path)] = '0' * 64
+        with self.assertRaises(AssertionError):
+            evidence.authenticate_last_native(bad_roles, freeze['after_format'])
+        config_path = prior / 'native-config.json'; config = evidence.read(config_path)
+        for extra in (config['pins'][0], str(config_path), str(Path(self.roles['supervisor_path']).resolve())):
+            bad = copy.deepcopy(config); bad['pins'].append(extra)
+            with self.replaced_record(config_path, bad), self.assertRaises(AssertionError):
+                evidence.authenticate_last_native(self.roles, freeze['after_format'])
         gate = next(g for g in self.roles['gates'] if g['kind'] == 'loading' and g['stem'] == 'loading-tests')
         artifact = evidence.read(Path(evidence.ROOTS['L']) / 'slug_loading_v2-executable.json')
         original = evidence.digest
@@ -291,6 +331,7 @@ class SupervisorControls(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    ROOT = control_root(sys.argv[1:])
     started = time.monotonic()
     result = unittest.TextTestRunner(verbosity=2).run(unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__]))
     record = dict(selected=result.testsRun, passed=result.testsRun - len(result.errors) - len(result.failures),

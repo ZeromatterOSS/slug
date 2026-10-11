@@ -10407,6 +10407,16 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                 "/rules-other/rust/runfiles",
             ],
         ),
+        (
+            "rust/rust_analyzer",
+            "/rules/rust/rust_analyzer",
+            [
+                "/rules/rust/rust_analyzer/child",
+                "/rules/RUST/rust_analyzer",
+                "/rules/rust/rust_analyzer-extra",
+                "/rules-other/rust/rust_analyzer",
+            ],
+        ),
     ];
     for (relative, selected, spellings) in metadata {
         assert_exact_root_file_role(
@@ -10460,7 +10470,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::DirectoryEntries,
         ))
         .unwrap();
-    assert_eq!(all.path_observations().unwrap().demands().len(), 78);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 79);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
