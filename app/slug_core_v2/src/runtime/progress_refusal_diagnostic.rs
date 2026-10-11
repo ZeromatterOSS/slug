@@ -12,6 +12,7 @@ use super::*;
 use crate::runtime::materialization_diagnostic::BorrowedHex;
 
 const ROWS: usize = 32;
+const OWNER_EPOCH_ENTRIES: usize = 128;
 const FIELD: usize = 1024;
 const RAW: usize = 4096;
 const ENCODED: usize = 10240;
@@ -121,10 +122,11 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
         instance: slug_workspace_v2::PathObservationInstanceId,
     ) -> fmt::Result {
         use RepositoryMaterializationInstanceLookupError as E;
-        let view = match self
-            .epoch
-            .borrowed_instance_for_namespace(self.workspace, instance, ROWS)
-        {
+        let view = match self.epoch.borrowed_instance_for_namespace(
+            self.workspace,
+            instance,
+            OWNER_EPOCH_ENTRIES,
+        ) {
             Ok(Some(view)) => view,
             other => {
                 return write!(
@@ -444,13 +446,109 @@ mod tests {
                 .borrowed_instance_for_namespace(
                     &workspace,
                     PathObservationInstanceId::new(17),
-                    ROWS
+                    OWNER_EPOCH_ENTRIES
                 )
                 .unwrap()
                 .unwrap()
                 .request() as *const _,
             Arc::as_ptr(&a)
         );
+        for (entries, duplicate) in [
+            (32usize, false),
+            (33, false),
+            (128, false),
+            (129, false),
+            (128, true),
+        ] {
+            let mut original_root = Some(PathBuf::from("/A"));
+            let root_pointer = original_root
+                .as_ref()
+                .unwrap()
+                .as_os_str()
+                .as_bytes()
+                .as_ptr();
+            let bounded = RepositoryMaterializationResultEpoch::new(
+                workspace.dupe(),
+                (0..entries).map(|index| {
+                    let owner = if index == 0 {
+                        a.clone()
+                    } else {
+                        let owner = request(&if duplicate && index == entries - 1 {
+                            "zzduplicate+".to_owned()
+                        } else {
+                            format!("{}{index:03}+", if duplicate { "r" } else { "0r" })
+                        });
+                        if duplicate {
+                            assert!(owner.id.canonical_repo > a.id.canonical_repo);
+                            assert!(owner.id.canonical_repo.as_str() <= "zzduplicate+");
+                        } else {
+                            assert!(owner.id.canonical_repo < a.id.canonical_repo);
+                        }
+                        owner
+                    };
+                    RepositoryMaterializationEpochEntry {
+                        request: owner,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Immutable {
+                                source_identity: "proof".into(),
+                                generation_root: if index == 0 {
+                                    original_root.take().unwrap()
+                                } else {
+                                    PathBuf::from("/A")
+                                },
+                                observation_instance: PathObservationInstanceId::new(
+                                    if index == 0 || (duplicate && index == entries - 1) {
+                                        17
+                                    } else {
+                                        24 + index as u64
+                                    },
+                                ),
+                            },
+                        ),
+                    }
+                }),
+            )
+            .unwrap();
+            let owners = Arc::strong_count(&a);
+            let (_, projected) = encode(&root, &single, &bounded);
+            assert_eq!(projected["capture"], "captured");
+            let view = bounded.borrowed_instance_for_namespace(
+                &workspace,
+                PathObservationInstanceId::new(17),
+                OWNER_EPOCH_ENTRIES,
+            );
+            if duplicate {
+                assert_eq!(
+                    projected["rows"][0][3],
+                    serde_json::json!(["ambiguous", null])
+                );
+                assert_eq!(
+                    view,
+                    Err(RepositoryMaterializationInstanceLookupError::AmbiguousInstance)
+                );
+            } else if entries <= OWNER_EPOCH_ENTRIES {
+                assert_eq!(projected["rows"][0][3], ja["rows"][0][3]);
+                let view = view.unwrap().unwrap();
+                assert!(std::ptr::eq(view.request(), a.as_ref()));
+                assert_eq!(
+                    view.generation_root().as_os_str().as_bytes().as_ptr(),
+                    root_pointer
+                );
+                assert_eq!(Arc::strong_count(&a), owners);
+            } else {
+                assert_eq!(
+                    projected["rows"][0][3],
+                    serde_json::json!(["bounds_refused", null])
+                );
+                assert_eq!(
+                    view,
+                    Err(RepositoryMaterializationInstanceLookupError::TooManyEntries)
+                );
+            }
+            assert_eq!(Arc::strong_count(&a), owners);
+            drop(bounded);
+            assert_eq!(Arc::strong_count(&a), count);
+        }
         for (other, expected) in [
             (epoch(vec![]), "missing"),
             (
@@ -460,14 +558,6 @@ mod tests {
             (
                 epoch(vec![(a.clone(), "relative", 17)]),
                 "invalid_generation_root",
-            ),
-            (
-                epoch(
-                    (0..33)
-                        .map(|i| (request(&format!("r{i}+")), "/A", i + 1))
-                        .collect(),
-                ),
-                "bounds_refused",
             ),
         ] {
             assert_eq!(encode(&root, &single, &other).1["rows"][0][3][0], expected);

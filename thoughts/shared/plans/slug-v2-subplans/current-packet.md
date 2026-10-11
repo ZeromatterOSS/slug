@@ -1,62 +1,87 @@
-# WP1109 bounded current materialization owner lookup
+# WP1110 qualified native readiness window
 
-Packet: WP-7-321-m7a-materialization-owner-lookup
-Status: accepted — FINAL source/evidence ACCEPT; next progress owner diagnostic
-Baseline: cd1c7f1c0 (accepted WP1108)
+Packet: WP-7-322-m7a-qualified-native-readiness-window
+Status: accepted — FINAL source/evidence ACCEPT; next Python archive provenance
+Baseline: f9e60407e (accepted WP1109)
 
-Outcome: resolve a current unique materialization owner within a finite128-entry
-inspection checkpoint instead of rejecting an epoch over32 before lookup; preserve
-the next actual terminal of the original native fixture. Slug-native private
-Linux-test/probe association capacity; exact owner predicates unchanged, Windows
-execution/JVM deferred.128 is not a measured complete epoch size or fit promise.
+Outcome: continue the original qualified native requested-root probe within an
+explicit20s work/23s scope/26s outer checkpoint and project its original path-Need
+owner within128 retained entries. Preserve the genuine next terminal. Slug-native
+private probe/diagnostic policy; exact owners/admission unchanged, Windows/JVM
+execution deferred. No whole-producer/heap/fit or CPU-cause/speed guarantee.
 
-Basis: wp1108-qualified-native-source-count-2026-10-10.json and
- target/wp1108/next-namespace-research.md SHA256
-2b6df7e05b9176f3ebaf41e5dcdb7fb80fb06542cfd5c581f506f08451821d25.
-WP987 bounds_refused means generic wholeepoch.entries.len()>32; instance22/raw'/'
-do not identify a canonical owner or prove evaluated owner-plan rejection.
-Existing Bzlmod source_preparation.rs borrowed_instance_for_namespace validates
-workspace/nonzero instance/wholeepoch bound, scans all successful observations for
-unique instance, and returns original borrowed request/root after lexical checks.
-No exact parity changes or new upstream oracle needed; reuse accepted owner proofs.
+Basis: accepted wp1109-materialization-owner-lookup-2026-10-10.json and
+ target/wp1109/next-source-research.md SHA
+8b89107dddc8f9cda64b6bff5f1fca4918003524b10b71fd5e90767ba04935f3;
+ target/wp1109/probe-time-policy-research.md SHA
+972dba8b5086c4f9af0513135ba5f403b20b5360674d92f6de60a6db6d1054e6.
+Actual267 sources/WorkDeadline/phase220.359MiB under256. Caller7:296 is a prebatch
+scope detector, not CPU attribution. Separate progress formatter ROWS32 refuses
+epoch owner projection; current namespace128 policy failure is not established.
 
-Decision: one private MATERIALIZATION_NAMESPACE_ENTRIES constant32→128 shared by
-namespace_policy and namespace_diagnostic. Generic API, retained epoch identity,
-DICE ownership/equality/locking, immutable and qualifiedJava File-only/staticplan
-predicates and lexical confinement unchanged. No new permission for '/' or header
-projection; unknown/unsupported/ambiguous/foreign owners remain refused. Bounds129
-refused before selection. No new storage, interner, copies, indices or cache;
-additional borrowed inspection bounded O128 over already retained current epoch.
-Same all-process memory/time guards assess actual native cost, no speed claim.
+User authorizes tasktime required and recurring>180s necessity/refactor review.
+7/8/10 were private probe checkpoints in bounded WP1083/WP938/WP937 source/history,
+not a found direct-human fixed native ceiling. This explicitly changes technical
+time policy; no memory/source/byte/admission permission is inferred. Generic
+constructor maxwork27/cleanup<=work+3 stays unchanged;30/35 excluded.20/23/26 are
+finite engineering checkpoints, not measured completion time or automatic growth.
 
-Allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/
-public_probe_preparation_tests.rs only, scheduling/compactreceipt and target-only
-helpers. Estimate1 policyline and40–80 adjacentprooflines. Large private testowner
-is cohesive through existing materialization predicate/proof; no copied IO/lifecycle
-framework or new family. Extend generated_features_materialization_is_opt_in_and_exact:
-old32/33 now in-bound, selected128/129, queried original owner sortedlast and pointer/
-root borrow, late duplicate observation refusal/fullscan. Existing namespace refusal
-projection/firstoffender/zero progress and qualifiedJava A→B→A/malformed/markers/Weak
-controls stay protected. Add that existing materialization proof to accepted62→63
-(Bzlmod7/Loading26/Core30); no new testname. Direct production wrappers checked.
+Decision: private Bodies native_source_work_duration qualified7→20 with the same
+PreparedFile/PublicProbe/defs/full borrowed archive binding predicate; otherwise5.
+Evaluate it once in native wiring and use work=start+duration, cleanup=work+3s:
+qualified20/23, unqualified5/8. Target-only runner native26, ordinary/list/preflight10,
+preparationnull and external termination/reapgrace3 unchanged. Keep clocks/sticky
+firstrefusal/cancellation/no-refund/disposal/lifecycle ownership unchanged.
 
-Inherit accepted WP1108 tools/profiles/limits/sourceauthority contracts. Source45
-(37Rust8metadata): onlychildchanged44same; all8 caller IDs/paths/digests unchanged.
-Original350ordered held-FD sources/18env immutable; no corpus/body/archive/envvalue
-reads. Runtime10s/RSS256MiB/AS512MiB/work7/default5/lifetime8/cleanup3 and byte/live/
-object/registry/directory/log limits unchanged; source512/census513 preserved.
-Pinned toolchain freshly resolved; locked/offline/jobs1 CargoJSON no-run/list/exact
-batched preflight/63 nonzero bodies/prod/ignoredsingleton, compiler memory separate
-and preparation deadline null. Independent DESIGN before source, source/helper/
-config PRELAUNCH before ONE freshshell distinct native/allwritersstopped, FINAL
-actual diff/proofs/terminal, plan/diff/archivechecks and acceptedcommit. Preserve
-all old operations; no identical replay, smaller root or diagnostic-header grant.
-REPLAN for another owner/capability/budget/lifecycle/key decision. Recurring>180s
-work reviewed for necessity; reuse scaffolding/focused reviewers. Fullproducer/
-certificate/actions/Rustc/M7A/bootstrap open regardless of next association result.
+ProgressRefusalDiagnostic splits dedicated owner-epoch inspection128 from ROWS32.
+Reuse unchanged generic fullscan/wholeepochbound/originalrequest-root/ambiguity.
+Keep path/target rows32, field1024/raw4096/encoded10240, frame schema/family triples/
+two-pass preflight/output, unavailable fullSpec/source/options tags, unsupported
+mixedfamilies and image/Windows earlyrejection. Atmost32*128 perpass inspections,
+no newstorage/Strings/path/requestclones/cache/interner/index/key/lock/API. Borrowed
+identity projections grant nothing; namespace policy/admission remains unchanged.
+Longer work may retain more existing history; all memory/resourceguards still bind.
 
-Immediate predecessor accepted62proofs/prod7.443s/ONE6.362s/source262/phase219.801MiB;
-no SourceAttempts/WorkDeadline. Current association bounds_refused only, narrow
-retirement and prefix memory are not whole closure/heap/fit evidence.
+Allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs;
+its immutable_archive_preparation.rs child; app/slug_core_v2/src/runtime/
+progress_refusal_diagnostic.rs (existing inline tests); scheduling/compactreceipt/
+target-only helpers. Estimate scalarwiring<15lines plus40–100 cohesive existing
+proof adaptations. Existing testowners remain cohesive through profile and borrowed
+formatter contract; no copied IO/lifecycle/serializer or newfamily. Two policy parts
+serve one bounded originalprobe readiness operation, avoiding separate attribution
+and time packets/repeated compilations. No performance optimization is asserted.
 
-Accepted receipt: wp1109-materialization-owner-lookup-2026-10-10.json. Actual63proofs/prod7.428s/ONE7.643s/source267 WorkDeadline/supervisor219.313MiB phase220.359MiB. Separate progress owner ROWS32 prevents projection; no actual128-policy failure. Next diagnostic source research target/wp1109/next-source-research.md, broader producer remains open.
+Controls: complete qualified/unqualified/ordinary profiles and source/byte limits,
+optionalJavaNonepositive/presentinvalidnegative, roles/defs/URL/digest/mirror/MODULE
+negatives and borrowedArc/path unchanged. Existing selected deadline/retirement
+proof exact20/23 plus deterministic immediateWorkDeadline/sticky/cancel/cleanup/
+livecredit/Weak controls; no20s sleeps. Formatter owner32/33/128 successful with
+sortedlast original/pointers/Arc,129 boundsrefused and withinboundlateduplicate
+ambiguous;33 pathrows/33 targets stillrefuse, existing field/raw/encoded/fallback/
+writerfailure/current-A-B/nonUTF8/unsupported controls preserved. Existing current63
+selectors7Bzlmod/26Loading/30Core include profile and formatter controls; add only
+if actual proof gap found before gates. Runner native26 vs other10/prepnull strict
+mode arithmetic verified without child execution; RSS/AS/FSIZE/log/grace unchanged.
+
+Inherit acceptedWP1109 tool/profile/source/permission contracts except explicit
+20/23/26 and progressowner128 changes. Freeze45authorities37Rust8metadata with
+only3allowedchanges42same; caller8 IDs/paths/digests unchanged. Original350ordered
+noninherited heldFDsourcebindings/18env unchanged; no corpus/body/archive/envvalue
+reads. RSS256MiB/AS512MiB/source512/census513/qualifieddecodewrite64MiB and all
+transfer/live/object/registry/directory/log limits unchanged. Fresh pinned nightly,
+locked/offline/jobs1 CargoJSON no-run/list/batched exactpreflight/nonzero63 bodies/
+directproduction/currentignoredsingleton; compilerRSS separate. Reuse root-only
+scaffolding with fresh operationstems, preserve historicalmaps/logs. DESIGN before
+source; source/helper/config PRELAUNCH before ONE distinct freshshell native with
+allwritersstopped; FINAL actualdiff/proofs/terminal/limits then plan/diff/archive/
+acceptedcommit. No identical replay/smallerroot/headergrant/automaticbudgetgrowth.
+REPLAN for another owner/effect/key/lifecycle/resource decision. Workflow>180s is a
+refactor signal: reuse reviews/scaffolding and avoid per-name or attribution-only
+packets; no timing speedup claim. Broader producer/certificate/analysis/actions/
+Rustc/M7A/bootstrap remains open until real evidence establishes it.
+
+Immediate predecessor f9e60407e accepted63proofs/Core27.219s/prod7.428s/ONE7.643s,
+145pins/source267/phase220.359MiB. WorkDeadline and null boundsrefused ownerprojection
+supply no fullSpec/currentownereligibility/CPUcause; retirement remains narrow.
+
+Accepted receipt: wp1110-qualified-native-readiness-window-2026-10-11.json. Actual63proofs/Core27.132s/prod7.409s/ONE14.960s/source291/phase229.672MiB. No quota/WorkDeadline; exact immutable rules_python+ release1.7.0 with nonemptyremoteMODULEpatch/strip1 is next materialization. Projection supplies no byteauthority/patchskip/admission. Broader producer remains open.

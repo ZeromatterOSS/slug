@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-321-m7a-materialization-owner-lookup
-Status: accepted — FINAL source/evidence ACCEPT; next progress owner diagnostic
+Packet: WP-7-322-m7a-qualified-native-readiness-window
+Status: accepted — FINAL source/evidence ACCEPT; next Python archive provenance
 
 The [current manifest](./slug-v2-subplans/current-packet.md) records the accepted
-[borrowed owner lookup checkpoint](./slug-v2-subplans/wp1109-materialization-owner-lookup-2026-10-10.json).
-Actual63 proofs/direct production passed; ONE7.643s/source267 reached WorkDeadline,
-phase220.359MiB under256. Originalprogressowner projection has a separate32-entry
-lookup ceiling; current128-policy failure and nativeowner eligibility are unproved.
-All resourcecaps unchanged. Fullproducer/M7A remains open.
+[qualified readiness window](./slug-v2-subplans/wp1110-qualified-native-readiness-window-2026-10-11.json).
+Actual63 proofs/prod passed; ONE14.960s/source291/phase229.672MiB under256 reached
+immutable rules_python+ archive materialization. No quota/WorkDeadline; exacttyped
+projection has a nonempty remoteMODULEpatch/strip1, requiring byte/provenance gates.
+Explicit20/23/26 timecheckpoint, all memory/byte/source caps unchanged. Fullproducer/
+M7A remains open.
 
 ### Ready and blocked queue
 

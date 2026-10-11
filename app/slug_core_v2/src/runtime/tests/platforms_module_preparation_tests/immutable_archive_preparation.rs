@@ -663,7 +663,7 @@ mod tests {
         assert_eq!(native(&bodies), expected);
         assert_eq!(
             bodies.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(7)
+            Duration::from_secs(20)
         );
         assert_eq!(Arc::strong_count(owner), owners);
         assert!(std::ptr::eq(
@@ -688,7 +688,7 @@ mod tests {
         assert_eq!(native(&cohort), expected);
         assert_eq!(
             cohort.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(7)
+            Duration::from_secs(20)
         );
         for case in 0..4 {
             let mut b = make();
@@ -847,7 +847,7 @@ mod tests {
         let module = bodies.offline_archive_module.as_ref().unwrap().as_path();
         let work = bodies
             .native_source_work_duration(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-        assert_eq!(work, Duration::from_secs(7));
+        assert_eq!(work, Duration::from_secs(20));
         assert_eq!(Arc::strong_count(backing), count);
         assert!(std::ptr::eq(
             bodies.offline_archive_module.as_ref().unwrap().as_path(),
@@ -868,7 +868,7 @@ mod tests {
         let scope = SourceServiceScope::new_for_test_with_offline_archive(
             bodies.roots[0].dupe(),
             start + work,
-            start + Duration::from_secs(8),
+            start + work + Duration::from_secs(3),
             limits,
             Some(bodies.roots[1].dupe()),
             bodies.offline_archive.clone(),
@@ -876,8 +876,8 @@ mod tests {
         )
         .unwrap();
         let scope_weak = Arc::downgrade(&scope);
-        assert_eq!(scope.work_deadline(), start + Duration::from_secs(7));
-        assert_eq!(scope.cleanup_deadline(), start + Duration::from_secs(8));
+        assert_eq!(scope.work_deadline(), start + Duration::from_secs(20));
+        assert_eq!(scope.cleanup_deadline(), start + Duration::from_secs(23));
         assert_eq!(scope.limits(), limits);
         let held = scope.reserve_buffer(16).unwrap();
         assert_eq!(scope.snapshot().live_buffer_bytes, 16);

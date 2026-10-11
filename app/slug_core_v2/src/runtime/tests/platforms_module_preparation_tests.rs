@@ -1851,7 +1851,7 @@ impl Bodies {
                 && self.rules_rust_defs_import_sources
                 && immutable_archive_preparation::native_byte_budget_backing(self)
             {
-                7
+                20
             } else {
                 5
             },
@@ -3512,11 +3512,12 @@ fn observe_native_command(
     let features_import_sources = bodies.bazel_features_import_sources;
     let features_root_present = bodies.additional[0].is_some();
     let start = Instant::now();
+    let work_duration = bodies.native_source_work_duration(registry_choice, command);
     let limits = bodies.native_source_limits(registry_choice, command);
     let scope = SourceServiceScope::new_for_test_with_offline_archives(
         workspace.clone(),
-        start + bodies.native_source_work_duration(registry_choice, command),
-        start + Duration::from_secs(8),
+        start + work_duration,
+        start + work_duration + Duration::from_secs(3),
         limits,
         bodies
             .rules_rust_defs_import_sources
