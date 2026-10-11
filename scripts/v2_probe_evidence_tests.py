@@ -41,7 +41,8 @@ class DirectEvidenceControls(unittest.TestCase):
         for key, value in (('extra_owner', 'invented'), ('owner_test_introduction_root', 'target/wp1132'),
                            ('historical_compile_root', 'target/wp1134'), ('last_actual_native_root', 'target/wp1133'),
                            ('prior', 'target/wp1133'), ('prior_receipt', 'thoughts/shared/plans/slug-v2-subplans/wp1133-invented.json'),
-                           ('core_counts', {**self.roles['core_counts'], 'current': 51}),
+                           ('core_counts', {**self.roles['core_counts'], 'current': 52}),
+                           ('source_counts', {**self.roles['source_counts'], 'current': 54}),
                            ('native_time_policy', {**self.roles['native_time_policy'], 'native_outer_seconds': 33})):
             changed = copy.deepcopy(self.roles)
             changed[key] = value
@@ -112,12 +113,12 @@ class DirectEvidenceControls(unittest.TestCase):
     def test_literal_transition_rejects_extra_missing_and_false_after(self):
         freeze = evidence.read(ROOT / 'source-freeze.json')
         evidence.validate_transition(self.roles, freeze)
-        third = next(p for p in freeze['before'] if p not in evidence.CHANGED)
+        third = next(p for p in freeze['before'] if p not in evidence.CURRENT_CHANGED)
         for field, key, value in [('after_format', third, '0' * 64), ('after_format', evidence.CHANGED[0], freeze['before'][evidence.CHANGED[0]])]:
             bad = copy.deepcopy(freeze); bad[field][key] = value
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
-        for key, value in [('changed', evidence.CHANGED[:1]), ('unchanged', 53), ('known_validation_sources_before', {third: '0' * 64})]:
+        for key, value in [('changed', evidence.CURRENT_CHANGED[:3]), ('changed', list(reversed(evidence.CURRENT_CHANGED))), ('unchanged', 52), ('known_validation_sources_before', {third: '0' * 64}), ('new_gate_sources', {evidence.READER: evidence.READER_BEFORE})]:
             bad = copy.deepcopy(freeze); bad[key] = value
             with self.assertRaises(AssertionError):
                 evidence.validate_transition(self.roles, bad)
@@ -127,6 +128,22 @@ class DirectEvidenceControls(unittest.TestCase):
         original = evidence.digest
         with mock.patch.object(evidence, 'digest', side_effect=lambda p: freeze['before'][str(p)] if str(p) in evidence.CHANGED else original(p)), self.assertRaises(AssertionError):
             evidence.authenticate_current_checkpoint(self.roles)
+        for path in evidence.CURRENT_CHANGED:
+            bad = copy.deepcopy(freeze); bad['after_format'][path] = bad['before'][path]
+            with self.assertRaises(AssertionError):
+                evidence.validate_transition(self.roles, bad)
+        after = freeze['after_format']
+        callers_path = ROOT / 'caller-source-pins.json'; callers = evidence._current_callers(self.roles, ROOT, after)
+        for row, field, value in [('1', 'sha256', '0' * 64), ('2', 'path', callers['1']['path']),
+                                  ('2', 'sha256', evidence.MEMORY_BEFORE), ('2', 'bytes', callers['2']['bytes'] + 1)]:
+            bad = copy.deepcopy(callers); bad[row][field] = value
+            with self.replaced_record(callers_path, bad), self.assertRaises(AssertionError):
+                evidence._current_callers(self.roles, ROOT, after)
+        selectors_path = ROOT / 'core-selectors.json'; evidence._current_selectors(self.roles, ROOT)
+        for index in (0, 52):
+            bad = evidence.read(selectors_path); bad['ordinary'][index] = 'invented::selector'
+            with self.replaced_record(selectors_path, bad), self.assertRaises(AssertionError):
+                evidence._current_selectors(self.roles, ROOT)
 
     def test_fresh_compile_profile_features_and_old_artifact_refuse(self):
         evidence.authenticate_current_compile(self.roles)
@@ -208,6 +225,10 @@ class DirectEvidenceControls(unittest.TestCase):
         artifact = evidence.read(Path(evidence.ROOTS['L']) / 'slug_loading_v2-executable.json')
         original = evidence.digest
         with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if str(p) == artifact['path'] else original(p)), self.assertRaises(AssertionError):
+            evidence.authenticate_operation(self.roles, gate, freeze)
+        # The one additional memory exception never expands to an unrelated physical source.
+        third = next(p for p in self.roles['current_before'] if p not in evidence.CURRENT_CHANGED and p not in self.roles['loading_private_before'])
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if str(p) == third else original(p)), self.assertRaises(AssertionError):
             evidence.authenticate_operation(self.roles, gate, freeze)
         bad_roles = copy.deepcopy(self.roles); bad_roles['historical_pins']['target/wp1133/native/operation.json'] = '0' * 64
         with self.assertRaises(AssertionError):

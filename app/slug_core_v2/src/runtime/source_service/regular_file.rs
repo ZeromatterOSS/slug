@@ -186,6 +186,107 @@ impl Capture {
     }
 }
 
+// Host storage stays unpublished and uniquely owned until every slot and the
+// original file identity have been checked. Registry retains its Vec capture.
+enum ReadCapture {
+    Host {
+        bytes: Arc<[std::mem::MaybeUninit<u8>]>,
+        initialized: usize,
+        _credit: SourceBufferReservation,
+    },
+    Registry(Capture),
+}
+impl ReadCapture {
+    fn new(
+        scope: &Arc<SourceServiceScope>,
+        policy: ReadPolicy,
+        capacity: usize,
+    ) -> Result<(Self, SourceBufferReservation), SourceServiceError> {
+        if policy.is_host() {
+            let size = capacity
+                .checked_add(64)
+                .ok_or_else(|| scope.poison(SourceServiceError::BufferLimit))?;
+            let credit = scope.reserve_buffer_at(size, policy.arc_site())?;
+            let scratch = scope.reserve_buffer_at(CHUNK_BYTES, policy.read_site())?;
+            scope.check()?;
+            // Like final Arc::from, allocation is infallible. The accepted Host
+            // policy moves it earlier, after both budget reservations/checks.
+            let bytes = Arc::<[u8]>::new_uninit_slice(capacity);
+            scope.check()?;
+            Ok((
+                Self::Host {
+                    bytes,
+                    initialized: 0,
+                    _credit: credit,
+                },
+                scratch,
+            ))
+        } else {
+            let capture = Capture::with_capacity(scope, policy, capacity)?;
+            let scratch = scope.reserve_buffer_at(CHUNK_BYTES, policy.read_site())?;
+            Ok((Self::Registry(capture), scratch))
+        }
+    }
+    fn len(&self) -> usize {
+        match self {
+            Self::Host { initialized, .. } => *initialized,
+            Self::Registry(capture) => capture.bytes.len(),
+        }
+    }
+    fn append(
+        &mut self,
+        scope: &SourceServiceScope,
+        chunk: &[u8],
+    ) -> Result<(), SourceServiceError> {
+        match self {
+            Self::Registry(capture) => capture.append(scope, chunk),
+            Self::Host {
+                bytes, initialized, ..
+            } => {
+                let next = initialized.checked_add(chunk.len()).ok_or_else(|| {
+                    scope.poison(SourceServiceError::Overflow(SourceCounter::DecodedBytes))
+                })?;
+                if next > bytes.len() {
+                    return Err(scope.poison(SourceServiceError::Allocation));
+                }
+                scope.charge(SourceCounter::DecodedBytes, chunk.len() as u64)?;
+                let slots = Arc::get_mut(bytes).expect("unpublished Host capture is unique");
+                for (slot, value) in slots[*initialized..next].iter_mut().zip(chunk) {
+                    slot.write(*value);
+                }
+                *initialized = next;
+                Ok(())
+            }
+        }
+    }
+    fn finish_with(
+        self,
+        scope: &Arc<SourceServiceScope>,
+        after_created: impl FnOnce(&Arc<[u8]>),
+    ) -> Result<Arc<[u8]>, SourceServiceError> {
+        match self {
+            Self::Registry(capture) => capture.finish_with(scope, after_created),
+            Self::Host {
+                bytes,
+                initialized,
+                _credit,
+            } => {
+                scope.check()?;
+                if initialized != bytes.len() {
+                    return Err(scope.poison(SourceServiceError::Allocation));
+                }
+                // SAFETY: charge-before-write initialized every slot in the
+                // exact bounded prefix; no initialized view escaped earlier.
+                // The normal reader also verified EOF/size/inode/current name.
+                let result = unsafe { bytes.assume_init() };
+                after_created(&result);
+                scope.check()?;
+                Ok(result)
+            }
+        }
+    }
+}
+
 pub(in crate::runtime) fn read_host_file(
     scope: &Arc<SourceServiceScope>,
     path: &Path,
@@ -417,15 +518,14 @@ fn read_regular_with(
     } else {
         policy.maximum(scope)
     };
-    let mut buffer = Capture::with_capacity(scope, policy, capacity)?;
-    let _read_credit = scope.reserve_buffer_at(CHUNK_BYTES, policy.read_site())?;
+    let (mut buffer, _read_credit) = ReadCapture::new(scope, policy, capacity)?;
     let mut chunk = [0u8; CHUNK_BYTES];
     loop {
         hook(ReadPoint::BeforeRead, &input);
         scope.check()?;
         // Registry keeps its original full chunk, including overflow rejection
         // before any charge. Host reads its pinned length plus one EOF probe.
-        let remaining = capacity - buffer.bytes.len();
+        let remaining = capacity - buffer.len();
         let requested = if !policy.is_host() {
             CHUNK_BYTES
         } else if remaining == 0 {
@@ -466,7 +566,7 @@ fn read_regular_with(
         "scoped registry final stat failed",
         || input.metadata(),
     )?;
-    if identity(&after) != identity(&before) || buffer.bytes.len() as u64 != before.len() {
+    if identity(&after) != identity(&before) || buffer.len() as u64 != before.len() {
         return Err(RegularFileError::Changed { before_read: false });
     }
     hook(ReadPoint::BeforeConversion, &input);
@@ -492,7 +592,7 @@ fn read_regular_with(
             return Err(RegularFileError::Changed { before_read: false });
         }
     }
-    let result = buffer.finish(scope)?;
+    let result = buffer.finish_with(scope, |_| {})?;
     if policy.is_host() {
         scope.check()?;
     }

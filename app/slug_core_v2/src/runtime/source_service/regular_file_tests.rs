@@ -74,6 +74,8 @@ fn scoped_host_regular_bytes_empty_and_maximum_keep_accounting_and_owner_domains
         let bytes = (0..length).map(|i| (i % 251) as u8).collect::<Vec<_>>();
         std::fs::write(&path, &bytes).unwrap();
         let owner = scope(SourceServiceLimits::default());
+        owner.arm_copy_counts_for_test();
+        let traffic_before = owner.copy_counts_for_test();
         let value = host_with_policy(
             &owner,
             &path,
@@ -93,10 +95,8 @@ fn scoped_host_regular_bytes_empty_and_maximum_keep_accounting_and_owner_domains
             (0, 0)
         );
         assert_eq!((counters.transferred_bytes, counters.written_bytes), (0, 0));
-        assert_eq!(
-            counters.peak_buffer_bytes,
-            length * 2 + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES + 64
-        );
+        assert_eq!(counters.peak_buffer_bytes, length + CHUNK_BYTES + 64);
+        assert_eq!(owner.copy_counts_for_test(), traffic_before);
         let weak = Arc::downgrade(&value);
         let retained = Arc::clone(&value);
         assert!(Arc::ptr_eq(&value, &retained));
@@ -306,15 +306,15 @@ fn scoped_host_interrupted_reads_are_bounded_and_scope_failure_wins() {
 #[test]
 fn scoped_host_conversion_overlap_and_cumulative_history_are_bounded() {
     let owner = scope(SourceServiceLimits::default());
-    let mut capture = Capture::with_capacity(&owner, ReadPolicy::Host, 2).unwrap();
+    let (mut capture, scratch) = ReadCapture::new(&owner, ReadPolicy::Host, 2).unwrap();
     assert_eq!(
         capture.append(&owner, b"abc"),
         Err(SourceServiceError::Allocation)
     );
-    assert_eq!(capture.bytes.capacity(), 2);
-    assert!(capture.bytes.is_empty());
+    assert_eq!(capture.len(), 0);
     assert_eq!(owner.snapshot().decoded_bytes, 0);
     drop(capture);
+    drop(scratch);
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
     let directory = tempfile::tempdir().unwrap();
     let path = directory.path().join("body");
@@ -342,28 +342,117 @@ fn scoped_host_conversion_overlap_and_cumulative_history_are_bounded() {
     let length = 4096;
     std::fs::write(&path, vec![0x5a; length]).unwrap();
     for policy in [ReadPolicy::Host, ReadPolicy::KnownShas] {
-        let ceiling = length * 2 + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES + 63;
-        let owner = scope(SourceServiceLimits {
-            live_buffer_bytes: ceiling,
-            ..SourceServiceLimits::default()
-        });
-        assert!(matches!(
-            host_with_policy(
+        for shortage in [0, 1] {
+            let owner = scope(SourceServiceLimits {
+                live_buffer_bytes: length + CHUNK_BYTES + 64 - shortage,
+                ..SourceServiceLimits::default()
+            });
+            let mut reads = 0;
+            let result = host_with_policy(
                 &owner,
                 &path,
                 policy,
                 |_, _| {},
-                |file, bytes| file.read(bytes)
-            ),
-            Err(RegularFileError::Scope(SourceServiceError::BufferLimit))
-        ));
-        assert_eq!(owner.snapshot().decoded_bytes, length as u64);
-        assert_eq!(
-            owner.snapshot().peak_buffer_bytes,
-            length + std::mem::size_of::<Vec<u8>>() + CHUNK_BYTES
-        );
-        assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+                |file, bytes| {
+                    reads += 1;
+                    file.read(bytes)
+                },
+            );
+            if shortage == 0 {
+                assert_eq!(result.unwrap().as_ref(), vec![0x5a; length]);
+                assert_eq!(owner.snapshot().decoded_bytes, length as u64);
+                assert_eq!(
+                    owner.snapshot().peak_buffer_bytes,
+                    length + CHUNK_BYTES + 64
+                );
+            } else {
+                assert!(matches!(
+                    result,
+                    Err(RegularFileError::Scope(SourceServiceError::BufferLimit))
+                ));
+                assert_eq!(reads, 0);
+                assert_eq!(owner.snapshot().decoded_bytes, 0);
+                assert_eq!(owner.snapshot().peak_buffer_bytes, length + 64);
+            }
+            assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+        }
     }
+}
+
+#[test]
+fn scoped_host_final_storage_refuses_partial_and_cancelled_publication() {
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("body");
+    std::fs::write(&path, b"abcd").unwrap();
+    for io_error in [false, true] {
+        let owner = scope(SourceServiceLimits::default());
+        let mut reads = 0;
+        let result = host_with(
+            &owner,
+            &path,
+            |_, _| {},
+            |file, bytes| {
+                reads += 1;
+                if reads == 1 {
+                    file.read(&mut bytes[..2])
+                } else if io_error {
+                    Err(io::Error::from(io::ErrorKind::UnexpectedEof))
+                } else {
+                    Ok(0)
+                }
+            },
+        );
+        if io_error {
+            assert!(matches!(
+                result,
+                Err(RegularFileError::Io {
+                    stage: RegularFileStage::Read,
+                    ..
+                })
+            ));
+        } else {
+            assert!(matches!(
+                result,
+                Err(RegularFileError::Changed { before_read: false })
+            ));
+        }
+        assert_eq!(owner.snapshot().decoded_bytes, 2);
+        assert_eq!(owner.check(), Ok(()));
+    }
+    let owner = scope(SourceServiceLimits::default());
+    let (mut partial, scratch) = ReadCapture::new(&owner, ReadPolicy::Host, 4).unwrap();
+    partial.append(&owner, b"ab").unwrap();
+    let weak = match &partial {
+        ReadCapture::Host { bytes, .. } => Arc::downgrade(bytes),
+        _ => unreachable!(),
+    };
+    assert!(matches!(
+        partial.finish_with(&owner, |_| panic!("partial storage escaped")),
+        Err(SourceServiceError::Allocation)
+    ));
+    drop(scratch);
+    assert!(weak.upgrade().is_none());
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    let owner = scope(SourceServiceLimits::default());
+    owner.arm_copy_counts_for_test();
+    let traffic_before = owner.copy_counts_for_test();
+    let (mut complete, scratch) = ReadCapture::new(&owner, ReadPolicy::Host, 4).unwrap();
+    complete.append(&owner, b"abcd").unwrap();
+    let mut published_weak = None;
+    let result = complete.finish_with(&owner, |value| {
+        assert_eq!(value.as_ref(), b"abcd");
+        published_weak = Some(Arc::downgrade(value));
+        owner.cancel();
+    });
+    assert!(matches!(result, Err(SourceServiceError::Cancelled)));
+    drop(scratch);
+    assert!(published_weak.unwrap().upgrade().is_none());
+    assert_eq!(owner.snapshot().decoded_bytes, 4);
+    assert_eq!(owner.snapshot().live_buffer_bytes, 0);
+    assert_eq!(owner.copy_counts_for_test(), traffic_before);
+    let scope_weak = Arc::downgrade(&owner);
+    drop(owner);
+    assert!(scope_weak.upgrade().is_none());
 }
 
 #[test]

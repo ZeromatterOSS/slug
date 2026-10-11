@@ -34,23 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-348-m7a-rust-analyzer-component-and-routing
-Status: resource correction in preparation — frozen WP1136 native rejected
+Packet: WP-7-349-m7a-host-final-buffer-correction
+Status: accepted — independent FINAL; current memory gate fits unchanged256MiB; selecting exact rustfmt metadata successor
 
-Accepted WP1135 33699afa7 admits runfiles component Lstat and passes fresh52/13,
-PRE/ONE/FIRST/FINAL. Phase255.0859375MiB leaves0.9140625 under256; future fit open.
-[Current manifest](./slug-v2-subplans/current-packet.md) selects only actual next
-root1 rust/rust_analyzer component Lstat (metadata10→11/Need78→79/source34 unchanged)
-and the stopped workflow advisory's explicit predecessor/root and full config+2
-routing seam. Fixed compile history/current/native identities and all caps stay.
-Marker/body/producer/actions/Rustc/bootstrap closure remains open; Windows deferred.
-WP1136 fresh52/13/default production passed; actual phase262180KiB exceeded
-256MiB by36KiB and immutable FIRST once rejected acceptance. The
-[failure receipt](./slug-v2-subplans/wp1136-resource-failure-2026-10-11.json)
-preserves candidate/evidence; last accepted native stays WP1135. Source-only
-allocation readiness identifies Host Vec-to-Arc duplication for separately
-reviewed correction. No cap lift/identical replay or allocation-cause claim;
-broader expansion waits for representative workload fit.
+[WP1137 receipt](./slug-v2-subplans/wp1137-host-final-buffer-2026-10-11.json)
+accepts final Host Arc storage and the coupled pending rust_analyzer metadata.
+Fresh59/helper13/default production and strictly qualified protected36/fixture31
+passed. ONE20.765s measured255.4296875MiB under unchanged256MiB; FIRST once passed.
+The rejected [WP1136 cohort](./slug-v2-subplans/wp1136-resource-failure-2026-10-11.json)
+remains immutable failure evidence. Next captured boundary is root1 rust/rustfmt
+Lstat200B, with closed normal-component source readiness. Resume exact metadata
+under the same caps and reviewed finite helper routing; full producer/actions/
+Rustc/bootstrap and future fit remain open. Windows deferred.
 
 ### Ready and blocked queue
 

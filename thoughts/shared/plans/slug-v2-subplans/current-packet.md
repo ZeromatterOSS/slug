@@ -1,125 +1,145 @@
-# WP1136 Rust analyzer component and reusable packet evidence routing
+# WP1137 Host final-buffer allocation correction
 
-Packet: WP-7-348-m7a-rust-analyzer-component-and-routing
-Status: resource correction in preparation — frozen WP1136 native rejected
+Frozen detailed contract: target/wp1137/packet-contract.md.
 
-Outcome: append only borrowed static rust/rust_analyzer root1 Lstat metadata
-under the existing exact rules-Rust defs-import PreparedFile/PublicProbe flag.
-Source34/order/bytes unchanged, metadata10→11, whole-Need78→79. Normal Host,
-materialization, PathObservationKey/DICE epoch, Arc ownership and errors stay.
-Compatibility: Slug-native private tooling around unchanged exact normal path
-semantics; Windows deferred. Producer/actions/Rustc/bootstrap and whole fit open.
+Packet: WP-7-349-m7a-host-final-buffer-correction
+Status: accepted — independent FINAL; current memory gate fits unchanged256MiB; selecting exact rustfmt metadata successor
+Baseline: f850b8478 preservation commit over accepted WP1135
+33699afa7a762fa6556eda5f139d5557594a5db5. The pending WP1136 Rust2 component
+metadata/routing candidate remains applied, not accepted. Frozen WP1136 contract
+4f7789c82d37f11d5b91aa8228823b821519d2c208abb2a9d91bc688e4c9545c
+and complete inherited contracts remain authority except explicit changes below.
+Last ACCEPT native/receipt stays WP1135, not the rejected WP1136 native.
 
-Baseline: accepted WP1135 HEAD33699afa7a762fa6556eda5f139d5557594a5db5.
-[Receipt](./wp1135-rust-runfiles-component-metadata-2026-10-11.json)
-SHA70eda4799c566d926f270c16142723170a29c05ad3a6879985bf0fdef9e05b6c.
-Actual ONE captured root1 rust/rust_analyzer Lstat206B, original_headers[];
-no presence/kind/caller/marker/body/list is inferred. Stopped normal-source
-readiness target/wp1135/next-metadata-source-readiness.md
-SHA7c2c6796d61a96458ed0211f190aaa5218704735e6efe7e213183184c813ab6c
-pins path_resolution.rs:533/743–774, source_preparation.rs:5964/6016 and
-host_package.rs:755/833. Append only the exact component; no marker pair yet.
+Evidence: WP1136 resource failure receipt
+thoughts/shared/plans/slug-v2-subplans/wp1136-resource-failure-2026-10-11.json
+SHA775884efff5555b0c32ddf552320e040399d462fafad0d5a9456e25274fe3eeb.
+Actual frozen native phase262180KiB exceeded262144KiB by36KiB. Immutable FIRST
+once exited1; no candidate/FINAL acceptance. Preserve every old source/config/
+checkpoint/operation/stream/review. Never replay the unchanged cohort or rerun
+its FIRST. Resource review57b8039988332058be408d90d4a21d62a845f332cc00d66a81e24957fadf87d3
+and Core readiness9498155ac90205384bd052ba924bb71a6f068dced6892b2110d8976588a0b6b0
+are read-only source basis. Loading advisory06203a556fb822c2a9bdf1ef410a913cc76a626e8e30560a50bee5579a0f568e
+is an unmeasured alternative; no Loading implementation selected here.
 
-Inherited complete contract target/wp1135/packet-contract.md
-SHAd7ed14a228acb6ef299387afbf46964f513995f7450f0620a36ce4d94a6baa9e,
-which explicitly links complete WP1134 contract2ae39fd792092fc1b327f176d7463b119b72eae66a3ca5a92b96fd01913b6ee5.
-Current-before54 is actual WP1135.after54; after changes exactly the same ordered
-Rust2, other52/auth6 unchanged, known/new additions empty. Q/L/S/H/O/E/I direct103,
-eleven original gates, seven named Q-private3/diagnostic2/Loading2 exceptions,
-distinct L-before and I1131 introduction, protected physical executables remain.
-Core52 exact names/order/focused88/protected36/fixture31/portable3 and source361/
-caller8/env18/backings6 remain exact. Historical compile9 stays actual WP1132;
-last actual native6 is WP1135. Immediate12 is its eleven named facts plus receipt.
-Original WP1132 source-freeze915501cdb77e419ed592c03e7f26bd6221f8166bb3b3d9cadd84b315b8525510
-remains one explicit metadata pin in initial helper/checkpoint/every current
-config/prototype/native, outside source54/direct103/historical15. Original54
-keyset/other52/auth6 match immediate before, exact old Core2 remain original.
-No old Core execution, predecessor union or unexecuted template credit.
+Outcome: scoped regular Host/KnownShas reads initialize only their final,
+uniquely owned pinned-size Arc allocation, eliminating their intermediate Vec
+and its final payload copy. Registry keeps its original fixed-capacity Vec,
+full64KiB read, overflow/charge ordering and conversion behavior. The returned
+Arc remains independent of request/scope scratch. No additional source/policy
+admission beyond preserved pending WP1136 rust/rust_analyzer Lstat. No new
+interner/cache/global pool, DICE key/lock, allocator/API/dependency or Windows work.
+Compatibility: Slug-native bounded allocation implementation; exact existing
+Host file bytes/inode/name/EOF/error/epoch semantics stay. System-OOM handling
+is explicitly narrowed below, not claimed to be exact Bazel behavior.
 
-Scope: same two Core policy/proof files; scripts/v2_probe_evidence.py and
-scripts/v2_probe_evidence_tests.py; target/wp1136 fixed wrappers/artifacts;
-root receipt/scheduling. Supervisorce5a8627acd9f0669bc7afcf827be38d0b280d4cd24bf09bfdf10207bf7c56cd
-and six leaf utility/source-qualification function bodies stay exact. Rust grows
-one borrowed tuple plus shared discriminator; no String/Vec/clone/field/cache/
-interner/selector/source grant. Reuse child/case/suffix/foreign-root negatives,
-roles/operations, both mixed orders/borrowed offender/zero Progress/Arc-Weak cleanup
-and budgets. Large test owners remain cohesive; no representation or Stage9 delta.
+Natural owner: regular_file.rs/read_regular_with, SourceServiceScope buffer bank,
+normal path_observation FileBytes/current source epoch, independently returned
+Arc bytes. Retained DICE semantic payload shape/equality/history remain identical.
+Host capture storage is unpublished command/read scratch until full validation;
+returned payload history remains bounded by existing cumulative DecodedBytes,
+not a per-Arc live bank lease. Arc/Weak/last-Drop and scope cleanup remain separate.
 
-Recurring preparation decision: stopped workflow advisory
- target/wp1135/workflow-readiness.md
-SHA21b855557fa578ebf0f15ac38513ed6a57b009bf92816daf930295c8b05c1866
-examined actual helper276.675s; this selects its smallest reusable predecessor
-seam before further helper churn. DESIGN must accept the exact API before edits:
-- Add only roles.prior_receipt, the explicit canonical relative accepted receipt
-  path. Require root/prior canonical target/wpN, distinct, last_native==prior,
-  fixed historical_compile_root==WP1132, exact immediate eleven names+that receipt.
-  No environment/cwd/latest scanning or donor recursion. Future packet roots are
-  declared frozen metadata, not implicit discovery or extra historical exceptions.
-- Authenticate pinned predecessor receipt verdict, contract/baseline against its
-  original source freeze/checkpoint, source_pins equality and original actual
-  native operation/config/stdout facts. Root binds the accepted receipt at current
-  Git baseline before DESIGN; no current-baseline substitution for its old base.
-- Replace fixed256/258 with the exact original unique config pin set plus exactly
-  original config path and stable absolute supervisor selfpath. Both automatic
-  identities must be distinct and absent from original listed set; full operation
-  map/cardinality is config+2. This is a relation, not an adjustable cap or union.
-- All original entries remain authenticated against original checkpoint/freeze/
-  source54/helper hashes. Only exact Rust2/shared helper+controls2/obsolete Core
-  are historical metadata after replacement; unchanged physical pins and protected
-  binaries remain strict. No arbitrary third helper exception.
-- Controls take one explicit packet-root command argument supplied by frozen
-  factory. Authenticate canonical input/roles.root/checkpoint before fixtures.
-  No default root or implicit environment/cwd lookup. Alternate-root schema checks
-  use an owned unused-root fixture rather than the next packet number. Preserve
-  all13 named meaningful methods/order, extending root/receipt/map negatives.
-  Wrong receipt path/hash/verdict/baseline/contract/sourcepin/native fact, wrong
-  compile/native root, duplicate config pin or automatic identity/alias, omitted
-  source/self key, helper-map inconsistency and protected binary corruption refuse.
-Existing public helper signatures and counts remain; six digest/encoded/read/
-sha_map/equal_aliases/qualified_sources bodies unchanged. Native policy/current
-checkpoint/full compile binding protocols stay. No framework/cache/registry or
-per-packet helper copy. Estimate helper≤40/control≤55 changed net lines is a
-responsibility-review trigger, never quota/permission stop; tests add only genuine
-missing distinctions within13 methods, otherwise record actual new count.
+Decision for DESIGN: reuse repository_archive_http/scoped.rs transfer_selected_capture
+unpublished Arc::new_uninit_slice/initialized-prefix pattern (SHAc349008bb6af9a5c04fea351a032746bfaf37f36628aa0f0dae5fab20c7e6bec).
+Use the existing64KiB initialized read scratch; charge before writing new slots;
+never expose partial storage. Initialize all0..pinned_len exactly, verify full
+EOF/size/inode/current name and scope before assume_init/publication. Empty capture
+has a valid fully initialized empty range. Partial IO/growth/shrink/cancel failures
+drop MaybeUninit<u8> safely; no unsafe initialized read or public uninit interface.
+Keep interrupted Host reads bounded by actual scope checks and IO postcheck priority.
 
-Reuse existing factory193/FIRST381 protocols through mechanical literal
-rebinding. Factory root/doc and explicit helper-tests argument change; FIRST doc/
-root/modulealias/baseline/packet/workpacket/implementation text change. Other
-protocol bodies/outputs/filenames/profile/source vectors and >=13 floor unchanged.
-Root measures stopped actual deltas, full SOURCE review before any new import/main.
-Initial immutable freeze/checkpoint excludes future artifact; postcompile separate
-binding. Each factory/gate/artifact/list/preflight/body/production/native call is
-a distinct fresh root execution; serial Cargo. Fresh current compile Cargo JSON/
-full64KiB executable hash, exact52 batchedpreflight/body, default Core+slug CLI,
-ignored singleton, all13 controls, independent PRE, ONE native, immutable FIRST
-once after JOIN, independent FINAL then compact accepted receipt/local commit.
-Reuse passing unchanged protected evidence. Preserve failures; no identical replay
-or cap raise. No source helper execution or original leaf/stat/list/body/archive/
-environment-value acquisition outside existing native361 held-FD observation.
+Explicit allocation-failure/sequencing decision: budget/overflow/scope refusal
+must precede final Arc allocation. Reserve pinned_len+64 conservative header/owner
+credit and64KiB scratch under unchanged bank/caps. Arc::new_uninit_slice is infallible,
+as was existing final Arc::from. Removing the Vec removes its try_reserve_exact
+system-allocator Allocation result; a physical system-OOM can abort earlier,
+rather than after the old typed Vec allocation/refund. This narrow Slug-native
+sequencing change is selected explicitly; do not claim preservation of a fallible
+final-Arc allocator. Bound length/credit; preserve existing explicit poisoned
+Allocation/cancel/acquisition and other typed refusal precedence. No allocator_api,
+custom allocator/manual Arc layout or catch/retry. If independent DESIGN rejects
+this explicit change, correct the contract before implementation, not permission-stop.
 
-Caps unchanged: work26/cleanup29/outer32/default5/8/ordinary10, constructor27+tail3,
-RSS256/AS512/live16/source512/census513/transfer32, decoded128 and written128 each,
-FSIZE16/native32 and Kotlin-onlyFD exception. Compile separately. Last phase
-255.0859375MiB/headroom0.9140625 is narrow prefix fit, no future fit/saving/cause.
-Necessary time authorized; recurring >180s examined for reuse/refactoring, not a
-deadline or permission request. No prediction of actual next frontier/RSS/traffic.
-REPLAN only for a concrete contradicting semantic owner/authority/compatibility
-choice; routine invocation and test corrections remain within this contract.
+Implementation allowlist: regular_file.rs and existing regular_file_tests.rs;
+shared evidence/helper controls solely for exact current-memory/source transition;
+mechanically adapted fixed target/wp1137 factory/FIRST/artifacts; Stage9 matching
+Core source row and root compact receipts/scheduling. Pending Rust2 policy/proof
+files and all other production/source owners remain byte-exact WP1136. Reader
+currently537L/one~190L validation loop: keep one cohesive identity/IO loop and one
+private final-buffer helper/enum, avoiding duplicate Host reader or new framework.
+Estimate <=120 net production lines and <=80 net test lines; responsibility triggers,
+not quotas. No changes to scope state/limits, copy counter storage, production CLI
+semantics, request selector, archive capture, source grants or normal Host observation.
 
-Current result: fresh Core52/default production/13 controls and independent
-DESIGN/SOURCE/PRE passed. ONE20.864791495s exited0/JOIN but five-phase peak
-262180KiB exceeds256MiB by36KiB; immutable FIRST once exited1 at the
-unchanged phase assertion. [Failure receipt](./wp1136-resource-failure-2026-10-11.json)
-preserves this cohort; no candidate/FINAL acceptance exists. Last accepted native
-remains WP1135. Existing frozen target/wp1136 contract/configs/sources/evidence
-remain immutable. No unchanged replay or cap lift.
+Traffic: existing CopyCounts still counts actual Vec-to-Arc created/returned copies;
+Host final storage creates no such copy and must not increment those counts. Registry
+controls/counts/overflow/arming stay unchanged. A lower native count is copy traffic,
+not retained memory/RSS saving or36KiB-cause attribution. Discriminate final storage
+shape using actual live-bank peak, independent Arc identity/last-Weak behavior,
+known-size content/partial cancellation. No performance percent/speedup claim or
+A/B replay; acceptance is structural duplicate removal plus unchanged256MiB fit.
 
-Next action: separately design a concrete allocation correction before another
-native cohort. Source-only Core readiness target/wp1136/core-allocation-readiness.md
-identifies pinned Host/KnownShas Vec-to-Arc duplication and the existing final-Arc
-fill precedent; saved482 conversions/8120973B are traffic, not retained-memory
-or36KiB-cause attribution. Resolve typed Vec allocation failure versus earlier
-infallible final-Arc allocation explicitly; keep Registry behavior and all
-identity/EOF/cancellation/counters/independent-Arc lifetime constraints. Add exact
-reader-test authority and freeze a distinct changed-source cohort if selected.
-Broader metadata expansion waits for representative workload memory fit.
+Fresh owner tests: all six existing reader tests plus one bounded final-storage
+partial/post-publication cancellation discriminator, added to unchanged Core52:
+Core59+protected36=95. Reuse existing reader byte/empty/max/KnownShas/missing/nonregular/
+overlimit/inode/growth/shrink/current-name/Interrupted/IO priority/cumulative history/
+Registry proofs. Update only former Host two-allocation overlap expectations to
+one final allocation; test exact lower bank succeeds and one-byte-under refuses
+without payload publication, then live credit0 and last-Weak expiry. Final-helper
+partial prefix never becomes initialized Arc; post-created cancellation retires
+Arc/credit; counters remain charged only for consumed bytes. Registry CopyCounts2
+remain in current Core52. No original Host payload acquisition in source tests.
+
+Provenance correction for distinct next cohort: accepted-before54 remains WP1135
+actual after54. Add exactly one known existing reader-test source (before SHA
+6da02db74f164389b00cb5c296cfeb84a644843481ffc724004bcadb8b536a55) to
+before55/after55; current physical design baseline54 is preserved WP1136 after54,
+with exactly pending Rust2 differences from accepted-before. Final changed order
+is Rust parent, Rust proof, regular_file.rs, reader tests; other51/auth6 unchanged.
+No authority addition; exact known/new gate-source map is reader tests only.
+Original WP1132 compile54 remains intact; compare its original keyset/other52/auth6
+to accepted-before54 excluding the one added gate source, original Rust2 differences
+remain distinct from new current4 allowlist. Historical source maps stay original.
+
+Shared helper must authenticate that distinction explicitly, preserving all six
+utility/qualified-source function bodies, full original pin/config+2 relations,
+original Q/L/S/H/O/E/I direct103/eleven gates/seven original source exceptions,
+distinct L-before/I1131 introduction and strict protected executable identities.
+Only one extra named replaced-source exception regular_file.rs is allowed where
+old Core compile/P5 native/L gate maps pinned it; use EACH original map's recorded
+SHA, never substitute another predecessor hash or pretend old Core ran current code.
+Original Q regular_file already has its own older diagnostic exception; preserve
+that original pin separately. Reader-test new source stays outside old maps, explicitly
+in current freeze/checkpoint/configs. No arbitrary extra helper/binary exception.
+Caller metadata has exactly one changed ID2 row: same regular_file.rs path; old
+P5 row SHA04413bdc878b65224556f24a8d8b56dc9fe289041bd3704f866035323394d48f/15294B
+authenticated against accepted-before54/receipt, fresh row SHA=after[regular_file]
+and actual current source byte count. IDs1/3–8 remain entire-row exact; cardinality8
+unchanged. Preserve original prior caller metadata; no arbitrary caller exception.
+
+Before implementation helper author must pin exact original maps and expose wrong
+extra exception/order/source/count/protected-binary refusals within13 controls.
+
+Validation/integration: independent DESIGN before owner/helper edits. Resolve actual
+pinned cargo/rustc/rustdoc/rustfmt; format changed Rust only, diff/archive checks.
+Stopped full SOURCE review/current freeze/checkpoint precede any new helper import/
+factory main. Fresh serial compile CargoJSON/current Core executable streamed SHA,
+separate artifact binding/list/batched59 preflight/body; default Core+slug production;
+exact ignored singleton; all13 helper controls. Reuse strictly unchanged protected36/
+fixture31 evidence only with the explicitly revised memory-source relations above.
+PRE reviews actual new current/source/compile/native config; ONE distinct native,
+immutable FIRST once after JOIN, FINAL before coupled acceptance/local commit.
+Old failed native remains immutable evidence, not an accepted predecessor or template.
+
+Caps unchanged: work26/cleanup29/outer32/default5/8/ordinary10/constructor27+tail3;
+RSS256/AS512/live16/source512/census513/transfer32, independent decoded128/written128,
+FSIZE16/native32/Kotlin-only FD exception. Current source361/caller8/env18/backings6
+and all source bytes/order remain unchanged. Broader plan expansion waits for the
+representative cohort within memory budget. Native identity/producer/actions/
+Rustc/bootstrap/whole/future fit and savings remain unproved; no new frontier prediction.
+Recurring work>180s is examined for actual need/refactoring, not a deadline. Reuse
+closed Core allocation seam rather than repeat broad scans; setup/FIRST protocol
+changes remain bounded explicit relations, no new validation framework. REPLAN only
+for contradictory semantic owner/authority/compatibility choice; root can resolve
+this declared private allocation sequencing choice under existing user authorization.
