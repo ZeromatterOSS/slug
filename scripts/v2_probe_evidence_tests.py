@@ -129,8 +129,9 @@ class DirectEvidenceControls(unittest.TestCase):
         with self.replaced_record(ROOT / 'source-freeze.json', bad), self.assertRaises(AssertionError):
             evidence.authenticate_current_checkpoint(self.roles)
         original = evidence.digest
-        with mock.patch.object(evidence, 'digest', side_effect=lambda p: freeze['before'][str(p)] if str(p) in evidence.CHANGED else original(p)), self.assertRaises(AssertionError):
-            evidence.authenticate_current_checkpoint(self.roles)
+        for path in evidence.CURRENT_CHANGED:
+            with mock.patch.object(evidence, 'digest', side_effect=lambda p, changed=path: freeze['before'][str(p)] if str(p) == changed else original(p)), self.assertRaises(AssertionError):
+                evidence.authenticate_current_checkpoint(self.roles)
         for path in evidence.CURRENT_CHANGED:
             bad = copy.deepcopy(freeze); bad['after_format'][path] = bad['before'][path]
             with self.assertRaises(AssertionError):
@@ -138,8 +139,13 @@ class DirectEvidenceControls(unittest.TestCase):
         for path, old in ((evidence.MEMORY, evidence.MEMORY_BEFORE), (evidence.READER, evidence.READER_BEFORE),
                           (evidence.LOADING, evidence.LOADING_BEFORE), (evidence.LOADING_TEST, evidence.LOADING_TEST_BEFORE)):
             bad = copy.deepcopy(freeze); bad['after_format'][path] = old
-            with self.assertRaises(AssertionError):
-                evidence.validate_transition(self.roles, bad)
+            if path in evidence.CURRENT_CHANGED:
+                self.assertEqual(evidence.validate_transition(self.roles, bad), bad['after_format'])
+                with self.replaced_record(ROOT / 'source-freeze.json', bad), self.assertRaises(AssertionError):
+                    evidence.authenticate_current_checkpoint(self.roles)
+            else:
+                with self.assertRaises(AssertionError):
+                    evidence.validate_transition(self.roles, bad)
             bad_roles = copy.deepcopy(self.roles); bad_roles['current_before'][path] = old
             with self.assertRaises(AssertionError):
                 evidence.validate_roles(bad_roles)

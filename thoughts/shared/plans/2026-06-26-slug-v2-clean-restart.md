@@ -34,16 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-359-m7a-host-child-carrier-borrowing
-Status: correcting — Rust gates pass; stale helper negative blocks native
+Packet: WP-7-360-m7a-host-child-carrier-control-correction
+Status: preserved unaccepted — native RSS exceeds256MiB by416KiB
 
-[WP1146 failed cohort](./slug-v2-subplans/wp1146-rustfmt-build-resource-failure-2026-10-11.json)
-is preserved unaccepted: ordinary gates pass; native RSS259.105MiB exceeded256MiB.
-The [current contract](./slug-v2-subplans/current-packet.md) retains child Arc results
-and borrows module views to bypass successful payload string/path clones. Last
-ACCEPT remains WP1145; exact rustfmt metadata candidate is coupled to allocation
-validation. No unchanged replay or cap lift; broader work waits for memory fit.
-Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
+The [current contract](./slug-v2-subplans/current-packet.md) corrects a stale
+checkpoint-control assertion for the declared Loading changes. The carrier
+implementation and Core metadata remain byteexact from preserved WP1147;
+Core59/Loading30 passed, but the helper failure prevented its native run.
+Last ACCEPT remains WP1145. Fresh corrected gates and capped representative
+measurement are required before broader work resumes. Producer/actions/Rustc/
+full bootstrap remain open; Windows deferred.
 
 ### Ready and blocked queue
 
