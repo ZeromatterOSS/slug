@@ -10377,6 +10377,26 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                 "/rules-other/rust/platform/BUILD",
             ],
         ),
+        (
+            "rust/private/BUILD.bazel",
+            "/rules/rust/private/BUILD.bazel",
+            [
+                "/rules/rust/private/BUILD.bazel/child",
+                "/rules/rust/private/build.bazel",
+                "/rules/rust/private/BUILD.bazel-extra",
+                "/rules-other/rust/private/BUILD.bazel",
+            ],
+        ),
+        (
+            "rust/private/BUILD",
+            "/rules/rust/private/BUILD",
+            [
+                "/rules/rust/private/BUILD/child",
+                "/rules/rust/private/build",
+                "/rules/rust/private/BUILD-extra",
+                "/rules-other/rust/private/BUILD",
+            ],
+        ),
     ];
     for (relative, selected, spellings) in metadata {
         assert_exact_root_file_role(
@@ -10430,7 +10450,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::DirectoryEntries,
         ))
         .unwrap();
-    assert_eq!(all.path_observations().unwrap().demands().len(), 75);
+    assert_eq!(all.path_observations().unwrap().demands().len(), 77);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -10483,7 +10503,7 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             PathObservationOperation::Lstat,
         ),
         (
-            "/rules/rust/private/BUILD.bazel",
+            "/rules/rust/private/BUILD.bazel.extra",
             PathObservationOperation::Lstat,
         ),
         (

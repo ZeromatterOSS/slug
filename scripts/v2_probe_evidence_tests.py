@@ -6,12 +6,13 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 import v2_probe_supervisor as supervisor
 import v2_probe_evidence as evidence
 
 
-ROOT = Path('target/wp1133')
+ROOT = Path('target/wp1134')
 SHARED = ('scripts/v2_probe_supervisor.py', 'scripts/v2_probe_evidence.py',
           'scripts/v2_probe_evidence_tests.py')
 
@@ -36,11 +37,11 @@ class DirectEvidenceControls(unittest.TestCase):
 
     def test_current_root_seam_and_escape_refusal(self):
         changed = copy.deepcopy(self.roles)
-        changed['root'] = 'target/wp1134'
-        self.assertEqual(evidence.validate_roles(changed, Path('target/wp1134')), Path('target/wp1134'))
+        changed['root'] = 'target/wp1135'
+        self.assertEqual(evidence.validate_roles(changed, Path('target/wp1135')), Path('target/wp1135'))
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed, ROOT)
-        changed['root'] = 'target/wp1133/../wp1134'
+        changed['root'] = 'target/wp1134/../wp1135'
         with self.assertRaises(AssertionError):
             evidence.validate_roles(changed)
 
@@ -60,7 +61,7 @@ class DirectEvidenceControls(unittest.TestCase):
             evidence.validate_roles(changed)
 
     def test_native_policy_count_order_and_environment_are_exact(self):
-        config = json.loads((ROOT / 'native-config.json').read_text())
+        config = json.loads((ROOT / 'native-policy-prototype.json').read_text())
         evidence.native_policy_equivalent(self.roles, config)
         for key, value in (('expected_count', 2), ('native_output_bytes', 64 << 20),
                            ('sources', list(reversed(config['sources']))),
@@ -77,6 +78,62 @@ class DirectEvidenceControls(unittest.TestCase):
             changed['pins'].remove(path)
             with self.assertRaises((AssertionError, KeyError, ValueError)):
                 evidence.native_policy_equivalent(self.roles, changed)
+
+
+    def replaced_record(self, path, value):
+        original = evidence.read
+        return mock.patch.object(evidence, 'read', side_effect=lambda p: copy.deepcopy(value) if Path(p) == Path(path) else original(p))
+
+    def test_literal_transition_rejects_extra_missing_and_false_after(self):
+        freeze = evidence.read(ROOT / 'source-freeze.json')
+        evidence.validate_transition(self.roles, freeze)
+        third = next(p for p in freeze['before'] if p not in evidence.CHANGED)
+        for field, key, value in [('after_format', third, '0' * 64), ('after_format', evidence.CHANGED[0], freeze['before'][evidence.CHANGED[0]])]:
+            bad = copy.deepcopy(freeze); bad[field][key] = value
+            with self.assertRaises(AssertionError):
+                evidence.validate_transition(self.roles, bad)
+        for key, value in [('changed', evidence.CHANGED[:1]), ('unchanged', 53), ('known_validation_sources_before', {third: '0' * 64})]:
+            bad = copy.deepcopy(freeze); bad[key] = value
+            with self.assertRaises(AssertionError):
+                evidence.validate_transition(self.roles, bad)
+        bad = copy.deepcopy(freeze); bad['after_format'][evidence.CHANGED[0]] = '0' * 64
+        with self.replaced_record(ROOT / 'source-freeze.json', bad), self.assertRaises(AssertionError):
+            evidence.authenticate_current_checkpoint(self.roles)
+        original = evidence.digest
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: freeze['before'][str(p)] if str(p) in evidence.CHANGED else original(p)), self.assertRaises(AssertionError):
+            evidence.authenticate_current_checkpoint(self.roles)
+
+    def test_fresh_compile_profile_features_and_old_artifact_refuse(self):
+        evidence.authenticate_current_compile(self.roles)
+        paths = [ROOT / 'slug_core_v2-executable.json', ROOT / 'artifact-binding.json']
+        old = evidence.read(Path(self.roles['prior']) / 'slug_core_v2-executable.json')
+        with self.replaced_record(paths[0], old), self.assertRaises(AssertionError):
+            evidence.authenticate_current_compile(self.roles)
+        binding = evidence.read(paths[1])
+        for field, value in [('features', ['default']), ('profile', {**binding['cargo_artifact']['profile'], 'opt_level': '0'})]:
+            bad = copy.deepcopy(binding); bad['cargo_artifact'][field] = value
+            with self.replaced_record(paths[1], bad), self.assertRaises(AssertionError):
+                evidence.authenticate_current_compile(self.roles)
+        bad = copy.deepcopy(binding); bad['checkpoint_sha256'] = '0' * 64
+        with self.replaced_record(paths[1], bad), self.assertRaises(AssertionError):
+            evidence.authenticate_current_compile(self.roles)
+
+    def test_historical_complete_map_and_protected_artifact_stay_strict(self):
+        freeze = evidence.read(ROOT / 'source-freeze.json')
+        gate = dict(root=str(evidence.HISTORY), stem='compile-core', count=0, kind='current-core', supervisor=str(evidence.HISTORY / 'run_gate.py'))
+        path = evidence.HISTORY / 'compile-core/operation.json'; bad = evidence.read(path)
+        missing = evidence.CHANGED[0]
+        del bad['pins_before'][missing]; del bad['pins_after'][missing]
+        with self.replaced_record(path, bad), self.assertRaises(AssertionError):
+            evidence.authenticate_operation(self.roles, gate, freeze)
+        gate = next(g for g in self.roles['gates'] if g['kind'] == 'loading' and g['stem'] == 'loading-tests')
+        artifact = evidence.read(Path(evidence.ROOTS['L']) / 'slug_loading_v2-executable.json')
+        original = evidence.digest
+        with mock.patch.object(evidence, 'digest', side_effect=lambda p: '0' * 64 if str(p) == artifact['path'] else original(p)), self.assertRaises(AssertionError):
+            evidence.authenticate_operation(self.roles, gate, freeze)
+        bad_roles = copy.deepcopy(self.roles); bad_roles['historical_pins']['target/wp1133/native/operation.json'] = '0' * 64
+        with self.assertRaises(AssertionError):
+            evidence.validate_roles(bad_roles)
 
 
 class SupervisorControls(unittest.TestCase):

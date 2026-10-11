@@ -34,17 +34,21 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-345-m7a-probe-evidence-reuse
-Status: accepted — FINAL passed; next private marker pair pending rollover
+Packet: WP-7-346-m7a-rust-private-marker-metadata
+Status: accepted
 
-[Accepted WP1133](./slug-v2-subplans/wp1133-probe-evidence-reuse-2026-10-11.json)
-reuses one pinned supervisor and fixed direct evidence instead of predecessor
-context unions. Ten helper controls and fresh52 passed; qualifiedLoading29/Bzlmod7/
-fixture31 and unchanged compilation/production were authenticated. Rust54,
-source361 and caps stay unchanged; no native replay or new whole-fit credit.
-The [current manifest](./slug-v2-subplans/current-packet.md) is accepted after
-independent FINAL. The exact private BUILD-marker pair is next; its changed-Rust
-role/source transition and actual PRE/ONE/FIRST/FINAL remain required.
+[Accepted WP1134](./slug-v2-subplans/wp1134-rust-private-marker-metadata-2026-10-11.json)
+admits the two borrowed private BUILD-marker Lstat rows: source34 unchanged,
+metadata9 and Need77. Fresh Core52 and13 helper controls passed; protected36 and
+fixture31 retain qualified evidence. ONE native passed20.650s with stable361
+held-source brackets and cleanup; immutable FIRST and independent FINAL passed.
+Observed phase peak255.84765625MiB leaves0.15234375MiB under256, so whole/future
+workload fit remains unproved and allocation discipline continues.
+
+The [current manifest](./slug-v2-subplans/current-packet.md) records acceptance
+and the next captured root1 `rust/runfiles` Lstat boundary. Next contract selection
+must use the stopped normal-source readiness and reuse stable evidence tooling;
+marker/body/producer/bootstrap closure remains open. Windows remains deferred.
 
 ### Ready and blocked queue
 

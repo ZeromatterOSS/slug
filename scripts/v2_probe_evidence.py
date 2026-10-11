@@ -12,6 +12,9 @@ METADATA_LIMIT = 2 << 20
 TIME_POLICY = dict(qualified_work_seconds=26, qualified_cleanup_seconds=29,
                    native_outer_seconds=32, default_work_seconds=5,
                    default_cleanup_seconds=8, ordinary_outer_seconds=10)
+CHANGED = ['app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs',
+           'app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs']
+HISTORY = Path('target/wp1132')
 ROOTS = dict(Q='target/wp1119', L='target/wp1128', S='target/wp1130',
              H='target/wp1129', O='target/wp1124', E='target/wp1125', I='target/wp1131')
 
@@ -54,11 +57,11 @@ def equal_aliases(pins):
 
 def validate_roles(roles, root=None):
     """Validate declarations without opening any donor body, archive or executable."""
-    assert set(roles) == set(('authority_schema', 'baseline', 'changed_allowlist', 'checkpoint_name', 'contract_sha256', 'copy_count_selectors', 'core_counts', 'current_authorities', 'current_before', 'current_private_before', 'direct_groups', 'direct_pins', 'evidence_path', 'existing_current_only_sources', 'fixture_counts', 'gates', 'historical_private_paths', 'historical_vector_pins', 'historical_vector_root', 'immediate_pins', 'inherited_pins', 'known_validation_sources_before', 'loading_counts', 'loading_private_before', 'loading_root', 'mandatory_projection_selectors', 'mandatory_skylib_selector', 'mandatory_time_profile_selectors', 'native_time_policy', 'new_authorities', 'new_gate_sources', 'original_vector_root', 'owner_test_introduction_root', 'prior', 'private_core_before', 'protected_diagnostic_before', 'protected_diagnostic_paths', 'protected_loading_before', 'protected_loading_paths', 'protected_root', 'root', 'rust_source_evidence_root', 'rust_source_policy', 'source_counts', 'source_evidence_pins', 'source_evidence_root', 'source_owner_pins', 'source_vector_policy', 'supervisor_path'))
+    assert set(roles) == set(('authority_schema', 'baseline', 'changed_allowlist', 'checkpoint_name', 'contract_sha256', 'copy_count_selectors', 'core_counts', 'current_authorities', 'current_before', 'current_private_before', 'direct_groups', 'direct_pins', 'evidence_path', 'existing_current_only_sources', 'fixture_counts', 'gates', 'historical_private_paths', 'historical_vector_pins', 'historical_vector_root', 'historical_pins', 'immediate_pins', 'inherited_pins', 'known_validation_sources_before', 'loading_counts', 'loading_private_before', 'loading_root', 'mandatory_projection_selectors', 'mandatory_skylib_selector', 'mandatory_time_profile_selectors', 'native_time_policy', 'new_authorities', 'new_gate_sources', 'original_vector_root', 'owner_test_introduction_root', 'prior', 'private_core_before', 'protected_diagnostic_before', 'protected_diagnostic_paths', 'protected_loading_before', 'protected_loading_paths', 'protected_root', 'root', 'rust_source_evidence_root', 'rust_source_policy', 'source_counts', 'source_evidence_pins', 'source_evidence_root', 'source_owner_pins', 'source_vector_policy', 'supervisor_path'))
     root = Path(roles['root'] if root is None else root)
     assert str(root) == roles['root'] and re.fullmatch(r'target/wp[1-9][0-9]*', roles['root'])
     assert roles['authority_schema'] == 'finite-probe-evidence-v1'
-    assert roles['prior'] == 'target/wp1132'
+    assert roles['prior'] == 'target/wp1133'
     assert roles['protected_root'] == ROOTS['Q'] and roles['loading_root'] == ROOTS['L']
     assert roles['owner_test_introduction_root'] == ROOTS['I']
     assert roles['source_evidence_root'] == ROOTS['E']
@@ -70,14 +73,14 @@ def validate_roles(roles, root=None):
     assert roles['checkpoint_name'] == 'root-source-checkpoint.json'
     assert re.fullmatch('[0-9a-f]{40}', roles['baseline'])
     assert re.fullmatch('[0-9a-f]{64}', roles['contract_sha256'])
-    assert roles['changed_allowlist'] == [] and roles['new_gate_sources'] == {}
+    assert roles['changed_allowlist'] == CHANGED and roles['new_gate_sources'] == {}
     assert roles['known_validation_sources_before'] == {}
-    assert roles['source_counts'] == dict(current=54, unchanged=54, vector=361, callers=8, environment=18, backings=6)
+    assert roles['source_counts'] == dict(current=54, unchanged=52, vector=361, callers=8, environment=18, backings=6)
     assert roles['core_counts'] == dict(donor=52, extra=0, current=52, protected=36, focused=88)
     assert roles['loading_counts'] == dict(current=29)
     assert roles['fixture_counts'] == dict(selected=31, passed=31, deselected=3, objects=35, bytes=32440662)
     assert roles['native_time_policy'] == TIME_POLICY
-    for key in ('direct_pins', 'immediate_pins', 'current_before', 'current_authorities',
+    for key in ('direct_pins', 'historical_pins', 'immediate_pins', 'current_before', 'current_authorities',
                 'source_evidence_pins', 'source_owner_pins', 'historical_vector_pins',
                 'private_core_before', 'current_private_before', 'protected_diagnostic_before',
                 'protected_loading_before', 'loading_private_before', 'existing_current_only_sources'):
@@ -114,13 +117,29 @@ def validate_roles(roles, root=None):
             assert str(Path(gate['root']) / name) in roles['direct_pins']
     p = Path(roles['prior'])
     immediate = {'source-freeze.json', 'caller-source-pins.json', 'core-selectors.json', 'source-vector.json',
-                 'native-config.json', 'compile-core-config.json', 'production-check-config.json',
-                 'slug_core_v2-executable.json', 'final-evidence-review.md'}
-    immediate |= {s + '/' + n for s in ('compile-core', 'production-check') for n in ('operation.json', 'stdout', 'stderr')}
-    receipt = 'thoughts/shared/plans/slug-v2-subplans/wp1132-rust-platform-marker-metadata-2026-10-11.json'
+                 'native-config.json', 'slug_core_v2-executable.json', 'artifact-reuse.json',
+                 'root-source-checkpoint.json', 'root-gate-results.json', 'qualification-attempt0.json', 'final-evidence-review.md'}
+    receipt = 'thoughts/shared/plans/slug-v2-subplans/wp1133-probe-evidence-reuse-2026-10-11.json'
     assert set(roles['immediate_pins']) == {str(p / name) for name in immediate} | {receipt}
-    equal_aliases({**roles['direct_pins'], **roles['immediate_pins']})
+    historical = {'slug_core_v2-executable.json', 'native-config.json', 'root-native-facts.json', 'next-frontier.json'}
+    historical |= {s + '-config.json' for s in ('compile-core', 'production-check')}
+    historical |= {s + '/' + n for s in ('compile-core', 'production-check', 'native') for n in ('operation.json', 'stdout', 'stderr')}
+    assert set(roles['historical_pins']) == {str(HISTORY / name) for name in historical}
+    equal_aliases({**roles['direct_pins'], **roles['immediate_pins'], **roles['historical_pins']})
     return root
+
+
+def validate_transition(roles, freeze):
+    assert digest(Path(roles['prior']) / 'source-freeze.json') == roles['immediate_pins'][str(Path(roles['prior']) / 'source-freeze.json')]
+    before, after = sha_map(freeze['before']), sha_map(freeze['after_format'])
+    assert before == roles['current_before'] == read(Path(roles['prior']) / 'source-freeze.json')['after_format']
+    assert len(before) == 54 and set(after) == set(before)
+    assert roles['changed_allowlist'] == CHANGED
+    assert [p for p in before if before[p] != after[p]] == freeze['changed'] == CHANGED
+    assert freeze['unchanged'] == 52
+    assert freeze['new_authorities'] == roles['current_authorities'] == read(Path(roles['prior']) / 'source-freeze.json')['new_authorities']
+    assert freeze['known_validation_sources_before'] == freeze['new_gate_sources'] == {}
+    return after
 
 
 def authenticate_current_checkpoint(roles, root=None, config_pins=None):
@@ -142,20 +161,23 @@ def authenticate_current_checkpoint(roles, root=None, config_pins=None):
     assert design['verdict'] == 'ACCEPT' and design['baseline'] == roles['baseline']
     assert design['contract_sha256'] == roles['contract_sha256']
     assert digest(root / 'design-review.md') == design['design_review_sha256']
-    assert freeze['before'] == freeze['after_format'] == roles['current_before']
-    assert freeze['changed'] == {} and freeze['new_authorities'] == roles['current_authorities']
-    assert set(freeze['unchanged']) == set(roles['current_before'])
+    after = validate_transition(roles, freeze)
+    assert all(checkpoint['source_pins'][path] == after[path] for path in CHANGED)
     return checkpoint
 
 
 def authenticate_operation(roles, gate, current_freeze=None):
     """Preserve the complete saved map, including automatic config/self identities."""
-    assert gate in roles['gates'] or (gate['root'] == roles['prior'] and gate['stem'] in ('compile-core', 'production-check'))
+    compile_gate = gate['stem'] in ('compile-core', 'production-check') and gate['kind'] == 'current-core'
+    assert gate in roles['gates'] or (compile_gate and gate['root'] in (str(HISTORY), roles['root']))
+    assert current_freeze == read(Path(roles['root']) / 'source-freeze.json')
+    current = validate_transition(roles, current_freeze)
     root, stem = Path(gate['root']), gate['stem']
     config_path, operation_path = root / (stem + '-config.json'), root / stem / 'operation.json'
-    declared = roles['immediate_pins'] if str(root) == roles['prior'] else roles['direct_pins']
+    declared = roles['historical_pins'] if root == HISTORY else roles['direct_pins']
     for path in (config_path, operation_path, root / stem / 'stdout', root / stem / 'stderr'):
-        assert digest(path) == declared[str(path)], str(path)
+        if str(root) != roles['root']:
+            assert digest(path) == declared[str(path)], str(path)
     config, operation = read(config_path), read(operation_path)
     assert operation['exit_code'] == 0 and operation['stop_reason'] is None
     assert operation['joined'] and operation['owned_group_empty']
@@ -190,12 +212,14 @@ def authenticate_operation(roles, gate, current_freeze=None):
     assert pins[self_path] == digest(gate['supervisor'])
     assert operation['stdout_sha256'] == digest(root / stem / 'stdout')
     assert operation['stderr_sha256'] == digest(root / stem / 'stderr')
-    current = roles['current_before'] if current_freeze is None else current_freeze['after_format']
     exceptions = {}
     if gate['kind'] in ('bzlmod', 'fixture'):
         exceptions = {**roles['private_core_before'], **roles['protected_diagnostic_before'], **roles['protected_loading_before']}
     elif gate['kind'] == 'loading':
         exceptions = roles['loading_private_before']
+    elif root == HISTORY:
+        exceptions = {p: roles['current_before'][p] for p in CHANGED}
+        historical = roles['current_before']
     if gate['kind'] in ('bzlmod', 'fixture', 'loading'):
         historical = read(root / 'source-freeze.json')['after_format']
         assert all(pins[path] == expected for path, expected in historical.items())
@@ -215,6 +239,11 @@ def authenticate_operation(roles, gate, current_freeze=None):
         assert config['environment'] == {} and config['mode'] == 'list'
         assert config['command'] == [read(root / 'inspection-source-checkpoint.json')['supervisor']['python_executable'], str(root / ('inspect_rust_build.py' if stem == 'inspection' else 'qualify_rust_build.py'))]
         assert config['stem'] == str((root / stem).resolve())
+    if str(root) == roles['root']:
+        checkpoint = read(root / roles['checkpoint_name'])
+        required = {**current, **roles['current_authorities'], **checkpoint['source_pins']}
+        required.update({str(root / name): digest(root / name) for name in ('source-freeze.json', roles['checkpoint_name'])})
+        assert all(pins[path] == expected for path, expected in required.items())
     return operation
 
 
@@ -232,23 +261,27 @@ def native_policy_equivalent(roles, config):
     assert config['native_output_bytes'] == 32 << 20
     assert isinstance(config['pins'], list) and len(config['pins']) == len(set(config['pins']))
     root = validate_roles(roles)
-    required = (set(roles['direct_pins']) - set(roles['historical_vector_pins'])) | set(roles['immediate_pins'])
+    required = set(roles['historical_pins']) | (set(roles['direct_pins']) - set(roles['historical_vector_pins'])) | set(roles['immediate_pins'])
     required |= set(roles['source_owner_pins']) | set(roles['source_evidence_pins'])
     required |= set(roles['current_before']) | set(roles['current_authorities'])
     required |= {str(root / name) for name in ('roles.json', roles['checkpoint_name'], 'source-freeze.json',
-                    'source-vector.json', 'core-selectors.json', 'caller-source-pins.json', 'slug_core_v2-executable.json')}
+                    'source-vector.json', 'core-selectors.json', 'caller-source-pins.json', 'slug_core_v2-executable.json', 'artifact-binding.json')}
+    protected_artifacts = [read(Path(ROOTS[key]) / (family + '-executable.json')) for key, family in [('Q', 'slug_bzlmod_v2'), ('L', 'slug_loading_v2')]]
+    required |= {a['path'] for a in protected_artifacts}
     required |= {roles['supervisor_path'], roles['evidence_path'], config['executable']}
     assert required <= set(config['pins']), sorted(required - set(config['pins']))
     assert not set(roles['historical_vector_pins']) & set(config['pins'])
     assert digest(config['executable']) == config['executable_sha256']
     pin_hashes = {path: digest(path) for path in config['pins']}
-    declared = {**roles['direct_pins'], **roles['immediate_pins'], **roles['current_before'], **roles['current_authorities']}
+    after = validate_transition(roles, read(root / 'source-freeze.json'))
+    declared = {**roles['direct_pins'], **roles['immediate_pins'], **roles['historical_pins'], **after, **roles['current_authorities']}
     for path in pin_hashes.keys() & declared.keys():
         assert pin_hashes[path] == declared[path], path
+    assert all(pin_hashes[a['path']] == a['sha256'] for a in protected_artifacts)
     equal_aliases(pin_hashes)
     authenticate_current_checkpoint(roles, config_pins=pin_hashes)
     assert read(root / 'source-vector.json') == config['sources']
-    artifact = read(root / 'slug_core_v2-executable.json')
+    artifact = authenticate_current_compile(roles, root)['artifact']
     assert (artifact['path'], artifact['sha256']) == (config['executable'], config['executable_sha256'])
     return previous
 
@@ -364,17 +397,61 @@ def qualified_sources(roles, root):
 
 
 
-def qualify_direct_evidence(roles, root=None):
+def authenticate_current_compile(roles, root=None, include_production=True):
+    assert type(include_production) is bool
+    root = validate_roles(roles, root)
+    authenticate_current_checkpoint(roles, root)
+    freeze = read(root / 'source-freeze.json')
+    stems = ('compile-core', 'production-check') if include_production else ('compile-core',)
+    operations = {}
+    for stem in stems:
+        config, template = read(root / (stem + '-config.json')), read(HISTORY / (stem + '-config.json'))
+        assert digest(HISTORY / (stem + '-config.json')) == roles['historical_pins'][str(HISTORY / (stem + '-config.json'))]
+        assert set(config) == set(template) and all(config[k] == template[k] for k in config.keys() - {'pins'})
+        gate = dict(root=str(root), stem=stem, count=0, kind='current-core', supervisor=roles['supervisor_path'])
+        operations[stem] = authenticate_operation(roles, gate, freeze)
+    artifact, binding = read(root / 'slug_core_v2-executable.json'), read(root / 'artifact-binding.json')
+    paths = dict(source_freeze=root / 'source-freeze.json', checkpoint=root / roles['checkpoint_name'],
+                 compile_config=root / 'compile-core-config.json', compile_operation=root / 'compile-core/operation.json',
+                 compile_stdout=root / 'compile-core/stdout', compile_stderr=root / 'compile-core/stderr',
+                 artifact_descriptor=root / 'slug_core_v2-executable.json')
+    assert set(binding) == {k + '_sha256' for k in paths} | {'artifact_sha256', 'cargo_artifact', 'build_finished'}
+    assert all(binding[k + '_sha256'] == digest(path) for k, path in paths.items())
+    rows = [json.loads(line) for line in encoded(root / 'compile-core/stdout').splitlines() if line.startswith(b'{')]
+    selected = [row for row in rows if row.get('reason') == 'compiler-artifact' and row.get('executable') == artifact['path']]
+    assert len(selected) == 1 and selected[0] == binding['cargo_artifact']
+    row = selected[0]
+    assert row['target']['name'] == 'slug_core_v2' and row['target']['kind'] == ['lib']
+    assert row['profile'] == dict(opt_level='1', debuginfo=0, debug_assertions=True, overflow_checks=True, test=True)
+    assert row['features'] == artifact['features'] == ['default', 'native-probe-observer']
+    assert [r for r in rows if r.get('reason') == 'build-finished'] == [binding['build_finished']] == [dict(reason='build-finished', success=True)]
+    assert artifact['compile_stem'] == 'compile-core' and artifact['compile_operation_sha256'] == digest(paths['compile_operation'])
+    assert binding['artifact_sha256'] == artifact['sha256'] == digest(artifact['path'])
+    if include_production:
+        rows = [json.loads(line) for line in encoded(root / 'production-check/stdout').splitlines() if line.startswith(b'{')]
+        assert [r for r in rows if r.get('reason') == 'build-finished'] == [dict(reason='build-finished', success=True)]
+        for family in ('slug_core_v2', 'slug'):
+            selected = [r for r in rows if r.get('reason') == 'compiler-artifact' and r['target']['name'] == family]
+            profile = dict(opt_level='1', debuginfo=0 if family == 'slug_core_v2' else 2, debug_assertions=True, overflow_checks=True, test=False)
+            assert selected and all(r['features'] == ['default'] and r['profile'] == profile and r['executable'] is None for r in selected)
+    return dict(artifact=artifact, operations=operations, artifact_binding_sha256=digest(root / 'artifact-binding.json'))
+
+
+def qualify_direct_evidence(roles, root=None, current_freeze=None):
     """Authenticate fixed donors and current identity; do not execute or publish."""
     root = validate_roles(roles, root)
-    for mapping in (roles['direct_pins'], roles['immediate_pins']):
+    for mapping in (roles['direct_pins'], roles['immediate_pins'], roles['historical_pins']):
         for path, expected in mapping.items():
             assert digest(path) == expected, path
     P, Q, L, I = [Path(p) for p in (roles['prior'], ROOTS['Q'], ROOTS['L'], ROOTS['I'])]
     previous = read(P / 'source-freeze.json')
     current, historical = roles['current_before'], read(Q / 'source-freeze.json')['after_format']
     assert previous['after_format'] == current and len(historical) == 52
-    assert read(root / 'slug_core_v2-executable.json') == read(P / 'slug_core_v2-executable.json')
+    authenticate_current_checkpoint(roles, root)
+    freeze = read(root / 'source-freeze.json')
+    assert current_freeze is None or current_freeze == freeze
+    after = validate_transition(roles, freeze)
+    compiled = authenticate_current_compile(roles, root)
     assert previous['new_authorities'] == roles['current_authorities']
     assert read(Q / 'source-freeze.json')['new_authorities'] == previous['new_authorities']
     assert set(current) == set(historical) | set(roles['existing_current_only_sources'])
@@ -390,7 +467,7 @@ def qualify_direct_evidence(roles, root=None):
     assert roles['current_private_before'] == {p: current[p] for p in roles['historical_private_paths']}
     assert roles['loading_private_before'] == {p: read(L / 'source-freeze.json')['after_format'][p] for p in roles['loading_private_before']}
     assert all(current[p] == expected for p, expected in historical.items() if p not in exceptions)
-    for mapping in (current, roles['current_authorities']):
+    for mapping in (after, roles['current_authorities']):
         for path, expected in mapping.items():
             assert digest(path) == expected, path
     callers = read(root / 'caller-source-pins.json')
@@ -406,22 +483,34 @@ def qualify_direct_evidence(roles, root=None):
     assert len(required) == len(set(required)) == 7 and all(ordinary.count(s) == 1 for s in required)
     assert read(L / 'loading-selectors.json')['ordinary'][:26] == read(Q / 'loading-selectors.json')['ordinary']
     assert len(read(L / 'loading-selectors.json')['ordinary']) == 29
-    operations = {g['root'] + '/' + g['stem']: authenticate_operation(roles, g) for g in roles['gates']}
+    operations = {g['root'] + '/' + g['stem']: authenticate_operation(roles, g, freeze) for g in roles['gates']}
     for stem in ('compile-core', 'production-check'):
-        gate = dict(root=str(P), stem=stem, count=0, kind='current-core', supervisor=str(P / 'run_gate.py'))
-        operation = authenticate_operation(roles, gate)
+        gate = dict(root=str(HISTORY), stem=stem, count=0, kind='current-core', supervisor=str(HISTORY / 'run_gate.py'))
+        operation = authenticate_operation(roles, gate, freeze)
         assert all(operation['pins_before'][p] == expected for p, expected in current.items())
         assert all(operation['pins_before'][p] == expected for p, expected in roles['current_authorities'].items())
-        operations[str(P / stem)] = operation
-    artifacts = [('slug_core_v2', P, 'compile-core', ['default', 'native-probe-observer']),
-                 ('slug_loading_v2', L, 'compile-loading', []), ('slug_bzlmod_v2', Q, 'compile-bzlmod', [])]
+        operations[str(HISTORY / stem)] = operation
+    artifacts = [('slug_loading_v2', L, 'compile-loading', []), ('slug_bzlmod_v2', Q, 'compile-bzlmod', [])]
     for family, donor_root, stem, features in artifacts:
         artifact = read(donor_root / (family + '-executable.json'))
         assert artifact['features'] == features and artifact['compile_stem'] == stem
         assert artifact['compile_operation_sha256'] == digest(donor_root / stem / 'operation.json')
         assert digest(artifact['path']) == artifact['sha256']
     native = read(P / 'native-config.json')
-    artifact = read(P / 'slug_core_v2-executable.json')
+    artifact = read(HISTORY / 'slug_core_v2-executable.json')
+    assert artifact == read(P / 'slug_core_v2-executable.json')
+    actual_native = read(HISTORY / 'native/operation.json')
+    assert actual_native['exit_code'] == 0 and actual_native['stop_reason'] is None and actual_native['joined'] and actual_native['owned_group_empty']
+    assert actual_native['pins_before'] == actual_native['pins_after'] and actual_native['selected_count'] == actual_native['pass_count'] == 1
+    historical_native = read(HISTORY / 'native-config.json')
+    assert actual_native['command'] == historical_native['command'] == native['command']
+    assert actual_native['environment'] == historical_native['environment'] == native['environment']
+    assert set(actual_native['pins_before']) == set(historical_native['pins']) | {str(HISTORY / 'native-config.json'), str((HISTORY / 'run_gate.py').resolve())}
+    equal_aliases(actual_native['pins_before'])
+    assert all(actual_native['pins_before'][p] == expected for p, expected in current.items())
+    assert len(actual_native['source_bindings']) == 361
+    assert all(r['before'] == r['after'] == {k: row[k] for k in ('bytes', 'sha256')} and r['path'] == row['path'] for r, row in zip(actual_native['source_bindings'], historical_native['sources']))
+    assert actual_native['stdout_sha256'] == digest(HISTORY / 'native/stdout') and actual_native['stderr_sha256'] == digest(HISTORY / 'native/stderr')
     assert native['executable'] == artifact['path'] and native['executable_sha256'] == artifact['sha256']
     assert native['native_time_policy'] == TIME_POLICY and len(native['environment']) == 18
     sources = qualified_sources(roles, root)
@@ -434,10 +523,12 @@ def qualify_direct_evidence(roles, root=None):
     assert fixture['inventory_sha256'] == '6895d4ffee1075659d9db5709bf4a1418b0cc772ac7d95cbeaf472c14c669538'
     return dict(schema=roles['authority_schema'], direct_pins=dict(roles['direct_pins']),
                 immediate_pins=dict(roles['immediate_pins']), source_paths=54, source_rows=361,
-                compile_evidence='authenticated-immediate-predecessor-no-replay',
+                compile_evidence='fresh-current-after54; historical-P1132-metadata-only',
+                historical_pins=dict(roles['historical_pins']), artifact=compiled['artifact'], last_actual_native_root=str(HISTORY),
+                native_template_root=str(P),
                 protected_tests=36, fixture_tests=31, portable_unproved=3,
                 operation_sha256={path: digest(Path(path) / 'operation.json') for path in operations},
-                private_core_before=roles['private_core_before'], private_core_after=roles['current_private_before'],
+                private_core_before=roles['private_core_before'], private_core_after={p: after[p] for p in roles['historical_private_paths']},
                 protected_diagnostic_before=roles['protected_diagnostic_before'],
                 protected_diagnostic_after={p: current[p] for p in roles['protected_diagnostic_paths']},
                 protected_loading_before=roles['protected_loading_before'],
