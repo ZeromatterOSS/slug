@@ -34,18 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-353-m7a-rust-runfiles-build-metadata
-Status: accepted — fresh gates, root PRE, ONE native, immutable FIRST and independent FINAL
+Packet: WP-7-354-m7a-rust-analyzer-build-metadata
+Status: preserved, unaccepted — representative phase RSS failure
 
-Accepted exact root1 rust/runfiles/BUILD.bazel Lstat under the existing borrowed table.
-[Receipt](./slug-v2-subplans/wp1141-rust-runfiles-build-metadata-2026-10-11.json)
-records fresh59/helper13/production, qualified36/fixture31, ONE20.886s and phase
-255.390625MiB under unchanged256MiB, stable361 sources, FIRST/FINAL acceptance.
-No new owned strings/retained storage; steady helper unchanged. Next observed
-rust/rust_analyzer/BUILD.bazel Lstat is source-ready. Existing request records do
-not establish finite transitive package authority for broader marker batching.
-Recurring packet overhead examined; closed evidence and scaffolding remain reused.
-Producer/actions/Rustc/full bootstrap and future fit remain open; Windows deferred.
+The exact analyzer metadata source delta passed focused59/helper13/production,
+qualified36/fixture31 and independent SOURCE. ONE20.747s completed/JOIN267pins/full361,
+but phase256.15625MiB exceeded the unchanged256MiB limit by160KiB. FIRST ran once,
+correctly rejected acceptance and emitted no candidate; independent FINAL REVISE.
+[Failure receipt](./slug-v2-subplans/wp1142-resource-failure-2026-10-11.json)
+preserves the candidate and raw failure without replay or cap lift. Last accepted
+native remains WP1141. Broader metadata work waits for a bounded Loading scratch
+allocation correction using existing load-label storage and retained module owners.
+Producer/actions/Rustc/full bootstrap remain open; Windows deferred.
 
 ### Ready and blocked queue
 
