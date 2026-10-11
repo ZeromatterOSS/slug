@@ -1834,6 +1834,7 @@ impl Bodies {
         {
             limits.source_attempts = 256;
             if immutable_archive_preparation::native_byte_budget_backing(self) {
+                limits.source_attempts = 512;
                 limits.decoded_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
                 limits.written_bytes = immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
             }

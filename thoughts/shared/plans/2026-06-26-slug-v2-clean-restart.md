@@ -34,15 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-319-m7a-java-descriptor-file-capability
-Status: accepted — qualified source-rule File capability; FINAL ACCEPT
+Packet: WP-7-320-m7a-qualified-native-source-count
+Status: accepted — FINAL source/evidence ACCEPT; next namespace lookup checkpoint
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records one cohesive
-qualified Java descriptor File capability, preserving original full identity and
-complete bounded plans/current namespace. Current55 proofs/prod/Core10.725s and
-ONE5.124s/217.676MiB phase prefix reach genuine source quota firstlimit257 after256
-admitted. Quota-owner/finite closure assessment selects successor; current limits
-are unchanged. Full producer/M7A/bootstrap remains open.
+The [current manifest](./slug-v2-subplans/current-packet.md) records the accepted
+[qualified count checkpoint](./slug-v2-subplans/wp1108-qualified-native-source-count-2026-10-10.json).
+Actual62 proofs and direct production passed; ONE native6.362s reached262 sources,
+phase219.801MiB under256. The next refusal is the bounded current namespace
+owner association (>32 retained epoch entries); owner eligibility remains unknown.
+Internal512/census513 are explicit test-policy changes; other caps unchanged.
+Full producer/M7A remains open.
 
 ### Ready and blocked queue
 

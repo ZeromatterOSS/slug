@@ -11,7 +11,7 @@ use slug_workspace_v2::PathObservationOperation;
 use super::SourceCounter;
 use super::SourceServiceError;
 
-pub(super) const EVENT_LIMIT: u64 = 257;
+pub(super) const EVENT_LIMIT: u64 = 513;
 const PATH_LIMIT: usize = 1024;
 const RAW_LIMIT: u64 = 131072;
 const ENCODED_LIMIT: u64 = 524288;
@@ -674,7 +674,7 @@ mod tests {
             empty.finish(&row, bytes, true);
         }
         let complete = empty.summary(16, 0).including_summary().unwrap();
-        assert_eq!(complete.emitted, 257);
+        assert_eq!(complete.emitted, EVENT_LIMIT);
         assert_eq!(complete.raw_bytes, 0);
         assert!(complete.accounting_complete && !complete.identity_complete);
         assert!(complete.encoded_bytes <= ENCODED_LIMIT);
@@ -691,7 +691,7 @@ mod tests {
                 incomplete.skipped,
                 incomplete.in_flight
             ),
-            (258, 257, 1, 0)
+            (EVENT_LIMIT + 1, EVENT_LIMIT, 1, 0)
         );
         assert!(!incomplete.accounting_complete);
         let mut encoded_full = CensusState::default();

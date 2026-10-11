@@ -9057,6 +9057,161 @@ fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
             );
         }
     }
+    {
+        use immutable_archive_preparation::PROTOBUF_DIGEST;
+        use immutable_archive_preparation::PROTOBUF_NATIVE_BYTE_BUDGET;
+        use immutable_archive_preparation::PROTOBUF_URL;
+        let project = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+        let archive = NormalizedAbsolutePath::new(
+            project
+                .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                .join(PROTOBUF_URL.strip_prefix("https://").unwrap()),
+        )
+        .unwrap();
+        let make_qualified = || {
+            let mut bodies = java_proxy_test_bodies();
+            bodies.offline_archive = Some(OfflineArchiveBacking::new(
+                PROTOBUF_URL,
+                PROTOBUF_DIGEST,
+                archive.dupe(),
+            ));
+            bodies.offline_archive_module = Some(
+                NormalizedAbsolutePath::new(
+                    project.join("target/wp954/registry/modules/protobuf/33.4/MODULE.bazel"),
+                )
+                .unwrap(),
+            );
+            bodies
+        };
+        for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+            for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+                for defs in [false, true] {
+                    let mut bodies = make_qualified();
+                    bodies.rules_rust_defs_import_sources = defs;
+                    let ordinary = bodies.source_limits(registry);
+                    let qualified = defs
+                        && matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe);
+                    assert_eq!(
+                        bodies.native_source_limits(registry, command),
+                        SourceServiceLimits {
+                            source_attempts: if qualified {
+                                512
+                            } else {
+                                ordinary.source_attempts
+                            },
+                            decoded_bytes: if qualified {
+                                PROTOBUF_NATIVE_BYTE_BUDGET
+                            } else {
+                                ordinary.decoded_bytes
+                            },
+                            written_bytes: if qualified {
+                                PROTOBUF_NATIVE_BYTE_BUDGET
+                            } else {
+                                ordinary.written_bytes
+                            },
+                            ..ordinary
+                        }
+                    );
+                }
+            }
+        }
+        for case in 0..9 {
+            let mut bodies = make_qualified();
+            match case {
+                0 => {}                                  // Both qualified archives.
+                1 => bodies.java_offline_archive = None, // Optional absence stays qualified.
+                2 => bodies.offline_archive = None,
+                3 => bodies.offline_archive_module = None,
+                4 => {
+                    bodies.offline_archive = Some(OfflineArchiveBacking::new(
+                        "https://other.invalid/a",
+                        PROTOBUF_DIGEST,
+                        archive.dupe(),
+                    ))
+                }
+                5 => {
+                    bodies.offline_archive = Some(OfflineArchiveBacking::new(
+                        PROTOBUF_URL,
+                        [0; 32],
+                        archive.dupe(),
+                    ))
+                }
+                6 => {
+                    bodies.offline_archive = Some(OfflineArchiveBacking::new(
+                        PROTOBUF_URL,
+                        PROTOBUF_DIGEST,
+                        path("/foreign/a"),
+                    ))
+                }
+                7 => bodies.offline_archive_module = Some(path("/foreign/MODULE.bazel")),
+                _ => {
+                    bodies.java_offline_archive.as_mut().unwrap().module =
+                        path("/foreign/java/MODULE.bazel")
+                }
+            }
+            let ordinary = bodies.source_limits(RegistryChoice::PreparedFile);
+            let qualified = case < 2;
+            let native = bodies
+                .native_source_limits(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+            assert_eq!(
+                native,
+                SourceServiceLimits {
+                    source_attempts: if qualified { 512 } else { 256 },
+                    decoded_bytes: if qualified {
+                        PROTOBUF_NATIVE_BYTE_BUDGET
+                    } else {
+                        ordinary.decoded_bytes
+                    },
+                    written_bytes: if qualified {
+                        PROTOBUF_NATIVE_BYTE_BUDGET
+                    } else {
+                        ordinary.written_bytes
+                    },
+                    ..ordinary
+                }
+            );
+            if qualified {
+                let start = Instant::now();
+                let scope = bodies
+                    .source_scope(
+                        path("/fixture"),
+                        start + Duration::from_secs(2),
+                        start + Duration::from_secs(3),
+                        native,
+                    )
+                    .unwrap();
+                let scope_weak = Arc::downgrade(&scope);
+                scope.charge(SourceCounter::SourceAttempts, 512).unwrap();
+                let refused = Err(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+                assert_eq!(scope.charge(SourceCounter::SourceAttempts, 1), refused);
+                assert_eq!(scope.charge(SourceCounter::RegistryAttempts, 1), refused);
+                assert_eq!(scope.charge(SourceCounter::SourceAttempts, 0), refused);
+                assert_eq!(scope.snapshot().source_attempts, 512);
+                assert_eq!(scope.snapshot().registry_attempts, 0);
+                for count in [0, 513] {
+                    assert!(matches!(
+                        bodies.source_scope(
+                            path("/fixture"),
+                            start + Duration::from_secs(2),
+                            start + Duration::from_secs(3),
+                            SourceServiceLimits {
+                                source_attempts: count,
+                                ..native
+                            }
+                        ),
+                        Err(SourceServiceError::InvalidLimits)
+                    ));
+                }
+                drop(scope);
+                assert!(scope_weak.upgrade().is_none());
+            }
+        }
+    }
 }
 #[test]
 fn probe_package_source_need_is_opt_in_exact_fixture_only() {

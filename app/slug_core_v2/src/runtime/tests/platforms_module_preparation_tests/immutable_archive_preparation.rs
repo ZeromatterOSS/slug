@@ -655,7 +655,7 @@ mod tests {
         let owners = Arc::strong_count(owner);
         let weak = Arc::downgrade(owner);
         let expected = SourceServiceLimits {
-            source_attempts: 256,
+            source_attempts: 512,
             decoded_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
             written_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
             ..bodies.source_limits(PreparedFile)
@@ -858,7 +858,7 @@ mod tests {
         assert_eq!(
             limits,
             SourceServiceLimits {
-                source_attempts: 256,
+                source_attempts: 512,
                 decoded_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
                 written_bytes: PROTOBUF_NATIVE_BYTE_BUDGET,
                 ..bodies.source_limits(RegistryChoice::PreparedFile)

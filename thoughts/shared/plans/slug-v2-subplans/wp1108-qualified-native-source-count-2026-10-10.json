@@ -1,0 +1,249 @@
+{
+  "packet": "WP-7-320-m7a-qualified-native-source-count",
+  "baseline": "4c6d8d63d",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "outcome": "Reviewed internal Linux-test max512/qualified native512/census513 checkpoint resumes original fixture beyond old256quota. Actual source262, noquota or WorkDeadline, next namespace owner association bounds_refused/materializationinstance22/Lstat rawroot. No fullproducer completion.",
+  "compatibility": {
+    "changed_policy": "Slug-native bounded Linux-test/probe technical source-count checkpoint",
+    "accepted_exact_semantics": "unchanged",
+    "ordinary_profiles": "128/16/unqualifiednative256 preserved",
+    "production_nonlinux_default": "64 unchanged",
+    "windows": "execution/JVM/host/path deferred"
+  },
+  "source": {
+    "freeze_path": "target/wp1108/source-freeze.json",
+    "freeze_sha256": "e9164ac747f47569b5f4a1430b8f65bb999290b8864bc7eea7d229044e024751",
+    "rust": 37,
+    "metadata": 8,
+    "changed_authorities": 5,
+    "files": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+        "sha256": "60dd262639160ce4c1cf5a022dcb1752ec0074916976af1f13bcc7907316bad1",
+        "delta": "+1/-0"
+      },
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+        "sha256": "762c2c252e555d5180f3087e4f75815490f6c407079cb29d5095a2f5646a27c2",
+        "delta": "+155/-0"
+      },
+      "app/slug_core_v2/src/runtime/source_service/scope.rs": {
+        "sha256": "391e923eb0e238dca85c5e81944e56d40981a57748218578a535ea542a68b7b2",
+        "delta": "+1/-1"
+      },
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/immutable_archive_preparation.rs": {
+        "sha256": "6f7698a7837351f03be98d1476d5dcb38834141d767bf030c434b67b4f33a3ce",
+        "delta": "+2/-2 mechanical expected-count assertions"
+      },
+      "app/slug_core_v2/src/runtime/source_service/source_charge_census.rs": {
+        "sha256": "17e433cbf831f12558da16dce439224e98b13b9e25c8d4b198106c08512f9026",
+        "delta": "+3/-3"
+      }
+    },
+    "caller_roles": "IDs/paths8 unchanged;role1 allowedcurrentScope digest/bytes;other7exact/historyimmutable",
+    "caller_pin_sha256": "20ae502deadae15410f80308e11e036722a14a5178224b090207173f6b96c168"
+  },
+  "allocation": "Only scalar Linux-test construction/profile and census event eligibility; no new retained fields/eventarray/Strings/body/path/request copies/cache/interner/key/lock/API. More attempted graph data may retain more history, so unchanged RSS/byte/time guards remain binding; scalar change is not memory relief. Bounded lexical testfixture/arithmetic charges, no512fileIO.",
+  "focused": {
+    "selected": 62,
+    "passed": 62,
+    "families": {
+      "loading": {
+        "selected": 26,
+        "passed": 26,
+        "elapsed_seconds": 0.3100029320921749,
+        "operation_sha256": "423c4a240abff762e85c4e583b3e930cab2f24580414de695a97db5d54775921"
+      },
+      "bzlmod": {
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.11964398191776127,
+        "operation_sha256": "628d511fd472bcbcac1a254dec8d8184ac69ab5cf7b852520ae57e13843bafbb"
+      },
+      "core": {
+        "selected": 29,
+        "passed": 29,
+        "elapsed_seconds": 0.23657728196121752,
+        "operation_sha256": "ee14553f2bf0fcd6964aff4e23932dfb0d1f7aa3e3f25c37fb4e38ed09c732f7"
+      }
+    },
+    "qualification": "Fresh current Cargo artifacts/lists/batched preflight/bodies at explicitly changed Bzlmod/Core opt1 profiles (ordinary Loading0; native/production Loading1). Actual independent definition frontier/order/recovery/identity proofs. No timing speed, native frequency, source acquisition or whole-workload fit credit."
+  },
+  "preparation": {
+    "operations": {
+      "compile-bzlmod": {
+        "seconds": 0.10630640399176627,
+        "deadline_seconds": null,
+        "operation_sha256": "60f8d51c9377018d545572ad29b61b49aca4fa66f300fa4b4497212256b994aa",
+        "over_three_minutes": false
+      },
+      "compile-loading": {
+        "seconds": 0.11634994798805565,
+        "deadline_seconds": null,
+        "operation_sha256": "3538dd69b92eb7af648913a2922b784957bf38aa1c982a81ff746be36dd6f796",
+        "over_three_minutes": false
+      },
+      "compile-core": {
+        "seconds": 23.01812971790787,
+        "deadline_seconds": null,
+        "operation_sha256": "ee430a4193e8f48ba9094a1b69c2f04ac915bfde2c9717aa5eac04f1f72ca3c2",
+        "over_three_minutes": false
+      }
+    },
+    "necessity": "Current source-changed Core artifact/profile authority and current cached Loading/Bzlmod/direct production.",
+    "frequency": "Current Core23.018s, earlier common-edit10.725/28.738/39.565/37.852s below180; not recurrence distribution or speed/cause benchmark.",
+    "refactoring": "Prior packet341.708s since design-to-receipt vs25.176s saved operation sum signals recurring workflow overhead too. Source-owned shared descriptor capability removes per-name packets. New resource-profile decision needs design/final reviews; reuse bounded scaffolding and focused correction reviews, avoid repeated prior-owner decisions. No measured workflow speedup claimed.",
+    "memory": "Compiler RSS uncapped preparation only, no workload memory credit."
+  },
+  "production_check": {
+    "seconds": 7.442992780008353,
+    "operation_sha256": "7fb75d00306a8d4c620e760be023a82df23ea6d971697f415a2c0faf4c8d495e"
+  },
+  "native": {
+    "operation_sha256": "1bed5f5c183b338ba72e8378879e833fdbd9ddd4ed1e8ae86ba9787165c66959",
+    "stdout_sha256": "3925984d4f6aa3c08e53a29c0f2202d463d13b89d12f2b4bff9ddd50d82741f7",
+    "elapsed_seconds": 6.361695612082258,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 223540,
+    "rss_mib": 218.30078125,
+    "source_count": 262,
+    "decode_bytes": 55588489,
+    "write_bytes": 52810211,
+    "held_fds": 350,
+    "pins": 144,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 407,
+        "wall_ns": 162907301,
+        "process_cpu_ns": 162340059,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 407,
+        "wall_ns": 5509627225,
+        "process_cpu_ns": 5571616634,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 406,
+        "wall_ns": 174895978,
+        "process_cpu_ns": 174208405,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 407,
+        "wall_ns": 18951784,
+        "process_cpu_ns": 24757324,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=namespace path_len=1 path_hex=2f capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 262 7021682 55588489 52810211 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=262 seen=262 emitted=262 admitted=262 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=41101 encoded_bytes=141957 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. External runtime/memory/byte caps unchanged; internal Linux-test maximum and qualified native source-count512/census513 are explicitly reviewed changes.",
+    "phase_rss_kib": {
+      "after_runtime": 30216,
+      "after_command": 225076,
+      "after_terminal_drop": 225076,
+      "after_runtime_drop": 225076,
+      "after_scope_drop": 223020
+    },
+    "phase_peak_mib": 219.80078125,
+    "config_sha256": "dcd6aa1b6ae1b35493683f3ad6d69cee60a1810407f099193e89f13305dc6512",
+    "progress_refusal_record": {
+      "operation_sha256": "1bed5f5c183b338ba72e8378879e833fdbd9ddd4ed1e8ae86ba9787165c66959",
+      "stdout_sha256": "3925984d4f6aa3c08e53a29c0f2202d463d13b89d12f2b4bff9ddd50d82741f7",
+      "marker_sha256": null,
+      "record": null,
+      "claim_limit": "Captured means exact supported path-only outstanding Need. Owner headers/root targets are projections; full Specs/result source identity/request options unavailable. No acquisition, admission, CPU cause, producer/certificate/action/Rustc or whole-fit claim. Missing/unsupported/bounds record leaves next owner unproved."
+    },
+    "materialization_frames": [],
+    "namespace_frames": [
+      "WP987_NAMESPACE association=bounds_refused namespace=materialization instance=22 operation=lstat",
+      "WP988_NAMESPACE_POLICY owner_plan_allowed=false path_class=unavailable"
+    ],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "source_profile": {
+      "native_qualified": 512,
+      "native_unqualified": 256,
+      "ordinary": 128,
+      "production": 64,
+      "census_events": 513,
+      "other_limits": "unchanged"
+    }
+  },
+  "reviews": {
+    "design-review.md": {
+      "path": "target/wp1108/design-review.md",
+      "sha256": "35f44a72cf63132843d8dfab1a55ba652161e50a7becee54e2faad06b7f3a84f"
+    },
+    "helper-review.md": {
+      "path": "target/wp1108/helper-review.md",
+      "sha256": "b311c92a160d9191124a7564f42cdabfafa2263fc4dadd4fe2cfa36452524a41"
+    },
+    "helper-correction-review.md": {
+      "path": "target/wp1108/helper-correction-review.md",
+      "sha256": "1730df11e48452a2f2751f90c19bab5b5ee50bcd5ec88a9740f3ea5895c6c241"
+    },
+    "source-worker.md": {
+      "path": "target/wp1108/source-worker.md",
+      "sha256": "e778b2a3851305e4fcca7c45508a0ee8914cd06f05980782e80a865ecfab3786"
+    },
+    "source-prelaunch-review.md": {
+      "path": "target/wp1108/source-prelaunch-review.md",
+      "sha256": "e848fd7a433f447970390b5d1a6c77a50d2b9bdb0e186fc146a5ef08dc1db608"
+    },
+    "prelaunch-evidence.md": {
+      "path": "target/wp1108/prelaunch-evidence.md",
+      "sha256": "827e099cf9b092cc515a0f36420e3677882242481dde3fe482f6e7095975a027"
+    },
+    "root-prelaunch.md": {
+      "path": "target/wp1108/root-prelaunch.md",
+      "sha256": "cde38dd2d3e6223b6e35a364abd28d349c705c994b4141d40e08454266c31ef5"
+    },
+    "final-source-review.md": {
+      "path": "target/wp1108/final-source-review.md",
+      "sha256": "daaf851194e4ac9208413cc6641970fcbd13ce7b99ea2eb2d59ad5bd8af4728e"
+    },
+    "final-evidence-review.md": {
+      "path": "target/wp1108/final-evidence-review.md",
+      "sha256": "26d4a71fdcc2ef81b2757ff25a7edf14d03ea8d3822484f87b15ce45f8479482"
+    },
+    "next-namespace-research.md": {
+      "path": "target/wp1108/next-namespace-research.md",
+      "sha256": "2b6df7e05b9176f3ebaf41e5dcdb7fb80fb06542cfd5c581f506f08451821d25"
+    }
+  },
+  "corrections": "Beforegates, two mechanical immutable archive expectedfields addedtoallowedsource andactual2existingarchiveprofile selectors explicitlyadded (prior55+5source+2archive=62), replacing sourceworker alreadyselected/60 wording; currentdesignbinding/notes/metadata preservecorrection. One guessedinlinecensustestspath lookupfailed read-only no credit; correctrg ownerread. No semantic/gate correction/failure. ROOT-onlyhelpers retain generic originalcaps stdout as externalrunnercaps, while512/513codeprofile explicit. Allhistoricaloperations/maps immutable; caller1currentallowedsource rebind only. Decoder26malformed tests no workloadcredit.",
+  "claim_limit": "144actualstrictstablepins/350orderedstable noninheritedFDbrackets/18env collectionnon-atomic. Actualcomputationrefusal WP987bounds_refused Mat22/Lstat rawroot and WP988owner_plan_allowedfalse/classunavailable cannotidentifycanonical/fullSpec/attrs/plan/currentownereligibility. NoWP982/progressrecord/firstWorkDeadline; source262 censusaccountingcompleteidentityfalse. Rootobserveraborted_partial/allthreadwindows no exclusiveCPU/perkey/cause/speed/frequency. Phaseprefix219.80078125MiB under256, no wholefit/fullproducer/wholeheap; SourceWeakunseenexpiryvacuous/ScopeRecorderlivebufferretirement narrow. Count512checkpointnotfinitewholeclosurebound; allbyte/memory/worklimits unchanged.",
+  "next": "Source-only bounded current namespace owner lookup diagnosis; distinguish failed owner association from owner plan policy, no canonical inference/header grant frominstance22/rawroot.",
+  "goal": "Active/incomplete; broader configured producer/certificate/analysis/actions/Rustc/M7A/bootstrap remain open.",
+  "elapsed_since_design_binding_seconds": 788.110118,
+  "reviewed_candidate": {
+    "path": "target/wp1108/receipt-reviewed.json",
+    "sha256": "baee563c01990d3a6d52993c8d7d59593b857738665eea47e8876b8b7046107e"
+  },
+  "workflow_assessment": "Current packet exceeds180s including design/source/helper/final review and integration. Saved Core preparation23.018s and native6.362s do not account for that workflow duration. Reuse accepted scaffolding and focused reviewers for successor; preserve necessary resource-policy review. No timing speedup claim."
+}
