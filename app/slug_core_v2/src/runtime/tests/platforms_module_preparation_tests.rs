@@ -530,6 +530,13 @@ const APPLE_GENERATED_DIAGNOSTIC_OWNER: (&str, &str, &str, &str, &str) = (
     "setup_internal.bzl",
     "apple_cc_autoconf_toolchains",
 );
+const SWIFT_GENERATED_DIAGNOSTIC_OWNER: (&str, &str, &str, &str, &str) = (
+    "rules_swift++non_module_deps+build_bazel_rules_swift_local_config",
+    "rules_swift+",
+    "swift/internal",
+    "swift_autoconfiguration.bzl",
+    "swift_autoconfiguration",
+);
 const APPLE_SUPPORT_IMPORTS: [&str; 5] = [
     "crosstool/setup.bzl",
     "crosstool/setup_internal.bzl",
@@ -1491,7 +1498,16 @@ impl Bodies {
             label.package().package().as_str(),
             label.target().as_str(),
             request.repo_spec.rule_id.rule_name.as_str(),
-        ) == APPLE_GENERATED_DIAGNOSTIC_OWNER;
+        ) == APPLE_GENERATED_DIAGNOSTIC_OWNER
+            || (self.rules_rust_defs_import_sources
+                && immutable_archive_preparation::native_swift_environment_binding(self)
+                && (
+                    request.id.canonical_repo.as_str(),
+                    label.package().repo().as_str(),
+                    label.package().package().as_str(),
+                    label.target().as_str(),
+                    request.repo_spec.rule_id.rule_name.as_str(),
+                ) == SWIFT_GENERATED_DIAGNOSTIC_OWNER);
         if reason != "generated_kind" || request.id.workspace != self.roots[0] || !exact_owner {
             return None;
         }

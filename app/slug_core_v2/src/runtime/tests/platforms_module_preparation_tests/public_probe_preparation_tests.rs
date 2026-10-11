@@ -7893,6 +7893,11 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         "@@apple_support+//crosstool:setup_internal.bzl",
         APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
     );
+    let swift_owner = (
+        SWIFT_GENERATED_DIAGNOSTIC_OWNER.0,
+        "@@rules_swift+//swift/internal:swift_autoconfiguration.bzl",
+        SWIFT_GENERATED_DIAGNOSTIC_OWNER.4,
+    );
     let shell_owner = (
         "rules_shell++sh_configure+local_config_shell",
         "@@rules_shell+//shell/private/repositories:sh_config.bzl",
@@ -7922,10 +7927,22 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         ))
         .chain(std::iter::once(&shell_owner))
         .chain(std::iter::once(&apple_owner))
+        .chain(std::iter::once(&swift_owner))
         .enumerate()
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+        let bodies = if canonical == swift_owner.0 {
+            generated_test_bodies_with_swift(
+                bodies.with_rules_rust_defs_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                ),
+                1,
+            )
+        } else {
+            bodies
+        };
         let request_for_plan = |plan: Plan| {
             let mut request = generated_globals_request(&bodies, plan);
             request.id.canonical_repo =
@@ -7985,6 +8002,11 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                 RegistryChoice::PreparedFile,
                 CommandChoice::PublicProbe,
             );
+        let enabled = if canonical == swift_owner.0 {
+            generated_test_bodies_with_swift(enabled, 1)
+        } else {
+            enabled
+        };
         assert!(enabled.rules_rust_defs_import_sources);
         assert!(enabled.rules_cc_import_sources);
         assert!(enabled.rules_shell_import_sources);
@@ -8000,6 +8022,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
         if owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len()
             || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 1
             || owner == GENERATED_DIAGNOSTIC_TEST_OWNERS.len() + 2
+            || canonical == swift_owner.0
         {
             assert_eq!(permissive.unwrap_err().family, "materialization");
             assert_eq!(
@@ -8029,6 +8052,54 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
                         .is_none()
                 );
             }
+        }
+        if canonical == swift_owner.0 {
+            eprintln!(
+                "WP1121_DIAGNOSTIC_LAYOUT owner={} Bodies={} Scope={}",
+                std::mem::size_of_val(&SWIFT_GENERATED_DIAGNOSTIC_OWNER),
+                std::mem::size_of::<Bodies>(),
+                std::mem::size_of::<SourceServiceScope>()
+            );
+            for case in [0, 2, 3, 4, 5, 6] {
+                let closed = generated_test_bodies_with_swift(
+                    Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+                        .with_rules_rust_defs_import_sources(
+                            RegistryChoice::PreparedFile,
+                            CommandChoice::PublicProbe,
+                        ),
+                    case,
+                );
+                assert!(
+                    closed
+                        .generated_plan_diagnostic(&needs, &closed.admit(&needs).unwrap_err())
+                        .is_none()
+                );
+            }
+            for (registry, command) in [
+                (RegistryChoice::DefaultBcr, CommandChoice::PublicProbe),
+                (RegistryChoice::PreparedFile, CommandChoice::Modules),
+                (RegistryChoice::DefaultBcr, CommandChoice::Modules),
+            ] {
+                let closed = generated_test_bodies_with_swift(
+                    Bodies::new([path("/fixture"), path("/rules"), path("/platforms")])
+                        .with_rules_rust_defs_import_sources(registry, command),
+                    1,
+                );
+                assert!(
+                    closed
+                        .generated_plan_diagnostic(&needs, &closed.admit(&needs).unwrap_err())
+                        .is_none()
+                );
+            }
+            let closed = generated_test_bodies_with_swift(
+                Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]),
+                1,
+            );
+            assert!(
+                closed
+                    .generated_plan_diagnostic(&needs, &closed.admit(&needs).unwrap_err())
+                    .is_none()
+            );
         }
         let original = needs.repository_materializations().values().next().unwrap();
         let weak = Arc::downgrade(original);
@@ -8163,6 +8234,7 @@ fn generated_plan_refusal_projection_preserves_original_order_and_owner() {
             ))
             .chain(std::iter::once(&shell_owner))
             .chain(std::iter::once(&apple_owner))
+            .chain(std::iter::once(&swift_owner))
         {
             if other_canonical == canonical {
                 continue;
@@ -8319,6 +8391,11 @@ fn generated_plan_refusal_projection_is_bounded() {
         "@@apple_support+//crosstool:setup_internal.bzl",
         APPLE_GENERATED_DIAGNOSTIC_OWNER.4,
     );
+    let swift_owner = (
+        SWIFT_GENERATED_DIAGNOSTIC_OWNER.0,
+        "@@rules_swift+//swift/internal:swift_autoconfiguration.bzl",
+        SWIFT_GENERATED_DIAGNOSTIC_OWNER.4,
+    );
     let shell_owner = (
         "rules_shell++sh_configure+local_config_shell",
         "@@rules_shell+//shell/private/repositories:sh_config.bzl",
@@ -8331,9 +8408,21 @@ fn generated_plan_refusal_projection_is_bounded() {
         ))
         .chain(std::iter::once(&shell_owner))
         .chain(std::iter::once(&apple_owner))
+        .chain(std::iter::once(&swift_owner))
     {
         let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
         let bodies = Bodies::new([path("/fixture"), path("/rules"), path("/platforms")]);
+        let bodies = if canonical == swift_owner.0 {
+            generated_test_bodies_with_swift(
+                bodies.with_rules_rust_defs_import_sources(
+                    RegistryChoice::PreparedFile,
+                    CommandChoice::PublicProbe,
+                ),
+                1,
+            )
+        } else {
+            bodies
+        };
         let request_for_plan = |plan: Plan| {
             let mut request = generated_globals_request(&bodies, plan);
             request.id.canonical_repo =

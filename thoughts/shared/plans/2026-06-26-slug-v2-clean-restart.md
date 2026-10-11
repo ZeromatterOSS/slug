@@ -34,20 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-333-m7a-swift-generated-plan-capture
+Packet: WP-7-334-m7a-swift-file-plan
 Status: ready — independent DESIGN before implementation
 
-The [accepted environment request](./slug-v2-subplans/wp1120-observed-environment-request-2026-10-11.json)
-passes freshCore43+production/qualified protected33+fixture31 and ONE19.734s/source366,
-phase245.41015625MiB under256;359source/195pins/18env stable. Exact original
-CC/Path/ProgramData tuple progressed through the unchanged complete caller snapshot;
-current controlled-empty input is no ambient claim. No new retained field or policy
-owned strings; Bodies304/Scope488 unchanged. Producer/whole fit remain open.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects only a bounded
-original Swift generated local-config plan metadata capture by the existing borrowed
-diagnostic. Current WP982 identifies the original tuple but has no ordered plan/body.
-Reuse existing formatter/projection controls; no new admission or namespace grant,
-source acquisition or Windows work. Independent DESIGN precedes activation.
+The [accepted Swift diagnostic](./slug-v2-subplans/wp1121-swift-generated-plan-capture-2026-10-11.json)
+passes currentCore43+extra2 projection controls/production and qualified protected33/
+fixture31. ONE19.739s/source366/phase245.296875MiB under256;233pins/359source/18env
+stable. Original plan metadata captures one executable BUILD File1094B, unmapped
+label/empty attrs; literal body/fullSpec unavailable. No new retained strings/fields;
+Bodies304/Scope488 unchanged. Producer/whole fit remain open.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects an exact Swift
+original File-only qualifier over existing bounded validation and current declared-
+leaf namespace. Original request/bytes/structural DICE identity remain the owner;
+no copied template, source acquisition or Windows work. Independent DESIGN precedes
+activation; current metadata grants no capability by itself.
 
 ### Ready and blocked queue
 
