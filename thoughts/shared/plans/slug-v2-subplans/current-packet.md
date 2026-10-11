@@ -1,103 +1,100 @@
-# WP1131 exact Rust root directory
+# WP1132 exact Rust platform marker metadata
 
-Packet: WP-7-343-m7a-rust-root-directory
+Packet: WP-7-344-m7a-rust-platform-marker-metadata
 Status: ready — independent DESIGN and stopped source checkpoint pending
 
-Outcome: permit only DirectoryEntries for the authentic configured rules-rust
-root1/rust path under the existing PreparedFile/PublicProbe defs-import role,
-then observe the next original boundary once under unchanged budgets. Slug-native
-private Linux-test capability; normal Bazel9.2 Host/package/glob semantics and
-production remain unchanged, Windows deferred.
+Outcome: admit only Lstat for authentic configured rules-rust root1
+rust/platform/BUILD.bazel and rust/platform/BUILD through the existing private
+PreparedFile/PublicProbe defs-import role, then observe the next original boundary
+once under unchanged caps. Slug-native private Linux-test capability; normal
+Bazel9.2 Host/package semantics and production unchanged, Windows deferred.
 
-Basis: accepted [WP1130](./wp1130-rust-build-source-2026-10-11.json), receiptSHA
-27b526215fcdbbfc340bd6ebdb8e70329f3bf54a869f36e9024110d577ab7c5e, actual FINAL
-899e53f2f601585e76e13b655b35a3da7ab3ee35ebdba20d5ae1cabc0573f186.
-ONE native20.614492478s admitted the authentic564B rust/BUILD.bazel, source391,
-then refused DirectoryEntries at original root1/rust. Distinct phase253.94140625
-MiB under256 leaves2.05859375MiB, without future/whole-fit or savings/cause credit.
-The original BUILD source's glob is already captured/qualified; no new source or
-listing is supplied by its metadata or refusal. Record actual accepted WP1130 HEAD
-as baseline before DESIGN; never guess the acceptance commit.
+Basis: accepted [WP1131](./wp1131-rust-root-directory-2026-10-11.json), receiptSHA
+f6f408a97c93320bcfd8986efea41359e1a638656f9ca37c4d312542ff1f7c83 and actual FINAL
+3cbbe857613229fd27b59577d4e7a500ec925301355fd1d8a16bd966ee3e6bb8.
+Fresh52/production and qualifiedLoading29/Bzlmod7/fixture31 passed. ONE native
+20.691521542s advanced beyond exact root1/rust DirectoryEntries to captured
+family=path/Lstat rust/platform/BUILD.bazel213B, source391. Distinct phase
+255.64453125MiB under256 leaves0.35546875MiB; supervisor254.2109375MiB. Neither
+metric predicts next/whole fit, retained bytes or allocation cause/savings.
+Record actual accepted WP1131 HEAD as baseline before DESIGN; never guess it.
 
-Reuse source readiness target/wp1130/next-directory-source-readiness.md fullSHA
-338a24adeae5b75b4d39a6bf101c17fb2f3cfbb44e28e4f47e6a1cb0f8a262cd.
-Existing Bodies exact root predicates, PathObservationKey/HostRepositoryDirectoryListingKey,
-RepositoryMaterializer::observe_native_impl and scoped_directory::observe remain
-the semantic owners. Directory identity is namespace+normalized path+operation and
-an independently owned ordinary Host/DICE observed epoch; opendir/refinement is
-mutable and non-atomic, with no anchored inode/source certificate or snapshot claim.
-Normal absence/wrong-kind/error polarity, tracked inputs/invalidation/cutoff/revocation/
-restoration and cleanup stay unchanged; no direct reader or graph/cache bypass.
+Reuse target/wp1131/next-metadata-source-readiness.md fullSHA
+ac9cc8f181d08efb9e6f43ebc606228fbaeecdd8cdafbcd9fd95794e5fffe77d.
+The next demanded path is not observed leaf presence/kind/inode/body/source identity.
+No original leaf prelisting/stat/capture/archive/member/body acquisition is needed.
+All361 ordered source rows/hash/bytes and saved source cohort remain byteexact.
 
-Rust allowlist ONLY platforms_module_preparation_tests.rs and its existing
-public_probe_preparation_tests.rs. Reuse rules_rust_defs_import_sources bool,
-borrowed exact strip_prefix(roots[1])/Path("rust") predicate and one DirectoryEntries
-branch arm. Source34/metadata5 stay; existing shared Need72→73 adds one demand.
-No descendants/root1 itself/other roots/namespaces/case/suffix/child, FileBytes/
-FileDigest/ReadLink on the directory, source/body/glob recursion or other operation
-is admitted. Preserve registry/role defaults, all old negatives, both-order original
-first offender pointer/path/op/family/zero calls/preparations/progress and Arc/Weak
-materialization tail. Estimate policy7–10/proof30–65 lines; these two large private
-owners remain cohesive through the existing shared exact-role/mixed-Need helpers.
-No new selector/test/harness/fixture/API/key/lock/field/pool/global interner.
+Natural owners remain PathObservationDemand/Key (namespace+normalized path+op),
+HostRepositoryPath[Observation]Key and existing directory/request/epoch/Arc/DICE
+owners. drive_host_repository_path selects normal Local Host/source_root versus
+Immutable Materialization(instance)/generation_root. Native Lstat adapter keeps
+scope checks and normal Present/Missing/Error. Normal marker lookup requests
+BUILD.bazel before BUILD; unavailable observation is Need before fallback, actual
+Missing/ineligible terminal kind permits fallback, errors propagate. Preserve
+normal SpecialFile eligibility/symlink resolution without a regular-only shortcut
+or new ReadLink/body grant. Mutable Host metadata is not an anchored snapshot or
+source certificate. Tracking/equality cutoff/invalidation/revocation/restoration,
+provisional cleanup/retained error and negative/selected Arc ownership stay.
+No direct reader, graph/cache bypass, new key/lock/semantic owner or production change.
 
-The existing scoped Unix directory reader checks128 entries/1024 bytes per name/
-16384 aggregate bytes before independent name copies/classification, brackets
-scope/deadline checks, arms and closes one DIR handle and returns no partial epoch
-on operational refusal. It owns/charges names under existing immutable Arc result,
-request/epoch/Host/DICE lifetimes, never dirent/scratch references. Keep vector/Arc/
-libc metadata and retention honest: name-byte bounds do not prove whole heap/RSS.
-Borrow/transfer/share/intern under existing natural owners; no unnecessary owned
-string/content/request/plan copies. Production layout Scope536/Copy48/Bodies304 stays.
+Rust allowlist ONLY platforms_module_preparation_tests.rs and existing public child
+public_probe_preparation_tests.rs. Append two borrowed static exact metadata rows:
+RULES_RUST_IMPORT_METADATA5→7, source34 table/order unchanged. Existing flag and
+exact roots[1]/relative predicate/Lstat arm unchanged; distinct shared Need73→75.
+No new field/selector/test source/fixture/API/interner/pool/owned policy String/Vec.
+Two borrowed row16 descriptors32B is representation only, not heap/RSS/literal-pooling
+credit. Scope536/Copy48/Bodies304 layout unchanged, subject to compiled proof.
+Keep borrowing/transfer/sharing and existing scoped string interners where their
+natural lifetimes fit; independently retained observation names remain owned.
 
-No original directory prelisting is required or authorized by readiness: it would
-not certify a later mutable observation. The actual normal scoped Host listing may
-refuse on current entry/name/aggregate/deadline/IO limits. Do not guess names/kinds/
-count, directory presence, future boundary or memory fit. No source append/capture/
-archive/member/body acquisition; current361 ordered rows/hash/bytes remain byteexact.
+Reuse existing shared matrix metadata tuples for both exact markers with case,
+suffix, child/sub-marker and foreign-root near misses. Preserve four registry/role
+pairs, eleven slots, namespace, root itself/descendants/wrong-operation negatives.
+Metadata-derived FileBytes/FileDigest/DirectoryEntries/ReadLink negatives include
+both new markers; sole FileBytes exemption stays exact /rules/rust/BUILD.bazel.
+Neither new platform marker gains body/digest/readlink/list/source/glob recursion.
+Existing exact root1/rust directory admission and four reader controls stay.
+Both-order mixed whole Need must retain original first offender pointer/path/op/
+family, zero calls/preparations/progress and materialization Arc/Weak tail; byte
+budgets stay. Estimated policy3–5/proof20–35 lines; the large existing private owners
+remain cohesive through shared table/role/mixed-Need helpers, no duplicate harness.
 
-Fresh pinned-toolchain offline/locked/jobs1 Core52: exact saved P1130 Core48 order,
-including changed matrix/budget/projection/time/Capture proofs, then FOUR existing
-scoped_directory tests: inclusive_bounds_preserve_names_and_kinds,
-refuses_before_copy_classification_and_closes_once,
-retries_check_scope_and_preserve_error_polarity,
-native_epoch_is_fresh_and_operational_refusal_has_no_partial_epoch (each prefixed
-runtime::path_observation::scoped_directory::tests::scoped_directory_).
-No current Core48 proof credit is assumed for those four newly selected controls.
-They establish the reader bounds/close/refusal/freshness/owned-result invariants for
-this new admitted operation. One batch list/preflight/body, production/singleton;
-qualified unchanged L1128Loading29/Q1119Bzlmod7 gives focused88, fixture31 reused,
-portable3 missingstrace unproved. No oldCore/QLoading26 runtime credit.
+Fresh pinned-toolchain offline/locked/jobs1 Core52: exact P1131 saved52 order,
+changed matrix once, inherited four scoped_directory bounds/close/refusal/freshness
+controls once; no new selector append. One current compile/artifact/list/batch
+preflight/body, production/singleton; qualified unchanged L1128Loading29/Q1119
+Bzlmod7 gives focused88=current52/reused36, fixture31 reused, portable3 missingstrace
+unproved. No oldCore/QLoading26 runtime credit. Unchanged production marker
+regressions are source evidence, not invented current selected Bzlmod gate counts.
 
-Pin the ALREADY EXISTING owner test source
-app/slug_core_v2/src/runtime/path_observation/scoped_directory/tests.rs, fullSHA
-8f922912cb3e433c2ceb5772b41cdffec9ef7813d73f903b1a99d1435ff1bb27,
-for the added four selectors. Current frozen source cohort is P53 plus this known
-validation file:54 before/after paths, only two Core edits/52 unchanged. Its actual
-baseline/fullhash is required; do not fabricate a null/new-file introduction row.
-Preserve P53 prefix and explicit Q-absent copy_counts/owner-test provenance with
-finite historical private3/diagnostic2/Loading2 maps. All8 callers/18 entries/6backings
-stay unchanged. All source/helper writers STOPPED for root full actual source/diff/
-handoff review and independent source checkpoint before any factory/import/main.
+Current source cohort is P1131 after54; before/after54, two Core edits/52 unchanged.
+scoped_directory/tests.rs is ALREADY inherited alongside copy_counts: no additional
+known physical file, null/new-file row or repeated four-test append. A no-added-file
+known_validation_sources_before={} merge may express this; retain actual P1131
+known owner-test baseline and both Q-absent child hashes. All8 caller records/18
+configured entries/6 backing identities/current361 sources stay unchanged.
 
-Validation source evidence is immediate P1130/current361 and accepted Rust cohort
-S1130 (unchanged8 binding plus original source utility records, never reexecuted);
-separate H1129 historical360/Skylib prefix, E1125 uncredited360 contextual vector and
-O1124 original359. L1128Loading29 retains its actual different Core-before hashes.
-Adapt only these finite donor roots/maps and new known validation path/counts;
-reuse accepted original source checkpoints rather than broad history/reacquisition.
-Readiness and repeated validation-map authoring over180s were examined: reuse the
-pinned reader/owner/proof and finite map seams; consolidate repeated declarations
-where bounded and necessary, without an unsolicited framework/metrics packet.
+Validation roots remain explicit: P1131 current54/Core52/361; S1130 original Rust
+accepted exact8 binding plus saved source utility config/operation/streams; H1129
+legacy360; O1124 original359; E1125 contextual360 uncredited/outside native pins;
+L1128 actualLoading29 different Core-before2; Q1119 finite private3/diagnostic2/
+Loading2 exceptions for Bzlmod7/fixture31. No source helper import/main/reexecution,
+recapture/requalification or recursive history audit. Reuse closed finite seams;
+adapt only prior/current-before/pins/count guards/known-file inheritance. Preserve
+four finalizer authentication functions and normal FD owner/parser/caps. Repeated
+521/320/644 factory/runner/finalizer copies and declarations are concrete workflow
+refactoring candidates; no new framework/metrics packet or speedup claim selected.
 
-Actual independent DESIGN before implementation; root stopped source checkpoint,
-fresh gates/actual PRELAUNCH before ONE distinct native; actual first finalizer/FINAL/
-receipt/local commit before acceptance. Compile separate from runtime. Qualified
-work26/cleanup29/outer32/default5/8/ordinary10/constructor27tail3; RSS256MiB/AS512/
-live16/source512/census513/transfer32/separate decoded128+written128MiB,
-FSIZE16/native32/exact Kotlin FD exception unchanged. Necessary time authorized;
-recurring>180s is necessity/refactoring signal. Preserve real refusal/resource failure;
-no identical replay/capraise. REPLAN only for wider identity/owner/capability changes,
-unbounded reader or contradictory prerequisites; technical decisions remain within
-existing authorization. Full producer/certificate/actions/Rustc/M7A/bootstrap/parity/
-whole fit and later source/directory/body capabilities remain open.
+Actual independent DESIGN before Rust/helper activation; all writers STOP for root
+full actual diff/source/handoff and independent source review before factory/import/
+main. Fresh gates and actual independent PRE before ONE distinct changed-packet
+native; actual immutable FIRST finalizer/FINAL/receipt/local commit before acceptance.
+Compile separate from workload. Qualified26/29/outer32/default5/8/ordinary10/
+constructor27tail3; RSS256MiB/AS512/live16/source512/census513/transfer32/separate
+cumulative decoded128+written128MiB/FSIZE16-native32/exact Kotlin FD exception stay.
+Necessary time authorized; recurring>180s is necessity/refactoring signal. Preserve
+genuine refusal/failure, no identical replay/capraise. REPLAN only for wider identity/
+owner/capability, unbounded reads or contradictory prerequisite; existing technical
+decisions stay within user authorization. Later bodies/recursion/producer/certificate/
+actions/Rustc/M7A/bootstrap/parity/whole-fit remain open prerequisites, not claimed.

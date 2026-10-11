@@ -34,18 +34,17 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-343-m7a-rust-root-directory
+Packet: WP-7-344-m7a-rust-platform-marker-metadata
 Status: ready — independent DESIGN and stopped source checkpoint pending
 
-[Accepted WP1130](./slug-v2-subplans/wp1130-rust-build-source-2026-10-11.json)
-admits the qualified original564-byte Rust BUILD source through one borrowed static
-entry. FreshCore48/production and qualifiedLoading29/Bzlmod7/fixture31 passed; one
-native reached source391 and the original Rust directory listing boundary. Phase
-253.94140625MiB remains below256; future/whole fit is unproved. The
-[current manifest](./slug-v2-subplans/current-packet.md) selects exact root1/rust
-DirectoryEntries using the existing bounded Host/DICE reader and role, with four
-existing reader controls added to fresh validation. All361 source rows, allocation
-owners and resource caps stay unchanged; production and Windows unchanged.
+[Accepted WP1131](./slug-v2-subplans/wp1131-rust-root-directory-2026-10-11.json)
+admits only exact root1/rust DirectoryEntries through the existing bounded owner.
+FreshCore52/production and qualifiedLoading29/Bzlmod7/fixture31 passed. ONE native
+20.692s reached source391 and original rust/platform/BUILD.bazel Lstat; phase
+255.64453125MiB under256 leaves0.35546875MiB, without future/whole-fit credit.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects two exact platform
+BUILD-marker metadata rows under the existing role. Source34/current361, allocation
+owners and all resource caps stay unchanged; production and Windows unchanged.
 
 ### Ready and blocked queue
 

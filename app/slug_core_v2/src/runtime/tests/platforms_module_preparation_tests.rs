@@ -1822,6 +1822,12 @@ impl Bodies {
                             .any(|file| relative == Path::new(file))
                 })
     }
+    fn admits_rules_rust_defs_import_directory(&self, path: &Path) -> bool {
+        self.rules_rust_defs_import_sources
+            && path
+                .strip_prefix(self.roots[1].as_path())
+                .is_ok_and(|relative| relative == Path::new("rust"))
+    }
     fn with_generated_features_file_effects(
         mut self,
         registry: RegistryChoice,
@@ -2332,7 +2338,8 @@ impl Bodies {
                             })
                     }
                     PathObservationOperation::DirectoryEntries
-                        if self.admits_platforms_host_directory(path)
+                        if self.admits_rules_rust_defs_import_directory(path)
+                            || self.admits_platforms_host_directory(path)
                             || self.admits_platforms_cpu_directory(path)
                             || self.admits_platforms_os_directory(path) =>
                     {

@@ -10274,6 +10274,22 @@ fn rules_rust_defs_source_need_is_opt_in_exact_import_only() {
 }
 #[test]
 fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
+    let directory_near_misses = [
+        "/rules",
+        "/rules/RUST",
+        "/rules/rust-extra",
+        "/rules/rust/child",
+        "/rules/rust/BUILD.bazel",
+    ];
+    assert_exact_root_file_role(
+        "rust",
+        &[PathObservationOperation::DirectoryEntries],
+        Bodies::with_rules_rust_defs_import_sources,
+        |b| b.rules_rust_defs_import_sources,
+        &directory_near_misses,
+        "/rules/rust",
+        Some("/rules"),
+    );
     let operations = [
         PathObservationOperation::Lstat,
         PathObservationOperation::FileBytes,
@@ -10388,7 +10404,13 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
             all = all.try_union(&need(&selected, operation.dupe())).unwrap();
         }
     }
-    assert_eq!(all.path_observations().unwrap().demands().len(), 72);
+    all = all
+        .try_union(&need(
+            Path::new("/rules/rust"),
+            PathObservationOperation::DirectoryEntries,
+        ))
+        .unwrap();
+    assert_eq!(all.path_observations().unwrap().demands().len(), 73);
     assert!(bodies.admit(&all).is_ok());
     let root = BuildCommandRootKey::new_with_overlay(
         path("/fixture"),
@@ -10508,7 +10530,16 @@ fn rules_rust_defs_import_sources_need_is_opt_in_exact_table_only() {
                 })
                 .map(move |operation| (selected, operation)),
             )
-    })) {
+    }))
+    .chain(directory_near_misses.map(|path| (path, PathObservationOperation::DirectoryEntries)))
+    .chain(
+        [
+            PathObservationOperation::FileBytes,
+            PathObservationOperation::FileDigest,
+            PathObservationOperation::ReadLink,
+        ]
+        .map(|operation| ("/rules/rust", operation)),
+    ) {
         let expected_family = match &operation {
             PathObservationOperation::DirectoryEntries | PathObservationOperation::ReadLink => {
                 "operation"
