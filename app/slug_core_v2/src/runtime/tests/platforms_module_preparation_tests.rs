@@ -2011,7 +2011,7 @@ impl Bodies {
                 && self.rules_rust_defs_import_sources
                 && immutable_archive_preparation::native_byte_budget_backing(self)
             {
-                20
+                26
             } else {
                 5
             },

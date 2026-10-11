@@ -34,18 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-336-m7a-qualified-work-time
-Status: ready for DESIGN
+Packet: WP-7-337-m7a-skylib-collections-closure
+Status: ready — independent DESIGN before selected-source inspection
 
-The [accepted Swift package metadata](./slug-v2-subplans/wp1123-swift-package-metadata-2026-10-11.json)
-passes freshCore45/production and qualified protected33/fixture31. ONE20.579s/source377/
-phase246.8671875MiB under256;217pins/359source/18env stable. Prior root BUILD.bazel
-boundary crossed; genuine work20 deadline captures8 late immutableSwift path demands.
-No new retained strings or fields; Bodies304/Scope488 unchanged. Producer/wholefit open.
-The [current manifest](./slug-v2-subplans/current-packet.md) proposes reviewed qualified
-work26/cleanup29/outer32 within unchanged constructor ceiling27/tail3, retaining all
-memory/byte/source/input caps. No new namespace/body/source/Windows capability.
-Independent DESIGN precedes time-policy activation; original deadline result preserved.
+[Accepted WP1124](./slug-v2-subplans/wp1124-qualified-work-time-2026-10-11.json) changes
+only qualified private work26/cleanup29/outer32 timing, preserving memory/source/byte caps.
+Fresh45/production and protected33/fixture31 passed. ONE20.323s/source383/phase246.945MiB
+under256 crosses prior work20 boundary; current Lstat lib/collections.bzl refused.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects bounded original
+Skylib literal-load inspection and Host qualification before exact static table changes.
+No body/source permission inferred from headers; producer/wholefit remains open.
 
 ### Ready and blocked queue
 

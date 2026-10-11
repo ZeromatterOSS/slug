@@ -1279,7 +1279,7 @@ mod tests {
         assert_eq!(native(&bodies), expected);
         assert_eq!(
             bodies.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         assert_eq!(Arc::strong_count(owner), owners);
         assert!(std::ptr::eq(
@@ -1327,7 +1327,7 @@ mod tests {
         assert_eq!(native(&cohort), expected);
         assert_eq!(
             cohort.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         for case in 0..4 {
             let mut b = make();
@@ -1365,7 +1365,7 @@ mod tests {
         assert_eq!(native(&cohort), expected);
         assert_eq!(
             cohort.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         assert_eq!(Arc::strong_count(&python.archive.backing), python_count);
         assert_eq!(
@@ -1393,7 +1393,7 @@ mod tests {
         assert_eq!(native(&kotlin_cohort), kotlin_expected);
         assert_eq!(
             kotlin_cohort.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         assert_eq!(Arc::strong_count(&kotlin.archive.backing), kotlin_count);
         assert_eq!(kotlin.patch.as_path() as *const Path, kotlin_patch);
@@ -1402,7 +1402,7 @@ mod tests {
         assert_eq!(native(&swift_only), expected);
         assert_eq!(
             swift_only.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         let swift = valid_patched(4);
         let swift_weak = Arc::downgrade(&swift.archive.backing);
@@ -1415,7 +1415,7 @@ mod tests {
         assert_eq!(swift.patch.as_path() as *const Path, swift_patch);
         assert_eq!(
             kotlin_cohort.native_source_work_duration(PreparedFile, PublicProbe),
-            Duration::from_secs(20)
+            Duration::from_secs(26)
         );
         for index in [2, 3, 4] {
             let descriptor = &ARCHIVES[index];
@@ -1653,7 +1653,7 @@ mod tests {
         let module = bodies.offline_archive_module.as_ref().unwrap().as_path();
         let work = bodies
             .native_source_work_duration(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
-        assert_eq!(work, Duration::from_secs(20));
+        assert_eq!(work, Duration::from_secs(26));
         assert_eq!(Arc::strong_count(backing), count);
         assert!(std::ptr::eq(
             bodies.offline_archive_module.as_ref().unwrap().as_path(),
@@ -1682,8 +1682,8 @@ mod tests {
         )
         .unwrap();
         let scope_weak = Arc::downgrade(&scope);
-        assert_eq!(scope.work_deadline(), start + Duration::from_secs(20));
-        assert_eq!(scope.cleanup_deadline(), start + Duration::from_secs(23));
+        assert_eq!(scope.work_deadline(), start + Duration::from_secs(26));
+        assert_eq!(scope.cleanup_deadline(), start + Duration::from_secs(29));
         assert_eq!(scope.limits(), limits);
         let held = scope.reserve_buffer(16).unwrap();
         assert_eq!(scope.snapshot().live_buffer_bytes, 16);
