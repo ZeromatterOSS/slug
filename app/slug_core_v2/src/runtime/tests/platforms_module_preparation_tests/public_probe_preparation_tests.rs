@@ -2629,7 +2629,7 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
             + APPLE_SUPPORT_ENVIRONMENT_NAMES.len()
             + RULES_JAVA_ENVIRONMENT_NAMES.len()
             + RULES_PYTHON_ENVIRONMENT_NAMES.len(),
-        21
+        25
     );
     eprintln!(
         "WP1093_JAVA_ENVIRONMENT_LAYOUT table={} row={} literal={} bodies={}/{}",
@@ -2779,12 +2779,12 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
             guard.command().repository_environment_frontier,
             accepted.repository_environment_frontier
         );
-        assert!(
+        assert!(names.iter().all(|name| {
             !guard
                 .command()
                 .repository_environment_frontier
-                .contains(names[0])
-        );
+                .contains(name)
+        }));
     }
     assert_eq!(
         guard.progress(&admitted).unwrap(),
@@ -2795,20 +2795,23 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
         Err(NativeDemandSessionError::EnvironmentInternalNonProgress)
     ));
     guard.begin_attempt().unwrap();
-    let cell = RepositoryEnvironmentCellKey::new(normalized.dupe(), names[0]);
     runtime.runtime.block_on(async {
         let data = guard.attempt_user_computation_data().unwrap();
         let carrier = data.data.get::<RepositoryHostInputTransaction>().unwrap();
         assert!(carrier.snapshot().is_empty());
-        assert!(carrier.frontier().contains(names[0]));
+        assert!(names.iter().all(|name| carrier.frontier().contains(name)));
         let mut updater = runtime.dice.updater_with_data(data);
         guard.inject_attempt(&mut updater).unwrap();
         let mut tx = updater.commit().await;
         runtime.request_revision.bind_cycle_detector(&tx);
-        assert_eq!(
-            tx.compute(&cell).await.unwrap(),
-            RepositoryEnvironmentCell::observed(None)
-        );
+        for name in names {
+            assert_eq!(
+                tx.compute(&RepositoryEnvironmentCellKey::new(normalized.dupe(), *name))
+                    .await
+                    .unwrap(),
+                RepositoryEnvironmentCell::observed(None)
+            );
+        }
         assert!(
             tx.compute(&RepositoryEnvironmentSnapshotKey::new(normalized.dupe()))
                 .await
@@ -2818,16 +2821,20 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
     });
     let restored = guard.discard().unwrap();
     assert!(restored.snapshot().is_empty());
-    assert!(!restored.frontier().contains(names[0]));
+    assert!(names.iter().all(|name| !restored.frontier().contains(name)));
     assert_current_native_snapshot(&runtime, &accepted);
     runtime.runtime.block_on(async {
         let data = runtime.user_computation_data(None).unwrap();
         let mut tx = runtime.dice.updater_with_data(data).existing_state().await;
         runtime.request_revision.bind_cycle_detector(&tx);
-        assert_eq!(
-            tx.compute(&cell).await.unwrap(),
-            RepositoryEnvironmentCell::Unauthorized
-        );
+        for name in names {
+            assert_eq!(
+                tx.compute(&RepositoryEnvironmentCellKey::new(normalized.dupe(), *name))
+                    .await
+                    .unwrap(),
+                RepositoryEnvironmentCell::Unauthorized
+            );
+        }
         assert!(
             tx.compute(&RepositoryEnvironmentSnapshotKey::new(normalized))
                 .await
@@ -2887,11 +2894,42 @@ fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() 
     let python = need(&bodies.roots[0], &RULES_PYTHON_ENVIRONMENT_NAMES);
     assert!(bodies.offline_archive.is_none() && bodies.java_offline_archive.is_none());
     bodies.admit(&python).unwrap();
+    assert_eq!(RULES_PYTHON_ENVIRONMENT_NAMES.len(), 5);
+    assert!(
+        RULES_PYTHON_ENVIRONMENT_NAMES
+            .windows(2)
+            .all(|pair| pair[0] < pair[1])
+    );
+    assert_eq!(python.repository_environment().unwrap().names().len(), 5);
+    let reordered = SourcePreparationNeeds::environment(
+        NeedRepositoryEnvironmentNames::new(
+            bodies.roots[0].dupe(),
+            RepositoryEnvironmentNameFrontier::from_unsorted(
+                RULES_PYTHON_ENVIRONMENT_NAMES
+                    .iter()
+                    .rev()
+                    .chain(RULES_PYTHON_ENVIRONMENT_NAMES.iter())
+                    .map(|name| (*name).into()),
+            ),
+        )
+        .unwrap(),
+    );
+    assert_eq!(
+        reordered.repository_environment(),
+        python.repository_environment()
+    );
+    bodies.admit(&reordered).unwrap();
+    for name in RULES_PYTHON_ENVIRONMENT_NAMES {
+        bodies.admit(&need(&bodies.roots[0], &[name])).unwrap();
+    }
     eprintln!(
-        "WP1112_PYTHON_ENVIRONMENT_LAYOUT table={} row={} literal={} bodies={}/{}",
+        "WP1113_PYTHON_ENVIRONMENT_LAYOUT table={} row={} literals={} bodies={}/{}",
         std::mem::size_of_val(&RULES_PYTHON_ENVIRONMENT_NAMES),
         std::mem::size_of::<&str>(),
-        RULES_PYTHON_ENVIRONMENT_NAMES[0].len(),
+        RULES_PYTHON_ENVIRONMENT_NAMES
+            .iter()
+            .map(|name| name.len())
+            .sum::<usize>(),
         std::mem::size_of::<Bodies>(),
         std::mem::align_of::<Bodies>()
     );
@@ -2965,15 +3003,7 @@ fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() 
             .family,
         "environment"
     );
-    for name in [
-        "rules_python_bzlmod_debug",
-        "RULES_PYTHON_BZLMOD_DEBUG_suffix",
-        "",
-        "UNKNOWN",
-        "JAVA_HOME",
-        "TEMP",
-        "PATH",
-    ] {
+    let rejects_name = |name: &str| {
         let bad = need(&bodies.roots[0], &[name]);
         for mixed in [
             python.try_union(&bad).unwrap(),
@@ -2990,6 +3020,13 @@ fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() 
                 mixed.repository_environment().unwrap()
             ));
         }
+    };
+    for name in RULES_PYTHON_ENVIRONMENT_NAMES {
+        rejects_name(&name.to_ascii_lowercase());
+        rejects_name(&format!("{name}_suffix"));
+    }
+    for name in ["", "UNKNOWN", "JAVA_HOME", "TEMP", "BAZEL_SH", "WINDIR"] {
+        rejects_name(name);
     }
     let mut combined = selected()
         .with_rules_cc_import_sources(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);

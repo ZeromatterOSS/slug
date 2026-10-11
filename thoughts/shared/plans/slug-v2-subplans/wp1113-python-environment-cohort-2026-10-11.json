@@ -1,0 +1,351 @@
+{
+  "packet": "WP-7-325-m7a-python-environment-cohort",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "baseline": "b25b3491ee7ca0bf8b735e48e44df558691b5317",
+  "compatibility": "Slug-native private Linux-test finite exact-name capability; production snapshot/DICE semantics unchanged; Windows/JVM deferred.",
+  "outcome": "Original requested-root probe crossed the source-connected Python environment cohort and reached the generated pythons_hub repository boundary under unchanged caps. Full producer/M7A open.",
+  "source": {
+    "authorities": 51,
+    "changed": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs"
+    ],
+    "unchanged": 49,
+    "sha256": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "7c823329bd3470e951c965b47b7f47558f2da45cb8a06ae2ab2b9d26c03754b2",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "016d9d979d77b31679884bb5476b0cc6de49a408d87093bdfa7ae6a71b18f7f2"
+    },
+    "caller_ids_paths_digests": "All8 unchanged",
+    "complexity": {
+      "diff": {
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+          "added": 7,
+          "deleted": 1,
+          "net": 6
+        },
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+          "added": 63,
+          "deleted": 26,
+          "net": 37
+        }
+      },
+      "retained_memory": "Five staticstr rows80B/90Bliterals, Bodies256/8 unchanged; no fields/cache/interner/key/lock or policyString allocations. Existingnormalfrontier/CellKey ownership retained; tests use temporarycase/suffixstrings only to discriminate exactname rejection.",
+      "cohesion": "ExistingPython finiteprofile/matrix and sharedJava/Python lifecycle owner; no newtestselector or copiedharness. Sharedlifecycle checksALL names in snapshot/frontier/revocation, source table/aggregatebound only updated; production untouched.",
+      "workflow": "Sourceinspection .160s/DESIGN31s/cohortreview62s; none>180. Packetelapsed tracked separately; authoring/review/setup notisolated. Finitecohort chosen to avoid further singleheaderpacket cycles, no measuredspeedup/frequency claims."
+    }
+  },
+  "semantic_proofs": {
+    "admission": "Five sorted unique exact static names, independent and canonical combined Need; reverse/duplicate equality; full independently-qualified Python binding required; case/suffix/empty/unknown/ungated-cohort and all prior role/binding/workspace negatives. Mixed Need denies before progress with original diagnostic pointer. Removing Python retains independent Java/CC admission.",
+    "lifecycle": "Shared Java/Python proof checks ALL names/cells under synthetic empty immutable snapshot: normal progress/retry Observed(None), discard restores Unauthorized and original full frontier. Existing runtime A/B/A, cutoff, retry-restoration controls current among42; no native-value inference."
+  },
+  "cohort_provenance": {
+    "names": [
+      "NETRC",
+      "PATH",
+      "RULES_PYTHON_BZLMOD_DEBUG",
+      "RULES_PYTHON_REPO_DEBUG",
+      "RULES_PYTHON_REPO_DEBUG_VERBOSITY"
+    ],
+    "archive_path": "tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz",
+    "archive_bytes": 1007915,
+    "archive_sha256": "f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+    "source_report_sha256": "8aea45dcf5665737c7170e2284da8727a7fee4d4a90ca003e382825f3aa601c8",
+    "reader_sha256": "0281b8fdaac3dac3fa2be6d25214d4e0dd0028610f461a742f3f21f46404cd7c",
+    "closure_sha256": "0ab38ec60e070ccd3735383d1e94f0e0e1f352ab8dfcb7b0713171484b9c5f0c",
+    "provenance": [
+      {
+        "name": "NETRC",
+        "path": "python/private/auth.bzl",
+        "member_sha256": "afe4e0f8e971b6eac2ec7bc97edf8490f1b5f73d963a0bcde6f36085efd9aa9f",
+        "declaration_line": 100,
+        "access_line": 102
+      },
+      {
+        "name": "PATH",
+        "path": "python/private/repo_utils.bzl",
+        "member_sha256": "60568cd60f284331357f46181a032d0c0bfc1254b4eb2ef88d3cab12bed69fbb",
+        "declaration_line": 297,
+        "access_line": 297
+      },
+      {
+        "name": "RULES_PYTHON_BZLMOD_DEBUG",
+        "path": "python/private/python.bzl",
+        "member_sha256": "d9ade73ad9107f5ee9f8021382cd85791e85c903acac152a84b9245e5bd738fd",
+        "declaration_line": 59,
+        "access_line": 59
+      },
+      {
+        "name": "RULES_PYTHON_REPO_DEBUG",
+        "path": "python/private/repo_utils.bzl",
+        "member_sha256": "60568cd60f284331357f46181a032d0c0bfc1254b4eb2ef88d3cab12bed69fbb",
+        "declaration_line": 20,
+        "access_line": 32
+      },
+      {
+        "name": "RULES_PYTHON_REPO_DEBUG_VERBOSITY",
+        "path": "python/private/repo_utils.bzl",
+        "member_sha256": "60568cd60f284331357f46181a032d0c0bfc1254b4eb2ef88d3cab12bed69fbb",
+        "declaration_line": 21,
+        "access_line": 57
+      }
+    ],
+    "qualification": "Possible literal/constant access in reviewed 15-member load-connected subset; not every dynamic demand/complete environment closure. NETRC name admission grants no file/value authority. Dynamic tag and formatted toolchain names/arbitrary helper args/external edges remain unsupported. Bounded held-FD source inspection only; no source evaluation/extraction/acquisition.",
+    "reader_correction": "Original reader/report frozen; r1 captures _ENV_VAR aliases and default keyword syntax within same accepted bounds. Same188 member path/size/SHA records; .1600435s,1,179,340 source bytes,2550 tar entries,5,969,920 gzip decoded bytes,199 candidate spans/454 load edges/82,773 excerpt bytes/247,262 report bytes. No AST completeness claim.",
+    "origin": "python/extensions/python.bzl",
+    "source_members": {
+      "python/extensions/python.bzl": "44b745f68257e826680dd370ec71de653c4c9d1a6c9050262a569e3e5c32b568",
+      "python/private/auth.bzl": "afe4e0f8e971b6eac2ec7bc97edf8490f1b5f73d963a0bcde6f36085efd9aa9f",
+      "python/private/coverage_deps.bzl": "7e0ade8710c8512f2efc283810e7e3b05d465523cb3d3390da928e5daf2b27e0",
+      "python/private/full_version.bzl": "3bd227d109c54d8e850947c698504ef97374ed1e9a173d0875a2a66ab3898daf",
+      "python/private/platform_info.bzl": "61af7b0f1060edc96697ea76ea4e78dcccdf37117d666321c3a8d9d276b3bcc8",
+      "python/private/python.bzl": "d9ade73ad9107f5ee9f8021382cd85791e85c903acac152a84b9245e5bd738fd",
+      "python/private/python_register_toolchains.bzl": "54662747c92019c65e9edbd8857b7ff0263027fe5c45e6054233b80180b9308f",
+      "python/private/python_repository.bzl": "a977ffc6ed258301330a993864762e2bbb9f64cad5caf1519d02c24e68f228ff",
+      "python/private/pythons_hub.bzl": "1283d5a20719ce62c320237a4574c04c7ea3e6e42621113e3869348e08a3cd13",
+      "python/private/repo_utils.bzl": "60568cd60f284331357f46181a032d0c0bfc1254b4eb2ef88d3cab12bed69fbb",
+      "python/private/text_util.bzl": "9ab2e0cc0212476f3b8d5deb3358cb61818b63eeb017aff055073717c21708a1",
+      "python/private/toolchains_repo.bzl": "44dc2e49ba286173d7a2be245231e4b0b7b41e212bb29542f0685bda79c89cf8",
+      "python/private/version.bzl": "8beca5fd9cb8a3e41b25506fb01c812eb20a0e3626bb0a53195d0fa1d34f55a0",
+      "python/private/version_label.bzl": "cce98401375f95e114987eacc56e20563bc40fed4ed2d79ce6812c75855d3508",
+      "python/versions.bzl": "c873eb108d1796d0538deca6462acbe29794abff3b4aeb22fa099dd07a439c2e"
+    },
+    "external_edges": [
+      {
+        "path": "python/private/python.bzl",
+        "line": 17,
+        "label": "@bazel_features//:features.bzl"
+      },
+      {
+        "path": "python/private/auth.bzl",
+        "line": 24,
+        "label": "@bazel_tools//tools/build_defs/repo:utils.bzl"
+      },
+      {
+        "path": "python/private/coverage_deps.bzl",
+        "line": 18,
+        "label": "@bazel_tools//tools/build_defs/repo:http.bzl"
+      },
+      {
+        "path": "python/private/coverage_deps.bzl",
+        "line": 19,
+        "label": "@bazel_tools//tools/build_defs/repo:utils.bzl"
+      }
+    ],
+    "unresolved": [
+      {
+        "path": "python/private/python.bzl",
+        "line": 887,
+        "kind": "module tag/attribute default_python_version_env, noliteralname"
+      },
+      {
+        "path": "python/private/toolchains_repo.bzl",
+        "line": 590,
+        "kind": "formattedversion/OS/CPUname, no finiteexacttuples selected"
+      },
+      {
+        "path": "python/private/repo_utils.bzl",
+        "line": 316,
+        "kind": "genericname helper; only connectedliteral/aliascallsite names selected"
+      }
+    ]
+  },
+  "inputs": {
+    "held_sources": 352,
+    "environment_entries": 18,
+    "source_vector_sha256": "a649e5535126ca84c1bff29d84384150ced79b01e7de7b398d26d4da6cfb8a48",
+    "exact_prior_vector": "Exact ordered352 equality toWP1112;18 environment entries unchanged. No source/vector/value growth."
+  },
+  "validation": {
+    "focused": {
+      "selected": 75,
+      "passed": 75,
+      "families": {
+        "bzlmod": {
+          "selected": 7,
+          "passed": 7,
+          "elapsed_seconds": 0.12153167207725346,
+          "operation_sha256": "b7a36250efc8a6b13509603318664120d2f838ca6ceb9dd9917856bd5fb9cdad",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "loading": {
+          "selected": 26,
+          "passed": 26,
+          "elapsed_seconds": 0.30930458998773247,
+          "operation_sha256": "a681e542444b037d9ff678c1b0eb022aa3ec32451f7914070c022ba3b5ca5098",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "core": {
+          "selected": 42,
+          "passed": 42,
+          "elapsed_seconds": 0.259726095944643,
+          "operation_sha256": "1764469d69c7355325714dfd3d87bf48d0aa3247342b50d3dbfaf4766f6522f2",
+          "evidence": "current"
+        }
+      },
+      "current_core": 42,
+      "reused_protected": 33,
+      "qualification": "CurrentCore42 actual passes/directproductioncompile; unchanged protected Bzlmod7/Loading26 evidence retained. No native completion/frequency/speed credit."
+    },
+    "preparation": {
+      "operations": {
+        "compile-core": {
+          "seconds": 40.24442188604735,
+          "deadline_seconds": null,
+          "operation_sha256": "9bb424bafdcb9828c27819a6edb2c28f40a271153c196bcf3a08ea3d7b6fc511",
+          "over_three_minutes": false
+        },
+        "production-check": {
+          "seconds": 7.38400055305101,
+          "deadline_seconds": null,
+          "operation_sha256": "7009265e4028d246a89c00b14db3b4fdeb4fa5b8da9f25bd32442c89d07a50ba",
+          "over_three_minutes": false
+        }
+      },
+      "compiler_memory": "Compilation only; runtime256MiB remains unchanged.",
+      "workflow": "CurrentCore/prod only; protected33 and fixture7 reused. Sourceinspectionr1 .160s/DESIGN31s/cohort62s actual, allbelow180s; packet authoring/bookkeeping notisolated. Exactfinitecohort chosen instead of another singlenameactivation; no measuredspeedup/frequency/wholefit claim."
+    },
+    "fixture": "Reuse unchanged prior7relevant proofs, full10notpassed;3portable driver rows remain missingstrace unproved; fixture/tool/sourceobjects unchanged.",
+    "current_core": "42 current PASS .259726096s; pinned offline locked jobs1 serialized no-run JSONartifact/list/exactbatchedpreflight. Direct production compile PASS7.384s. Protected33 qualified reuse from originalWP1111 artifacts with accepted WP1112 historical3path exceptions; all other historical pins current, no substitution. Aggregate75 is not75 fresh.",
+    "checks": "Plan/archive/diff checks PASS; rerun after scheduling publication. Current source/gates failures0/no Cargo/native retry. PRELAUNCH metadata-reader assumption failure1 qualified; source inspection reader correction frozen within same design. Pinned upstream patch unchanged."
+  },
+  "native": {
+    "operation_sha256": "455b92a5661198747ce6783b5edd8936c89295c6717c86988e0122c09da7d246",
+    "stdout_sha256": "3beefd96d258c51a0bbf7ce05dee4bf1ec0998438b65cad63447a84a29c9fc66",
+    "elapsed_seconds": 15.905458324006759,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 239560,
+    "rss_mib": 233.9453125,
+    "source_count": 309,
+    "decode_bytes": 61853085,
+    "write_bytes": 57985242,
+    "held_fds": 352,
+    "pins": 153,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 658,
+        "wall_ns": 340037302,
+        "process_cpu_ns": 338859746,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 658,
+        "wall_ns": 14735129436,
+        "process_cpu_ns": 14886029416,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 657,
+        "wall_ns": 275968187,
+        "process_cpu_ns": 275352061,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 658,
+        "wall_ns": 42342309,
+        "process_cpu_ns": 51984628,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=materialization path_len=none path_hex=none capture=missing",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=none",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 309 8043568 61853085 57985242 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=309 seen=309 emitted=309 admitted=309 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=42574 encoded_bytes=155916 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Memory/byte/source caps unchanged; explicit native26s/work20/qualifiedcleanup23 time checkpoint.",
+    "phases_kib": {
+      "after_runtime": 30664,
+      "after_command": 240860,
+      "after_terminal_drop": 240860,
+      "after_runtime_drop": 240864,
+      "after_scope_drop": 238808
+    },
+    "phase_peak_mib": 235.21875,
+    "environment_frames": [],
+    "materialization_frames": [
+      "WP982_MATERIALIZATION capture=captured kind=generated_file_effects reason=generated_kind workspace_len=101 workspace_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762f736c75672f74657374732f76325f6f7261636c652f66697874757265732f72756c65732d727573742d3037332d746f6f6c636861696e2d6f776e65722f776f726b7370616365 canonical_len=32 canonical_hex=72756c65735f707974686f6e2b2b707974686f6e2b707974686f6e735f687562 rule_repo_len=13 rule_repo_hex=72756c65735f707974686f6e2b rule_package_len=14 rule_package_hex=707974686f6e2f70726976617465 rule_target_len=15 rule_target_hex=707974686f6e735f6875622e627a6c rule_name_len=8 rule_name_hex=6875625f7265706f logical_root_len=none logical_root_hex=none"
+    ],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "limits_qualification": "Scope error None / first_work=false / no source limit;309 seen/emitted/admitted. Accounting complete, identity incomplete. Unseen source weak expiry vacuous; scope/recorder/livebuffer retirement only. No producer/whole-fit/environment-value claim.",
+    "next_owner": "rules_python++python+pythons_hub; generated_file_effects; rules_python+ //python/private:pythons_hub.bzl hub_repo",
+    "cohort_demand_qualification": "Original probe advanced beyond prior environment boundary; does not prove every admitted name was dynamically demanded/read."
+  },
+  "limits": {
+    "rss_mib": 256,
+    "as_mib": 512,
+    "qualified_source": 512,
+    "census_rows": 513,
+    "decoded_written_mib": 64,
+    "qualified_work_scope_outer_seconds": [
+      20,
+      23,
+      26
+    ],
+    "ordinary_outer_seconds": 10,
+    "preparation_seconds": null,
+    "external_grace_seconds": 3,
+    "inherited": "All transfer/live/bank/object/registry/directory/logcaps and exactoptimizationprofiles unchanged. CompilationRSS separate. No capgrowth/smallerroot/identicalnative replay."
+  },
+  "reviews": {
+    "design": {
+      "path": "target/wp1113/design-review.md",
+      "sha256": "c9308755f610ac72cdd308f0056eb30226fa7823c2ab60c1cd6c898b9d4b35e9",
+      "verdict": "ACCEPT"
+    },
+    "cohort": {
+      "path": "target/wp1113/cohort-review.md",
+      "sha256": "04e7898456cebb481a43c627b7e06e88dbd8e700e2df8860b55a45bcee79c2e8",
+      "verdict": "ACCEPT"
+    },
+    "source_helper_evidence_prelaunch": {
+      "path": "target/wp1113/prelaunch-evidence.md",
+      "sha256": "924d2fdcaf8ff4bdccbe7e8634a30457c942b691f41c615b0dfa531fcde1c689",
+      "verdict": "ACCEPT"
+    },
+    "final": {
+      "path": "target/wp1113/final-evidence-review.md",
+      "sha256": "40a78a815f0239050867c1be29b6c235b54792c590a8b86e58facd4042c942bf",
+      "verdict": "ACCEPT"
+    },
+    "review_draft_sha256": "c279a8f495b1b4e3c912601c9bbaf8cf2f32daf8b16af6eea3e7f8b09c2a66d7"
+  },
+  "workflow": {
+    "elapsed_seconds_at_review_draft": 888.0783120850101,
+    "review_seconds": {
+      "design": 31,
+      "cohort": 62,
+      "prelaunch": 109,
+      "final": 71
+    },
+    "three_minute_signal": "Packet elapsed exceeds180s; individually measured source inspection, compile/prod, focused proof, native and reviews each below180s. Remaining authoring/setup/bookkeeping not isolated. Recurring per-name packet overhead examined: finite source-connected cohort, shared lifecycle, protected33/fixture7 reuse and reviewer delta reduce repeated work by design; no measured speedup/frequency claim. PRELAUNCH109s includes waiting for root evidence; one metadata-reader assumption corrected without gate/source changes.",
+    "elapsed_seconds_at_publication": 1017.0624400919769
+  },
+  "remaining": "Exact next generated pythons_hub header only; existing owner/source inspection needed before admission. Producer/certificate/observations/analysis/actions/Rustc/M7A remain open; goal active.",
+  "next_research": {
+    "path": "target/wp1113/next-owner-research.md",
+    "sha256": "a4a95e41c2db38bbc089bb894f3c01ef9dd0d3d659d0b6246b805618617cc8ff",
+    "status": "READY/source-only; no new body/value/acquisition/execution",
+    "decision": "Narrow pinned hub/text_util/toolchains_repo producer inspection then complete borrowed File-only capability only if supported; header gives no admission."
+  }
+}

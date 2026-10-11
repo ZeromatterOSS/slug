@@ -1,100 +1,111 @@
-# WP1112 exact Python environment capability
+# WP1113 finite Python environment cohort
 
-Packet: WP-7-324-m7a-python-environment-capability
-Status: accepted — independentFINAL ACCEPT; finite Python cohort research ready
-Baseline: 1f0579968 (accepted WP1111)
+Packet: WP-7-325-m7a-python-environment-cohort
+Status: accepted — independent FINAL ACCEPT; next owner ready
+Baseline: b25b3491ee7ca0bf8b735e48e44df558691b5317 (accepted WP1112)
 
-Outcome: admit the exact RULES_PYTHON_BZLMOD_DEBUG environment-name frontier
-only for the qualified prepared Python binding and use the normal immutable
-request snapshot/progress/retry owner. Observe the next actual boundary in ONE
-original requested-root native probe under unchanged resource limits.
-Slug-native private Linux-test policy. Production environment semantics and all
-accepted exact surfaces unchanged; Windows/JVM remain deferred.
+Outcome: inspect the pinned rules_python1.7.0 producer sources to establish one
+finite source-connected Python environment-name cohort, admit its exact static
+names through the existing qualified private policy, and advance the original
+requested-root native probe under unchanged caps. Slug-native private Linux-test
+capability; no production semantic/parity change. Windows/JVM deferred.
 
-Basis: wp1111-python-archive-preparation-2026-10-11.json and
- target/wp1111/next-owner-research.md (b052f5cb01e2fb3ad0b51f0c5daa07a6dbba2afa2cd613925908d41ace1cec04).
-Original captured name/workspace only proves the demanded name; it grants no
-source/repository/extension producer or environment-value authority. Selecting
-this exact static name is the explicit private probe policy decision.
+Basis: wp1112-python-environment-capability-2026-10-11.json and
+ target/wp1112/next-owner-research.md (74fd63e07e14c6ccd3fba726211ba5a1acf50cd5cf06ef4346ffc740f6d4cdd7).
+Accepted priorPythondebug23/25byte captured names demand source-supported cohort
+research rather than repeated singleton packets. Research's intermediate result
+pin is qualified in acceptedreceipt; finalstdout/source pins remain exact.
+Saved WP1111 inventory has188 python/*.bzl non-test members,1,179,340B total,
+max80,119B; priorgzip5,969,920B/2550members/fullarchive1,007,915B.
 
-Owners: Bodies admits the whole original Need before any progress. Require
-original workspace, nonempty bounded frontier and every enabled exact name.
-Python additionally requires defs + PreparedFile/PublicProbe qualification and
-optional full Python backing URL/digest/mirror/preparedMODULE/preparedpatch
-binding. Reuse native_python_binding via a borrowed boolean wrapper; do not
-require unrelated protobuf/Java qualification or bypass normal DICE discovery.
-Existing Bzlmod repository_host_input.rs frontier sorted union and Loading
-module_extension.rs/module_extension_repository_file_effect.rs retry keep the
-same immutable snapshot. Core dice.rs/repository_host_input.rs inject existing
-snapshot cells; unauthorized and observed absence remain distinct; discard
-restores accepted frontier/snapshot. These owners and structural equality are
-unchanged. Reuse docs/developers/dice.md and accepted existing runtime tests for
-A/B/A/empty revisions, unrelated-change cutoff, Need retry and rejection restore.
-No ambient environment-value read, forced absence, snapshot replacement, normal
-API/key/lock/cache/interner/retained-field change or public capability is selected.
+Prerequisite inspection: root may inspect only .bzl regular-file bodies beneath
+rules_python-1.7.0/python/, excluding tests path components, from the existing
+verbatim fixturearchive:
+ tests/v2_oracle/fixtures/configured-cli-authentic/mirror/github.com/bazel-contrib/rules_python/releases/download/1.7.0/rules_python-1.7.0.tar.gz
+SHA256 f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da,
+exact1,007,915B. Fullhash via held O_NOFOLLOW/CLOEXEC fd, regularfile
+lstat/fstat identity before/after; no acquisition/extraction/execution. Stream
+64KiB blocks; gzipdecoded cap6MiB, tar4096entries/path256B/components32 with no
+absolute/dot/traversal/nonregular/nondirectory entries. Whitelist at most256source
+members, each128KiB, cumulative2MiB UTF8 bodies. One member/AST scratch at a time,
+AST100,000nodes/member, at most512 candidate source spans/512literal load edges;
+source excerpts<=4KiB each/128KiB total and encoded report<=512KiB.
+Verify inspected paths/types/sizes against saved pinned inventory, fullgzip/drain,
+original digest and held identity again. Bodies outside whitelist are streamed
+past for archive framing but never interpreted/retained/extracted.
 
-Allowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
-(static single-name table, bound and admission arm); child
-immutable_archive_preparation.rs (borrowed full-binding wrapper); child
-public_probe_preparation_tests.rs (compact focused proof). Target-only helpers,
-configuration/reviews/receipt plus scheduling documents. No fixture/corpus/source
-vector/environment/profile/cap/observer change or new acquisition/body read.
-Static one &str row only; no request/path/String clone or policy allocation.
-Existing scoped Arc/shared paths and runtime cell allocation/retention owners
-unchanged. No donor/import or new utility; Stage9 existing owner disposition.
-Test owners are large but cohesive private preparation-family owners; reuse
-existing Java guard lifecycle as a shared test helper instead of copying its
-snapshot harness. Estimated policy/wiring<25lines, net proof growth<160lines;
-size is a review trigger, not authorization/acceptance evidence.
+Reader uses Python AST as syntax data only (no eval/exec/import from sources),
+records getenv/declared-environ/literal environ-map accesses plus load/constant/
+alias evidence and exact memberpath/length/SHA/span. Unresolved dynamic names,
+helper arguments and external load edges stay explicitly unresolved; no prefix
+inference, wildcard or completeness claim from a regex/AST scan alone. Root and
+independent reviewer connect a finite literal-name subset to current original
+Python extension/repository producers using saved source spans and literal load
+edges. Select at most32 exact static names from that source-connected cohort,
+including both actually demanded names; source-supported possible access is an
+explicit private capability decision, not proof of dynamic demand. New names
+must be reviewed after inspection before activation; ambiguity stops expansion
+and chooses a bounded next owner, never guesses. Not every archive/test/pip/uv
+name is admitted merely because it occurs. Compact durable provenance anchors
+may be committed with the receipt, no copiedwholeproducer source/fixture.
 
-Controls: exact positive qualification with unrelated Java/protobuf absent;
-missing/wrong Python URL/digest/mirror/MODULE/patch, missing defs, all registry/
-command roles, foreign workspace; name case/suffix/empty/unknown, ungranted
-Java/CC names; independent Java/CC enablement; both-order mixed frontiers preserve
-original diagnostic pointer and zero guard mutations. Shared real command guard
-progress/nonprogress/retry observes synthetic accepted empty snapshot as
-Observed(None) then discard restores Unauthorized, using existing runtime API.
-Reuse current Python exact archive/profile proof and existing three runtime
-snapshot/revision/restoration controls. No copied lifecycle harness or full
-producer/certificate/analysis/actions/Rustc/M7A completion claim.
+Owners/invariants inherited from WP1112: Bodies originalworkspace/nonempty/
+bounded/everyenabledexactname wholeNeed predicate rejects beforeprogress and
+borrows original diagnostic. defs PreparedFile/PublicProbe + full independent
+Python URL/digest/mirror/MODULE/patch binding remains mandatory. Core immutable
+request snapshot/frontier/cells keep existing structuralidentity, DICE retry/
+Observed(None) versus Unauthorized and discard restoration; no ambientvalue
+read, forcedabsence/snapshotreplacement/DICEproducerbypass or producer grant.
+Existing normal declarations batch unknown names already; dynamic getenv remains
+DICE owned. No new field/flag/key/lock/cache/interner/requestcopy/runtimeAPI.
+Only static &str rows, borrowing existing paths/Arc; no heapString policyallocation.
 
-Validation: serial pinned toolchain/offline/locked/jobs1 current Core no-run
-CargoJSON/executable/list/batchedpreflight/nonzero bodies (prior41+Python proof),
-one direct production compile; reuse unchanged predecessor Bzlmod7/Loading26
-proofs rather than replaying protected code. Exactly352 ordered
-held source descriptors and18environment entries unchanged, same8caller pins.
-Freeze all predecessor51authorities and3changed Rustfiles; test-only changes
-refresh current Core/production artifact and strict source/helper pins. Rebind
-frozen supervisor/selection/native/decode scaffolding only for root/current
-metadata and add exact new selector. No supervisor weakening. Independent source/
-helper/config PRELAUNCH before ONE distinct freshshell native; independent FINAL
-actualdiff/current proof/typed terminal/strictpins/limits. Never identical replay.
+Rustallowlist: app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs
+(static table only) and child public_probe_preparation_tests.rs (existingJava count/
+Python finiteproof/shared lifecycle parameterization only). Immutablebinding child/
+production owners/fixtures/sourcevector/environment/profiles/observer unchanged.
+Target-only inspection/helpers/configuration/reviews plus acceptedreceipt and
+scheduling. Estimatedpolicy<40lines/proofnet<80; large existingtest family remains
+cohesive, reuse one matrix/helper, no copied lifecycle. No donor/representation
+change; existing ownership/interner disposition retained.
 
-Inherit WP1111 RSS256MiB/AS512MiB/source512/census513/decodedwritten64MiB and all
-transfer/live/object/registry/directory/log caps; qualified work20/cleanup23/outer26,
-ordinary10/preparationnull/grace3 and optimization profiles unchanged. Runtime
-RSS measured separately from compiler. Quota/deadline refusal preserves evidence
-and chooses next bounded owner; it never automatically raises a cap or shrinks
-requested roots. Header/name capture never grants additional producer/value access.
-DESIGN review before source edits, FINAL before acceptance. Plan/archive/diff
-checks and compact accepted commit. Recurring>180s examined for necessity; record
-compile/test/review/packet timings, reuse independent review deltas and avoid
-repeated unchanged protected gates. Upstream pinned patch context whitespace is
-verbatim integrity data in WP1111; no alteration or false diff-check PASS claim.
+Controls: every admittedrow independently and canonical combinedcohort; exact
+count/unique/sortednames, case/suffix/empty/unknown/ungatedothercohorts, missing/
+malformedfullbinding/allroles/foreignworkspace, both-order mixedNeed originalptr
+and zero mutation. SharedJava/Python genuineguardprogress/nonprogress/retry checks
+ALL cohortcells from original syntheticempty snapshot as Observed(None), then
+ALL restored Unauthorized; reuse3runtime A/B/A/cutoff/retryrestoration controls.
+No nativevalue/absence inference. Immutablebinding/profile/file-session proofs
+remain current/reused as appropriate. Source inspection shows possible names,
+actual ONE probe shows next authenticboundary; no fullproducer/M7A/wholefitclaim.
 
-Immediate predecessor: accepted WP1111 1f0579968;74Rustproofs/productioncompile,
-7fixture proofs, original15.674s/309sources/phase232.289MiB under256 crossed
-Pythonarchive. Three unchanged portable-driver rows remain missing-strace
-unproved. Broader producer and M7A remain open.
+Gates: independent DESIGN before inspection, independent inspectedcohort/helper
+review before activation. Serial pinned/offline/locked/jobs1 currentCore no-run
+CargoJSON/list/exactbatchedpreflight/body42 and directproductioncompile. Reuse
+unchanged Bzlmod7/Loading26 and7fixture proofs rather than replay;3portable rows
+remain missingstraceunproved. Current51sourceauthorities freeze exactly2private
+Rust changes/49unchanged; caller8 unchanged. Reuse WP1112 runner/selection/native/
+decoder scaffolding with root/currentrole rebindings. Protected evidence retains
+exactly the accepted WP1112 historical3path exceptions at originalWP1111 digests,
+including inherited bindingchild change; current2changes are a subset of those3.
+Never substitute currentbaseline hashes for historical source hashes. Strict current maps
+and original352orderedheldsources/18env/8callers remain. Source/helper/config
+PRELAUNCH before ONE distinct freshshell native; FINALactualdiff/proofs/typed
+terminal/strictpins/limits. No identicalnative replay/automaticcapgrowth/rootshrink.
 
-Accepted receipt: wp1112-python-environment-capability-2026-10-11.json.
-CurrentCore42/productioncompile passed; protectedBzlmod7/Loading26 proofs reused,
-aggregate75not75fresh. ONE15.794s/309sources/phase234.602MiB under256 crossed
-PythonBzlmoddebug and nextcaptured RULES_PYTHON_REPO_DEBUG23. Noquota/deadline;
-144strictstablepins/352orderedheldFDbrackets/18env unchanged. Decoded61853085/
-written57985242 under64MiB. IndependentFINAL accepted actualsource/evidence.
-Source-only finitecohort successorresearch ready; any boundedarchive Starlarkbody
-inspection/nameexpansion needs a newexplicitcontract/DESIGN. No inferredvalue/
-producerauthority or M7A closure. Measured packettotal>180s; gateoperations each
-below180, remainingtime unisolated. Repeatedone-namepacket overhead is a process
-signal; cohortsourceevidence proposed without speedup/frequencyclaim.
+Inherit WP1112 RSS256MiB/AS512MiB/source512/census513/decodedwritten64MiB and all
+transfer/live/bank/object/registry/directory/logcaps; work20/cleanup23/outer26,
+ordinary10/preparationnull/grace3/profiles unchanged. Inspection/compilation
+preparation memory separate from runtimeRSS. Wholeprefix cap fit is stillunproved
+beyond accepted234.602MiB boundary; reachinglimit is evidence, notpermission to
+expand. User permits required tasktime; recurring>180s triggersnecessity/refactor
+examination. Record actualpacket/gate/review times without unmeasuredattribution/
+frequency/speedupclaims. Cohortselection reduces repeatedone-nameactivation work
+by design, not a measuredperformanceoptimization.
+
+Immediate predecessor: accepted WP1112 b25b3491e;currentCore42/prodpassed,
+protected33reused, native15.794s/source309/phase234.602MiB under256 crossed
+RULES_PYTHON_BZLMOD_DEBUG then requested RULES_PYTHON_REPO_DEBUG. Goalactive;
+producer/certificate/observations/analysis/actions/Rustc/M7A remain open.
+
+Accepted receipt: wp1113-python-environment-cohort-2026-10-11.json. CurrentCore42/prod passed; protected33 reused. ONE15.905s/source309/phase235.219MiB under256 crossed prior environment boundary to generated pythons_hub. Next source-inspection/file-plan contract ready for root selection; no next admission inferred.

@@ -34,16 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-324-m7a-python-environment-capability
-Status: accepted — independentFINAL ACCEPT; finite Python cohort research ready
+Packet: WP-7-325-m7a-python-environment-cohort
+Status: accepted — independent FINAL ACCEPT; next owner ready
 
-The [current manifest](./slug-v2-subplans/current-packet.md) records accepted
-[Python environment capability](./slug-v2-subplans/wp1112-python-environment-capability-2026-10-11.json).
-CurrentCore42/productioncompile passed and protected33 proofs reused. ONE15.794s/
-source309/phase234.602MiB under256 crossed PythonBzlmoddebug and reached the next
-original RULES_PYTHON_REPO_DEBUG Need. All caps/352heldsources/18env unchanged;
-finitePythoncohort source-onlyresearch ready before another singletonpacket.
-Full producer/M7A remains open; prior3portable-driver rows missingstrace unproved.
+The [accepted finite Python cohort](./slug-v2-subplans/wp1113-python-environment-cohort-2026-10-11.json)
+crossed the prior environment frontier to original generated pythons_hub at309sources/
+phase235.219MiB under256 in15.905s. CurrentCore42/prod passed; protected33 reused.
+The [current manifest](./slug-v2-subplans/current-packet.md) and source-only research
+select narrow pinned hub producer inspection plus bounded file-plan capability
+as successor. All caps/352heldsources/18env unchanged; full producer/M7A open.
 
 ### Ready and blocked queue
 
