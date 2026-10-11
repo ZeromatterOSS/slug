@@ -34,17 +34,18 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-344-m7a-rust-platform-marker-metadata
+Packet: WP-7-345-m7a-probe-evidence-reuse
 Status: ready — independent DESIGN and stopped source checkpoint pending
 
-[Accepted WP1131](./slug-v2-subplans/wp1131-rust-root-directory-2026-10-11.json)
-admits only exact root1/rust DirectoryEntries through the existing bounded owner.
-FreshCore52/production and qualifiedLoading29/Bzlmod7/fixture31 passed. ONE native
-20.692s reached source391 and original rust/platform/BUILD.bazel Lstat; phase
-255.64453125MiB under256 leaves0.35546875MiB, without future/whole-fit credit.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects two exact platform
-BUILD-marker metadata rows under the existing role. Source34/current361, allocation
-owners and all resource caps stay unchanged; production and Windows unchanged.
+[Accepted WP1132](./slug-v2-subplans/wp1132-rust-platform-marker-metadata-2026-10-11.json)
+admits only two exact platform BUILD-marker Lstat rows under the existing role.
+FreshCore52/production and qualifiedLoading29/Bzlmod7/fixture31 passed. ONE20.753s
+reached source391 and original rust/private/BUILD.bazel Lstat; phase255.10546875MiB
+under256 leaves0.89453125MiB, without future/whole-fit credit. Repeated helper
+copy/review and growing143→169 context declarations exceeded180s and were examined.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects bounded pinned
+supervisor/direct-evidence reuse before the next private marker pair. Rust,
+production, source361 and all workload caps stay unchanged; no native replay.
 
 ### Ready and blocked queue
 
