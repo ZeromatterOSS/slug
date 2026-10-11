@@ -312,7 +312,7 @@ fn namespace_policy(
         return policy;
     }
     #[cfg(target_os = "linux")]
-    if let Some(plan) = bodies.qualified_java_file_plan(request) {
+    if let Some(plan) = bodies.qualified_generated_file_plan(request) {
         let path = demand.path().as_path();
         let root = view.generation_root();
         let path_class = if path == root {
@@ -2844,42 +2844,84 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
     });
 }
 #[cfg(target_os = "linux")]
-#[test]
-fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
+fn python_test_bodies() -> Bodies {
     use immutable_archive_preparation::ArchiveBinding;
-    use immutable_archive_preparation::JAVA_URL;
     use immutable_archive_preparation::PYTHON_DIGEST;
     use immutable_archive_preparation::PYTHON_PREPARED_MODULE;
     use immutable_archive_preparation::PYTHON_PREPARED_PATCH;
     use immutable_archive_preparation::PYTHON_URL;
     use immutable_archive_preparation::PythonArchiveBinding;
-    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
     let project = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
         .parent()
         .unwrap();
-    let selected = || {
-        let mut bodies = namespace_test_bodies();
-        bodies.rules_cc_import_sources = false;
-        bodies.python_offline_archive = Some(PythonArchiveBinding {
-            archive: ArchiveBinding {
-                backing: OfflineArchiveBacking::new(
-                    PYTHON_URL,
-                    PYTHON_DIGEST,
-                    NormalizedAbsolutePath::new(
-                        project
-                            .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
-                            .join(PYTHON_URL.strip_prefix("https://").unwrap()),
+    let mut bodies = namespace_test_bodies();
+    bodies.rules_cc_import_sources = false;
+    bodies.python_offline_archive = Some(PythonArchiveBinding {
+        archive: ArchiveBinding {
+            backing: OfflineArchiveBacking::new(
+                PYTHON_URL,
+                PYTHON_DIGEST,
+                NormalizedAbsolutePath::new(
+                    project
+                        .join("tests/v2_oracle/fixtures/configured-cli-authentic/mirror")
+                        .join(PYTHON_URL.strip_prefix("https://").unwrap()),
+                )
+                .unwrap(),
+            ),
+            module: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_MODULE)).unwrap(),
+        },
+        patch: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_PATCH)).unwrap(),
+    });
+    bodies
+}
+#[cfg(target_os = "linux")]
+fn python_test_bodies_with_invalid_binding(case: usize) -> Bodies {
+    use immutable_archive_preparation::JAVA_URL;
+    use immutable_archive_preparation::PYTHON_DIGEST;
+    use immutable_archive_preparation::PYTHON_URL;
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
+    let mut closed = python_test_bodies();
+    match case {
+        0 => closed.python_offline_archive = None,
+        6 => closed.rules_rust_defs_import_sources = false,
+        _ => {
+            let binding = closed.python_offline_archive.as_mut().unwrap();
+            match case {
+                1 => {
+                    binding.archive.backing = OfflineArchiveBacking::new(
+                        JAVA_URL,
+                        PYTHON_DIGEST,
+                        binding.archive.backing.path().dupe(),
                     )
-                    .unwrap(),
-                ),
-                module: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_MODULE)).unwrap(),
-            },
-            patch: NormalizedAbsolutePath::new(project.join(PYTHON_PREPARED_PATCH)).unwrap(),
-        });
-        bodies
-    };
+                }
+                2 => {
+                    binding.archive.backing = OfflineArchiveBacking::new(
+                        PYTHON_URL,
+                        [0; 32],
+                        binding.archive.backing.path().dupe(),
+                    )
+                }
+                3 => {
+                    binding.archive.backing = OfflineArchiveBacking::new(
+                        PYTHON_URL,
+                        PYTHON_DIGEST,
+                        path("/foreign/python.tar.gz"),
+                    )
+                }
+                4 => binding.archive.module = path("/foreign/MODULE.bazel"),
+                _ => binding.patch = path("/foreign/module.patch"),
+            }
+        }
+    }
+    closed
+}
+#[cfg(target_os = "linux")]
+#[test]
+fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
+    let path = |s: &str| NormalizedAbsolutePath::new(s).unwrap();
+    let selected = python_test_bodies;
     let need = environment_test_need;
     use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
     use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
@@ -2946,39 +2988,7 @@ fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() 
         }
     }
     for case in 0..7 {
-        let mut closed = selected();
-        match case {
-            0 => closed.python_offline_archive = None,
-            6 => closed.rules_rust_defs_import_sources = false,
-            _ => {
-                let binding = closed.python_offline_archive.as_mut().unwrap();
-                match case {
-                    1 => {
-                        binding.archive.backing = OfflineArchiveBacking::new(
-                            JAVA_URL,
-                            PYTHON_DIGEST,
-                            binding.archive.backing.path().dupe(),
-                        )
-                    }
-                    2 => {
-                        binding.archive.backing = OfflineArchiveBacking::new(
-                            PYTHON_URL,
-                            [0; 32],
-                            binding.archive.backing.path().dupe(),
-                        )
-                    }
-                    3 => {
-                        binding.archive.backing = OfflineArchiveBacking::new(
-                            PYTHON_URL,
-                            PYTHON_DIGEST,
-                            path("/foreign/python.tar.gz"),
-                        )
-                    }
-                    4 => binding.archive.module = path("/foreign/MODULE.bazel"),
-                    _ => binding.patch = path("/foreign/module.patch"),
-                }
-            }
-        }
+        let closed = python_test_bodies_with_invalid_binding(case);
         let denied = closed.admit(&python).unwrap_err();
         assert_eq!(denied.family, "environment");
         assert!(std::ptr::eq(
@@ -3105,12 +3115,26 @@ fn java_file_plan_test_request(
     );
     request
 }
+#[cfg(target_os = "linux")]
+fn python_file_plan_test_request(
+    bodies: &Bodies,
+    plan: slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+) -> slug_bzlmod_v2::RepositoryMaterializationRequest {
+    let mut request = java_file_plan_test_request(bodies, plan, None);
+    request.id.canonical_repo =
+        slug_identity_v2::CanonicalRepoName::new("rules_python++python+pythons_hub").unwrap();
+    request.repo_spec.rule_id.bzl_file =
+        CanonicalLabel::parse("@@rules_python+//python/private:pythons_hub.bzl").unwrap();
+    request.repo_spec.rule_id.rule_name = "hub_repo".into();
+    request
+}
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_file_effects_are_bounded_and_opt_in() {
     for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
         assert_java_file_effects_are_bounded_and_opt_in(remote);
     }
+    assert_python_file_effects_are_bounded_and_opt_in();
 }
 #[cfg(target_os = "linux")]
 fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
@@ -3367,9 +3391,209 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
         assert!(bodies.admit_with_plan_matcher(&bad, &|_, _| true).is_err());
         reject(bad);
     }
+    assert_bounded_file_plan_shapes(&bodies, &make_request, &reject);
+    assert_eq!(
+        (
+            Arc::strong_count(original),
+            Arc::strong_count(&original.repo_spec.attributes),
+            Arc::strong_count(&bodies.java_offline_archive.as_ref().unwrap().backing)
+        ),
+        counts
+    );
+}
+#[cfg(target_os = "linux")]
+fn assert_python_file_effects_are_bounded_and_opt_in() {
+    let mut bodies = python_test_bodies();
+    assert!(bodies.offline_archive.is_none() && bodies.java_offline_archive.is_none());
+    let valid = SourcePreparationNeeds::repository(python_file_plan_test_request(
+        &bodies,
+        small_generated_plan(&[
+            ("BUILD.bazel", b"synthetic", false),
+            ("interpreters.bzl", b"", true),
+            ("versions.bzl", b"synthetic", false),
+        ]),
+    ));
+    let original = valid.repository_materializations().values().next().unwrap();
+    let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &original.kind else {
+        panic!()
+    };
+    let counts = (
+        Arc::strong_count(original),
+        Arc::strong_count(&original.repo_spec.attributes),
+        Arc::strong_count(
+            &bodies
+                .python_offline_archive
+                .as_ref()
+                .unwrap()
+                .archive
+                .backing,
+        ),
+    );
+    assert!(std::ptr::eq(
+        bodies.qualified_python_file_plan(original).unwrap(),
+        plan
+    ));
+    assert!(std::ptr::eq(
+        bodies.qualified_generated_file_plan(original).unwrap(),
+        plan
+    ));
+    assert!(
+        bodies
+            .generated_features_owner_signatures(original)
+            .is_none()
+    );
+    assert!(bodies.admit(&valid).is_ok());
+    let mut changed = original.as_ref().clone();
+    changed.kind = RepositoryMaterializationKind::GeneratedFileEffects(small_generated_plan(&[(
+        "BUILD.bazel",
+        b"changed",
+        true,
+    )]));
+    assert_eq!(changed.repo_spec, original.repo_spec);
+    assert_ne!(&changed, original.as_ref());
+    changed.repo_spec.attributes = Arc::new(
+        [(
+            compact_str::CompactString::new("different"),
+            slug_bzlmod_v2::OverrideAttributeValue::Bool(false),
+        )]
+        .into_iter()
+        .collect(),
+    );
+    assert_ne!(&changed, original.as_ref());
+    assert!(
+        bodies
+            .admit(&SourcePreparationNeeds::repository(changed))
+            .is_ok()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            for defs in [false, true] {
+                let mut selected = python_test_bodies()
+                    .with_generated_features_file_effects(registry, command)
+                    .with_rules_rust_defs_import_sources(registry, command);
+                selected.rules_rust_defs_import_sources &= defs;
+                assert_eq!(
+                    selected.admit(&valid).is_ok(),
+                    defs && matches!(registry, RegistryChoice::PreparedFile)
+                        && matches!(command, CommandChoice::PublicProbe)
+                );
+            }
+        }
+    }
+    for case in 0..7 {
+        let closed = python_test_bodies_with_invalid_binding(case);
+        assert!(
+            closed
+                .admit_with_plan_matcher(&valid, &|_, _| true)
+                .is_err()
+        );
+    }
+    let mut no_generated = python_test_bodies();
+    no_generated.generated_features_file_effects = false;
+    assert!(
+        no_generated
+            .admit_with_plan_matcher(&valid, &|_, _| true)
+            .is_err()
+    );
+    assert!(Bodies::new(bodies.roots.clone()).admit(&valid).is_err());
+    // A separately qualified Java owner supplies the admitted, distinct-key mixed Need.
+    bodies.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
+    let allowed = SourcePreparationNeeds::repository(java_proxy_generated_request(
+        &bodies,
+        small_generated_plan(&java_proxy_literal_rows()),
+    ));
+    assert!(bodies.admit(&allowed).is_ok());
+    let reject = |bad: SourcePreparationNeeds| {
+        let offender = bad.repository_materializations().values().next().unwrap();
+        for mixed in [
+            allowed.try_union(&bad).unwrap(),
+            bad.try_union(&allowed).unwrap(),
+        ] {
+            let mut progress = 0;
+            if bodies.admit(&mixed).is_ok() {
+                progress += 1;
+            }
+            assert_eq!(progress, 0);
+            assert_eq!(bodies.admit(&mixed).unwrap_err().family, "materialization");
+            let (first, reason) = bodies.first_denied_materialization(&mixed).unwrap();
+            assert_eq!(reason, "generated_kind");
+            assert!(std::ptr::eq(first, offender.as_ref()));
+        }
+    };
+    for case in 0..7 {
+        let mut wrong = original.as_ref().clone();
+        match case {
+            0 => wrong.id.workspace = NormalizedAbsolutePath::new("/foreign").unwrap(),
+            1 => {
+                wrong.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new(
+                    "rules_python++python+pythons_hub_extra",
+                )
+                .unwrap()
+            }
+            2 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@other+//python/private:pythons_hub.bzl").unwrap()
+            }
+            3 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_python+//python:pythons_hub.bzl").unwrap()
+            }
+            4 => {
+                wrong.repo_spec.rule_id.bzl_file =
+                    CanonicalLabel::parse("@@rules_python+//python/private:Pythons_hub.bzl")
+                        .unwrap()
+            }
+            5 => wrong.repo_spec.rule_id.rule_name = "hub_repo_extra".into(),
+            _ => {
+                let mut mapping = slug_identity_v2::RepositoryMapping::new(
+                    slug_identity_v2::RepositoryMappingId::new("mapped").unwrap(),
+                );
+                mapping.insert(
+                    slug_identity_v2::ApparentRepoName::new("python").unwrap(),
+                    slug_identity_v2::CanonicalRepoName::new("rules_python+").unwrap(),
+                );
+                wrong.repo_spec.rule_id.bzl_file = slug_identity_v2::ApparentLabel::parse(
+                    "@python//python/private:pythons_hub.bzl",
+                )
+                .unwrap()
+                .resolve(&mapping);
+            }
+        }
+        let bad = SourcePreparationNeeds::repository(wrong);
+        assert!(bodies.admit_with_plan_matcher(&bad, &|_, _| true).is_err());
+        reject(bad);
+    }
+    assert_bounded_file_plan_shapes(&bodies, &python_file_plan_test_request, &reject);
+    assert_eq!(
+        (
+            Arc::strong_count(original),
+            Arc::strong_count(&original.repo_spec.attributes),
+            Arc::strong_count(
+                &bodies
+                    .python_offline_archive
+                    .as_ref()
+                    .unwrap()
+                    .archive
+                    .backing
+            )
+        ),
+        counts
+    );
+    eprintln!("WP1114_PYTHON_FILE_PLAN complete");
+}
+#[cfg(target_os = "linux")]
+fn assert_bounded_file_plan_shapes(
+    bodies: &Bodies,
+    make_request: &impl Fn(
+        &Bodies,
+        slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest,
+    reject: &impl Fn(SourcePreparationNeeds),
+) {
+    let path = |s| NormalizedAbsolutePath::new(s).unwrap();
     let reject_plan = |plan| {
         reject(SourcePreparationNeeds::repository(make_request(
-            &bodies, plan,
+            bodies, plan,
         )))
     };
     reject_plan(small_generated_plan(&[]));
@@ -3408,14 +3632,14 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
     let short: Vec<_> = (0..9).map(|i| format!("f{i}")).collect();
     let empty: Arc<[u8]> = Arc::from(&b""[..]);
     let max_rows =
-        SourcePreparationNeeds::repository(make_request(&bodies, make_plan(&short[..8], &empty)));
+        SourcePreparationNeeds::repository(make_request(bodies, make_plan(&short[..8], &empty)));
     assert!(bodies.admit(&max_rows).is_ok());
     reject_plan(make_plan(&short, &empty));
     let long: Vec<_> = (0..5)
         .map(|i| format!("{}{i}", "x".repeat(GENERATED_PLAN_PATH_BYTES - 1)))
         .collect();
     let exact =
-        SourcePreparationNeeds::repository(make_request(&bodies, make_plan(&long[..4], &shared)));
+        SourcePreparationNeeds::repository(make_request(bodies, make_plan(&long[..4], &shared)));
     assert!(bodies.admit(&exact).is_ok()); // Exact per-field and aggregate ceilings, sharing one body.
     let mut sum_over = long[..4].to_vec();
     sum_over.push("y".to_owned()); // Exact path sum ceiling plus one.
@@ -3464,32 +3688,44 @@ fn assert_java_file_effects_are_bounded_and_opt_in(remote: Option<&str>) {
         }
         reject_plan(builder.finish());
     }
-    assert_eq!(
-        (
-            Arc::strong_count(original),
-            Arc::strong_count(&original.repo_spec.attributes),
-            Arc::strong_count(&bodies.java_offline_archive.as_ref().unwrap().backing)
-        ),
-        counts
-    );
 }
 #[test]
 #[cfg(target_os = "linux")]
 fn local_jdk_namespace_is_current_and_declared_only() {
     for remote in JAVA_FILE_PLAN_TEST_CANONICALS {
-        assert_java_namespace_is_current_and_declared_only(remote);
+        assert_generated_namespace_is_current_and_declared_only(
+            java_proxy_test_bodies,
+            &|bodies, plan| java_file_plan_test_request(bodies, plan, remote),
+        );
     }
+    assert_generated_namespace_is_current_and_declared_only(
+        python_test_bodies,
+        &python_file_plan_test_request,
+    );
+    eprintln!("WP1114_PYTHON_NAMESPACE complete");
 }
 #[cfg(target_os = "linux")]
-fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
-    let make_request = |bodies: &Bodies, plan| java_file_plan_test_request(bodies, plan, remote);
-    let bodies = java_proxy_test_bodies()
+fn assert_generated_namespace_is_current_and_declared_only(
+    make_bodies: fn() -> Bodies,
+    make_request: &impl Fn(
+        &Bodies,
+        slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan,
+    ) -> slug_bzlmod_v2::RepositoryMaterializationRequest,
+) {
+    let bodies = make_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     let content: Arc<[u8]> = Arc::from(&b"synthetic"[..]);
     let body_weak = Arc::downgrade(&content);
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
-    builder.push("nested/BUILD".into(), content, false).unwrap();
+    for leaf in [
+        "nested/BUILD",
+        "nested/interpreters.bzl",
+        "nested/versions.bzl",
+    ] {
+        builder.push(leaf.into(), content.clone(), false).unwrap();
+    }
+    drop(content);
     let request = Arc::new(make_request(&bodies, builder.finish()));
     let request_weak = Arc::downgrade(&request);
     let attributes_weak = Arc::downgrade(&request.repo_spec.attributes);
@@ -3502,7 +3738,7 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
         body_weak.strong_count(),
     );
     let materialized = PathObservationNamespace::Materialization(instance);
-    let demand = |namespace, path, operation| {
+    let demand = |namespace, path: &str, operation| {
         PathObservationDemand::new(
             namespace,
             NormalizedAbsolutePath::new(path).unwrap(),
@@ -3565,6 +3801,17 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
         ] {
             assert!(admits(&demand(materialized, leaf, operation), Some(epoch)));
         }
+        for relative in ["nested/interpreters.bzl", "nested/versions.bzl"] {
+            for operation in [
+                PathObservationOperation::Lstat,
+                PathObservationOperation::FileBytes,
+            ] {
+                assert!(admits(
+                    &demand(materialized, &format!("{root}/{relative}"), operation),
+                    Some(epoch)
+                ));
+            }
+        }
         for (path, class) in [(marker, "repo_marker"), (ignore, "ignore_marker")] {
             let marker = demand(materialized, path, PathObservationOperation::Lstat);
             assert_eq!(
@@ -3593,6 +3840,12 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
     )
     .unwrap();
     assert!(!admits(&valid_demand, Some(&wrong_workspace)));
+    let mut wrong_owner = request.as_ref().clone();
+    wrong_owner.repo_spec.rule_id.rule_name = "wrong_owner".into();
+    let wrong_owner_epoch =
+        namespace_test_epoch_at(&bodies, [Arc::new(wrong_owner)], instance, "/parent/B");
+    assert!(!admits(&valid_demand, Some(&wrong_owner_epoch)));
+    drop(wrong_owner_epoch);
     let mut other = request.as_ref().clone();
     other.id.canonical_repo = slug_identity_v2::CanonicalRepoName::new("other+").unwrap();
     let ambiguous = namespace_test_epoch_at(
@@ -3623,7 +3876,7 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
         }
     }
     for (repo, ignore) in [(false, false), (false, true), (true, false), (true, true)] {
-        let mut flags = java_proxy_test_bodies();
+        let mut flags = make_bodies();
         flags.repo_marker_metadata = repo;
         flags.ignore_file_bytes = ignore;
         for (marker, enabled) in [(&marker, repo), (&ignore_marker, ignore)] {
@@ -3641,7 +3894,7 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
     }
     for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
         for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
-            let roles = java_proxy_test_bodies()
+            let roles = make_bodies()
                 .with_repo_marker_metadata(registry, command)
                 .with_ignore_file_bytes(registry, command);
             for marker in [&marker, &ignore_marker] {
@@ -3661,7 +3914,7 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
     }
     // An explicit leaf retains its prior body authority even without the marker role.
     {
-        let disabled = java_proxy_test_bodies()
+        let disabled = make_bodies()
             .with_repo_marker_metadata(RegistryChoice::DefaultBcr, CommandChoice::Modules)
             .with_ignore_file_bytes(RegistryChoice::DefaultBcr, CommandChoice::Modules);
         let declared = namespace_test_epoch_at(
@@ -3718,10 +3971,13 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
             ));
         }
     }
-    let mut closed = java_proxy_test_bodies()
+    let mut closed = make_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
+    assert!(closed.java_offline_archive.is_some() ^ closed.python_offline_archive.is_some());
+    assert!(closed.qualified_generated_file_plan(&request).is_some());
     closed.java_offline_archive = None;
+    closed.python_offline_archive = None;
     assert!(
         !namespace_policy(
             &closed,
@@ -3742,7 +3998,7 @@ fn assert_java_namespace_is_current_and_declared_only(remote: Option<&str>) {
             .admits(&marker.operation())
         );
     }
-    let mut no_defs = java_proxy_test_bodies()
+    let mut no_defs = make_bodies()
         .with_repo_marker_metadata(RegistryChoice::PreparedFile, CommandChoice::PublicProbe)
         .with_ignore_file_bytes(RegistryChoice::PreparedFile, CommandChoice::PublicProbe);
     no_defs.rules_rust_defs_import_sources = false;

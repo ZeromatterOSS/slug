@@ -34,15 +34,15 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-325-m7a-python-environment-cohort
-Status: accepted — independent FINAL ACCEPT; next owner ready
+Packet: WP-7-326-m7a-python-hub-file-plan
+Status: accepted — independent FINAL ACCEPT; Skylib closure successor ready
 
-The [accepted finite Python cohort](./slug-v2-subplans/wp1113-python-environment-cohort-2026-10-11.json)
-crossed the prior environment frontier to original generated pythons_hub at309sources/
-phase235.219MiB under256 in15.905s. CurrentCore42/prod passed; protected33 reused.
+The [accepted Python hub file plan](./slug-v2-subplans/wp1114-python-hub-file-plan-2026-10-11.json)
+crossed original generated pythons_hub to Skylib lib/selects.bzl Lstat at311sources/
+phase237.258MiB under256 in16.312s. CurrentCore42/prod passed; protected33 reused.
 The [current manifest](./slug-v2-subplans/current-packet.md) and source-only research
-select narrow pinned hub producer inspection plus bounded file-plan capability
-as successor. All caps/352heldsources/18env unchanged; full producer/M7A open.
+select bounded same-owner literal import-closure inspection as successor; nextbody/
+closure/admission unproved. All caps/352heldsources/18env unchanged; producer/M7A open.
 
 ### Ready and blocked queue
 

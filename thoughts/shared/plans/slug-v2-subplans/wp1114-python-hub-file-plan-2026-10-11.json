@@ -1,0 +1,351 @@
+{
+  "packet": "WP-7-326-m7a-python-hub-file-plan",
+  "status": "accepted \u2014 independent FINAL source/evidence ACCEPT",
+  "baseline": "99ab511efa4ffad5f1298c3651e0fb2284e6fe35",
+  "compatibility": "Slug-native private Linux-test exact original Pythonhub owner, complete bounded File-only capability. Normal producer/DICE/IO semantics and exact priorstatic signatures unchanged. Windows/JVM deferred.",
+  "outcome": "Original requested-root probe crossed Python generated hub boundary to Skylib lib/selects.bzl source frontier under unchanged caps; fullproducer/M7A open.",
+  "source": {
+    "authorities": 51,
+    "changed": [
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs"
+    ],
+    "unchanged": 49,
+    "sha256": {
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": "73c94c084af3e9f77051d1d5bea58f75d2737e5de579d794450f81023a33d50a",
+      "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": "9e2747744cce0e526aab60abf98887e4e88fefabb78ae8268435b3f2d9f62e3e"
+    },
+    "caller_ids_paths_digests": "All8 unchanged",
+    "complexity": {
+      "diff": {
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests.rs": {
+          "added": 45,
+          "deleted": 2,
+          "net": 43
+        },
+        "app/slug_core_v2/src/runtime/tests/platforms_module_preparation_tests/public_probe_preparation_tests.rs": {
+          "added": 335,
+          "deleted": 79,
+          "net": 256
+        }
+      },
+      "retained_memory": "No fields/cache/interner/key/lock or owned runtime strings. Existing complete borrowed validator scratch Option<&str>[8]128B, Bodies256/8 expected unchanged; lifecycle original Arc/path ownership unchanged. Tiny synthetic tests share byteArc; existing1MiB boundarybody reused serially.",
+      "cohesion": "Extracted shared validator byte-identical, oldJava gates unchanged; existing shape and namespace matrix shared across7Java+1Python, existing testselectors42. New Python gate negatives reuse prior environment binding helper. Existing large test family retains one coherent bounded policy/lifecycle abstraction; no copied suite/newfile.",
+      "workflow": "Child author311s exceeds180: one-time matrix/lifecycle factoring to avoid repeated suites; examine if repeated. Two prewrite tooling failures (python unavailable/textanchor) corrected no source/gatefailure. DESIGN65s/source44s/inspection.045s. Compile/test/native independenttimings; no frequency/speedup claim.",
+      "estimate_review": "Formatted child net256 exceeds200 estimate by56; unformatted author net126. Rustfmt reflows new identity/gating assertions into readable blocks. Shared existing boundary/lifecycle matrices and binding helper avoid copied suites; actual responsibility remains exact Python gate plus shared Java/Python proof. Independent PRELAUNCH must assess actual diff cohesion/coverage; estimate is review trigger, not cap."
+    }
+  },
+  "producer_provenance": {
+    "decision": "Exact hub owner File-only bounded live-plan capability; source shows three nonexecutable literal file writes in order, no hub symlink/archive/execute/download. Contents and semantic attrs remain original dynamic producer-owned data; policy may allow any complete bounded File-only plan under exact source/owner qualification, not claim exactbytes.",
+    "source_report_sha256": "7e2b60a274f3f0bb8281966c0e6f6f3aae01b584a8fecdec56a0d65202cdf6e1",
+    "reader_sha256": "14d1dca9fd05466e0e8786ac60a6b2dd0180a07ab08d99a88996d023878ce105",
+    "source_members": [
+      {
+        "path": "python/private/pythons_hub.bzl",
+        "bytes": 6940,
+        "sha256": "1283d5a20719ce62c320237a4574c04c7ea3e6e42621113e3869348e08a3cd13",
+        "lines": 188
+      },
+      {
+        "path": "python/private/text_util.bzl",
+        "bytes": 4786,
+        "sha256": "9ab2e0cc0212476f3b8d5deb3358cb61818b63eeb017aff055073717c21708a1",
+        "lines": 174
+      },
+      {
+        "path": "python/private/toolchains_repo.bzl",
+        "bytes": 23319,
+        "sha256": "44dc2e49ba286173d7a2be245231e4b0b7b41e212bb29542f0685bda79c89cf8",
+        "lines": 617
+      }
+    ],
+    "producer": {
+      "path": "python/private/pythons_hub.bzl",
+      "implementation_lines": [
+        96,
+        132
+      ],
+      "rule_lines": [
+        134,
+        188
+      ],
+      "effects": [
+        {
+          "line": 99,
+          "path": "BUILD.bazel",
+          "executable": false
+        },
+        {
+          "line": 107,
+          "path": "interpreters.bzl",
+          "executable": false
+        },
+        {
+          "line": 121,
+          "path": "versions.bzl",
+          "executable": false
+        }
+      ],
+      "dynamic_contents": "BUILD toolchain names/platform metadata/compatibility/settings/versions and source repository label; interpreters host-compatible repo names; versions default/minormapping/version lists. No attr allowlist inferred; original full RepoSpec retained."
+    },
+    "dataflow": {
+      "hub": [
+        21,
+        24,
+        47,
+        84,
+        86,
+        94,
+        96,
+        132
+      ],
+      "toolchains_repo": [
+        36,
+        50,
+        221,
+        241
+      ],
+      "text_util": [
+        17,
+        21,
+        23,
+        30,
+        47,
+        58,
+        79,
+        109,
+        155,
+        174
+      ],
+      "qualification": "toolchain_suite_content only formats static _SUITE_TEMPLATE using render; render.dict/list/str/indent/left_pad_zero only text/pure data. PLATFORMS imported existing producer data used as flag_values, no called external helper. Other toolchains_repo repository implementations (including symlinks/env/helpers) are not called by hub and stay unsupported; load text inside output templates is future generated source, not current call."
+    },
+    "bounds": "Existing8rows/path512/pathsum2048/content1MiB/sum4MiB remain; exact three source writes suggests rowshape only. Actual native contents/bounds unproved; normal failure on exceed, no sampled syntheticpayload as real bytes.",
+    "memory": "Complete plan borrowed, shared original bounded validator scratch128B Option<&str>[8]; Bodies256/8 expected unchanged; no static contents/ownedString/clone/cache/interner/retained field."
+  },
+  "semantic_proofs": {
+    "admission": "Exact original tuple/workspace/unmapped label/generated opt-in/defs/full independentlyqualified Python archive-MODULE-patch binding; wholecomplete borrowed File-only plan shares byte-identical Java validation. Dynamic contents/attrs participate in original request identity. New independentPython positivity and changingvalidcontents/attrs/fullidentity/controlmatrix;7malformedbindings/gates/7identity negatives; both-order wholeNeed denial with originaloffender pointer beforepolicyprogress. Java/static gates unchanged.",
+    "bounds": "One shared matrix executes all7 priorJava identities andPython, covering empty,8rows/path512/pathsum2048/content1MiB/sum4MiB exactceilings/overflow, bothancestorcollisionorders, originalrawpath lexicalguards, trailingArchive/Symlink. Policy128Bborrowedscratch only; no cloned request/plan/content or heapstrings.",
+    "namespace": "SAME complete predicate through unique borrowedcurrent epoch. Shared7Java+Python matrix checks all3 syntheticdeclared leaves, currentA/B/A/missing/stale/foreignworkspace/ambiguous/wrongrule epochs; leavesLstat/FileBytes only/rootancestor metadata/markerprecedence, otherpaths/ops denial; both-order wholeNeed originalpointer/zero policyprogress; strict Arc counts and Weaklastdrop. Existing normal IO/session/runtime controls current/reused; syntheticpayloads not realhubbytes.",
+    "compiler_correction": "Explicit fixtureclosure path:&str fixes E0716 without policychange. Workerhandoff d4d787... unformattedSHA differs from initialcompiledSHA recorded by failed source-freeze/operation; original artifacts preserved, currentr1freeze/r2selection strict."
+  },
+  "inputs": {
+    "held_sources": 352,
+    "environment_entries": 18,
+    "source_vector_sha256": "a649e5535126ca84c1bff29d84384150ced79b01e7de7b398d26d4da6cfb8a48",
+    "exact_prior_vector": "Exact ordered352 equality toWP1113;18env unchanged; no vectorgrowth/acquisition/newbodygrant."
+  },
+  "validation": {
+    "focused": {
+      "selected": 75,
+      "passed": 75,
+      "families": {
+        "bzlmod": {
+          "selected": 7,
+          "passed": 7,
+          "elapsed_seconds": 0.12153167207725346,
+          "operation_sha256": "b7a36250efc8a6b13509603318664120d2f838ca6ceb9dd9917856bd5fb9cdad",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "loading": {
+          "selected": 26,
+          "passed": 26,
+          "elapsed_seconds": 0.30930458998773247,
+          "operation_sha256": "a681e542444b037d9ff678c1b0eb022aa3ec32451f7914070c022ba3b5ca5098",
+          "evidence": "unchanged protected predecessor code;3 Core-test-only changes excluded from historical current-pin equality"
+        },
+        "core": {
+          "selected": 42,
+          "passed": 42,
+          "elapsed_seconds": 0.25285921595059335,
+          "operation_sha256": "8d6266b701b1a743bb7313b960209dca3da3f1095eb43891dcfeeb5ae2444d6b",
+          "evidence": "current"
+        }
+      },
+      "current_core": 42,
+      "reused_protected": 33,
+      "qualification": "CurrentCore42 actual passes/directproductioncompile; unchanged protected Bzlmod7/Loading26 evidence retained. No native completion/frequency/speed credit."
+    },
+    "preparation": {
+      "operations": {
+        "compile-core": {
+          "elapsed_seconds": 2.44081823900342,
+          "exit_code": 101,
+          "stop_reason": null,
+          "joined": true,
+          "owned_group_empty": true,
+          "monitored_rss_kib": 1317024,
+          "operation_sha256": "8ba997b3d652c8605ed7475f370449c4038f5e835135f3342261b486aafe2303",
+          "deadline_seconds": null,
+          "over_three_minutes": false
+        },
+        "compile-core-r1": {
+          "elapsed_seconds": 41.793942327960394,
+          "exit_code": 0,
+          "stop_reason": null,
+          "joined": true,
+          "owned_group_empty": true,
+          "monitored_rss_kib": 2532564,
+          "operation_sha256": "b14cd3b1bdc83e114aa3e69a318c727431c288785e53263638563fea6288ec3d",
+          "deadline_seconds": null,
+          "over_three_minutes": false
+        },
+        "production-check-r1": {
+          "elapsed_seconds": 7.357769516995177,
+          "exit_code": 0,
+          "stop_reason": null,
+          "joined": true,
+          "owned_group_empty": true,
+          "monitored_rss_kib": 730300,
+          "operation_sha256": "38af3acebfc51b837fff4e802c3f2bc2f9a1fe4bbef42f59c8c52cefe1117d52",
+          "deadline_seconds": null,
+          "over_three_minutes": false
+        }
+      },
+      "compiler_memory": "Preparation compilerRSS separate, native256MiB cap unchanged.",
+      "workflow": "One genuine E0716 test-helper correction (.path:&str) then fresh41.794s currentcompile/prod7.358s; three root setup/discovery failures before child/operation corrected and frozen. Childauthor311s one-time sharedshape/lifecycle refactor; root scaffolding filename mistakes are concrete need to use explicit path rebindings going forward. No identicalnative replay, no memory/cap growth; existing42 current/protected33 reuse.",
+      "root_marker_reader_correction": "Initial metadata assertion looked only in stdout; eprintln proof markers are in stderr, each exactlyonce. Corrected stream reader, no source/helper/gate change/replay."
+    },
+    "fixture": "Reuse unchanged prior7relevant proofs, full10notpassed;3portable driver rows remain missingstrace unproved; fixture/tool/sourceobjects unchanged.",
+    "current_core": "42 currentPASS .252859216s with bothWP1114 markers eachonce in stderr. Fresh pinned no-run compile-core-r1 artifact/list-r2/exactbatchedpreflight-r2, directproduction-check-r1 passed; protected33 qualified historicalreuse, not75fresh.",
+    "checks": "Plan/archive/diff checks PASS; rerun after scheduling publication. Current42/prod/native passed; original failedcompile and pre-child setup/reader errors qualified in preparation results. No identicalnative replay/capgrowth."
+  },
+  "native": {
+    "operation_sha256": "8b85ce16c2e78eb49d2be853e2add89de2af3f6ac892583d9057217cc7f01fac",
+    "stdout_sha256": "2ccc0b1d8c4e89499d25cacb384540a04d01669c678bd2128de1e2620bccab65",
+    "elapsed_seconds": 16.31224154389929,
+    "selected": 1,
+    "passed": 1,
+    "rss_kib": 241612,
+    "rss_mib": 235.94921875,
+    "source_count": 311,
+    "decode_bytes": 61868405,
+    "write_bytes": 57991543,
+    "held_fds": 352,
+    "pins": 153,
+    "pins_stable": true,
+    "source_brackets_stable": true,
+    "collection_atomic": false,
+    "joined": true,
+    "owned_group_empty": true,
+    "observer_version": 2,
+    "status": 524288,
+    "intervals": [
+      {
+        "category": "injection_revision",
+        "interval_count": 668,
+        "wall_ns": 348187266,
+        "process_cpu_ns": 346813213,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "root_compute",
+        "interval_count": 668,
+        "wall_ns": 15133937098,
+        "process_cpu_ns": 15272893788,
+        "qualifications": [
+          "aborted_partial"
+        ],
+        "qualified": true
+      },
+      {
+        "category": "acquisition_merge",
+        "interval_count": 667,
+        "wall_ns": 279647113,
+        "process_cpu_ns": 278729474,
+        "qualifications": [],
+        "qualified": false
+      },
+      {
+        "category": "idle_drain",
+        "interval_count": 668,
+        "wall_ns": 43139825,
+        "process_cpu_ns": 53007688,
+        "qualifications": [],
+        "qualified": false
+      }
+    ],
+    "facts": {
+      "WP942_STAGE": "WP942_STAGE native_refusal",
+      "WP958_RESULT": "WP958_RESULT stage=native_refusal kind=computation preparation=complete dispatch=singleton policy_checked=true certificate=unavailable observations=unavailable analyses=unavailable actions=unavailable rustc=unavailable",
+      "WP942_DENIED": "WP942_DENIED family=path path_len=203 path_hex=2f72756e2f6d656469612f73797374656d2f436f6c6f737375732f6465762d686f6d652f2e63616368652f62617a656c2f5f62617a656c5f77677261792f63616368652f7265706f732f76312f636f6e74656e74732f363338366636366239653063356235333563373930323932313731333938383938653237616263643164366438336535663835306137613738633335316233392f36643134366562392d386332642d346631372d396336312d6535376436653433373761662f6c69622f73656c656374732e627a6c capture=captured",
+      "WP957_METADATA": "WP957_METADATA enabled=true denied_operation=lstat",
+      "WP938_SCOPE": "WP938_SCOPE None 105 235521 311 8043568 61868405 57991543 2114200 11679580",
+      "WP1008_TIMEOUT": "WP1008_TIMEOUT status=available armed=true first_work=false origin=false site=0 domain=0 phase=0 return=0 overflow=false sticky=false caller=false caller_owner=0 caller_line=0",
+      "WP1033_SOURCE_CHARGE_SUMMARY": "WP1033_SOURCE_CHARGE_SUMMARY enabled=true limit=512 source=311 seen=311 emitted=311 admitted=311 first_limit=none in_flight=0 skipped=0 bounds=0 writer_failed=0 raw_bytes=42654 encoded_bytes=156544 accounting_complete=true identity_complete=false"
+    },
+    "qualification": "Windowed all-process-thread CPU, not exclusive/per-key or cause. Normal selected windows serial/non-nested; aborted/invalid/suppressed sums are partial. Unbracketed validation/seal/drop/download/execute/startup/teardown remain residual. ONE distinct instrumented candidate; observed memory prefix and admission counts are not fullproducer/wholefit/bodycompletion/speed. Memory/byte/source caps unchanged; explicit native26s/work20/qualifiedcleanup23 time checkpoint.",
+    "phases_kib": {
+      "after_runtime": 30372,
+      "after_command": 242952,
+      "after_terminal_drop": 242952,
+      "after_runtime_drop": 242952,
+      "after_scope_drop": 240896
+    },
+    "phase_peak_mib": 237.2578125,
+    "environment_frames": [],
+    "materialization_frames": [],
+    "retirement": "WP942_RETIREMENT source_weak_seen=false source_weak_expired=true live_buffer_zero=true scope_weak_expired=true recorder_weak_expired=true",
+    "next_path": "/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af/lib/selects.bzl",
+    "limits_qualification": "No scopeerror/worktimeout/sourcequota stop;311 seen/emitted/admitted, identity accounting incomplete. Observed prefix only, not full producer/whole-fit or outputbyte parity. Unseen source weakexpiry vacuous; narrow scope/recorder/livebuffer retirement only.",
+    "next_path_operation": "lstat"
+  },
+  "limits": {
+    "rss_mib": 256,
+    "as_mib": 512,
+    "qualified_source": 512,
+    "census_rows": 513,
+    "decoded_written_mib": 64,
+    "qualified_work_scope_outer_seconds": [
+      20,
+      23,
+      26
+    ],
+    "ordinary_outer_seconds": 10,
+    "preparation_seconds": null,
+    "external_grace_seconds": 3,
+    "inherited": "All transfer/live/bank/object/registry/directory/logcaps and exactoptimizationprofiles unchanged. CompilationRSS separate. No capgrowth/smallerroot/identicalnative replay."
+  },
+  "reviews": {
+    "design": {
+      "path": "target/wp1114/design-review.md",
+      "sha256": "0181c363b9b7b167ead15d8ffc0f9ee52455e370a8803dddabebc797482ab8c9",
+      "verdict": "ACCEPT"
+    },
+    "producer_source": {
+      "path": "target/wp1114/producer-source-review.md",
+      "sha256": "f050a8797ef3da1cd93f96a08c340f25fd35c725491f08071deb84f6ec84897c",
+      "verdict": "ACCEPT"
+    },
+    "source_helper_evidence_prelaunch": {
+      "path": "target/wp1114/prelaunch-evidence.md",
+      "sha256": "3b01b8fbe7a29931fab612d30bd43f1aacb64c6d439d04c7e64b5465d81e8b50",
+      "verdict": "ACCEPT"
+    },
+    "final": {
+      "path": "target/wp1114/final-evidence-review.md",
+      "sha256": "926d72c49020bb27c01ff3e2c3f66f3cd335519506cd0b24466c8809880bb3e4",
+      "verdict": "ACCEPT"
+    },
+    "review_draft_sha256": "7a34763d69f809f607b71c7287c516bbbc1f01f6eecb1266b72b1a647ebb1535"
+  },
+  "workflow": {
+    "elapsed_seconds_at_review_draft": 1127.5419256420573,
+    "review_seconds": {
+      "design": 65,
+      "source": 44,
+      "prelaunch_restarted": 75,
+      "final": 57
+    },
+    "child_author_seconds": 311,
+    "three_minute_signal": "Packetelapsed and childauthor311s exceed180s. Childsharedmatrix refactor is one-time work avoiding copiedsuites; assess if repeated. Individualcurrentcompile41.794s/prod7.358s/proof.253s/native16.312s eachbelow180. Root filename-rebinding errors are concrete workflowrefactor signal: use explicitcurrent-role/prior/upstream path mappings; preservefailed evidence/fresh stems. Earlier reviewerwait notisolated/activecredit, pendingconfigreaderdiscovery1qualified. No frequency/speedup/exclusivephase claim.",
+    "elapsed_seconds_at_publication": 1266.729163435055
+  },
+  "remaining": "Authentic nextHost Skylib lib/selects.bzl Lstat prerequisite; body/hash/importclosure not yet proved. Source-only bounded same-owner closure proposal ready. Producer/certificate/observations/analysis/actions/Rustc/M7A remain open; goal active.",
+  "next_research": {
+    "path": "target/wp1114/next-owner-research.md",
+    "sha256": "7d91023647ed1913cc6d321ac86f87e3601c1d62773e36cde94dea20406f2984",
+    "status": "READY/source-only; no body/archive/value/acquisition/execution",
+    "decision": "Review bounded exact same-owner literal-load closure inspection rooted selects.bzl; then staticsource/metadata cohort and qualified heldvector additions. Rawnextpath grants no body/closure/capability."
+  }
+}

@@ -981,7 +981,6 @@ impl Bodies {
         &self,
         request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
     ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
-        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
         let label = &request.repo_spec.rule_id.bzl_file;
         if !self.generated_features_file_effects
             || !self.rules_rust_defs_import_sources
@@ -1013,6 +1012,50 @@ impl Bodies {
         {
             return None;
         }
+        Self::bounded_file_only_plan(request)
+    }
+    #[cfg(target_os = "linux")]
+    fn qualified_python_file_plan<'a>(
+        &self,
+        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
+        let label = &request.repo_spec.rule_id.bzl_file;
+        if !self.generated_features_file_effects
+            || !self.rules_rust_defs_import_sources
+            || request.id.workspace != self.roots[0]
+            || label.mapping_id().is_some()
+            || (
+                request.id.canonical_repo.as_str(),
+                label.package().repo().as_str(),
+                label.package().package().as_str(),
+                label.target().as_str(),
+                request.repo_spec.rule_id.rule_name.as_str(),
+            ) != (
+                "rules_python++python+pythons_hub",
+                "rules_python+",
+                "python/private",
+                "pythons_hub.bzl",
+                "hub_repo",
+            )
+            || !immutable_archive_preparation::native_python_environment_binding(self)
+        {
+            return None;
+        }
+        Self::bounded_file_only_plan(request)
+    }
+    #[cfg(target_os = "linux")]
+    fn qualified_generated_file_plan<'a>(
+        &self,
+        request: &'a slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> Option<&'a slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
+        self.qualified_java_file_plan(request)
+            .or_else(|| self.qualified_python_file_plan(request))
+    }
+    #[cfg(target_os = "linux")]
+    fn bounded_file_only_plan(
+        request: &slug_bzlmod_v2::RepositoryMaterializationRequest,
+    ) -> Option<&slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan> {
+        use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef as Effect;
         let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind else {
             return None;
         };
@@ -1202,7 +1245,7 @@ impl Bodies {
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
                     #[cfg(target_os = "linux")]
-                    if self.qualified_java_file_plan(request).is_some() {
+                    if self.qualified_generated_file_plan(request).is_some() {
                         continue;
                     }
                     if self
