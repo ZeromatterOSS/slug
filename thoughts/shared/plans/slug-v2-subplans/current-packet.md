@@ -1,93 +1,115 @@
-# WP1120 observed environment request
+# WP1121 Swift generated-plan capture
 
-Packet: WP-7-332-m7a-observed-environment-request
+Packet: WP-7-333-m7a-swift-generated-plan-capture
 Status: ready — independent DESIGN before implementation
 
-Outcome: admit only the complete observed original workspace/name tuple
-CC, Path, ProgramData through the existing scoped environment snapshot owner,
-then observe ONE fresh native frontier. Slug-native private Linux-test capability;
-normal production environment/DICE semantics and exact source bytes unchanged.
-Windows implementation deferred; name queries preserve normal Linux host presence
-or absence without Windows emulation or forced values. Producer/certificate/actions/
-Rustc/M7A/bootstrap and whole closure fit remain open.
+Outcome: capture the bounded original Swift generated local-configuration plan
+metadata at the existing normal refusal boundary, then ONE fresh native observation.
+Slug-native private Linux-test diagnostic only; no new admission/namespace grant,
+production semantic owner, source payload or Windows implementation. Exact source
+and previous accepted capabilities remain unchanged. Full producer/certificate/
+actions/Rustc/M7A/bootstrap/output parity and whole fit remain open.
 
-Basis: accepted wp1119-swift-immutable-cohort-2026-10-11.json, actual operation
-d969ca9bc09d40ff6ce4623a07389fbb9c3c1d5270c6346695a082f969b6aeb1,
-stdout77e45ed423f2fb063c5c08a5c593422de22a034e0a213447ebcdb6496bd9c59e.
-ONE19.711s/source366/supervisor244.640625MiB/phase245.88671875MiB under256,
-359full source brackets/175pins/18env stable; current76Rust/31fixture+production
-passed. Actual WP1024 lines384–387 capture original workspace101B and exact
-three case-sensitive names/17B. Missing WP942 path projection is not missing
-environment capture. Source-only terminal next-diagnostic-research.md SHA
-bc599dcc0e9872719baf126e00541a3652ab7a0a29793de47d038cd0883931c3 proves
-typed NeedRepositoryEnvironmentNames contains workspace+canonical names only;
-caller/values are unavailable and not inferred from five preceding Swift imports.
-Reuse accepted wp1024-environment-name-diagnostic, wp1025-environment-snapshot-readiness,
-wp1113-python-environment-cohort, original Bazel9.2 getenv/environ-name source
-regressions and normal Rust tracked environment snapshot/cutoff/restoration proofs.
-No new diagnostic or source-body discovery is needed for this request-defined slice.
+Basis: accepted wp1120-observed-environment-request-2026-10-11.json, actual native
+operation d2362508faef2ff09f803ec2082150bb0b11f12329bc399c7d6ab13831b1de06,
+stdout959c0d44d9cd5290cdb075c0d92f144735654b87e1dd4158ec87308720a2be86.
+ONE19.734s/source366/supervisor244.23828125MiB/phase245.41015625MiB under256,
+359stable source brackets/195pins/18env. Current freshCore43+production and strictly
+qualified protected33/fixture31 pass; portable missing-strace3 remain unproved.
+Original WP982 line384 identifies generated_file_effects/generated_kind for:
+canonical rules_swift++non_module_deps+build_bazel_rules_swift_local_config;
+rule repo rules_swift+, package swift/internal, target swift_autoconfiguration.bzl,
+rule swift_autoconfiguration; original workspace101B, logical_root absent.
+Original names-only environment boundary progressed; current no environment or
+original path-progress frame. Generic missing path projection does not erase WP982.
+Root-derived next-frontier.json SHA07addc683cd13fd07db72d1a4abd4a97bd30d87f6497995e01381fc9f7ad1d4f
+preserves actual bounded identity only and grants no file plan/body authority.
+Terminal source-only next-diagnostic-research.md
+SHAbb2672749398454db12e885cb6d2038f5c6ff3b6b620615c830b4c3d6be00f32
+establishes missing Swift diagnostic selection, not a failed File-only bound.
 
-Decision: separate exact full-tuple branch in Bodies::admits_repository_environment,
-not three independently combinable additions to global name tables. Require original
-roots[0] workspace, complete case-sensitive canonical names exactly CC/Path/ProgramData,
-existing PreparedFile/PublicProbe definitions role, and borrowed fully qualified
-original Swift binding via descriptor4/native_patched_binding (URL/digest/mirror/
-prepared MODULE/patch identity). A Some-only test is insufficient. Other archive
-owners need not be present; old Java/Python/etc qualifiers remain independent.
-Existing old environment branches retain behavior; subsets, supersets (including
-old-name union), suffix/case changes, foreign workspace, disabled role, absent/
-malformed/crossed Swift binding refuse. The whole mixed Need stays atomic with
-original first offender and zero acquisition progress in both orders. No namespace
-change: this family owns workspace/names, not a materialization path or caller.
+Decision for DESIGN: extend Bodies::generated_plan_diagnostic selection for only
+this exact five-part canonical/rule-label/name tuple, roots[0] original workspace,
+GeneratedFileEffects/generated_kind, existing PreparedFile/PublicProbe definitions
+role and borrowed fully qualified Swift descriptor4 via existing
+native_swift_environment_binding/native_patched_binding. Preserve old diagnostic
+owners' polarity and first-original-offender ordering. No admission signature,
+qualified-file-plan dispatcher entry, new namespace permission, fabricated File,
+attribute/body template, value capture or broad generic serializer.
 
-Natural owner: existing normal scoped repository-environment observation/acquisition
-and tracked NameFrontier/CellKey snapshot feed; discovery/dependencies stay DICE-owned.
-DESIGN must confirm exact batch interaction and normal snapshot authority before
-activation. Observe actual requested values/absence through existing owner, retain
-independent snapshot storage as required, validate/publish or retry, restore initial
-input on completion/refusal/cancel and preserve equality cutoff/revocation/A-B-A.
-Do not fabricate values, infer absence/platform intent, replay a historical mutable
-host snapshot, or inspect unrelated environment/credentials. No direct-filesystem/
-fresh-graph bypass, key/lock/result cache/public API/error carrier/producer change.
+Natural owner: original RepositoryMaterializationRequest already owns immutable
+GeneratedFileEffects and complete structurally identified RepoSpec under normal
+DICE. Its Arc-backed ordered effects and original File CompactString/Arcbytes/
+executable getters are borrowed by existing GeneratedPlanDiagnostic. Existing
+GuardedSingleton::record_denied invokes the normal selected original request view.
+Reuse its formatter and bounds; no fresh graph/direct filesystem/read bypass,
+request/plan clone, retained diagnostic field or command-side semantic repair.
+All publication/retry/restoration/cancellation semantics remain under existing
+normal scope/guard owners. Diagnostic does not replace request identity.
 
-Memory: existing Stage9 borrowed static identities/Arc/Dupe/interned paths and
-normal snapshot ownership. Exact tuple3 staticstr descriptors48B/17 literalB at
-most; compare borrowed canonical names without String/Vec/request/Arc copies.
-No retained field/new pool/cache/interner. Scope488/Bodies304 expected unchanged;
-measure actual compiled witness and narrow lifetime behavior. Independent retained
-environment values remain owned by normal snapshot, never borrowed command scratch.
-Current large private owner/matrix stays cohesive; policy estimate<45net/proof<140net,
-share existing environment fixture/lifecycle helpers and selectors; assess growth.
+Evidence scope: existing WP983 formatter reports bounded count/completeness,
+ordered effect tags and File path/content length/SHA256/executable, mapping bytes
+and attribute count. Literal content bytes and typed attribute values are absent.
+Archive/Symlink metadata is unavailable beyond tags. Do not call this universal
+full-Spec/full-plan/body capture. Bounds refusal suppresses all rows; transport or
+partial frame is unproved. Strict decoder binds exactly one complete frame to the
+same original WP982 header and current full raw operation/stdout SHA. It authenticates
+canonical counts/order/hex and explicit unavailable/bounds markers, never substitutes
+inferred fields. A later File-only capability requires actual complete typed request
+qualification and its own reviewed scope, not this identity projection alone.
 
-Allowlist three existing Rust files: app/slug_core_v2/src/runtime/tests/
-platforms_module_preparation_tests.rs, its immutable_archive_preparation.rs and
-public_probe_preparation_tests.rs children. Target-only frozen helper/review/evidence,
-compact receipt/Stage9/canonical/current manifest. No fixture/transport/scope/diagnostic/
-production changes, source payload acquisitions/body substitutions, alternate roots,
-flags/env exports or Windows work. Current source52 keys should change exactly3
-private owners/49same; six extra authorities and359physical source rows/env18 unchanged.
+Memory: existing borrowed GeneratedPlanDiagnostic/ordered iterator/hash over original
+content and bounded writer16KiB; maximum8effects, perpath512B/aggregate2048B,
+perFile1MiB/aggregate4MiB and existing owner/mapping bounds unchanged. Reuse existing
+Arc/Dupe/interned paths; no owned runtime policy String/Vec/request/plan/value copies,
+new pool/cache/global interner or fields. Original bodies retain existing independent
+ownership; diagnostic borrows only for synchronous formatting and adds no retention.
+Bodies304/Scope488 expected unchanged; actual compiled witness required. Estimated
+policy<20net/proof<100net through parameterized existing two projection controls,
+not a copied suite/new selectors. Assess growth and recurring>180s as refactor signal.
 
-Validation: independent DESIGN and actual source/helper PRELAUNCH before ONE native,
-actual FINAL before acceptance. Resolve nightly2025-09-14 tools; serial offline locked
-jobs1 Core JSON no-run observer compile, exact fresh list/batched preflight/current43.
-Extend existing selected environment matrix: complete tuple/binding/role/workspace/
-case/subset/superset/cross-binding/old-owner independence and original borrowed request;
-normal observed snapshot/cutoff/retry/restoration and whole mixed Need controls via
-existing scaffolding. Current production Core/CLI check. Protected Bzlmod7/Loading26
-and fixture31 can be reused ONLY strict source/fixture/executable/options/caller maps
-prove unchanged owners after exact3private changes; otherwise run missing fresh gates.
-Known portable missing-strace3 unproved. Compile/setup separate from every runtime;
-64KiB executable fullSHA, fixed helpers frozen before first gate, accepted r7heldFD
-owner exact Kotlin23089629B exception unchanged. Native359source/18env/PRELAUNCH context
-all actual, only intended future review note may be missing at config generation.
+Allowlist exactly parent app/slug_core_v2/src/runtime/tests/
+platforms_module_preparation_tests.rs and child public_probe_preparation_tests.rs.
+Immutable helper/transport/scope/fixtures/production/other diagnostics unchanged.
+Target-only decoder/helper/review/evidence; compact receipt/Stage9/canonical/current
+manifest. No acquisition/archive/corpus body/value read, source payload substitution,
+new flags/env exports/roots, key/lock/result cache/API/producer or Windows work.
+Current52source keys must change exactly2/50same; six extra authorities/eight callers/
+359physical source rows/18env remain unchanged. Baseline is actual accepted WP1120
+checkout after integration; pass its resolved HEAD to workers and binding records.
 
-Limits unchanged: RSS256MiB/AS512MiB/live16MiB/work20/cleanup23/outer26/source512/
-census513; qualified Kotlin transfer32MiB/cumulative decoded+written128MiB;
-fixture total+archive32MiB/small+member+retained16MiB; ordinaryFSIZE16/native32.
-No native replay without changed implementation/environment hypothesis; preserve any
-failure. Genuine Need/quota/deadline frontier is bounded evidence, not whole-fit or
-producer completion. Missing/unattributed gate is unproved. New semantic ownership,
-source prerequisite or resource requirement needs technical DESIGN/REPLAN; routine
-invocation/test/assertion correction stays scoped and invalidates affected gates.
-User permits necessary time; recurring>180s examined for necessity/refactoring, not
-permission deadline. Reuse original captured frame instead of generic error serializer.
+Validation: independent DESIGN plus actual source/helper PRELAUNCH before ONE native,
+actual FINAL before acceptance. Freshly rustup-resolve pinned nightly2025-09-14 tools;
+serial offline locked jobs1 Core JSON no-run observer compile/list/batched exact
+preflight/current43 plus production Core/CLI and unique ignored singleton list.
+Parameterize generated_plan_refusal_projection_preserves_original_order_and_owner
+and generated_plan_refusal_projection_is_bounded: original request/plan pointers,
+Arc/Weak retirement, order/path/hash/executable/altered+reversed body, mapping/count,
+opaque nonFile tags, exactrow8/9/path512/513/perFile1MiB/total4MiB/all-or-none bounds,
+zero progress, unrelated offender/bootstrap priority. Add exact Swift tuple success
+and representative wrong workspace/canonical/rule/label/role/absent/malformed/crossed
+binding negatives. Other owner diagnostics unchanged. No native output body fabricated.
+
+Protected33 and fixture31 may reuse WP1120's qualification of actual WP1119 old
+operations/executables/options/source/caller maps only if all nonprivate bytes and
+production owners remain identical, exact two current changes are authenticated,
+and the three explicit historical private Core digests remain separately bound to
+the current replacements (immutable child unchanged from WP1120). Do not confuse
+current2changed with historical3exceptions or invent WP1120 Bzlmod/Loading gate dirs.
+No old Core executable credit. Missing/stale qualification requires the missing gate
+fresh. Source-only helper review before freeze must authenticate this finite chain;
+use accepted scaffolding/delta checks instead of rebuilding historical operations.
+Compile/setup and every runtime separate fresh invocations; executable SHA64KiB.
+
+Limits unchanged: native RSS256MiB/AS512MiB/live16MiB/work20/cleanup23/outer26/
+source512/census513; qualified transfer32MiB, separate cumulative decoded128MiB and
+written128MiB; fixture total+archive32MiB/small+member+retained16MiB; ordinaryFSIZE16/
+native32MiB. Original heldFD reader exact Kotlinpath+23089629B exception unchanged.
+Source vector byte/order identical. Freeze helpers before first gate; only future
+PRELAUNCH note may be absent at native config generation, actual rootprelaunch and
+all current validation/layout/qualification context required first. No identical
+native replay; preserve failure and change hypothesis. Genuine bounds/quota/Need/
+deadline is bounded evidence, no producer or whole-fit claim. New owner/prerequisite/
+resource decision needs technical DESIGN/REPLAN; routine invocation/assertion
+correction stays scoped and invalidates affected evidence. User permits necessary
+time; recurring>3min examined, not permission deadline. No new cyber work.

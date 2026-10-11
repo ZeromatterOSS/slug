@@ -344,6 +344,7 @@ const RULES_CC_ENVIRONMENT_NAMES: [&str; 14] = [
 ];
 const RULES_SHELL_ENVIRONMENT_NAMES: [&str; 3] = ["BAZEL_SH", "PATH", "WINDIR"];
 const RULES_JAVA_ENVIRONMENT_NAMES: [&str; 1] = ["JAVA_HOME"];
+const OBSERVED_ENVIRONMENT_REQUEST_NAMES: [&str; 3] = ["CC", "Path", "ProgramData"];
 const RULES_PYTHON_ENVIRONMENT_NAMES: [&str; 5] = [
     "NETRC",
     "PATH",
@@ -1342,6 +1343,18 @@ impl Bodies {
         &self,
         request: &slug_bzlmod_v2::NeedRepositoryEnvironmentNames,
     ) -> bool {
+        if request.workspace() == &self.roots[0]
+            && self.rules_rust_defs_import_sources
+            && request.names().len() == OBSERVED_ENVIRONMENT_REQUEST_NAMES.len()
+            && request
+                .names()
+                .iter()
+                .zip(OBSERVED_ENVIRONMENT_REQUEST_NAMES)
+                .all(|(actual, expected)| actual.as_str() == expected)
+            && immutable_archive_preparation::native_swift_environment_binding(self)
+        {
+            return true;
+        }
         request.workspace() == &self.roots[0]
             && !request.names().is_empty()
             && request.names().len()

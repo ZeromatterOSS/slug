@@ -2858,13 +2858,25 @@ fn java_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() {
 }
 
 #[cfg(target_os = "linux")]
-fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, names: &[&str]) {
+fn assert_environment_frontier_observes_empty_snapshot(current: Bodies, names: &[&str]) {
+    assert_environment_frontier_observes_snapshot(
+        current,
+        names,
+        slug_bzlmod_v2::RepositoryEnvironmentSnapshot::empty(),
+    );
+}
+#[cfg(target_os = "linux")]
+fn assert_environment_frontier_observes_snapshot(
+    mut current: Bodies,
+    names: &[&str],
+    snapshot: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+) {
     use slug_bzlmod_v2::RepositoryEnvironmentCell;
     use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
     use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
     use slug_bzlmod_v2::RepositoryHostInputTransaction;
     let need = environment_test_need;
-    // Exercise the normal command/frontier owner with the accepted empty snapshot.
+    // Original immutable command input is authoritative, including declared absence.
     let workspace = tempfile::tempdir().unwrap();
     let runtime = test_runtime(workspace.path()).unwrap();
     let normalized = NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap();
@@ -2873,14 +2885,77 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
     current.roots[0] = normalized.dupe();
     let admitted = need(&normalized, names);
     current.admit(&admitted).unwrap();
+    let mut request = NativeDemandRequestInputBundle::normalized_initial();
+    request.repository_environment = snapshot.clone();
     let mut guard = NativeDemandAbortGuard::new(
         runtime
-            .begin_native_demand_command_with_inputs(
-                NativeDemandRequestInputBundle::normalized_initial(),
-            )
+            .begin_native_demand_command_with_inputs(request)
             .unwrap()
             .into_command(),
     );
+    if !snapshot.is_empty() {
+        guard.begin_attempt().unwrap();
+        runtime.runtime.block_on(async {
+            let data = guard.attempt_user_computation_data().unwrap();
+            let carrier = data.data.get::<RepositoryHostInputTransaction>().unwrap();
+            assert_eq!(carrier.snapshot(), &snapshot);
+            assert!(
+                names
+                    .iter()
+                    .all(|name| carrier.frontier().contains(name) == snapshot.get(name).is_some())
+            );
+            let mut updater = runtime.dice.updater_with_data(data);
+            guard.inject_attempt(&mut updater).unwrap();
+            let mut tx = updater.commit().await;
+            runtime.request_revision.bind_cycle_detector(&tx);
+            // Never-authorized names have no injected cell; the normal producer
+            // checks the frontier before looking them up and returns Need.
+            for entry in snapshot.iter() {
+                let cell = tx
+                    .compute(&RepositoryEnvironmentCellKey::new(
+                        normalized.dupe(),
+                        entry.name(),
+                    ))
+                    .await
+                    .unwrap();
+                assert_eq!(
+                    cell,
+                    RepositoryEnvironmentCell::observed(Some(entry.value().clone()))
+                );
+                assert!(Arc::ptr_eq(
+                    cell.value().unwrap().as_ref().unwrap(),
+                    entry.value()
+                ));
+            }
+        });
+        guard.seal_retry().unwrap();
+    }
+    let excluded =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/not-a-declared-source").unwrap(),
+            PathObservationOperation::Lstat,
+        )));
+    for mixed in [
+        admitted.try_union(&excluded).unwrap(),
+        excluded.try_union(&admitted).unwrap(),
+    ] {
+        let first = current
+            .first_denied_path_with_namespace_matcher(&mixed, &|_| false)
+            .unwrap()
+            .0;
+        assert!(std::ptr::eq(
+            first,
+            &mixed.path_observations().unwrap().demands()[0]
+        ));
+        assert!(current.admit(&mixed).is_err());
+        assert_eq!(
+            guard.command().repository_environment_frontier,
+            snapshot.present_name_frontier()
+        );
+        assert!(guard.command().path_observations.observations().is_empty());
+        assert!(guard.command().issued_requests.is_empty());
+    }
     let bad = need(&normalized, &["UNKNOWN"]);
     for mixed in [
         admitted.try_union(&bad).unwrap(),
@@ -2896,13 +2971,14 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
         ));
         assert_eq!(
             guard.command().repository_environment_frontier,
-            accepted.repository_environment_frontier
+            snapshot.present_name_frontier()
         );
         assert!(names.iter().all(|name| {
-            !guard
+            guard
                 .command()
                 .repository_environment_frontier
                 .contains(name)
+                == snapshot.get(name).is_some()
         }));
     }
     assert_eq!(
@@ -2917,25 +2993,39 @@ fn assert_environment_frontier_observes_empty_snapshot(mut current: Bodies, name
     runtime.runtime.block_on(async {
         let data = guard.attempt_user_computation_data().unwrap();
         let carrier = data.data.get::<RepositoryHostInputTransaction>().unwrap();
-        assert!(carrier.snapshot().is_empty());
+        assert_eq!(carrier.snapshot(), &snapshot);
+        for entry in snapshot.iter() {
+            assert!(Arc::ptr_eq(
+                carrier.snapshot().get(entry.name()).unwrap(),
+                entry.value()
+            ));
+        }
         assert!(names.iter().all(|name| carrier.frontier().contains(name)));
         let mut updater = runtime.dice.updater_with_data(data);
         guard.inject_attempt(&mut updater).unwrap();
         let mut tx = updater.commit().await;
         runtime.request_revision.bind_cycle_detector(&tx);
         for name in names {
+            let cell = tx
+                .compute(&RepositoryEnvironmentCellKey::new(normalized.dupe(), *name))
+                .await
+                .unwrap();
             assert_eq!(
-                tx.compute(&RepositoryEnvironmentCellKey::new(normalized.dupe(), *name))
-                    .await
-                    .unwrap(),
-                RepositoryEnvironmentCell::observed(None)
+                cell,
+                RepositoryEnvironmentCell::observed(snapshot.get(name).cloned())
             );
+            if let Some(expected) = snapshot.get(name) {
+                assert!(Arc::ptr_eq(
+                    cell.value().unwrap().as_ref().unwrap(),
+                    expected
+                ));
+            }
         }
-        assert!(
+        assert_eq!(
             tx.compute(&RepositoryEnvironmentSnapshotKey::new(normalized.dupe()))
                 .await
-                .unwrap()
-                .is_empty()
+                .unwrap(),
+            snapshot
         );
     });
     let restored = guard.discard().unwrap();
@@ -3273,6 +3363,133 @@ fn python_environment_frontier_is_qualified_exact_and_observes_empty_snapshot() 
     assert_environment_frontier_observes_empty_snapshot(
         selected(),
         &RULES_PYTHON_ENVIRONMENT_NAMES,
+    );
+    assert_observed_environment_request_is_exact_and_request_owned();
+}
+
+#[cfg(target_os = "linux")]
+fn assert_observed_environment_request_is_exact_and_request_owned() {
+    use slug_bzlmod_v2::RepositoryEnvironmentEntry;
+    use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
+    let selected = || generated_test_bodies_with_swift(namespace_test_bodies(), 1);
+    let bodies = selected();
+    let need = environment_test_need;
+    let observed = need(&bodies.roots[0], &OBSERVED_ENVIRONMENT_REQUEST_NAMES);
+    bodies.admit(&observed).unwrap();
+    assert!(
+        bodies.java_offline_archive.is_none()
+            && bodies.python_offline_archive.is_none()
+            && bodies.kotlin_offline_archive.is_none()
+    );
+    let reordered = need(&bodies.roots[0], &["ProgramData", "CC", "Path", "CC"]);
+    assert_eq!(
+        reordered.repository_environment(),
+        observed.repository_environment()
+    );
+    bodies.admit(&reordered).unwrap();
+    eprintln!(
+        "WP1120_ENVIRONMENT_REQUEST_LAYOUT table={} literals={} bodies={}/{} scope={}/{}",
+        std::mem::size_of_val(&OBSERVED_ENVIRONMENT_REQUEST_NAMES),
+        OBSERVED_ENVIRONMENT_REQUEST_NAMES
+            .iter()
+            .map(|name| name.len())
+            .sum::<usize>(),
+        std::mem::size_of::<Bodies>(),
+        std::mem::align_of::<Bodies>(),
+        std::mem::size_of::<SourceServiceScope>(),
+        std::mem::align_of::<SourceServiceScope>()
+    );
+    for registry in [RegistryChoice::DefaultBcr, RegistryChoice::PreparedFile] {
+        for command in [CommandChoice::Modules, CommandChoice::PublicProbe] {
+            assert_eq!(
+                selected()
+                    .with_rules_rust_defs_import_sources(registry, command)
+                    .admit(&observed)
+                    .is_ok(),
+                matches!(registry, RegistryChoice::PreparedFile)
+                    && matches!(command, CommandChoice::PublicProbe)
+            );
+        }
+    }
+    for case in [0, 2, 3, 4, 5, 6] {
+        let closed = generated_test_bodies_with_swift(namespace_test_bodies(), case);
+        let denied = closed.admit(&observed).unwrap_err();
+        assert_eq!(denied.family, "environment");
+        assert!(std::ptr::eq(
+            closed
+                .environment_diagnostic(&observed, &denied)
+                .unwrap()
+                .request,
+            observed.repository_environment().unwrap()
+        ));
+    }
+    let mut crossed = selected();
+    crossed.swift_offline_archive = python_test_bodies().python_offline_archive;
+    assert_eq!(crossed.admit(&observed).unwrap_err().family, "environment");
+    let foreign = need(
+        &NormalizedAbsolutePath::new("/foreign").unwrap(),
+        &OBSERVED_ENVIRONMENT_REQUEST_NAMES,
+    );
+    assert_eq!(bodies.admit(&foreign).unwrap_err().family, "environment");
+    assert!(observed.try_union(&foreign).is_err());
+    for names in [
+        &["CC"][..],
+        &["Path"][..],
+        &["ProgramData"][..],
+        &["CC", "Path"][..],
+        &["CC", "ProgramData"][..],
+        &["Path", "ProgramData"][..],
+        &["cc", "Path", "ProgramData"][..],
+        &["CC", "PATH", "ProgramData"][..],
+        &["CC", "Path_suffix", "ProgramData"][..],
+        &["CC", "Path", "programdata"][..],
+        &["CC", "Path", "ProgramData", "UNKNOWN"][..],
+    ] {
+        let bad = need(&bodies.roots[0], names);
+        let denied = bodies.admit(&bad).unwrap_err();
+        assert_eq!(denied.family, "environment");
+        assert!(std::ptr::eq(
+            bodies
+                .environment_diagnostic(&bad, &denied)
+                .unwrap()
+                .request,
+            bad.repository_environment().unwrap()
+        ));
+    }
+    // Even enabled old cohorts cannot turn the exact tuple into a broad union.
+    let mut combined = selected();
+    combined.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
+    combined.python_offline_archive = python_test_bodies().python_offline_archive;
+    let old = need(&combined.roots[0], &RULES_JAVA_ENVIRONMENT_NAMES)
+        .try_union(&need(&combined.roots[0], &RULES_PYTHON_ENVIRONMENT_NAMES))
+        .unwrap();
+    for case in 0..7 {
+        let mut current = generated_test_bodies_with_swift(python_test_bodies(), case);
+        current.java_offline_archive = java_proxy_test_bodies().java_offline_archive;
+        current.admit(&old).unwrap();
+    }
+    for mixed in [
+        observed.try_union(&old).unwrap(),
+        old.try_union(&observed).unwrap(),
+    ] {
+        assert_eq!(combined.admit(&mixed).unwrap_err().family, "environment");
+    }
+    combined.swift_offline_archive = None;
+    combined.admit(&old).unwrap();
+    assert_eq!(combined.admit(&observed).unwrap_err().family, "environment");
+    assert_environment_frontier_observes_empty_snapshot(
+        selected(),
+        &OBSERVED_ENVIRONMENT_REQUEST_NAMES,
+    );
+    let supplied: Arc<str> = Arc::from("caller-owned-value");
+    let snapshot = RepositoryEnvironmentSnapshot::from_canonical(Arc::from([
+        RepositoryEnvironmentEntry::new("CC", supplied.clone()),
+    ]))
+    .unwrap();
+    assert_environment_frontier_observes_snapshot(
+        selected(),
+        &OBSERVED_ENVIRONMENT_REQUEST_NAMES,
+        snapshot,
     );
 }
 

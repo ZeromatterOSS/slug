@@ -34,19 +34,20 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-332-m7a-observed-environment-request
+Packet: WP-7-333-m7a-swift-generated-plan-capture
 Status: ready — independent DESIGN before implementation
 
-The [accepted Swift cohort](./slug-v2-subplans/wp1119-swift-immutable-cohort-2026-10-11.json)
-passes current76Rust/31fixture+production and ONE19.711s/source366 with measured
-supervisor244.640625MiB/phase245.88671875MiB under256.359source/175pins/18env
-brackets stable; original Swift archive and five imports crossed. Scoped retirement
-is narrow; producer/certificate/actions/Rustc/M7A and whole fit remain open.
-The [current manifest](./slug-v2-subplans/current-packet.md) selects only the captured
-original environment request CC/Path/ProgramData through normal scoped snapshots,
-qualified current Swift context and complete original tuple. Values/caller are not
-inferred; Windows implementation remains deferred, all resource caps unchanged.
-Independent DESIGN settles snapshot authority and batch interaction before activation.
+The [accepted environment request](./slug-v2-subplans/wp1120-observed-environment-request-2026-10-11.json)
+passes freshCore43+production/qualified protected33+fixture31 and ONE19.734s/source366,
+phase245.41015625MiB under256;359source/195pins/18env stable. Exact original
+CC/Path/ProgramData tuple progressed through the unchanged complete caller snapshot;
+current controlled-empty input is no ambient claim. No new retained field or policy
+owned strings; Bodies304/Scope488 unchanged. Producer/whole fit remain open.
+The [current manifest](./slug-v2-subplans/current-packet.md) selects only a bounded
+original Swift generated local-config plan metadata capture by the existing borrowed
+diagnostic. Current WP982 identifies the original tuple but has no ordered plan/body.
+Reuse existing formatter/projection controls; no new admission or namespace grant,
+source acquisition or Windows work. Independent DESIGN precedes activation.
 
 ### Ready and blocked queue
 
