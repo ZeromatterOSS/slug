@@ -167,6 +167,8 @@ mod native_label_flag;
 mod output_group_info;
 mod package_specification;
 mod rustc_map_each;
+#[path = "starlark_rule/starlark_platform_selector_tests.rs"]
+mod starlark_platform_selector_tests;
 mod template_variable;
 #[path = "starlark_rule/toolchain_frontier_tests.rs"]
 mod toolchain_frontier_tests;
@@ -14702,12 +14704,12 @@ async fn native_alias_direct_constraint_rejects_wrong_kind_and_ineligible_owner(
     fs::write(workspace.join("MODULE.bazel"), "module(name='root')\n").unwrap();
     fs::write(
         workspace.join("defs.bzl"),
-        "Selected = provider(fields={'value':''})\ndef _probe(ctx): return [DefaultInfo(), Selected(value=ctx.attr.text)]\nprobe = rule(implementation=_probe, attrs={'text':attr.string()})\n",
+        "Selected = provider(fields={'value':''})\ndef _probe(ctx): return [DefaultInfo(), Selected(value=ctx.attr.text)]\nprobe = rule(implementation=_probe, attrs={'text':attr.string()})\ndisabled_probe = rule(implementation=_probe, attrs={'text':attr.string()}, build_setting=config.bool(flag=True))\n",
     )
     .unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
-        r#"load(':defs.bzl', 'probe')
+        r#"load(':defs.bzl', 'probe', 'disabled_probe')
 constraint_setting(name='os')
 constraint_value(name='linux', constraint_setting=':os')
 constraint_setting(name='cpu')
@@ -14732,10 +14734,10 @@ alias(name='cycle_b', actual=':cycle_a')
 alias(name='cycle', actual=select({':cycle_a':':first', '//conditions:default':':second'}))
 alias(name='selector_cycle', actual=select({':selector_cycle':':linux', '//conditions:default':':linux'}))
 alias(name='nested_cycle', actual=select({':selector_cycle':':first', '//conditions:default':':second'}))
-probe(name='ineligible', text=select({':linux':'yes', '//conditions:default':'no'}))
-probe(name='ineligible_alias', text=select({':linux_key':'yes', '//conditions:default':'no'}))
+disabled_probe(name='ineligible', build_setting_default=False, text=select({':linux':'yes', '//conditions:default':'no'}))
+disabled_probe(name='ineligible_alias', build_setting_default=False, text=select({':linux_key':'yes', '//conditions:default':'no'}))
 probe(name='nested_setting', text=select({':nested_setting_key':'yes', '//conditions:default':'no'}))
-probe(name='ineligible_nested', text=select({':nested_constraint_key':'yes', '//conditions:default':'no'}))
+disabled_probe(name='ineligible_nested', build_setting_default=False, text=select({':nested_constraint_key':'yes', '//conditions:default':'no'}))
 "#,
     )
     .unwrap();
