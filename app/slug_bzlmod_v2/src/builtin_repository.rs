@@ -214,6 +214,14 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/allowlists/function_transition_allowlist/BUILD",
+        bytes: include_bytes!(
+            "../builtin/bazel_tools/tools/allowlists/function_transition_allowlist/BUILD"
+        ),
+        expected_sha256: "28ba77597c529ea11281c8247a3bcfb55d440de6299cc517831573efdac538eb",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/build_defs.bzl",
         bytes: include_bytes!("../builtin/bazel_tools/tools/build_defs.bzl"),
         expected_sha256: "d5f935c4e72a365438711f08a2640094cbf0a03392eebb06d8cecdc58b8ab19c",
@@ -1189,6 +1197,7 @@ mod tests {
             listing_rows("tools"),
             [
                 ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("allowlists".to_owned(), PathDirectoryEntryKind::Directory),
                 ("build_defs".to_owned(), PathDirectoryEntryKind::Directory),
                 ("build_defs.bzl".to_owned(), PathDirectoryEntryKind::File),
                 ("cpp".to_owned(), PathDirectoryEntryKind::Directory),
@@ -1448,6 +1457,45 @@ mod tests {
                 ("generate-xml.sh".to_owned(), PathDirectoryEntryKind::File),
                 ("test-setup.sh".to_owned(), PathDirectoryEntryKind::File),
             ]
+        );
+    }
+
+    #[test]
+    fn function_transition_allowlist_catalog_bytes_and_direct_listing_are_exact() {
+        let path = "tools/allowlists/function_transition_allowlist/BUILD";
+        let file = lookup(CompactString::new(path)).unwrap();
+        assert_eq!(file.path(), path);
+        assert_eq!(
+            hex::encode(file.sha256()),
+            "28ba77597c529ea11281c8247a3bcfb55d440de6299cc517831573efdac538eb"
+        );
+        assert_eq!(file.bytes().len(), 281);
+        assert!(!file.executable());
+        assert_eq!(
+            listing_rows("tools/allowlists"),
+            [(
+                "function_transition_allowlist".to_owned(),
+                PathDirectoryEntryKind::Directory
+            )]
+        );
+        assert_eq!(
+            listing_rows("tools/allowlists/function_transition_allowlist"),
+            [("BUILD".to_owned(), PathDirectoryEntryKind::File)]
+        );
+        for path in [
+            "tools/allowlists/absent/BUILD",
+            "tools/allowlists/BUILD",
+            "tools/allowlists/function_transition_allowlist/BUILD.bazel",
+        ] {
+            assert!(matches!(
+                lookup(CompactString::new(path)),
+                Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+            ));
+        }
+        assert_eq!(
+            builtin_directory_listing(&PackagePath::parse("tools/allowlists/absent").unwrap())
+                .unwrap(),
+            PathDirectoryListing::Missing
         );
     }
 

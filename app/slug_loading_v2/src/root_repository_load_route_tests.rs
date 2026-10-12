@@ -382,6 +382,121 @@ async fn ordinary_builtin_route_uses_canonical_owner_but_root_build_keeps_root_b
 }
 
 #[tokio::test]
+async fn builtin_function_transition_allowlist_loads_and_reuses_genuine_package() {
+    use slug_identity_v2::PackagePath;
+
+    use crate::PackageTargetKind;
+    use crate::RepositoryPackageLoadKey;
+    use crate::RepositoryPackageLoadObservationKey;
+
+    let dice = builtin_graph_dice();
+    let module = builtin_graph_module();
+    let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+    let trace = Arc::new(RouteTrace::default());
+    let mut tx = transaction(
+        &dice,
+        &module,
+        EXTENSION_A,
+        true,
+        Some(trace.clone() as Arc<dyn ActivationTracker>),
+    )
+    .await;
+    let route_key = HostRootRepositoryLoadRouteKey::new(
+        workspace,
+        ApparentRepoName::new("bazel_tools").unwrap(),
+    )
+    .unwrap();
+    let SourcePreparationOutcome::Complete(route) = tx.compute(&route_key).await.unwrap() else {
+        panic!("builtin route must complete without materialization Need")
+    };
+    let route = route.as_ref().as_ref().unwrap();
+    assert_eq!(route.apparent_repo().as_str(), "bazel_tools");
+    assert_eq!(route.canonical_repo().as_str(), "bazel_tools");
+    let HostRepositorySourceRoute::Canonical(input) = route.source() else {
+        panic!("builtin package must retain canonical owner")
+    };
+    assert_eq!(
+        input.view().route().view().kind(),
+        HostCanonicalRepositoryRouteKind::Builtin
+    );
+    let package_path =
+        PackagePath::parse("tools/allowlists/function_transition_allowlist").unwrap();
+    let legacy_key = RepositoryPackageLoadKey::new_canonical(input.clone(), package_path.clone());
+    let observed_key =
+        RepositoryPackageLoadObservationKey::new_canonical(input.clone(), package_path);
+    let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap() else {
+        panic!("genuine legacy builtin package must complete without Need")
+    };
+    let SourcePreparationOutcome::Complete(Ok(observed)) = tx.compute(&observed_key).await.unwrap()
+    else {
+        panic!("genuine observed builtin package must complete without Need")
+    };
+    assert_eq!(observed.result(), &legacy);
+    assert!(observed.observations().observations().is_empty());
+    let package = legacy.as_ref().as_ref().unwrap();
+    assert!(package.direct_load_roots.is_empty() && package.reachable_loads.is_empty());
+    let target = package
+        .targets
+        .iter()
+        .find(|target| target.name == "function_transition_allowlist")
+        .unwrap();
+    let PackageTargetKind::PackageGroup { contents, includes } = &target.kind else {
+        panic!("original package_group must be produced, not a synthesized rule")
+    };
+    assert!(contents.positive_all() && !contents.has_private());
+    assert!(contents.exact_positive().is_empty() && contents.subtree_positive().is_empty());
+    assert!(contents.exact_negative().is_empty() && contents.subtree_negative().is_empty());
+    assert!(includes.is_empty());
+    assert!(trace.contains(
+        "builtin-bazel-tools-source-file:tools/allowlists/function_transition_allowlist/BUILD"
+    ));
+    let source_key = HostRepositorySourceObservationEpochKey::new_canonical(
+        input.clone(),
+        host_repository_relative_path(PathBuf::from(
+            "tools/allowlists/function_transition_allowlist/BUILD",
+        ))
+        .unwrap(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(source)) = tx.compute(&source_key).await.unwrap()
+    else {
+        panic!("genuine embedded source must complete without Need")
+    };
+    let HostRepositorySourceObservationView::Builtin(file) =
+        source.result().as_ref().as_ref().unwrap().view()
+    else {
+        panic!("allowlist source must use builtin catalog")
+    };
+    assert_eq!(
+        file.bytes(),
+        include_bytes!(
+            "../../slug_bzlmod_v2/builtin/bazel_tools/tools/allowlists/function_transition_allowlist/BUILD"
+        )
+    );
+    assert_eq!(
+        trace.dependencies(&source_key.to_string()),
+        ["builtin-bazel-tools-source-file:tools/allowlists/function_transition_allowlist/BUILD"]
+    );
+    let SourcePreparationOutcome::Complete(warm_legacy) = tx.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("warm legacy package must complete")
+    };
+    assert!(Arc::ptr_eq(&legacy, &warm_legacy));
+    let SourcePreparationOutcome::Complete(Ok(warm)) = tx.compute(&observed_key).await.unwrap()
+    else {
+        panic!("warm observed package must complete")
+    };
+    assert!(Arc::ptr_eq(observed.result(), warm.result()));
+    let SourcePreparationOutcome::Complete(Ok(warm_source)) =
+        tx.compute(&source_key).await.unwrap()
+    else {
+        panic!("warm source must complete")
+    };
+    assert!(Arc::ptr_eq(source.result(), warm_source.result()));
+    assert!(!trace.contains_fragment("repository-materialization-result:@@bazel_tools"));
+    assert!(!trace.contains_fragment("host-repository-source-file:@@bazel_tools:"));
+}
+
+#[tokio::test]
 async fn root_build_and_existing_root_routes_do_not_activate_canonical_fallback() {
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
     let local_module = "module(name='bazel_tools')\nbazel_dep(name='local', version='1')\nlocal_path_override(module_name='local', path='local')\n";

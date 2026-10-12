@@ -1,0 +1,119 @@
+{
+  "packet": "WP-7-409-m7a-builtin-function-transition-allowlist",
+  "status": "ACCEPTED_EXACT_BUILTIN_CONTENT_PUBLIC_LOADING_PREREQUISITE_DISCOVERY",
+  "base_revision": "2448eb11684521600416ab0f6c85136f17e12fe8",
+  "closed_utc": "2026-10-12T22:04:09.151437+00:00",
+  "compatibility": "Exact original Bazel9.2 runtime BUILD281B SHA28ba77597c529ea11281c8247a3bcfb55d440de6299cc517831573efdac538eb; configuration identity remains Slug-native.",
+  "change": "Add sorted8line catalogue entry and original runtime BUILD through existing manifest/source/DICE/package owner, plus existing-style source wrapper/data label. No new route/key/materializer/representation/interner/tool guard.",
+  "source_transition": {
+    "app/slug_bzlmod_v2/src/builtin_repository.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "c0eedb8bb369a4554686c2b8a62ef7d61f8be22e2b3246825d425a9d1c26a295"
+      },
+      "after": {
+        "sha256": "3866bb869115aa6ebf17fdc49ee3e1c3247dd19decf0094a4c20c258bb6adad6",
+        "bytes": 68082
+      }
+    },
+    "app/slug_bzlmod_v2/BUILD.bazel": {
+      "before": {
+        "exists": true,
+        "sha256": "100ccaa7b327e1e64fe1e5c40d9651cc8452fb5f425bf1be41348cb3b3907268"
+      },
+      "after": {
+        "sha256": "63db4b6627e477ab2bccc6703257117c14c7787080f34e1c0b5250db0ff7d572",
+        "bytes": 6893
+      }
+    },
+    "app/slug_loading_v2/src/root_repository_load_route_tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "91481a0eea66eaacd728ddffa177ea212f72f49e5c1971a7552210ae1ba5bfc2"
+      },
+      "after": {
+        "sha256": "3d8f41175c66596017fe7629907cba8bd3dfebf09cf6bfc3311d464ccb5f3f2c",
+        "bytes": 51342
+      }
+    },
+    "app/slug_bzlmod_v2/builtin/bazel_tools/tools/allowlists/function_transition_allowlist/BUILD": {
+      "before": {
+        "exists": false
+      },
+      "after": {
+        "sha256": "28ba77597c529ea11281c8247a3bcfb55d440de6299cc517831573efdac538eb",
+        "bytes": 281
+      }
+    },
+    "app/slug_bzlmod_v2/builtin/bazel_tools/tools/allowlists/function_transition_allowlist/BUILD.bazel": {
+      "before": {
+        "exists": false
+      },
+      "after": {
+        "sha256": "f552ac938ac79f9dcfb5e66ae2cf9be43b1ebc384c09e22a8283ca6fc8825eda",
+        "bytes": 114
+      }
+    }
+  },
+  "final_review": {
+    "path": "target/wp1209/final-review.json",
+    "sha256": "61c88d775869db124eddd95a6acefa0965220bc9ace9821a1d255adb7294759f",
+    "direct_pins_root_verified": 80,
+    "reviewer_distinct_files_verified": 509,
+    "active_seconds": 160.996
+  },
+  "gates": {
+    "root_evidence_path": "target/wp1209/root-final-evidence.json",
+    "root_evidence_sha256": "82e3da281a3a073f732f228647a0add5a286988ef12b538abe7cf49d5f3031fd",
+    "focused_selected": 8,
+    "focused_passed": 8,
+    "public_query_path": "target/wp1209/public-query.json",
+    "public_query_sha256": "d3809520a9b92fd335d83c40c1fbe44e73821af99e91cb13b17861238b33c153",
+    "public_stdout_equivalent": true,
+    "compile_seconds": {
+      "bzlmod": 84.60135809401982,
+      "loading": 136.4944321308285,
+      "cli": 37.00827087997459
+    }
+  },
+  "configured_measurement": {
+    "path": "target/wp1209/configured-command-memory-result.json",
+    "sha256": "d9ea9df047e9b28d3d7a48a1e29e260613c9970a7304871d1719c0a5819a6d93",
+    "ratio": null,
+    "maximum_ratio": 1.25,
+    "metrics": {
+      "bazel": {
+        "peak_rss_kib": 800932,
+        "elapsed_seconds": 10.748777364846319,
+        "exit_code": 0,
+        "stdout_lines": 1,
+        "observed_command_names": [
+          "java",
+          "time"
+        ]
+      },
+      "slug": {
+        "peak_rss_kib": 312752,
+        "elapsed_seconds": 40.3584683269728,
+        "exit_code": 2,
+        "stdout_lines": 0,
+        "observed_command_names": [
+          "slug",
+          "time"
+        ]
+      }
+    },
+    "owned_groups_empty": true
+  },
+  "next_prerequisite": {
+    "cause": "Real authenticated nightly_tools caller excluded from old rust_host_tools profile before URL/prefix/SHA parsing; existing full-plan guard is also stable1.97.1-only. Add separately reviewed real-root nightly profile; no arbitrary caller widening.",
+    "boundary_path": "target/wp1209/next-download-extract-boundary.json",
+    "boundary_sha256": "ae8326399ac66882d6f7e1569ce46963d2658f619d565db13e9623d7fd3ba367",
+    "upstream_path": "target/wp1209/next-download-extract-source.json",
+    "upstream_sha256": "c97bb4ff84853809649299555e59f2e045c5ade282d5330a75c29f2058f2356d",
+    "rustfmt": "Actual original defaultnightly2026-07-16;2025rustfmt hash adjacent unused, no rewrite.",
+    "diagnostics": "Current error expands full certificate to4.1MB. Bounded presentation is a followup allocation issue; no measured RSS-saving claim."
+  },
+  "growth_and_resource_examination": "8static production lines,281B upstream bytes;40catalogue/listing+115Loading testlines exceeds100estimate by55 and is explicitly reviewed as cohesive real-source/route/reuse coverage. No framework or retained pool. Compiles84.601/136.494/37.008s separate from workload; pair10.749/40.358s. Initial public query unsupported lockfile flag invocation preserved, then same supported query flags matched both outputs. Hashing final inputs/binaries streams64KiB; initial preparatory source validation briefly owned one archive(max83.9MB) outside workload, no retained payload.",
+  "acceptance_limits": "Configured Slug completion/ratio unproved despite lower RSS; no fullM7/Rustc execution/coupled memory acceptance. Next packet needs authenticated nightly archive profile design checkpoint and then same configured command; above1.25 inspect allocations/retention and relevant Zabel before broader work."
+}
