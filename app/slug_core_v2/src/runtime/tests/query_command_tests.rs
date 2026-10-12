@@ -1,7 +1,32 @@
 use super::*;
 
+// Reuse authenticated registry bytes so these command tests need no network.
+fn query_test_registry() -> tempfile::TempDir {
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/v2_oracle/fixtures/configured-cli-authentic");
+    let registry = tempfile::tempdir().unwrap();
+    tar::Archive::new(fs::File::open(fixture.join("registry-metadata.tar")).unwrap())
+        .unpack(registry.path())
+        .unwrap();
+    for relative in [
+        "modules/rules_license/0.0.7/MODULE.bazel",
+        "modules/rules_license/1.0.0/MODULE.bazel",
+        "modules/platforms/1.0.0/MODULE.bazel",
+        "modules/platforms/1.0.0/source.json",
+        "modules/rules_shell/0.6.1/MODULE.bazel",
+        "modules/rules_shell/0.6.1/source.json",
+    ] {
+        let dest = registry.path().join(relative);
+        fs::create_dir_all(dest.parent().unwrap()).unwrap();
+        fs::copy(fixture.join("registry").join(relative), dest).unwrap();
+    }
+    registry
+}
+
     #[test]
     fn real_query_command_drives_typed_results_and_cold_events_without_warm_replay() {
+        let registry = query_test_registry();
+        let registry_urls = [url::Url::from_file_path(registry.path()).unwrap().to_string()];
         let target_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/slug-query-real-command");
         fs::create_dir_all(&target_parent).unwrap();
@@ -31,7 +56,7 @@ use super::*;
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
-                &[],
+                &registry_urls,
                 QueryOutputCompletion::Standard,
             )
         };
@@ -85,6 +110,8 @@ use super::*;
 
     #[test]
     fn direct_external_query_uses_host_route_native_materialization_and_apparent_output() {
+        let registry = query_test_registry();
+        let registry_urls = [url::Url::from_file_path(registry.path()).unwrap().to_string()];
         let target_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/slug-query-external-command");
         fs::create_dir_all(&target_parent).unwrap();
@@ -119,7 +146,7 @@ use super::*;
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
-                &[],
+                &registry_urls,
                 QueryOutputCompletion::Standard,
             )
         };
@@ -131,7 +158,7 @@ use super::*;
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
-                &[],
+                &registry_urls,
                 QueryOutputCompletion::LabelKind,
             )
         };
@@ -502,7 +529,7 @@ use super::*;
                     BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
-                    &[],
+                    &registry_urls,
                     QueryOutputCompletion::Standard,
                 )
                 .unwrap();
@@ -531,7 +558,7 @@ use super::*;
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
-                &[],
+                &registry_urls,
                 QueryOutputCompletion::Standard,
             )
             .unwrap();
@@ -671,7 +698,19 @@ use super::*;
         );
         assert_eq!(error.exit_code, 7);
 
-        for pattern in ["@dep//:all", "@dep//:*", "@dep//..."] {
+        // Rules-only wildcards exclude exported files after package restoration.
+        let wildcard = query("@dep//:all").unwrap();
+        assert_eq!(
+            wildcard
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .stdout(),
+            ""
+        );
+
+        for pattern in ["@dep//:*", "@dep//..."] {
             let pattern_error = query(pattern).unwrap();
             assert_eq!(
                 pattern_error

@@ -59,6 +59,13 @@ functions, external-repository breadth, and non-text formats remain later
 breadth rather than M3 gates. Historical Java-compatibility feasibility notes
 below are evidence only and do not reopen the accepted contract.
 
+Apparent external rules-only package `:all` is admitted through the existing
+repository-route and package-graph DICE owners for supported package contents.
+Actual targets named `all`, external all-target/recursive patterns, canonical
+pattern spelling and unadmitted external rule families remain deferred. Root
+pattern behavior is unchanged. [Acceptance evidence](wp1205-external-package-query-2026-10-12.json)
+covers both observation modes, ordering/provenance and repository/package lifecycle.
+
 ### Query engine reuse policy
 
 The admitted query engine already uses extracted generic machinery. Preserve

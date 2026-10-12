@@ -1,0 +1,103 @@
+{
+  "packet": "WP-7-405-m7a-external-rules-only-package-query",
+  "status": "ACCEPTED_NARROW_EXTERNAL_RULES_ONLY_QUERY",
+  "closed_utc": "2026-10-12T20:31:46.653391+00:00",
+  "base_revision": "765d09e3b342b1e45bd2e720ee16285cff5aad25",
+  "semantic_change": "Apparent external rules-only package :all uses existing DICE route/owner/package graph; root unchanged; named-all ambiguity/canonical/recursive/all-target and unadmitted external rule families deferred",
+  "source_transition": {
+    "app/slug_query_v2/src/loading_environment.rs": {
+      "before": "16e58bec17f4f58ed9dac71981d3dc78819ee1fbc9722b4c8407781550d750de",
+      "after": "b7f6de1645932b33be16820e56a4d243c278b56a921f66dc44b61ac69175a730"
+    },
+    "app/slug_query_v2/tests/loading_query.rs": {
+      "before": "abf864e744d572d198dd4ec179f3249fef6dd1411f717c5131f54ac6bc9f3381",
+      "after": "b763bb1ed1684f2e7c5696928d550a81eaf6c82119aba18812f100171757e41b"
+    },
+    "app/slug_core_v2/src/runtime/tests/query_command_tests.rs": {
+      "before": "ec29aae5202c7a257514f7a70690adb921e37d38b969bf502fbfa7f978c9e21f",
+      "after": "75aedb851888c82757970a95b30ca3c2ee2a43b23d3832409b271661eeb3006e"
+    }
+  },
+  "final_review": {
+    "path": "target/wp1205/final-review.json",
+    "sha256": "43d3df24a1d88334b7e54ebdd4a114e602329da8566f905dff25a9bbfcd84b78",
+    "physical_pins_verified": 192,
+    "seconds": 214.435249
+  },
+  "root_evidence": {
+    "path": "target/wp1205/root-final-evidence.json",
+    "sha256": "659c1781b62301800197ac9c83dd869b938c6685d8ced85ba50116f68a61bb82",
+    "current_selected_passed": 18
+  },
+  "oracle_queries": 5,
+  "memory": {
+    "command": [
+      "query",
+      "kind(toolchain, @rust_toolchains//:all)",
+      "--output=label",
+      "--order_output=full",
+      "--noshow_progress",
+      "--registry=file:///run/media/system/Colossus/dev/slug/target/wp1203/offline-registry-full",
+      "--override_module=rules_rust=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+      "--override_module=platforms=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+      "--override_module=bazel_features=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+      "--override_module=bazel_skylib=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af",
+      "--override_module=rules_cc=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b679c020813eb8d658920448a1e821880c62d293d56d564524c8c254e20e485f/d0e4ebaa-7ffa-4a3d-a755-c5d29e9dc78c",
+      "--override_module=rules_license=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/4c6795bb04c3349d2b9b2808b887d3f14ff63bd269fbefd4b4c28155a2d19525/f6cf33a6-90b1-4749-a93c-e2cb5cce1b13",
+      "--override_module=rules_shell=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/e4cd8731be89dd0473a729d04ebd85444fe476aba6f06f85094f7b108924b591/4bca3bf5-0643-4020-8164-f11be8f615a5",
+      "--override_module=apple_support=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/13472a256eff8c8b5f8a2a117b4cf3b0f5694370e2b294b1d6245602764578c5/332a872f-7ce2-4ac9-ab78-01592c6cd5ac",
+      "--override_module=package_metadata=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/87ddb5d5a728136adee9906902ea29def4999252491ac9c7561a865cab34f2ca/0c45a275-e090-43c4-a806-bd40b1d3c496",
+      "--override_module=buildozer=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b1e01de9c6b5635482f28248bca3a662d4e80b182852ad2e4bdb089d264e881a/5da1f8a3-3aad-4c7f-935e-a831b99ae956"
+    ],
+    "both_completed": true,
+    "exact_stdout_equal": true,
+    "metrics": {
+      "slug": {
+        "peak_rss_kib": 127004,
+        "elapsed_seconds": 1.3393020040821284,
+        "exit_code": 0,
+        "stdout_lines": 78,
+        "observed_command_names": [
+          "slug",
+          "time"
+        ]
+      },
+      "bazel": {
+        "peak_rss_kib": 359612,
+        "elapsed_seconds": 0.8542642819229513,
+        "exit_code": 0,
+        "stdout_lines": 78,
+        "observed_command_names": [
+          "java",
+          "time"
+        ]
+      }
+    },
+    "ratio": 0.353169527157047,
+    "maximum_ratio": 1.25,
+    "measurement_review_sha256": "82bfcb81dc16175e1c083f4aeaa5298ab0c10d32f251b416b7ea5204a17587cb",
+    "result_sha256": "8ac40a2897782bdbff6413da6809f8357d3a12510a932d1f76f118f461da9fb1"
+  },
+  "compile_seconds": {
+    "cli": 11.058968572877347,
+    "core_first": 23.668338647810742,
+    "core_hermetic": 22.999697590013966,
+    "query_first_dependency_variant": 180.60082393488847,
+    "query_final_correction": 1.290821627015248
+  },
+  "focused_runtime_seconds": 0.5363123079296201,
+  "qualifications": {
+    "record": "target/wp1205/validation-qualification.md",
+    "sha256": "621e2aa69b4b3bb94be74f721e11a244c7cc5f368d203847a75901570b49debb",
+    "test_fixture_corrections": "Fresh pinned oracle supplies exact Full vectors; actual failures preserved. Ground future Full vectors before expectations.",
+    "idle_review_dispatch": "send_message did not restart stopped design reviewer; corrected with followup_task.",
+    "future_review_efficiency": "Reuse accepted measurement review, bind actual delta and affected gates; avoid redundant history verification.",
+    "prepared_binding": "historical WP1203 field; actual runtime verified current93source binding explicitly."
+  },
+  "next_packet": "WP-7-406-m7a-configured-rust-command-prerequisite",
+  "prior_coupled_memory_changes_accepted": false,
+  "configured_analysis_accepted": false,
+  "full_build_accepted": false,
+  "milestone_complete": false,
+  "full_goal_complete": false
+}

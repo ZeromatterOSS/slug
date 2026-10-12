@@ -71,6 +71,7 @@ use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_query_v2::QueryPreparationOutcome;
 use slug_query_v2::RootQueryCommandKey;
+use slug_query_v2::RootQueryCommandObservationKey;
 use slug_query_v2::SubtreePackageSetKey;
 use slug_query_v2::UnconfiguredPackageGraphKey;
 use slug_query_v2::evaluate_loading_query;
@@ -5080,6 +5081,172 @@ async fn external_default_rule_toolchain_is_an_implicit_edge_not_an_attribute_or
     assert!(error.contains("no such target"), "{error}");
 }
 
+async fn external_wildcard_result(
+    transaction: &mut DiceTransaction,
+    source: &str,
+    observed: bool,
+    completion: QueryOutputCompletion,
+) -> Arc<Result<slug_query_v2::QueryOutput, slug_query_v2::QueryError>> {
+    if observed {
+        let key = RootQueryCommandObservationKey::new(
+            root_query_workspace(),
+            source,
+            QueryOrder::Full,
+            QueryPolicy::default(),
+            completion,
+        )
+        .unwrap();
+        let QueryPreparationOutcome::Complete(value) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("observed {source} requested preparation")
+        };
+        value.unwrap().result().clone()
+    } else {
+        let key = RootQueryCommandKey::new(
+            root_query_workspace(),
+            source,
+            QueryOrder::Full,
+            QueryPolicy::default(),
+            completion,
+        )
+        .unwrap();
+        let QueryPreparationOutcome::Complete(value) = transaction.compute(&key).await.unwrap()
+        else {
+            panic!("legacy {source} requested preparation")
+        };
+        value
+    }
+}
+
+#[tokio::test]
+async fn external_rules_only_wildcard_preserves_kinds_order_dedup_and_provenance() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut epoch = RootQueryEpochBuilder::external_starlark_package(320);
+    epoch.file("/workspace/dep/rule/defs.bzl",
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"empty\": attr.label_list()})\n", 320);
+    epoch.file("/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nexports_files([\"source.txt\"])\nprobe(name = \"zeta\", empty = [], visibility = [\"//visibility:public\"])\nfilegroup(name = \"alpha\")\nalias(name = \"alias\", actual = \":alpha\")\n", 320);
+    epoch.file("/workspace/dep/rule/source.txt", "source", 320);
+    let mut transaction =
+        root_query_transaction(&dice, epoch.build(), Arc::new(RootAnchorTracker::default())).await;
+    for observed in [false, true] {
+        for (source, expected) in [
+            (
+                "set(@dep//rule:all @dep//rule:alpha @dep//rule:all)",
+                "@dep//rule:zeta\n@dep//rule:alias\n@dep//rule:alpha\n",
+            ),
+            (
+                "kind('filegroup rule', @dep//rule:all)",
+                "@dep//rule:alpha\n",
+            ),
+            ("buildfiles(@dep//rule:all)", "@dep//rule:defs.bzl\n"),
+            ("@dep//rule:source.txt", "@dep//rule:source.txt\n"),
+        ] {
+            let result = external_wildcard_result(
+                &mut transaction,
+                source,
+                observed,
+                QueryOutputCompletion::Standard,
+            )
+            .await;
+            assert_eq!(
+                result.as_ref().as_ref().unwrap().stdout(),
+                expected,
+                "{source}, observed={observed}"
+            );
+        }
+        let result = external_wildcard_result(
+            &mut transaction,
+            "@dep//rule:all",
+            observed,
+            QueryOutputCompletion::LabelKind,
+        )
+        .await;
+        assert_eq!(
+            result.as_ref().as_ref().unwrap().label_kind_stdout(),
+            "probe rule @dep//rule:zeta\nalias rule @dep//rule:alias\nfilegroup rule @dep//rule:alpha\n"
+        );
+    }
+}
+
+#[tokio::test]
+async fn external_rules_only_wildcard_propagates_deferred_output_attribute() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut epoch = RootQueryEpochBuilder::external_starlark_package(323);
+    epoch.file("/workspace/dep/rule/defs.bzl",
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"outs\": attr.output_list()})\n", 323);
+    epoch.file("/workspace/dep/rule/BUILD.bazel",
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"zeta\", outs = [\"generated.txt\"], visibility = [\"//visibility:public\"])\n", 323);
+    let mut transaction =
+        root_query_transaction(&dice, epoch.build(), Arc::new(RootAnchorTracker::default())).await;
+    for observed in [false, true] {
+        let result = external_wildcard_result(
+            &mut transaction,
+            "@dep//rule:all",
+            observed,
+            QueryOutputCompletion::Standard,
+        )
+        .await;
+        assert_eq!(
+            result.as_ref().as_ref().unwrap_err().to_string(),
+            "loaded external Starlark rule @@dep+//rule:zeta is deferred: attribute `outs` contains a reachable label"
+        );
+    }
+}
+
+#[tokio::test]
+async fn external_rules_only_wildcard_refuses_named_all_rule_and_file_and_other_patterns() {
+    for (variant, build) in [
+        (321, "filegroup(name = \"all\")\n"),
+        (322, "exports_files([\"all\"])\n"),
+    ] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut epoch =
+            RootQueryEpochBuilder::external_visibility_package(variant, "friend", build);
+        epoch.file("/workspace/dep/all", "source", variant);
+        let mut transaction =
+            root_query_transaction(&dice, epoch.build(), Arc::new(RootAnchorTracker::default()))
+                .await;
+        for observed in [false, true] {
+            let result = external_wildcard_result(
+                &mut transaction,
+                "@friend//:all",
+                observed,
+                QueryOutputCompletion::Standard,
+            )
+            .await;
+            assert_eq!(
+                result.as_ref().as_ref().unwrap_err().to_string(),
+                "external package wildcard conflicts with target named all are deferred: @friend//:all"
+            );
+            for (source, expected) in [
+                (
+                    "@friend//:*",
+                    "external repository query patterns are deferred",
+                ),
+                (
+                    "@friend//...",
+                    "external repository query patterns are deferred",
+                ),
+                (
+                    "'@@dep+//:all'",
+                    "target pattern uses apparent repo spelling, not @@",
+                ),
+            ] {
+                let result = external_wildcard_result(
+                    &mut transaction,
+                    source,
+                    observed,
+                    QueryOutputCompletion::Standard,
+                )
+                .await;
+                let error = result.as_ref().as_ref().unwrap_err().to_string();
+                assert!(error.contains(expected), "{source}: {error}");
+            }
+        }
+    }
+}
+
 #[tokio::test]
 async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root_fallback() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -6468,6 +6635,32 @@ async fn external_starlark_configured_hidden_default_is_deferred() {
     );
 }
 
+async fn assert_external_wildcard_lifecycle(
+    transaction: &mut DiceTransaction,
+    expected: Result<&str, &str>,
+) {
+    for observed in [false, true] {
+        let result = external_wildcard_result(
+            transaction,
+            "@dep//:all",
+            observed,
+            QueryOutputCompletion::Standard,
+        )
+        .await;
+        match expected {
+            Ok(labels) => assert_eq!(result.as_ref().as_ref().unwrap().stdout(), labels),
+            Err(message) => assert!(
+                result
+                    .as_ref()
+                    .as_ref()
+                    .unwrap_err()
+                    .to_string()
+                    .contains(message)
+            ),
+        }
+    }
+}
+
 #[tokio::test]
 async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recovers() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -6488,6 +6681,8 @@ async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recov
         cold_result.as_ref().as_ref().unwrap().labels.as_ref(),
         ["@dep//:BUILD.bazel"]
     );
+    assert_external_wildcard_lifecycle(&mut cold, Ok("@dep//:rule\n")).await;
+    assert_external_wildcard_lifecycle(&mut cold, Ok("@dep//:rule\n")).await;
     let warm_value = cold.compute(&key).await.unwrap();
     assert!(RootQueryCommandKey::equality(&cold_value, &warm_value));
 
@@ -6508,6 +6703,7 @@ async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recov
         ["@dep//:BUILD.bazel"]
     );
 
+    assert_external_wildcard_lifecycle(&mut edited, Ok("@dep//:edited\n")).await;
     let mut deleted_epoch = RootQueryEpochBuilder::external_package(12);
     deleted_epoch.missing("/workspace/dep/BUILD.bazel");
     deleted_epoch.missing("/workspace/dep/BUILD");
@@ -6525,6 +6721,7 @@ async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recov
             .contains("BUILD file not found")
     );
 
+    assert_external_wildcard_lifecycle(&mut deleted, Err("BUILD file not found")).await;
     let mut recreated_epoch = RootQueryEpochBuilder::external_package(13);
     recreated_epoch.file(
         "/workspace/dep/BUILD.bazel",
@@ -6540,6 +6737,7 @@ async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recov
         recreated_result.as_ref().as_ref().unwrap().labels.as_ref(),
         ["@dep//:BUILD.bazel"]
     );
+    assert_external_wildcard_lifecycle(&mut recreated, Ok("@dep//:edited\n")).await;
 }
 
 #[tokio::test]

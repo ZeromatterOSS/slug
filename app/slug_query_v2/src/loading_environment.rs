@@ -1231,7 +1231,7 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                 package,
                 wildcard,
             } => {
-                if !repo.is_root() {
+                if !repo.is_root() && !wildcard.rules_only() {
                     return Err(QueryError::evaluation(format!(
                         "external repository query patterns are deferred: {literal}"
                     )));
@@ -1241,7 +1241,25 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
                         "all-target package patterns are deferred: {literal}"
                     )));
                 }
-                let graph = self.package_graph(package.as_str()).await?;
+                let graph = if repo.is_root() {
+                    self.package_graph(package.as_str()).await?
+                } else {
+                    let route = self.repository_route(&repo).await?;
+                    let owner = QueryPackageIdentity::external(
+                        route.canonical_repo().clone(),
+                        repo,
+                        package,
+                    )?;
+                    let graph = self.package_graph_for_owner(&owner).await?;
+                    // Bazel gives an explicit target named `all` precedence over
+                    // this wildcard, even for files. Its warning is deferred.
+                    if graph.nodes.keys().any(|label| label.target() == "all") {
+                        return Err(QueryError::evaluation(format!(
+                            "external package wildcard conflicts with target named all are deferred: {literal}"
+                        )));
+                    }
+                    graph
+                };
                 let mut result = TargetSet::default();
                 for (label, node) in graph.nodes.iter() {
                     if node.kind.is_rule() {
