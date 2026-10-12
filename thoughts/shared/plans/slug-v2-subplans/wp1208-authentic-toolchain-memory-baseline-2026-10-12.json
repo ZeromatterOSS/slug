@@ -1,0 +1,83 @@
+{
+  "packet": "WP-7-408-m7a-authentic-toolchain-command-memory",
+  "status": "ACCEPTED_AUTHENTIC_INPUTS_VALID_BAZEL_BASELINE_SLUG_PREREQUISITE_DISCOVERY",
+  "base_revision": "d88afa5d7",
+  "closed_utc": "2026-10-12T21:42:59.653691+00:00",
+  "production_changes": 0,
+  "preparation": {
+    "workspace-preparation.json": {
+      "path": "target/wp1208/workspace-preparation.json",
+      "sha256": "6f4be0192991f9a81e66b04c119ac2ac0226316c122334d693ef745fec37019d"
+    },
+    "archive-preparation.json": {
+      "path": "target/wp1208/archive-preparation.json",
+      "sha256": "f1cf898f8ec9ee7b30ae09900e654bad78f500f0020d0f4a6994365d8e6614c5"
+    },
+    "prepared-inputs.json": {
+      "path": "target/wp1208/prepared-inputs.json",
+      "sha256": "251c2a5ac6261be282f05218c10624ba7102cbe9e46a0d2701698f1cc9afed6c"
+    },
+    "root-measurement-input-binding.json": {
+      "path": "target/wp1208/root-measurement-input-binding.json",
+      "sha256": "c9e6bdce87f3eca83760509dd3073fb08008d4f714c2832d2acce206a3be9611"
+    }
+  },
+  "input_change": "Identical six authentic manifest SHA declarations added only to copied MODULE files; original nightly/edition/query, other five files, registry, ten overrides and source URLs preserved. Six exact authentic archives staged;27distdirs/private27archive cache. Original fixtures/caches untouched.",
+  "environment": "Both actual commands use identical normal host UID maps, root-owned0755 compiler chain and unchanged product guards; sandbox unmapped UID is not accepted as trusted.",
+  "precondition_review": {
+    "path": "target/wp1208/precondition-review.json",
+    "sha256": "52dcdd9b1a8c06ecd5c31626ab0047385eac92061d72af0b565fe4a3d9b67905"
+  },
+  "final_review": {
+    "path": "target/wp1208/final-review.json",
+    "sha256": "0a918b2826d34ab5c2a9706ce3cd1da54b013659b44764abb1e76000cad0b142",
+    "physical_pins_verified": 454,
+    "elapsed_seconds": 159.029646,
+    "root_verified_direct_review_anchors": 25
+  },
+  "measurement": {
+    "path": "target/wp1208/configured-command-memory-result.json",
+    "sha256": "e6f97e643890e222889c990499a7ad43f4b6e71d12000d2ec047ac7544444f49",
+    "ratio": null,
+    "maximum_ratio": 1.25,
+    "metrics": {
+      "bazel": {
+        "peak_rss_kib": 761300,
+        "elapsed_seconds": 10.689628103049472,
+        "exit_code": 0,
+        "stdout_lines": 1,
+        "observed_command_names": [
+          "java",
+          "time"
+        ]
+      },
+      "slug": {
+        "peak_rss_kib": 292728,
+        "elapsed_seconds": 38.2173504231032,
+        "exit_code": 2,
+        "stdout_lines": 0,
+        "observed_command_names": [
+          "slug",
+          "time"
+        ]
+      }
+    },
+    "valid_bazel_baseline_rss_kib": 761300,
+    "slug_limit_rss_kib": 951625,
+    "owned_groups_empty": true
+  },
+  "validation_reuse": "WP1207 committed19 exact focused passes, no Rust change/current binary112source binding preserved. No extra Cargo or stress replay.",
+  "next_gap": "Slug needs original Bazel9.2 builtin function_transition_allowlist BUILD; source/owner inventories pin exact281B runtime BUILD.tools bytes and existing catalogue route. No invented package graph/producer needed.",
+  "next_gap_evidence": {
+    "next-builtin-allowlist-owner.json": {
+      "path": "target/wp1208/next-builtin-allowlist-owner.json",
+      "sha256": "93686cc44e01b952f96684a3d491a4171cfab82ef3d92b595bcff1a69477c823"
+    },
+    "next-builtin-allowlist-source.json": {
+      "path": "target/wp1208/next-builtin-allowlist-source.json",
+      "sha256": "c3b7d072c1b237ad5c3374470c8b72e995909c9707503a2da01ffb1cf55cadc8"
+    }
+  },
+  "acceptance_limits": "Bazel successfully configured102packages/1200targets, one label and zeroactions; this is a configured cquery baseline, not Rustc execution/fullM7. Slug exit2/emptyoutput means ratio is unproved despite lower RSS. Coupled memory candidates remain unaccepted. Above1.25 on a completed equivalent command, inspect allocations/retention and relevant Zabel optimizations before broader work.",
+  "timing": "Archive streaming preparation .672s; required full public pair10.690/38.217s; independent final159.030s no wait. No recurring >3minute runtime or compile here."
+}
