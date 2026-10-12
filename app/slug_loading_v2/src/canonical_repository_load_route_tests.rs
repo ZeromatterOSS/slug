@@ -177,6 +177,104 @@ compatibility=module_extension(implementation=impl)
         }
     }
 
+    #[tokio::test]
+    async fn canonical_invocation_display_bounds_unicode_and_retains_typed_owner() {
+        use crate::HostCanonicalRepositoryRouteKey;
+        use crate::HostSelectedRepositoryFileEffectError;
+        use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteError;
+        use crate::canonical_repository_load_route::HostCanonicalRepositoryLoadRouteErrorKind;
+        use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCertificateKey;
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
+        let canonical = names(&validated(&mut tx).await).remove(0);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let SourcePreparationOutcome::Complete(route) = tx
+            .compute(&HostCanonicalRepositoryRouteKey::new(
+                workspace.clone(),
+                canonical.clone(),
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("real selected route must complete")
+        };
+        let seed = route
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .view()
+            .generated_effect_seed()
+            .unwrap();
+        let ordinal = seed.ordinal();
+        let SourcePreparationOutcome::Complete(certificate_result) = tx
+            .compute(&HostSelectedExtensionOwnerCertificateKey::new(
+                workspace,
+                seed.owner().clone(),
+            ))
+            .await
+            .unwrap()
+        else {
+            panic!("real selected certificate must complete")
+        };
+        let certificate = Arc::new(certificate_result.as_ref().as_ref().unwrap().clone());
+        assert_eq!(
+            certificate.repository(ordinal).unwrap().spec_parts().0,
+            &canonical
+        );
+        drop(certificate_result);
+        drop(route);
+        drop(tx);
+        drop(dice);
+        let prefix = format!(
+            "canonical repository load route '{canonical}': Effect(Invocation ordinal={ordinal}): "
+        );
+        for (cause, expected) in [
+            (String::from("short cause"), String::from("short cause")),
+            ("é🦀".repeat(256), "é🦀".repeat(256)),
+            ("é🦀".repeat(300), format!("{}…", "é🦀".repeat(256))),
+        ] {
+            let error = HostCanonicalRepositoryLoadRouteError {
+                canonical_repo: canonical.clone(),
+                kind: HostCanonicalRepositoryLoadRouteErrorKind::Effect(
+                    HostSelectedRepositoryFileEffectError::Invocation {
+                        certificate: certificate.clone(),
+                        ordinal,
+                        message: cause.clone().into(),
+                    },
+                ),
+            };
+            let retained = error.clone();
+            let text = error.to_string();
+            assert_eq!(text, format!("{prefix}{expected}"));
+            assert!(!text.contains("certificate") && !text.contains("HostSelectedExtensionOwner"));
+            assert!(error.is_effect_error());
+            assert_eq!(error, retained);
+            let HostCanonicalRepositoryLoadRouteErrorKind::Effect(
+                HostSelectedRepositoryFileEffectError::Invocation {
+                    certificate: held,
+                    ordinal: held_ordinal,
+                    message,
+                },
+            ) = &error.kind
+            else {
+                panic!("formatting changed typed error")
+            };
+            assert!(Arc::ptr_eq(held, &certificate));
+            assert_eq!(*held_ordinal, ordinal);
+            assert_eq!(message.as_str(), cause);
+            assert_eq!(held.repository(ordinal).unwrap().spec_parts().0, &canonical);
+        }
+        let ordinary = HostCanonicalRepositoryLoadRouteError {
+            canonical_repo: canonical.clone(),
+            kind: HostCanonicalRepositoryLoadRouteErrorKind::RouteCompute(Arc::from("unchanged")),
+        };
+        assert_eq!(
+            ordinary.to_string(),
+            format!("canonical repository load route '{canonical}': RouteCompute(\"unchanged\")")
+        );
+    }
+
     #[derive(Default)]
     struct DependencyTrace(Mutex<Vec<(String, Vec<String>)>>);
 

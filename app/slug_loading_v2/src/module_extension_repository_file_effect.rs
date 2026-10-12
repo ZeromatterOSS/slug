@@ -20,7 +20,6 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlanError;
-use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
 use slug_bzlmod_v2::HostRepositoryLabelPathError;
 use slug_bzlmod_v2::HostRepositoryLabelPathKey;
 use slug_bzlmod_v2::HostRepositoryLabelPathObservationKey;
@@ -77,6 +76,9 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 #[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryHostPaths, PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
 use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
+mod selected_archive_profile;
+use selected_archive_profile::SelectedArchiveProfile;
+
 struct RepositoryEffectLimits;
 // Pinned rules_cc 0.2.17 unix_cc_configure.bzl:68-87,332-417 can probe
 // 13 distinct tools, each within repository_ctx.which's 64-candidate limit.
@@ -119,21 +121,9 @@ const SELECTED_HOST_TOOLS_ARCHIVES: [(&str, &str, &str); 6] = [
     ),
 ];
 
+#[cfg(test)]
 fn matches_selected_host_tools_archives(plan: &GeneratedRepositoryFileEffectPlan) -> bool {
-    let mut effects = plan.ordered_effects();
-    for (url, sha256, strip_prefix) in SELECTED_HOST_TOOLS_ARCHIVES {
-        let Some(GeneratedRepositoryOrderedEffectRef::Archive(archive)) = effects.next() else {
-            return false;
-        };
-        if archive.urls().len() != 1
-            || archive.urls()[0].as_str() != url
-            || archive.sha256_hex() != sha256
-            || archive.strip_prefix() != strip_prefix
-        {
-            return false;
-        }
-    }
-    effects.all(|effect| matches!(effect, GeneratedRepositoryOrderedEffectRef::File(_)))
+    SelectedArchiveProfile::Stable.matches_plan(plan)
 }
 
 #[doc(hidden)]
@@ -1807,13 +1797,6 @@ async fn compute_effect(
         Err(error) => return complete_effect_error(error, observations),
     };
     let (canonical_name, spec) = repository.spec_parts();
-    // The archive effect is admitted only for the authenticated rules_rust
-    // host-tools rule, not for other generated repository rules that happen to
-    // call a method with the same name.
-    let archive_owner = repository.generated_name() == "rust_host_tools"
-        && repository.call().definition.defining_label.to_string()
-            == "@@rules_rust+//rust/private:repositories.bzl"
-        && repository.call().definition.exported_name == "rust_toolchain_tools_repository";
     let homebrew_template_owner = repository.generated_name() == "local_config_cc"
         && repository.call().definition.defining_label.to_string()
             == "@@rules_cc+//cc/private/toolchain:cc_configure.bzl"
@@ -1835,11 +1818,6 @@ async fn compute_effect(
                 observations,
             );
         }
-    };
-    let input = if archive_owner {
-        input.with_archive_owner()
-    } else {
-        input
     };
     let transaction = match ctx
         .per_transaction_data()
@@ -1905,6 +1883,13 @@ async fn compute_effect(
             observations,
         );
     }
+    // Authentication and the existing platform observation precede local capability selection.
+    let archive_profile = SelectedArchiveProfile::select(&repository, &platform);
+    let input = if archive_profile.is_some() {
+        input.with_archive_owner()
+    } else {
+        input
+    };
     let declared_observed =
         match verified_environment(ctx, &key.workspace, &transaction, declared.iter().cloned())
             .await
@@ -1970,7 +1955,7 @@ async fn compute_effect(
             );
         }
     };
-    if archive_owner && !matches_selected_host_tools_archives(&invocation.plan) {
+    if archive_profile.is_some_and(|profile| !profile.matches_plan(&invocation.plan)) {
         return complete_effect_error(
             terminal_repository_rule_invocation_error(
                 &certificate,

@@ -1,0 +1,169 @@
+{
+  "packet": "WP-7-410-m7a-linux-nightly-tools-archive-profile",
+  "status": "HELD_REPLAN_UNACCEPTED_CANDIDATE",
+  "baseline": "ab2f1c1cb",
+  "compatibility": "Exact named archive effect candidate; Slug-native diagnostic; broader caller/platform families deferred. Windows minimal.",
+  "source_pins": {
+    "/run/media/system/Colossus/dev/slug/app/slug_loading_v2/src/module_extension_repository_file_effect.rs": "545b52e117b98b25fc0a7aaf29f1b4f5f7a546a46a8a51cdf40b11b0e2015ce2",
+    "/run/media/system/Colossus/dev/slug/app/slug_loading_v2/src/module_extension_repository_file_effect/selected_archive_profile.rs": "fe7cebef4eca77c611d2ff4b802d10a9c8df947f599c28fe23fd216a4b6251a4",
+    "/run/media/system/Colossus/dev/slug/app/slug_loading_v2/src/module_extension_repository_file_effect/selected_archive_profile_tests.rs": "fb706722d1247deff2b7c3481c252997313dfa2ad33ebcd19764fc839b900a24",
+    "/run/media/system/Colossus/dev/slug/app/slug_loading_v2/src/canonical_repository_load_route.rs": "fc62bdbabb8cd7d4c221723cc9df4a8c96eadf14dea71c07b97c552e24944f50",
+    "/run/media/system/Colossus/dev/slug/app/slug_loading_v2/src/canonical_repository_load_route_tests.rs": "766ee65b955c7af701c1b4bb6e868796657e46a60c1e58a767f1e3e051f7b283"
+  },
+  "validation": {
+    "loading_compile_seconds": 85.55191048793495,
+    "initial_test_type_failure_seconds": 18.390008768066764,
+    "cli_compile_seconds": 72.99352704710327,
+    "focused_tests_selected": 7,
+    "focused_tests_passed": 7,
+    "test_body_seconds": 0.01,
+    "test_and_hash_seconds": 0.14168747514486313
+  },
+  "configured_command": {
+    "verdict": "UNPROVED_COMMAND_PREREQUISITE",
+    "common_argv": [
+      "cquery",
+      "//pkg:probe",
+      "--output=starlark",
+      "--starlark:expr=str(target.label)",
+      "--@rules_rust//rust/toolchain/channel=nightly",
+      "--lockfile_mode=off",
+      "--registry=file:///run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-patch-registry",
+      "--override_module=rules_rust=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+      "--override_module=platforms=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+      "--override_module=bazel_features=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+      "--override_module=bazel_skylib=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af",
+      "--override_module=rules_cc=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b679c020813eb8d658920448a1e821880c62d293d56d564524c8c254e20e485f/d0e4ebaa-7ffa-4a3d-a755-c5d29e9dc78c",
+      "--override_module=rules_license=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/4c6795bb04c3349d2b9b2808b887d3f14ff63bd269fbefd4b4c28155a2d19525/f6cf33a6-90b1-4749-a93c-e2cb5cce1b13",
+      "--override_module=rules_shell=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/e4cd8731be89dd0473a729d04ebd85444fe476aba6f06f85094f7b108924b591/4bca3bf5-0643-4020-8164-f11be8f615a5",
+      "--override_module=apple_support=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/13472a256eff8c8b5f8a2a117b4cf3b0f5694370e2b294b1d6245602764578c5/332a872f-7ce2-4ac9-ab78-01592c6cd5ac",
+      "--override_module=package_metadata=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/87ddb5d5a728136adee9906902ea29def4999252491ac9c7561a865cab34f2ca/0c45a275-e090-43c4-a806-bd40b1d3c496",
+      "--override_module=buildozer=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b1e01de9c6b5635482f28248bca3a662d4e80b182852ad2e4bdb089d264e881a/5da1f8a3-3aad-4c7f-935e-a831b99ae956",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8625cc7b7b2952e38101e17b4a9e7c043b3a79f55d26e4772819891998725e16",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/bd0786e0f8b6aed8c35898b4c06f64ba853d61d7c8361edb5a8d43c6ea37f5c6",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a58c25c5fe063a70057fa20cb8e15f3bda19b1030305bcb533af1e45f36a4a55",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/20152b14d9a420afc15ace905c02fd6425ddceb084630f3f043b287adf0fcdbd",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a1e351607f04fed296ba33c4977d3fe2a615ed50df7896676b67aac993c53c18",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/d20c951960ed77cb7b341c2a59488534e494d5ad1d30c4818c736d57772a9fef",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/0e1ed4a98f26e718776bd64d053d02bb34d98572ccd03d6ba355112a1205706b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1210/toolchain-distdirs/bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d"
+    ],
+    "operations": {
+      "bazel": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+      "slug": "2e50598d2c7b318b9f03d569851c1fdb34f41693ff3263cdf7ef30850d82e098"
+    },
+    "both_completed": false,
+    "stdout_equivalent": false,
+    "ratio": null,
+    "maximum_ratio": 1.25,
+    "metrics": {
+      "bazel": {
+        "peak_rss_kib": 892132,
+        "elapsed_seconds": 10.645009472034872,
+        "exit_code": 0,
+        "stdout_lines": 1,
+        "observed_command_names": [
+          "java",
+          "time"
+        ]
+      },
+      "slug": {
+        "peak_rss_kib": 324164,
+        "elapsed_seconds": 45.15818108408712,
+        "exit_code": 2,
+        "stdout_lines": 0,
+        "observed_command_names": [
+          "slug",
+          "time"
+        ]
+      }
+    },
+    "scope": "Actual configured Rust root command only; failed/incomplete commands do not ratio-pass. Existing source candidates remain coupled/unaccepted until relevant semantic/memory gates; no full action/execution/build milestone claim."
+  },
+  "genuine_invocation_gate": {
+    "proven": false,
+    "reason": "One-shot generated TempDir/plan source association released at exit; no saved Slug plan/manifest. New analysis error alone not producer proof."
+  },
+  "review": {
+    "verdict": "REPLAN",
+    "reason": "Separately reviewed ordinary Starlark platform-selector eligibility prerequisite; archive candidate source/7controls reviewed with no material blocker; actual invocation and ratio pending."
+  },
+  "growth": {
+    "owners": {
+      "app/slug_loading_v2/src/module_extension_repository_file_effect.rs": {
+        "before_lines": 6261,
+        "after_lines": 6246
+      },
+      "app/slug_loading_v2/src/canonical_repository_load_route.rs": {
+        "before_lines": 518,
+        "after_lines": 535
+      },
+      "app/slug_loading_v2/src/canonical_repository_load_route_tests.rs": {
+        "before_lines": 4029,
+        "after_lines": 4127
+      },
+      "app/slug_loading_v2/src/module_extension_repository_file_effect/selected_archive_profile.rs": {
+        "before_lines": 0,
+        "after_lines": 264
+      },
+      "app/slug_loading_v2/src/module_extension_repository_file_effect/selected_archive_profile_tests.rs": {
+        "before_lines": 0,
+        "after_lines": 321
+      }
+    },
+    "reassessment": "Bounded one profile/static tables/authenticated-default matching and mutation controls plus narrow diagnostic/ownership test. No genericframework/identitykeys/retainedpool. Formatting and type/default negatives exceed estimates; original typed owners unchanged."
+  },
+  "preservation": "Five named source owners only; no acceptance or old coupled memory landing. Keep candidate intact until successful configured CLI or adequate actual producer evidence, then release through final review.",
+  "user_memory_policy": {
+    "maximum_slug_bazel_ratio": 1.25,
+    "old_256_mib_cap_origin": "Inherited arbitrary profiling/supervisor setting, not measured Bazel baseline.",
+    "failed_command_ratio_pass": false,
+    "above_ratio_action": "Focused allocation/retention inspection plus relevant Zabel comparison before broader work.",
+    "compile_excluded": true
+  },
+  "evidence_pins": {
+    "/run/media/system/Colossus/dev/slug/target/wp1210/source-before.json": "6e43c70f760d6f5a5b5fcadfc85e7359e144000cdb6ac5bfdac61298155ee0c8",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/source-after.json": "71d720d327202de6d7849e9b545403e7d74c01fe0d30a3113adcc77d3baff1c5",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/root-measurement-input-binding.json": "ebf7a34f1072b9908003533bdd1083d73bbb6d0aca2748ee7931dd9d44d97dbf",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/design-review.md": "cd7ba4e5c279976aa3ef16916c1e402095497893c168d9d14196578621d9b993",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/design-review.json": "21ce0c85b5003437a69d78e51ce77076be83bba99e80f2646c5eabe3f31b654c",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/preparation-review.md": "36b1bf1b41988d6a20df444ce3ac88818878962dc82873a9ced97b63122c96fe",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/preparation-review.json": "740fa4ec48274a22ccf31bb58ba7470b52f63bec22f3b64918ad1842214bfd2c",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/final-review.md": "b795d2aea81363ee9ba6aaaeebc0a5ce92bc70f297a48a523e24318b59fa1a83",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/final-review.json": "c20bb818e18cf2c1a9b4f52b3c52abfbd682b86d26f54940e894deee98b28091",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/loading-tests.json": "df2ce039cec4ac32d07c8a0e93c0f39667190789e39a81fd0aa9a40faef5150f",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/loading-preflight.stdout": "10feb9254edac4806a00461ec4a417e9271d68e9fa633fac77d363961d735520",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/compile-loading.json": "ac5bbf9556422ae29b69c4509752e5dffd04acb8fb55f3b0993ea408d7f911c0",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/compile-cli.json": "850d2aca6fd7f829a7c99cc60b5322eab580fe3839d84a47c36fb8e99baac812",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/compile-loading-initial-type-failure.json": "019b23ea21dfbadaeb5a61f17d6b3dfb209a85354364848493bf696f4882df27",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/prepared-inputs.json": "2634ff4de3fbc5e73e341b2ac8b37cc7c3d621ba62c1e6ff7e0a65017d0a65fa",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/configured-command-memory-result.json": "568de0ae4a13685adef38f8daf3905752046414fcaf5a7a0a8ae88f35aa29c56",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/nightly-invocation-runtime-evidence.json": "eb68c0070cddda1d737fcb74f8d564c963063a241af3cbc6667ad3dea457cef3",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/next-select-boundary.json": "a6a96086adc142225a0cde91e582b6c3a57cc33d77d3d0e2d88bb03283215c34",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/measurement-binding-correction.json": "c9dbff8f7ddd2ac9a50187ed7b775d211a0dce69201c08ae53571b2cd0069317",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/packet-contract-with-reviewed-proof-tier.md": "2cff8120ee3d04904ba4f674d8c3f3653de2695c9038c1b361d82d433ad68229",
+    "/run/media/system/Colossus/dev/slug/target/wp1210/archive-status.stdout": "17827eb63e474e7f9d5014005847ace8267630f782aabed3f299464c2e4996f4"
+  },
+  "root_resumed_utc": "2026-10-12T22:19:32+00:00",
+  "recorded_utc": "2026-10-12T22:44:09.174123+00:00"
+}
