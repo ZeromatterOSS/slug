@@ -300,3 +300,60 @@ fn pinned_reopen_failure_has_no_pathname_fallback() {
         assert!(!owner.contains(forbidden), "{forbidden}");
     }
 }
+
+#[test]
+fn typed_candidate_misses_and_temp_write_failure_preserve_cleanup() {
+    let root = tempfile::tempdir().unwrap();
+    let good = root.path().join("good");
+    let missing = root.path().join("missing");
+    fs::write(&good, b"payload").unwrap();
+    for (path, expected) in [
+        (root.path(), b"".as_slice()),
+        (missing.as_path(), b"".as_slice()),
+        (good.as_path(), b"wrong".as_slice()),
+    ] {
+        let output = tempfile::NamedTempFile::new().unwrap();
+        let output_path = output.path().to_owned();
+        let result = capture_path_typed(
+            path,
+            output,
+            Sha256::digest(expected).into(),
+            20,
+            "archive",
+            &|| true,
+            None,
+        );
+        assert!(matches!(result, Err(FileCaptureError::Miss(_))));
+        assert!(!output_path.exists());
+        assert_eq!(handles_for(&good), 0);
+    }
+    let output = tempfile::NamedTempFile::new().unwrap();
+    let output_path = output.path().to_owned();
+    let readonly = fs::File::open(&output_path).unwrap();
+    let output = tempfile::NamedTempFile::from_parts(readonly, output.into_temp_path());
+    let error = capture_path_typed(
+        &good,
+        output,
+        Sha256::digest(b"payload").into(),
+        20,
+        "archive",
+        &|| true,
+        None,
+    )
+    .unwrap_err();
+    assert!(
+        matches!(error, FileCaptureError::Fatal(ref message) if message.contains("writing capture"))
+    );
+    assert!(!output_path.exists());
+    assert_eq!(handles_for(&good), 0);
+    let result = capture_path_typed(
+        &good,
+        tempfile::NamedTempFile::new().unwrap(),
+        [0; 32],
+        20,
+        "archive",
+        &|| false,
+        None,
+    );
+    assert!(matches!(result, Err(FileCaptureError::Fatal(_))));
+}

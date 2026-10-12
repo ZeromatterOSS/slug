@@ -33,6 +33,16 @@ fn charge_archive(
     }
 }
 
+// The physical distdir attempt uses the same local-source census as file capture.
+pub(super) fn charge_distdir_capture(scope: &SourceServiceScope) -> Result<(), String> {
+    charge_archive(
+        scope,
+        #[cfg(all(test, target_os = "linux"))]
+        SourceChargeDomain::ArchiveFile,
+    )
+    .map_err(|error| error.to_string())
+}
+
 pub(super) fn transfer_selected_capture(
     mut capture: tempfile::NamedTempFile,
     size: usize,

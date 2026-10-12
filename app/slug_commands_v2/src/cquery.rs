@@ -50,6 +50,7 @@ pub struct CqueryRequest {
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
+    pub distdirs: Vec<String>,
     pub repository_environment_overrides: Vec<RepositoryEnvironmentOverride>,
 }
 
@@ -112,6 +113,7 @@ impl CqueryRequest {
         let mut output = None;
         let mut starlark_expression = None;
         let mut output_base = None;
+        let mut distdirs = Vec::new();
         let mut configuration = Vec::new();
         let mut include_implicit = true;
         let mut include_tool = true;
@@ -127,6 +129,15 @@ impl CqueryRequest {
                 "output" => set_once(&mut output, flag, "--output")?,
                 "starlark:expr" => set_once(&mut starlark_expression, flag, "--starlark:expr")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
+                "distdir" => distdirs.push(
+                    flag.value
+                        .clone()
+                        .filter(|value| !value.is_empty())
+                        .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                            flag: flag.raw.clone(),
+                            message: "--distdir requires a non-empty directory".to_owned(),
+                        })?,
+                ),
                 "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
                 "noimplicit_deps" => {
                     include_implicit = parse_bool_flag(flag, true)?;
@@ -205,6 +216,7 @@ impl CqueryRequest {
             bzlmod_policy,
             lockfile_mode,
             registry_urls,
+            distdirs,
             repository_environment_overrides,
         })
     }
@@ -233,5 +245,43 @@ fn unsupported(message: &str) -> CommandParseError {
     CommandParseError::InvalidFlagValue {
         flag: "cquery".to_owned(),
         message: message.to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn distdirs_parse_in_order_and_stay_out_of_configuration() {
+        let baseline = CqueryRequest::parse(&["//pkg:probe"]).unwrap();
+        let request = CqueryRequest::parse(&[
+            "//pkg:probe",
+            "--distdir=relative",
+            "--distdir=/absolute",
+            "--distdir=relative",
+        ])
+        .unwrap();
+        assert_eq!(request.distdirs, ["relative", "/absolute", "relative"]);
+        assert!(baseline.distdirs.is_empty());
+        assert_eq!(
+            request.configuration_overlay,
+            baseline.configuration_overlay
+        );
+        assert_eq!(request.bzlmod_policy, baseline.bzlmod_policy);
+        let flags = split_args(&["--distdir=relative"]);
+        assert_eq!(
+            flags.flags[0].disposition,
+            crate::common::FlagDisposition::ParseOnly
+        );
+        for flag in ["--distdir", "--distdir="] {
+            assert!(
+                CqueryRequest::parse(&["//pkg:probe", flag])
+                    .unwrap_err()
+                    .to_string()
+                    .contains("non-empty directory")
+            );
+        }
+        assert!(CqueryRequest::parse(&["//pkg:probe", "--distdir", "relative"]).is_err());
     }
 }

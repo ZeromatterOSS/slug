@@ -1,0 +1,353 @@
+{
+  "packet": "WP-7-407-m7a-request-scoped-distdir-archives",
+  "status": "ACCEPTED_REQUEST_LOCAL_DISTDIR_SUBSET_PREREQUISITE_DISCOVERY_ONLY",
+  "base_revision": "05d8ef538",
+  "closed_utc": "2026-10-12T21:31:35.300472+00:00",
+  "compatibility": "Slug-native Linux SHA256 HTTPS original-basename archive acquisition; broader downloader/aliases/checksum types and Windows deferred. Original semantic URL/SRI/RepoSpec identities remain.",
+  "change": "Ordered readonly cquery distdirs normalize per requesting workspace; immutable optional Arc-backed policy belongs to NativeDemandCommand and reaches BCR and generated archive capture; held-inode64KiB streaming typed miss/fatal dispatch with fresh temporary capture and existing accounting/extraction/publication. No global policy/cache/payload or new DICE key.",
+  "source_transition": {
+    "app/slug_commands_v2/src/common.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "a8d79dceaeb7270f185d5104b873f83eb09bd937dae8ad6f1686fd2a62ff466d"
+      },
+      "after": {
+        "sha256": "3eca97c6e12abcddc2b4cb551093d0d9c1c972e56831da3df209e7306fc0f56d",
+        "bytes": 39821
+      }
+    },
+    "app/slug_commands_v2/src/cquery.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "28428f2bfe55a61aed68038df1a9ec5a30814d035c45ed079e5c4d61a4a487bc"
+      },
+      "after": {
+        "sha256": "b60e39f1937551b8f8f3d0e972852d69d6976091ded27e27bf82bf562e8a4e82",
+        "bytes": 10946
+      }
+    },
+    "app/slug_cli_v2/src/commands/cquery.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "64746315cd997e2965ab4df78d5d2b03d439be1f3a0aa2b01675a6120757084a"
+      },
+      "after": {
+        "sha256": "6b0f4aeecd6872660dec56bc963246e6b9470aeb3adcb1fe32cf5e56f39e71d7",
+        "bytes": 7312
+      }
+    },
+    "app/slug_core_v2/src/runtime/mod.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "fcae232ce872dbf22b3d82d9fc168821e84add2c947e7d0f227a16a7ad8cee75"
+      },
+      "after": {
+        "sha256": "75499c81be8e5ace510c35552ccfdc58f126b780d7e28d2ed2848a3f3488211e",
+        "bytes": 21201
+      }
+    },
+    "app/slug_core_v2/src/runtime/dice.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "c0699078cdb4dac10bc9f12ee796608f96836641c65be31143851c2034e05559"
+      },
+      "after": {
+        "sha256": "f2f37cb127b0595046566702e430fa529af80252cbbb20b747ec7a931fc9f5ff",
+        "bytes": 551550
+      }
+    },
+    "app/slug_core_v2/src/runtime/repository_io.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "5ffd3ded81841588752e494e95454663c4d1bb7a247df7297007421228573893"
+      },
+      "after": {
+        "sha256": "cb94a39a4e32ba3424b7e50be39a4f3c59efc8bd7129f61667cf3852cc196552",
+        "bytes": 226018
+      }
+    },
+    "app/slug_core_v2/src/runtime/repository_archive.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "57281c4aa61db136e4c010ee643999c9f25b34e72336623a6a6aec30b13ab561"
+      },
+      "after": {
+        "sha256": "daae9a6791a2925fe24dd415409df2d4b0dd4beee1c6de2d86283f706eb1990e",
+        "bytes": 32138
+      }
+    },
+    "app/slug_core_v2/src/runtime/repository_archive_http.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "ee05e302e92c8e8fda6b86f43c235f25107fcba8398d15fcff402262a995cc95"
+      },
+      "after": {
+        "sha256": "abe411856150e5e6b469f4f3f103afb449c14e6f90b9ac46bf29a84fefa12977",
+        "bytes": 33861
+      }
+    },
+    "app/slug_core_v2/src/runtime/repository_archive_http/scoped.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "c349008bb6af9a5c04fea351a032746bfaf37f36628aa0f0dae5fab20c7e6bec"
+      },
+      "after": {
+        "sha256": "c7bfef0323235beb449924ec9038781bd4a4ba4c8e6117e3d0c715aa7b3c6405",
+        "bytes": 14279
+      }
+    },
+    "app/slug_core_v2/src/runtime/repository_archive_file.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "9019aa0e1238750bf81058f112f62cc55ffaf5067a4e51579e6faa918b306d50"
+      },
+      "after": {
+        "sha256": "f796045d5ee97a43694d3df5d501588d67884d47a64ca2d1ee33502c71d691e6",
+        "bytes": 8453
+      }
+    },
+    "app/slug_core_v2/src/runtime/archive_distdir.rs": {
+      "before": {
+        "exists": false,
+        "sha256": null
+      },
+      "after": {
+        "sha256": "1bd0f848f6b9bb8e00fa05be66a394472601afcf29abbcb28972280a9a0a73c2",
+        "bytes": 15535
+      }
+    },
+    "app/slug_server_v2/src/lib.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "a553e03a0b811f473539185f0844c5b8907b53a2131bdd6818bd8dbae5ca17a8"
+      },
+      "after": {
+        "sha256": "481f5dea70a9c7a5dff94cb3c7a1a428416fe20eb06ef0ddb6f9327e65589bbc",
+        "bytes": 36485
+      }
+    },
+    "app/slug_server_v2/src/server.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "b0720fa74565d57f4233cb6d0c91220e6ba77a36d30642c3c2721e158ce00218"
+      },
+      "after": {
+        "sha256": "d4b2d550c22b3bf54b65fd9c69852ec07610dd59dac23eb337cacf7864ec2ae2",
+        "bytes": 32586
+      }
+    },
+    "app/slug_server_v2/src/tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "7e3ad98382f8fc3bdd7fe826bdcc554b08f0207dbe3ee1d89aa2ce862fd28cb8"
+      },
+      "after": {
+        "sha256": "e089e30602133e4c4a8987ea99fcc27b359256b845766632ccd4644958a77823",
+        "bytes": 139390
+      }
+    },
+    "app/slug_core_v2/src/runtime/tests/repository_archive_file_tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "2e2e84ad05b97e06c8ea23e4f60f3d53c65f764f267a72eb78ad7867113e286d"
+      },
+      "after": {
+        "sha256": "9fc1a899d31027459c4db8b695cc5f6a0d55a9764144d42c4569b8bc420e0661",
+        "bytes": 11515
+      }
+    },
+    "app/slug_core_v2/src/runtime/tests/archive_distdir_request_tests.rs": {
+      "before": {
+        "exists": false,
+        "sha256": null
+      },
+      "after": {
+        "sha256": "b9738b3884fab7037c18775591060a7bd85f5fd773d46b614aa0da19f8998241",
+        "bytes": 10446
+      }
+    },
+    "app/slug_core_v2/src/runtime/tests/build_info_template_inputs_tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "50f5e62e62ff812d0a3e25244dfa708188a9aa4d2d2e11a989a5b2513e5a97c6"
+      },
+      "after": {
+        "sha256": "50f5e62e62ff812d0a3e25244dfa708188a9aa4d2d2e11a989a5b2513e5a97c6",
+        "bytes": 24169
+      }
+    },
+    "app/slug_core_v2/src/runtime/tests/source_input_tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "914fe196334d0d4486c98391a29a6049073dada2c3fee162113b091aa468d072"
+      },
+      "after": {
+        "sha256": "914fe196334d0d4486c98391a29a6049073dada2c3fee162113b091aa468d072",
+        "bytes": 13065
+      }
+    },
+    "app/slug_core_v2/src/runtime/tests/generated_owner_shared_tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "25c840972d524bbfe7e7fb0b2fb2f2e2e9ef8248b76f1445241e6bba11ff703b"
+      },
+      "after": {
+        "sha256": "ac3dbb57fefd3b25023016794f701f4df75d9df0c7c7641300d984a436485dd0",
+        "bytes": 17560
+      }
+    },
+    "app/slug_core_v2/src/runtime/source_preparation.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "a5529e8435968f4de2ffbf1da08afefd8ee6eac660c8a0738cd4c0fd7efbb9f7"
+      },
+      "after": {
+        "sha256": "a5529e8435968f4de2ffbf1da08afefd8ee6eac660c8a0738cd4c0fd7efbb9f7",
+        "bytes": 8643
+      }
+    },
+    "app/slug_core_v2/src/runtime/source_preparation/genuine_root.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "7e9c798e055e509863ad4164e69048527655991374a8b243af9ead15e9c6e20d"
+      },
+      "after": {
+        "sha256": "e12a691f6e84a222178fd552cb7b86233afd02eb8b8c99b48bb2c5eeb27c0c47",
+        "bytes": 76841
+      }
+    },
+    "app/slug_core_v2/src/runtime/source_staging/tests.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "196c34ea0e7335fe3196dae44b111cc24fe3a01b536763032e39e4f39e1a84c0"
+      },
+      "after": {
+        "sha256": "196c34ea0e7335fe3196dae44b111cc24fe3a01b536763032e39e4f39e1a84c0",
+        "bytes": 15400
+      }
+    },
+    "app/slug_core_v2/src/runtime/source_service/diagnostic.rs": {
+      "before": {
+        "exists": true,
+        "sha256": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2"
+      },
+      "after": {
+        "sha256": "c33d97cbd9308ea406fdc65a91b1f10dd2db43a5cebc04d59244287f98cf99d2",
+        "bytes": 12274
+      }
+    }
+  },
+  "isolated_delta": {
+    "path": "target/wp1207/packet-source.patch",
+    "sha256": "72feb89fac4e5733aafe056f04ec0e462b72fca66d8ff46817e4a71ac67168eb",
+    "reconciliation_path": "target/wp1207/source-delta-reconciliation.json",
+    "reconciliation_sha256": "9572c883ba55a4f28ae9ebbb30f4d4d6e97077f3d922cb05a6b08c8e058c5187",
+    "dice_only_packet_hunks": 11,
+    "older_observer_hunks_preserved_unaccepted": 5,
+    "other_before_sources_equal_base": true
+  },
+  "design_review": {
+    "path": "target/slug-diagnostics/wp1207-distdir-design-review.json",
+    "sha256": "46a6d13410c614e15060e1a30ed73bb4aacfc8cb0fc145676d25013d8b003273"
+  },
+  "final_review": {
+    "path": "target/slug-diagnostics/wp1207-distdir-final-review.json",
+    "sha256": "25b1eac85c33a86946312bffc0200a87852b01db491980125273e954c025f7a2",
+    "review_md_sha256": "91a0359aceb34fb2e4e844f852670cc4c6645d4de6f765d4f1ddc61a8fba0428",
+    "physical_pins_verified": 194,
+    "elapsed_seconds": 1117.464094,
+    "scope": "ACCEPT_request_scoped_distdir_subset_and_prerequisite_discovery_only"
+  },
+  "root_evidence": {
+    "path": "target/wp1207/root-final-evidence.json",
+    "sha256": "80e6e20944d43ae759d1bed520e8ac62bbe7d450f04746d824dc963eb157bee3",
+    "focused_selected": 19,
+    "focused_passed": 19,
+    "test_seconds": {
+      "core": 6.453023761045188,
+      "commands": 0.0017919267993420362,
+      "server": 0.02943976502865553
+    },
+    "compiles": {
+      "cli": {
+        "path": "target/wp1207/compile-cli.json",
+        "sha256": "82da6ffe7814d097190e9db31a744c5c52b967b2e39d1d497f2b47565c340510",
+        "seconds": 3.3561639031395316
+      },
+      "core": {
+        "path": "target/wp1207/compile-core.json",
+        "sha256": "e47e67ade1fad942143ee5ec0c45f83ed358100162cf1127c2853029cad4f6dd",
+        "seconds": 15.607347407843918
+      },
+      "commands": {
+        "path": "target/wp1207/compile-commands.json",
+        "sha256": "8520598ad830dd95e6692567c67dd45e00e1087bf2027c107741c8dfd89dea95",
+        "seconds": 2.0023371970746666
+      },
+      "server": {
+        "path": "target/wp1207/compile-server.json",
+        "sha256": "8af38aa63247bf087e58b6823c83ec94314987061f2b21a3138fe7cf6f53ed26",
+        "seconds": 274.9947915521916
+      }
+    }
+  },
+  "prepared_inputs": {
+    "path": "target/wp1207/prepared-inputs.json",
+    "sha256": "d3b7979c8d2272930a5772dd0f563fe1def4e4fc959770ddb8a792cf4fe18054",
+    "registry_files": 194,
+    "staged_archives": 21,
+    "staged_bytes": 43994248,
+    "current_source_binding": "05ac936cae0f5e9dff8477eb371bc2b38f2101ae90871ee6ebe202b7040dfd4b"
+  },
+  "configured_measurement": {
+    "path": "target/wp1207/configured-command-memory-result.json",
+    "sha256": "b4ff7810bc8e8869076d32377b70079a3b6fcee5186b14fee5bb810ade312858",
+    "verdict": "UNPROVED_COMMAND_PREREQUISITE",
+    "ratio": null,
+    "maximum_ratio": 1.25,
+    "metrics": {
+      "bazel": {
+        "peak_rss_kib": 658236,
+        "elapsed_seconds": 75.43525607394986,
+        "exit_code": 1,
+        "stdout_lines": 0,
+        "observed_command_names": [
+          "cc1plus",
+          "gcc",
+          "java",
+          "process-wrapper",
+          "time"
+        ]
+      },
+      "slug": {
+        "peak_rss_kib": 282244,
+        "elapsed_seconds": 23.472846851916984,
+        "exit_code": 2,
+        "stdout_lines": 0,
+        "observed_command_names": [
+          "slug",
+          "time"
+        ]
+      }
+    },
+    "owned_groups_empty": true,
+    "stdout_equivalent": false
+  },
+  "next_prerequisites": {
+    "archive_inventory": {
+      "path": "target/wp1207/next-rust-toolchain-sources.json",
+      "sha256": "95b0745ce2c7587b036908ad7a65799ba22674198240fed8519a6bd0091548f5",
+      "verified_authentic_archive_count": 6,
+      "verified_bytes": 171520576
+    },
+    "compiler_chain": {
+      "path": "target/wp1207/next-repository-tool-chain.json",
+      "sha256": "b6bb99f80b77a59c0908a9335bc89bfa305a5be56e28d7ddd4387920f9c3bff9",
+      "host_metadata_path": "target/wp1207/host-compiler-chain-metadata.json",
+      "host_metadata_sha256": "dc172330ddeb8863aa692c8261a0c00058599d7d24edd1df79aea769c6a5bb26",
+      "cause": "Sandbox UID mapping leaves root compiler/ancestors unmapped; normal host exact chain UID0 mode0755. No product-policy change."
+    }
+  },
+  "resource_and_growth_examination": "Server first uncached direct-dependent feature-variant compile274.995s is necessary once; warm compiles reused. Review1117.464s includes root compile/correction/runtime waits and is not workload latency. Runtime pair75.435/23.473s; focused Core6.453s. Growth1386added/42removed exceeded estimate and was explicitly reassessed: small lookup/test leaves, coherent existing-layer plumbing, repeated signatures/fixture construction remain maintenance risks. Initial failures preserved; final19 passes include corrected prefix oracle and approved localIPC test exception.",
+  "acceptance_limits": "No configured command memory pass/rejection; incomplete outputs never ratio-pass. Full Rust/actions/M7 and earlier coupled memory/observer candidates remain unaccepted. Historical256MiB diagnostic cap not Bazel-derived. Next packet prepares six authentic toolchain archives/SHA declarations and matching normal host paired run."
+}

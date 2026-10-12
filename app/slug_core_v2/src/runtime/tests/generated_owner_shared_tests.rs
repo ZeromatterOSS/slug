@@ -228,6 +228,7 @@ fn reciprocal_owner_cycle_spans_two_independently_bound_request_proxies() {
     let prior_events = accepted_native_snapshot(&fixture.runtime).events;
 
     let request = NativeDemandRequestInputBundle {
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
         command_policy: fixture.policy.clone(),
         environment_policy: BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
             .unwrap(),

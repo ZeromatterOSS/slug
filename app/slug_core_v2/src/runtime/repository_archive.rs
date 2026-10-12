@@ -150,8 +150,29 @@ pub(super) fn materialize_selected_bcr_capture(
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<Materialized, ArchiveMaterializationError> {
-    let archive =
-        super::repository_archive_http::capture_selected_bcr(plan, runtime, active, scope)?;
+    materialize_selected_bcr_capture_with_distdirs(
+        plan,
+        runtime,
+        active,
+        scope,
+        &super::ArchiveDistdirPolicy::default(),
+    )
+}
+
+pub(super) fn materialize_selected_bcr_capture_with_distdirs(
+    plan: &SelectedBcrArchive,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
+) -> Result<Materialized, ArchiveMaterializationError> {
+    let archive = super::repository_archive_http::capture_selected_bcr_with_distdirs(
+        plan,
+        runtime,
+        active,
+        scope,
+        archive_distdirs,
+    )?;
     let overlays = plan
         .overlays
         .iter()
@@ -546,7 +567,7 @@ fn materialize_archive_with(
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(dead_code)] // Both flavors are exercised by host-pure tests.
+#[allow(dead_code)]// Both flavors are exercised by host-pure tests.
 enum PathFlavor {
     Unix,
     Windows,

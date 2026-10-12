@@ -751,6 +751,7 @@ struct NativeDemandGenerationBundle {
 #[allow(dead_code)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct NativeDemandRequestInputBundle {
+    archive_distdirs: crate::runtime::ArchiveDistdirPolicy,
     runtime_sources: Option<slug_bzlmod_v2::RuntimeSourceDeclarationPolicy>,
     guest_namespace: Option<slug_bzlmod_v2::GuestNamespacePolicy>,
     command_policy: BzlmodCommandPolicyKey,
@@ -771,6 +772,7 @@ struct NativeDemandInputBundle {
 impl NativeDemandRequestInputBundle {
     fn normalized_initial() -> Self {
         Self {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false)
@@ -6835,6 +6837,7 @@ impl WorkspaceRuntime {
         )
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy,
@@ -6959,6 +6962,36 @@ impl WorkspaceRuntime {
         AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
         CqueryCommandError,
     > {
+        self.cquery_command_with_repository_environment_and_distdirs(
+            expression,
+            include_implicit,
+            include_tool,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            crate::runtime::ArchiveDistdirPolicy::default(),
+        )
+    }
+
+    pub fn cquery_command_with_repository_environment_and_distdirs(
+        &self,
+        expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy,
+    ) -> Result<
+        AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+        CqueryCommandError,
+    > {
         let expression = QueryExpression::parse(expression)
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
         validate_cquery_query(&expression)
@@ -7024,6 +7057,7 @@ impl WorkspaceRuntime {
             include_tool,
         };
         let request = NativeDemandRequestInputBundle {
+            archive_distdirs,
             runtime_sources: None,
             guest_namespace: None,
             command_policy,
@@ -7106,6 +7140,7 @@ impl WorkspaceRuntime {
             completion,
         )?;
         let request = NativeDemandRequestInputBundle {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy,
@@ -7843,12 +7878,13 @@ impl NativeDemandCommand<'_> {
                 self.repository_results = self
                     .runtime
                     .repository_materializer
-                    .materialize_native_with_runtime(
+                    .materialize_native_with_runtime_and_distdirs(
                         self.repository_session,
                         request.clone(),
                         self.inputs.generations.repository,
                         &self.runtime.runtime,
                         self.runtime.source_scope(),
+                        &self.inputs.request.archive_distdirs,
                     )
                     .map_err(NativeDemandSessionError::Repository)?;
                 self.check_source_scope()?;
@@ -9193,6 +9229,11 @@ mod tests {
 
     mod registration_error_tests {
         include!("tests/registration_error_tests.rs");
+    }
+
+    #[cfg(target_os = "linux")]
+    mod archive_distdir_request_tests {
+        include!("tests/archive_distdir_request_tests.rs");
     }
 
     mod rust_toolchain_callback_tests {
@@ -11544,6 +11585,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let path = native_host_file_demand(root.join("probe.txt"));
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),
@@ -11579,6 +11621,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .clone();
 
         let rejected_inputs = NativeDemandRequestInputBundle {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
@@ -11714,6 +11757,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let path = native_host_file_demand(root.join("probe.txt"));
         let runtime = test_runtime(&root).unwrap();
         let accepted_inputs = NativeDemandRequestInputBundle {
+            archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
             runtime_sources: None,
             guest_namespace: None,
             command_policy: BzlmodCommandPolicyKey::from_flags(Some("all"), true).unwrap(),

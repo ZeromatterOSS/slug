@@ -138,6 +138,7 @@ fn repository_environment_wire_is_canonical_redacted_and_never_falls_back() {
                 include_implicit: true,
                 include_tool: true,
                 output: CqueryOutput::Label,
+                distdirs: Vec::new(),
                 configuration_overlay: Default::default(),
                 bzlmod: Default::default(),
                 repository_environment: RepositoryEnvironmentRequestInputs { entries },
@@ -529,6 +530,7 @@ fn retained_daemon_native_fdo_overlay_restores_a_b_a_without_source_invalidation
             include_implicit: false,
             include_tool: true,
             output: CqueryOutput::Label,
+            distdirs: Vec::new(),
             configuration_overlay,
             bzlmod: BzlmodRequestInputs::default(),
             repository_environment: RepositoryEnvironmentRequestInputs::default(),
@@ -712,6 +714,7 @@ subject = rule(implementation = _rule, subrules = [probe])
             include_implicit: true,
             include_tool: true,
             output: CqueryOutput::Label,
+            distdirs: Vec::new(),
             configuration_overlay,
             bzlmod: BzlmodRequestInputs::default(),
             repository_environment: RepositoryEnvironmentRequestInputs::default(),
@@ -1417,6 +1420,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
             include_implicit: false,
             include_tool: false,
             output,
+            distdirs: Vec::new(),
             configuration_overlay: root_setting_overlay(Some("Gr\u{00fc}\u{00df}e")),
             bzlmod: BzlmodRequestInputs::default(),
             repository_environment: Default::default(),
@@ -3436,3 +3440,101 @@ mod requested_build_tests;
 
 #[path = "metric_semantics_tests.rs"]
 mod metric_semantics_tests;
+
+#[cfg(target_os = "linux")]
+#[test]
+fn cquery_distdirs_round_trip_defaults_and_normalize_per_request() {
+    let first = scratch("cquery-distdir-first");
+    let second = scratch("cquery-distdir-second");
+    for workspace in [&first, &second] {
+        write(&workspace.join("MODULE.bazel"), "module(name = 'demo')\n");
+        write(
+            &workspace.join("BUILD.bazel"),
+            "filegroup(name = 'probe')\n",
+        );
+    }
+    let wire = |distdirs: Vec<String>| {
+        serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
+            expression: "//:probe".to_owned(),
+            include_implicit: true,
+            include_tool: true,
+            output: CqueryOutput::Label,
+            configuration_overlay: Default::default(),
+            bzlmod: Default::default(),
+            repository_environment: Default::default(),
+            distdirs,
+        }))
+        .unwrap()
+    };
+    let ordered = vec![
+        "archives".to_owned(),
+        "/absolute".to_owned(),
+        "archives".to_owned(),
+    ];
+    let json = wire(ordered.clone());
+    let DaemonRequest::Cquery(decoded) = serde_json::from_str(&json).unwrap() else {
+        panic!("cquery")
+    };
+    assert_eq!(decoded.distdirs, ordered);
+    assert_eq!(
+        decoded.configuration_overlay,
+        CommandConfigurationOverlay::default()
+    );
+    let mut old: serde_json::Value = serde_json::from_str(&json).unwrap();
+    old["request"].as_object_mut().unwrap().remove("distdirs");
+    let old_json = old.to_string();
+    let DaemonRequest::Cquery(defaulted) = serde_json::from_str(&old_json).unwrap() else {
+        panic!("cquery")
+    };
+    assert!(defaulted.distdirs.is_empty());
+
+    let mut daemon = Daemon::new(&first).unwrap();
+    for (request, expected) in [
+        (
+            json,
+            vec![
+                first.join("archives"),
+                PathBuf::from("/absolute"),
+                first.join("archives"),
+            ],
+        ),
+        (old_json, Vec::new()),
+        (wire(vec!["other".to_owned()]), vec![first.join("other")]),
+    ] {
+        let _response = handle_request(&mut daemon, &request);
+        let policies = daemon.take_forwarded_archive_distdirs_for_test();
+        assert_eq!(policies.len(), 1);
+        assert_eq!(
+            policies[0]
+                .paths()
+                .iter()
+                .map(|p| p.as_path().to_path_buf())
+                .collect::<Vec<_>>(),
+            expected
+        );
+    }
+    let mut other_daemon = Daemon::new(&second).unwrap();
+    let _response = handle_request(&mut other_daemon, &wire(vec!["archives".to_owned()]));
+    let policies = other_daemon.take_forwarded_archive_distdirs_for_test();
+    assert_eq!(policies.len(), 1);
+    assert_eq!(policies[0].paths()[0].as_path(), second.join("archives"));
+
+    for raw in ["", "bad\0path"] {
+        let response = handle_request(&mut daemon, &wire(vec![raw.to_owned()]));
+        assert_ne!(response.exit_code, 0);
+        assert!(response.stdout.is_empty());
+        assert_eq!(response.invalidated_files, 0);
+        assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
+    }
+    let malformed = r#"{"kind":"cquery","request":{"expression":"//:probe","output":"label","distdirs":"archives"}}"#;
+    let response = handle_request(&mut daemon, malformed);
+    assert_eq!(response.exit_code, 2);
+    assert!(response.stderr.contains("daemon_parse_error"));
+    assert!(daemon.take_forwarded_archive_distdirs_for_test().is_empty());
+    let _response = handle_request(&mut daemon, &wire(Vec::new()));
+    assert!(
+        daemon.take_forwarded_archive_distdirs_for_test()[0]
+            .paths()
+            .is_empty()
+    );
+}

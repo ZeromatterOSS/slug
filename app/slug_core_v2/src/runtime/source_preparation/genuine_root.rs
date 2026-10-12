@@ -1065,6 +1065,7 @@ fn request_inputs(
     )
     .map_err(|_| "workspace policy resource refusal")?;
     let inputs = NativeDemandRequestInputBundle {
+        archive_distdirs: crate::runtime::ArchiveDistdirPolicy::default(),
         runtime_sources: Some(
             RuntimeSourceDeclarationPolicy::new(
                 &pin,

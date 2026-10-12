@@ -395,6 +395,14 @@ slug-v2-oracle run --fixture bep-minimal-build-test --compare bep
 
 ## Retained command contracts
 
+- Cquery admits ordered readonly `--distdir` acquisition for the Linux SHA256
+  HTTPS archive subset. An immutable Arc-backed policy belongs to the command
+  inputs and reaches both BCR and generated archives; original URL/SRI/RepoSpec
+  identity and success-only semantic reuse remain with existing owners. Relative
+  paths use the requesting workspace, including daemon requests. Fresh temporary
+  captures stream through the held-inode file leaf; typed misses fall through,
+  while cancellation and resource/capture failures stop. Broader downloader
+  aliases, checksum types, and Windows remain deferred.
 - Query and cquery consume the ordinary loading/configured DICE graph and retain
   their accepted format, ordering, request, failure and invalidation boundaries.
   Canonical Live Status records the current accepted slices.

@@ -18,6 +18,8 @@ pub use action_prerequisites::ActionPrerequisitePlan;
 pub use action_prerequisites::PlannedAction;
 pub use action_prerequisites::PlannedActionInput;
 pub use action_prerequisites::RequestedActionPrerequisitePlan;
+mod archive_distdir;
+pub use archive_distdir::ArchiveDistdirPolicy;
 mod aquery_text;
 mod build_info_aquery_text;
 mod configured_action_closure;
@@ -276,9 +278,8 @@ pub fn evaluate_workspace_cquery_command_with_repository_environment(
     AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
     CqueryCommandError,
 > {
-    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
-        .map_err(CqueryCommandError::infrastructure)?;
-    runtime.cquery_command_with_repository_environment(
+    evaluate_workspace_cquery_command_with_repository_environment_and_distdirs(
+        workspace,
         expression,
         include_implicit,
         include_tool,
@@ -288,6 +289,39 @@ pub fn evaluate_workspace_cquery_command_with_repository_environment(
         registry_urls,
         repository_environment,
         configuration_overlay,
+        ArchiveDistdirPolicy::default(),
+    )
+}
+
+pub fn evaluate_workspace_cquery_command_with_repository_environment_and_distdirs(
+    workspace: &std::path::Path,
+    expression: &str,
+    include_implicit: bool,
+    include_tool: bool,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+    repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+    configuration_overlay: slug_configuration_v2::CommandConfigurationOverlay,
+    archive_distdirs: ArchiveDistdirPolicy,
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+    CqueryCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
+        .map_err(CqueryCommandError::infrastructure)?;
+    runtime.cquery_command_with_repository_environment_and_distdirs(
+        expression,
+        include_implicit,
+        include_tool,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+        repository_environment,
+        configuration_overlay,
+        archive_distdirs,
     )
 }
 

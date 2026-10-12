@@ -22,6 +22,7 @@ use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_configuration_v2::CommandConfigurationOverlay;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::ProcessHostOwner;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::WorkspaceRuntime;
@@ -46,6 +47,8 @@ pub struct Daemon {
     #[cfg(test)]
     forwarded_repository_environments: Vec<slug_bzlmod_v2::RepositoryEnvironmentSnapshot>,
     #[cfg(test)]
+    forwarded_archive_distdirs: Vec<ArchiveDistdirPolicy>,
+    #[cfg(test)]
     process_host_for_test: std::sync::Arc<ProcessHostOwner>,
 }
 
@@ -68,6 +71,8 @@ impl Daemon {
             forwarded_bzlmod_inputs: Vec::new(),
             #[cfg(test)]
             forwarded_repository_environments: Vec::new(),
+            #[cfg(test)]
+            forwarded_archive_distdirs: Vec::new(),
         })
     }
     pub fn workspace(&self) -> &Path {
@@ -603,6 +608,43 @@ impl Daemon {
         repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
         configuration_overlay: CommandConfigurationOverlay,
     ) -> QueryResult {
+        self.cquery_with_repository_environment_and_distdirs(
+            expression,
+            include_implicit,
+            include_tool,
+            output,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            repository_environment,
+            configuration_overlay,
+            &[],
+        )
+    }
+
+    pub fn cquery_with_repository_environment_and_distdirs(
+        &mut self,
+        expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
+        output: crate::server::CqueryOutput,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        repository_environment: slug_bzlmod_v2::RepositoryEnvironmentSnapshot,
+        configuration_overlay: CommandConfigurationOverlay,
+        raw_distdirs: &[String],
+    ) -> QueryResult {
+        let archive_distdirs =
+            match ArchiveDistdirPolicy::from_request(&self.workspace, raw_distdirs) {
+                Ok(policy) => policy,
+                Err(error) => return cquery_error_result(&error, 0),
+            };
+        #[cfg(test)]
+        self.forwarded_archive_distdirs
+            .push(archive_distdirs.clone());
         let invalidated = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => return cquery_error_result(&error.to_string(), 0),
@@ -619,17 +661,20 @@ impl Daemon {
         #[cfg(test)]
         self.forwarded_repository_environments
             .push(repository_environment.clone());
-        let accepted = match self.runtime.cquery_command_with_repository_environment(
-            expression,
-            include_implicit,
-            include_tool,
-            command_policy,
-            environment_policy,
-            lockfile_mode,
-            &registry_urls,
-            repository_environment,
-            configuration_overlay,
-        ) {
+        let accepted = match self
+            .runtime
+            .cquery_command_with_repository_environment_and_distdirs(
+                expression,
+                include_implicit,
+                include_tool,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                &registry_urls,
+                repository_environment,
+                configuration_overlay,
+                archive_distdirs,
+            ) {
             Ok(accepted) => accepted,
             Err(error) => return cquery_error_result_for_terminal(&error, invalidated),
         };
@@ -772,6 +817,11 @@ impl Daemon {
     #[cfg(test)]
     fn take_forwarded_bzlmod_inputs_for_test(&mut self) -> Vec<crate::server::BzlmodRequestInputs> {
         std::mem::take(&mut self.forwarded_bzlmod_inputs)
+    }
+
+    #[cfg(test)]
+    fn take_forwarded_archive_distdirs_for_test(&mut self) -> Vec<ArchiveDistdirPolicy> {
+        std::mem::take(&mut self.forwarded_archive_distdirs)
     }
 
     #[cfg(test)]

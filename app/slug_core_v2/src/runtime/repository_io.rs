@@ -116,7 +116,7 @@ fn observation_instance_exhausted() -> RepositoryTransportError {
     }
 }
 
-#[allow(dead_code)] // The bridge is dormant until the retry-driver packet.
+#[allow(dead_code)]// The bridge is dormant until the retry-driver packet.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct RepositorySessionToken(u64);
 
@@ -793,6 +793,25 @@ impl RepositoryMaterializer {
         runtime: &tokio::runtime::Runtime,
         scope: Option<&Arc<SourceServiceScope>>,
     ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        self.materialize_native_with_runtime_and_distdirs(
+            token,
+            request,
+            generation,
+            runtime,
+            scope,
+            &super::ArchiveDistdirPolicy::default(),
+        )
+    }
+
+    pub(super) fn materialize_native_with_runtime_and_distdirs(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        runtime: &tokio::runtime::Runtime,
+        scope: Option<&Arc<SourceServiceScope>>,
+        archive_distdirs: &super::ArchiveDistdirPolicy,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
         self.check_source_scope(scope)?;
         {
             let state = self
@@ -811,6 +830,7 @@ impl RepositoryMaterializer {
                 runtime,
                 &|| self.session_is_active(token) && source_service::check(scope).is_ok(),
                 scope,
+                archive_distdirs,
             )
         })
     }
@@ -1955,6 +1975,7 @@ fn materialize_generated_repository_archive_effects(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     source_service::check(scope).map_err(ArchiveMaterializationError::materialization)?;
     if (scope.is_none() && !plan.has_archives())
@@ -1990,12 +2011,13 @@ fn materialize_generated_repository_archive_effects(
                     .iter()
                     .map(ToString::to_string)
                     .collect::<Vec<_>>();
-                let capture = super::repository_archive_http::capture_selected_generated_archive(
+                let capture = super::repository_archive_http::capture_selected_generated_archive_with_distdirs(
                     &urls,
                     archive.sha256(),
                     runtime,
                     active,
                     scope,
+                    archive_distdirs,
                 )?;
                 super::repository_generated_archive::extract_selected_generated_archive(
                     capture.as_file(),
@@ -2121,12 +2143,13 @@ fn materialize_native_attempt_with_runtime(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
 ) -> RepositoryMaterializationAttempt {
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind
         && (plan.has_archives() || scope.is_some())
     {
         return materialized_attempt(materialize_generated_repository_archive_effects(
-            plan, runtime, active, scope,
+            plan, runtime, active, scope, archive_distdirs,
         ));
     }
     if request.repo_spec.rule_id.bzl_file.to_string()
@@ -2138,6 +2161,7 @@ fn materialize_native_attempt_with_runtime(
             runtime,
             active,
             scope,
+            archive_distdirs,
         ));
     }
     if let Some(scope) = scope {
@@ -2303,6 +2327,7 @@ fn materialize_archive_plan_with_capture(
     runtime: &tokio::runtime::Runtime,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     match super::repository_archive::parse_archive_plan(repo_spec) {
         Ok(super::repository_archive::ArchivePlan::LocalTar) => {
@@ -2316,8 +2341,8 @@ fn materialize_archive_plan_with_capture(
             super::repository_archive::materialize_local_tar(repo_spec)
         }
         Ok(super::repository_archive::ArchivePlan::SelectedBcrTarGz(plan)) => {
-            super::repository_archive::materialize_selected_bcr_capture(
-                &plan, runtime, active, scope,
+            super::repository_archive::materialize_selected_bcr_capture_with_distdirs(
+                &plan, runtime, active, scope, archive_distdirs,
             )
         }
         Err(error) => Err(ArchiveMaterializationError::spec(error)),
@@ -2717,9 +2742,14 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let materialized =
-            materialize_generated_repository_archive_effects(&plan, &runtime, &|| true, None)
-                .unwrap();
+        let materialized = materialize_generated_repository_archive_effects(
+            &plan,
+            &runtime,
+            &|| true,
+            None,
+            &crate::runtime::ArchiveDistdirPolicy::default(),
+        )
+        .unwrap();
         let Materialized::AssociatedImmutable {
             source_identity,
             root,
@@ -2782,10 +2812,115 @@ mod tests {
             &runtime,
             &|| true,
             None,
+            &crate::runtime::ArchiveDistdirPolicy::default(),
         )
         .err()
         .expect("mismatched SHA must fail before publication");
         assert_eq!(error.stage, ArchiveFailureStage::Transport);
+    }
+
+    #[test]
+    #[cfg(target_os = "linux")]
+    fn generated_archive_distdir_preserves_original_plan_and_extracts_without_network() {
+        use std::fs;
+        use std::time::Duration;
+        use std::time::Instant;
+
+        use crate::runtime::ArchiveDistdirPolicy;
+        use crate::runtime::dice::source_service::SourceServiceLimits;
+
+        let fixture = tempfile::tempdir().unwrap();
+        let archive = selected_archive_bytes("component", &[("payload.txt", b"archive\n", 0o644)]);
+        for name in ["wrong", "verified", "alternate"] {
+            fs::create_dir(fixture.path().join(name)).unwrap();
+        }
+        fs::write(
+            fixture.path().join("wrong/probe.tar.xz"),
+            b"wrong SHA bytes",
+        )
+        .unwrap();
+        for name in ["verified", "alternate"] {
+            fs::write(fixture.path().join(name).join("probe.tar.xz"), &archive).unwrap();
+        }
+        let original = "https://archive.invalid/probe.tar.xz";
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push_archive(
+                Arc::from([CompactString::new(original)]),
+                Sha256::digest(&archive).into(),
+                "component".into(),
+            )
+            .unwrap();
+        builder
+            .push(
+                "after.txt".into(),
+                Arc::from(&b"ordered file effect\n"[..]),
+                false,
+            )
+            .unwrap();
+        let plan = builder.finish();
+        let original_plan = plan.clone();
+        let expected_identity = generated_repository_file_effect_source_association(&plan);
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let scope = SourceServiceScope::new_for_test(
+            NormalizedAbsolutePath::new(fixture.path()).unwrap(),
+            deadline,
+            deadline + Duration::from_secs(2),
+            SourceServiceLimits {
+                allow_network: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut roots = Vec::new();
+        for raw in [
+            vec!["wrong".to_owned(), "verified".to_owned()],
+            vec!["alternate".to_owned()],
+        ] {
+            let policy = ArchiveDistdirPolicy::from_request(fixture.path(), &raw).unwrap();
+            let materialized = materialize_generated_repository_archive_effects(
+                &plan,
+                &runtime,
+                &|| true,
+                Some(&scope),
+                &policy,
+            )
+            .unwrap();
+            let Materialized::AssociatedImmutable {
+                source_identity,
+                root,
+            } = materialized
+            else {
+                panic!("expected genuine generated archive repository")
+            };
+            assert_eq!(source_identity, expected_identity);
+            assert_eq!(
+                fs::read(root.path().join("payload.txt")).unwrap(),
+                b"archive\n"
+            );
+            assert_eq!(
+                fs::read(root.path().join("after.txt")).unwrap(),
+                b"ordered file effect\n"
+            );
+            assert!(scope.check().is_ok());
+            roots.push(root);
+        }
+        assert_ne!(roots[0].path(), roots[1].path());
+        assert_eq!(plan, original_plan);
+        assert_eq!(
+            fs::read(fixture.path().join("verified/probe.tar.xz")).unwrap(),
+            archive
+        );
+        let extracted = roots
+            .iter()
+            .map(|root| root.path().to_path_buf())
+            .collect::<Vec<_>>();
+        drop(roots);
+        assert!(extracted.iter().all(|path| !path.exists()));
     }
 
     #[derive(Clone, Copy)]

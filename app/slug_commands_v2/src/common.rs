@@ -654,6 +654,7 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "lockfile_mode"
         | "override_module"
         | "registry"
+        | "distdir"
         | "repo_env" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible

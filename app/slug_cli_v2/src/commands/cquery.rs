@@ -12,9 +12,10 @@ use slug_commands_v2::cquery::CqueryOutputMode;
 use slug_commands_v2::cquery::CqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
+use slug_core_v2::runtime::ArchiveDistdirPolicy;
 use slug_core_v2::runtime::CqueryCommandError;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_repository_environment;
+use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_repository_environment_and_distdirs;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let workspace = match std::env::current_dir() {
@@ -54,8 +55,12 @@ pub fn run(argv: Vec<String>) -> i32 {
             );
         return run_daemon(&output_base, request, bzlmod, repository_environment);
     }
+    let archive_distdirs = match ArchiveDistdirPolicy::from_request(&workspace, &request.distdirs) {
+        Ok(policy) => policy,
+        Err(error) => return emit_error(&error, "one-shot"),
+    };
     let output_mode = request.output_mode;
-    let accepted = match evaluate_workspace_cquery_command_with_repository_environment(
+    let accepted = match evaluate_workspace_cquery_command_with_repository_environment_and_distdirs(
         &workspace,
         &request.expression,
         request.include_implicit,
@@ -66,6 +71,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         &request.registry_urls,
         repository_environment,
         request.configuration_overlay.clone(),
+        archive_distdirs,
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -132,6 +138,7 @@ fn run_daemon(
                 CqueryOutputMode::Graph => slug_server_v2::CqueryOutput::Graph,
             },
             configuration_overlay: request.configuration_overlay,
+            distdirs: request.distdirs,
             bzlmod,
             repository_environment,
         },

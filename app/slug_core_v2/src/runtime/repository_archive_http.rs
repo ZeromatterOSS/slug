@@ -293,6 +293,38 @@ pub(super) fn capture_selected_bcr(
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    capture_selected_bcr_with_distdirs(
+        plan,
+        runtime,
+        active,
+        scope,
+        &super::ArchiveDistdirPolicy::default(),
+    )
+}
+
+pub(super) fn capture_selected_bcr_with_distdirs(
+    plan: &SelectedBcrArchive,
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    for original in &plan.urls {
+        if let Some(capture) = archive_distdirs
+            .try_capture(
+                original,
+                plan.integrity,
+                CAPTURE_LIMIT,
+                "archive",
+                active,
+                scope,
+            )
+            .map_err(ArchiveMaterializationError::transport)?
+        {
+            return Ok(capture);
+        }
+    }
+
     if let Some(scope) = scope {
         return scoped::capture_urls(
             &plan.urls,
@@ -317,6 +349,40 @@ pub(super) fn capture_selected_generated_archive(
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    capture_selected_generated_archive_with_distdirs(
+        urls,
+        sha256,
+        runtime,
+        active,
+        scope,
+        &super::ArchiveDistdirPolicy::default(),
+    )
+}
+
+pub(super) fn capture_selected_generated_archive_with_distdirs(
+    urls: &[String],
+    sha256: [u8; 32],
+    runtime: &tokio::runtime::Runtime,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+    archive_distdirs: &super::ArchiveDistdirPolicy,
+) -> Result<tempfile::NamedTempFile, ArchiveMaterializationError> {
+    for original in urls {
+        if let Some(capture) = archive_distdirs
+            .try_capture(
+                original,
+                sha256,
+                CAPTURE_LIMIT,
+                "generated archive",
+                active,
+                scope,
+            )
+            .map_err(ArchiveMaterializationError::transport)?
+        {
+            return Ok(capture);
+        }
+    }
+
     if let Some(scope) = scope {
         return scoped::capture_urls(
             urls,
@@ -985,3 +1051,7 @@ fn finish(
 #[cfg(test)]
 #[path = "tests/repository_archive_http_tests.rs"]
 mod tests;
+
+pub(super) fn charge_distdir_capture(scope: &SourceServiceScope) -> Result<(), String> {
+    scoped::charge_distdir_capture(scope).map_err(|error| error.to_string())
+}

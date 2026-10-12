@@ -98,8 +98,37 @@ pub(super) fn capture_file(
     )
 }
 
+/// Candidate failures may advance distdir lookup; fatal failures must not fall through.
+#[derive(Debug)]
+pub(super) enum FileCaptureError {
+    Miss(String),
+    Fatal(String),
+}
+
+impl FileCaptureError {
+    fn into_message(self) -> String {
+        match self {
+            Self::Miss(message) | Self::Fatal(message) => message,
+        }
+    }
+}
+
 #[cfg(target_os = "linux")]
 pub(super) fn capture_path(
+    path: &Path,
+    capture: tempfile::NamedTempFile,
+    integrity: [u8; 32],
+    limit: u64,
+    subject: &str,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<tempfile::NamedTempFile, String> {
+    capture_path_typed(path, capture, integrity, limit, subject, active, scope)
+        .map_err(FileCaptureError::into_message)
+}
+
+#[cfg(target_os = "linux")]
+pub(super) fn capture_path_typed(
     path: &Path,
     mut capture: tempfile::NamedTempFile,
     integrity: [u8; 32],
@@ -107,7 +136,7 @@ pub(super) fn capture_path(
     subject: &str,
     active: &dyn Fn() -> bool,
     scope: Option<&Arc<SourceServiceScope>>,
-) -> Result<tempfile::NamedTempFile, String> {
+) -> Result<tempfile::NamedTempFile, FileCaptureError> {
     use std::fs::OpenOptions;
     use std::io::Read;
     use std::io::Write;
@@ -119,14 +148,17 @@ pub(super) fn capture_path(
     use sha2::Sha256;
 
     let check_active = || {
-        source_service::check(scope)?;
+        source_service::check(scope).map_err(FileCaptureError::Fatal)?;
         if active() {
             Ok(())
         } else {
-            Err("repository session is no longer active".to_owned())
+            Err(FileCaptureError::Fatal(
+                "repository session is no longer active".to_owned(),
+            ))
         }
     };
-    let oversized = || format!("BCR {subject} exceeds {limit} byte capture limit");
+    let oversized =
+        || FileCaptureError::Fatal(format!("BCR {subject} exceeds {limit} byte capture limit"));
     check_active()?;
     // O_PATH does not open the object for data, even for a FIFO or device.
     // A symlink may select an inode; SRI, not its mutable pathname, binds bytes.
@@ -134,12 +166,14 @@ pub(super) fn capture_path(
         .read(true)
         .custom_flags(libc::O_PATH | libc::O_CLOEXEC)
         .open(path)
-        .map_err(|error| format!("pinning BCR {subject} file: {error}"))?;
+        .map_err(|error| FileCaptureError::Miss(format!("pinning BCR {subject} file: {error}")))?;
     let pinned = pin
         .metadata()
-        .map_err(|error| format!("stat pinned file: {error}"))?;
+        .map_err(|error| FileCaptureError::Miss(format!("stat pinned file: {error}")))?;
     if !pinned.is_file() {
-        return Err(format!("BCR {subject} source is not a regular file"));
+        return Err(FileCaptureError::Miss(format!(
+            "BCR {subject} source is not a regular file"
+        )));
     }
     if pinned.len() > limit {
         return Err(oversized());
@@ -150,12 +184,16 @@ pub(super) fn capture_path(
         .read(true)
         .custom_flags(libc::O_CLOEXEC | libc::O_NONBLOCK)
         .open(format!("/proc/self/fd/{}", pin.as_raw_fd()))
-        .map_err(|error| format!("opening pinned BCR {subject} file: {error}"))?;
+        .map_err(|error| {
+            FileCaptureError::Miss(format!("opening pinned BCR {subject} file: {error}"))
+        })?;
     let readable = input
         .metadata()
-        .map_err(|error| format!("stat readable file: {error}"))?;
+        .map_err(|error| FileCaptureError::Miss(format!("stat readable file: {error}")))?;
     if !readable.is_file() || readable.dev() != pinned.dev() || readable.ino() != pinned.ino() {
-        return Err(format!("BCR {subject} pinned file identity changed"));
+        return Err(FileCaptureError::Miss(format!(
+            "BCR {subject} pinned file identity changed"
+        )));
     }
     check_active()?;
     if readable.len() > limit {
@@ -163,7 +201,8 @@ pub(super) fn capture_path(
     }
     // Regular-file syscalls need responsive local storage; O_NONBLOCK cannot
     // interrupt a stuck filesystem. Cancellation is cooperative between reads.
-    let _buffer_credit = source_service::buffer(scope, 64 * 1024)?;
+    let _buffer_credit =
+        source_service::buffer(scope, 64 * 1024).map_err(FileCaptureError::Fatal)?;
     let mut buffer = [0u8; 64 * 1024];
     let mut total = 0u64;
     let mut hasher = Sha256::new();
@@ -178,7 +217,11 @@ pub(super) fn capture_path(
         ) {
             Ok(count) => count,
             Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(error) => return Err(format!("reading BCR {subject} file: {error}")),
+            Err(error) => {
+                return Err(FileCaptureError::Fatal(format!(
+                    "reading BCR {subject} file: {error}"
+                )));
+            }
         };
         if count == 0 {
             break;
@@ -188,16 +231,18 @@ pub(super) fn capture_path(
             .filter(|total| *total <= limit)
             .ok_or_else(oversized)?;
         source_service::write_counted(&mut capture, &buffer[..count], active, scope)
-            .map_err(|error| format!("writing capture: {error}"))?;
+            .map_err(|error| FileCaptureError::Fatal(format!("writing capture: {error}")))?;
         hasher.update(&buffer[..count]);
     }
     check_active()?;
     if hasher.finalize().as_slice() != integrity {
-        return Err(format!("BCR {subject} SHA-256 SRI mismatch"));
+        return Err(FileCaptureError::Miss(format!(
+            "BCR {subject} SHA-256 SRI mismatch"
+        )));
     }
     capture
         .flush()
-        .map_err(|error| format!("flushing capture: {error}"))?;
+        .map_err(|error| FileCaptureError::Fatal(format!("flushing capture: {error}")))?;
     check_active()?;
     Ok(capture)
 }

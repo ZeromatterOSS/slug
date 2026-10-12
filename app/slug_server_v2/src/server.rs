@@ -144,6 +144,8 @@ pub struct CqueryRequest {
     pub bzlmod: BzlmodRequestInputs,
     #[serde(default)]
     pub repository_environment: RepositoryEnvironmentRequestInputs,
+    #[serde(default)]
+    pub distdirs: Vec<String>,
 }
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -632,7 +634,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     run_launch_plan: None,
                 };
             }
-            let result = daemon.cquery_with_repository_environment(
+            let result = daemon.cquery_with_repository_environment_and_distdirs(
                 &request.expression,
                 request.include_implicit,
                 request.include_tool,
@@ -643,6 +645,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 registry_urls,
                 repository_environment,
                 request.configuration_overlay.clone(),
+                &request.distdirs,
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -841,6 +844,7 @@ pub fn send_cquery_request(
         include_tool: request.include_tool,
         output: request.output,
         configuration_overlay: request.configuration_overlay.clone(),
+        distdirs: request.distdirs.clone(),
         bzlmod: request.bzlmod.clone(),
         repository_environment: request.repository_environment.clone(),
     }))
