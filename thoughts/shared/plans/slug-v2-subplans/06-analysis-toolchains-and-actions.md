@@ -1,5 +1,11 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+Depset truth is exactly nonemptiness, using existing element-type metadata
+(`Empty`/None means no leaves) through evaluator construction, freeze and native
+materialization. Truth does not flatten, traverse or allocate. Trusted native
+parts allocators preserve this metadata contract; caller-supplied retained depth
+is not the emptiness authority. False-valued elements still make a nonempty set.
+
 Configuration.default_shell_env copies only fixed entries from the existing
 tracked action-environment producer into a fresh mutable evaluator dictionary,
 sorted in UTF-16 key order. Inherited names remain unresolved and omitted during

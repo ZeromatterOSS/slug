@@ -1380,6 +1380,9 @@ mod cc_toolchain_tests;
 #[cfg(test)]
 mod provider_schema_tests;
 
+#[cfg(test)]
+mod depset_truth_tests;
+
 #[path = "analysis_value/cc_variables.rs"]
 mod cc_variables;
 

@@ -15361,3 +15361,6 @@ mod make_variable_context_tests;
 
 #[path = "starlark_rule/shell_environment_context_tests.rs"]
 mod shell_environment_context_tests;
+
+#[path = "starlark_rule/depset_truth_context_tests.rs"]
+mod depset_truth_context_tests;

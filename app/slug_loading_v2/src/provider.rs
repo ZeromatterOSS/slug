@@ -1384,6 +1384,10 @@ pub fn alloc_starlark_depset(
     )
 }
 
+/// Allocate a trusted native depset view without validating or rebuilding its DAG.
+/// `element_type` must be None exactly when the represented set is empty,
+/// including retained views whose successors are intentionally not materialized.
+/// Native producers preserve this fact independently of caller-supplied depth.
 pub fn alloc_starlark_depset_parts(
     heap: &starlark::values::FrozenHeap,
     order: DepsetOrder,
@@ -1415,6 +1419,10 @@ where
     Self: ProvidesStaticType<'v>,
 {
     type Canonical = FrozenStarlarkDepset;
+
+    fn to_bool(&self) -> bool {
+        self.element_type.is_some()
+    }
 
     fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
         Ok(StarlarkDepset::parts_from_value(other)
@@ -2287,3 +2295,6 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod depset_truth_tests;
