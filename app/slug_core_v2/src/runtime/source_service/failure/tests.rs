@@ -75,6 +75,10 @@ fn scope_projection_is_total_and_retains_exact_counter_and_message() {
             RegistryRefusalScopeFailure::BufferLimit,
         ),
         (
+            SourceServiceError::DecoderLimit,
+            RegistryRefusalScopeFailure::DecoderLimit,
+        ),
+        (
             SourceServiceError::Allocation,
             RegistryRefusalScopeFailure::Allocation,
         ),

@@ -10751,6 +10751,7 @@ fn rules_rust_defs_import_source_limits_preserve_byte_budgets() {
         decoded_bytes: 16 << 20,
         written_bytes: 16 << 20,
         live_buffer_bytes: 16 << 20,
+        live_decoder_bytes: SourceServiceLimits::MAX_LIVE_DECODER_BYTES,
         blocking_threads: Some(2),
     };
     assert_eq!(make().source_limits(RegistryChoice::PreparedFile), baseline);

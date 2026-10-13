@@ -567,7 +567,7 @@ fn materialize_archive_with(
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-#[allow(dead_code)]// Both flavors are exercised by host-pure tests.
+#[allow(dead_code)] // Both flavors are exercised by host-pure tests.
 enum PathFlavor {
     Unix,
     Windows,

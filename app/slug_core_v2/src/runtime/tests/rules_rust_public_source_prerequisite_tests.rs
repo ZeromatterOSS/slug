@@ -72,6 +72,9 @@ fn native_kind(error: &NativeDemandSessionError) -> &'static str {
         NativeDemandSessionError::ExecuteInternalNonProgress => "execute_nonprogress",
         NativeDemandSessionError::ExecuteEnvironmentMismatch => "execute_environment_mismatch",
         NativeDemandSessionError::RepositoryExecute(_) => "repository_execute",
+        NativeDemandSessionError::ArchiveInternalNonProgress => "archive_internal_non_progress",
+        NativeDemandSessionError::RepositoryArchive(_) => "repository_archive",
+        NativeDemandSessionError::ArchiveTranscript(_) => "archive_transcript",
         NativeDemandSessionError::ExecuteTranscript(_) => "execute_transcript",
         NativeDemandSessionError::RevisionInternalNonProgress => "revision_nonprogress",
         NativeDemandSessionError::Revision(_) => "revision",
@@ -535,6 +538,7 @@ fn observe_normal_rules_rust_public_probe(arm_registry: bool) {
             decoded_bytes: 16 << 20,
             written_bytes: 16 << 20,
             live_buffer_bytes: 16 << 20,
+            live_decoder_bytes: SourceServiceLimits::MAX_LIVE_DECODER_BYTES,
             blocking_threads: Some(2),
         },
     )

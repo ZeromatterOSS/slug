@@ -12,6 +12,9 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use base64::Engine;
+use base64::engine::DecodePaddingMode;
+use base64::engine::general_purpose::GeneralPurpose;
+use base64::engine::general_purpose::GeneralPurposeConfig;
 use base64::engine::general_purpose::STANDARD;
 use compact_str::CompactString;
 use starlark_map::small_set::SmallSet;
@@ -19,7 +22,7 @@ use url::Url;
 
 use crate::repository_label_path::HostRepositoryLabelPathValue;
 
-const MAX_ARCHIVES: usize = 6;
+const MAX_ARCHIVES: usize = 128;
 const MAX_ARCHIVE_URLS: usize = 8;
 const MAX_ARCHIVE_URL_BYTES: usize = 2048;
 const MAX_ARCHIVE_PREFIX_BYTES: usize = 256;
@@ -73,11 +76,12 @@ impl GeneratedRepositorySymlinkEffect {
     }
 }
 
-/// The one archive format admitted for the selected Rust host-tools repository.
+/// Compression formats admitted by the shared bounded tar extractor.
 #[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
 pub enum GeneratedRepositoryArchiveFormat {
     TarXz,
+    TarGz,
 }
 
 /// Bazel's omitted `output` argument extracts into the repository root.
@@ -87,7 +91,7 @@ pub enum GeneratedRepositoryArchiveOutput {
     RepositoryRoot,
 }
 
-/// A selected, checksum-pinned archive intent. No archive bytes or physical
+/// A general checksum-pinned archive intent. No archive bytes or physical
 /// capture path are retained in the repository observation.
 #[doc(hidden)]
 #[derive(Clone, PartialEq, Eq, Hash, Allocative)]
@@ -97,6 +101,8 @@ pub struct GeneratedRepositoryArchiveEffect {
     strip_prefix: CompactString,
     format: GeneratedRepositoryArchiveFormat,
     output: GeneratedRepositoryArchiveOutput,
+    canonical_id: CompactString,
+    declared_integrity: CompactString,
 }
 
 impl fmt::Debug for GeneratedRepositoryArchiveEffect {
@@ -112,6 +118,54 @@ impl fmt::Debug for GeneratedRepositoryArchiveEffect {
 }
 
 impl GeneratedRepositoryArchiveEffect {
+    pub fn new(
+        urls: Arc<[CompactString]>,
+        sha256: [u8; 32],
+        strip_prefix: CompactString,
+        format: GeneratedRepositoryArchiveFormat,
+        canonical_id: CompactString,
+        declared_integrity: CompactString,
+    ) -> Result<Self, GeneratedRepositoryFileEffectPlanError> {
+        if urls.is_empty() {
+            return Err(GeneratedRepositoryFileEffectPlanError::EmptyArchiveUrls);
+        }
+        if urls.len() > MAX_ARCHIVE_URLS {
+            return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchiveUrls);
+        }
+        if urls.iter().any(|url| !valid_archive_url(url)) {
+            return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveUrl);
+        }
+        if !strip_prefix.is_empty()
+            && (strip_prefix.len() > MAX_ARCHIVE_PREFIX_BYTES
+                || strip_prefix.split('/').count() > MAX_ARCHIVE_PREFIX_COMPONENTS
+                || !valid_path(&strip_prefix))
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveStripPrefix);
+        }
+        if !declared_integrity.is_empty()
+            && generated_repository_archive_parse_sha256("", &declared_integrity)? != sha256
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveChecksum);
+        }
+        Ok(Self {
+            urls,
+            sha256,
+            strip_prefix,
+            format,
+            output: GeneratedRepositoryArchiveOutput::RepositoryRoot,
+            canonical_id,
+            declared_integrity,
+        })
+    }
+
+    pub fn canonical_id(&self) -> &str {
+        &self.canonical_id
+    }
+
+    pub fn declared_integrity(&self) -> &str {
+        &self.declared_integrity
+    }
+
     pub fn urls(&self) -> &[CompactString] {
         &self.urls
     }
@@ -141,7 +195,7 @@ impl GeneratedRepositoryArchiveEffect {
     }
 }
 
-/// Result fields for a checksum-pinned selected archive, without requiring
+/// Result fields for a checksum-pinned archive, without requiring
 /// Loading to own a separate hex or base64 dependency.
 #[doc(hidden)]
 pub fn generated_repository_archive_sha256_hex(sha256: [u8; 32]) -> String {
@@ -151,6 +205,51 @@ pub fn generated_repository_archive_sha256_hex(sha256: [u8; 32]) -> String {
 #[doc(hidden)]
 pub fn generated_repository_archive_sha256_sri(sha256: [u8; 32]) -> String {
     format!("sha256-{}", STANDARD.encode(sha256))
+}
+
+/// Parse the admitted Bazel SHA256 checksum forms. Other algorithms and
+/// omitted checksums are explicit capability boundaries.
+#[doc(hidden)]
+pub fn generated_repository_archive_parse_sha256(
+    sha256: &str,
+    integrity: &str,
+) -> Result<[u8; 32], GeneratedRepositoryFileEffectPlanError> {
+    use GeneratedRepositoryFileEffectPlanError as Error;
+    if !sha256.is_empty() && !integrity.is_empty() {
+        return Err(Error::ConflictingArchiveChecksum);
+    }
+    if !sha256.is_empty() {
+        let mut digest = [0; 32];
+        hex::decode_to_slice(sha256, &mut digest).map_err(|_| Error::InvalidArchiveChecksum)?;
+        return Ok(digest);
+    }
+    if integrity.is_empty() {
+        return Err(Error::MissingArchiveChecksum);
+    }
+    let encoded = integrity
+        .strip_prefix("sha256-")
+        .ok_or(Error::UnsupportedArchiveChecksum)?;
+    // Java's basic Base64 decoder accepts optional padding and unused pad bits.
+    let decoder = GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        GeneralPurposeConfig::new()
+            .with_decode_padding_mode(DecodePaddingMode::Indifferent)
+            .with_decode_allow_trailing_bits(true),
+    );
+    if !matches!(encoded.len(), 43 | 44) {
+        return Err(Error::InvalidArchiveChecksum);
+    }
+    // The decoder's conservative output estimate is 33 bytes for padded SHA256.
+    let mut decoded = [0; 33];
+    let length = decoder
+        .decode_slice(encoded, &mut decoded)
+        .map_err(|_| Error::InvalidArchiveChecksum)?;
+    if length != 32 {
+        return Err(Error::InvalidArchiveChecksum);
+    }
+    let mut digest = [0; 32];
+    digest.copy_from_slice(&decoded[..32]);
+    Ok(digest)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -163,7 +262,7 @@ enum GeneratedRepositoryOrderItem {
 /// A borrowed effect in invocation order; file bytes remain owned only by the
 /// plan's file slice rather than being cloned into this order projection.
 #[doc(hidden)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GeneratedRepositoryOrderedEffectRef<'a> {
     File(&'a GeneratedRepositoryFileEffect),
     Archive(&'a GeneratedRepositoryArchiveEffect),
@@ -179,6 +278,32 @@ pub struct GeneratedRepositoryFileEffectPlan {
 }
 
 impl GeneratedRepositoryFileEffectPlan {
+    pub fn effect_count(&self) -> usize {
+        self.order.len()
+    }
+
+    pub fn is_prefix_of(&self, other: &Self) -> bool {
+        self.effect_count() <= other.effect_count()
+            && self
+                .ordered_effects()
+                .zip(other.ordered_effects())
+                .all(|(left, right)| left == right)
+    }
+
+    pub fn with_archive(
+        &self,
+        archive: GeneratedRepositoryArchiveEffect,
+    ) -> Result<Self, GeneratedRepositoryFileEffectPlanError> {
+        let mut builder = GeneratedRepositoryFileEffectPlanBuilder {
+            seen: SmallSet::new(),
+            files: self.files.to_vec(),
+            order: self.order.to_vec(),
+            archive_count: self.archive_count(),
+        };
+        builder.push_archive_effect(archive)?;
+        Ok(builder.finish())
+    }
+
     pub fn effects(&self) -> &[GeneratedRepositoryFileEffect] {
         &self.files
     }
@@ -238,6 +363,10 @@ pub enum GeneratedRepositoryFileEffectPlanError {
     TooManyArchiveUrls,
     InvalidArchiveUrl,
     InvalidArchiveStripPrefix,
+    MissingArchiveChecksum,
+    ConflictingArchiveChecksum,
+    InvalidArchiveChecksum,
+    UnsupportedArchiveChecksum,
 }
 
 impl GeneratedRepositoryFileEffectPlan {
@@ -280,7 +409,9 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         if !valid_path(&path) {
             return Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(path));
         }
-        if self.seen.contains(&path) {
+        if self.order.iter().any(|item| {
+            matches!(item, GeneratedRepositoryOrderItem::Symlink(symlink) if path == symlink.path())
+        }) {
             return Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path));
         }
         if self.order.iter().any(|item| {
@@ -338,6 +469,20 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         sha256: [u8; 32],
         strip_prefix: CompactString,
     ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
+        self.push_archive_effect(GeneratedRepositoryArchiveEffect::new(
+            urls,
+            sha256,
+            strip_prefix,
+            GeneratedRepositoryArchiveFormat::TarXz,
+            CompactString::new(""),
+            CompactString::new(""),
+        )?)
+    }
+
+    pub fn push_archive_effect(
+        &mut self,
+        archive: GeneratedRepositoryArchiveEffect,
+    ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
         if self
             .order
             .iter()
@@ -345,33 +490,11 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         {
             return Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix);
         }
-        if self.archive_count == MAX_ARCHIVES {
+        if self.archive_count >= MAX_ARCHIVES {
             return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchives);
         }
-        if urls.is_empty() {
-            return Err(GeneratedRepositoryFileEffectPlanError::EmptyArchiveUrls);
-        }
-        if urls.len() > MAX_ARCHIVE_URLS {
-            return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchiveUrls);
-        }
-        if urls.iter().any(|url| !valid_archive_url(url)) {
-            return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveUrl);
-        }
-        if strip_prefix.len() > MAX_ARCHIVE_PREFIX_BYTES
-            || strip_prefix.split('/').count() > MAX_ARCHIVE_PREFIX_COMPONENTS
-            || !valid_path(&strip_prefix)
-        {
-            return Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveStripPrefix);
-        }
-        self.order.push(GeneratedRepositoryOrderItem::Archive(
-            GeneratedRepositoryArchiveEffect {
-                urls,
-                sha256,
-                strip_prefix,
-                format: GeneratedRepositoryArchiveFormat::TarXz,
-                output: GeneratedRepositoryArchiveOutput::RepositoryRoot,
-            },
-        ));
+        self.order
+            .push(GeneratedRepositoryOrderItem::Archive(archive));
         self.archive_count += 1;
         Ok(())
     }
@@ -391,17 +514,12 @@ fn valid_archive_url(url: &str) -> bool {
     let Ok(parsed) = Url::parse(url) else {
         return false;
     };
-    if !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.query().is_some()
-        || parsed.fragment().is_some()
-        || !parsed.path().ends_with(".tar.xz")
-    {
+    if !parsed.username().is_empty() || parsed.password().is_some() || parsed.fragment().is_some() {
         return false;
     }
     match parsed.scheme() {
         "https" => parsed.host_str().is_some(),
-        "file" => parsed.host_str().is_none_or(|host| host.is_empty()),
+        "file" => parsed.host_str().is_none_or(|host| host.is_empty()) && parsed.query().is_none(),
         _ => false,
     }
 }
@@ -570,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    fn plan_rejects_non_normal_and_repeated_paths_at_first_occurrence() {
+    fn plan_rejects_non_normal_paths_and_preserves_ordered_file_overwrites() {
         for path in ["", "/absolute", "a/../b", "a//b", "a\\b", "a/"] {
             assert!(matches!(
                 GeneratedRepositoryFileEffectPlan::build([(
@@ -581,13 +699,16 @@ mod tests {
                 Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(_))
             ));
         }
-        assert!(matches!(
-            GeneratedRepositoryFileEffectPlan::build([
-                (CompactString::new("a"), Arc::from(&b"one"[..]), true),
-                (CompactString::new("a"), Arc::from(&b"two"[..]), false),
-            ]),
-            Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path)) if path == "a"
-        ));
+        let plan = GeneratedRepositoryFileEffectPlan::build([
+            (CompactString::new("a"), Arc::from(&b"one"[..]), true),
+            (CompactString::new("a"), Arc::from(&b"two"[..]), false),
+        ])
+        .unwrap();
+        assert_eq!(plan.effect_count(), 2);
+        assert_eq!(plan.effects()[0].content(), b"one");
+        assert!(plan.effects()[0].executable());
+        assert_eq!(plan.effects()[1].content(), b"two");
+        assert!(!plan.effects()[1].executable());
     }
 
     #[test]
@@ -936,7 +1057,93 @@ mod tests {
     }
 
     #[test]
-    fn archive_intent_rejects_unselected_shapes_and_enforces_six_call_cap() {
+    fn general_archive_identity_and_prefix_helpers_preserve_all_fields() {
+        let make = |format, canonical_id: &str, integrity: &str| {
+            super::GeneratedRepositoryArchiveEffect::new(
+                urls(&["https://example.org/source.crate?download=1"]),
+                [7; 32],
+                "".into(),
+                format,
+                canonical_id.into(),
+                integrity.into(),
+            )
+            .unwrap()
+        };
+        let effect = make(GeneratedRepositoryArchiveFormat::TarGz, "scope", "");
+        assert_eq!(effect.strip_prefix(), "");
+        assert_eq!(effect.canonical_id(), "scope");
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push("same".into(), Arc::from(&b"before"[..]), false)
+            .unwrap();
+        let prefix = builder.snapshot();
+        let through_archive = prefix.with_archive(effect.clone()).unwrap();
+        assert!(prefix.is_prefix_of(&through_archive));
+        assert!(!through_archive.is_prefix_of(&prefix));
+        assert_eq!(through_archive.effect_count(), 2);
+        builder.push_archive_effect(effect).unwrap();
+        assert_eq!(builder.snapshot(), through_archive);
+        builder
+            .push("same".into(), Arc::from(&b"after"[..]), true)
+            .unwrap();
+        let final_plan = builder.finish();
+        assert!(through_archive.is_prefix_of(&final_plan));
+        assert_eq!(final_plan.effects()[1].content(), b"after");
+        for changed in [
+            make(GeneratedRepositoryArchiveFormat::TarXz, "scope", ""),
+            make(GeneratedRepositoryArchiveFormat::TarGz, "other", ""),
+            make(
+                GeneratedRepositoryArchiveFormat::TarGz,
+                "scope",
+                &generated_repository_archive_sha256_sri([7; 32]),
+            ),
+        ] {
+            let changed = prefix.with_archive(changed).unwrap();
+            assert_ne!(through_archive, changed);
+            assert!(!through_archive.is_prefix_of(&changed));
+        }
+        let link = symlink_plan("link", "/source/file", 1, b"x");
+        assert_eq!(
+            link.with_archive(make(GeneratedRepositoryArchiveFormat::TarGz, "", "")),
+            Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix)
+        );
+    }
+
+    #[test]
+    fn explicit_sha_and_sri_are_exclusive_normalized_and_length_checked() {
+        use GeneratedRepositoryFileEffectPlanError as Error;
+
+        use super::generated_repository_archive_parse_sha256 as parse;
+        let hex = generated_repository_archive_sha256_hex([0xab; 32]);
+        let sri = generated_repository_archive_sha256_sri([0xab; 32]);
+        assert_eq!(parse(&hex.to_uppercase(), ""), Ok([0xab; 32]));
+        assert_eq!(parse("", &sri), Ok([0xab; 32]));
+        assert_eq!(parse("", sri.trim_end_matches('=')), Ok([0xab; 32]));
+        assert_eq!(parse(&hex, &sri), Err(Error::ConflictingArchiveChecksum));
+        assert_eq!(parse("", ""), Err(Error::MissingArchiveChecksum));
+        assert_eq!(
+            parse("", "sha512-AA=="),
+            Err(Error::UnsupportedArchiveChecksum)
+        );
+        for invalid in ["short", "sha256-AA==", "sha256-invalid"] {
+            assert!(parse("", invalid).is_err());
+        }
+        assert_eq!(parse("abc", ""), Err(Error::InvalidArchiveChecksum));
+        assert!(
+            super::GeneratedRepositoryArchiveEffect::new(
+                urls(&["file:///tmp/source.tar.gz"]),
+                [1; 32],
+                "".into(),
+                GeneratedRepositoryArchiveFormat::TarGz,
+                "".into(),
+                sri.into(),
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn archive_intent_rejects_unsafe_shapes_and_enforces_shared_call_cap() {
         let mut builder = GeneratedRepositoryFileEffectPlan::builder();
         assert_eq!(
             builder.push_archive(Arc::from([]), [0; 32], CompactString::new("rustc/rustc")),
@@ -953,8 +1160,6 @@ mod tests {
         for invalid in [
             "http://static.rust-lang.org/dist/rustc.tar.xz",
             "https://user:secret@static.rust-lang.org/dist/rustc.tar.xz",
-            "https://static.rust-lang.org/dist/rustc.tar.xz?token=secret",
-            "https://static.rust-lang.org/dist/rustc.zip",
             "file://remote-host/tmp/rustc.tar.xz",
         ] {
             assert_eq!(
@@ -962,7 +1167,7 @@ mod tests {
                 Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveUrl)
             );
         }
-        for invalid in ["", "/rustc", "rustc/../bin", "rustc//bin"] {
+        for invalid in ["/rustc", "rustc/../bin", "rustc//bin"] {
             assert_eq!(
                 builder.push_archive(
                     urls(&["file:///tmp/rustc.tar.xz"]),
@@ -972,12 +1177,12 @@ mod tests {
                 Err(GeneratedRepositoryFileEffectPlanError::InvalidArchiveStripPrefix)
             );
         }
-        for _ in 0..6 {
+        for _ in 0..128 {
             builder
                 .push_archive(
-                    urls(&["file:///tmp/rustc.tar.xz"]),
+                    urls(&["file:///tmp/unrelated.payload"]),
                     [0; 32],
-                    CompactString::new("rustc/rustc"),
+                    CompactString::new(""),
                 )
                 .unwrap();
         }
@@ -989,7 +1194,7 @@ mod tests {
             ),
             Err(GeneratedRepositoryFileEffectPlanError::TooManyArchives)
         );
-        assert_eq!(builder.finish().archive_count(), 6);
+        assert_eq!(builder.finish().archive_count(), 128);
     }
 
     #[test]

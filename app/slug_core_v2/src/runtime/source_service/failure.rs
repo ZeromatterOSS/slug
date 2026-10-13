@@ -153,6 +153,7 @@ fn scope_failure(error: SourceServiceError) -> RegistryRefusalScopeFailure {
         SourceServiceError::Limit(c) => R::Limit(counter(c)),
         SourceServiceError::Overflow(c) => R::Overflow(counter(c)),
         SourceServiceError::BufferLimit => R::BufferLimit,
+        SourceServiceError::DecoderLimit => R::DecoderLimit,
         SourceServiceError::Allocation => R::Allocation,
         SourceServiceError::UnsupportedSourceOwner => R::UnsupportedSourceOwner,
     }

@@ -776,6 +776,7 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
                 "src/tools/launcher",
                 "src/tools/launcher/util",
                 "tools",
+                "tools/allowlists/function_transition_allowlist",
                 "tools/build_defs/build_info",
                 "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",
@@ -795,6 +796,7 @@ async fn real_builtin_catalog_discovers_root_and_prefixed_package_sets() {
             "tools",
             vec![
                 "tools",
+                "tools/allowlists/function_transition_allowlist",
                 "tools/build_defs/build_info",
                 "tools/build_defs/build_info/templates",
                 "tools/build_defs/cc",

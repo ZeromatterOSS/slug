@@ -42,6 +42,9 @@ impl<'a> MaterializationDiagnostic<'a> {
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
             }
+            RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+                ("generated_archive_effects", None)
+            }
         };
         let label = &request.repo_spec.rule_id.bzl_file;
         Self {

@@ -1,8 +1,7 @@
-//! Bounded, in-process extraction for the source-selected rust_host_tools tar.xz calls.
+//! Bounded, in-process tar.xz/tar.gz extraction for ordered repository effects.
 //!
-//! This is deliberately separate from BCR extraction: the selected generated
-//! repository needs ordered regular-file replacement and substantially larger
-//! audited decode limits, while BCR keeps its existing stricter policy.
+//! Generated repositories use ordered regular-file replacement and their own
+//! shared decode limits, while BCR retains its stricter extraction policy.
 
 use std::collections::HashSet;
 use std::fs::File;
@@ -19,6 +18,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
 
+use flate2::read::MultiGzDecoder;
+use slug_bzlmod_v2::GeneratedRepositoryArchiveFormat;
 use xz2::read::XzDecoder;
 use xz2::stream::CONCATENATED;
 use xz2::stream::Stream;
@@ -31,11 +32,10 @@ use super::repository_io::source_service::{self};
 const BLOCK: usize = 512;
 const CALL_DECODED_LIMIT: u64 = 512 * 1024 * 1024;
 const AGGREGATE_DECODED_LIMIT: u64 = 1024 * 1024 * 1024;
-const ENTRY_LIMIT: u64 = 256 * 1024 * 1024;
 const HEADER_LIMIT: usize = 1024;
 const PATH_LIMIT: usize = 256;
 const COMPONENT_LIMIT: usize = 32;
-// The largest audited selected archive requires 134,283,320 decoder bytes.
+// Shared decoder allocation ceiling, independent of archive identity.
 const XZ_DECODER_MEMORY_LIMIT: u64 = 136 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
@@ -44,7 +44,7 @@ struct DecodeLimits {
     aggregate: u64,
 }
 
-const SELECTED_DECODE_LIMITS: DecodeLimits = DecodeLimits {
+const GENERATED_DECODE_LIMITS: DecodeLimits = DecodeLimits {
     per_call: CALL_DECODED_LIMIT,
     aggregate: AGGREGATE_DECODED_LIMIT,
 };
@@ -54,7 +54,7 @@ const SELECTED_DECODE_LIMITS: DecodeLimits = DecodeLimits {
 /// The caller invokes this in source order, owns SHA-verified capture and root
 /// publication, and discards the root on any error or cancellation. Decoded
 /// accounting includes every physical header, payload, padding, end marker,
-/// and trailing zero block; it is shared across the selected six calls.
+/// and trailing zero block; it is shared across the complete invocation.
 pub(super) fn extract_selected_generated_archive(
     capture: &File,
     root: &Path,
@@ -63,21 +63,65 @@ pub(super) fn extract_selected_generated_archive(
     aggregate_decoded: &mut u64,
     scope: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), ArchiveMaterializationError> {
-    extract_with_limits(
+    extract_generated_archive(
         capture,
         root,
         strip_prefix,
+        GeneratedRepositoryArchiveFormat::TarXz,
         active,
         aggregate_decoded,
-        SELECTED_DECODE_LIMITS,
         scope,
     )
 }
 
+pub(super) fn extract_generated_archive(
+    capture: &File,
+    root: &Path,
+    strip_prefix: &str,
+    format: GeneratedRepositoryArchiveFormat,
+    active: &dyn Fn() -> bool,
+    aggregate_decoded: &mut u64,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    extract_with_format_and_limits(
+        capture,
+        root,
+        strip_prefix,
+        format,
+        active,
+        aggregate_decoded,
+        GENERATED_DECODE_LIMITS,
+        scope,
+    )
+}
+
+#[cfg(test)]
 fn extract_with_limits(
     capture: &File,
     root: &Path,
     strip_prefix: &str,
+    active: &dyn Fn() -> bool,
+    aggregate_decoded: &mut u64,
+    limits: DecodeLimits,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    extract_with_format_and_limits(
+        capture,
+        root,
+        strip_prefix,
+        GeneratedRepositoryArchiveFormat::TarXz,
+        active,
+        aggregate_decoded,
+        limits,
+        scope,
+    )
+}
+
+fn extract_with_format_and_limits(
+    capture: &File,
+    root: &Path,
+    strip_prefix: &str,
+    format: GeneratedRepositoryArchiveFormat,
     active: &dyn Fn() -> bool,
     aggregate_decoded: &mut u64,
     limits: DecodeLimits,
@@ -106,18 +150,59 @@ fn extract_with_limits(
     capture
         .seek(SeekFrom::Start(0))
         .map_err(|error| materialization(format!("seeking verified generated archive: {error}")))?;
-    // A decoded-byte cap alone does not bound an XZ header's dictionary
-    // allocation. The custom stream caps decoder memory and consumes all
-    // concatenated streams rather than ignoring a compressed tail.
-    let stream = Stream::new_stream_decoder(XZ_DECODER_MEMORY_LIMIT, CONCATENATED)
-        .map_err(|error| materialization(format!("initializing bounded xz decoder: {error}")))?;
-    let decoder = XzDecoder::new_stream(capture, stream);
+    match format {
+        GeneratedRepositoryArchiveFormat::TarXz => {
+            // Bound XZ dictionary allocation and consume every concatenated stream.
+            let _decoder_credit = source_service::decoder(scope, XZ_DECODER_MEMORY_LIMIT as usize)
+                .map_err(materialization)?;
+            let stream = Stream::new_stream_decoder(XZ_DECODER_MEMORY_LIMIT, CONCATENATED)
+                .map_err(|error| {
+                    materialization(format!("initializing bounded xz decoder: {error}"))
+                })?;
+            extract_tar(
+                XzDecoder::new_stream(capture, stream),
+                root,
+                strip_prefix,
+                active,
+                aggregate_decoded,
+                limits,
+                scope,
+            )
+        }
+        GeneratedRepositoryArchiveFormat::TarGz => {
+            // flate2 bounds each optional extra/name/comment header field to
+            // 65535 bytes. Reserve their storage before the constructor parses
+            // the first header; later concatenated members reuse the decoder.
+            let _gzip_header_credit =
+                source_service::buffer(scope, 256 * 1024).map_err(materialization)?;
+            extract_tar(
+                MultiGzDecoder::new(capture),
+                root,
+                strip_prefix,
+                active,
+                aggregate_decoded,
+                limits,
+                scope,
+            )
+        }
+    }
+}
+
+fn extract_tar(
+    decoder: impl Read,
+    root: &Path,
+    strip_prefix: &str,
+    active: &dyn Fn() -> bool,
+    aggregate_decoded: &mut u64,
+    limits: DecodeLimits,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
     let _decoder_buffer_credit =
         source_service::buffer(scope, 64 * 1024 + 1024).map_err(materialization)?;
     let mut tar = BoundedTarReader::new(decoder, active, aggregate_decoded, limits, scope);
     let mut physical_headers = 0usize;
     let mut pending_longname: Option<String> = None;
-    let mut prefix_found = false;
+    let mut prefix_found = strip_prefix.is_empty();
     let mut seen_stripped_paths = HashSet::<String>::new();
 
     loop {
@@ -182,10 +267,11 @@ fn extract_with_limits(
                 "generated tar has an unsupported entry mode",
             ));
         }
-        if (kind == EntryKind::Regular && size > ENTRY_LIMIT)
-            || (kind == EntryKind::Directory && size != 0)
-        {
-            return Err(materialization("generated tar entry exceeds admitted size"));
+        if kind == EntryKind::Directory && size != 0 {
+            return Err(materialization("generated tar directory has a payload"));
+        }
+        if kind == EntryKind::Regular {
+            tar.admit_payload(size)?;
         }
         let raw_path = match pending_longname.take() {
             Some(path) => path,
@@ -198,7 +284,9 @@ fn extract_with_limits(
             tar.padding(size)?;
             continue;
         };
-        let stripped = if path == strip_prefix {
+        let stripped = if strip_prefix.is_empty() {
+            Some(path.as_str())
+        } else if path == strip_prefix {
             if kind != EntryKind::Directory {
                 return Err(materialization(
                     "generated tar strip prefix root is not a directory",
@@ -271,8 +359,10 @@ enum EntryKind {
 }
 
 fn validate_strip_prefix(prefix: &str) -> Result<(), ArchiveMaterializationError> {
-    if prefix.is_empty()
-        || prefix.len() > PATH_LIMIT
+    if prefix.is_empty() {
+        return Ok(());
+    }
+    if prefix.len() > PATH_LIMIT
         || prefix.starts_with('/')
         || prefix.ends_with('/')
         || prefix.contains('\\')
@@ -523,6 +613,29 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
         )
     }
 
+    fn admit_payload(&self, size: u64) -> Result<(), ArchiveMaterializationError> {
+        let padding = (BLOCK as u64 - size % BLOCK as u64) % BLOCK as u64;
+        let payload = size.checked_add(padding).ok_or_else(|| {
+            materialization("generated tar payload size overflows decoded accounting")
+        })?;
+        if payload > self.limits.per_call.saturating_sub(self.call_decoded) {
+            return Err(materialization(
+                "generated tar exceeds per-call decoded limit",
+            ));
+        }
+        if payload
+            > self
+                .limits
+                .aggregate
+                .saturating_sub(*self.aggregate_decoded)
+        {
+            return Err(materialization(
+                "generated archives exceed aggregate decoded limit",
+            ));
+        }
+        Ok(())
+    }
+
     fn finish_zero_padding(&mut self) -> Result<(), ArchiveMaterializationError> {
         let mut buffer = [0u8; 64 * 1024];
         loop {
@@ -541,7 +654,7 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                     Ok(0) => Ok(()),
                     Ok(_) => Err(self.limit_error()),
                     Err(error) => Err(materialization(format!(
-                        "finishing generated xz stream: {error}"
+                        "finishing generated compressed stream: {error}"
                     ))),
                 };
             }
@@ -552,7 +665,9 @@ impl<'a, R: Read> BoundedTarReader<'a, R> {
                 self.scope,
                 SourceCounter::DecodedBytes,
             )
-            .map_err(|error| materialization(format!("finishing generated xz stream: {error}")))?;
+            .map_err(|error| {
+                materialization(format!("finishing generated compressed stream: {error}"))
+            })?;
             if count == 0 {
                 return Ok(());
             }

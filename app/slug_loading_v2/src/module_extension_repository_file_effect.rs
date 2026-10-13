@@ -32,6 +32,10 @@ use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
 use slug_bzlmod_v2::ObservedHostRepositoryLabelPath;
+use slug_bzlmod_v2::RepositoryArchiveEpoch;
+use slug_bzlmod_v2::RepositoryArchiveObservationKey;
+use slug_bzlmod_v2::RepositoryArchiveRealization;
+use slug_bzlmod_v2::RepositoryArchiveTranscript;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
@@ -76,55 +80,10 @@ use crate::module_extension_repository_validation::HostSelectedExtensionOwnerCer
 #[rustfmt::skip] use crate::repository_rule_context::{PreparedRepositoryHostPaths, PreparedRepositoryLabelPaths, PreparedRepositoryLabelSources, PreparedRepositoryWhichCandidates, RepositoryRuleHostObservation, RepositoryRuleInvocationError, RepositoryRuleInvocationInput, RepositoryWhichCandidate};
 use crate::repository_rule_context::invoke_repository_rule_with_host_paths;
 
-mod selected_archive_profile;
-use selected_archive_profile::SelectedArchiveProfile;
-
 struct RepositoryEffectLimits;
 // Pinned rules_cc 0.2.17 unix_cc_configure.bzl:68-87,332-417 can probe
 // 13 distinct tools, each within repository_ctx.which's 64-candidate limit.
 #[rustfmt::skip] impl RepositoryEffectLimits { const LABEL_PATHS: usize = 256; const WHICH_CANDIDATES: usize = 13 * 64; const HOST_PATHS: usize = 64; }
-
-// Pinned rules_rust 0.73.0 rust/private/repositories.bzl:397-462 and
-// repository_utils.bzl:845-1009. These are the only audited Linux x86_64
-// rust_host_tools archive calls; changed module tags or upstream sources fail
-// before a generated repository effect can be published.
-const SELECTED_HOST_TOOLS_ARCHIVES: [(&str, &str, &str); 6] = [
-    (
-        "https://static.rust-lang.org/dist/rustc-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
-        "9819d0a32d56bd339585319c80260e332779f5541fd66838ab7e016d6c814819",
-        "rustc-1.97.1-x86_64-unknown-linux-gnu/rustc",
-    ),
-    (
-        "https://static.rust-lang.org/dist/clippy-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
-        "3441df8fb54db985f8c8a3e8356b8874a3f92cc8cca8565cfe36f1dc15935e72",
-        "clippy-1.97.1-x86_64-unknown-linux-gnu/clippy-preview",
-    ),
-    (
-        "https://static.rust-lang.org/dist/cargo-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
-        "e1be5f5ff7f7f80ca506fb65770b759edbdc6d303781ed71c5de8ec8a8394779",
-        "cargo-1.97.1-x86_64-unknown-linux-gnu/cargo",
-    ),
-    (
-        "https://static.rust-lang.org/dist/2026-07-16/rustfmt-nightly-x86_64-unknown-linux-gnu.tar.xz",
-        "bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d",
-        "rustfmt-nightly-x86_64-unknown-linux-gnu/rustfmt-preview",
-    ),
-    (
-        "https://static.rust-lang.org/dist/llvm-tools-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
-        "3e7a1c596a42dea6bf625ec6f006ce2fbcf5d1ff892f082828eb182a5d483b95",
-        "llvm-tools-1.97.1-x86_64-unknown-linux-gnu/llvm-tools-preview",
-    ),
-    (
-        "https://static.rust-lang.org/dist/rust-std-1.97.1-x86_64-unknown-linux-gnu.tar.xz",
-        "1c1e704ae80126b7de34f72ea2825f7fd01736dec20732faed47374b95282fba",
-        "rust-std-1.97.1-x86_64-unknown-linux-gnu/rust-std-x86_64-unknown-linux-gnu",
-    ),
-];
-
-#[cfg(test)]
-fn matches_selected_host_tools_archives(plan: &GeneratedRepositoryFileEffectPlan) -> bool {
-    SelectedArchiveProfile::Stable.matches_plan(plan)
-}
 
 #[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -133,11 +92,21 @@ pub struct HostSelectedRepositoryFileEffect {
     ordinal: usize,
     host: RepositoryRuleHostObservation,
     plan: GeneratedRepositoryFileEffectPlan,
+    metadata: crate::repository_rule_context::RepositoryMetadata,
+    archive_realization: Option<RepositoryArchiveRealization>,
 }
 
 impl HostSelectedRepositoryFileEffect {
     pub fn plan(&self) -> &GeneratedRepositoryFileEffectPlan {
         &self.plan
+    }
+
+    pub fn archive_realization(&self) -> Option<&RepositoryArchiveRealization> {
+        self.archive_realization.as_ref()
+    }
+
+    pub fn metadata(&self) -> &crate::repository_rule_context::RepositoryMetadata {
+        &self.metadata
     }
 
     pub fn host(&self) -> &RepositoryRuleHostObservation {
@@ -618,6 +587,35 @@ async fn verified_execute_transcript(
     Ok(epoch
         .transcript()
         .map_or_else(RepositoryExecuteTranscript::empty, Clone::clone))
+}
+
+async fn verified_archive_epoch(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRepositoryFileEffectKey,
+    certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
+    expected: Option<&RepositoryArchiveEpoch>,
+    observations: &PathObservationEpoch,
+) -> Result<RepositoryArchiveEpoch, EffectDriver> {
+    let epoch = ctx
+        .compute(&RepositoryArchiveObservationKey::new(key.workspace.dupe()))
+        .await
+        .map_err(|error| {
+            complete_effect_error(
+                host_input_error(certificate, key.ordinal, error.to_string()),
+                observations.dupe(),
+            )
+        })?;
+    if epoch.lease_nonce().is_none() || expected.is_some_and(|expected| expected != &epoch) {
+        return Err(complete_effect_error(
+            terminal_repository_rule_invocation_error(
+                certificate,
+                key.ordinal,
+                RepositoryRuleInvocationError::ArchiveReplay,
+            ),
+            observations.dupe(),
+        ));
+    }
+    Ok(epoch)
 }
 
 type DefinitionModuleResult =
@@ -1450,11 +1448,12 @@ fn terminal_repository_rule_invocation_error(
         RepositoryRuleInvocationError::ExecuteOptions => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute non-default options are unsupported".into() },
         RepositoryRuleInvocationError::ExecuteLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute exceeds the admitted per-command call limit".into() },
         RepositoryRuleInvocationError::ExecuteReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute prepared transcript differs from this invocation".into() },
-        RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface".into() },
+        RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the supported SHA-pinned archive surface".into() },
         RepositoryRuleInvocationError::ArchiveAuth => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract auth is unsupported".into() },
-        RepositoryRuleInvocationError::ArchiveLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract exceeds the selected limits".into() },
-        RepositoryRuleInvocationError::ArchiveIncomplete => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "selected rust_host_tools repository requires six ordered archives".into() },
-        RepositoryRuleInvocationError::ArchivePathObservation => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "generated path may depend on an unmaterialized archive".into() },
+        RepositoryRuleInvocationError::ArchiveLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract exceeds the shared archive limits".into() },
+        RepositoryRuleInvocationError::ArchiveReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository archive transcript differs from this invocation".into() },
+        RepositoryRuleInvocationError::ArchiveOptions => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract option capability is unsupported".into() },
+        RepositoryRuleInvocationError::ArchivePathObservation => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "observing archive-produced generated paths is unsupported".into() },
         RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
             certificate: certificate.clone(),
             ordinal,
@@ -1478,7 +1477,8 @@ fn terminal_repository_rule_invocation_error(
         | RepositoryRuleInvocationError::HostPathNeed(_)
         | RepositoryRuleInvocationError::RepositorySourceNeed(_)
         | RepositoryRuleInvocationError::WhichNeed(_)
-        | RepositoryRuleInvocationError::ExecuteNeed(_) => unreachable!(),
+        | RepositoryRuleInvocationError::ExecuteNeed(_)
+        | RepositoryRuleInvocationError::ArchiveNeed(_) => unreachable!(),
     }
 }
 
@@ -1512,6 +1512,14 @@ async fn invoke_repository_rule_with_label_paths(
         .get::<RepositoryExecuteEpoch>()
         .ok()
         .cloned();
+    let archive_epoch_hint = ctx
+        .per_transaction_data()
+        .data
+        .get::<RepositoryArchiveEpoch>()
+        .ok()
+        .cloned();
+    let mut prepared_archives = RepositoryArchiveTranscript::empty();
+    let mut archive_nonce = None;
     let mut prepared_execute = RepositoryExecuteTranscript::empty();
     if epoch_hint
         .as_ref()
@@ -1545,7 +1553,9 @@ async fn invoke_repository_rule_with_label_paths(
             &prepared_host_paths,
             input
                 .clone()
-                .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone()),
+                .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone())
+                .with_archives(key.owner.clone(), key.ordinal, prepared_archives.clone())
+                .with_archive_lease_nonce(archive_nonce),
             platform.clone(),
             transaction.snapshot().dupe(),
             capture.as_ref().map(|capture| capture as &dyn PrintHandler),
@@ -1555,7 +1565,39 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
         }
         match attempt.result {
-            Ok(invocation) => return Ok((invocation, capture, observations)),
+            Ok(invocation) => {
+                if invocation.archive_realization.is_none()
+                    && archive_epoch_hint
+                        .as_ref()
+                        .and_then(RepositoryArchiveEpoch::transcript)
+                        .is_some_and(|transcript| {
+                            transcript
+                                .records_for(&key.owner, key.ordinal)
+                                .next()
+                                .is_some()
+                        })
+                {
+                    // A surplus prepared record is itself an observed semantic
+                    // rejection: retain the epoch edge so clearing it can retry.
+                    verified_archive_epoch(
+                        ctx,
+                        key,
+                        certificate,
+                        archive_epoch_hint.as_ref(),
+                        &observations,
+                    )
+                    .await?;
+                    return Err(complete_effect_error(
+                        terminal_repository_rule_invocation_error(
+                            certificate,
+                            key.ordinal,
+                            RepositoryRuleInvocationError::ArchiveReplay,
+                        ),
+                        observations,
+                    ));
+                }
+                return Ok((invocation, capture, observations));
+            }
             Err(RepositoryRuleInvocationError::LabelPathNeed(address)) => {
                 if prepared_paths.contains_key(&address)
                     || prepared_paths.len() == RepositoryEffectLimits::LABEL_PATHS
@@ -1655,6 +1697,41 @@ async fn invoke_repository_rule_with_label_paths(
                 .await?;
                 observations = next_observations;
                 prepared_which.insert(candidate, value);
+            }
+            Err(RepositoryRuleInvocationError::ArchiveNeed(request)) => {
+                let epoch = verified_archive_epoch(
+                    ctx,
+                    key,
+                    certificate,
+                    archive_epoch_hint.as_ref(),
+                    &observations,
+                )
+                .await?;
+                let transcript = epoch
+                    .transcript()
+                    .expect("active archive epoch has a transcript")
+                    .for_owner(&key.owner, key.ordinal);
+                match transcript.matching_record(&request) {
+                    Ok(Some(_)) => {
+                        prepared_archives = transcript;
+                        archive_nonce = epoch.lease_nonce();
+                    }
+                    Ok(None) if transcript.records().len() == request.id().call_index() => {
+                        return Err(SourcePreparationOutcome::Need(
+                            SourcePreparationNeeds::repository_archive(request.as_ref().clone()),
+                        ));
+                    }
+                    _ => {
+                        return Err(complete_effect_error(
+                            terminal_repository_rule_invocation_error(
+                                certificate,
+                                key.ordinal,
+                                RepositoryRuleInvocationError::ArchiveReplay,
+                            ),
+                            observations,
+                        ));
+                    }
+                }
             }
             Err(RepositoryRuleInvocationError::ExecuteNeed(request)) => {
                 let observed = verified_execute_transcript(
@@ -1883,13 +1960,6 @@ async fn compute_effect(
             observations,
         );
     }
-    // Authentication and the existing platform observation precede local capability selection.
-    let archive_profile = SelectedArchiveProfile::select(&repository, &platform);
-    let input = if archive_profile.is_some() {
-        input.with_archive_owner()
-    } else {
-        input
-    };
     let declared_observed =
         match verified_environment(ctx, &key.workspace, &transaction, declared.iter().cloned())
             .await
@@ -1955,16 +2025,6 @@ async fn compute_effect(
             );
         }
     };
-    if archive_profile.is_some_and(|profile| !profile.matches_plan(&invocation.plan)) {
-        return complete_effect_error(
-            terminal_repository_rule_invocation_error(
-                &certificate,
-                key.ordinal,
-                RepositoryRuleInvocationError::ArchiveIncomplete,
-            ),
-            observations,
-        );
-    }
     if let Some(capture) = capture {
         ctx.store_evaluation_data(capture.into_batch())
             .expect("repository-file invocation stores one local Complete event batch");
@@ -1977,6 +2037,8 @@ async fn compute_effect(
             declared_observed.into_iter().chain(dynamic_observed),
             invocation.execute_transcript().clone(),
         ),
+        metadata: invocation.metadata.clone(),
+        archive_realization: invocation.archive_realization.clone(),
         plan: invocation.into_plan(),
     });
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
@@ -2043,6 +2105,7 @@ impl Key for HostSelectedRepositoryFileEffectObservationKey {
 
 #[cfg(test)]
 mod tests {
+    mod archive_replay_tests;
     use std::path::Path;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -5404,7 +5467,7 @@ ext = module_extension(implementation = impl)
         for (error, expected) in [
             (
                 RepositoryRuleInvocationError::ArchiveArgument,
-                "repository_ctx.download_and_extract arguments are outside the selected SHA-pinned tar.xz surface",
+                "repository_ctx.download_and_extract arguments are outside the supported SHA-pinned archive surface",
             ),
             (
                 RepositoryRuleInvocationError::ArchiveAuth,
@@ -5412,15 +5475,15 @@ ext = module_extension(implementation = impl)
             ),
             (
                 RepositoryRuleInvocationError::ArchiveLimit,
-                "repository_ctx.download_and_extract exceeds the selected limits",
+                "repository_ctx.download_and_extract exceeds the shared archive limits",
             ),
             (
-                RepositoryRuleInvocationError::ArchiveIncomplete,
-                "selected rust_host_tools repository requires six ordered archives",
+                RepositoryRuleInvocationError::ArchiveReplay,
+                "repository archive transcript differs from this invocation",
             ),
             (
                 RepositoryRuleInvocationError::ArchivePathObservation,
-                "generated path may depend on an unmaterialized archive",
+                "observing archive-produced generated paths is unsupported",
             ),
         ] {
             assert!(matches!(
@@ -6050,105 +6113,6 @@ ext=module_extension(implementation=impl)
                 .collect::<Vec<_>>(),
             ["repository-file-effect"]
         );
-    }
-
-    #[test]
-    fn selected_host_tools_archive_guard_requires_exact_six_ordered_tuples() {
-        let digest = |hex: &str| {
-            let mut bytes = [0u8; 32];
-            for (index, byte) in bytes.iter_mut().enumerate() {
-                *byte = u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap();
-            }
-            bytes
-        };
-        let build = |order: &[usize], corrupt: Option<usize>| {
-            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
-            for (ordinal, index) in order.iter().enumerate() {
-                let (url, sha256, prefix) = SELECTED_HOST_TOOLS_ARCHIVES[*index];
-                builder
-                    .push_archive(
-                        Arc::from([CompactString::new(url)]),
-                        if corrupt == Some(ordinal) {
-                            [0u8; 32]
-                        } else {
-                            digest(sha256)
-                        },
-                        prefix.into(),
-                    )
-                    .unwrap();
-            }
-            builder.finish()
-        };
-        let all = [0, 1, 2, 3, 4, 5];
-        assert!(matches_selected_host_tools_archives(&build(&all, None)));
-        assert!(!matches_selected_host_tools_archives(&build(
-            &all[..5],
-            None
-        )));
-        assert!(!matches_selected_host_tools_archives(&build(
-            &[1, 0, 2, 3, 4, 5],
-            None
-        )));
-        assert!(!matches_selected_host_tools_archives(&build(&all, Some(4))));
-        let mut wrong_url = GeneratedRepositoryFileEffectPlan::builder();
-        let mut wrong_prefix = GeneratedRepositoryFileEffectPlan::builder();
-        for (ordinal, (url, sha256, prefix)) in SELECTED_HOST_TOOLS_ARCHIVES.iter().enumerate() {
-            wrong_url
-                .push_archive(
-                    Arc::from([CompactString::new(if ordinal == 0 {
-                        "https://static.rust-lang.org/dist/other.tar.xz"
-                    } else {
-                        *url
-                    })]),
-                    digest(sha256),
-                    (*prefix).into(),
-                )
-                .unwrap();
-            wrong_prefix
-                .push_archive(
-                    Arc::from([CompactString::new(url)]),
-                    digest(sha256),
-                    if ordinal == 2 {
-                        "cargo-1.97.1-x86_64-unknown-linux-gnu/other"
-                    } else {
-                        *prefix
-                    }
-                    .into(),
-                )
-                .unwrap();
-        }
-        assert!(!matches_selected_host_tools_archives(&wrong_url.finish()));
-        assert!(!matches_selected_host_tools_archives(
-            &wrong_prefix.finish()
-        ));
-
-        let with_file = |file_at: usize| {
-            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
-            for (ordinal, (url, sha256, prefix)) in SELECTED_HOST_TOOLS_ARCHIVES.iter().enumerate()
-            {
-                if ordinal == file_at {
-                    builder
-                        .push("generated".into(), Arc::from(b"content".as_slice()), false)
-                        .unwrap();
-                }
-                builder
-                    .push_archive(
-                        Arc::from([CompactString::new(url)]),
-                        digest(sha256),
-                        (*prefix).into(),
-                    )
-                    .unwrap();
-            }
-            if file_at == SELECTED_HOST_TOOLS_ARCHIVES.len() {
-                builder
-                    .push("generated".into(), Arc::from(b"content".as_slice()), false)
-                    .unwrap();
-            }
-            builder.finish()
-        };
-        assert!(matches_selected_host_tools_archives(&with_file(6)));
-        assert!(!matches_selected_host_tools_archives(&with_file(0)));
-        assert!(!matches_selected_host_tools_archives(&with_file(3)));
     }
 
     #[tokio::test]

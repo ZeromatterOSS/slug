@@ -1338,6 +1338,9 @@ impl Bodies {
                     }
                     return Some((request, "immutable_kind"));
                 }
+                RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+                    return Some((request, "verified_archive_kind"));
+                }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {
                     #[cfg(target_os = "linux")]
                     if self.qualified_generated_file_plan(request).is_some() {
@@ -1998,6 +2001,7 @@ impl Bodies {
             decoded_bytes: 16 << 20,
             written_bytes: 16 << 20,
             live_buffer_bytes: 16 << 20,
+            live_decoder_bytes: SourceServiceLimits::MAX_LIVE_DECODER_BYTES,
             blocking_threads: Some(2),
         }
     }

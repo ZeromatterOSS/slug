@@ -280,7 +280,9 @@ pub(in crate::runtime::dice) fn progress_baseline(
     let progress = guard.progress(need)?;
     if matches!(
         progress,
-        NativeDemandProgress::Repositories | NativeDemandProgress::Downloads
+        NativeDemandProgress::Repositories
+            | NativeDemandProgress::Downloads
+            | NativeDemandProgress::Archives
     ) {
         selected_scratch_source::refresh_after_progress(
             guard.command.as_mut().unwrap(),
@@ -303,6 +305,7 @@ fn progress_sources(
     selected_scratch_source::active(guard.command(), deadline)?;
     // Whole mixed Need authorization precedes the first proof or source read.
     if !need.repository_executes().is_empty()
+        || !need.repository_archives().is_empty()
         || need.root_module_bootstrap_request().is_some()
         || !need.repository_materializations().is_empty()
         || !need.selected_extension_downloads().is_empty()

@@ -46,6 +46,7 @@ mod repository_archive;
 mod repository_archive_file;
 mod repository_archive_http;
 mod repository_archive_patch;
+mod repository_archive_progress;
 mod repository_archive_realize;
 mod repository_generated_archive;
 mod repository_host_input;

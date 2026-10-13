@@ -8,10 +8,11 @@ use crate::runtime::dice::source_service::SourceBufferReservation;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceBufferSite;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceBufferUnit;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceCounter;
+use crate::runtime::dice::source_service::SourceDecoderReservation;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceServiceError;
 pub(in crate::runtime) use crate::runtime::dice::source_service::SourceServiceScope;
 
-pub(super) fn check_identity(
+pub(in crate::runtime) fn check_identity(
     installed: Option<&Arc<SourceServiceScope>>,
     supplied: Option<&Arc<SourceServiceScope>>,
 ) -> Result<(), SourceServiceError> {
@@ -45,6 +46,17 @@ pub(in crate::runtime) fn buffer(
             s.reserve_buffer_at(bytes, SourceBufferSite::SharedIoBuffer)
                 .map_err(|e| e.to_string())
         })
+        .transpose()
+}
+
+/// Reserve codec allocation before constructing a decoder. The token owns the
+/// scope and stays live until the decoder has been dropped on every exit.
+pub(in crate::runtime) fn decoder(
+    scope: Option<&Arc<SourceServiceScope>>,
+    bytes: usize,
+) -> Result<Option<SourceDecoderReservation>, String> {
+    scope
+        .map(|s| s.reserve_decoder(bytes).map_err(|e| e.to_string()))
         .transpose()
 }
 

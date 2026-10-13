@@ -30,6 +30,10 @@ use super::timeout_provenance::SourceTimeoutSnapshot;
 #[cfg(all(test, target_os = "linux"))]
 use super::timeout_provenance::SourceTimeoutState;
 
+#[path = "decoder_reservation.rs"]
+mod decoder_reservation;
+pub(in crate::runtime) use decoder_reservation::SourceDecoderReservation;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in crate::runtime) enum SourceCounter {
     RegistryAttempts,
@@ -52,6 +56,8 @@ pub(in crate::runtime) struct SourceServiceLimits {
     pub(in crate::runtime) decoded_bytes: u64,
     pub(in crate::runtime) written_bytes: u64,
     pub(in crate::runtime) live_buffer_bytes: usize,
+    /// Codec allocation bank, independent of retained/streaming I/O buffers.
+    pub(in crate::runtime) live_decoder_bytes: usize,
     #[cfg(all(test, target_os = "linux"))]
     pub(in crate::runtime) blocking_threads: Option<usize>,
 }
@@ -67,12 +73,15 @@ impl Default for SourceServiceLimits {
             decoded_bytes: 2 << 30,
             written_bytes: 2 << 30,
             live_buffer_bytes: 16 << 20,
+            live_decoder_bytes: Self::MAX_LIVE_DECODER_BYTES,
             #[cfg(all(test, target_os = "linux"))]
             blocking_threads: None,
         }
     }
 }
 impl SourceServiceLimits {
+    pub(in crate::runtime) const MAX_LIVE_DECODER_BYTES: usize = 136 << 20;
+
     pub(super) const MAX_REGISTRY_ATTEMPTS: u64 = 256;
 
     #[cfg(all(test, target_os = "linux"))]
@@ -116,6 +125,8 @@ impl SourceServiceLimits {
         .all(|(v, m)| v > 0 && v <= m)
             && self.live_buffer_bytes > 0
             && self.live_buffer_bytes <= Self::MAX_LIVE_BUFFER_BYTES
+            && self.live_decoder_bytes > 0
+            && self.live_decoder_bytes <= Self::MAX_LIVE_DECODER_BYTES
     }
     fn maximum(self, counter: SourceCounter) -> u64 {
         match counter {
@@ -141,6 +152,7 @@ pub(in crate::runtime) enum SourceServiceError {
     Limit(SourceCounter),
     Overflow(SourceCounter),
     BufferLimit,
+    DecoderLimit,
     Allocation,
     UnsupportedSourceOwner,
 }
@@ -161,6 +173,8 @@ pub(in crate::runtime) struct SourceServiceCounters {
     pub(in crate::runtime) written_bytes: u64,
     pub(in crate::runtime) live_buffer_bytes: usize,
     pub(in crate::runtime) peak_buffer_bytes: usize,
+    pub(in crate::runtime) live_decoder_bytes: usize,
+    pub(in crate::runtime) peak_decoder_bytes: usize,
 }
 impl SourceServiceCounters {
     fn slot(&mut self, counter: SourceCounter) -> &mut u64 {

@@ -70,6 +70,7 @@ pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowanc
 pub(in crate::runtime) use regular_file::read_host_file_with_known_shas_allowance_and_census;
 pub(in crate::runtime) use scope::SourceBufferReservation;
 pub(in crate::runtime) use scope::SourceCounter;
+pub(in crate::runtime) use scope::SourceDecoderReservation;
 pub(in crate::runtime) use scope::SourceServiceCounters;
 pub(in crate::runtime) use scope::SourceServiceError;
 pub(in crate::runtime) use scope::SourceServiceLimits;

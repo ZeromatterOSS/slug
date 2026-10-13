@@ -90,6 +90,7 @@ pub enum RegistryRefusalScopeFailure {
     Limit(RegistryRefusalScopeCounter),
     Overflow(RegistryRefusalScopeCounter),
     BufferLimit,
+    DecoderLimit,
     Allocation,
     UnsupportedSourceOwner,
     NetworkDisabled,
@@ -211,6 +212,7 @@ impl RegistryRefusalScopeFailure {
             Self::Allocation => 10,
             Self::UnsupportedSourceOwner => 11,
             Self::NetworkDisabled => 12,
+            Self::DecoderLimit => 13,
         }
     }
 }

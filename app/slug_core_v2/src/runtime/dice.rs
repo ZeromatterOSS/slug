@@ -105,12 +105,17 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
 use slug_bzlmod_v2::RegistryUrls;
+use slug_bzlmod_v2::RepositoryArchiveEpoch;
+use slug_bzlmod_v2::RepositoryArchiveEpochKey;
+use slug_bzlmod_v2::RepositoryArchiveRecord;
+use slug_bzlmod_v2::RepositoryArchiveTranscript;
 use slug_bzlmod_v2::RepositoryExecuteEpoch;
 use slug_bzlmod_v2::RepositoryExecuteEpochKey;
 use slug_bzlmod_v2::RepositoryExecuteRecord;
 use slug_bzlmod_v2::RepositoryExecuteTranscript;
 use slug_bzlmod_v2::RepositoryMaterializationGeneration;
 use slug_bzlmod_v2::RepositoryMaterializationGenerationKey;
+use slug_bzlmod_v2::RepositoryMaterializationKind;
 use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
@@ -887,6 +892,9 @@ enum NativeDemandSessionError {
     },
     PathInternalNonProgress,
     ExecuteInternalNonProgress,
+    ArchiveInternalNonProgress,
+    RepositoryArchive(super::repository_io::ArchiveMaterializationError),
+    ArchiveTranscript(slug_bzlmod_v2::RepositoryArchiveTranscriptError),
     ExecuteEnvironmentMismatch,
     RepositoryExecute(super::repository_process::RepositoryProcessError),
     ExecuteTranscript(slug_bzlmod_v2::RepositoryExecuteTranscriptError),
@@ -956,6 +964,11 @@ impl fmt::Display for NativeDemandSessionError {
                 f.write_str("repository execution environment changed before launch")
             }
             Self::RepositoryExecute(error) => write!(f, "{error}"),
+            Self::ArchiveInternalNonProgress => {
+                f.write_str("repository archive preparation made no progress")
+            }
+            Self::RepositoryArchive(error) => write!(f, "repository archive: {}", error.message),
+            Self::ArchiveTranscript(_) => f.write_str("repository archive transcript conflict"),
             Self::ExecuteTranscript(_) => f.write_str("repository execution transcript conflict"),
             Self::RevisionInternalNonProgress => {
                 f.write_str("request revision made no bounded progress")
@@ -1009,6 +1022,7 @@ enum NativeDemandProgress {
     Downloads,
     Paths,
     Executes,
+    Archives,
 }
 
 #[allow(dead_code)]
@@ -1028,6 +1042,8 @@ struct NativeDemandCommand<'a> {
     scratch_metadata: Option<selected_tool_source::ScratchMetadataState>,
     repository_results: RepositoryMaterializationResultEpoch,
     execute_transcript: RepositoryExecuteTranscript,
+    archive_transcript: RepositoryArchiveTranscript,
+    archive_progress: super::repository_archive_progress::RepositoryArchiveProgress,
     path_observations: PathObservationEpoch,
     path_input_ledger: path_inputs::NativePathInputLedger,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
@@ -6430,6 +6446,8 @@ impl WorkspaceRuntime {
                 scratch_metadata: None,
                 repository_results: preflight.repository_results().clone(),
                 execute_transcript: RepositoryExecuteTranscript::empty(),
+                archive_transcript: RepositoryArchiveTranscript::empty(),
+                archive_progress: Default::default(),
                 path_observations,
                 repository_environment_frontier,
                 download_results,
@@ -7783,6 +7801,10 @@ impl NativeDemandCommand<'_> {
         // Loading uses this only to reject surplus prepared records on a
         // replay branch that no longer calls execute. A no-execute graph does
         // not acquire the transient DICE observation dependency.
+        data.data.set(RepositoryArchiveEpoch::active(
+            self.lease.0,
+            self.archive_transcript.dupe(),
+        ));
         data.data.set(RepositoryExecuteEpoch::active(
             self.lease.0,
             self.execute_transcript.dupe(),
@@ -7819,6 +7841,12 @@ impl NativeDemandCommand<'_> {
         if let Some(state) = &self.scratch_metadata {
             state.inject(updater, false)?;
         }
+        inject_repository_archive_epoch(
+            updater,
+            &self.runtime.workspace,
+            RepositoryArchiveEpoch::active(self.lease.0, self.archive_transcript.dupe()),
+        )
+        .map_err(NativeDemandSessionError::Injection)?;
         inject_repository_execute_epoch(
             updater,
             &self.runtime.workspace,
@@ -7839,6 +7867,24 @@ impl NativeDemandCommand<'_> {
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
     ) -> Result<NativeDemandProgress, NativeDemandSessionError> {
         self.validate_source_progress(needs)?;
+        // Validate every archive descriptor before any mixed-frontier I/O.
+        self.check_source_scope()?;
+        for request in needs.repository_archives().values() {
+            if let Some(known) = self.archive_transcript.find(request.id()) {
+                if known.request() != request.as_ref() {
+                    return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
+                }
+            } else if request.id().call_index()
+                != self
+                    .archive_transcript
+                    .records_for(request.id().owner(), request.id().ordinal())
+                    .count()
+                || self.archive_transcript.records().len() + needs.repository_archives().len()
+                    > slug_bzlmod_v2::REPOSITORY_ARCHIVE_MAX_CALLS
+            {
+                return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
+            }
+        }
         let mut repository_needs = needs
             .repository_materializations()
             .values()
@@ -7875,18 +7921,43 @@ impl NativeDemandCommand<'_> {
                 return Err(NativeDemandSessionError::RepositoryInternalNonProgress);
             }
             for request in new_requests {
-                self.repository_results = self
-                    .runtime
-                    .repository_materializer
-                    .materialize_native_with_runtime_and_distdirs(
-                        self.repository_session,
-                        request.clone(),
-                        self.inputs.generations.repository,
-                        &self.runtime.runtime,
-                        self.runtime.source_scope(),
-                        &self.inputs.request.archive_distdirs,
-                    )
-                    .map_err(NativeDemandSessionError::Repository)?;
+                self.repository_results =
+                    if let RepositoryMaterializationKind::GeneratedArchiveEffects(realization) =
+                        &request.kind
+                    {
+                        let materializer = &self.runtime.repository_materializer;
+                        let session = self.repository_session;
+                        let materialized = self
+                            .archive_progress
+                            .finish(
+                                realization,
+                                self.lease.0,
+                                &|| materializer.session_is_active(session),
+                                self.runtime.source_scope(),
+                            )
+                            .map_err(NativeDemandSessionError::RepositoryArchive)?;
+                        materializer
+                            .materialize_completed_archive(
+                                session,
+                                request.clone(),
+                                self.inputs.generations.repository,
+                                self.runtime.source_scope(),
+                                materialized,
+                            )
+                            .map_err(NativeDemandSessionError::Repository)?
+                    } else {
+                        self.runtime
+                            .repository_materializer
+                            .materialize_native_with_runtime_and_distdirs(
+                                self.repository_session,
+                                request.clone(),
+                                self.inputs.generations.repository,
+                                &self.runtime.runtime,
+                                self.runtime.source_scope(),
+                                &self.inputs.request.archive_distdirs,
+                            )
+                            .map_err(NativeDemandSessionError::Repository)?
+                    };
                 self.check_source_scope()?;
                 self.reusable_requests.shift_remove(&request.id);
                 self.issued_requests.insert(request.id.clone(), request);
@@ -8016,10 +8087,68 @@ impl NativeDemandCommand<'_> {
                 finish_probe_phase!(need_phase);
                 return Ok(NativeDemandProgress::Paths);
             }
-            if needs.repository_executes().is_empty() {
+            if needs.repository_executes().is_empty() && needs.repository_archives().is_empty() {
                 return Err(NativeDemandSessionError::PathInternalNonProgress);
             }
             finish_probe_phase!(need_phase);
+        }
+
+        if !needs.repository_archives().is_empty() {
+            let mut requests = needs
+                .repository_archives()
+                .values()
+                .cloned()
+                .collect::<Vec<_>>();
+            requests.sort_by(|left, right| {
+                left.id()
+                    .owner()
+                    .unique_name()
+                    .cmp(right.id().owner().unique_name())
+                    .then_with(|| left.id().ordinal().cmp(&right.id().ordinal()))
+                    .then_with(|| left.id().call_index().cmp(&right.id().call_index()))
+            });
+            let mut advanced = false;
+            for request in requests {
+                if let Some(known) = self.archive_transcript.find(request.id()) {
+                    if known.request() != request.as_ref() {
+                        return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
+                    }
+                    continue;
+                }
+                if request.id().call_index()
+                    != self
+                        .archive_transcript
+                        .records_for(request.id().owner(), request.id().ordinal())
+                        .count()
+                    || self.archive_transcript.records().len()
+                        >= slug_bzlmod_v2::REPOSITORY_ARCHIVE_MAX_CALLS
+                {
+                    return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
+                }
+                let materializer = &self.runtime.repository_materializer;
+                let session = self.repository_session;
+                let result = self
+                    .archive_progress
+                    .complete_call(
+                        &request,
+                        &self.runtime.runtime,
+                        &|| materializer.session_is_active(session),
+                        self.runtime.source_scope(),
+                        &self.inputs.request.archive_distdirs,
+                    )
+                    .map_err(NativeDemandSessionError::RepositoryArchive)?;
+                self.archive_transcript = self
+                    .archive_transcript
+                    .append(RepositoryArchiveRecord::new(request, result))
+                    .map_err(NativeDemandSessionError::ArchiveTranscript)?;
+                self.check_source_scope()?;
+                advanced = true;
+            }
+            return if advanced {
+                Ok(NativeDemandProgress::Archives)
+            } else {
+                Err(NativeDemandSessionError::ArchiveInternalNonProgress)
+            };
         }
 
         if !needs.repository_executes().is_empty() {
@@ -8166,6 +8295,12 @@ impl NativeDemandCommand<'_> {
                 if let Some(state) = &self.scratch_metadata {
                     state.inject(&mut updater, true)?;
                 }
+                inject_repository_archive_epoch(
+                    &mut updater,
+                    &self.runtime.workspace,
+                    RepositoryArchiveEpoch::revoked(),
+                )
+                .map_err(NativeDemandSessionError::Restoration)?;
                 inject_repository_execute_epoch(
                     &mut updater,
                     &self.runtime.workspace,
@@ -8923,6 +9058,12 @@ fn prepare_selected_native_demand_snapshot(
         &command.download_results,
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    inject_repository_archive_epoch(
+        &mut updater,
+        &command.runtime.workspace,
+        RepositoryArchiveEpoch::revoked(),
+    )
+    .map_err(NativeDemandSessionError::Injection)?;
     inject_repository_execute_epoch(
         &mut updater,
         &command.runtime.workspace,
@@ -8951,6 +9092,18 @@ async fn commit_prepared_native_demand_snapshot(
         .native_demand_sessions
         .record_trace(NativeDemandTestTrace::SelectedInjectionCommitted);
     Ok(())
+}
+
+fn inject_repository_archive_epoch(
+    updater: &mut DiceTransactionUpdater,
+    workspace: &Path,
+    epoch: RepositoryArchiveEpoch,
+) -> anyhow::Result<()> {
+    let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+        .context("normalizing repository archive workspace")?;
+    updater
+        .changed_to(vec![(RepositoryArchiveEpochKey::new(workspace), epoch)])
+        .context("injecting repository archive epoch")
 }
 
 fn inject_repository_execute_epoch(
@@ -9291,6 +9444,10 @@ mod tests {
         format!(
             "{source}bazel_dep(name = \"platforms\", version = \"1.0.0\")\nlocal_path_override(module_name = \"platforms\", path = \".slug_test_builtin/platforms\")\n"
         )
+    }
+
+    mod general_repository_archive_tests {
+        include!("tests/general_repository_archive_tests.rs");
     }
 
     #[test]

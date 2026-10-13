@@ -50,7 +50,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             attempt,
         })
     }
-    fn families(&self) -> [(&'static str, bool, usize); 7] {
+    fn families(&self) -> [(&'static str, bool, usize); 8] {
         let optional = |name, count: Option<usize>| (name, count.is_some(), count.unwrap_or(0));
         let map = |name, count| (name, count != 0, count);
         [
@@ -76,6 +76,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             ),
             map("downloads", self.needs.selected_extension_downloads().len()),
             map("executes", self.needs.repository_executes().len()),
+            map("archives", self.needs.repository_archives().len()),
         ]
     }
     fn operation(demand: &PathObservationDemand) -> Option<&'static str> {
@@ -152,6 +153,9 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             RepositoryMaterializationKind::Immutable => ("immutable", None),
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
+            }
+            RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+                ("generated_archive_effects", None)
             }
         };
         write!(out, "[\"unique\",[\"identity_projection\",\"{kind}\",")?;

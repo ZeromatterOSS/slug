@@ -36,6 +36,7 @@ pub mod parser;
 pub mod registry;
 pub mod registry_dice;
 mod repo_file;
+mod repository_archive;
 mod repository_execute;
 mod repository_host_input;
 mod repository_ignore;
@@ -109,6 +110,8 @@ pub use generated_repository_file_effect::GeneratedRepositoryFileEffectPlanError
 pub use generated_repository_file_effect::GeneratedRepositoryOrderedEffectRef;
 #[doc(hidden)]
 pub use generated_repository_file_effect::GeneratedRepositorySymlinkEffect;
+#[doc(hidden)]
+pub use generated_repository_file_effect::generated_repository_archive_parse_sha256;
 #[doc(hidden)]
 pub use generated_repository_file_effect::generated_repository_archive_sha256_hex;
 #[doc(hidden)]
@@ -328,6 +331,30 @@ pub use registry_dice::RootModuleRegistryUrls;
 pub use registry_dice::RootModuleRegistryUrlsKey;
 pub use registry_dice::inject_registry_request_inputs;
 pub use registry_dice::install_registry_io;
+#[doc(hidden)]
+pub use repository_archive::REPOSITORY_ARCHIVE_MAX_CALLS;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveCallId;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveEpoch;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveEpochKey;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveObservationKey;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveRealization;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveRealizationError;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveRecord;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveRequest;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveResult;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveTranscript;
+#[doc(hidden)]
+pub use repository_archive::RepositoryArchiveTranscriptError;
 #[doc(hidden)]
 pub use repository_execute::REPOSITORY_EXECUTE_MAX_CALLS;
 #[doc(hidden)]
@@ -742,6 +769,8 @@ pub use source_preparation::SourcePreparationOutcome;
 pub use source_preparation::SourcePreparationResult;
 #[doc(hidden)]
 pub use source_preparation::host_canonical_repository_source_input;
+#[doc(hidden)]
+pub use source_preparation::host_canonical_repository_source_input_with_archive_realization;
 #[doc(hidden)]
 pub use source_preparation::host_repository_materialization_request;
 #[doc(hidden)]

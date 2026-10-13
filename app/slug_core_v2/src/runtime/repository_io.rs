@@ -116,7 +116,7 @@ fn observation_instance_exhausted() -> RepositoryTransportError {
     }
 }
 
-#[allow(dead_code)]// The bridge is dormant until the retry-driver packet.
+#[allow(dead_code)] // The bridge is dormant until the retry-driver packet.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) struct RepositorySessionToken(u64);
 
@@ -616,7 +616,8 @@ impl RepositoryMaterializer {
                 RepositoryMaterializationKind::Immutable,
                 PreparedMaterializationAttempt::Immutable { .. }
             ) | (
-                RepositoryMaterializationKind::GeneratedFileEffects(_),
+                RepositoryMaterializationKind::GeneratedFileEffects(_)
+                    | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
                 PreparedMaterializationAttempt::Immutable { .. }
             ) | (_, PreparedMaterializationAttempt::Result(_))
         );
@@ -697,7 +698,8 @@ impl RepositoryMaterializer {
                 )
             }
             (
-                RepositoryMaterializationKind::GeneratedFileEffects(_),
+                RepositoryMaterializationKind::GeneratedFileEffects(_)
+                | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
                 PreparedMaterializationAttempt::Immutable {
                     source_identity,
                     root,
@@ -832,6 +834,20 @@ impl RepositoryMaterializer {
                 scope,
                 archive_distdirs,
             )
+        })
+    }
+
+    pub(super) fn materialize_completed_archive(
+        &self,
+        token: RepositorySessionToken,
+        request: Arc<RepositoryMaterializationRequest>,
+        generation: RepositoryMaterializationGeneration,
+        scope: Option<&Arc<SourceServiceScope>>,
+        materialized: Materialized,
+    ) -> Result<RepositoryMaterializationResultEpoch, RepositorySessionError> {
+        validate_native_request(&self.workspace, &request)?;
+        self.materialize_with_scope(token, request, generation, scope, || {
+            materialized_attempt(Ok(materialized))
         })
     }
 
@@ -1636,7 +1652,8 @@ impl GeneratedRepositoryFileEffectsIo for NativeGeneratedRepositoryFileEffectsIo
     fn create_file(&mut self, path: &Path) -> Result<File, String> {
         OpenOptions::new()
             .write(true)
-            .create_new(true)
+            .create(true)
+            .truncate(true)
             .open(path)
             .map_err(|error| error.to_string())
     }
@@ -1783,6 +1800,10 @@ fn generated_repository_file_effect_source_association(
                             GeneratedRepositoryArchiveFormat::TarXz,
                             GeneratedRepositoryArchiveOutput::RepositoryRoot,
                         ) => digest.update(b"tar-xz-root\0"),
+                        (
+                            GeneratedRepositoryArchiveFormat::TarGz,
+                            GeneratedRepositoryArchiveOutput::RepositoryRoot,
+                        ) => digest.update(b"tar-gz-root\0"),
                     }
                     digest.update((archive.urls().len() as u64).to_be_bytes());
                     for url in archive.urls() {
@@ -1792,6 +1813,13 @@ fn generated_repository_file_effect_source_association(
                     digest.update(archive.sha256());
                     digest.update((archive.strip_prefix().len() as u64).to_be_bytes());
                     digest.update(archive.strip_prefix().as_bytes());
+                    for bytes in [
+                        archive.canonical_id().as_bytes(),
+                        archive.declared_integrity().as_bytes(),
+                    ] {
+                        digest.update((bytes.len() as u64).to_be_bytes());
+                        digest.update(bytes);
+                    }
                 }
                 GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
                     unreachable!("symlink plans use their separate source-association domain")
@@ -1832,10 +1860,9 @@ fn generated_repository_file_effect_paths_are_valid(
                 .all(|component| !component.is_empty() && component != "." && component != "..")
     }) && paths.iter().enumerate().all(|(index, path)| {
         paths.iter().skip(index + 1).all(|other| {
-            path != other
-                && !other
-                    .strip_prefix(path)
-                    .is_some_and(|suffix| suffix.starts_with('/'))
+            !other
+                .strip_prefix(path)
+                .is_some_and(|suffix| suffix.starts_with('/'))
                 && !path
                     .strip_prefix(other)
                     .is_some_and(|suffix| suffix.starts_with('/'))
@@ -1970,6 +1997,55 @@ pub(super) fn stage_generated_repository_file_effect_prefix(
     }
 }
 
+pub(super) fn apply_generated_repository_file(
+    root: &Path,
+    file: &slug_bzlmod_v2::GeneratedRepositoryFileEffect,
+    active: &dyn Fn() -> bool,
+    scope: Option<&Arc<SourceServiceScope>>,
+) -> Result<(), ArchiveMaterializationError> {
+    let target = root.join(file.path());
+    if let Some(parent) = target.parent() {
+        std::fs::create_dir_all(parent).map_err(|error| {
+            ArchiveMaterializationError::materialization(format!(
+                "creating generated file parent: {error}"
+            ))
+        })?;
+    }
+    match std::fs::symlink_metadata(&target) {
+        Ok(metadata) if !metadata.file_type().is_file() => {
+            return Err(ArchiveMaterializationError::materialization(
+                "generated file effect collides with a non-regular archive entry",
+            ));
+        }
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
+            return Err(ArchiveMaterializationError::materialization(format!(
+                "checking generated file target: {error}"
+            )));
+        }
+        _ => {}
+    }
+    let mut output = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(&target)
+        .map_err(|error| {
+            ArchiveMaterializationError::materialization(format!("writing generated file: {error}"))
+        })?;
+    source_service::write_counted(&mut output, file.content(), active, scope).map_err(|error| {
+        ArchiveMaterializationError::materialization(format!(
+            "writing generated file bytes: {error}"
+        ))
+    })?;
+    output.flush().map_err(|error| {
+        ArchiveMaterializationError::materialization(format!("flushing generated file: {error}"))
+    })?;
+    NativeGeneratedRepositoryFileEffectsIo
+        .set_mode(&target, file.executable())
+        .map_err(ArchiveMaterializationError::materialization)?;
+    Ok(())
+}
+
 fn materialize_generated_repository_archive_effects(
     plan: &GeneratedRepositoryFileEffectPlan,
     runtime: &tokio::runtime::Runtime,
@@ -2002,7 +2078,8 @@ fn materialize_generated_repository_archive_effects(
             GeneratedRepositoryOrderedEffectRef::Archive(archive) => {
                 match (archive.format(), archive.output()) {
                     (
-                        GeneratedRepositoryArchiveFormat::TarXz,
+                        GeneratedRepositoryArchiveFormat::TarXz
+                        | GeneratedRepositoryArchiveFormat::TarGz,
                         GeneratedRepositoryArchiveOutput::RepositoryRoot,
                     ) => {}
                 }
@@ -2019,10 +2096,11 @@ fn materialize_generated_repository_archive_effects(
                     scope,
                     archive_distdirs,
                 )?;
-                super::repository_generated_archive::extract_selected_generated_archive(
+                super::repository_generated_archive::extract_generated_archive(
                     capture.as_file(),
                     root.path(),
                     archive.strip_prefix(),
+                    archive.format(),
                     active,
                     &mut aggregate_decoded,
                     scope,
@@ -2034,52 +2112,7 @@ fn materialize_generated_repository_archive_effects(
                 })?;
             }
             GeneratedRepositoryOrderedEffectRef::File(file) => {
-                let target = root.path().join(file.path());
-                if let Some(parent) = target.parent() {
-                    std::fs::create_dir_all(parent).map_err(|error| {
-                        ArchiveMaterializationError::materialization(format!(
-                            "creating generated file parent: {error}"
-                        ))
-                    })?;
-                }
-                match std::fs::symlink_metadata(&target) {
-                    Ok(metadata) if !metadata.file_type().is_file() => {
-                        return Err(ArchiveMaterializationError::materialization(
-                            "generated file effect collides with a non-regular archive entry",
-                        ));
-                    }
-                    Err(error) if error.kind() != std::io::ErrorKind::NotFound => {
-                        return Err(ArchiveMaterializationError::materialization(format!(
-                            "checking generated file target: {error}"
-                        )));
-                    }
-                    _ => {}
-                }
-                let mut output = OpenOptions::new()
-                    .write(true)
-                    .create(true)
-                    .truncate(true)
-                    .open(&target)
-                    .map_err(|error| {
-                        ArchiveMaterializationError::materialization(format!(
-                            "writing generated file: {error}"
-                        ))
-                    })?;
-                source_service::write_counted(&mut output, file.content(), active, scope).map_err(
-                    |error| {
-                        ArchiveMaterializationError::materialization(format!(
-                            "writing generated file bytes: {error}"
-                        ))
-                    },
-                )?;
-                output.flush().map_err(|error| {
-                    ArchiveMaterializationError::materialization(format!(
-                        "flushing generated file: {error}"
-                    ))
-                })?;
-                NativeGeneratedRepositoryFileEffectsIo
-                    .set_mode(&target, file.executable())
-                    .map_err(ArchiveMaterializationError::materialization)?;
+                apply_generated_repository_file(root.path(), file, active, scope)?;
             }
             GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
                 return Err(ArchiveMaterializationError::spec(
@@ -2103,6 +2136,14 @@ fn materialize_native_attempt(
     workspace: &Path,
     request: &RepositoryMaterializationRequest,
 ) -> RepositoryMaterializationAttempt {
+    if matches!(
+        &request.kind,
+        RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+    ) {
+        return RepositoryMaterializationAttempt::SpecError(
+            "archive realization must be adopted by its live command owner".into(),
+        );
+    }
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
         if plan.has_archives() {
             return RepositoryMaterializationAttempt::SpecError(
@@ -2145,12 +2186,37 @@ fn materialize_native_attempt_with_runtime(
     scope: Option<&Arc<SourceServiceScope>>,
     archive_distdirs: &super::ArchiveDistdirPolicy,
 ) -> RepositoryMaterializationAttempt {
-    if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind
-        && (plan.has_archives() || scope.is_some())
-    {
-        return materialized_attempt(materialize_generated_repository_archive_effects(
-            plan, runtime, active, scope, archive_distdirs,
-        ));
+    if matches!(
+        &request.kind,
+        RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+    ) {
+        return RepositoryMaterializationAttempt::SpecError(
+            "archive realization must be adopted by its live command owner".into(),
+        );
+    }
+    if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
+        if plan.has_archives() {
+            return RepositoryMaterializationAttempt::SpecError(
+                "archive effects require a verified invocation realization".into(),
+            );
+        }
+        // The typed invocation result selects realization, independently of
+        // the rule's source/export identity. Legacy source-spec acquisition
+        // below cannot replace an evaluated ordinary-file plan.
+        return if scope.is_some() {
+            materialized_attempt(materialize_generated_repository_archive_effects(
+                plan,
+                runtime,
+                active,
+                scope,
+                archive_distdirs,
+            ))
+        } else {
+            materialize_generated_repository_file_effects(
+                plan,
+                &mut NativeGeneratedRepositoryFileEffectsIo,
+            )
+        };
     }
     if request.repo_spec.rule_id.bzl_file.to_string()
         == "@@bazel_tools//tools/build_defs/repo:http.bzl"
@@ -2190,21 +2256,11 @@ fn validate_native_request(
         &request.kind,
     ) {
         (
-            "@@bazel_tools//tools/build_defs/repo:local.bzl",
-            "local_repository",
-            RepositoryMaterializationKind::GeneratedFileEffects(_),
-        )
-        | (
-            "@@bazel_tools//tools/build_defs/repo:http.bzl",
-            "http_archive",
-            RepositoryMaterializationKind::GeneratedFileEffects(_),
-        )
-        | (
-            "@@bazel_tools//tools/build_defs/repo:git.bzl",
-            "git_repository",
-            RepositoryMaterializationKind::GeneratedFileEffects(_),
-        ) => Err(RepositorySessionError::KindMismatch),
-        (_, _, RepositoryMaterializationKind::GeneratedFileEffects(_)) => Ok(()),
+            _,
+            _,
+            RepositoryMaterializationKind::GeneratedFileEffects(_)
+            | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
+        ) => Ok(()),
         (_, _, RepositoryMaterializationKind::Local { .. }) => {
             local_request::validate(workspace.as_path(), request)
                 .map_err(|_| RepositorySessionError::KindMismatch)
@@ -2342,7 +2398,11 @@ fn materialize_archive_plan_with_capture(
         }
         Ok(super::repository_archive::ArchivePlan::SelectedBcrTarGz(plan)) => {
             super::repository_archive::materialize_selected_bcr_capture_with_distdirs(
-                &plan, runtime, active, scope, archive_distdirs,
+                &plan,
+                runtime,
+                active,
+                scope,
+                archive_distdirs,
             )
         }
         Err(error) => Err(ArchiveMaterializationError::spec(error)),
@@ -2695,6 +2755,10 @@ mod tests {
         let mut encoder = xz2::write::XzEncoder::new(Vec::new(), 6);
         encoder.write_all(&tar).unwrap();
         encoder.finish().unwrap()
+    }
+
+    mod general_generated_effect_materialization_tests {
+        include!("tests/general_generated_effect_materialization_tests.rs");
     }
 
     #[test]
@@ -3380,7 +3444,7 @@ mod tests {
     }
 
     #[test]
-    fn generated_file_effect_kind_is_custom_rule_only_and_nonposix_mode_fails_closed() {
+    fn generated_file_effect_kind_is_generic_and_nonposix_mode_fails_closed() {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let plan = generated_plan([("BUILD.bazel", b"x" as &[u8], true)]);
         for spec in [
@@ -3394,10 +3458,7 @@ mod tests {
                 spec,
                 RepositoryMaterializationKind::GeneratedFileEffects(plan.clone()),
             );
-            assert_eq!(
-                validate_native_request(&workspace, &request),
-                Err(RepositorySessionError::KindMismatch)
-            );
+            assert_eq!(validate_native_request(&workspace, &request), Ok(()));
         }
         let custom = RepoSpec {
             rule_id: RepoRuleId {

@@ -341,6 +341,21 @@ impl NativeDemandCommand<'_> {
                 scope.poison(SourceServiceError::UnsupportedSourceOwner),
             ));
         }
+        for request in needs.repository_archives().values() {
+            if self
+                .archive_transcript
+                .find(request.id())
+                .is_some_and(|known| known.request() != request.as_ref())
+                || (self.archive_transcript.find(request.id()).is_none()
+                    && request.id().call_index()
+                        != self
+                            .archive_transcript
+                            .records_for(request.id().owner(), request.id().ordinal())
+                            .count())
+            {
+                return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
+            }
+        }
         // Counter access is a short lock and also checks sticky admission.
         scope
             .remaining(SourceCounter::SourceAttempts)

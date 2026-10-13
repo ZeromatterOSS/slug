@@ -20,7 +20,7 @@ use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
 use slug_bzlmod_v2::HostCanonicalRepositorySourceInput;
 use slug_bzlmod_v2::HostCanonicalRepositorySourceInputError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
-use slug_bzlmod_v2::host_canonical_repository_source_input;
+use slug_bzlmod_v2::host_canonical_repository_source_input_with_archive_realization;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
@@ -341,6 +341,7 @@ async fn compute_generated_effect(
             (CanonicalLoadRouteResult, PathObservationEpoch),
             (
                 Option<slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan>,
+                Option<slug_bzlmod_v2::RepositoryArchiveRealization>,
                 PathObservationEpoch,
             ),
         >,
@@ -349,6 +350,7 @@ async fn compute_generated_effect(
 > {
     let Some(seed) = route.view().generated_effect_seed() else {
         return SourcePreparationOutcome::Complete(Ok(ControlFlow::Continue((
+            None,
             None,
             route_observations,
         ))));
@@ -428,6 +430,7 @@ async fn compute_generated_effect(
     match result.as_ref() {
         Ok(effect) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Continue((
             Some(effect.plan().clone()),
+            effect.archive_realization().cloned(),
             observations,
         )))),
         Err(error) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Break((
@@ -455,7 +458,7 @@ async fn compute_load_route(
             return SourcePreparationOutcome::Complete(Ok(value));
         }
     };
-    let (plan, observations) =
+    let (plan, archive_realization, observations) =
         match compute_generated_effect(ctx, key, route.clone(), observations, mode).await {
             SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
@@ -466,12 +469,16 @@ async fn compute_load_route(
                 return SourcePreparationOutcome::Complete(Ok(value));
             }
         };
-    let result = host_canonical_repository_source_input(route, plan)
-        .map(|input| HostCanonicalRepositoryLoadRoute { input })
-        .map_err(|error| HostCanonicalRepositoryLoadRouteError {
-            canonical_repo: key.canonical_repo.clone(),
-            kind: HostCanonicalRepositoryLoadRouteErrorKind::Projection(error),
-        });
+    let result = host_canonical_repository_source_input_with_archive_realization(
+        route,
+        plan,
+        archive_realization,
+    )
+    .map(|input| HostCanonicalRepositoryLoadRoute { input })
+    .map_err(|error| HostCanonicalRepositoryLoadRouteError {
+        canonical_repo: key.canonical_repo.clone(),
+        kind: HostCanonicalRepositoryLoadRouteErrorKind::Projection(error),
+    });
     complete_load_route(result, observations)
 }
 
