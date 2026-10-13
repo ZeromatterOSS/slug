@@ -684,6 +684,12 @@ impl GeneratedPlanDiagnostic<'_> {
                 }
                 Effect::Archive(_) => 1,
                 Effect::Symlink(_) => 2,
+                // This historical bounded diagnostic has no deletion schema.
+                // Refuse its snapshot rather than silently omit new effects.
+                Effect::Delete(_) => return GeneratedPlanSummary {
+                    rows: result.rows, counts: None, paths: None,
+                    content: None, captured: false,
+                },
             };
             result.counts.as_mut().unwrap()[kind] += 1;
         }
@@ -755,6 +761,7 @@ impl fmt::Display for GeneratedPlanDiagnostic<'_> {
                             file.executable()
                         )?;
                     }
+                    Effect::Delete(_) => unreachable!("delete summaries are refused above"),
                     Effect::Archive(_) | Effect::Symlink(_) => {
                         let kind = if matches!(effect, Effect::Archive(_)) {
                             "archive"
@@ -1338,7 +1345,7 @@ impl Bodies {
                     }
                     return Some((request, "immutable_kind"));
                 }
-                RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+                RepositoryMaterializationKind::GeneratedFilesystemEffects(_) => {
                     return Some((request, "verified_archive_kind"));
                 }
                 RepositoryMaterializationKind::GeneratedFileEffects(plan) => {

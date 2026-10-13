@@ -26,17 +26,19 @@ use slug_bzlmod_v2::HostRepositoryLabelPathValue;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::OverrideAttributeKey;
 use slug_bzlmod_v2::OverrideAttributeValue;
-use slug_bzlmod_v2::REPOSITORY_ARCHIVE_MAX_CALLS;
 use slug_bzlmod_v2::REPOSITORY_EXECUTE_MAX_CALLS;
-use slug_bzlmod_v2::RepositoryArchiveCallId;
-use slug_bzlmod_v2::RepositoryArchiveRealization;
-use slug_bzlmod_v2::RepositoryArchiveRequest;
-use slug_bzlmod_v2::RepositoryArchiveTranscript;
+use slug_bzlmod_v2::REPOSITORY_FILESYSTEM_MAX_CALLS;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshot;
 use slug_bzlmod_v2::RepositoryExecuteArg;
 use slug_bzlmod_v2::RepositoryExecuteCallId;
 use slug_bzlmod_v2::RepositoryExecuteRequest;
 use slug_bzlmod_v2::RepositoryExecuteTranscript;
+use slug_bzlmod_v2::RepositoryFilesystemCallId;
+use slug_bzlmod_v2::RepositoryFilesystemOperation;
+use slug_bzlmod_v2::RepositoryFilesystemRealization;
+use slug_bzlmod_v2::RepositoryFilesystemRequest;
+use slug_bzlmod_v2::RepositoryFilesystemResult;
+use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatform;
 #[rustfmt::skip] use slug_workspace_v2::{NormalizedAbsolutePath, PathObservationNamespace};
@@ -74,6 +76,8 @@ use crate::provider::BzlEvaluationContext;
 use crate::starlark_label::StarlarkLabel;
 
 mod archive;
+mod deletion;
+mod filesystem;
 mod repository_metadata;
 pub use repository_metadata::RepositoryMetadata;
 use repository_metadata::classify_repository_return;
@@ -85,9 +89,9 @@ pub(crate) struct RepositoryRuleInvocationInput {
     original_name: Option<CompactString>,
     attributes: Arc<SmallMap<CompactString, OverrideAttributeValue>>,
     declaration: Arc<[RepositoryRuleAttribute]>,
-    archive_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
-    archive_transcript: RepositoryArchiveTranscript,
-    archive_lease_nonce: Option<u64>,
+    filesystem_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
+    filesystem_transcript: RepositoryFilesystemTranscript,
+    filesystem_lease_nonce: Option<u64>,
     homebrew_template_guard: bool,
     execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>,
     execute_transcript: RepositoryExecuteTranscript,
@@ -152,28 +156,28 @@ impl RepositoryRuleInvocationInput {
             original_name,
             attributes,
             declaration,
-            archive_owner: None,
-            archive_transcript: RepositoryArchiveTranscript::empty(),
-            archive_lease_nonce: None,
+            filesystem_owner: None,
+            filesystem_transcript: RepositoryFilesystemTranscript::empty(),
+            filesystem_lease_nonce: None,
             homebrew_template_guard: false,
             execute_owner: None,
             execute_transcript: RepositoryExecuteTranscript::empty(),
         })
     }
 
-    pub(crate) fn with_archives(
+    pub(crate) fn with_filesystem_operations(
         mut self,
         owner: Arc<HostSelectedExtensionOwner>,
         ordinal: usize,
-        transcript: RepositoryArchiveTranscript,
+        transcript: RepositoryFilesystemTranscript,
     ) -> Self {
-        self.archive_owner = Some((owner, ordinal));
-        self.archive_transcript = transcript;
+        self.filesystem_owner = Some((owner, ordinal));
+        self.filesystem_transcript = transcript;
         self
     }
 
-    pub(crate) fn with_archive_lease_nonce(mut self, nonce: Option<u64>) -> Self {
-        self.archive_lease_nonce = nonce;
+    pub(crate) fn with_filesystem_lease_nonce(mut self, nonce: Option<u64>) -> Self {
+        self.filesystem_lease_nonce = nonce;
         self
     }
 
@@ -492,10 +496,10 @@ impl RepositoryRuleHostObservation {
 
 #[rustfmt::skip]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, HomebrewTemplateEnvironment, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, ArchiveArgument, ArchiveAuth, ArchiveLimit, ArchiveNeed(Arc<RepositoryArchiveRequest>), ArchiveReplay, ArchiveOptions, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
+pub(crate) enum RepositoryRuleInvocationError { PathArgument, LabelPathArgument, LabelPathNeed(RepositoryLabelPathAddress), HostPathNeed(NormalizedAbsolutePath), ReadArgument, ReadLimit, TemplateDestinationArgument, TemplateSourceArgument, HomebrewTemplateEnvironment, SymlinkArgument, RepositorySourceNeed(RepositoryLabelPathAddress), TemplateSubstitutions, TemplateLimit, WhichArgument(CompactString), WhichLimit, WhichNeed(NormalizedAbsolutePath), ExecuteArgument, ExecuteOptions, ExecuteLimit, ExecuteNeed(Arc<RepositoryExecuteRequest>), ExecuteReplay, FilesystemExecuteMix, DeleteArgument, ArchiveArgument, ArchiveAuth, FilesystemLimit, FilesystemNeed(Arc<RepositoryFilesystemRequest>), FilesystemReplay, ArchiveOptions, ArchivePathObservation, Plan(GeneratedRepositoryFileEffectPlanError), Evaluation(CompactString), Result(CompactString) }
 
 #[rustfmt::skip]
-pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) metadata: RepositoryMetadata, pub(crate) archive_realization: Option<RepositoryArchiveRealization>, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript }
+pub(crate) struct RepositoryRuleInvocation { pub(crate) plan: GeneratedRepositoryFileEffectPlan, pub(crate) metadata: RepositoryMetadata, pub(crate) filesystem_realization: Option<RepositoryFilesystemRealization>, pub(crate) dynamic_environment: Arc<[CompactString]>, pub(crate) execute_transcript: RepositoryExecuteTranscript }
 
 pub(crate) struct RepositoryRuleInvocationAttempt {
     pub(crate) result: Result<RepositoryRuleInvocation, RepositoryRuleInvocationError>,
@@ -535,7 +539,7 @@ pub(crate) enum RepositoryWhichCandidate { Executable, Miss }
 enum RepositoryStarlarkPath { Label { address: RepositoryLabelPathAddress, path: HostRepositoryLabelPathValue }, Which(HostRepositoryLabelPathValue), Host { path: NormalizedAbsolutePath, exists: bool }, Generated { repository: CompactString, relative: CompactString, present: Arc<Mutex<GeneratedPathFacts>> } }
 
 #[rustfmt::skip] #[derive(Debug, ProvidesStaticType)]
-pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<GeneratedPathFacts>>, archive_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, archive_transcript: RepositoryArchiveTranscript, archive_lease_nonce: Option<u64>, archive_call_index: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, execute_transcript: RepositoryExecuteTranscript, execute_call_index: RefCell<usize>, error: RefCell<Option<RepositoryRuleInvocationError>> }
+pub(crate) struct RepositoryRuleInvocationState { bzl: BzlEvaluationContext, prepared_paths: PreparedRepositoryLabelPaths, prepared_sources: PreparedRepositoryLabelSources, prepared_which: PreparedRepositoryWhichCandidates, prepared_host_paths: PreparedRepositoryHostPaths, generated_repository: CompactString, generated_present: Arc<Mutex<GeneratedPathFacts>>, filesystem_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, filesystem_transcript: RepositoryFilesystemTranscript, filesystem_lease_nonce: Option<u64>, filesystem_call_index: RefCell<usize>, effects: RefCell<Option<GeneratedRepositoryFileEffectPlanBuilder>>, dynamic_environment: RefCell<Vec<CompactString>>, environment_enumerated: Arc<AtomicBool>, execute_owner: Option<(Arc<HostSelectedExtensionOwner>, usize)>, execute_transcript: RepositoryExecuteTranscript, execute_call_index: RefCell<usize>, error: RefCell<Option<RepositoryRuleInvocationError>> }
 
 #[derive(Debug, Allocative)]
 struct GeneratedPathFacts {
@@ -555,7 +559,7 @@ fn normalized_generated_path(base: &str, input: &str) -> Option<CompactString> {
 
 #[rustfmt::skip]
 impl RepositoryRuleInvocationState {
-    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, input: &RepositoryRuleInvocationInput) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository: input.name.clone(), generated_present: Arc::new(Mutex::new(GeneratedPathFacts { present: SmallSet::from_iter([CompactString::new("")]), archive_seen: false, refused: false })), archive_owner: input.archive_owner.clone(), archive_transcript: input.archive_transcript.clone(), archive_lease_nonce: input.archive_lease_nonce, archive_call_index: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), execute_owner: input.execute_owner.clone(), execute_transcript: input.execute_transcript.clone(), execute_call_index: RefCell::new(0), error: RefCell::new(None) } }
+    fn new(manifest: &BzlLoadManifest, prepared_paths: &PreparedRepositoryLabelPaths, prepared_sources: &PreparedRepositoryLabelSources, prepared_which: &PreparedRepositoryWhichCandidates, prepared_host_paths: &PreparedRepositoryHostPaths, input: &RepositoryRuleInvocationInput) -> Self { Self { bzl: BzlEvaluationContext::from_manifest(manifest), prepared_paths: prepared_paths.clone(), prepared_sources: prepared_sources.clone(), prepared_which: prepared_which.clone(), prepared_host_paths: prepared_host_paths.clone(), generated_repository: input.name.clone(), generated_present: Arc::new(Mutex::new(GeneratedPathFacts { present: SmallSet::from_iter([CompactString::new("")]), archive_seen: false, refused: false })), filesystem_owner: input.filesystem_owner.clone(), filesystem_transcript: input.filesystem_transcript.clone(), filesystem_lease_nonce: input.filesystem_lease_nonce, filesystem_call_index: RefCell::new(0), effects: RefCell::new(Some(GeneratedRepositoryFileEffectPlan::builder())), dynamic_environment: RefCell::new(Vec::new()), environment_enumerated: Arc::new(AtomicBool::new(false)), execute_owner: input.execute_owner.clone(), execute_transcript: input.execute_transcript.clone(), execute_call_index: RefCell::new(0), error: RefCell::new(None) } }
     fn from_evaluator<'a>(eval: &'a Evaluator<'_, '_, '_>) -> anyhow::Result<&'a Self> { eval.extra.and_then(|extra| extra.downcast_ref::<Self>()).ok_or_else(|| anyhow::anyhow!("repository_ctx is outside repository-rule execution")) }
     pub(crate) fn bzl(&self) -> &BzlEvaluationContext { &self.bzl }
     fn generated_path(&self, input: &str) -> Result<RepositoryStarlarkPath, RepositoryRuleInvocationError> { let relative = normalized_generated_path("", input).ok_or(RepositoryRuleInvocationError::LabelPathArgument)?; Ok(RepositoryStarlarkPath::Generated { repository: self.generated_repository.clone(), relative, present: self.generated_present.clone() }) }
@@ -575,18 +579,18 @@ impl RepositoryRuleInvocationState {
     fn fail(&self, error: RepositoryRuleInvocationError) -> anyhow::Error { *self.error.borrow_mut() = Some(error); anyhow::anyhow!("repository_ctx invocation failed") }
     fn record_environment(&self, name: &str) { self.dynamic_environment.borrow_mut().push(name.into()); }
     fn prepared_execute_count(&self) -> usize { self.execute_owner.as_ref().map_or(0, |(owner, ordinal)| self.execute_transcript.records_for(owner, *ordinal).count()) }
-    fn prepared_archive_count(&self) -> usize { self.archive_owner.as_ref().map_or(0, |(owner, ordinal)| self.archive_transcript.records_for(owner, *ordinal).count()) }
+    fn prepared_filesystem_count(&self) -> usize { self.filesystem_owner.as_ref().map_or(0, |(owner, ordinal)| self.filesystem_transcript.records_for(owner, *ordinal).count()) }
     fn finish(&self) -> Result<RepositoryRuleInvocation, RepositoryRuleInvocationError> {
         if *self.execute_call_index.borrow() != self.prepared_execute_count() { return Err(RepositoryRuleInvocationError::ExecuteReplay); }
-        if *self.archive_call_index.borrow() != self.prepared_archive_count() { return Err(RepositoryRuleInvocationError::ArchiveReplay); }
+        if *self.filesystem_call_index.borrow() != self.prepared_filesystem_count() { return Err(RepositoryRuleInvocationError::FilesystemReplay); }
         if self.generated_present.lock().expect("generated path state mutex poisoned").refused { return Err(RepositoryRuleInvocationError::ArchivePathObservation); }
         let plan = self.effects.borrow_mut().take().expect("repository context completes at most once").finish();
-        let archive_realization = if *self.archive_call_index.borrow() == 0 { None } else {
-            let (owner, ordinal) = self.archive_owner.as_ref().ok_or(RepositoryRuleInvocationError::ArchiveReplay)?;
-            Some(RepositoryArchiveRealization::new(self.archive_lease_nonce.ok_or(RepositoryRuleInvocationError::ArchiveReplay)?, owner.clone(), *ordinal, self.archive_transcript.for_owner(owner, *ordinal), plan.clone()).map_err(|_| RepositoryRuleInvocationError::ArchiveReplay)?)
+        let filesystem_realization = if *self.filesystem_call_index.borrow() == 0 { None } else {
+            let (owner, ordinal) = self.filesystem_owner.as_ref().ok_or(RepositoryRuleInvocationError::FilesystemReplay)?;
+            Some(RepositoryFilesystemRealization::new(self.filesystem_lease_nonce.ok_or(RepositoryRuleInvocationError::FilesystemReplay)?, owner.clone(), *ordinal, self.filesystem_transcript.for_owner(owner, *ordinal), plan.clone()).map_err(|_| RepositoryRuleInvocationError::FilesystemReplay)?)
         };
         let mut dynamic_environment = self.dynamic_environment.borrow().clone(); dynamic_environment.sort(); dynamic_environment.dedup();
-        Ok(RepositoryRuleInvocation { plan, metadata: RepositoryMetadata::nonreproducible(), archive_realization, dynamic_environment: dynamic_environment.into(), execute_transcript: self.execute_owner.as_ref().map_or_else(RepositoryExecuteTranscript::empty, |(owner, ordinal)| self.execute_transcript.for_owner(owner, *ordinal)) })
+        Ok(RepositoryRuleInvocation { plan, metadata: RepositoryMetadata::nonreproducible(), filesystem_realization, dynamic_environment: dynamic_environment.into(), execute_transcript: self.execute_owner.as_ref().map_or_else(RepositoryExecuteTranscript::empty, |(owner, ordinal)| self.execute_transcript.for_owner(owner, *ordinal)) })
     }
 
 }
@@ -1056,6 +1060,17 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         Ok(NoneType)
     }
 
+    fn delete<'v>(
+        this: Value<'v>,
+        path: Value<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<bool> {
+        RepositoryRuleContext::from_value(this)
+            .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
+        let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        deletion::delete(state, path)
+    }
+
     #[allow(non_snake_case)]
     fn download_and_extract<'v>(
         this: Value<'v>,
@@ -1183,6 +1198,9 @@ fn repository_rule_context_methods(builder: &mut MethodsBuilder) {
         let context = RepositoryRuleContext::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("invalid repository_ctx receiver"))?;
         let state = RepositoryRuleInvocationState::from_evaluator(eval)?;
+        if *state.filesystem_call_index.borrow() > 0 {
+            return Err(state.fail(RepositoryRuleInvocationError::FilesystemExecuteMix));
+        }
         if timeout != 600 || !environment.is_empty() || !quiet || !working_directory.is_empty() {
             return Err(state.fail(RepositoryRuleInvocationError::ExecuteOptions));
         }
@@ -1330,7 +1348,7 @@ pub(crate) fn invoke_repository_rule_with_host_paths(
                 | Err(RepositoryRuleInvocationError::RepositorySourceNeed(_))
                 | Err(RepositoryRuleInvocationError::WhichNeed(_))
                 | Err(RepositoryRuleInvocationError::ExecuteNeed(_))
-                | Err(RepositoryRuleInvocationError::ArchiveNeed(_))
+                | Err(RepositoryRuleInvocationError::FilesystemNeed(_))
         ) {
         Err(RepositoryRuleInvocationError::ExecuteReplay)
     } else {
@@ -1683,7 +1701,7 @@ mod tests {
         let invocation = invoke_input(r#"
 def implementation(ctx):
     if not (ctx.name == "canonical" and ctx.original_name == "canonical" and ctx.attr.name == ctx.name): fail("names")
-    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "download_and_extract", "execute", "file", "getenv", "name", "original_name", "os", "path", "read", "repo_metadata", "symlink", "template", "which"]): fail("context reflection")
+    if not (hasattr(ctx, "attr") and getattr(ctx, "name") == "canonical" and dir(ctx) == ["attr", "delete", "download_and_extract", "execute", "file", "getenv", "name", "original_name", "os", "path", "read", "repo_metadata", "symlink", "template", "which"]): fail("context reflection")
     if not (ctx.attr.s == "value" and ctx.attr.b and ctx.attr.i == 7 and type(ctx.attr.l) == "Label"): fail("scalars")
     if not (type(ctx.attr.ll[0]) == "Label" and type(ctx.attr.o) == "Label" and type(ctx.attr.ol[0]) == "Label"): fail("labels")
     if not (ctx.attr.sd == {"k": "v"} and ctx.attr.sld == {"k": ["v"]} and type(ctx.attr.skld["k"]) == "Label"): fail("maps")

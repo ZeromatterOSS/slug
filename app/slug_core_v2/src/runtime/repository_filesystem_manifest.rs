@@ -204,5 +204,5 @@ fn capture(
 }
 
 #[cfg(all(test, unix))]
-#[path = "tests/repository_archive_manifest_tests.rs"]
+#[path = "tests/repository_filesystem_manifest_tests.rs"]
 mod tests;

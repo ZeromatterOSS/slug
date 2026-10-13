@@ -341,15 +341,15 @@ impl NativeDemandCommand<'_> {
                 scope.poison(SourceServiceError::UnsupportedSourceOwner),
             ));
         }
-        for request in needs.repository_archives().values() {
+        for request in needs.repository_filesystem_operations().values() {
             if self
-                .archive_transcript
+                .filesystem_transcript
                 .find(request.id())
                 .is_some_and(|known| known.request() != request.as_ref())
-                || (self.archive_transcript.find(request.id()).is_none()
+                || (self.filesystem_transcript.find(request.id()).is_none()
                     && request.id().call_index()
                         != self
-                            .archive_transcript
+                            .filesystem_transcript
                             .records_for(request.id().owner(), request.id().ordinal())
                             .count())
             {

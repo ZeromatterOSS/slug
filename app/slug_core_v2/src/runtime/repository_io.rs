@@ -617,7 +617,7 @@ impl RepositoryMaterializer {
                 PreparedMaterializationAttempt::Immutable { .. }
             ) | (
                 RepositoryMaterializationKind::GeneratedFileEffects(_)
-                    | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
+                    | RepositoryMaterializationKind::GeneratedFilesystemEffects(_),
                 PreparedMaterializationAttempt::Immutable { .. }
             ) | (_, PreparedMaterializationAttempt::Result(_))
         );
@@ -699,7 +699,7 @@ impl RepositoryMaterializer {
             }
             (
                 RepositoryMaterializationKind::GeneratedFileEffects(_)
-                | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
+                | RepositoryMaterializationKind::GeneratedFilesystemEffects(_),
                 PreparedMaterializationAttempt::Immutable {
                     source_identity,
                     root,
@@ -1775,14 +1775,15 @@ fn generated_repository_file_effect_source_association(
                         }
                     }
                 }
-                GeneratedRepositoryOrderedEffectRef::Archive(_) => {
-                    unreachable!("symlink/archive mixtures are rejected by the plan builder")
+                GeneratedRepositoryOrderedEffectRef::Archive(_)
+                | GeneratedRepositoryOrderedEffectRef::Delete(_) => {
+                    unreachable!("symlink/filesystem mixtures are rejected by the plan builder")
                 }
             }
         }
         return Arc::from(hex::encode(digest.finalize()));
     }
-    if plan.has_archives() {
+    if plan.has_filesystem_operations() {
         digest.update(b"slug.generated-repository-ordered-effects.v1\0");
         for effect in plan.ordered_effects() {
             match effect {
@@ -1821,6 +1822,11 @@ fn generated_repository_file_effect_source_association(
                         digest.update(bytes);
                     }
                 }
+                GeneratedRepositoryOrderedEffectRef::Delete(path) => {
+                    digest.update(b"delete\0");
+                    digest.update((path.len() as u64).to_be_bytes());
+                    digest.update(path.as_bytes());
+                }
                 GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
                     unreachable!("symlink plans use their separate source-association domain")
                 }
@@ -1847,7 +1853,8 @@ fn generated_repository_file_effect_paths_are_valid(
         .filter_map(|effect| match effect {
             GeneratedRepositoryOrderedEffectRef::File(file) => Some(file.path()),
             GeneratedRepositoryOrderedEffectRef::Symlink(link) => Some(link.path()),
-            GeneratedRepositoryOrderedEffectRef::Archive(_) => None,
+            GeneratedRepositoryOrderedEffectRef::Archive(_)
+            | GeneratedRepositoryOrderedEffectRef::Delete(_) => None,
         })
         .collect::<Vec<_>>();
     paths.iter().all(|path| {
@@ -1903,7 +1910,7 @@ fn materialize_generated_repository_file_effects(
     plan: &GeneratedRepositoryFileEffectPlan,
     io: &mut impl GeneratedRepositoryFileEffectsIo,
 ) -> RepositoryMaterializationAttempt {
-    if plan.has_archives() || !generated_repository_file_effect_paths_are_valid(plan) {
+    if plan.has_filesystem_operations() || !generated_repository_file_effect_paths_are_valid(plan) {
         return RepositoryMaterializationAttempt::SpecError(
             "invalid generated repository file-effect plan".into(),
         );
@@ -1917,7 +1924,8 @@ fn materialize_generated_repository_file_effects(
         let path = match &effect {
             GeneratedRepositoryOrderedEffectRef::File(file) => file.path(),
             GeneratedRepositoryOrderedEffectRef::Symlink(link) => link.path(),
-            GeneratedRepositoryOrderedEffectRef::Archive(_) => {
+            GeneratedRepositoryOrderedEffectRef::Archive(_)
+            | GeneratedRepositoryOrderedEffectRef::Delete(_) => {
                 return RepositoryMaterializationAttempt::SpecError(
                     "generated repository symlink/archive mixtures are unsupported".into(),
                 );
@@ -1958,7 +1966,8 @@ fn materialize_generated_repository_file_effects(
                     return RepositoryMaterializationAttempt::MaterializationError(error);
                 }
             }
-            GeneratedRepositoryOrderedEffectRef::Archive(_) => unreachable!("checked above"),
+            GeneratedRepositoryOrderedEffectRef::Archive(_)
+            | GeneratedRepositoryOrderedEffectRef::Delete(_) => unreachable!("checked above"),
         }
     }
     RepositoryMaterializationAttempt::GeneratedImmutable {
@@ -2054,7 +2063,7 @@ fn materialize_generated_repository_archive_effects(
     archive_distdirs: &super::ArchiveDistdirPolicy,
 ) -> Result<Materialized, ArchiveMaterializationError> {
     source_service::check(scope).map_err(ArchiveMaterializationError::materialization)?;
-    if (scope.is_none() && !plan.has_archives())
+    if (scope.is_none() && !plan.has_filesystem_operations())
         || plan.has_symlinks()
         || !generated_repository_file_effect_paths_are_valid(plan)
     {
@@ -2114,6 +2123,11 @@ fn materialize_generated_repository_archive_effects(
             GeneratedRepositoryOrderedEffectRef::File(file) => {
                 apply_generated_repository_file(root.path(), file, active, scope)?;
             }
+            GeneratedRepositoryOrderedEffectRef::Delete(_) => {
+                return Err(ArchiveMaterializationError::spec(
+                    "repository deletion requires its live invocation prefix",
+                ));
+            }
             GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
                 return Err(ArchiveMaterializationError::spec(
                     "generated repository symlink/archive mixtures are unsupported",
@@ -2138,16 +2152,17 @@ fn materialize_native_attempt(
 ) -> RepositoryMaterializationAttempt {
     if matches!(
         &request.kind,
-        RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+        RepositoryMaterializationKind::GeneratedFilesystemEffects(_)
     ) {
         return RepositoryMaterializationAttempt::SpecError(
-            "archive realization must be adopted by its live command owner".into(),
+            "filesystem realization must be adopted by its live command owner".into(),
         );
     }
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
-        if plan.has_archives() {
+        if plan.has_filesystem_operations() {
             return RepositoryMaterializationAttempt::SpecError(
-                "generated repository archive effects require runtime capture".into(),
+                "generated repository filesystem effects require live invocation realization"
+                    .into(),
             );
         }
         return materialize_generated_repository_file_effects(
@@ -2188,16 +2203,16 @@ fn materialize_native_attempt_with_runtime(
 ) -> RepositoryMaterializationAttempt {
     if matches!(
         &request.kind,
-        RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+        RepositoryMaterializationKind::GeneratedFilesystemEffects(_)
     ) {
         return RepositoryMaterializationAttempt::SpecError(
-            "archive realization must be adopted by its live command owner".into(),
+            "filesystem realization must be adopted by its live command owner".into(),
         );
     }
     if let RepositoryMaterializationKind::GeneratedFileEffects(plan) = &request.kind {
-        if plan.has_archives() {
+        if plan.has_filesystem_operations() {
             return RepositoryMaterializationAttempt::SpecError(
-                "archive effects require a verified invocation realization".into(),
+                "filesystem effects require a verified invocation realization".into(),
             );
         }
         // The typed invocation result selects realization, independently of
@@ -2259,7 +2274,7 @@ fn validate_native_request(
             _,
             _,
             RepositoryMaterializationKind::GeneratedFileEffects(_)
-            | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
+            | RepositoryMaterializationKind::GeneratedFilesystemEffects(_),
         ) => Ok(()),
         (_, _, RepositoryMaterializationKind::Local { .. }) => {
             local_request::validate(workspace.as_path(), request)

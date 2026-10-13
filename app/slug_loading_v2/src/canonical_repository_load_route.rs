@@ -20,7 +20,7 @@ use slug_bzlmod_v2::HostCanonicalRepositoryRoute;
 use slug_bzlmod_v2::HostCanonicalRepositorySourceInput;
 use slug_bzlmod_v2::HostCanonicalRepositorySourceInputError;
 use slug_bzlmod_v2::SourcePreparationOutcome;
-use slug_bzlmod_v2::host_canonical_repository_source_input_with_archive_realization;
+use slug_bzlmod_v2::host_canonical_repository_source_input_with_filesystem_realization;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
@@ -341,7 +341,7 @@ async fn compute_generated_effect(
             (CanonicalLoadRouteResult, PathObservationEpoch),
             (
                 Option<slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan>,
-                Option<slug_bzlmod_v2::RepositoryArchiveRealization>,
+                Option<slug_bzlmod_v2::RepositoryFilesystemRealization>,
                 PathObservationEpoch,
             ),
         >,
@@ -430,7 +430,7 @@ async fn compute_generated_effect(
     match result.as_ref() {
         Ok(effect) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Continue((
             Some(effect.plan().clone()),
-            effect.archive_realization().cloned(),
+            effect.filesystem_realization().cloned(),
             observations,
         )))),
         Err(error) => SourcePreparationOutcome::Complete(Ok(ControlFlow::Break((
@@ -458,7 +458,7 @@ async fn compute_load_route(
             return SourcePreparationOutcome::Complete(Ok(value));
         }
     };
-    let (plan, archive_realization, observations) =
+    let (plan, filesystem_realization, observations) =
         match compute_generated_effect(ctx, key, route.clone(), observations, mode).await {
             SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
@@ -469,10 +469,10 @@ async fn compute_load_route(
                 return SourcePreparationOutcome::Complete(Ok(value));
             }
         };
-    let result = host_canonical_repository_source_input_with_archive_realization(
+    let result = host_canonical_repository_source_input_with_filesystem_realization(
         route,
         plan,
-        archive_realization,
+        filesystem_realization,
     )
     .map(|input| HostCanonicalRepositoryLoadRoute { input })
     .map_err(|error| HostCanonicalRepositoryLoadRouteError {

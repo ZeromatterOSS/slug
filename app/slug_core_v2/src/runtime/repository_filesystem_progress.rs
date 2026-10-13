@@ -5,12 +5,13 @@ use std::sync::Arc;
 
 use slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan;
 use slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef;
-use slug_bzlmod_v2::RepositoryArchiveCallId;
-use slug_bzlmod_v2::RepositoryArchiveRealization;
-use slug_bzlmod_v2::RepositoryArchiveRecord;
-use slug_bzlmod_v2::RepositoryArchiveRequest;
-use slug_bzlmod_v2::RepositoryArchiveResult;
-use slug_bzlmod_v2::RepositoryArchiveTranscript;
+use slug_bzlmod_v2::RepositoryFilesystemCallId;
+use slug_bzlmod_v2::RepositoryFilesystemOperation;
+use slug_bzlmod_v2::RepositoryFilesystemRealization;
+use slug_bzlmod_v2::RepositoryFilesystemRecord;
+use slug_bzlmod_v2::RepositoryFilesystemRequest;
+use slug_bzlmod_v2::RepositoryFilesystemResult;
+use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 
 use super::repository_io::ArchiveMaterializationError;
 use super::repository_io::Materialized;
@@ -24,26 +25,27 @@ struct Prefix {
     root: tempfile::TempDir,
     realized: GeneratedRepositoryFileEffectPlan,
     decoded: u64,
-    records: RepositoryArchiveTranscript,
+    deletion_work: deletion::DeleteWork,
+    records: RepositoryFilesystemTranscript,
     scope: Option<Arc<SourceServiceScope>>,
 }
 
 /// Dropping a command drops every unfinished prefix. A failed operation removes
 /// its prefix before doing I/O, so it cannot authorize a retry with partial bytes.
 #[derive(Default)]
-pub(super) struct RepositoryArchiveProgress {
+pub(super) struct RepositoryFilesystemProgress {
     prefixes: Vec<Prefix>,
 }
 
-impl RepositoryArchiveProgress {
+impl RepositoryFilesystemProgress {
     pub(super) fn complete_call(
         &mut self,
-        request: &Arc<RepositoryArchiveRequest>,
+        request: &Arc<RepositoryFilesystemRequest>,
         runtime: &tokio::runtime::Runtime,
         active: &dyn Fn() -> bool,
         scope: Option<&Arc<SourceServiceScope>>,
         distdirs: &super::ArchiveDistdirPolicy,
-    ) -> Result<RepositoryArchiveResult, ArchiveMaterializationError> {
+    ) -> Result<RepositoryFilesystemResult, ArchiveMaterializationError> {
         check(active, scope)?;
         let id = request.id();
         let mut prefix = match self.take(id) {
@@ -58,17 +60,18 @@ impl RepositoryArchiveProgress {
                     .map_err(io_error)?,
                 realized: GeneratedRepositoryFileEffectPlan::builder().finish(),
                 decoded: 0,
-                records: RepositoryArchiveTranscript::empty(),
+                deletion_work: Default::default(),
+                records: RepositoryFilesystemTranscript::empty(),
                 scope: scope.cloned(),
             },
-            None => return Err(spec("archive prefix is absent or was discarded")),
+            None => return Err(spec("filesystem prefix is absent or was discarded")),
         };
         source_service::check_identity(prefix.scope.as_ref(), scope).map_err(io_error)?;
         if prefix.generated_repository != request.generated_repository()
             || prefix.records.records().len() != id.call_index()
             || !prefix.realized.is_prefix_of(request.prefix())
         {
-            return Err(spec("archive request differs from completed prefix"));
+            return Err(spec("filesystem request differs from completed prefix"));
         }
         apply_file_suffix(
             &prefix.realized,
@@ -77,56 +80,67 @@ impl RepositoryArchiveProgress {
             active,
             scope,
         )?;
-        let urls = request
-            .archive()
-            .urls()
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>();
-        let capture =
-            super::repository_archive_http::capture_selected_generated_archive_with_distdirs(
-                &urls,
-                request.archive().sha256(),
-                runtime,
-                active,
-                scope,
-                distdirs,
-            )?;
-        super::repository_generated_archive::extract_generated_archive(
-            capture.as_file(),
-            prefix.root.path(),
-            request.archive().strip_prefix(),
-            request.archive().format(),
-            active,
-            &mut prefix.decoded,
-            scope,
-        )
-        .map_err(|error| {
-            ArchiveMaterializationError::materialization(format!(
-                "archive repository {} owner {} ordinal {} SHA256 {}: {}",
-                request.generated_repository(),
-                request.id().owner().unique_name(),
-                request.id().ordinal(),
-                hex::encode(request.archive().sha256()),
-                error.message,
-            ))
-        })?;
+        let result = match request.operation() {
+            RepositoryFilesystemOperation::Archive(archive) => {
+                let urls = archive
+                    .urls()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                let capture =
+                super::repository_archive_http::capture_selected_generated_archive_with_distdirs(
+                        &urls,
+                        archive.sha256(),
+                        runtime,
+                        active,
+                        scope,
+                        distdirs,
+                )?;
+                super::repository_generated_archive::extract_generated_archive(
+                    capture.as_file(),
+                    prefix.root.path(),
+                    archive.strip_prefix(),
+                    archive.format(),
+                    active,
+                    &mut prefix.decoded,
+                    scope,
+                )
+                .map_err(|error| {
+                    ArchiveMaterializationError::materialization(format!(
+                        "archive repository {} owner {} ordinal {} SHA256 {}: {}",
+                        request.generated_repository(),
+                        request.id().owner().unique_name(),
+                        request.id().ordinal(),
+                        hex::encode(archive.sha256()),
+                        error.message,
+                    ))
+                })?;
+                capture.close().map_err(io_error)?;
+                RepositoryFilesystemResult::Archive(archive.sha256())
+            }
+            RepositoryFilesystemOperation::Delete(path) => {
+                let removed = deletion::delete(
+                    prefix.root.path(),
+                    path,
+                    &mut prefix.deletion_work,
+                    active,
+                    scope,
+                )?;
+                RepositoryFilesystemResult::Delete(removed)
+            }
+        };
         check(active, scope)?;
-        // The capture owner already verifies these exact bytes; extraction also
-        // succeeded before this result can reach a Starlark continuation.
-        let result = RepositoryArchiveResult::verified(request.archive().sha256());
         prefix.realized = request
             .prefix()
-            .with_archive(request.archive().clone())
+            .with_operation(request.operation())
             .map_err(|_| spec("invalid realized archive prefix"))?;
         prefix.records = prefix
             .records
-            .append(RepositoryArchiveRecord::new(
+            .append(RepositoryFilesystemRecord::new(
                 request.clone(),
                 result.clone(),
             ))
             .map_err(|_| spec("invalid completed archive transcript"))?;
-        capture.close().map_err(io_error)?;
         check(active, scope)?;
         self.prefixes.push(prefix);
         Ok(result)
@@ -134,26 +148,26 @@ impl RepositoryArchiveProgress {
 
     pub(super) fn finish(
         &mut self,
-        realization: &RepositoryArchiveRealization,
+        realization: &RepositoryFilesystemRealization,
         expected_lease: u64,
         active: &dyn Fn() -> bool,
         scope: Option<&Arc<SourceServiceScope>>,
     ) -> Result<Materialized, ArchiveMaterializationError> {
         check(active, scope)?;
         if realization.lease_nonce() != expected_lease {
-            return Err(spec("archive realization belongs to a stale command"));
+            return Err(spec("filesystem realization belongs to a stale command"));
         }
         let id =
-            RepositoryArchiveCallId::new(realization.owner().clone(), realization.ordinal(), 0);
+            RepositoryFilesystemCallId::new(realization.owner().clone(), realization.ordinal(), 0);
         let prefix = self
             .take(&id)
-            .ok_or_else(|| spec("completed archive root is absent"))?;
+            .ok_or_else(|| spec("completed filesystem root is absent"))?;
         source_service::check_identity(prefix.scope.as_ref(), scope).map_err(io_error)?;
         if prefix.records != *realization.transcript()
             || !prefix.realized.is_prefix_of(realization.terminal_plan())
         {
             return Err(spec(
-                "terminal archive plan differs from verified realization",
+                "terminal filesystem plan differs from verified realization",
             ));
         }
         apply_file_suffix(
@@ -181,7 +195,7 @@ impl RepositoryArchiveProgress {
             .collect()
     }
 
-    fn take(&mut self, id: &RepositoryArchiveCallId) -> Option<Prefix> {
+    fn take(&mut self, id: &RepositoryFilesystemCallId) -> Option<Prefix> {
         self.prefixes
             .iter()
             .position(|prefix| &prefix.owner == id.owner() && prefix.ordinal == id.ordinal())
@@ -229,5 +243,7 @@ fn apply_file_suffix(
     check(active, scope)
 }
 
-#[path = "repository_archive_manifest.rs"]
+#[path = "repository_delete.rs"]
+mod deletion;
+#[path = "repository_filesystem_manifest.rs"]
 mod manifest;

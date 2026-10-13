@@ -36,8 +36,8 @@ pub mod parser;
 pub mod registry;
 pub mod registry_dice;
 mod repo_file;
-mod repository_archive;
 mod repository_execute;
+mod repository_filesystem;
 mod repository_host_input;
 mod repository_ignore;
 mod repository_label_path;
@@ -332,30 +332,6 @@ pub use registry_dice::RootModuleRegistryUrlsKey;
 pub use registry_dice::inject_registry_request_inputs;
 pub use registry_dice::install_registry_io;
 #[doc(hidden)]
-pub use repository_archive::REPOSITORY_ARCHIVE_MAX_CALLS;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveCallId;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveEpoch;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveEpochKey;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveObservationKey;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveRealization;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveRealizationError;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveRecord;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveRequest;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveResult;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveTranscript;
-#[doc(hidden)]
-pub use repository_archive::RepositoryArchiveTranscriptError;
-#[doc(hidden)]
 pub use repository_execute::REPOSITORY_EXECUTE_MAX_CALLS;
 #[doc(hidden)]
 pub use repository_execute::RepositoryExecuteArg;
@@ -379,6 +355,32 @@ pub use repository_execute::RepositoryExecuteResult;
 pub use repository_execute::RepositoryExecuteTranscript;
 #[doc(hidden)]
 pub use repository_execute::RepositoryExecuteTranscriptError;
+#[doc(hidden)]
+pub use repository_filesystem::REPOSITORY_FILESYSTEM_MAX_CALLS;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemCallId;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemEpoch;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemEpochKey;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemObservationKey;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemOperation;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemRealization;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemRealizationError;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemRecord;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemRequest;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemResult;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemTranscript;
+#[doc(hidden)]
+pub use repository_filesystem::RepositoryFilesystemTranscriptError;
 #[doc(hidden)]
 pub use repository_host_input::NeedRepositoryEnvironmentNames;
 #[doc(hidden)]
@@ -770,7 +772,7 @@ pub use source_preparation::SourcePreparationResult;
 #[doc(hidden)]
 pub use source_preparation::host_canonical_repository_source_input;
 #[doc(hidden)]
-pub use source_preparation::host_canonical_repository_source_input_with_archive_realization;
+pub use source_preparation::host_canonical_repository_source_input_with_filesystem_realization;
 #[doc(hidden)]
 pub use source_preparation::host_repository_materialization_request;
 #[doc(hidden)]

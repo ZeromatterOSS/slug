@@ -105,10 +105,10 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
 use slug_bzlmod_v2::RegistryUrls;
-use slug_bzlmod_v2::RepositoryArchiveEpoch;
-use slug_bzlmod_v2::RepositoryArchiveEpochKey;
-use slug_bzlmod_v2::RepositoryArchiveRecord;
-use slug_bzlmod_v2::RepositoryArchiveTranscript;
+use slug_bzlmod_v2::RepositoryFilesystemEpoch;
+use slug_bzlmod_v2::RepositoryFilesystemEpochKey;
+use slug_bzlmod_v2::RepositoryFilesystemRecord;
+use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryExecuteEpoch;
 use slug_bzlmod_v2::RepositoryExecuteEpochKey;
 use slug_bzlmod_v2::RepositoryExecuteRecord;
@@ -893,8 +893,8 @@ enum NativeDemandSessionError {
     PathInternalNonProgress,
     ExecuteInternalNonProgress,
     ArchiveInternalNonProgress,
-    RepositoryArchive(super::repository_io::ArchiveMaterializationError),
-    ArchiveTranscript(slug_bzlmod_v2::RepositoryArchiveTranscriptError),
+    RepositoryFilesystem(super::repository_io::ArchiveMaterializationError),
+    ArchiveTranscript(slug_bzlmod_v2::RepositoryFilesystemTranscriptError),
     ExecuteEnvironmentMismatch,
     RepositoryExecute(super::repository_process::RepositoryProcessError),
     ExecuteTranscript(slug_bzlmod_v2::RepositoryExecuteTranscriptError),
@@ -967,7 +967,7 @@ impl fmt::Display for NativeDemandSessionError {
             Self::ArchiveInternalNonProgress => {
                 f.write_str("repository archive preparation made no progress")
             }
-            Self::RepositoryArchive(error) => write!(f, "repository archive: {}", error.message),
+            Self::RepositoryFilesystem(error) => write!(f, "repository filesystem: {}", error.message),
             Self::ArchiveTranscript(_) => f.write_str("repository archive transcript conflict"),
             Self::ExecuteTranscript(_) => f.write_str("repository execution transcript conflict"),
             Self::RevisionInternalNonProgress => {
@@ -1042,8 +1042,8 @@ struct NativeDemandCommand<'a> {
     scratch_metadata: Option<selected_tool_source::ScratchMetadataState>,
     repository_results: RepositoryMaterializationResultEpoch,
     execute_transcript: RepositoryExecuteTranscript,
-    archive_transcript: RepositoryArchiveTranscript,
-    archive_progress: super::repository_archive_progress::RepositoryArchiveProgress,
+    filesystem_transcript: RepositoryFilesystemTranscript,
+    filesystem_progress: super::repository_filesystem_progress::RepositoryFilesystemProgress,
     path_observations: PathObservationEpoch,
     path_input_ledger: path_inputs::NativePathInputLedger,
     repository_environment_frontier: slug_bzlmod_v2::RepositoryEnvironmentNameFrontier,
@@ -6446,8 +6446,8 @@ impl WorkspaceRuntime {
                 scratch_metadata: None,
                 repository_results: preflight.repository_results().clone(),
                 execute_transcript: RepositoryExecuteTranscript::empty(),
-                archive_transcript: RepositoryArchiveTranscript::empty(),
-                archive_progress: Default::default(),
+                filesystem_transcript: RepositoryFilesystemTranscript::empty(),
+                filesystem_progress: Default::default(),
                 path_observations,
                 repository_environment_frontier,
                 download_results,
@@ -7801,9 +7801,9 @@ impl NativeDemandCommand<'_> {
         // Loading uses this only to reject surplus prepared records on a
         // replay branch that no longer calls execute. A no-execute graph does
         // not acquire the transient DICE observation dependency.
-        data.data.set(RepositoryArchiveEpoch::active(
+        data.data.set(RepositoryFilesystemEpoch::active(
             self.lease.0,
-            self.archive_transcript.dupe(),
+            self.filesystem_transcript.dupe(),
         ));
         data.data.set(RepositoryExecuteEpoch::active(
             self.lease.0,
@@ -7841,10 +7841,10 @@ impl NativeDemandCommand<'_> {
         if let Some(state) = &self.scratch_metadata {
             state.inject(updater, false)?;
         }
-        inject_repository_archive_epoch(
+        inject_repository_filesystem_epoch(
             updater,
             &self.runtime.workspace,
-            RepositoryArchiveEpoch::active(self.lease.0, self.archive_transcript.dupe()),
+            RepositoryFilesystemEpoch::active(self.lease.0, self.filesystem_transcript.dupe()),
         )
         .map_err(NativeDemandSessionError::Injection)?;
         inject_repository_execute_epoch(
@@ -7869,18 +7869,18 @@ impl NativeDemandCommand<'_> {
         self.validate_source_progress(needs)?;
         // Validate every archive descriptor before any mixed-frontier I/O.
         self.check_source_scope()?;
-        for request in needs.repository_archives().values() {
-            if let Some(known) = self.archive_transcript.find(request.id()) {
+        for request in needs.repository_filesystem_operations().values() {
+            if let Some(known) = self.filesystem_transcript.find(request.id()) {
                 if known.request() != request.as_ref() {
                     return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
                 }
             } else if request.id().call_index()
                 != self
-                    .archive_transcript
+                    .filesystem_transcript
                     .records_for(request.id().owner(), request.id().ordinal())
                     .count()
-                || self.archive_transcript.records().len() + needs.repository_archives().len()
-                    > slug_bzlmod_v2::REPOSITORY_ARCHIVE_MAX_CALLS
+                || self.filesystem_transcript.records().len() + needs.repository_filesystem_operations().len()
+                    > slug_bzlmod_v2::REPOSITORY_FILESYSTEM_MAX_CALLS
             {
                 return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
             }
@@ -7922,20 +7922,20 @@ impl NativeDemandCommand<'_> {
             }
             for request in new_requests {
                 self.repository_results =
-                    if let RepositoryMaterializationKind::GeneratedArchiveEffects(realization) =
+                    if let RepositoryMaterializationKind::GeneratedFilesystemEffects(realization) =
                         &request.kind
                     {
                         let materializer = &self.runtime.repository_materializer;
                         let session = self.repository_session;
                         let materialized = self
-                            .archive_progress
+                            .filesystem_progress
                             .finish(
                                 realization,
                                 self.lease.0,
                                 &|| materializer.session_is_active(session),
                                 self.runtime.source_scope(),
                             )
-                            .map_err(NativeDemandSessionError::RepositoryArchive)?;
+                            .map_err(NativeDemandSessionError::RepositoryFilesystem)?;
                         materializer
                             .materialize_completed_archive(
                                 session,
@@ -8087,15 +8087,15 @@ impl NativeDemandCommand<'_> {
                 finish_probe_phase!(need_phase);
                 return Ok(NativeDemandProgress::Paths);
             }
-            if needs.repository_executes().is_empty() && needs.repository_archives().is_empty() {
+            if needs.repository_executes().is_empty() && needs.repository_filesystem_operations().is_empty() {
                 return Err(NativeDemandSessionError::PathInternalNonProgress);
             }
             finish_probe_phase!(need_phase);
         }
 
-        if !needs.repository_archives().is_empty() {
+        if !needs.repository_filesystem_operations().is_empty() {
             let mut requests = needs
-                .repository_archives()
+                .repository_filesystem_operations()
                 .values()
                 .cloned()
                 .collect::<Vec<_>>();
@@ -8109,7 +8109,7 @@ impl NativeDemandCommand<'_> {
             });
             let mut advanced = false;
             for request in requests {
-                if let Some(known) = self.archive_transcript.find(request.id()) {
+                if let Some(known) = self.filesystem_transcript.find(request.id()) {
                     if known.request() != request.as_ref() {
                         return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
                     }
@@ -8117,18 +8117,18 @@ impl NativeDemandCommand<'_> {
                 }
                 if request.id().call_index()
                     != self
-                        .archive_transcript
+                        .filesystem_transcript
                         .records_for(request.id().owner(), request.id().ordinal())
                         .count()
-                    || self.archive_transcript.records().len()
-                        >= slug_bzlmod_v2::REPOSITORY_ARCHIVE_MAX_CALLS
+                    || self.filesystem_transcript.records().len()
+                        >= slug_bzlmod_v2::REPOSITORY_FILESYSTEM_MAX_CALLS
                 {
                     return Err(NativeDemandSessionError::ArchiveInternalNonProgress);
                 }
                 let materializer = &self.runtime.repository_materializer;
                 let session = self.repository_session;
                 let result = self
-                    .archive_progress
+                    .filesystem_progress
                     .complete_call(
                         &request,
                         &self.runtime.runtime,
@@ -8136,10 +8136,10 @@ impl NativeDemandCommand<'_> {
                         self.runtime.source_scope(),
                         &self.inputs.request.archive_distdirs,
                     )
-                    .map_err(NativeDemandSessionError::RepositoryArchive)?;
-                self.archive_transcript = self
-                    .archive_transcript
-                    .append(RepositoryArchiveRecord::new(request, result))
+                    .map_err(NativeDemandSessionError::RepositoryFilesystem)?;
+                self.filesystem_transcript = self
+                    .filesystem_transcript
+                    .append(RepositoryFilesystemRecord::new(request, result))
                     .map_err(NativeDemandSessionError::ArchiveTranscript)?;
                 self.check_source_scope()?;
                 advanced = true;
@@ -8295,10 +8295,10 @@ impl NativeDemandCommand<'_> {
                 if let Some(state) = &self.scratch_metadata {
                     state.inject(&mut updater, true)?;
                 }
-                inject_repository_archive_epoch(
+                inject_repository_filesystem_epoch(
                     &mut updater,
                     &self.runtime.workspace,
-                    RepositoryArchiveEpoch::revoked(),
+                    RepositoryFilesystemEpoch::revoked(),
                 )
                 .map_err(NativeDemandSessionError::Restoration)?;
                 inject_repository_execute_epoch(
@@ -9058,10 +9058,10 @@ fn prepare_selected_native_demand_snapshot(
         &command.download_results,
     )
     .map_err(NativeDemandSessionError::Injection)?;
-    inject_repository_archive_epoch(
+    inject_repository_filesystem_epoch(
         &mut updater,
         &command.runtime.workspace,
-        RepositoryArchiveEpoch::revoked(),
+        RepositoryFilesystemEpoch::revoked(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
     inject_repository_execute_epoch(
@@ -9094,15 +9094,15 @@ async fn commit_prepared_native_demand_snapshot(
     Ok(())
 }
 
-fn inject_repository_archive_epoch(
+fn inject_repository_filesystem_epoch(
     updater: &mut DiceTransactionUpdater,
     workspace: &Path,
-    epoch: RepositoryArchiveEpoch,
+    epoch: RepositoryFilesystemEpoch,
 ) -> anyhow::Result<()> {
     let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
         .context("normalizing repository archive workspace")?;
     updater
-        .changed_to(vec![(RepositoryArchiveEpochKey::new(workspace), epoch)])
+        .changed_to(vec![(RepositoryFilesystemEpochKey::new(workspace), epoch)])
         .context("injecting repository archive epoch")
 }
 

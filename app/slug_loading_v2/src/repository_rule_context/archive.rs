@@ -58,7 +58,7 @@ pub(super) fn parse_archive_effect<'v>(
             .map_err(|_| RepositoryRuleInvocationError::ArchiveArgument)?
         {
             if urls.len() == 8 {
-                return Err(RepositoryRuleInvocationError::ArchiveLimit);
+                return Err(RepositoryRuleInvocationError::FilesystemLimit);
             }
             urls.push(CompactString::new(
                 value
@@ -104,47 +104,8 @@ pub(super) fn replay_archive<'v>(
     effect: GeneratedRepositoryArchiveEffect,
     heap: Heap<'v>,
 ) -> anyhow::Result<Value<'v>> {
-    let (owner, ordinal) = state
-        .archive_owner
-        .as_ref()
-        .ok_or_else(|| state.fail(RepositoryRuleInvocationError::ArchiveArgument))?;
-    let index = *state.archive_call_index.borrow();
-    if index >= REPOSITORY_ARCHIVE_MAX_CALLS {
-        return Err(state.fail(RepositoryRuleInvocationError::ArchiveLimit));
-    }
-    let prefix = state
-        .effects
-        .borrow()
-        .as_ref()
-        .expect("repository context has not completed")
-        .snapshot();
-    let request = Arc::new(RepositoryArchiveRequest::new(
-        RepositoryArchiveCallId::new(owner.clone(), *ordinal, index),
-        state.generated_repository.clone(),
-        effect.clone(),
-        prefix,
-    ));
-    let record = state
-        .archive_transcript
-        .matching_record(&request)
-        .map_err(|_| state.fail(RepositoryRuleInvocationError::ArchiveReplay))?;
-    let Some(record) = record else {
-        if index != state.prepared_archive_count() {
-            return Err(state.fail(RepositoryRuleInvocationError::ArchiveReplay));
-        }
-        return Err(state.fail(RepositoryRuleInvocationError::ArchiveNeed(request)));
-    };
-    if state.archive_lease_nonce.is_none() || record.result().sha256() != effect.sha256() {
-        return Err(state.fail(RepositoryRuleInvocationError::ArchiveReplay));
-    }
-    state
-        .effects
-        .borrow_mut()
-        .as_mut()
-        .expect("repository context has not completed")
-        .push_archive_effect(effect)
-        .map_err(|error| state.fail(RepositoryRuleInvocationError::Plan(error)))?;
-    *state.archive_call_index.borrow_mut() += 1;
+    let result =
+        filesystem::replay_operation(state, RepositoryFilesystemOperation::Archive(effect))?;
     state
         .generated_present
         .lock()
@@ -152,8 +113,14 @@ pub(super) fn replay_archive<'v>(
         .archive_seen = true;
     Ok(heap.alloc(AllocStruct([
         ("success", heap.alloc(true)),
-        ("sha256", heap.alloc(record.result().sha256_hex())),
-        ("integrity", heap.alloc(record.result().sha256_sri())),
+        (
+            "sha256",
+            heap.alloc(result.sha256_hex().expect("validated archive result")),
+        ),
+        (
+            "integrity",
+            heap.alloc(result.sha256_sri().expect("validated archive result")),
+        ),
     ])))
 }
 

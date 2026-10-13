@@ -22,7 +22,6 @@ use url::Url;
 
 use crate::repository_label_path::HostRepositoryLabelPathValue;
 
-const MAX_ARCHIVES: usize = 128;
 const MAX_ARCHIVE_URLS: usize = 8;
 const MAX_ARCHIVE_URL_BYTES: usize = 2048;
 const MAX_ARCHIVE_PREFIX_BYTES: usize = 256;
@@ -257,6 +256,7 @@ enum GeneratedRepositoryOrderItem {
     File(usize),
     Archive(GeneratedRepositoryArchiveEffect),
     Symlink(GeneratedRepositorySymlinkEffect),
+    Delete(CompactString),
 }
 
 /// A borrowed effect in invocation order; file bytes remain owned only by the
@@ -267,6 +267,7 @@ pub enum GeneratedRepositoryOrderedEffectRef<'a> {
     File(&'a GeneratedRepositoryFileEffect),
     Archive(&'a GeneratedRepositoryArchiveEffect),
     Symlink(&'a GeneratedRepositorySymlinkEffect),
+    Delete(&'a CompactString),
 }
 
 /// Ordered, structural output of one selected repository-rule invocation.
@@ -294,14 +295,45 @@ impl GeneratedRepositoryFileEffectPlan {
         &self,
         archive: GeneratedRepositoryArchiveEffect,
     ) -> Result<Self, GeneratedRepositoryFileEffectPlanError> {
+        self.with_operation(&crate::RepositoryFilesystemOperation::Archive(archive))
+    }
+
+    pub fn with_operation(
+        &self,
+        operation: &crate::RepositoryFilesystemOperation,
+    ) -> Result<Self, GeneratedRepositoryFileEffectPlanError> {
         let mut builder = GeneratedRepositoryFileEffectPlanBuilder {
             seen: SmallSet::new(),
             files: self.files.to_vec(),
             order: self.order.to_vec(),
-            archive_count: self.archive_count(),
+            filesystem_operation_count: self.filesystem_operation_count(),
         };
-        builder.push_archive_effect(archive)?;
+        match operation {
+            crate::RepositoryFilesystemOperation::Archive(archive) => {
+                builder.push_archive_effect(archive.clone())?;
+            }
+            crate::RepositoryFilesystemOperation::Delete(path) => {
+                builder.push_delete(path.clone())?
+            }
+        }
         Ok(builder.finish())
+    }
+
+    pub fn filesystem_operation_count(&self) -> usize {
+        self.order
+            .iter()
+            .filter(|item| {
+                matches!(
+                    item,
+                    GeneratedRepositoryOrderItem::Archive(_)
+                        | GeneratedRepositoryOrderItem::Delete(_)
+                )
+            })
+            .count()
+    }
+
+    pub fn has_filesystem_operations(&self) -> bool {
+        self.filesystem_operation_count() != 0
     }
 
     pub fn effects(&self) -> &[GeneratedRepositoryFileEffect] {
@@ -318,6 +350,9 @@ impl GeneratedRepositoryFileEffectPlan {
             }
             GeneratedRepositoryOrderItem::Symlink(symlink) => {
                 GeneratedRepositoryOrderedEffectRef::Symlink(symlink)
+            }
+            GeneratedRepositoryOrderItem::Delete(path) => {
+                GeneratedRepositoryOrderedEffectRef::Delete(path)
             }
         })
     }
@@ -346,7 +381,7 @@ impl GeneratedRepositoryFileEffectPlan {
             seen: SmallSet::new(),
             files: Vec::new(),
             order: Vec::new(),
-            archive_count: 0,
+            filesystem_operation_count: 0,
         }
     }
 }
@@ -358,7 +393,8 @@ pub enum GeneratedRepositoryFileEffectPlanError {
     RepeatedPath(CompactString),
     ConflictingPath(CompactString),
     SymlinkArchiveMix,
-    TooManyArchives,
+    TooManyFilesystemOperations,
+    SymlinkDeleteMix,
     EmptyArchiveUrls,
     TooManyArchiveUrls,
     InvalidArchiveUrl,
@@ -387,7 +423,7 @@ pub struct GeneratedRepositoryFileEffectPlanBuilder {
     seen: SmallSet<CompactString>,
     files: Vec<GeneratedRepositoryFileEffect>,
     order: Vec<GeneratedRepositoryOrderItem>,
-    archive_count: usize,
+    filesystem_operation_count: usize,
 }
 
 impl GeneratedRepositoryFileEffectPlanBuilder {
@@ -442,8 +478,19 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         if self.seen.contains(&path) {
             return Err(GeneratedRepositoryFileEffectPlanError::RepeatedPath(path));
         }
-        if self.archive_count != 0 {
+        if self
+            .order
+            .iter()
+            .any(|item| matches!(item, GeneratedRepositoryOrderItem::Archive(_)))
+        {
             return Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix);
+        }
+        if self
+            .order
+            .iter()
+            .any(|item| matches!(item, GeneratedRepositoryOrderItem::Delete(_)))
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::SymlinkDeleteMix);
         }
         if self.files.iter().any(|file| paths_conflict(&path, file.path()))
             || self.order.iter().any(|item| {
@@ -490,12 +537,34 @@ impl GeneratedRepositoryFileEffectPlanBuilder {
         {
             return Err(GeneratedRepositoryFileEffectPlanError::SymlinkArchiveMix);
         }
-        if self.archive_count >= MAX_ARCHIVES {
-            return Err(GeneratedRepositoryFileEffectPlanError::TooManyArchives);
+        if self.filesystem_operation_count >= crate::REPOSITORY_FILESYSTEM_MAX_CALLS {
+            return Err(GeneratedRepositoryFileEffectPlanError::TooManyFilesystemOperations);
         }
         self.order
             .push(GeneratedRepositoryOrderItem::Archive(archive));
-        self.archive_count += 1;
+        self.filesystem_operation_count += 1;
+        Ok(())
+    }
+
+    pub fn push_delete(
+        &mut self,
+        path: CompactString,
+    ) -> Result<(), GeneratedRepositoryFileEffectPlanError> {
+        if !valid_delete_path(&path) {
+            return Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(path));
+        }
+        if self
+            .order
+            .iter()
+            .any(|item| matches!(item, GeneratedRepositoryOrderItem::Symlink(_)))
+        {
+            return Err(GeneratedRepositoryFileEffectPlanError::SymlinkDeleteMix);
+        }
+        if self.filesystem_operation_count >= crate::REPOSITORY_FILESYSTEM_MAX_CALLS {
+            return Err(GeneratedRepositoryFileEffectPlanError::TooManyFilesystemOperations);
+        }
+        self.order.push(GeneratedRepositoryOrderItem::Delete(path));
+        self.filesystem_operation_count += 1;
         Ok(())
     }
 
@@ -522,6 +591,14 @@ fn valid_archive_url(url: &str) -> bool {
         "file" => parsed.host_str().is_none_or(|host| host.is_empty()) && parsed.query().is_none(),
         _ => false,
     }
+}
+
+pub(crate) fn valid_delete_path(path: &str) -> bool {
+    // Slug-native descriptor bounds; physical deletion additionally accounts
+    // cumulative path work and visited entries without refunds.
+    let drive = path.as_bytes().get(1) == Some(&b':')
+        && path.as_bytes().first().is_some_and(u8::is_ascii_alphabetic);
+    !drive && path.len() <= 4096 && path.split('/').count() <= 256 && valid_path(path)
 }
 
 fn valid_path(path: &str) -> bool {
@@ -1192,9 +1269,108 @@ mod tests {
                 [0; 32],
                 CompactString::new("rustc/rustc"),
             ),
-            Err(GeneratedRepositoryFileEffectPlanError::TooManyArchives)
+            Err(GeneratedRepositoryFileEffectPlanError::TooManyFilesystemOperations)
         );
         assert_eq!(builder.finish().archive_count(), 128);
+    }
+
+    #[test]
+    fn delete_plan_preserves_file_archive_delete_write_order_and_shared_cap() {
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder
+            .push("same".into(), Arc::from(&b"before"[..]), false)
+            .unwrap();
+        builder
+            .push_archive(urls(&["file:///tmp/unrelated.tar.xz"]), [1; 32], "".into())
+            .unwrap();
+        let prefix = builder.snapshot();
+        builder.push_delete("same".into()).unwrap();
+        let deleted = builder.snapshot();
+        assert_eq!(
+            deleted,
+            prefix
+                .with_operation(&crate::RepositoryFilesystemOperation::Delete("same".into()))
+                .unwrap()
+        );
+        builder
+            .push("same".into(), Arc::from(&b"after"[..]), true)
+            .unwrap();
+        builder.push_delete("missing/nested".into()).unwrap();
+        let plan = builder.finish();
+        assert_eq!(plan.filesystem_operation_count(), 3);
+        assert_eq!(plan.archive_count(), 1);
+        assert!(deleted.is_prefix_of(&plan));
+        assert!(
+            matches!(plan.ordered_effects().nth(2), Some(GeneratedRepositoryOrderedEffectRef::Delete(path)) if path == "same")
+        );
+        assert!(
+            matches!(plan.ordered_effects().nth(3), Some(GeneratedRepositoryOrderedEffectRef::File(file)) if file.content() == b"after")
+        );
+        for invalid in [
+            "",
+            ".",
+            "..",
+            "/absolute",
+            "C:/host",
+            "a/../b",
+            "a//b",
+            "a/",
+            "a\\b",
+            "a\0b",
+        ] {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            assert_eq!(
+                builder.push_delete(invalid.into()),
+                Err(GeneratedRepositoryFileEffectPlanError::InvalidPath(
+                    invalid.into()
+                ))
+            );
+            assert_eq!(builder.finish().effect_count(), 0);
+        }
+        for invalid in [
+            "x".repeat(4097),
+            std::iter::repeat_n("x", 257).collect::<Vec<_>>().join("/"),
+        ] {
+            let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+            assert!(builder.push_delete(invalid.into()).is_err());
+            assert_eq!(builder.finish().effect_count(), 0);
+        }
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        for index in 0..128 {
+            if index % 2 == 0 {
+                builder.push_delete("same".into()).unwrap();
+            } else {
+                builder
+                    .push_archive(urls(&["file:///tmp/unrelated.tar.xz"]), [1; 32], "".into())
+                    .unwrap();
+            }
+        }
+        let full = builder.snapshot();
+        assert_eq!(
+            builder.push_delete("other".into()),
+            Err(GeneratedRepositoryFileEffectPlanError::TooManyFilesystemOperations)
+        );
+        assert_eq!(
+            builder.push_archive(urls(&["file:///tmp/unrelated.tar.xz"]), [1; 32], "".into()),
+            Err(GeneratedRepositoryFileEffectPlanError::TooManyFilesystemOperations)
+        );
+        assert_eq!(full, builder.finish());
+        let mut builder = GeneratedRepositoryFileEffectPlan::builder();
+        builder.push_delete("gone".into()).unwrap();
+        assert_eq!(
+            builder.push_symlink(
+                "link".into(),
+                source("/source/file", 1),
+                Arc::from(&b"x"[..])
+            ),
+            Err(GeneratedRepositoryFileEffectPlanError::SymlinkDeleteMix)
+        );
+        assert_eq!(
+            symlink_plan("link", "/source/file", 1, b"x")
+                .with_operation(&crate::RepositoryFilesystemOperation::Delete("gone".into())),
+            Err(GeneratedRepositoryFileEffectPlanError::SymlinkDeleteMix)
+        );
+        assert_eq!(builder.finish().filesystem_operation_count(), 1);
     }
 
     #[test]

@@ -1,5 +1,23 @@
 # Stage 5: Bzlmod and Repository Graph
 
+## Ordered repository filesystem mutations
+
+Loading replays real repository-rule Starlark through one typed Archive/Delete
+stream. Core completes each operation on the same private invocation tree before
+returning its verified digest or actual deletion Boolean. Owner, ordinal, combined
+call index, full preceding effects and active nonce bind replay structurally.
+Any nonempty filesystem transcript, including delete-only output, requires a
+terminal realization and final actual manifest before immutable publication.
+
+The shared command cap is 128 operations. Deletion additionally bounds each
+invocation to 131072 visited entries, 4MiB cumulative relative path work without
+refunds and depth 256, with 4MiB+64KiB scoped frontier credit. Failures and
+cancellation discard the taken prefix. Known generated descendants are pruned
+without granting unknown archive path observations. Linux writable generated
+trees are admitted; root/external deletion, nonnormalized string paths, symlink
+mixtures and execute/filesystem composition remain unsupported. Execute currently
+owns a separate temporary tree and carries no filesystem output observations.
+
 ## Independent generated Label path boundary
 
 WP885 admits module_ctx.path(Label) for an independent generated owner only

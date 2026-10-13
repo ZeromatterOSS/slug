@@ -42,7 +42,7 @@ impl<'a> MaterializationDiagnostic<'a> {
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
             }
-            RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+            RepositoryMaterializationKind::GeneratedFilesystemEffects(_) => {
                 ("generated_archive_effects", None)
             }
         };

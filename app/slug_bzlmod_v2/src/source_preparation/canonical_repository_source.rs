@@ -11,7 +11,7 @@ use compact_str::CompactString;
 use super::*;
 use crate::HostCanonicalRepositoryRoute;
 use crate::HostCanonicalRepositoryRouteKind;
-use crate::RepositoryArchiveRealization;
+use crate::RepositoryFilesystemRealization;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct HostCanonicalRepositorySourceInput {
@@ -25,9 +25,9 @@ pub enum HostCanonicalRepositorySourceInputError {
     MissingRepositorySpecification,
     MissingGeneratedFileEffectPlan,
     ExtraneousGeneratedFileEffectPlan,
-    MissingGeneratedArchiveRealization,
-    ExtraneousGeneratedArchiveRealization,
-    MismatchedGeneratedArchiveRealization,
+    MissingGeneratedFilesystemRealization,
+    ExtraneousGeneratedFilesystemRealization,
+    MismatchedGeneratedFilesystemRealization,
     Projection(RepositoryMaterializationError),
 }
 
@@ -64,7 +64,7 @@ impl Hash for HostCanonicalRepositorySourceInput {
                 std::mem::discriminant(&request.kind).hash(state);
                 match &request.kind {
                     RepositoryMaterializationKind::GeneratedFileEffects(plan) => plan.hash(state),
-                    RepositoryMaterializationKind::GeneratedArchiveEffects(realization) => {
+                    RepositoryMaterializationKind::GeneratedFilesystemEffects(realization) => {
                         realization.hash(state)
                     }
                     _ => {}
@@ -88,19 +88,23 @@ pub fn host_canonical_repository_source_input(
     route: Arc<HostCanonicalRepositoryRoute>,
     generated_plan: Option<GeneratedRepositoryFileEffectPlan>,
 ) -> Result<HostCanonicalRepositorySourceInput, HostCanonicalRepositorySourceInputError> {
-    host_canonical_repository_source_input_with_archive_realization(route, generated_plan, None)
+    host_canonical_repository_source_input_with_filesystem_realization(route, generated_plan, None)
 }
 
 /// Project the natural generated producer's terminal archive binding. A plan
 /// containing archives cannot fall back to recapturing unassociated effects.
-pub fn host_canonical_repository_source_input_with_archive_realization(
+pub fn host_canonical_repository_source_input_with_filesystem_realization(
     route: Arc<HostCanonicalRepositoryRoute>,
     generated_plan: Option<GeneratedRepositoryFileEffectPlan>,
-    archive_realization: Option<RepositoryArchiveRealization>,
+    filesystem_realization: Option<RepositoryFilesystemRealization>,
 ) -> Result<HostCanonicalRepositorySourceInput, HostCanonicalRepositorySourceInputError> {
     let view = route.view();
-    if archive_realization.is_some() && view.kind() != HostCanonicalRepositoryRouteKind::Generated {
-        return Err(HostCanonicalRepositorySourceInputError::ExtraneousGeneratedArchiveRealization);
+    if filesystem_realization.is_some()
+        && view.kind() != HostCanonicalRepositoryRouteKind::Generated
+    {
+        return Err(
+            HostCanonicalRepositorySourceInputError::ExtraneousGeneratedFilesystemRealization,
+        );
     }
     let disposition = match view.kind() {
         HostCanonicalRepositoryRouteKind::Root => {
@@ -123,10 +127,10 @@ pub fn host_canonical_repository_source_input_with_archive_realization(
             let repo_spec = view
                 .repo_spec()
                 .ok_or(HostCanonicalRepositorySourceInputError::MissingRepositorySpecification)?;
-            let kind = match archive_realization {
+            let kind = match filesystem_realization {
                 Some(realization) => {
-                    if !plan.has_archives() {
-                        return Err(HostCanonicalRepositorySourceInputError::ExtraneousGeneratedArchiveRealization);
+                    if !plan.has_filesystem_operations() {
+                        return Err(HostCanonicalRepositorySourceInputError::ExtraneousGeneratedFilesystemRealization);
                     }
                     let seed = view
                         .generated_effect_seed()
@@ -139,13 +143,13 @@ pub fn host_canonical_repository_source_input_with_archive_realization(
                                 != view.canonical_repo().as_str()
                         })
                     {
-                        return Err(HostCanonicalRepositorySourceInputError::MismatchedGeneratedArchiveRealization);
+                        return Err(HostCanonicalRepositorySourceInputError::MismatchedGeneratedFilesystemRealization);
                     }
-                    RepositoryMaterializationKind::GeneratedArchiveEffects(realization)
+                    RepositoryMaterializationKind::GeneratedFilesystemEffects(realization)
                 }
-                None if plan.has_archives() => {
+                None if plan.has_filesystem_operations() => {
                     return Err(
-                        HostCanonicalRepositorySourceInputError::MissingGeneratedArchiveRealization,
+                        HostCanonicalRepositorySourceInputError::MissingGeneratedFilesystemRealization,
                     );
                 }
                 None => RepositoryMaterializationKind::GeneratedFileEffects(plan),
@@ -259,7 +263,7 @@ impl HostRepositorySourceRoute {
                     request.kind,
                     RepositoryMaterializationKind::Immutable
                         | RepositoryMaterializationKind::GeneratedFileEffects(_)
-                        | RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+                        | RepositoryMaterializationKind::GeneratedFilesystemEffects(_)
                 ),
                 HostRepositorySourceInputDispositionView::Builtin(_) => false,
             },
@@ -504,13 +508,13 @@ mod tests {
         );
     }
 
-    fn archive_realization(
+    fn filesystem_realization(
         owner: Arc<HostSelectedExtensionOwner>,
         ordinal: usize,
         repo: &str,
         nonce: u64,
         suffix: &'static [u8],
-    ) -> RepositoryArchiveRealization {
+    ) -> RepositoryFilesystemRealization {
         let archive = crate::GeneratedRepositoryArchiveEffect::new(
             Arc::from(["https://arbitrary.test/content.tar.xz".into()]),
             [7; 32],
@@ -520,16 +524,16 @@ mod tests {
             "".into(),
         )
         .unwrap();
-        let request = crate::RepositoryArchiveRequest::new(
-            crate::RepositoryArchiveCallId::new(owner.clone(), ordinal, 0),
+        let request = crate::RepositoryFilesystemRequest::new(
+            crate::RepositoryFilesystemCallId::new(owner.clone(), ordinal, 0),
             repo.into(),
-            archive.clone(),
+            crate::RepositoryFilesystemOperation::Archive(archive.clone()),
             GeneratedRepositoryFileEffectPlan::build([]).unwrap(),
         );
-        let transcript = crate::RepositoryArchiveTranscript::empty()
-            .append(crate::RepositoryArchiveRecord::new(
+        let transcript = crate::RepositoryFilesystemTranscript::empty()
+            .append(crate::RepositoryFilesystemRecord::new(
                 Arc::new(request),
-                crate::RepositoryArchiveResult::verified([7; 32]),
+                crate::RepositoryFilesystemResult::Archive([7; 32]),
             ))
             .unwrap();
         let mut builder = GeneratedRepositoryFileEffectPlan::builder();
@@ -537,8 +541,52 @@ mod tests {
         builder
             .push("terminal.txt".into(), Arc::from(suffix), false)
             .unwrap();
-        RepositoryArchiveRealization::new(nonce, owner, ordinal, transcript, builder.finish())
+        RepositoryFilesystemRealization::new(nonce, owner, ordinal, transcript, builder.finish())
             .unwrap()
+    }
+
+    #[test]
+    fn delete_only_projection_requires_live_filesystem_realization() {
+        let owner = Arc::new(HostSelectedExtensionOwner::testing("+extension"));
+        let repo = "+extension+repo";
+        let HostRepositorySourceRoute::Canonical(input) = generated_route(owner.clone(), repo)
+        else {
+            unreachable!()
+        };
+        let route = input.view().route().clone();
+        let request = crate::RepositoryFilesystemRequest::new(
+            crate::RepositoryFilesystemCallId::new(owner.clone(), 0, 0),
+            repo.into(),
+            crate::RepositoryFilesystemOperation::delete("absent".into()).unwrap(),
+            GeneratedRepositoryFileEffectPlan::build([]).unwrap(),
+        );
+        let plan = request
+            .prefix()
+            .with_operation(request.operation())
+            .unwrap();
+        assert!(!plan.has_archives());
+        let transcript = crate::RepositoryFilesystemTranscript::empty()
+            .append(crate::RepositoryFilesystemRecord::new(
+                Arc::new(request),
+                crate::RepositoryFilesystemResult::Delete(false),
+            ))
+            .unwrap();
+        let realization =
+            RepositoryFilesystemRealization::new(17, owner, 0, transcript, plan.clone()).unwrap();
+        assert!(matches!(
+            host_canonical_repository_source_input(route.clone(), Some(plan.clone())),
+            Err(HostCanonicalRepositorySourceInputError::MissingGeneratedFilesystemRealization)
+        ));
+        let projected = host_canonical_repository_source_input_with_filesystem_realization(
+            route,
+            Some(plan),
+            Some(realization),
+        )
+        .unwrap();
+        assert!(
+            matches!(projected.view().disposition(), HostRepositorySourceInputDispositionView::Request(request)
+            if matches!(request.kind, RepositoryMaterializationKind::GeneratedFilesystemEffects(_)))
+        );
     }
 
     #[test]
@@ -550,49 +598,49 @@ mod tests {
             unreachable!()
         };
         let route = input.view().route().clone();
-        let realization = archive_realization(owner.clone(), 0, repo, 1, b"terminal");
+        let realization = filesystem_realization(owner.clone(), 0, repo, 1, b"terminal");
         let plan = realization.terminal_plan().clone();
         assert!(matches!(
             host_canonical_repository_source_input(route.clone(), Some(plan.clone())),
-            Err(HostCanonicalRepositorySourceInputError::MissingGeneratedArchiveRealization)
+            Err(HostCanonicalRepositorySourceInputError::MissingGeneratedFilesystemRealization)
         ));
-        let projected = host_canonical_repository_source_input_with_archive_realization(
+        let projected = host_canonical_repository_source_input_with_filesystem_realization(
             route.clone(),
             Some(plan.clone()),
             Some(realization.clone()),
         )
         .unwrap();
         assert!(
-            matches!(projected.view().disposition(), HostRepositorySourceInputDispositionView::Request(request) if matches!(&request.kind, RepositoryMaterializationKind::GeneratedArchiveEffects(actual) if actual == &realization))
+            matches!(projected.view().disposition(), HostRepositorySourceInputDispositionView::Request(request) if matches!(&request.kind, RepositoryMaterializationKind::GeneratedFilesystemEffects(actual) if actual == &realization))
         );
         assert!(
             HostRepositorySourceRoute::canonical(projected.clone()).is_immutable_materialization()
         );
         for mismatch in [
-            archive_realization(
+            filesystem_realization(
                 Arc::new(HostSelectedExtensionOwner::testing("+foreign")),
                 0,
                 repo,
                 1,
                 b"terminal",
             ),
-            archive_realization(owner.clone(), 1, repo, 1, b"terminal"),
-            archive_realization(owner.clone(), 0, "+extension+other", 1, b"terminal"),
-            archive_realization(owner.clone(), 0, repo, 1, b"different suffix"),
+            filesystem_realization(owner.clone(), 1, repo, 1, b"terminal"),
+            filesystem_realization(owner.clone(), 0, "+extension+other", 1, b"terminal"),
+            filesystem_realization(owner.clone(), 0, repo, 1, b"different suffix"),
         ] {
             assert!(matches!(
-                host_canonical_repository_source_input_with_archive_realization(
+                host_canonical_repository_source_input_with_filesystem_realization(
                     route.clone(),
                     Some(plan.clone()),
                     Some(mismatch)
                 ),
-                Err(HostCanonicalRepositorySourceInputError::MismatchedGeneratedArchiveRealization)
+                Err(HostCanonicalRepositorySourceInputError::MismatchedGeneratedFilesystemRealization)
             ));
         }
-        let changed = host_canonical_repository_source_input_with_archive_realization(
+        let changed = host_canonical_repository_source_input_with_filesystem_realization(
             route.clone(),
             Some(plan.clone()),
-            Some(archive_realization(owner, 0, repo, 2, b"terminal")),
+            Some(filesystem_realization(owner, 0, repo, 2, b"terminal")),
         )
         .unwrap();
         assert_ne!(projected, changed);
@@ -603,7 +651,7 @@ mod tests {
         };
         assert_ne!(digest(&projected), digest(&changed));
         assert_eq!(
-            host_canonical_repository_source_input_with_archive_realization(
+            host_canonical_repository_source_input_with_filesystem_realization(
                 route,
                 Some(plan),
                 Some(realization.clone())
@@ -616,12 +664,12 @@ mod tests {
             HostBuiltinBazelToolsRepositoryMapping::testing(),
         ));
         assert!(matches!(
-            host_canonical_repository_source_input_with_archive_realization(
+            host_canonical_repository_source_input_with_filesystem_realization(
                 builtin,
                 None,
                 Some(realization)
             ),
-            Err(HostCanonicalRepositorySourceInputError::ExtraneousGeneratedArchiveRealization)
+            Err(HostCanonicalRepositorySourceInputError::ExtraneousGeneratedFilesystemRealization)
         ));
     }
 

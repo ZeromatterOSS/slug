@@ -76,7 +76,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             ),
             map("downloads", self.needs.selected_extension_downloads().len()),
             map("executes", self.needs.repository_executes().len()),
-            map("archives", self.needs.repository_archives().len()),
+            map("filesystem", self.needs.repository_filesystem_operations().len()),
         ]
     }
     fn operation(demand: &PathObservationDemand) -> Option<&'static str> {
@@ -154,7 +154,7 @@ impl<'a> ProgressRefusalDiagnostic<'a> {
             RepositoryMaterializationKind::GeneratedFileEffects(_) => {
                 ("generated_file_effects", None)
             }
-            RepositoryMaterializationKind::GeneratedArchiveEffects(_) => {
+            RepositoryMaterializationKind::GeneratedFilesystemEffects(_) => {
                 ("generated_archive_effects", None)
             }
         };

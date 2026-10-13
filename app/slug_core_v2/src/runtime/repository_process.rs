@@ -308,7 +308,7 @@ mod linux {
     fn validate_prefix(
         prefix: &GeneratedRepositoryFileEffectPlan,
     ) -> Result<bool, RepositoryProcessError> {
-        if prefix.has_archives() {
+        if prefix.has_filesystem_operations() {
             return Err(RepositoryProcessError::Policy(
                 "archive effects cannot precede GCC probes",
             ));

@@ -186,8 +186,8 @@ pub struct SourcePreparationNeeds {
     >,
     repository_executes:
         Arc<SmallMap<crate::RepositoryExecuteCallId, Arc<crate::RepositoryExecuteRequest>>>,
-    repository_archives:
-        Arc<SmallMap<crate::RepositoryArchiveCallId, Arc<crate::RepositoryArchiveRequest>>>,
+    repository_filesystem_operations:
+        Arc<SmallMap<crate::RepositoryFilesystemCallId, Arc<crate::RepositoryFilesystemRequest>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -204,8 +204,8 @@ pub enum SourcePreparationNeedsError {
     ConflictingRepositoryExecute {
         id: crate::RepositoryExecuteCallId,
     },
-    ConflictingRepositoryArchive {
-        id: crate::RepositoryArchiveCallId,
+    ConflictingRepositoryFilesystem {
+        id: crate::RepositoryFilesystemCallId,
     },
 }
 
@@ -239,7 +239,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -256,7 +256,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -269,7 +269,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -284,7 +284,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(repository_materializations),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -300,7 +300,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(selected_extension_downloads),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -315,13 +315,13 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(repository_executes),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
-    pub fn repository_archive(request: crate::RepositoryArchiveRequest) -> Self {
-        let mut repository_archives = SmallMap::new();
-        repository_archives.insert(request.id().clone(), Arc::new(request));
+    pub fn repository_filesystem_operation(request: crate::RepositoryFilesystemRequest) -> Self {
+        let mut repository_filesystem_operations = SmallMap::new();
+        repository_filesystem_operations.insert(request.id().clone(), Arc::new(request));
         Self {
             scratch_elf_metadata: None,
             root_module_bootstrap: None,
@@ -329,7 +329,7 @@ impl SourcePreparationNeeds {
             path_observations: None,
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(repository_archives),
+            repository_filesystem_operations: Arc::new(repository_filesystem_operations),
             repository_executes: Arc::new(SmallMap::new()),
         }
     }
@@ -351,7 +351,7 @@ impl SourcePreparationNeeds {
             repository_materializations: Arc::new(SmallMap::new()),
             selected_extension_downloads: Arc::new(SmallMap::new()),
             repository_executes: Arc::new(SmallMap::new()),
-            repository_archives: Arc::new(SmallMap::new()),
+            repository_filesystem_operations: Arc::new(SmallMap::new()),
         }
     }
 
@@ -380,10 +380,10 @@ impl SourcePreparationNeeds {
         &self.repository_executes
     }
 
-    pub fn repository_archives(
+    pub fn repository_filesystem_operations(
         &self,
-    ) -> &SmallMap<crate::RepositoryArchiveCallId, Arc<crate::RepositoryArchiveRequest>> {
-        &self.repository_archives
+    ) -> &SmallMap<crate::RepositoryFilesystemCallId, Arc<crate::RepositoryFilesystemRequest>> {
+        &self.repository_filesystem_operations
     }
 
     pub fn try_union(&self, other: &Self) -> Result<Self, SourcePreparationNeedsError> {
@@ -477,26 +477,26 @@ impl SourcePreparationNeeds {
             }
             Arc::new(repository_executes)
         };
-        let repository_archives = if let Some(shared) =
-            shared_no_op_need_map(&self.repository_archives, &other.repository_archives)
+        let repository_filesystem_operations = if let Some(shared) =
+            shared_no_op_need_map(&self.repository_filesystem_operations, &other.repository_filesystem_operations)
         {
             shared
         } else {
-            let mut repository_archives = (*self.repository_archives).clone();
-            for (id, request) in other.repository_archives.iter() {
-                match repository_archives.get(id) {
+            let mut repository_filesystem_operations = (*self.repository_filesystem_operations).clone();
+            for (id, request) in other.repository_filesystem_operations.iter() {
+                match repository_filesystem_operations.get(id) {
                     Some(existing) if existing == request => {}
                     Some(_) => {
-                        return Err(SourcePreparationNeedsError::ConflictingRepositoryArchive {
+                        return Err(SourcePreparationNeedsError::ConflictingRepositoryFilesystem {
                             id: id.clone(),
                         });
                     }
                     None => {
-                        repository_archives.insert(id.clone(), request.dupe());
+                        repository_filesystem_operations.insert(id.clone(), request.dupe());
                     }
                 }
             }
-            Arc::new(repository_archives)
+            Arc::new(repository_filesystem_operations)
         };
         let root_module_bootstrap =
             match (&self.root_module_bootstrap, &other.root_module_bootstrap) {
@@ -515,7 +515,7 @@ impl SourcePreparationNeeds {
                 || !requests.is_empty()
                 || !selected_extension_downloads.is_empty()
                 || !repository_executes.is_empty()
-                || !repository_archives.is_empty()
+                || !repository_filesystem_operations.is_empty()
         );
         Ok(Self {
             scratch_elf_metadata,
@@ -525,7 +525,7 @@ impl SourcePreparationNeeds {
             repository_materializations: requests,
             selected_extension_downloads,
             repository_executes,
-            repository_archives,
+            repository_filesystem_operations,
         })
     }
 }
@@ -549,7 +549,7 @@ pub enum RepositoryMaterializationKind {
     },
     Immutable,
     GeneratedFileEffects(GeneratedRepositoryFileEffectPlan),
-    GeneratedArchiveEffects(crate::RepositoryArchiveRealization),
+    GeneratedFilesystemEffects(crate::RepositoryFilesystemRealization),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -773,7 +773,7 @@ fn result_kind_matches(
             )
             | (
                 RepositoryMaterializationKind::GeneratedFileEffects(_)
-                    | RepositoryMaterializationKind::GeneratedArchiveEffects(_),
+                    | RepositoryMaterializationKind::GeneratedFilesystemEffects(_),
                 RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable { .. }
                 )

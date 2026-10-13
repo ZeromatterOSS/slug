@@ -1,9 +1,9 @@
 //! Loading replay tests use explicitly supplied semantic records. Native
 //! capture/extraction and final publication are separate Core acceptance gates.
 
-use slug_bzlmod_v2::RepositoryArchiveEpochKey;
-use slug_bzlmod_v2::RepositoryArchiveRecord;
-use slug_bzlmod_v2::RepositoryArchiveResult;
+use slug_bzlmod_v2::RepositoryFilesystemEpochKey;
+use slug_bzlmod_v2::RepositoryFilesystemRecord;
+use slug_bzlmod_v2::RepositoryFilesystemResult;
 
 use super::*;
 
@@ -26,9 +26,9 @@ def impl(ctx):
 ext = module_extension(implementation=impl)
 "#;
 
-async fn epoch_transaction(
+pub(super) async fn epoch_transaction(
     transaction: dice::DiceTransaction,
-    epoch: RepositoryArchiveEpoch,
+    epoch: RepositoryFilesystemEpoch,
 ) -> dice::DiceTransaction {
     let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
     let mut data = UserComputationData {
@@ -47,7 +47,7 @@ async fn epoch_transaction(
     data.data.set(epoch.clone());
     let mut updater = transaction.into_updater();
     updater
-        .changed_to(vec![(RepositoryArchiveEpochKey::new(workspace), epoch)])
+        .changed_to(vec![(RepositoryFilesystemEpochKey::new(workspace), epoch)])
         .unwrap();
     updater.commit_with_data(data).await
 }
@@ -82,20 +82,27 @@ ext = module_extension(implementation=impl)
         );
         transaction = epoch_transaction(
             transaction,
-            RepositoryArchiveEpoch::active(17, RepositoryArchiveTranscript::empty()),
+            RepositoryFilesystemEpoch::active(17, RepositoryFilesystemTranscript::empty()),
         )
         .await;
         let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
             panic!("valid positional defaults must reach the actual archive boundary")
         };
-        assert_eq!(needs.repository_archives().len(), 1);
-        let request = needs.repository_archives().values().next().unwrap();
-        assert_eq!(request.archive().sha256(), [0xa1; 32]);
-        assert_eq!(request.archive().strip_prefix(), "arbitrary/prefix");
+        assert_eq!(needs.repository_filesystem_operations().len(), 1);
+        let request = needs
+            .repository_filesystem_operations()
+            .values()
+            .next()
+            .unwrap();
+        assert_eq!(request.archive().unwrap().sha256(), [0xa1; 32]);
+        assert_eq!(
+            request.archive().unwrap().strip_prefix(),
+            "arbitrary/prefix"
+        );
         // Loading uses the admitted Bazel byte-carrier string representation.
         let expected_id: String = canonical_id.bytes().map(char::from).collect();
-        assert_eq!(request.archive().canonical_id(), expected_id);
-        assert!(request.archive().declared_integrity().is_empty());
+        assert_eq!(request.archive().unwrap().canonical_id(), expected_id);
+        assert!(request.archive().unwrap().declared_integrity().is_empty());
         assert_eq!(request.id().call_index(), 0);
         assert_eq!(request.prefix().effect_count(), 0);
     }
@@ -111,31 +118,36 @@ async fn general_archive_calls_suspend_then_replay_exact_order_and_terminal_refe
         owner.clone(),
         0,
     );
-    let mut transcript = RepositoryArchiveTranscript::empty();
+    let mut transcript = RepositoryFilesystemTranscript::empty();
     for index in 0..2 {
         transaction = epoch_transaction(
             transaction,
-            RepositoryArchiveEpoch::active(23, transcript.clone()),
+            RepositoryFilesystemEpoch::active(23, transcript.clone()),
         )
         .await;
         let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
             panic!("unverified archive must suspend before callback continuation")
         };
-        assert_eq!(needs.repository_archives().len(), 1);
-        let request = needs.repository_archives().values().next().unwrap().clone();
+        assert_eq!(needs.repository_filesystem_operations().len(), 1);
+        let request = needs
+            .repository_filesystem_operations()
+            .values()
+            .next()
+            .unwrap()
+            .clone();
         assert_eq!(request.id().call_index(), index);
         assert_eq!(request.prefix().archive_count(), index);
         assert_eq!(request.prefix().effects().len(), index + 1);
         transcript = transcript
-            .append(RepositoryArchiveRecord::new(
+            .append(RepositoryFilesystemRecord::new(
                 request.clone(),
-                RepositoryArchiveResult::verified(request.archive().sha256()),
+                RepositoryFilesystemResult::Archive(request.archive().unwrap().sha256()),
             ))
             .unwrap();
     }
     transaction = epoch_transaction(
         transaction,
-        RepositoryArchiveEpoch::active(23, transcript.clone()),
+        RepositoryFilesystemEpoch::active(23, transcript.clone()),
     )
     .await;
     let SourcePreparationOutcome::Complete(result) = transaction.compute(&key).await.unwrap()
@@ -154,7 +166,7 @@ async fn general_archive_calls_suspend_then_replay_exact_order_and_terminal_refe
     );
     assert!(result.metadata().reproducible());
     let realization = result
-        .archive_realization()
+        .filesystem_realization()
         .expect("terminal archive handoff");
     assert_eq!(realization.lease_nonce(), 23);
     assert_eq!(realization.transcript(), &transcript);
@@ -175,23 +187,28 @@ async fn changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_c
     let key = HostSelectedRepositoryFileEffectKey::new(workspace.dupe(), owner, 0);
     transaction = epoch_transaction(
         transaction,
-        RepositoryArchiveEpoch::active(31, RepositoryArchiveTranscript::empty()),
+        RepositoryFilesystemEpoch::active(31, RepositoryFilesystemTranscript::empty()),
     )
     .await;
     let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
         panic!("first archive must suspend")
     };
-    let request = needs.repository_archives().values().next().unwrap().clone();
-    let transcript = RepositoryArchiveTranscript::empty()
-        .append(RepositoryArchiveRecord::new(
+    let request = needs
+        .repository_filesystem_operations()
+        .values()
+        .next()
+        .unwrap()
+        .clone();
+    let transcript = RepositoryFilesystemTranscript::empty()
+        .append(RepositoryFilesystemRecord::new(
             request.clone(),
-            RepositoryArchiveResult::verified(request.archive().sha256()),
+            RepositoryFilesystemResult::Archive(request.archive().unwrap().sha256()),
         ))
         .unwrap();
     for (source, epoch) in [
-        (ARCHIVES.replace("'before'", "'changed'"), RepositoryArchiveEpoch::active(31, transcript.clone())),
-        (ARCHIVES.to_owned(), RepositoryArchiveEpoch::revoked()),
-        (ARCHIVES.replace("    ctx.file('same', 'middle', executable=True)", "    hasattr(ctx.path('archive-produced').get_child('unknown'), 'exists')\n    ctx.file('same', 'middle', executable=True)"), RepositoryArchiveEpoch::active(31, transcript.clone())),
+        (ARCHIVES.replace("'before'", "'changed'"), RepositoryFilesystemEpoch::active(31, transcript.clone())),
+        (ARCHIVES.to_owned(), RepositoryFilesystemEpoch::revoked()),
+        (ARCHIVES.replace("    ctx.file('same', 'middle', executable=True)", "    hasattr(ctx.path('archive-produced').get_child('unknown'), 'exists')\n    ctx.file('same', 'middle', executable=True)"), RepositoryFilesystemEpoch::active(31, transcript.clone())),
     ] {
         let fresh = transaction_untracked(&dice, MODULE, &source, true).await;
         let mut fresh = epoch_transaction(fresh, epoch).await;
@@ -201,14 +218,15 @@ async fn changed_prefix_revoked_epoch_and_swallowed_generated_observation_fail_c
 
     let file_only = "def write(ctx):\n    ctx.file('same', 'before', executable=False)\nindependent_repository=repository_rule(implementation=write)\ndef impl(ctx):\n    independent_repository(name='first')\next=module_extension(implementation=impl)\n";
     let fresh = transaction_untracked(&dice, MODULE, file_only, true).await;
-    let mut fresh = epoch_transaction(fresh, RepositoryArchiveEpoch::active(31, transcript)).await;
+    let mut fresh =
+        epoch_transaction(fresh, RepositoryFilesystemEpoch::active(31, transcript)).await;
     let SourcePreparationOutcome::Complete(result) = fresh.compute(&key).await.unwrap() else {
         panic!("surplus records must terminate")
     };
     assert!(result.is_err());
     fresh = epoch_transaction(
         fresh,
-        RepositoryArchiveEpoch::active(31, RepositoryArchiveTranscript::empty()),
+        RepositoryFilesystemEpoch::active(31, RepositoryFilesystemTranscript::empty()),
     )
     .await;
     let SourcePreparationOutcome::Complete(result) = fresh.compute(&key).await.unwrap() else {
@@ -248,6 +266,6 @@ async fn repository_metadata_only_change_invalidates_and_restores_without_archiv
     assert!(
         results
             .iter()
-            .all(|result| result.archive_realization().is_none())
+            .all(|result| result.filesystem_realization().is_none())
     );
 }

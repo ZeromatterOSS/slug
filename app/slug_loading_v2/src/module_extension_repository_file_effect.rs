@@ -32,16 +32,16 @@ use slug_bzlmod_v2::HostRepositorySourceRoute;
 use slug_bzlmod_v2::HostSelectedExtensionOwner;
 use slug_bzlmod_v2::NeedRepositoryEnvironmentNames;
 use slug_bzlmod_v2::ObservedHostRepositoryLabelPath;
-use slug_bzlmod_v2::RepositoryArchiveEpoch;
-use slug_bzlmod_v2::RepositoryArchiveObservationKey;
-use slug_bzlmod_v2::RepositoryArchiveRealization;
-use slug_bzlmod_v2::RepositoryArchiveTranscript;
 use slug_bzlmod_v2::RepositoryEnvironmentCellKey;
 use slug_bzlmod_v2::RepositoryEnvironmentNameFrontier;
 use slug_bzlmod_v2::RepositoryEnvironmentSnapshotKey;
 use slug_bzlmod_v2::RepositoryExecuteEpoch;
 use slug_bzlmod_v2::RepositoryExecuteObservationKey;
 use slug_bzlmod_v2::RepositoryExecuteTranscript;
+use slug_bzlmod_v2::RepositoryFilesystemEpoch;
+use slug_bzlmod_v2::RepositoryFilesystemObservationKey;
+use slug_bzlmod_v2::RepositoryFilesystemRealization;
+use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 use slug_bzlmod_v2::RepositoryHostInputTransaction;
 use slug_bzlmod_v2::RepositoryLabelPathAddress;
 use slug_bzlmod_v2::RepositoryPlatformKey;
@@ -93,7 +93,7 @@ pub struct HostSelectedRepositoryFileEffect {
     host: RepositoryRuleHostObservation,
     plan: GeneratedRepositoryFileEffectPlan,
     metadata: crate::repository_rule_context::RepositoryMetadata,
-    archive_realization: Option<RepositoryArchiveRealization>,
+    filesystem_realization: Option<RepositoryFilesystemRealization>,
 }
 
 impl HostSelectedRepositoryFileEffect {
@@ -101,8 +101,8 @@ impl HostSelectedRepositoryFileEffect {
         &self.plan
     }
 
-    pub fn archive_realization(&self) -> Option<&RepositoryArchiveRealization> {
-        self.archive_realization.as_ref()
+    pub fn filesystem_realization(&self) -> Option<&RepositoryFilesystemRealization> {
+        self.filesystem_realization.as_ref()
     }
 
     pub fn metadata(&self) -> &crate::repository_rule_context::RepositoryMetadata {
@@ -589,15 +589,17 @@ async fn verified_execute_transcript(
         .map_or_else(RepositoryExecuteTranscript::empty, Clone::clone))
 }
 
-async fn verified_archive_epoch(
+async fn verified_filesystem_epoch(
     ctx: &mut DiceComputations<'_>,
     key: &HostSelectedRepositoryFileEffectKey,
     certificate: &Arc<HostSelectedExtensionOwnerCertificate>,
-    expected: Option<&RepositoryArchiveEpoch>,
+    expected: Option<&RepositoryFilesystemEpoch>,
     observations: &PathObservationEpoch,
-) -> Result<RepositoryArchiveEpoch, EffectDriver> {
+) -> Result<RepositoryFilesystemEpoch, EffectDriver> {
     let epoch = ctx
-        .compute(&RepositoryArchiveObservationKey::new(key.workspace.dupe()))
+        .compute(&RepositoryFilesystemObservationKey::new(
+            key.workspace.dupe(),
+        ))
         .await
         .map_err(|error| {
             complete_effect_error(
@@ -610,7 +612,7 @@ async fn verified_archive_epoch(
             terminal_repository_rule_invocation_error(
                 certificate,
                 key.ordinal,
-                RepositoryRuleInvocationError::ArchiveReplay,
+                RepositoryRuleInvocationError::FilesystemReplay,
             ),
             observations.dupe(),
         ));
@@ -1448,10 +1450,12 @@ fn terminal_repository_rule_invocation_error(
         RepositoryRuleInvocationError::ExecuteOptions => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute non-default options are unsupported".into() },
         RepositoryRuleInvocationError::ExecuteLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute exceeds the admitted per-command call limit".into() },
         RepositoryRuleInvocationError::ExecuteReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute prepared transcript differs from this invocation".into() },
+        RepositoryRuleInvocationError::FilesystemExecuteMix => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.execute and filesystem mutations cannot share an invocation before a unified physical execution owner is supported".into() },
+        RepositoryRuleInvocationError::DeleteArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.delete requires a normalized non-root relative string or this repository generated path".into() },
         RepositoryRuleInvocationError::ArchiveArgument => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract arguments are outside the supported SHA-pinned archive surface".into() },
         RepositoryRuleInvocationError::ArchiveAuth => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract auth is unsupported".into() },
-        RepositoryRuleInvocationError::ArchiveLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract exceeds the shared archive limits".into() },
-        RepositoryRuleInvocationError::ArchiveReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository archive transcript differs from this invocation".into() },
+        RepositoryRuleInvocationError::FilesystemLimit => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx filesystem operations exceed the shared limits".into() },
+        RepositoryRuleInvocationError::FilesystemReplay => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository filesystem transcript differs from this invocation".into() },
         RepositoryRuleInvocationError::ArchiveOptions => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "repository_ctx.download_and_extract option capability is unsupported".into() },
         RepositoryRuleInvocationError::ArchivePathObservation => HostSelectedRepositoryFileEffectError::Invocation { certificate: certificate.clone(), ordinal, message: "observing archive-produced generated paths is unsupported".into() },
         RepositoryRuleInvocationError::Plan(error) => HostSelectedRepositoryFileEffectError::Path {
@@ -1478,7 +1482,7 @@ fn terminal_repository_rule_invocation_error(
         | RepositoryRuleInvocationError::RepositorySourceNeed(_)
         | RepositoryRuleInvocationError::WhichNeed(_)
         | RepositoryRuleInvocationError::ExecuteNeed(_)
-        | RepositoryRuleInvocationError::ArchiveNeed(_) => unreachable!(),
+        | RepositoryRuleInvocationError::FilesystemNeed(_) => unreachable!(),
     }
 }
 
@@ -1512,14 +1516,14 @@ async fn invoke_repository_rule_with_label_paths(
         .get::<RepositoryExecuteEpoch>()
         .ok()
         .cloned();
-    let archive_epoch_hint = ctx
+    let filesystem_epoch_hint = ctx
         .per_transaction_data()
         .data
-        .get::<RepositoryArchiveEpoch>()
+        .get::<RepositoryFilesystemEpoch>()
         .ok()
         .cloned();
-    let mut prepared_archives = RepositoryArchiveTranscript::empty();
-    let mut archive_nonce = None;
+    let mut prepared_filesystem_operations = RepositoryFilesystemTranscript::empty();
+    let mut filesystem_nonce = None;
     let mut prepared_execute = RepositoryExecuteTranscript::empty();
     if epoch_hint
         .as_ref()
@@ -1554,8 +1558,12 @@ async fn invoke_repository_rule_with_label_paths(
             input
                 .clone()
                 .with_execute(key.owner.clone(), key.ordinal, prepared_execute.clone())
-                .with_archives(key.owner.clone(), key.ordinal, prepared_archives.clone())
-                .with_archive_lease_nonce(archive_nonce),
+                .with_filesystem_operations(
+                    key.owner.clone(),
+                    key.ordinal,
+                    prepared_filesystem_operations.clone(),
+                )
+                .with_filesystem_lease_nonce(filesystem_nonce),
             platform.clone(),
             transaction.snapshot().dupe(),
             capture.as_ref().map(|capture| capture as &dyn PrintHandler),
@@ -1566,10 +1574,10 @@ async fn invoke_repository_rule_with_label_paths(
         }
         match attempt.result {
             Ok(invocation) => {
-                if invocation.archive_realization.is_none()
-                    && archive_epoch_hint
+                if invocation.filesystem_realization.is_none()
+                    && filesystem_epoch_hint
                         .as_ref()
-                        .and_then(RepositoryArchiveEpoch::transcript)
+                        .and_then(RepositoryFilesystemEpoch::transcript)
                         .is_some_and(|transcript| {
                             transcript
                                 .records_for(&key.owner, key.ordinal)
@@ -1579,11 +1587,11 @@ async fn invoke_repository_rule_with_label_paths(
                 {
                     // A surplus prepared record is itself an observed semantic
                     // rejection: retain the epoch edge so clearing it can retry.
-                    verified_archive_epoch(
+                    verified_filesystem_epoch(
                         ctx,
                         key,
                         certificate,
-                        archive_epoch_hint.as_ref(),
+                        filesystem_epoch_hint.as_ref(),
                         &observations,
                     )
                     .await?;
@@ -1591,7 +1599,7 @@ async fn invoke_repository_rule_with_label_paths(
                         terminal_repository_rule_invocation_error(
                             certificate,
                             key.ordinal,
-                            RepositoryRuleInvocationError::ArchiveReplay,
+                            RepositoryRuleInvocationError::FilesystemReplay,
                         ),
                         observations,
                     ));
@@ -1698,12 +1706,12 @@ async fn invoke_repository_rule_with_label_paths(
                 observations = next_observations;
                 prepared_which.insert(candidate, value);
             }
-            Err(RepositoryRuleInvocationError::ArchiveNeed(request)) => {
-                let epoch = verified_archive_epoch(
+            Err(RepositoryRuleInvocationError::FilesystemNeed(request)) => {
+                let epoch = verified_filesystem_epoch(
                     ctx,
                     key,
                     certificate,
-                    archive_epoch_hint.as_ref(),
+                    filesystem_epoch_hint.as_ref(),
                     &observations,
                 )
                 .await?;
@@ -1713,12 +1721,14 @@ async fn invoke_repository_rule_with_label_paths(
                     .for_owner(&key.owner, key.ordinal);
                 match transcript.matching_record(&request) {
                     Ok(Some(_)) => {
-                        prepared_archives = transcript;
-                        archive_nonce = epoch.lease_nonce();
+                        prepared_filesystem_operations = transcript;
+                        filesystem_nonce = epoch.lease_nonce();
                     }
                     Ok(None) if transcript.records().len() == request.id().call_index() => {
                         return Err(SourcePreparationOutcome::Need(
-                            SourcePreparationNeeds::repository_archive(request.as_ref().clone()),
+                            SourcePreparationNeeds::repository_filesystem_operation(
+                                request.as_ref().clone(),
+                            ),
                         ));
                     }
                     _ => {
@@ -1726,7 +1736,7 @@ async fn invoke_repository_rule_with_label_paths(
                             terminal_repository_rule_invocation_error(
                                 certificate,
                                 key.ordinal,
-                                RepositoryRuleInvocationError::ArchiveReplay,
+                                RepositoryRuleInvocationError::FilesystemReplay,
                             ),
                             observations,
                         ));
@@ -2038,7 +2048,7 @@ async fn compute_effect(
             invocation.execute_transcript().clone(),
         ),
         metadata: invocation.metadata.clone(),
-        archive_realization: invocation.archive_realization.clone(),
+        filesystem_realization: invocation.filesystem_realization.clone(),
         plan: invocation.into_plan(),
     });
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
@@ -2106,6 +2116,7 @@ impl Key for HostSelectedRepositoryFileEffectObservationKey {
 #[cfg(test)]
 mod tests {
     mod archive_replay_tests;
+    mod filesystem_replay_tests;
     use std::path::Path;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -5474,12 +5485,12 @@ ext = module_extension(implementation = impl)
                 "repository_ctx.download_and_extract auth is unsupported",
             ),
             (
-                RepositoryRuleInvocationError::ArchiveLimit,
-                "repository_ctx.download_and_extract exceeds the shared archive limits",
+                RepositoryRuleInvocationError::FilesystemLimit,
+                "repository_ctx filesystem operations exceed the shared limits",
             ),
             (
-                RepositoryRuleInvocationError::ArchiveReplay,
-                "repository archive transcript differs from this invocation",
+                RepositoryRuleInvocationError::FilesystemReplay,
+                "repository filesystem transcript differs from this invocation",
             ),
             (
                 RepositoryRuleInvocationError::ArchivePathObservation,

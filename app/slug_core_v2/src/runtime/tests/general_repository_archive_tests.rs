@@ -173,7 +173,7 @@ unrelated = repository_rule(implementation=_independent, attrs={'source':attr.st
             .filter_map(|request| {
                 if !matches!(
                     request.kind,
-                    RepositoryMaterializationKind::GeneratedArchiveEffects(_)
+                    RepositoryMaterializationKind::GeneratedFilesystemEffects(_)
                 ) {
                     return None;
                 }
@@ -201,7 +201,7 @@ unrelated = repository_rule(implementation=_independent, attrs={'source':attr.st
     ) -> (
         Result<DrivenCommand<ObservedRootQueryCommand>, NativeDemandSessionError>,
         Arc<AtomicBool>,
-        Arc<Mutex<Vec<RepositoryArchiveRecord>>>,
+        Arc<Mutex<Vec<RepositoryFilesystemRecord>>>,
     ) {
         let changed = Arc::new(AtomicBool::new(false));
         let records = Arc::new(Mutex::new(Vec::new()));
@@ -250,7 +250,7 @@ struct InterceptQuery {
     source: PathBuf,
     action: SourceChange,
     changed: Arc<AtomicBool>,
-    records: Arc<Mutex<Vec<RepositoryArchiveRecord>>>,
+    records: Arc<Mutex<Vec<RepositoryFilesystemRecord>>>,
 }
 
 #[async_trait]
@@ -269,7 +269,7 @@ impl NativeCommandRoot for InterceptQuery {
         let epoch = transaction
             .per_transaction_data()
             .data
-            .get::<RepositoryArchiveEpoch>()
+            .get::<RepositoryFilesystemEpoch>()
             .unwrap()
             .clone();
         *self.records.lock().unwrap() = epoch.transcript().unwrap().records().to_vec();
@@ -449,7 +449,7 @@ fn extraction_suffix_failure_and_request_abort_publish_no_archive_root() {
 }
 
 fn realized_plan(
-    request: &slug_bzlmod_v2::RepositoryArchiveRequest,
+    request: &slug_bzlmod_v2::RepositoryFilesystemRequest,
     suffix: Option<(&str, &[u8])>,
 ) -> slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan {
     let mut builder = slug_bzlmod_v2::GeneratedRepositoryFileEffectPlan::builder();
@@ -467,14 +467,22 @@ fn realized_plan(
             slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef::Archive(archive) => {
                 builder.push_archive_effect(archive.clone()).unwrap();
             }
+            slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef::Delete(path) => {
+                builder.push_delete(path.clone()).unwrap();
+            }
             slug_bzlmod_v2::GeneratedRepositoryOrderedEffectRef::Symlink(_) => {
                 unreachable!("fixture has no symlinks")
             }
         }
     }
-    builder
-        .push_archive_effect(request.archive().clone())
-        .unwrap();
+    match request.operation() {
+        slug_bzlmod_v2::RepositoryFilesystemOperation::Archive(archive) => {
+            builder.push_archive_effect(archive.clone()).unwrap()
+        }
+        slug_bzlmod_v2::RepositoryFilesystemOperation::Delete(path) => {
+            builder.push_delete(path.clone()).unwrap()
+        }
+    }
     if let Some((path, bytes)) = suffix {
         builder.push(path.into(), Arc::from(bytes), false).unwrap();
     }
@@ -482,11 +490,11 @@ fn realized_plan(
 }
 
 #[test]
-fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descriptor_failure() {
-    use slug_bzlmod_v2::RepositoryArchiveRealization;
-    use slug_bzlmod_v2::RepositoryArchiveTranscript;
+fn actual_filesystem_progress_drops_physical_roots_on_stale_abort_suffix_and_descriptor_failure() {
+    use slug_bzlmod_v2::RepositoryFilesystemRealization;
+    use slug_bzlmod_v2::RepositoryFilesystemTranscript;
 
-    use crate::runtime::repository_archive_progress::RepositoryArchiveProgress;
+    use crate::runtime::repository_filesystem_progress::RepositoryFilesystemProgress;
 
     let fixture = ArchiveFixture::new();
     let (outcome, _, captured) = fixture.query(SourceChange::None);
@@ -511,12 +519,12 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
         .iter()
         .cloned()
         .try_fold(
-            RepositoryArchiveTranscript::empty(),
+            RepositoryFilesystemTranscript::empty(),
             |transcript, record| transcript.append(record),
         )
         .unwrap();
     let last = records.last().unwrap().request();
-    let realization = RepositoryArchiveRealization::new(
+    let realization = RepositoryFilesystemRealization::new(
         17,
         last.id().owner().clone(),
         last.id().ordinal(),
@@ -525,7 +533,7 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
     )
     .unwrap();
     for failure in ["stale lease", "inactive", "suffix", "descriptor"] {
-        let mut progress = RepositoryArchiveProgress::default();
+        let mut progress = RepositoryFilesystemProgress::default();
         for record in &records {
             let result = progress
                 .complete_call(
@@ -552,7 +560,7 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
                 .err()
                 .expect("inactive command must refuse realization"),
             "suffix" => {
-                let invalid = RepositoryArchiveRealization::new(
+                let invalid = RepositoryFilesystemRealization::new(
                     17,
                     last.id().owner().clone(),
                     last.id().ordinal(),
@@ -572,7 +580,7 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
                 error
             }
             "descriptor" => {
-                let archive = last.archive();
+                let archive = last.archive().unwrap();
                 let changed_archive = slug_bzlmod_v2::GeneratedRepositoryArchiveEffect::new(
                     Arc::from(archive.urls()),
                     archive.sha256(),
@@ -582,21 +590,21 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
                     archive.declared_integrity().into(),
                 )
                 .unwrap();
-                let changed = slug_bzlmod_v2::RepositoryArchiveRequest::new(
+                let changed = slug_bzlmod_v2::RepositoryFilesystemRequest::new(
                     last.id().clone(),
                     last.generated_repository().into(),
-                    changed_archive,
+                    slug_bzlmod_v2::RepositoryFilesystemOperation::Archive(changed_archive),
                     last.prefix().clone(),
                 );
-                let changed_transcript = RepositoryArchiveTranscript::empty()
+                let changed_transcript = RepositoryFilesystemTranscript::empty()
                     .append(records[0].clone())
                     .unwrap()
-                    .append(RepositoryArchiveRecord::new(
+                    .append(RepositoryFilesystemRecord::new(
                         Arc::new(changed.clone()),
                         records[1].result().clone(),
                     ))
                     .unwrap();
-                let invalid = RepositoryArchiveRealization::new(
+                let invalid = RepositoryFilesystemRealization::new(
                     17,
                     last.id().owner().clone(),
                     last.id().ordinal(),
@@ -633,10 +641,10 @@ fn actual_archive_progress_drops_physical_roots_on_stale_abort_suffix_and_descri
 }
 
 #[test]
-fn actual_archive_progress_binds_source_scope_and_releases_refused_physical_roots() {
+fn actual_filesystem_progress_binds_source_scope_and_releases_refused_physical_roots() {
     use crate::runtime::dice::source_service::SourceServiceLimits;
     use crate::runtime::dice::source_service::SourceServiceScope;
-    use crate::runtime::repository_archive_progress::RepositoryArchiveProgress;
+    use crate::runtime::repository_filesystem_progress::RepositoryFilesystemProgress;
 
     let fixture = ArchiveFixture::new();
     let (outcome, _, captured) = fixture.query(SourceChange::None);
@@ -654,11 +662,11 @@ fn actual_archive_progress_binds_source_scope_and_releases_refused_physical_root
     let records = captured.lock().unwrap().clone();
     assert_eq!(records.len(), 2);
     let request = Arc::new(records[0].request().clone());
-    let realization = slug_bzlmod_v2::RepositoryArchiveRealization::new(
+    let realization = slug_bzlmod_v2::RepositoryFilesystemRealization::new(
         23,
         request.id().owner().clone(),
         request.id().ordinal(),
-        slug_bzlmod_v2::RepositoryArchiveTranscript::empty()
+        slug_bzlmod_v2::RepositoryFilesystemTranscript::empty()
             .append(records[0].clone())
             .unwrap(),
         realized_plan(&request, None),
@@ -686,7 +694,7 @@ fn actual_archive_progress_binds_source_scope_and_releases_refused_physical_root
         let scope_a = make_scope();
         let scope_b = make_scope();
         assert!(!Arc::ptr_eq(&scope_a, &scope_b));
-        let mut progress = RepositoryArchiveProgress::default();
+        let mut progress = RepositoryFilesystemProgress::default();
         let verified = progress
             .complete_call(
                 &request,
@@ -741,3 +749,6 @@ fn actual_archive_progress_binds_source_scope_and_releases_refused_physical_root
         );
     }
 }
+
+#[path = "general_repository_archive_tests/delete_tests.rs"]
+mod delete_tests;
