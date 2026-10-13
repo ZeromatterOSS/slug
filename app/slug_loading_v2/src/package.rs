@@ -5589,7 +5589,13 @@ fn starlark_builtin_schema<V>(
             allow_empty: true,
             executable: false,
             exec_configuration: false,
-            required_providers: Arc::from([]),
+            required_providers: if name == "toolchains" {
+                Arc::from([Arc::<[ProviderIdentity]>::from([
+                    ProviderIdentity::builtin("TemplateVariableInfo"),
+                ])])
+            } else {
+                Arc::from([])
+            },
             attached_aspect: None,
         });
     };
@@ -8411,6 +8417,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 declaration.kind,
                             ),
                         )
+                        .with_required_providers(declaration.required_providers.clone())
                     } else {
                         let dependency_configuration = match (
                             declaration.exec_configuration,
@@ -11581,6 +11588,36 @@ mod module_extension_definition_tests {
             Some(CoercedAttributeValue::IntegerList(Arc::from([1, -2])))
         );
         assert!(!definition.attributes[1].allow_empty);
+    }
+
+    #[test]
+    fn common_toolchains_requires_template_variables_and_disallows_files() {
+        let module =
+            evaluate("def unrelated(ctx): pass\nR = rule(implementation = unrelated)\n").unwrap();
+        let definition = module
+            .get("R")
+            .unwrap()
+            .downcast::<FrozenRuleDefinition>()
+            .unwrap();
+        let attribute = definition
+            .schema
+            .iter()
+            .find(|attribute| attribute.name == "toolchains")
+            .unwrap();
+        assert_eq!(attribute.kind, AttributeKind::LabelList);
+        assert!(attribute.file_admissibility.is_no_files());
+        assert_eq!(attribute.required_providers.len(), 1);
+        assert_eq!(
+            attribute.required_providers[0].as_ref(),
+            &[ProviderIdentity::builtin("TemplateVariableInfo")]
+        );
+        assert!(
+            definition
+                .schema
+                .iter()
+                .filter(|attribute| attribute.builtin && attribute.name != "toolchains")
+                .all(|attribute| attribute.required_providers.is_empty())
+        );
     }
 
     #[test]

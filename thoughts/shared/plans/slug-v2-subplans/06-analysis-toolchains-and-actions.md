@@ -1,5 +1,15 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+Configured `ctx.var` uses a cached immutable evaluator-owned string dictionary
+from the current structural configuration, actual selected target-platform CPU,
+and default-attribute/resolved-toolchain TemplateVariableInfo suppliers. Defines
+normalize last-wins in UTF-16 key order before configuration publication. Provider
+variables sort globally after collection; key replacement preserves insertion
+slots. Resolved suppliers with unequal overlapping values are unsupported until
+their encounter order is modeled. Unsupported native controls fail on var access;
+returned dictionaries retain no live context. Output-directory spellings remain
+Slug-native. Existing tracked owners supply invalidation; no semantic side cache.
+
 ## Goal
 
 Analyze configured targets with Bazel-compatible providers, depsets,

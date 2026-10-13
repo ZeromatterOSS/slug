@@ -2516,6 +2516,7 @@ where
         })
         .expect("normalized execution groups retain Default");
     let toolchain_context = default_prepared.action_context.toolchain().cloned();
+    let platform_cpu = default_prepared.platform_cpu.clone();
     for prepared in &prepared_groups {
         if let Some(context) = prepared.action_context.toolchain() {
             for row in context.rows() {
@@ -2618,6 +2619,7 @@ where
         configured_attributes,
         rust_helpers,
         exec_groups.clone(),
+        platform_cpu,
         runfiles_packages,
         print_capture
             .as_ref()
@@ -3709,6 +3711,24 @@ async fn prepare_toolchain_target_settings(
         .collect()))
 }
 
+// Bazel's native CPU setting is canonical and does not use an apparent
+// repository mapping. The resolved platform already supplies actual values.
+fn target_platform_cpu(platform: &ConfiguredPlatform) -> CompactString {
+    platform
+        .constraints()
+        .iter()
+        .find(|constraint| {
+            let setting = constraint.constraint_setting().label();
+            setting.package().repo().as_str() == "platforms"
+                && setting.package().package().as_str() == "cpu"
+                && setting.target().as_str() == "cpu"
+        })
+        .map(|constraint| {
+            CompactString::new(constraint.constraint_value().label().target().as_str())
+        })
+        .unwrap_or_default()
+}
+
 async fn prepare_selected_toolchain_context(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
@@ -3843,12 +3863,17 @@ async fn prepare_selected_toolchain_context(
                     Ok(actual) => actual,
                     Err(error) => return toolchain_outcome(Err(error)),
                 };
-                Some(ConfiguredToolchainSelection::new(
-                    declaration.clone(),
-                    requested_implementation,
-                    actual_implementation,
-                    info,
-                ))
+                Some(
+                    ConfiguredToolchainSelection::new(
+                        declaration.clone(),
+                        requested_implementation,
+                        actual_implementation,
+                        info,
+                    )
+                    .with_template_variable_info(
+                        result.providers().template_variable_info().cloned(),
+                    ),
+                )
             }
             _ => unreachable!("resolution validates declaration and implementation selection"),
         };
@@ -3882,6 +3907,7 @@ async fn prepare_selected_toolchain_context(
     .map_err(AnalysisError::message);
     toolchain_outcome(action_context.map(|action_context| PreparedToolchain {
         action_context,
+        platform_cpu: target_platform_cpu(resolution.target_platform()),
         runfiles_packages: runfiles_packages.into(),
     }))
 }
@@ -6802,3 +6828,7 @@ impl ConfiguredNodeAnalysisKey {
         ))
     }
 }
+
+#[cfg(test)]
+#[path = "dice/target_platform_cpu_tests.rs"]
+mod target_platform_cpu_tests;

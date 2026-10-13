@@ -334,6 +334,8 @@ pub enum SlugConfigurationError {
     DuplicateStarlarkOption,
     UnknownNativeOption,
     InvalidCommandNativeOption { option: &'static str },
+    UnsupportedMakeVariableOption { option: &'static str },
+    UnexpectedMakeVariableOption { option: &'static str },
     UnexpectedNativeStringList { option: &'static str },
     UnexpectedNativeBoolean { option: &'static str },
     UnexpectedNativeLabel { option: &'static str },
@@ -399,6 +401,15 @@ impl fmt::Display for SlugConfigurationError {
                 write!(
                     formatter,
                     "invalid command value for native option {option}"
+                )
+            }
+            Self::UnsupportedMakeVariableOption { option } => {
+                write!(formatter, "ctx.var does not support native option {option}")
+            }
+            Self::UnexpectedMakeVariableOption { option } => {
+                write!(
+                    formatter,
+                    "ctx.var requires a valid retained value for native option {option}"
                 )
             }
             Self::UnexpectedNativeStringList { option } => {
@@ -597,6 +608,7 @@ impl SlugConfiguration {
             });
         }
         let mut options = self.0.options.to_vec();
+        self.project_core_exec_options(&mut options)?;
         self.project_cc_feature_exec_options(&mut options)?;
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
@@ -722,12 +734,8 @@ impl SlugConfiguration {
             actual => return Err(SlugConfigurationError::ExecProjectionRequiresTarget { actual }),
         };
         let mut options = self.0.options.to_vec();
-        let host_compilation_mode = self
-            .option_value(CORE_OPTIONS, "host_compilation_mode")?
-            .clone();
         let host_action_environment = self.option_value(CORE_OPTIONS, "host_action_env")?.clone();
         let mut found_platform = false;
-        let mut found_compilation_mode = false;
         let mut found_action_environment = false;
         for record in &mut options {
             if record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS {
@@ -736,19 +744,15 @@ impl SlugConfiguration {
                     OptionValue::Label(Some(LabelValue::Labels(LabelValues(Arc::from([
                         ResolvedOptionLabel::from_canonical(platform),
                     ])))));
-            } else if record.class_name == CORE_OPTIONS
-                && record.canonical_name == "compilation_mode"
-            {
-                found_compilation_mode = true;
-                record.value = host_compilation_mode.clone();
             } else if record.class_name == CORE_OPTIONS && record.canonical_name == "action_env" {
                 found_action_environment = true;
                 record.value = host_action_environment.clone();
             }
         }
-        if !found_platform || !found_compilation_mode || !found_action_environment {
+        if !found_platform || !found_action_environment {
             return Err(SlugConfigurationError::UnknownNativeOption);
         }
+        self.project_core_exec_options(&mut options)?;
         self.project_cc_feature_exec_options(&mut options)?;
         Ok(finish_configuration(
             SlugConfigurationKind::Exec,
@@ -756,6 +760,23 @@ impl SlugConfiguration {
             starlark_options,
             self.0.action_environment_host.dupe(),
         ))
+    }
+
+    /// Core's exec compilation mode derives from the retained host option in
+    /// both ordinary and platform-specific projections, independently of ctx.var.
+    fn project_core_exec_options(
+        &self,
+        options: &mut [OptionRecord],
+    ) -> Result<(), SlugConfigurationError> {
+        let host_mode = self.option_value(CORE_OPTIONS, "host_compilation_mode")?;
+        let record = options
+            .iter_mut()
+            .find(|record| {
+                record.class_name == CORE_OPTIONS && record.canonical_name == "compilation_mode"
+            })
+            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+        record.value = host_mode.clone();
+        Ok(())
     }
 
     /// Only the C++ projection slices admitted by WP759/WP761/WP764. Bazel's exec
@@ -1019,6 +1040,7 @@ impl SlugConfiguration {
         for (index, value) in updates {
             options[index].value = value;
         }
+        super::make_variables::normalize_defines(&mut options);
         if options.as_slice() == base.0.options.as_ref()
             && starlark_options == base.0.starlark_options
         {
@@ -1407,7 +1429,8 @@ fn typed_native_command_descriptor(
     option: NativeCommandOption,
 ) -> Result<(usize, &'static NativeOptionDescriptor), SlugConfigurationError> {
     let class_name = match option {
-        NativeCommandOption::CollectCodeCoverage
+        NativeCommandOption::Define
+        | NativeCommandOption::CollectCodeCoverage
         | NativeCommandOption::CheckVisibility
         | NativeCommandOption::IncompatibleFilegroupRunfilesForData
         | NativeCommandOption::IncompatibleAlwaysIncludeFilesInData
@@ -2631,3 +2654,7 @@ mod cpp_implementation_deps_tests;
 #[cfg(test)]
 #[path = "cpp_start_end_lib_tests.rs"]
 mod cpp_start_end_lib_tests;
+
+#[cfg(test)]
+#[path = "configuration/make_variable_tests.rs"]
+mod make_variable_tests;

@@ -260,6 +260,9 @@ fn check_rule_context_teardown(fail: bool) {
         executables: Arc::from([]),
         attribute_file,
         attribute_files,
+        make_variables: Ok(module
+            .frozen_heap()
+            .alloc(AllocDict([("COMPILATION_MODE", "fastbuild")]))),
         resolved_attributes: Arc::from([]),
         predeclared_outputs: Arc::from([]),
         build_setting_value: None,
@@ -424,12 +427,39 @@ fn check_rule_context_teardown(fail: bool) {
             "File is not callable"
         );
     }
+    let unsupported = module.heap().alloc(AnalysisContextGen {
+        make_variables: Err("unsupported make-variable control".into()),
+        ..AnalysisContext::from_value(ctx).unwrap().clone()
+    });
+    assert!(
+        unsupported
+            .get_attr("var", module.heap())
+            .unwrap_err()
+            .to_string()
+            .contains("unsupported make-variable control")
+    );
+    assert!(
+        unsupported
+            .get_attr("label", module.heap())
+            .unwrap()
+            .is_some()
+    );
+    let variables = ctx.get_attr("var", module.heap()).unwrap().unwrap();
+    assert!(variables.ptr_eq(ctx.get_attr("var", module.heap()).unwrap().unwrap()));
     let result = eval.eval_function(module.get("implementation").unwrap(), &[ctx], &[]);
     assert_eq!(result.is_err(), fail);
     if let Ok(label) = result {
         assert_eq!(label.to_str(), "@@//pkg:subject");
     }
     drop(guard);
+    let error = ctx.get_attr("var", module.heap()).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("outside of its own implementation function")
+    );
+    assert_eq!(variables.to_repr(), "{\"COMPILATION_MODE\": \"fastbuild\"}");
+    // The plain immutable dict remains readable after its context expires.
     let error = declarations
         .instrumented_files_info_empty(ctx, module.frozen_heap())
         .unwrap_err();

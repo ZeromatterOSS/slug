@@ -15355,3 +15355,6 @@ probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=Tr
     }
     fs::remove_dir_all(workspace).unwrap();
 }
+
+#[path = "starlark_rule/make_variable_context_tests.rs"]
+mod make_variable_context_tests;

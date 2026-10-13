@@ -115,7 +115,10 @@ fn check(result: &ConfiguredNodeResult, main: bool, exec: bool, flags: &[&str]) 
 async fn published_public_compile_expands_complete_c_cpp_pic_main_external_target_exec_commands() {
     let root = workspace();
     let dice = registry::dice(&root);
-    let target = config(&[]);
+    // Keep this one-action matrix in fastbuild for target and exec. With
+    // supports_pic, opt generates both PIC and non-PIC (cc_helper_internal
+    // 333-355); provider.rs separately covers that complete opt action matrix.
+    let target = config(&[(NativeCommandOption::HostCompilationMode, "fastbuild")]);
     let exec = ConfigurationKey::from_slug(target.slug_configuration().unwrap().to_exec().unwrap());
     for main in [false, true] {
         for (configuration, is_exec) in [(target.clone(), false), (exec.clone(), true)] {

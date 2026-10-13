@@ -28,7 +28,9 @@ fn check(result: &ConfiguredNodeResult) -> CppCompileInputSets {
 async fn published_c_cpp_pic_preparation_preserves_main_external_target_exec_input_sets() {
     let root = workspace();
     let dice = registry::dice(&root);
-    let target = config(&[]);
+    // Match the target's fastbuild mode so supports_pic has one compilation
+    // recipe. The opt PIC/non-PIC pair is covered in provider.rs's matrix.
+    let target = config(&[(NativeCommandOption::HostCompilationMode, "fastbuild")]);
     let exec = ConfigurationKey::from_slug(target.slug_configuration().unwrap().to_exec().unwrap());
     for main in [false, true] {
         for configuration in [target.clone(), exec.clone()] {

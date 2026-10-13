@@ -147,6 +147,7 @@ use crate::runfiles_support::complete_runfiles_support;
 mod attribute_files;
 mod cc_compile_action;
 mod cc_context;
+mod make_variables;
 use cc_context::CcContextProjection;
 pub(crate) use cc_context::selected_execution_os;
 
@@ -199,6 +200,7 @@ struct AnalysisContextGen<V> {
     executables: Arc<[AnalysisExecutable]>,
     attribute_file: FrozenValue,
     attribute_files: FrozenValue,
+    make_variables: Result<FrozenValue, CompactString>,
     resolved_attributes: Arc<[ResolvedRuleAttribute]>,
     #[trace(unsafe_ignore)]
     predeclared_outputs: Arc<[PredeclaredOutput]>,
@@ -230,6 +232,7 @@ impl<'v> Freeze for AnalysisContext<'v> {
             executables: self.executables,
             attribute_file: self.attribute_file,
             attribute_files: self.attribute_files,
+            make_variables: self.make_variables,
             resolved_attributes: self.resolved_attributes,
             predeclared_outputs: self.predeclared_outputs,
             build_setting_value: self
@@ -381,6 +384,15 @@ fn runfiles_symlinks(
 
 #[starlark_module]
 fn analysis_context_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn var<'v>(this: &AnalysisContext<'v>) -> anyhow::Result<Value<'v>> {
+        this.token.require_active("var", "rule context")?;
+        this.make_variables
+            .as_ref()
+            .map(|value| value.to_value())
+            .map_err(|error| anyhow::anyhow!("{error}"))
+    }
+
     fn coverage_instrumented<'v>(
         this: &AnalysisContext<'v>,
         target: Option<Value<'v>>,
@@ -492,6 +504,7 @@ pub(crate) struct PreparedConfiguredAttribute {
 
 #[derive(Debug, Clone, Allocative)]
 pub(crate) struct PreparedToolchain {
+    pub(crate) platform_cpu: CompactString,
     pub(crate) action_context: Arc<ConfiguredActionOwnerContext>,
     pub(crate) runfiles_packages: Arc<[crate::result::RunfilesPackageClosureRow]>,
 }
@@ -2352,6 +2365,7 @@ pub(crate) fn evaluate_loaded_rule(
     configured_attributes: Vec<PreparedConfiguredAttribute>,
     rust_helpers: Arc<[slug_loading_v2::PreparedRustToolchainHelperBinding]>,
     exec_groups: ConfiguredExecGroupCollection,
+    platform_cpu: CompactString,
     runfiles_packages: RunfilesPackageDepset,
     print_handler: Option<&dyn PrintHandler>,
 ) -> Result<ConfiguredNodeResult, LoadedRuleError> {
@@ -2422,6 +2436,15 @@ pub(crate) fn evaluate_loaded_rule(
     )?;
     let actions = Arc::new(Mutex::new(CtxActions::new(output_root.clone())));
     let module = Module::new();
+    let make_variables = make_variables::prepare(
+        module.frozen_heap(),
+        key.configuration().slug_configuration(),
+        &platform_cpu,
+        &output_root,
+        implementation,
+        &dependencies,
+        &exec_groups,
+    );
     let needs_cpp_fragment = implementation
         .required_fragments()
         .iter()
@@ -2686,6 +2709,7 @@ pub(crate) fn evaluate_loaded_rule(
             executables,
             attribute_file,
             attribute_files,
+            make_variables,
             resolved_attributes: resolved_attributes.clone(),
             predeclared_outputs: predeclared_outputs.clone(),
             build_setting_value,

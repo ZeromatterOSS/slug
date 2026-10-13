@@ -375,6 +375,7 @@ fn proof(
                 FrozenValue,
             )>::new(
             ))),
+        make_variables: Err("fixture does not prepare make-variable inputs".into()),
         attribute_files: module
             .frozen_heap()
             .alloc(starlark::values::structs::AllocStruct(Vec::<(

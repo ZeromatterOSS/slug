@@ -25,6 +25,7 @@ use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::RetainedSpawnInvocation;
 use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::RunfilesPackageMetadata;
+use slug_build_api_v2::TemplateVariableInfo;
 use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::RuleCapability;
 
@@ -87,6 +88,7 @@ pub struct ConfiguredToolchainSelection {
     implementation: ConfiguredTargetKey,
     actual_implementation: ConfiguredTargetKey,
     info: ProviderOccurrence,
+    template_variable_info: Option<TemplateVariableInfo>,
 }
 
 impl ConfiguredToolchainSelection {
@@ -101,7 +103,17 @@ impl ConfiguredToolchainSelection {
             implementation,
             actual_implementation,
             info,
+            template_variable_info: None,
         }
+    }
+
+    pub fn with_template_variable_info(mut self, info: Option<TemplateVariableInfo>) -> Self {
+        self.template_variable_info = info;
+        self
+    }
+
+    pub fn template_variable_info(&self) -> Option<&TemplateVariableInfo> {
+        self.template_variable_info.as_ref()
     }
 
     pub fn declaration(&self) -> &CanonicalLabel {
@@ -438,6 +450,16 @@ impl PartialEq for ConfiguredActionToolchainContext {
                                 left.declaration == right.declaration
                                     && left.implementation == right.implementation
                                     && left.actual_implementation == right.actual_implementation
+                                    && match (
+                                        &left.template_variable_info,
+                                        &right.template_variable_info,
+                                    ) {
+                                        (None, None) => true,
+                                        (Some(left), Some(right)) => {
+                                            left.variables().eq_ordered(right.variables())
+                                        }
+                                        _ => false,
+                                    }
                             }
                             _ => false,
                         }
@@ -1200,3 +1222,7 @@ impl ConfiguredNodeResult {
         self
     }
 }
+
+#[cfg(test)]
+#[path = "result/make_variable_selection_tests.rs"]
+mod make_variable_selection_tests;
