@@ -1,5 +1,13 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+Native attribute calls resolve the actual getter before arguments and call its
+returned value through the ordinary traced frame temporary. Delayed method
+dispatch is admitted only when an actual frozen receiver's immutable Methods
+entry proves NativeMethod; method-name hints alone cannot prove that. Attribute
+getters do not create a fabricated function frame. Extra bound-method allocation
+for unproven receivers and invalid-callability/argument-error priority stay
+qualified rather than establishing whole interpreter or memory parity.
+
 ## Runtime module Label context
 
 Runtime `Label()` uses the innermost Starlark function's original module,

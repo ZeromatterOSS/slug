@@ -77,13 +77,19 @@ impl UnboundValue {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> crate::Result<Value<'v>> {
-        eval.with_call_stack(
-            self.to_frozen_value().to_value(),
-            Some(span),
-            |eval| match self {
-                UnboundValue::Method(m) => m.function.invoke(eval, this, args),
-                UnboundValue::Attr(a) => a.invoke(this, eval.heap()),
-            },
-        )
+        match self {
+            UnboundValue::Method(m) => {
+                eval.with_call_stack(m.to_frozen_value().to_value(), Some(span), |eval| {
+                    m.function.invoke(eval, this, args)
+                })
+            }
+            UnboundValue::Attr(a) => {
+                let callable = a.invoke(this, eval.heap())?;
+                callable.invoke_with_loc(Some(span), args, eval)
+            }
+        }
     }
 }
+
+#[cfg(test)]
+mod native_attribute_call_tests;

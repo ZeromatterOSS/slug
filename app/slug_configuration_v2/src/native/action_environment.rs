@@ -556,28 +556,126 @@ mod tests {
 
     #[test]
     fn exec_projection_uses_host_action_environment_and_preserves_host_identity() {
-        let target = configuration(
-            ActionEnvironmentHost::without_environment(ActionEnvironmentHostOs::Linux),
-            vec![
-                native(NativeCommandOption::ActionEnv, "MODE=target"),
-                native(NativeCommandOption::HostActionEnv, "MODE=exec"),
-                native(NativeCommandOption::HostActionEnv, "HOST_ONLY"),
-            ],
-        );
-        let exec = target
-            .to_exec_for_platform(&CanonicalLabel::parse("@@//:platform").unwrap())
-            .unwrap();
-        assert_eq!(
-            target
-                .configured_action_environment()
-                .unwrap()
-                .fixed()
-                .get("MODE"),
-            Some("target")
-        );
-        let environment = exec.configured_action_environment().unwrap();
-        assert_eq!(environment.fixed().get("MODE"), Some("exec"));
-        assert!(environment.inherited().contains("HOST_ONLY"));
+        // Bazel 9.2 8220c619 builtin_exec_platforms.bzl223–227: the real
+        // Core exec transition replaces action_env, not only its public view.
+        let host = ActionEnvironmentHost::without_environment(ActionEnvironmentHostOs::Linux);
+        let platform = CanonicalLabel::parse("@@//:platform").unwrap();
+        for strict in [true, false] {
+            let make_target = |mode: &str| {
+                configuration(
+                    host.dupe(),
+                    vec![
+                        native(
+                            NativeCommandOption::IncompatibleStrictActionEnv,
+                            if strict { "true" } else { "false" },
+                        ),
+                        native(NativeCommandOption::CompilationMode, "dbg"),
+                        native(NativeCommandOption::HostCompilationMode, "opt"),
+                        native(NativeCommandOption::ActionEnv, "MODE=target"),
+                        native(NativeCommandOption::ActionEnv, "TARGET_ONLY=fixed"),
+                        native(NativeCommandOption::ActionEnv, "TARGET_INHERITED"),
+                        native(NativeCommandOption::HostActionEnv, "MODE=overwritten"),
+                        native(NativeCommandOption::HostActionEnv, mode),
+                        native(NativeCommandOption::HostActionEnv, "HOST_ONLY"),
+                        native(NativeCommandOption::HostActionEnv, "HOST_FIXED"),
+                        native(NativeCommandOption::HostActionEnv, "HOST_FIXED="),
+                        native(NativeCommandOption::HostActionEnv, "REMOVED=value"),
+                        native(NativeCommandOption::HostActionEnv, "=REMOVED"),
+                    ],
+                )
+            };
+            let targets = [
+                make_target("MODE=exec"),
+                make_target("MODE=changed"),
+                make_target("MODE=exec"),
+            ];
+            assert_ne!(targets[0], targets[1]);
+            assert_ne!(targets[0].canonical_bytes(), targets[1].canonical_bytes());
+            assert_eq!(targets[0], targets[2]);
+            assert_eq!(targets[0].canonical_bytes(), targets[2].canonical_bytes());
+            let mut expected_target_fixed = vec![("MODE", "target"), ("TARGET_ONLY", "fixed")];
+            let mut expected_target_inherited = vec!["TARGET_INHERITED"];
+            if strict {
+                expected_target_fixed.insert(1, ("PATH", "/bin:/usr/bin:/usr/local/bin"));
+            } else {
+                expected_target_inherited.splice(0..0, ["LD_LIBRARY_PATH", "PATH"]);
+            }
+            let expected_target = targets[0].configured_action_environment().unwrap();
+            assert_eq!(
+                expected_target.fixed().iter().collect::<Vec<_>>(),
+                expected_target_fixed
+            );
+            assert_eq!(
+                expected_target.inherited().iter().collect::<Vec<_>>(),
+                expected_target_inherited
+            );
+            // Both full projections retain option/Host ownership and restore
+            // structural identity after a host_action_env A/B/A change.
+            for with_platform in [false, true] {
+                let execs = targets.each_ref().map(|target| {
+                    let exec = if with_platform {
+                        target.to_exec_for_platform(&platform).unwrap()
+                    } else {
+                        target.to_exec().unwrap()
+                    };
+                    assert_eq!(exec.action_environment_host(), Some(&host));
+                    assert_eq!(
+                        exec.option_value(CORE_OPTIONS, "action_env").unwrap(),
+                        target
+                            .option_value(CORE_OPTIONS, "host_action_env")
+                            .unwrap()
+                    );
+                    assert_eq!(
+                        exec.option_value(CORE_OPTIONS, "host_action_env").unwrap(),
+                        target
+                            .option_value(CORE_OPTIONS, "host_action_env")
+                            .unwrap()
+                    );
+                    assert_eq!(
+                        exec.option_value(CORE_OPTIONS, "compilation_mode").unwrap(),
+                        target
+                            .option_value(CORE_OPTIONS, "host_compilation_mode")
+                            .unwrap()
+                    );
+                    assert_eq!(
+                        exec.target_platform_label().unwrap(),
+                        if with_platform {
+                            platform.clone()
+                        } else {
+                            target.target_platform_label().unwrap()
+                        }
+                    );
+                    assert_eq!(target.action_environment_host(), Some(&host));
+                    assert_eq!(
+                        target.configured_action_environment().unwrap(),
+                        expected_target
+                    );
+                    exec
+                });
+                assert_ne!(execs[0], execs[1]);
+                assert_ne!(execs[0].canonical_bytes(), execs[1].canonical_bytes());
+                assert_eq!(execs[0], execs[2]);
+                assert_eq!(execs[0].canonical_bytes(), execs[2].canonical_bytes());
+                for (exec, mode) in execs.iter().zip(["exec", "changed", "exec"]) {
+                    let environment = exec.configured_action_environment().unwrap();
+                    let mut expected_fixed = vec![("HOST_FIXED", ""), ("MODE", mode)];
+                    let mut expected_inherited = vec!["HOST_ONLY"];
+                    if strict {
+                        expected_fixed.push(("PATH", "/bin:/usr/bin:/usr/local/bin"));
+                    } else {
+                        expected_inherited.extend(["LD_LIBRARY_PATH", "PATH"]);
+                    }
+                    assert_eq!(
+                        environment.fixed().iter().collect::<Vec<_>>(),
+                        expected_fixed
+                    );
+                    assert_eq!(
+                        environment.inherited().iter().collect::<Vec<_>>(),
+                        expected_inherited
+                    );
+                }
+            }
+        }
     }
 
     #[test]

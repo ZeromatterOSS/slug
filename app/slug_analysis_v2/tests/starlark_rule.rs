@@ -15358,3 +15358,6 @@ probe = rule(implementation=_probe, attrs={'src':attr.label(allow_single_file=Tr
 
 #[path = "starlark_rule/make_variable_context_tests.rs"]
 mod make_variable_context_tests;
+
+#[path = "starlark_rule/shell_environment_context_tests.rs"]
+mod shell_environment_context_tests;

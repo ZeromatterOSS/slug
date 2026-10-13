@@ -734,9 +734,7 @@ impl SlugConfiguration {
             actual => return Err(SlugConfigurationError::ExecProjectionRequiresTarget { actual }),
         };
         let mut options = self.0.options.to_vec();
-        let host_action_environment = self.option_value(CORE_OPTIONS, "host_action_env")?.clone();
         let mut found_platform = false;
-        let mut found_action_environment = false;
         for record in &mut options {
             if record.class_name == PLATFORM_OPTIONS && record.canonical_name == TARGET_PLATFORMS {
                 found_platform = true;
@@ -744,12 +742,9 @@ impl SlugConfiguration {
                     OptionValue::Label(Some(LabelValue::Labels(LabelValues(Arc::from([
                         ResolvedOptionLabel::from_canonical(platform),
                     ])))));
-            } else if record.class_name == CORE_OPTIONS && record.canonical_name == "action_env" {
-                found_action_environment = true;
-                record.value = host_action_environment.clone();
             }
         }
-        if !found_platform || !found_action_environment {
+        if !found_platform {
             return Err(SlugConfigurationError::UnknownNativeOption);
         }
         self.project_core_exec_options(&mut options)?;
@@ -762,20 +757,24 @@ impl SlugConfiguration {
         ))
     }
 
-    /// Core's exec compilation mode derives from the retained host option in
-    /// both ordinary and platform-specific projections, independently of ctx.var.
+    /// Both exec projection paths use Core's retained host options. Bazel 9.2
+    /// 8220c619: builtin_exec_platforms.bzl223–227 projects compilation_mode and
+    /// action_env from their host counterparts, independently of facade getters.
     fn project_core_exec_options(
         &self,
         options: &mut [OptionRecord],
     ) -> Result<(), SlugConfigurationError> {
-        let host_mode = self.option_value(CORE_OPTIONS, "host_compilation_mode")?;
-        let record = options
-            .iter_mut()
-            .find(|record| {
-                record.class_name == CORE_OPTIONS && record.canonical_name == "compilation_mode"
-            })
-            .ok_or(SlugConfigurationError::UnknownNativeOption)?;
-        record.value = host_mode.clone();
+        for (name, host_name) in [
+            ("compilation_mode", "host_compilation_mode"),
+            ("action_env", "host_action_env"),
+        ] {
+            let host_value = self.option_value(CORE_OPTIONS, host_name)?;
+            let record = options
+                .iter_mut()
+                .find(|record| record.class_name == CORE_OPTIONS && record.canonical_name == name)
+                .ok_or(SlugConfigurationError::UnknownNativeOption)?;
+            record.value = host_value.clone();
+        }
         Ok(())
     }
 

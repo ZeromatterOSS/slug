@@ -1,5 +1,13 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+Configuration.default_shell_env copies only fixed entries from the existing
+tracked action-environment producer into a fresh mutable evaluator dictionary,
+sorted in UTF-16 key order. Inherited names remain unresolved and omitted during
+analysis; errors are field-local. Both exec projection paths use host_action_env
+for action_env through the shared native options owner. Dictionary mutation and
+publication retain no producer context; native canonical and REAPI ordering stay
+unchanged. No second retained map, semantic cache, observation, key or lock.
+
 Configured `ctx.var` uses a cached immutable evaluator-owned string dictionary
 from the current structural configuration, actual selected target-platform CPU,
 and default-attribute/resolved-toolchain TemplateVariableInfo suppliers. Defines

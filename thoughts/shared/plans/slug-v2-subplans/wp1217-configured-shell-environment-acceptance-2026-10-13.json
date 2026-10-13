@@ -1,0 +1,474 @@
+{
+  "packet": "WP1217 configured static shell environment and native-property call correction",
+  "base_revision": "9e6e3d9f905e5effb9baebd7de084fb5ca33a44a",
+  "accepted_at_utc": "2026-10-13T21:15:25.618946+00:00",
+  "observable_capability": "Actual Rust cquery evaluates configuration.default_shell_env at rustc.bzl1851 and reaches upstream rustc.bzl1936 process-wrapper semantic refusal. Diagnostic progress only; no authentic completion through adapters.",
+  "classification": {
+    "exact_admitted": "Fresh mutable string dictionary containing only fixed configured action environment entries in UTF16 order. Existing tracked configuration/Host producer; inherited variables omitted. Shared host_action_env projection for both exec paths. Native getter lookup before call arguments and invocation of the actual returned value through traced temporaries.",
+    "slug_native": "Structural configuration, path/output identity and native canonical ordering remain Slug-native. REAPI ordering/domain identity unchanged.",
+    "qualified_or_deferred": "Extra bound-method allocation for unproven receivers, existing invalid-callability versus argument-error precedence, unsupported shell/runfiles controls, configuration facade publication, workload memory and full interpreter parity."
+  },
+  "source": {
+    "revision": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "actual_head": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "files": [
+      {
+        "path": "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/BuildConfigurationApi.java",
+        "pinned_sha256": "773b2ac9267c6e8c6949375e83a9a080f9aae58cc29786c5337f1f25d403adcf",
+        "live_file_matches_pinned": true
+      },
+      {
+        "path": "src/main/java/com/google/devtools/build/lib/analysis/config/BuildConfigurationValue.java",
+        "pinned_sha256": "5e715c71ebdf3f3df2cf978c7435397d0fac8fcfb9e98e3715006a3a3d911bf9",
+        "live_file_matches_pinned": true
+      },
+      {
+        "path": "src/main/java/com/google/devtools/build/lib/bazel/rules/BazelRuleClassProvider.java",
+        "pinned_sha256": "a7de1ba5a700468ead269865f2563378ea0851d3430844ee6491591e52fd3d91",
+        "live_file_matches_pinned": true
+      },
+      {
+        "path": "src/main/java/net/starlark/java/eval/Starlark.java",
+        "pinned_sha256": "cbc71970bef037ed0c8c56171d45582201fad2471b17f2944ffb131574070aa6",
+        "live_file_matches_pinned": true
+      },
+      {
+        "path": "src/main/java/net/starlark/java/eval/MethodDescriptor.java",
+        "pinned_sha256": "fdeb2ea2733103ea26fd366f4d9e31c007987bf3f635da6ac412b320bd02bffe",
+        "live_file_matches_pinned": true
+      },
+      {
+        "path": "src/main/starlark/builtins_bzl/common/builtin_exec_platforms.bzl",
+        "pinned_sha256": "b61da947cdbd18f1d12411a057c3b88b26fff399e80d6f903e8d88eb4215956a",
+        "live_file_matches_pinned": true
+      }
+    ],
+    "anchors": [
+      "BuildConfigurationApi.java51\u201357",
+      "BuildConfigurationValue.java526\u2013553",
+      "BazelRuleClassProvider.java142\u2013204",
+      "Starlark.java198\u2013223,979\u2013991",
+      "MethodDescriptor.java240\u2013246,300\u2013315",
+      "builtin_exec_platforms.bzl223\u2013227",
+      "Eval.java661\u2013714"
+    ]
+  },
+  "ownership": "Existing SlugConfiguration/retained Host options own environment identity and dependencies. Facade shares full configuration, computes existing producer Result in phase scratch, borrows fixed pairs for UTF16 sorting, then copies strings to current Heap AllocDict. No retained second map, cache, interner, DICE key/observation/lock, ambient environment read or producer ctx/actions. Plain dict freezes/publishes normally; facade publication remains unsupported. Dynamic getters use existing traced function temporaries. Fast method dispatch requires actual frozen receiver immutable Methods entry NativeMethod, not a name hint. Attr fallback invokes the returned Value with original span and no fabricated Attribute frame.",
+  "implementation_paths": [
+    "app/slug_configuration_v2/src/native/configuration.rs",
+    "app/slug_configuration_v2/src/native/action_environment.rs",
+    "app/slug_loading_v2/src/cc_compile_outputs/configuration.rs",
+    "app/slug_loading_v2/src/cc_compile_outputs/configuration/shell_environment_tests.rs",
+    "app/slug_analysis_v2/tests/starlark_rule.rs",
+    "app/slug_analysis_v2/tests/starlark_rule/shell_environment_context_tests.rs",
+    "starlark-rust/starlark/src/eval/bc/compiler/call.rs",
+    "starlark-rust/starlark/src/values/types/unbound.rs",
+    "starlark-rust/starlark/src/values/types/unbound/native_attribute_call_tests.rs"
+  ],
+  "validation": {
+    "compiles": {
+      "toolchain": "nightly-2025-09-14-x86_64-unknown-linux-gnu",
+      "serial": true,
+      "common_tail": [
+        "--offline",
+        "--locked",
+        "--message-format=json",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.opt-level=1",
+        "--config",
+        "profile.dev.package.slug_bzlmod_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_loading_v2.opt-level=1",
+        "--config",
+        "profile.dev.package.slug_loading_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_core_v2.opt-level=1",
+        "--config",
+        "profile.dev.package.slug_core_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_analysis_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_query_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.opt-level=0",
+        "--config",
+        "profile.dev.package.slug_build_api_v2.debug=0",
+        "--config",
+        "profile.dev.package.slug_cli_v2.debug=0"
+      ],
+      "environment_overlay": {
+        "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+        "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+        "CARGO_BUILD_JOBS": "1",
+        "RUST_BACKTRACE": "0"
+      },
+      "final": [
+        {
+          "owner": "configuration",
+          "command_head": [
+            "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "-p",
+            "slug_configuration_v2",
+            "--lib",
+            "--no-run"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 2.606549962190911
+        },
+        {
+          "owner": "starlark",
+          "command_head": [
+            "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "-p",
+            "starlark",
+            "--lib",
+            "--no-run"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 3.5021149918902665
+        },
+        {
+          "owner": "loading",
+          "command_head": [
+            "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "-p",
+            "slug_loading_v2",
+            "--lib",
+            "--no-run"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 10.82901640702039
+        },
+        {
+          "owner": "analysis",
+          "command_head": [
+            "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+            "test",
+            "-p",
+            "slug_analysis_v2",
+            "--test",
+            "starlark_rule"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 9.827527564018965
+        },
+        {
+          "owner": "cli",
+          "command_head": [
+            "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+            "build",
+            "-p",
+            "slug_cli_v2",
+            "--bin",
+            "slug"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 48.38283462403342
+        }
+      ]
+    },
+    "focused_commands": {
+      "preflight": [
+        "python3",
+        "scripts/v2_test_preflight.py",
+        "<owner executable>",
+        "--exact",
+        "<all exact selectors>"
+      ],
+      "execution": [
+        "<owner executable>",
+        "<exact selector>",
+        "--exact",
+        "--nocapture"
+      ]
+    },
+    "focused": [
+      {
+        "owner": "configuration",
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_configuration_v2-b530108ec92e2fa5",
+        "executable_sha256": "73dbf12ebdccff980b17a702ddd17d75c846ff2cb0c23ec229b999edd770f424",
+        "exit_code": 0,
+        "selected": 7,
+        "passed": 7,
+        "elapsed_seconds": 0.07039688806980848,
+        "selector_elapsed_seconds": {
+          "native::action_environment::tests::exec_projection_uses_host_action_environment_and_preserves_host_identity": 0.005820182850584388,
+          "native::action_environment::tests::configured_environment_applies_strict_runfiles_and_option_rows": 0.0016014359425753355,
+          "native::action_environment::tests::non_strict_environment_inherits_unix_and_uses_windows_server_path": 0.004476438043639064,
+          "native::action_environment::tests::host_fact_is_structural_restores_and_missing_fails_closed": 0.003127112053334713,
+          "native::action_environment::tests::retained_types_are_allocative_and_cheap_to_clone": 0.0007340929005295038,
+          "native::configuration::tests::configured_action_environment_rejects_deferred_option_mutation": 0.0013662150595337152,
+          "native::configuration::tests::label_options_preserve_typed_identity_and_exec_restoration": 0.0032806030940264463
+        }
+      },
+      {
+        "owner": "starlark",
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-ee5f5b4104d6a204",
+        "executable_sha256": "a06e209508376803e5b4819c478c7194c70f8b2983cd1810ec6ac191c8c1be11",
+        "exit_code": 0,
+        "selected": 10,
+        "passed": 10,
+        "elapsed_seconds": 0.1732475170865655,
+        "selector_elapsed_seconds": {
+          "values::types::unbound::native_attribute_call_tests::native_attribute_noncallable_values_reject_direct_and_separated_calls": 0.004062877036631107,
+          "values::types::unbound::native_attribute_call_tests::native_attribute_callable_forwards_all_argument_forms_and_preserves_native_methods": 0.004079535836353898,
+          "values::types::unbound::native_attribute_call_tests::native_attribute_getter_failure_precedes_argument_failure_without_attribute_frame": 0.00369307491928339,
+          "values::types::unbound::native_attribute_call_tests::native_attribute_captures_callee_before_arguments_even_for_known_method_names": 0.003959334921091795,
+          "values::types::unbound::native_attribute_call_tests::native_attribute_selected_dynamic_callable_survives_argument_gc_without_old_roots": 0.003895625937730074,
+          "eval::runtime::evaluator::module_client_data_tests::module_client_data_is_set_once_traced_and_frozen_without_changing_extra_value": 0.0033687129616737366,
+          "eval::runtime::evaluator::module_client_data_tests::native_constructor_passed_as_value_uses_helper_module_and_missing_original_stays_missing": 0.003320773132145405,
+          "eval::runtime::evaluator::module_client_data_tests::identical_filenames_keep_distinct_original_modules_through_actual_frozen_inlining": 0.0034302640706300735,
+          "eval::runtime::evaluator::module_client_data_tests::runtime_nested_function_keeps_producer_metadata_after_gc_refreeze_and_owner_drop": 0.0031303330324590206,
+          "eval::runtime::evaluator::module_client_data_tests::foreign_frozen_client_data_requires_and_retains_the_existing_heap_reference": 0.0007816629949957132
+        }
+      },
+      {
+        "owner": "loading",
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-28bf71b6db44503c",
+        "executable_sha256": "46b4fc9bd729aeffe539a80b3735937af1a8e0f41bc3b4613690ee209204e051",
+        "exit_code": 0,
+        "selected": 5,
+        "passed": 5,
+        "elapsed_seconds": 0.22475847112946212,
+        "selector_elapsed_seconds": {
+          "cc_compile_outputs::configuration::shell_environment_tests::default_shell_env_returns_fresh_mutable_plain_dict": 0.0052278609946370125,
+          "cc_compile_outputs::configuration::shell_environment_tests::fixed_entries_omit_inherited_and_unset_and_keep_last_row": 0.0041699272114783525,
+          "cc_compile_outputs::configuration::shell_environment_tests::dictionary_order_is_utf16_without_changing_native_canonical_order": 0.003966455115005374,
+          "cc_compile_outputs::configuration::shell_environment_tests::missing_host_is_lazy_and_preserves_unrelated_configuration_fields": 0.003776234807446599,
+          "cc_compile_outputs::configuration::shell_environment_tests::returned_dictionary_freezes_after_configuration_producer_drop": 0.004095286130905151
+        }
+      },
+      {
+        "owner": "analysis",
+        "executable": "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-ce890e0b6c9003ba",
+        "executable_sha256": "acb698b4f408d4f204303cafaecbaa5f3030389cdb11060b2e70e0da746c3738",
+        "exit_code": 0,
+        "selected": 4,
+        "passed": 4,
+        "elapsed_seconds": 0.3698927580844611,
+        "selector_elapsed_seconds": {
+          "shell_environment_context_tests::shell_environment_strict_non_strict_copies_mutate_independently_and_publish": 0.045209820149466395,
+          "shell_environment_context_tests::shell_environment_fixed_inherited_unset_last_wins_and_utf16_order": 0.0340289541054517,
+          "shell_environment_context_tests::shell_environment_target_exec_uses_host_rows_on_both_projection_paths": 0.031702195992693305,
+          "shell_environment_context_tests::shell_environment_source_configuration_and_retained_host_a_b_a_use_one_dice": 0.05491295689716935
+        }
+      }
+    ],
+    "total_selected": 26,
+    "total_passed": 26,
+    "broader": {
+      "configuration": {
+        "command": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_configuration_v2-b530108ec92e2fa5",
+          "--test-threads=1"
+        ],
+        "environment_overlay": {
+          "CARGO_MANIFEST_DIR": "/run/media/system/Colossus/dev/slug/app/slug_configuration_v2"
+        },
+        "exit_code": 0,
+        "elapsed_seconds": 0.1460349599365145,
+        "summary": [
+          "test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s"
+        ],
+        "failures": [],
+        "executable_sha256": "73dbf12ebdccff980b17a702ddd17d75c846ff2cb0c23ec229b999edd770f424"
+      },
+      "starlark": {
+        "command": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark-ee5f5b4104d6a204",
+          "--test-threads=1"
+        ],
+        "environment_overlay": {
+          "CARGO_MANIFEST_DIR": "/run/media/system/Colossus/dev/slug/starlark-rust/starlark"
+        },
+        "exit_code": 101,
+        "elapsed_seconds": 2.503659222042188,
+        "summary": [
+          "test result: FAILED. 891 passed; 28 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.50s"
+        ],
+        "failures": [
+          "environment::modules::tests::test_gen_heap_summary_profile",
+          "eval::compiler::call::receiver_memory_tests::method_call_transfers_nested_symbol_buffers_and_preserves_ir_spans_arguments",
+          "eval::runtime::profile::tests::test_profile_golden_heap_allocated",
+          "eval::runtime::profile::tests::test_profile_golden_heap_flame_allocated",
+          "eval::runtime::profile::tests::test_profile_golden_heap_flame_retained",
+          "eval::runtime::profile::tests::test_profile_golden_heap_retained",
+          "eval::runtime::profile::tests::test_profile_golden_heap_summary_allocated",
+          "eval::runtime::profile::tests::test_profile_golden_heap_summary_retained",
+          "eval::runtime::profile::tests::test_profile_golden_time_flame",
+          "tests::bc::call::test_call",
+          "tests::bc::definitely_assigned::test_definitely_assigned_slot_range_in_call",
+          "tests::bc::definitely_assigned::test_mov_is_used",
+          "tests::bc::expr::test_call_maybe_known_method",
+          "tests::bc::for_stmt::test_for",
+          "tests::bc::for_stmt::test_for_break",
+          "tests::bc::for_stmt::test_for_continue",
+          "tests::bc::if_stmt::test_if_false_or_x",
+          "tests::bc::if_stmt::test_if_true_and_x",
+          "tests::bc::if_stmt::test_if_true_or_x",
+          "tests::bc::if_stmt::test_if_x_and_true",
+          "tests::bc::if_stmt::test_if_x_or_false",
+          "tests::bc::if_stmt::test_if_x_or_true",
+          "tests::opt::def_inline::test_calls_with_const_args_inlined",
+          "tests::opt::def_inline::test_calls_with_locals_inlined",
+          "tests::opt::def_inline::test_do_not_inline_functions_with_return_type",
+          "tests::opt::test_mutual_recursion",
+          "tests::opt::test_recursion",
+          "values::types::structs::value::tests::test_to_json"
+        ],
+        "executable_sha256": "a06e209508376803e5b4819c478c7194c70f8b2983cd1810ec6ac191c8c1be11"
+      },
+      "loading": {
+        "command": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/slug_loading_v2-28bf71b6db44503c",
+          "--test-threads=1"
+        ],
+        "environment_overlay": {
+          "CARGO_MANIFEST_DIR": "/run/media/system/Colossus/dev/slug/app/slug_loading_v2"
+        },
+        "exit_code": 101,
+        "elapsed_seconds": 9.829440240981057,
+        "summary": [
+          "test result: FAILED. 975 passed; 10 failed; 3 ignored; 0 measured; 0 filtered out; finished in 9.83s"
+        ],
+        "failures": [
+          "bzl_module::host_package_load_tests::exact_rules_cc_info_freezes_complete_recursive_producer",
+          "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+          "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+          "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+          "canonical_repository_load_route_tests::tests::cancellation_publishes_no_canonical_package_source_and_recovery_completes",
+          "canonical_repository_load_route_tests::tests::recursive_mapped_child_need_and_route_errors_stop_before_child_source",
+          "canonical_repository_load_route_tests::tests::root_request_external_bzl_preserves_exact_source_children",
+          "canonical_repository_load_route_tests::tests::selected_parent_routes_generated_load_through_canonical_owner",
+          "canonical_repository_load_route_tests::tests::transitive_registry_repo_is_canonical_only_and_reads_shared_source_owners",
+          "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+        ],
+        "executable_sha256": "46b4fc9bd729aeffe539a80b3735937af1a8e0f41bc3b4613690ee209204e051"
+      },
+      "analysis": {
+        "command": [
+          "/run/media/system/Colossus/dev/slug/target/debug/deps/starlark_rule-ce890e0b6c9003ba",
+          "--test-threads=1"
+        ],
+        "environment_overlay": {
+          "CARGO_MANIFEST_DIR": "/run/media/system/Colossus/dev/slug/app/slug_analysis_v2"
+        },
+        "exit_code": 101,
+        "elapsed_seconds": 32.377517394023016,
+        "summary": [
+          "test result: FAILED. 258 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.37s"
+        ],
+        "failures": [
+          "directory_args::unexpanded_directory_vectors_retain_literal_paths_and_reject_expansion",
+          "output_group_info::configured_output_groups_preserve_artifacts_sharing_forwarding_and_a_b_a"
+        ],
+        "executable_sha256": "acb698b4f408d4f204303cafaecbaa5f3030389cdb11060b2e70e0da746c3738"
+      }
+    },
+    "qualification": "Configuration108 wholly passes. Engine891PASS/28FAIL, Loading975PASS/10FAIL/3ignored, Analysis258PASS/2FAIL have the same failure NAME sets as WP1215/WP1216 records. Neither full suite pass, unchanged failure contents, regression-free memory nor stronger baseline attribution is asserted.",
+    "checks": [
+      "Pinned rustfmt scoped files, skip_children for Engine, passed",
+      "git diff --check passed",
+      "bash scripts/v2_archive_status.sh passed",
+      "python3 scripts/v2_plan_status.py passed; live markers matched"
+    ],
+    "ordinary_corrections": [
+      "Discriminating noncallable-field test exposed actual interpreter bug: a one-line unbound fix was insufficient because dynamic getters were resolved after arguments. Independent correction design required existing eager traced value-call lowering; implemented without touching mixed compiler candidates.",
+      "Engine fixtures use the existing Rust dict-call diagnostic and valid named-before-* syntax; all refusal/forwarding cases retained.",
+      "Host A/B/A fixture uses existing HostConversionInputs and identical native defaults/host platform instead of a nonexistent SlugConfiguration setter.",
+      "Loading selector receipt key corrected before preflight; no zero-test proof admitted."
+    ]
+  },
+  "public_diagnostic": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cquery",
+      "//pkg:probe",
+      "--output=starlark",
+      "--starlark:expr=str(target.label)",
+      "--@rules_rust//rust/toolchain/channel=nightly",
+      "--lockfile_mode=off",
+      "--registry=file:///run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-patch-registry",
+      "--override_module=rules_rust=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+      "--override_module=platforms=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+      "--override_module=bazel_features=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+      "--override_module=bazel_skylib=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af",
+      "--override_module=rules_cc=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b679c020813eb8d658920448a1e821880c62d293d56d564524c8c254e20e485f/d0e4ebaa-7ffa-4a3d-a755-c5d29e9dc78c",
+      "--override_module=rules_license=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/4c6795bb04c3349d2b9b2808b887d3f14ff63bd269fbefd4b4c28155a2d19525/f6cf33a6-90b1-4749-a93c-e2cb5cce1b13",
+      "--override_module=rules_shell=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/e4cd8731be89dd0473a729d04ebd85444fe476aba6f06f85094f7b108924b591/4bca3bf5-0643-4020-8164-f11be8f615a5",
+      "--override_module=apple_support=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/13472a256eff8c8b5f8a2a117b4cf3b0f5694370e2b294b1d6245602764578c5/332a872f-7ce2-4ac9-ab78-01592c6cd5ac",
+      "--override_module=package_metadata=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/87ddb5d5a728136adee9906902ea29def4999252491ac9c7561a865cab34f2ca/0c45a275-e090-43c4-a806-bd40b1d3c496",
+      "--override_module=buildozer=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b1e01de9c6b5635482f28248bca3a662d4e80b182852ad2e4bdb089d264e881a/5da1f8a3-3aad-4c7f-935e-a831b99ae956",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8625cc7b7b2952e38101e17b4a9e7c043b3a79f55d26e4772819891998725e16",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/bd0786e0f8b6aed8c35898b4c06f64ba853d61d7c8361edb5a8d43c6ea37f5c6",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a58c25c5fe063a70057fa20cb8e15f3bda19b1030305bcb533af1e45f36a4a55",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/20152b14d9a420afc15ace905c02fd6425ddceb084630f3f043b287adf0fcdbd",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a1e351607f04fed296ba33c4977d3fe2a615ed50df7896676b67aac993c53c18",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/d20c951960ed77cb7b341c2a59488534e494d5ad1d30c4818c736d57772a9fef",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/0e1ed4a98f26e718776bd64d053d02bb34d98572ccd03d6ba355112a1205706b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1210/toolchain-distdirs/bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d"
+    ],
+    "workspace": "/run/media/system/Colossus/dev/slug/target/wp1217/normal-host-diagnostic/slug-workspace",
+    "exit_code": 2,
+    "elapsed_seconds": 64.14555624197237,
+    "binary_sha256": "123d6eac893b79f906cfe265812835dd4f4336b35d2dc2c04fd70a9ac684454a",
+    "scope": "Diagnostic continuation only. Banned preserved repository/callback adapters remain present; cannot establish authentic compatibility, memory acceptance, M7A or M8. Reuse immutable verified source preparation from WP1210; deadline180s.",
+    "outputs": {
+      "configured-diagnostic.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "configured-diagnostic.stderr": "8620f229c1b34b432d3581501697fa7e0c00d237a26e528eebbc5ed6afc3b714"
+    }
+  },
+  "prepared_integrity": "Diagnostic supervisor exit0 confirms all before/after immutable WP1210 preparation assertions; command exit2 captured separately. Registry/archive/override/toolchain pins unchanged. No stale slugd observed before or after.",
+  "next_concrete_blocker": {
+    "location": "@@rules_rust+//rust/private:rustc.bzl1936",
+    "kind": "Actual upstream authored semantic refusal, not a missing API",
+    "error": "build_env_files, build_flags_files, stamp, build_metadata are not supported when building without process_wrapper",
+    "causality": "Pending successor proof of actual inputs. Source inspection found generic StarlarkDepset has no to_bool override although pinned Bazel Depset.java288 returns !set.isEmpty(); empty build_flags_files depset is a concrete candidate, not an accepted root-cause claim yet."
+  },
+  "review": {
+    "independent_agent": "/root/cleanup_design_review",
+    "design": "ACCEPT fixed-entry fresh mutable copy and shared exec ownership. Correction REVISE then ACCEPT actual frozen-method proof/eager generic getter-before-arguments with traced callable roots.",
+    "final": "ACCEPT actual owned diff, all26 focused tests, verified terminal diagnostic/output/binary hashes, scoped contracts and qualified broad evidence.",
+    "residual": "Extra bound-method allocations, callability-error priority, memory, authentic command, M7A and M8 remain open."
+  },
+  "integrity_and_dirty_ownership": {
+    "inherited_snapshot": "target/wp1217/inherited-dirty.patch",
+    "owned_source_patch_sha256": "cf03d69fd882a2819fad9e7528a9cca27d0464980d5058995c4ed80e27c8a860",
+    "stage4_patch_sha256": "b4387b23a99aeaa06c8c729b5acb35d2655bada4d6bc82d745006824574227c3",
+    "stage6_patch_sha256": "782c6160211510bb6257a8f891dcac1bbca529065ae391b34ce9218607da4b59",
+    "method": "Nine clean-baseline production/test files projected against HEAD; inherited mixed compiler expr/instr/writer/def, Loading, Core observer and all other active candidates excluded. Contracts projected narrowly into HEAD rather than staging concise plan rewrites.",
+    "fixture_growth": "WP1215 checkpoint reused. Three new test leaves and one receipt; cumulative additions since checkpoint below six accepted packets,100files/10000lines. No nondiscriminating fixture copy identified."
+  },
+  "remaining_gates": [
+    "Existing rules-specific repository/callback adapters remain replacement-required; diagnostic cannot close authentic rules_rust/M7A/M8.",
+    "Required action comparison, authentic Rust REAPI execution, complete Slug closure and Stage10 stage1/stage2 fixed point remain unproved.",
+    "Equivalent public-command memory ratio <=1.25 Bazel remains unestablished."
+  ]
+}

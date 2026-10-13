@@ -15,6 +15,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Value;
+use starlark::values::dict::AllocDict;
 use starlark::values::starlark_value;
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
@@ -40,12 +41,32 @@ impl<'v> StarlarkValue<'v> for ConfigurationValue {
         }
     }
     fn dir_attr(&self) -> Vec<String> {
-        vec!["coverage_enabled".to_owned()]
+        vec![
+            "coverage_enabled".to_owned(),
+            "default_shell_env".to_owned(),
+        ]
     }
 }
 
 #[starlark_module]
 fn configuration_methods(builder: &mut MethodsBuilder) {
+    #[starlark(attribute)]
+    fn default_shell_env<'v>(
+        this: &ConfigurationValue,
+        heap: Heap<'v>,
+    ) -> anyhow::Result<Value<'v>> {
+        let environment = this.0.configured_action_environment()?;
+        // Bazel's TreeMap uses Java String order. Keep this borrowed sorting
+        // scratch separate from the configuration's native canonical identity.
+        let mut fixed = environment.fixed().iter().collect::<Vec<_>>();
+        fixed.sort_unstable_by(|(left, _), (right, _)| {
+            left.encode_utf16().cmp(right.encode_utf16())
+        });
+        // Java Map return conversion makes a fresh mutable dictionary. Only
+        // these evaluator-owned strings survive the producer and sort scratch.
+        Ok(heap.alloc(AllocDict(fixed)))
+    }
+
     fn is_tool_configuration(this: &ConfigurationValue) -> anyhow::Result<bool> {
         Ok(this.0.kind() == SlugConfigurationKind::Exec)
     }
@@ -89,3 +110,6 @@ pub(crate) fn unpack(value: Value<'_>) -> anyhow::Result<&SlugConfiguration> {
         .map(|value| &value.0)
         .ok_or_else(|| anyhow::anyhow!("requires a genuine configuration"))
 }
+
+#[cfg(test)]
+mod shell_environment_tests;

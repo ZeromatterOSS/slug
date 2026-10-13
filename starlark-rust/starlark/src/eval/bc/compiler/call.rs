@@ -52,6 +52,7 @@ use crate::values::FrozenValue;
 use crate::values::FrozenValueTyped;
 use crate::values::function::NativeFunction;
 use crate::values::types::known_methods::get_known_method;
+use crate::values::types::unbound::UnboundValue;
 use crate::values::typing::type_compiled::compiled::TypeCompiled;
 
 impl ArgsCompiledValue {
@@ -247,23 +248,33 @@ impl IrSpanned<CallCompiled> {
         let span = self.span;
         let call_site = self.call_site;
         let file_span = bc.alloc_file_span(call_site);
-        match self.method() {
-            None => match self.fun.as_value() {
-                Some(f) => Self::write_call_frozen(span, call_site, f, &self.args, target, bc),
-                None => {
-                    self.fun.write_bc_cb(bc, |fun, bc| {
-                        Self::write_args(&self.args, bc, |args, bc| match args {
-                            Either::Left(npops) => bc
-                                .write_instr::<InstrCallPos>(span, (fun, npops, file_span, target)),
-                            Either::Right(args) => {
-                                bc.write_instr::<InstrCall>(span, (fun, args, file_span, target));
-                            }
-                        })
-                    });
-                }
-            },
-            Some((this, symbol, args)) => {
-                Self::write_call_method(target, span, call_site, this, symbol, args, bc)
+        if let Some((this, symbol, args)) = self.method() {
+            let proven_method = this.as_value().is_some_and(|this| {
+                this.to_value()
+                    .vtable()
+                    .methods()
+                    .and_then(|methods| methods.get_frozen_symbol(symbol))
+                    .is_some_and(|member| matches!(member, UnboundValue::Method(_)))
+            });
+            if proven_method {
+                return Self::write_call_method(target, span, call_site, this, symbol, args, bc);
+            }
+        }
+        match self.fun.as_value() {
+            Some(f) => Self::write_call_frozen(span, call_site, f, &self.args, target, bc),
+            None => {
+                // Resolve dynamic dot getters before arguments, and keep their
+                // returned callable in the existing traced frame slot.
+                self.fun.write_bc_cb(bc, |fun, bc| {
+                    Self::write_args(&self.args, bc, |args, bc| match args {
+                        Either::Left(npops) => {
+                            bc.write_instr::<InstrCallPos>(span, (fun, npops, file_span, target))
+                        }
+                        Either::Right(args) => {
+                            bc.write_instr::<InstrCall>(span, (fun, args, file_span, target));
+                        }
+                    })
+                });
             }
         }
     }
