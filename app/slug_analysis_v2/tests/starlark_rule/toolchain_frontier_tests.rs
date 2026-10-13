@@ -3,15 +3,22 @@ use super::*;
 #[derive(Default)]
 struct ResolutionCompletionTracker {
     completed: Mutex<Vec<(dice::RootActivation, bool)>>,
+    packages: Mutex<Vec<String>>,
 }
 
 impl ActivationTracker for ResolutionCompletionTracker {
     fn key_activated(
         &self,
-        _key: &DynKey,
+        key: &DynKey,
         _deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
+        if let Some(key) = key.downcast_ref::<HostPackageInventoryKey>() {
+            self.packages.lock().unwrap().push(key.to_string());
+        }
+        if let Some(key) = key.downcast_ref::<HostPackageInventoryObservationKey>() {
+            self.packages.lock().unwrap().push(key.to_string());
+        }
     }
 
     fn root_completed(&self, key: &DynKey, activation: dice::RootActivation, transient: bool) {
@@ -25,10 +32,13 @@ impl ActivationTracker for ResolutionCompletionTracker {
 }
 
 #[tokio::test]
-async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closure() {
+async fn required_toolchain_declaration_need_repairs_with_strict_closure_without_speculative_implementation()
+ {
     let workspace = scratch();
     let bad = workspace.join("speculative/bad");
     fs::create_dir_all(&bad).unwrap();
+    let needed = workspace.join("speculative/needed");
+    fs::create_dir_all(&needed).unwrap();
     for (relative, source) in [
         (
             "MODULE.bazel",
@@ -40,7 +50,7 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         ),
         (
             "BUILD.bazel",
-            "load(':defs.bzl','impl')\ntoolchain_type(name='wanted')\ntoolchain_type(name='other')\nimpl(name='impl')\ntoolchain(name='chosen',toolchain_type=':wanted',toolchain=':impl')\ntoolchain(name='unused',toolchain_type=':other',toolchain='@speculative//bad:impl')\n",
+            "load(':defs.bzl','impl')\ntoolchain_type(name='other')\nimpl(name='impl')\ntoolchain(name='chosen',toolchain_type='@speculative//needed:wanted',toolchain=':impl')\ntoolchain(name='unused',toolchain_type=':other',toolchain='@speculative//bad:impl')\n",
         ),
         (
             "speculative/MODULE.bazel",
@@ -49,6 +59,11 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         ("speculative/REPO.bazel", ""),
         ("speculative/.bazelignore", ""),
         ("speculative/BUILD.bazel", ""),
+        (
+            "speculative/needed/BUILD.bazel",
+            "load(':a.bzl','A')\ntoolchain_type(name='wanted')\n",
+        ),
+        ("speculative/needed/a.bzl", "A = 1\n"),
         (
             "speculative/bad/BUILD.bazel",
             "load(':outer.bzl','impl')\nimpl(name='impl')\n",
@@ -66,7 +81,7 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
         test_configuration(),
         Arc::from([ToolchainTypeRequirement::new(
-            CanonicalLabel::parse("@@//:wanted").unwrap(),
+            CanonicalLabel::parse("@@speculative+//needed:wanted").unwrap(),
             true,
         )]),
     )
@@ -75,13 +90,13 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
     let tracker = Arc::new(ResolutionCompletionTracker::default());
     let a_bytes = PathObservationDemand::new(
         PathObservationNamespace::Host,
-        NormalizedAbsolutePath::new(bad.join("a.bzl")).unwrap(),
+        NormalizedAbsolutePath::new(needed.join("a.bzl")).unwrap(),
         PathObservationOperation::FileBytes,
     );
     let full_epoch = root_epoch(&workspace);
     assert!(full_epoch.get(&a_bytes).is_some());
-    // Only A's bytes are withheld: its file metadata and B's real malformed
-    // source remain observed. The imports retain their genuine AST order.
+    // Withhold a genuine required declaration input. The malformed unselected
+    // implementation is independently present and must never join this frontier.
     let cold_epoch = PathObservationEpoch::from_shared(
         full_epoch
             .observations()
@@ -108,7 +123,7 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         &outcome
     ));
     let AnalysisPreparationOutcome::Need(need) = outcome else {
-        panic!("earlier missing bytes were obscured by later parse failure: {outcome:?}")
+        panic!("required declaration bytes did not produce Need: {outcome:?}")
     };
     assert!(
         need.path_observations()
@@ -135,7 +150,7 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         &outcome
     ));
     let AnalysisPreparationOutcome::Complete(Ok(result)) = outcome else {
-        panic!("repaired speculative loading did not complete successfully: {outcome:?}")
+        panic!("repaired declaration loading did not complete successfully: {outcome:?}")
     };
     let resolution = result.as_ref().as_ref().unwrap();
     assert_eq!(resolution.rows().len(), 1);
@@ -147,9 +162,13 @@ async fn speculative_toolchain_package_need_repairs_to_success_with_strict_closu
         resolution.rows()[0].implementation(),
         Some(&CanonicalLabel::parse("@@//:impl").unwrap())
     );
-    // B's parse failure remains in the unselected implementation inventory;
-    // repaired A is enough for the normal successful resolution closure.
+    // The implementation parse failure is irrelevant to this declaration graph.
     assert_eq!(fs::read_to_string(bad.join("b.bzl")).unwrap(), "B = (\n");
+    let packages = tracker.packages.lock().unwrap().clone();
+    assert!(
+        packages.iter().all(|package| !package.contains("//bad")),
+        "unselected implementation package was activated: {packages:?}"
+    );
     let completed = tracker.completed.lock().unwrap().clone();
     assert_eq!(completed.len(), 2);
     let (root, transient) = completed[1];

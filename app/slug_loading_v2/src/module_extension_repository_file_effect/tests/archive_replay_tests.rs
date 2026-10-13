@@ -66,30 +66,39 @@ def impl(ctx):
     independent_repository(name='first')
 ext = module_extension(implementation=impl)
 "#;
-    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let mut transaction = transaction_untracked(&dice, MODULE, source, true).await;
-    let owner = owner(&mut transaction).await;
-    let key = HostSelectedRepositoryFileEffectKey::new(
-        NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
-        owner,
-        0,
-    );
-    transaction = epoch_transaction(
-        transaction,
-        RepositoryArchiveEpoch::active(17, RepositoryArchiveTranscript::empty()),
-    )
-    .await;
-    let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
-        panic!("valid positional defaults must reach the actual archive boundary")
-    };
-    assert_eq!(needs.repository_archives().len(), 1);
-    let request = needs.repository_archives().values().next().unwrap();
-    assert_eq!(request.archive().sha256(), [0xa1; 32]);
-    assert_eq!(request.archive().strip_prefix(), "arbitrary/prefix");
-    assert!(request.archive().canonical_id().is_empty());
-    assert!(request.archive().declared_integrity().is_empty());
-    assert_eq!(request.id().call_index(), 0);
-    assert_eq!(request.prefix().effect_count(), 0);
+    // Opaque cache-partition metadata is retained even without a cache consumer.
+    for canonical_id in ["", "independent namespace Ω", "another partition"] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let actual_source = source.replace(
+            "False, '', {}, {}",
+            &format!("False, {canonical_id:?}, {{}}, {{}}"),
+        );
+        let mut transaction = transaction_untracked(&dice, MODULE, &actual_source, true).await;
+        let owner = owner(&mut transaction).await;
+        let key = HostSelectedRepositoryFileEffectKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            owner,
+            0,
+        );
+        transaction = epoch_transaction(
+            transaction,
+            RepositoryArchiveEpoch::active(17, RepositoryArchiveTranscript::empty()),
+        )
+        .await;
+        let SourcePreparationOutcome::Need(needs) = transaction.compute(&key).await.unwrap() else {
+            panic!("valid positional defaults must reach the actual archive boundary")
+        };
+        assert_eq!(needs.repository_archives().len(), 1);
+        let request = needs.repository_archives().values().next().unwrap();
+        assert_eq!(request.archive().sha256(), [0xa1; 32]);
+        assert_eq!(request.archive().strip_prefix(), "arbitrary/prefix");
+        // Loading uses the admitted Bazel byte-carrier string representation.
+        let expected_id: String = canonical_id.bytes().map(char::from).collect();
+        assert_eq!(request.archive().canonical_id(), expected_id);
+        assert!(request.archive().declared_integrity().is_empty());
+        assert_eq!(request.id().call_index(), 0);
+        assert_eq!(request.prefix().effect_count(), 0);
+    }
 }
 
 #[tokio::test]

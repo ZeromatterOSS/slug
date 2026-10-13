@@ -3457,13 +3457,14 @@ fn native_references(target: &slug_loading_v2::PackageTarget) -> Vec<CanonicalLa
     match &target.kind {
         PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
             toolchain_type,
-            implementation,
             exec_compatible_with,
             target_compatible_with,
             target_settings,
             ..
         }) => {
-            let mut references = vec![toolchain_type.clone(), implementation.clone()];
+            // Bazel's implementation attribute is NODEP_LABEL: declarations
+            // load before matching, implementations only after selection.
+            let mut references = vec![toolchain_type.clone()];
             references.extend(exec_compatible_with.value().iter().cloned());
             references.extend(target_compatible_with.value().iter().cloned());
             references.extend(target_settings.value().selector_key_labels());

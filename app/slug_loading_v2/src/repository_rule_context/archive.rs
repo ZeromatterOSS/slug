@@ -23,11 +23,7 @@ pub(super) fn parse_archive_effect<'v>(
     strip_components: i32,
     heap: Heap<'v>,
 ) -> Result<GeneratedRepositoryArchiveEffect, RepositoryRuleInvocationError> {
-    if !matches!(output, "" | ".")
-        || allow_fail
-        || strip_components != 0
-        || !canonical_id.is_empty()
-    {
+    if !matches!(output, "" | ".") || allow_fail || strip_components != 0 {
         return Err(RepositoryRuleInvocationError::ArchiveOptions);
     }
     for (option, nonempty_error) in [

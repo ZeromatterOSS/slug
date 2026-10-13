@@ -1195,6 +1195,12 @@ identity distinct from rendered paths, Bazel ActionKey and REAPI digests.
   toolchains, platform aliases, host fallback, optional and mandatory
   toolchains, target settings, default constraints, and per-exec-group contexts.
 
+Registered toolchain implementation labels are NODEP_LABEL declarations: retain
+them structurally, but load type, constraints, target settings and declaration
+aliases before matching. Prepare an implementation package only after selection
+through the existing selected-toolchain context; selected Need, errors, aliases,
+cycles and provider validation keep their normal DICE owners.
+
 ### 6.6 Aspects After Base Analysis
 
 - Defer aspects until custom rules, providers, depsets, and toolchains are

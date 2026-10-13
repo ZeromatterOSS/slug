@@ -170,6 +170,8 @@ mod rustc_map_each;
 #[path = "starlark_rule/starlark_platform_selector_tests.rs"]
 mod starlark_platform_selector_tests;
 mod template_variable;
+#[path = "starlark_rule/toolchain_declaration_laziness_tests.rs"]
+mod toolchain_declaration_laziness_tests;
 #[path = "starlark_rule/toolchain_frontier_tests.rs"]
 mod toolchain_frontier_tests;
 mod workspace_name;
