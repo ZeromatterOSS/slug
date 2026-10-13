@@ -74,6 +74,7 @@ use crate::stdlib::extra::PrintHandler;
 use crate::stdlib::extra::StderrPrintHandler;
 use crate::values::FrozenHeap;
 use crate::values::FrozenRef;
+use crate::values::FrozenValue;
 use crate::values::Heap;
 use crate::values::Trace;
 use crate::values::Tracer;
@@ -590,6 +591,50 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
         self.call_stack
             .nth_location(0)
             .map(|location| location.file.filename().to_owned())
+    }
+
+    /// Borrow the client metadata of the module defining the innermost logical
+    /// Starlark function containing a native call. Compiler-inlined functions
+    /// preserve their actual original function/module association.
+    ///
+    /// An unfrozen function uses the current module. A frozen original module
+    /// without client data returns `None`, even if this evaluator's module has
+    /// client data. Direct module bytecode uses the initializing module; direct
+    /// native calls from Rust without Starlark bytecode have no defining module.
+    ///
+    /// This borrowed value relies on the existing ownership of the executing
+    /// function and its frozen heap. It creates no new heap owner or cache.
+    pub fn native_call_defining_module_client_data(&self) -> Option<Value<'v>> {
+        fn data<'v>(function: Value<'v>, module: &'v Module) -> Option<Option<Value<'v>>> {
+            let original = if let Some(function) = function.downcast_ref::<FrozenDef>() {
+                function.module.load_relaxed()
+            } else if let Some(function) = function.downcast_ref::<Def>() {
+                function.module.load_relaxed()
+            } else {
+                return None;
+            };
+            Some(match original {
+                Some(original) => original.client_data.map(FrozenValue::to_value),
+                None => module.client_data(),
+            })
+        }
+
+        if let Some(function) = self.call_stack.native_call_innermost_inlined_function() {
+            if let Some(data) = data(function.to_value(), self.module_env) {
+                return data;
+            }
+        }
+        for depth in 0..self.call_stack.count() {
+            let function = self.call_stack.top_nth_function_opt(depth)?;
+            if let Some(data) = data(function, self.module_env) {
+                return data;
+            }
+        }
+        if self.current_frame.is_inititalized() {
+            self.module_env.client_data()
+        } else {
+            None
+        }
     }
 
     pub(crate) fn before_stmt_fn(
@@ -1273,3 +1318,7 @@ mod tests {
 #[cfg(test)]
 #[path = "native_local_tests.rs"]
 mod native_local_tests;
+
+#[cfg(test)]
+#[path = "module_client_data_tests.rs"]
+mod module_client_data_tests;

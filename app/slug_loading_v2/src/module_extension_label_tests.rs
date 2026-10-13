@@ -101,6 +101,7 @@ fn freeze(
     let path = context.root.workspace_path.to_str().unwrap();
     let ast = AstModule::parse(path, source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, &context.root).unwrap();
     let bzl = BzlEvaluationContext::from_manifest(context);
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(&bzl);
@@ -184,7 +185,7 @@ fn extension_label_uses_imported_function_source_mapping_and_records_typed_calls
 }
 
 #[test]
-fn extension_label_fails_closed_for_mapping_unmanifested_frame_and_no_frame_string() {
+fn extension_label_uses_original_module_and_refuses_missing_mapping_or_context() {
     let (loaded, manifest) = loaded();
     let state = RepositoryRuleInvocationState::new().with_bzl_manifest(&manifest);
     let error = invoke(&loaded, "invalid", &state).unwrap_err();
@@ -196,10 +197,9 @@ fn extension_label_fails_closed_for_mapping_unmanifested_frame_and_no_frame_stri
         &[],
     );
     let state = RepositoryRuleInvocationState::new().with_bzl_manifest(&unrelated);
-    let error = invoke(&loaded, "direct", &state).unwrap_err();
-    assert!(
-        error.contains("not present in the recursive Bzl manifest"),
-        "{error}"
+    assert_eq!(
+        invoke(&loaded, "direct", &state).unwrap(),
+        "Label(\"@@//ext:caller\")"
     );
     assert!(state.records().is_empty());
 
@@ -224,11 +224,7 @@ fn extension_label_fails_closed_for_mapping_unmanifested_frame_and_no_frame_stri
     let error = eval
         .eval_function(label.to_value(), &[raw], &[])
         .unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("requires a loaded .bzl function caller")
-    );
+    assert!(error.to_string().contains("Label() can only be used"));
     let existing = eval.heap().alloc_simple(StarlarkLabel::new(
         CanonicalLabel::parse("@@producer+//owner:existing").unwrap(),
     ));

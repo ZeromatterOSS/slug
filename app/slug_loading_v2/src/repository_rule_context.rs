@@ -1401,6 +1401,7 @@ mod tests {
         )
         .unwrap();
         let module = Module::new();
+        crate::starlark_label::attach_defining_module_context(&module, &manifest.root).unwrap();
         let context = BzlEvaluationContext::from_manifest(manifest);
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
@@ -2262,10 +2263,7 @@ def implementation(ctx):
                 .collect(),
             ..manifest.clone()
         };
-        assert!(matches!(
-            invoke(&missing),
-            Err(RepositoryRuleInvocationError::Evaluation(_))
-        ));
+        assert_eq!(invoke(&missing).unwrap().plan, invocation.plan);
         let ambiguous = BzlLoadManifest {
             reachable: [root_identity.clone(), root_identity]
                 .into_iter()
@@ -2273,10 +2271,7 @@ def implementation(ctx):
                 .collect(),
             ..manifest
         };
-        assert!(matches!(
-            invoke(&ambiguous),
-            Err(RepositoryRuleInvocationError::Evaluation(_))
-        ));
+        assert_eq!(invoke(&ambiguous).unwrap().plan, invocation.plan);
     }
 
     #[test]

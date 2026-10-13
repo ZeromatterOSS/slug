@@ -21862,6 +21862,8 @@ fn eval_bzl_with_loaded_children(
     let ast = AstModule::parse(&filename, source.to_owned(), &Dialect::Bazel)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let loader = LocalBzlLoader {
         modules: children
             .iter()
@@ -31045,6 +31047,8 @@ RUN = RunEnvironmentInfo
 "#;
     let ast = AstModule::parse("clippy.bzl", source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let loader = LocalBzlLoader {
         modules: vec![("//rust/private:lint_test.bzl", child.dupe())],
     };
@@ -33309,6 +33313,8 @@ fn eval_bzl_with_identity_and_globals_and_visibility(
         fingerprint: [0; 32],
     });
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&module);
     evaluator.extra = Some(&context);
     evaluator.eval_module(ast, globals)?;
@@ -33510,6 +33516,8 @@ RUN_ENVIRONMENT_CALLABLE = RunEnvironmentInfo
         fingerprint: [0; 32],
     });
     let fresh_module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&fresh_module, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&fresh_module);
     evaluator.extra = Some(&context);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
@@ -33898,6 +33906,8 @@ InitializedAlias = Initialized
     });
     let ast = AstModule::parse("/workspace/keys.bzl", SOURCE.to_owned(), &Dialect::Bazel).unwrap();
     let live = Module::new();
+    crate::starlark_label::attach_defining_module_context(&live, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&live);
     evaluator.extra = Some(&context);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
@@ -34499,9 +34509,13 @@ fn bazel_aspect_definition_validates_complete_abi_and_build_absence() {
     )
     .unwrap_err();
     assert!(error.contains("aspect"), "{error}");
-    eval_global(
+    eval_bzl_with_identity(
         "def impl(target, ctx): return []\nA=aspect(implementation=impl, toolchains=[str(Label('//rust:toolchain_type'))])",
-        &loading_globals(),
+        BzlModuleIdentity {
+            label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
+            workspace_path: PathBuf::from("/workspace/defs.bzl"),
+            repository_mapping: Arc::from([]),
+        },
     )
     .unwrap();
 }
@@ -34529,6 +34543,8 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     )
     .unwrap();
     let support = Module::new();
+    crate::starlark_label::attach_defining_module_context(&support, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&support);
     evaluator.extra = Some(&context);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
@@ -34556,6 +34572,8 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     )
     .unwrap();
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let loader = LocalBzlLoader {
         modules: vec![("//owner:support.bzl", support)],
     };
@@ -34652,7 +34670,7 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
         &loading_globals(),
     )
     .unwrap_err();
-    assert!(error.contains("recursive Bzl manifest"), "{error}");
+    assert!(error.contains("Label() can only be used"), "{error}");
 
     let conflicting = BzlModuleIdentity {
         label: CanonicalLabel::parse("@@owner+//:defs.bzl").unwrap(),
@@ -34696,6 +34714,8 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     )
     .unwrap();
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&module);
     evaluator.extra = Some(&context);
     let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
@@ -34708,6 +34728,8 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     )
     .unwrap();
     let module = Module::new();
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+        .unwrap();
     let mut evaluator = Evaluator::new(&module);
     evaluator.extra = Some(&context);
     let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
@@ -34947,7 +34969,7 @@ async fn repository_package_genrule_preserves_external_identity_and_source_aba()
 }
 
 #[test]
-fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
+fn package_label_original_module_context_is_independent_of_runtime_source_lookup() {
     let identity = |label: &str, path: &str| BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
         workspace_path: PathBuf::from(path),
@@ -34996,15 +35018,13 @@ fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
             .map_err(|error| error.to_string());
         (count, result)
     };
-    assert_eq!(run(None).0, None);
+    let (count, result) = run(None);
+    assert_eq!(count, None);
+    assert_eq!(result.unwrap(), "@@dep+//:target");
     let missing: Arc<[_]> = [("other.bzl".into(), owner.clone())].into();
     let (count, missing) = run(Some(missing));
     assert_eq!(count, Some(1));
-    assert!(
-        missing
-            .unwrap_err()
-            .contains("not present in the recursive Bzl manifest")
-    );
+    assert_eq!(missing.unwrap(), "@@dep+//:target");
     let ambiguous: Arc<[_]> = [
         ("/workspace/dep/defs.bzl".into(), owner.clone()),
         (
@@ -35013,12 +35033,7 @@ fn package_label_call_source_lookup_is_sparse_and_fail_closed() {
         ),
     ]
     .into();
-    assert!(
-        run(Some(ambiguous))
-            .1
-            .unwrap_err()
-            .contains("ambiguous Starlark caller")
-    );
+    assert_eq!(run(Some(ambiguous)).1.unwrap(), "@@dep+//:target");
     let exact: Arc<[_]> = [("/workspace/dep/defs.bzl".into(), owner.clone())].into();
     assert_eq!(run(Some(exact)).1.unwrap(), "@@dep+//:target");
     assert!(eval_bzl_with_identity("X=Label(':direct')\n", owner).is_ok());
@@ -39381,7 +39396,16 @@ async fn package_relative_label_rejects_bad_inputs_and_does_not_publish_partial_
     }
     for input in ["':target'", "Label(':target')", "17"] {
         let source = format!("X = native.package_relative_label({input})");
-        let error = eval_global(&source, &loading_globals()).unwrap_err();
+        let error = eval_bzl_with_identity(
+            &source,
+            BzlModuleIdentity {
+                label: CanonicalLabel::parse("@@//:defs.bzl").unwrap(),
+                workspace_path: PathBuf::from("/workspace/defs.bzl"),
+                repository_mapping: Arc::from([]),
+            },
+        )
+        .unwrap_err()
+        .to_string();
         assert!(
             error.contains("Bazel package global invoked without package state"),
             "{input}: {error}"

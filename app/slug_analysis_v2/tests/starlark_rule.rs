@@ -166,6 +166,8 @@ mod native_filegroup;
 mod native_label_flag;
 mod output_group_info;
 mod package_specification;
+#[path = "starlark_rule/runtime_module_label_tests.rs"]
+mod runtime_module_label_tests;
 mod rustc_map_each;
 #[path = "starlark_rule/starlark_platform_selector_tests.rs"]
 mod starlark_platform_selector_tests;

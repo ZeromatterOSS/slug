@@ -11042,6 +11042,7 @@ mod module_extension_definition_tests {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let module = Module::new();
         let context = BzlEvaluationContext::new("//:ext.bzl".to_owned());
+        crate::starlark_label::attach_defining_module_context(&module, context.source_identity())?;
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
         evaluator

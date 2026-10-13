@@ -634,6 +634,18 @@ const CATALOG: &[CatalogEntry] = &[
         executable: false,
     },
     CatalogEntry {
+        path: "tools/sh/BUILD",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/sh/BUILD"),
+        expected_sha256: "e80e71184c9819ee287f415668d59ea3f9eab67dcb5e706528a7ddc4cb64a750",
+        executable: false,
+    },
+    CatalogEntry {
+        path: "tools/sh/sh_toolchain.bzl",
+        bytes: include_bytes!("../builtin/bazel_tools/tools/sh/sh_toolchain.bzl"),
+        expected_sha256: "b5b50c1e5837aa5a45f2ac59acf204826e6c5c8c0056c56fbd2953bdef6debce",
+        executable: false,
+    },
+    CatalogEntry {
         path: "tools/test/BUILD",
         bytes: include_bytes!("../builtin/bazel_tools/tools/test/BUILD"),
         expected_sha256: "81db88f41f7a9a07af246a42cfa7a8b6e118012b4f41830aaee9ffe4a4a9ee17",
@@ -1207,6 +1219,7 @@ mod tests {
                 ("osx".to_owned(), PathDirectoryEntryKind::Directory),
                 ("python".to_owned(), PathDirectoryEntryKind::Directory),
                 ("res".to_owned(), PathDirectoryEntryKind::Directory),
+                ("sh".to_owned(), PathDirectoryEntryKind::Directory),
                 ("test".to_owned(), PathDirectoryEntryKind::Directory),
             ]
         );
@@ -1500,6 +1513,38 @@ mod tests {
     }
 
     #[test]
+    fn shell_package_catalog_matches_embedded_upstream_bytes_and_listing() {
+        for (path, sha, length) in [
+            (
+                "tools/sh/BUILD",
+                "e80e71184c9819ee287f415668d59ea3f9eab67dcb5e706528a7ddc4cb64a750",
+                278,
+            ),
+            (
+                "tools/sh/sh_toolchain.bzl",
+                "b5b50c1e5837aa5a45f2ac59acf204826e6c5c8c0056c56fbd2953bdef6debce",
+                765,
+            ),
+        ] {
+            let file = lookup(path.into()).unwrap();
+            assert_eq!(hex::encode(file.sha256()), sha);
+            assert_eq!(file.bytes().len(), length);
+            assert!(!file.executable());
+        }
+        assert_eq!(
+            listing_rows("tools/sh"),
+            [
+                ("BUILD".to_owned(), PathDirectoryEntryKind::File),
+                ("sh_toolchain.bzl".to_owned(), PathDirectoryEntryKind::File),
+            ]
+        );
+        assert!(matches!(
+            lookup("tools/sh/BUILD.tools".into()),
+            Err(BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. })
+        ));
+    }
+
+    #[test]
     fn builtin_directory_listing_distinguishes_missing_and_file() {
         assert_eq!(
             builtin_directory_listing(&PackagePath::parse("absent").unwrap()).unwrap(),
@@ -1595,9 +1640,9 @@ mod tests {
         assert_eq!(
             hex::encode(value.route_identity.manifest_sha256()),
             if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
-                "19bdfa5b0e4e3b64a16dfa7dba2d7df4c900e0f7a1aa9895e3d612babb436aa4"
+                "e1d1588e90f3099e9ca41144c98d94f4b2f0a43cc9695bc78f139d576e603e7b"
             } else {
-                "f86d3c2aea06183099114a0fb0ce3e017634f34fda97549358bfda7915950d20"
+                "426fc8636b9b4ec2f134a2c9f861093db99f7926a706d46211bc3485e3fa5b45"
             }
         );
         assert_eq!(value.module_sha256, source.sha256());

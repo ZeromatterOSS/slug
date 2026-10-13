@@ -2493,6 +2493,8 @@ ext=module_extension(implementation=impl)
         .unwrap();
         assert!(ast.loads().is_empty());
         let module = Module::new();
+        crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
+            .unwrap();
         let mut evaluator = Evaluator::new(&module);
         evaluator.extra = Some(&context);
         evaluator.eval_module(ast, &loading_globals()).unwrap();

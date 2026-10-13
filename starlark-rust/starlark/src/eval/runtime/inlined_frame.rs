@@ -66,6 +66,17 @@ impl PartialEq for InlinedFrames {
 impl Eq for InlinedFrames {}
 
 impl InlinedFrames {
+    /// Actual innermost logical function, without rendering or allocating frames.
+    pub(crate) fn innermost_function(self) -> Option<FrozenValue> {
+        let mut frames = self.frames;
+        let mut function = None;
+        while let Some(frame) = frames {
+            function = Some(frame.fun);
+            frames = frame.span.inlined_frames.frames;
+        }
+        function
+    }
+
     /// Collect frames, bottom-to-top, same order as in `CallStack`.
     pub(crate) fn extend_frames(self, frames: &mut Vec<Frame>) {
         if let Some(f) = self.frames {

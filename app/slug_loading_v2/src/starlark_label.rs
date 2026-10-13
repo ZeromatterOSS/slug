@@ -13,7 +13,9 @@ use std::fmt::Write;
 use std::hash::Hash;
 
 use allocative::Allocative;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Methods;
@@ -29,9 +31,9 @@ use starlark::values::starlark_value;
 use starlark_map::StarlarkHasher;
 
 use crate::bzl_module::BzlModuleIdentity;
-use crate::module_extension_repository_rule::RepositoryRuleInvocationState;
-use crate::package::PackageRecorder;
-use crate::provider::BzlEvaluationContext;
+
+mod defining_module_context;
+pub(crate) use defining_module_context::attach_defining_module_context;
 
 /// One canonical Bazel Label value shared by loading and module-extension
 /// evaluation. Repository/package/target identity lives only in this owner.
@@ -133,21 +135,28 @@ pub(crate) fn resolve_label(
     raw: &str,
     defining_source: &BzlModuleIdentity,
 ) -> anyhow::Result<CanonicalLabel> {
-    CanonicalLabel::parse_with_package_context(raw, defining_source.label.package(), |requested| {
-        let mut matches = defining_source
-            .repository_mapping
+    resolve_label_in_module(
+        raw,
+        &defining_source.label,
+        &defining_source.repository_mapping,
+    )
+}
+
+fn resolve_label_in_module(
+    raw: &str,
+    defining_label: &CanonicalLabel,
+    repository_mapping: &[(ApparentRepoName, CanonicalRepoName)],
+) -> anyhow::Result<CanonicalLabel> {
+    CanonicalLabel::parse_with_package_context(raw, defining_label.package(), |requested| {
+        let mut matches = repository_mapping
             .iter()
             .filter(|(apparent, _)| apparent.as_str() == requested);
         let canonical = matches.next().ok_or_else(|| {
-            format!(
-                "repository '@{requested}' is not visible from {}",
-                defining_source.label
-            )
+            format!("repository '@{requested}' is not visible from {defining_label}")
         })?;
         if matches.next().is_some() {
             return Err(format!(
-                "repository mapping for '@{requested}' is ambiguous from {}",
-                defining_source.label
+                "repository mapping for '@{requested}' is ambiguous from {defining_label}"
             ));
         }
         Ok(canonical.1.clone())
@@ -165,22 +174,28 @@ pub(crate) fn label_globals(builder: &mut GlobalsBuilder) {
         let raw = input
             .unpack_str()
             .ok_or_else(|| anyhow::anyhow!("Label input must be a string or Label"))?;
-        let source = if let Some(source) =
-            RepositoryRuleInvocationState::label_source_identity_for_call(eval)
-        {
-            source?
-        } else {
-            match BzlEvaluationContext::from_evaluator(eval) {
-                Ok(context) => context.source_identity_for_call(eval)?,
-                Err(_) => PackageRecorder::label_source_identity_for_call(eval)?,
-            }
-        };
+        let context = eval
+            .native_call_defining_module_client_data()
+            .and_then(defining_module_context::DefiningBzlModuleContext::from_value)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Label() can only be used during .bzl initialization (top-level evaluation)"
+                )
+            })?;
         Ok(eval
             .heap()
-            .alloc_simple(StarlarkLabel::new(resolve_label(raw, source)?)))
+            .alloc_simple(StarlarkLabel::new(resolve_label_in_module(
+                raw,
+                context.label(),
+                context.repository_mapping(),
+            )?)))
     }
 }
 
 #[cfg(test)]
 #[path = "starlark_label/render_tests.rs"]
 mod render_tests;
+
+#[cfg(test)]
+#[path = "starlark_label/runtime_module_tests.rs"]
+mod runtime_module_tests;

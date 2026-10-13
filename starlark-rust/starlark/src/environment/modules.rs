@@ -70,6 +70,8 @@ enum ModuleError {
     RetainedMemoryProfileNotEnabled,
     #[error("Extra value already set to a value of type `{}`", .0)]
     ExtraValueAlreadySet(&'static str),
+    #[error("Client data already set to a value of type `{}`", .0)]
+    ClientDataAlreadySet(&'static str),
 }
 
 /// The result of freezing a [`Module`], making it and its contained values immutable.
@@ -98,6 +100,7 @@ pub struct FrozenModule {
 pub(crate) struct FrozenModuleData {
     pub(crate) names: FrozenNames,
     pub(crate) slots: FrozenSlots,
+    pub(crate) client_data: Option<FrozenValue>,
     docstring: Option<String>,
     /// When heap profile enabled, this field stores retained memory info.
     heap_profile: Option<RetainedHeapProfile>,
@@ -128,6 +131,8 @@ pub struct Module {
     eval_duration: Cell<Duration>,
     /// Field that can be used for any purpose you want.
     extra_value: Cell<Option<Value<'static>>>,
+    /// Set-once client metadata belonging to this defining module.
+    client_data: Cell<Option<Value<'static>>>,
     /// When `Some`, heap profile is collected on freeze.
     heap_profile_on_freeze: Cell<Option<RetainedHeapProfileMode>>,
 }
@@ -311,6 +316,15 @@ impl FrozenModule {
         self.extra_value
             .map(|v| unsafe { OwnedFrozenValue::new(self.heap.dupe(), v) })
     }
+
+    /// Client metadata of this original module, frozen with its values.
+    ///
+    /// The returned value borrows this module's frozen heap. Retain that heap
+    /// whenever passing the value to another module, just as for other frozen
+    /// module values.
+    pub fn client_data(&self) -> Option<FrozenValue> {
+        self.module.client_data
+    }
 }
 
 impl FrozenModuleData {
@@ -375,6 +389,7 @@ impl Module {
             docstring: RefCell::new(None),
             eval_duration: Cell::new(Duration::ZERO),
             extra_value: Cell::new(None),
+            client_data: Cell::new(None),
             heap_profile_on_freeze: Cell::new(None),
         }
     }
@@ -458,6 +473,7 @@ impl Module {
             docstring,
             eval_duration,
             extra_value,
+            client_data,
             heap_profile_on_freeze,
         } = self;
         let start = Instant::now();
@@ -468,6 +484,7 @@ impl Module {
         let freezer = Freezer::new(&frozen_heap);
         let slots = slots.freeze(&freezer)?;
         let extra_value = extra_value.into_inner().freeze(&freezer)?;
+        let client_data = client_data.into_inner().freeze(&freezer)?;
         let stacks = if let Some(mode) = heap_profile_on_freeze.get() {
             // TODO(nga): retained heap profile does not store information about data
             //   allocated in frozen heap before freeze starts.
@@ -483,6 +500,7 @@ impl Module {
         let rest = FrozenModuleData {
             names: names.freeze(),
             slots,
+            client_data,
             docstring: docstring.into_inner(),
             heap_profile: stacks,
         };
@@ -578,6 +596,13 @@ impl Module {
             self.set_extra_value(extra_value);
         }
 
+        if let Some(mut client_data) = self.client_data() {
+            client_data.trace(tracer);
+            // GC updates the moving root without changing its set-once binding.
+            let client_data = unsafe { transmute!(Value, Value, client_data) };
+            self.client_data.set(Some(client_data));
+        }
+
         self.heap().trace_interner(tracer);
     }
 
@@ -601,6 +626,26 @@ impl Module {
     pub fn extra_value<'v>(&'v self) -> Option<Value<'v>> {
         // Cast lifetime.
         unsafe { transmute!(Option<Value>, Option<Value>, self.extra_value.get()) }
+    }
+
+    /// Associate client metadata with this defining module exactly once.
+    ///
+    /// The value is a GC root and is frozen before functions are published.
+    /// Clients should use immutable metadata for a fixed lexical context.
+    /// Foreign frozen values require their owner's heap to be referenced by
+    /// this module's frozen heap; this setter does not establish that ownership.
+    pub fn set_client_data_no_overwrite<'v>(&'v self, value: Value<'v>) -> anyhow::Result<()> {
+        if let Some(existing) = self.client_data() {
+            return Err(ModuleError::ClientDataAlreadySet(existing.get_type()).into());
+        }
+        let value = unsafe { transmute!(Value, Value, value) };
+        self.client_data.set(Some(value));
+        Ok(())
+    }
+
+    /// Borrow this module's set-once client metadata.
+    pub fn client_data<'v>(&'v self) -> Option<Value<'v>> {
+        unsafe { transmute!(Option<Value>, Option<Value>, self.client_data.get()) }
     }
 }
 

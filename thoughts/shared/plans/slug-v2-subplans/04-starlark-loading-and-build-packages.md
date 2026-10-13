@@ -1,5 +1,16 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+## Runtime module Label context
+
+Runtime `Label()` uses the innermost Starlark function's original module,
+including imported and compiler-inlined calls. Set-once traced module client
+data freezes into that original module and retains only an immutable canonical
+label and shared repository mapping. Loading attaches context before genuine
+`.bzl` evaluation. Label inputs pass through unchanged; evaluator scratch roots
+remain separate. No filename, phase or caller profile selects label resolution.
+Contextless calls and unsupported repository visibility remain explicit refusals.
+Source and mapping dependencies stay with existing loading/DICE owners.
+
 ## Current status and reading guide
 
 M7A loading is partial. Imported genrule loading is accepted at `de62232ad`;

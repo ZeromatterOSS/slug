@@ -230,6 +230,7 @@ mod tests {
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         let module = Module::new();
         let context = BzlEvaluationContext::new("//:apple_test.bzl");
+        crate::starlark_label::attach_defining_module_context(&module, context.source_identity())?;
         let mut eval = Evaluator::new(&module);
         eval.extra = Some(&context);
         eval.eval_module(ast, &globals)

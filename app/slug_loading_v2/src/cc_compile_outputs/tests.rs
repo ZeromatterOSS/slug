@@ -113,6 +113,7 @@ fn evaluate(source: &str, coverage: bool) -> anyhow::Result<String> {
     module.set("CONFIG", value);
     // These entrypoints have no additional private caller gate.
     let context = BzlEvaluationContext::new("@@//:ordinary_consumer.bzl");
+    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())?;
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(&context);
     eval.eval_module(

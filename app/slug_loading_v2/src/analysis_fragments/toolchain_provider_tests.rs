@@ -89,6 +89,7 @@ fn evaluate_module(
         workspace_path: PathBuf::from(FILE),
         repository_mapping: Arc::from([]),
     };
+    crate::starlark_label::attach_defining_module_context(&module, &identity)?;
     let context = BzlEvaluationContext::macro_runtime_context(
         identity.clone(),
         Arc::from([(

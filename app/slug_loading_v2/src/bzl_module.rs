@@ -3186,6 +3186,8 @@ async fn compute_host_bzl_module(
             .map(|(load, carrier)| (*load, successful_host_bzl_module(carrier).module.dupe()))
             .collect(),
     };
+    crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
+    .expect("a new .bzl module has no defining client data");
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = context.globals(&manifest.root.label);
@@ -5587,6 +5589,8 @@ fn evaluate_external_bzl_module(
             .map(|(load, module)| (load.as_str(), module.module.dupe()))
             .collect(),
     };
+    crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
+    .expect("a new .bzl module has no defining client data");
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = context.globals(&manifest.root.label);
@@ -7896,6 +7900,8 @@ impl Key for BzlModuleEvalKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
+                crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
+                .expect("a new .bzl module has no defining client data");
                 let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
                 let globals = loading_globals_for_source(&manifest.root.label);

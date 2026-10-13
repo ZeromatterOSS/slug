@@ -30,6 +30,7 @@ use crate::eval::runtime::frame_span::FrameSpan;
 use crate::eval::runtime::inlined_frame::InlinedFrames;
 use crate::hint::unlikely;
 use crate::values::FrozenRef;
+use crate::values::FrozenValue;
 use crate::values::Trace;
 use crate::values::Tracer;
 use crate::values::Value;
@@ -213,6 +214,14 @@ impl<'v> CheapCallStack<'v> {
     pub(crate) fn top_nth_function_opt(&self, n: usize) -> Option<Value<'v>> {
         let index = self.count.checked_sub(1).and_then(|x| x.checked_sub(n))?;
         Some(self.stack[index].function)
+    }
+
+    pub(crate) fn native_call_innermost_inlined_function(&self) -> Option<FrozenValue> {
+        let span = self
+            .count
+            .checked_sub(1)
+            .and_then(|index| self.stack[index].span)?;
+        span.inlined_frames.innermost_function()
     }
 
     /// Logical source filenames represented by the native call-site span,
