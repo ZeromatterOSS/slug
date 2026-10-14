@@ -74,6 +74,7 @@ mod workspace_status_inputs;
 mod workspace_status_publication_file;
 
 pub use aquery_text::format_aquery_text_output_for_scope;
+pub use aquery_text::format_aquery_text_output_for_scope_with_context;
 pub use configured_output::configured_output_root;
 pub use dice::ActionChainOutputTransport;
 pub use dice::ActionChainResult;

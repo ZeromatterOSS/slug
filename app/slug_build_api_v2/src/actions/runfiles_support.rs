@@ -27,7 +27,7 @@ pub enum RunfilesSymlinkMode {
     Create,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub enum RunfilesSupportActionSpec {
     RepoMappingManifest {
         support: Arc<RunfilesSupport>,
@@ -277,3 +277,70 @@ fn derived_owner(
         }
     }
 }
+
+impl RunfilesSupportActionSpec {
+    pub(super) fn publication_eq_with(
+        &self,
+        other: &Self,
+        state: &mut crate::analysis_value::PublicationEqState,
+    ) -> bool {
+        if !self.support().publication_eq_with(other.support(), state) {
+            return false;
+        }
+        match (self, other) {
+            (
+                Self::RepoMappingManifest {
+                    packages: l,
+                    workspace_name: lw,
+                    emit_compact_repo_mapping: le,
+                    output: lo,
+                    ..
+                },
+                Self::RepoMappingManifest {
+                    packages: r,
+                    workspace_name: rw,
+                    emit_compact_repo_mapping: re,
+                    output: ro,
+                    ..
+                },
+            ) => l == r && lw == rw && le == re && lo == ro,
+            (
+                Self::SourceSymlinkManifest {
+                    remotable: l,
+                    output: lo,
+                    ..
+                },
+                Self::SourceSymlinkManifest {
+                    remotable: r,
+                    output: ro,
+                    ..
+                },
+            ) => l == r && lo == ro,
+            (
+                Self::SymlinkTree {
+                    environment: l,
+                    mode: lm,
+                    output: lo,
+                    ..
+                },
+                Self::SymlinkTree {
+                    environment: r,
+                    mode: rm,
+                    output: ro,
+                    ..
+                },
+            ) => l == r && lm == rm && lo == ro,
+            (Self::RunfilesTree { output: l, .. }, Self::RunfilesTree { output: r, .. }) => l == r,
+            _ => false,
+        }
+    }
+}
+impl PartialEq for RunfilesSupportActionSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(
+            other,
+            &mut crate::analysis_value::PublicationEqState::default(),
+        )
+    }
+}
+impl Eq for RunfilesSupportActionSpec {}

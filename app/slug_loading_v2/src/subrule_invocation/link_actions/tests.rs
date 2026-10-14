@@ -73,13 +73,16 @@ impl AnalysisActionSink for DeclarationSink {
             CanonicalLabel::parse("@@//:recorded").unwrap(),
         )))
     }
-    fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
+    fn write<'v>(
+        &self,
+        _: &'v starlark::environment::Module,
+        _: Value<'v>,
+        _: Value<'v>,
+        _: bool,
+    ) -> anyhow::Result<()> {
         unreachable!()
     }
     fn run_shell(&self, _: Value<'_>, _: &str, _: Value<'_>) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn run(&self, _: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
         unreachable!()
     }
     fn artifact_symlink(

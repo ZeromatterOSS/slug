@@ -27,9 +27,10 @@ impl SourceSpawnReapiPlan {
     pub fn from_prepared(
         prepared: Arc<PreparedSourceActionInputs>,
         remote_defaults: &BTreeMap<String, String>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self, String> {
         let mut command = spawn_command(prepared.configured_action(), remote_defaults)?;
-        let mut inputs = SourceInputReapiPlan::from_prepared(prepared)?;
+        let mut inputs = SourceInputReapiPlan::from_prepared(prepared, args_context)?;
         for output in command
             .output_files
             .iter()

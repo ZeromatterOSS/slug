@@ -334,7 +334,7 @@ async fn runfiles_aquery_metadata_guards_identity_environment_and_priority() {
     for scope in [AqueryScope::Literal, AqueryScope::Deps] {
         assert_eq!(
             crate::runtime::format_aquery_text_output_for_scope(&altered, scope),
-            Err("configured runfiles-support query requires a public manifest")
+            Err("configured runfiles-support query requires a public manifest".into())
         );
     }
     assert_eq!(owner.as_ref(), &snapshot);

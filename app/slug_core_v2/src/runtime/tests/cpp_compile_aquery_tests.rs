@@ -1021,7 +1021,7 @@ async fn cpp_compile_aquery_metadata_guards_environment_identity_and_priority() 
         for scope in [AqueryScope::Literal, AqueryScope::Deps] {
             assert_eq!(
                 crate::runtime::format_aquery_text_output_for_scope(&rejected, scope),
-                Err(expected)
+                Err(expected.into())
             );
         }
     }

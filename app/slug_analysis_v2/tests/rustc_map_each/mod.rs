@@ -3,6 +3,7 @@ use super::*;
 include!("sources.rs");
 
 mod artifact_roots;
+mod callable_source_checks;
 mod cc_compile_inputs;
 mod cc_context_naming;
 mod cc_headers;
@@ -224,7 +225,7 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
         spawn.environment().fixed().get("CARGO_MANIFEST_DIR"),
         Some("${pwd}/external/rules_rust+")
     );
-    let argv = spawn.render_argv();
+    let argv = spawn.render_argv().unwrap();
     assert!(
         argv.windows(3)
             .any(|args| args == ["--", "rustc", "lib.rs"]),
@@ -234,11 +235,12 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     else {
         panic!("rustc flags must retain their own Args snapshot");
     };
-    assert_eq!(rustc.recipe().render()[0], "lib.rs");
+    assert_eq!(rustc.recipe().render().unwrap()[0], "lib.rs");
     assert!(
         rustc
             .recipe()
             .render_write_content()
+            .unwrap()
             .starts_with("lib.rs\n")
     );
     assert_eq!(rustc.param_file().unwrap().flag_format(), "@%s");
@@ -250,7 +252,7 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     assert_eq!(file.path(), params_path);
     assert_eq!(
         file.bytes(),
-        rustc.recipe().render_write_content().as_bytes()
+        rustc.recipe().render_write_content().unwrap().as_bytes()
     );
     assert!(file.bytes().starts_with(b"lib.rs\n"));
     let mut expected = spawn.invocation().render_prefix();
@@ -259,7 +261,9 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
             expected.push(format!("@{params_path}"));
         } else {
             expected.extend(
-                slug_build_api_v2::RetainedCommandLine::new(vec![segment.clone()]).render(),
+                slug_build_api_v2::RetainedCommandLine::new(vec![segment.clone()])
+                    .render()
+                    .unwrap(),
             );
         }
     }
@@ -269,12 +273,39 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
     let source = fs::read_to_string(&source_path).unwrap();
     // Preserve label, callsite and callback name; only loaded source bytes change.
     fs::write(&source_path, format!("{source}\n")).unwrap();
-    let error = request(&dice, &workspace).await.unwrap_err();
+    let edited = request(&dice, &workspace).await.unwrap();
     assert!(
-        error.contains("Args.add_all callback forms are not supported"),
-        "{error}"
+        first != edited,
+        "tracked callback source bytes participate in publication"
     );
-    assert!(error.contains("rustc.bzl"), "{error}");
+    assert_eq!(
+        edited.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        argv
+    );
+    // Change the actual callback body while retaining its ordinary name/location.
+    let start = source.find("def _get_crate_root_path(args):").unwrap();
+    let (prefix, callback) = source.split_at(start);
+    let changed = format!(
+        "{prefix}{}",
+        callback.replacen("return file.path", "return file.path + '.callback-edit'", 1)
+    );
+    fs::write(&source_path, changed).unwrap();
+    let changed = request(&dice, &workspace).await.unwrap();
+    let changed_argv = changed.actions()[0]
+        .spawn_spec()
+        .unwrap()
+        .render_argv()
+        .unwrap();
+    assert!(
+        changed_argv
+            .windows(3)
+            .any(|args| args == ["--", "rustc", "lib.rs.callback-edit"])
+    );
+    assert!(first != changed);
 
     fs::write(&source_path, source).unwrap();
     let restored = request(&dice, &workspace).await.unwrap();
@@ -285,23 +316,39 @@ async fn pinned_rustc_arguments_publish_and_restore_after_source_edit() {
 
     let proof_path = workspace.join("rules_rust/proof.bzl");
     let proof = fs::read_to_string(&proof_path).unwrap();
-    for (from, to, expected) in [
-        (
-            "root_path = \"unused-for-regular-file.rs\"",
-            "root_path = False",
-            "requires a string root path",
-        ),
-        (
+    let from = "root_path = \"unused-for-regular-file.rs\"";
+    assert_eq!(proof.matches(from).count(), 1);
+    fs::write(&proof_path, proof.replacen(from, "root_path = False", 1)).unwrap();
+    let ignored_root_path = request(&dice, &workspace).await.unwrap();
+    assert_eq!(
+        ignored_root_path.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        argv,
+        "original callback ignores root_path for a regular File"
+    );
+    fs::write(
+        &proof_path,
+        proof.replacen(
             "transitive_crates = transitive_crates",
             "transitive_crates = depset([ctx.attr.src[DefaultInfo].files.to_list()[0]])",
-            "requires pinned CrateInfo",
+            1,
         ),
-    ] {
-        assert_eq!(proof.matches(from).count(), 1);
-        fs::write(&proof_path, proof.replacen(from, to, 1)).unwrap();
-        let error = request(&dice, &workspace).await.unwrap_err();
-        assert!(error.contains(expected), "{error}");
-    }
+    )
+    .unwrap();
+    let malformed = request(&dice, &workspace).await.unwrap();
+    let error = malformed.actions()[0]
+        .spawn_spec()
+        .unwrap()
+        .render_argv()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("output") && error.contains("File"),
+        "{error}"
+    );
     fs::write(&proof_path, proof).unwrap();
     assert!(first == request(&dice, &workspace).await.unwrap());
     fs::remove_dir_all(workspace).unwrap();
@@ -351,7 +398,7 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
             .iter()
             .find_map(|action| action.spawn_spec())
             .unwrap();
-        let argv = spawn.render_argv();
+        let argv = spawn.render_argv().unwrap();
         let prefix = spawn.outputs()[0].root().path();
         let output_dir = format!("{prefix}/external/rules_rust+/out");
         let root = if generated {
@@ -397,7 +444,7 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
         else {
             panic!("missing rustc Args")
         };
-        let bytes = rustc.recipe().render_write_content();
+        let bytes = rustc.recipe().render_write_content().unwrap();
         assert!(bytes.starts_with(&format!("{root}\n")));
         assert!(bytes.contains(&format!("\n--out-dir={output_dir}\n")));
         assert!(bytes.contains("\n-L\nstd/a\n-L\nstd/b\n"));
@@ -416,19 +463,35 @@ async fn pinned_rustc_file_dirnames_preserve_order_and_generated_root() {
         (
             "rust_std = stdlib",
             "rust_std = depset(['not-a-file'])",
-            "action inputs require a depset of File",
+            "dirname",
         ),
         (
             "sysroot_anchor = sysroot",
             "sysroot_anchor = 'not-a-file'",
-            "Args file dirname mapping requires Files",
+            "dirname",
         ),
     ] {
         assert_eq!(proof.matches(from).count(), 1);
         fs::write(&proof_path, proof.replace(from, to)).unwrap();
-        let error = request(&dice, &workspace).await.unwrap_err();
-        assert!(error.contains(expected), "{error}");
+        let result = request(&dice, &workspace).await.unwrap();
+        let error = result
+            .actions()
+            .iter()
+            .find_map(|action| action.spawn_spec())
+            .unwrap()
+            .render_argv()
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(expected) && error.contains("string"),
+            "{error}"
+        );
     }
+    fs::write(&proof_path, proof).unwrap();
+    assert!(
+        initial.unwrap() == request(&dice, &workspace).await.unwrap(),
+        "repair restores the original callback inputs and configured publication"
+    );
     fs::remove_dir_all(workspace).unwrap();
 }
 
@@ -472,7 +535,7 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
         let result = request(&dice, &workspace).await.unwrap();
         assert_eq!(result.actions().len(), 1);
         let spawn = result.actions()[0].spawn_spec().unwrap();
-        let argv = spawn.render_argv();
+        let argv = spawn.render_argv().unwrap();
         let selected = if objects {
             "deps/a/liba.rlib"
         } else {
@@ -506,7 +569,7 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
         else {
             panic!("missing rustc Args")
         };
-        let text = rustc.recipe().render_write_content();
+        let text = rustc.recipe().render_write_content().unwrap();
         for flag in expected {
             assert!(text.contains(&format!("\n{flag}\n")), "{text}");
         }
@@ -531,10 +594,16 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
         ),
     )
     .unwrap();
-    let error = request(&dice, &workspace).await.unwrap_err();
+    let truthy_metadata = request(&dice, &workspace).await.unwrap();
+    let argv = truthy_metadata.actions()[0]
+        .spawn_spec()
+        .unwrap()
+        .render_argv()
+        .unwrap();
     assert!(
-        error.contains("metadata_supports_pipelining must be a bool"),
-        "{error}"
+        argv.iter()
+            .any(|arg| arg == "--extern=renamed=deps/a/liba.rmeta"),
+        "the original callback uses Starlark truth for metadata_supports_pipelining"
     );
     fs::write(&proof_path, &proof).unwrap();
     assert_eq!(initial.unwrap(), request(&dice, &workspace).await.unwrap());
@@ -548,7 +617,7 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
     .unwrap();
     let error = request(&dice, &workspace).await.unwrap_err();
     assert!(
-        error.contains("unsupported analysis value of type `function`"),
+        error.contains("Args input contains unsupported callable"),
         "{error}"
     );
     fs::remove_dir_all(workspace).unwrap();
@@ -593,7 +662,7 @@ async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
         )).unwrap();
         let result = request(&dice, &workspace).await.unwrap();
         let spawn = result.actions()[0].spawn_spec().unwrap();
-        let argv = spawn.render_argv();
+        let argv = spawn.render_argv().unwrap();
         assert!(argv.contains(&"--codegen=linker=tools/ld".to_owned()));
         let native = argv
             .iter()
@@ -658,10 +727,22 @@ async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
     let utils_path = workspace.join("rules_rust/rust/private/utils.bzl");
     let utils = fs::read_to_string(&utils_path).unwrap();
     fs::write(&utils_path, format!("{utils}\n")).unwrap();
-    let error = request(&dice, &workspace).await.unwrap_err();
+    let edited = request(&dice, &workspace).await.unwrap();
     assert!(
-        error.contains("requires pinned utils.bzl source provenance"),
-        "{error}"
+        first.as_ref().unwrap() != &edited,
+        "tracked imported source changes participate in publication"
+    );
+    assert_eq!(
+        edited.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        first.as_ref().unwrap().actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap()
     );
     fs::write(&utils_path, utils).unwrap();
     assert_eq!(
@@ -675,7 +756,10 @@ async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
     assert_eq!(proof.matches(from).count(), 1);
     fs::write(&proof_path,proof.replace(from,"first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, \"-pthread\"), unused_callable = _no_coverage)")).unwrap();
     let error = request(&dice, &workspace).await.unwrap_err();
-    assert!(error.contains("function"), "{error}");
+    assert!(
+        error.contains("Args input contains unsupported callable"),
+        "{error}"
+    );
     fs::remove_dir_all(workspace).unwrap();
 }
 
@@ -712,7 +796,7 @@ async fn pinned_cc_providers_feed_rustc_and_restore() {
         )).unwrap();
         let result = request(&dice, &workspace).await.unwrap();
         let spawn = result.actions()[0].spawn_spec().unwrap();
-        let argv = spawn.render_argv();
+        let argv = spawn.render_argv().unwrap();
         let native = argv
             .iter()
             .filter(|arg| {
@@ -757,13 +841,22 @@ async fn pinned_cc_providers_feed_rustc_and_restore() {
         }
     }
     // Reload the defining Cc module to create a fresh HeaderInfo occurrence.
-    // Equal configured publication must survive the new token's alias partition.
+    // Native aliases and rendered arguments survive the new token. Retained
+    // callback source authority must still record the imported source edit.
     let cc_path = workspace.join("rules_cc/cc/private/cc_info.bzl");
     let cc_source = fs::read_to_string(&cc_path).unwrap();
-    fs::write(&cc_path, format!("{cc_source}\n")).unwrap();
-    assert_eq!(
+    let cc_changed_source = format!("{cc_source}\n");
+    fs::write(&cc_path, &cc_changed_source).unwrap();
+    let source_changed = request(&dice, &workspace).await.unwrap();
+    callable_source_checks::assert_cc_source_only_change(
         first.as_ref().unwrap(),
-        &request(&dice, &workspace).await.unwrap()
+        &source_changed,
+        &cc_source,
+        &cc_changed_source,
+    );
+    assert!(
+        first.as_ref().unwrap() != &source_changed,
+        "tracked callback source changes participate in publication"
     );
     fs::write(&cc_path, cc_source).unwrap();
     assert_eq!(

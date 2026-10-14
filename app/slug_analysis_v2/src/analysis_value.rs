@@ -71,6 +71,7 @@ use starlark::values::ValueLike;
 use starlark::values::dict::AllocDict;
 use starlark::values::dict::DictRef;
 use starlark::values::float::StarlarkFloat;
+use starlark::values::list::AllocImmutableList;
 use starlark::values::list::ListRef;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::starlark_value;
@@ -522,6 +523,9 @@ impl<'v> StarlarkValue<'v> for AnalysisConfiguredTargetValue {
 
 pub(crate) struct AnalysisValueMaterializer<'a> {
     heap: &'a FrozenHeap,
+    // Owning keys are phase scratch: aliases survive all roots handled by this
+    // materializer, and temporary native allocations cannot cause pointer ABA.
+    containers: HashMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
     rust_helpers: &'a [slug_loading_v2::PreparedRustToolchainHelperBinding],
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
@@ -533,6 +537,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
     pub(crate) fn new(heap: &'a FrozenHeap) -> Self {
         Self {
             heap,
+            containers: HashMap::new(),
             rust_helpers: &[],
             cc_variables: SmallMap::new(),
             depsets: HashMap::default(),
@@ -846,6 +851,20 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
+        let key = value.container_identity();
+        if let Some(key) = &key
+            && let Some(frozen) = self.containers.get(key)
+        {
+            return Ok(*frozen);
+        }
+        let frozen = self.value_unmemoized(value)?;
+        if let Some(key) = key {
+            self.containers.insert(key, frozen);
+        }
+        Ok(frozen)
+    }
+
+    fn value_unmemoized(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
             AnalysisValueKind::RustToolchainCallable(callable) => {
                 let model = callable.model();
@@ -925,12 +944,12 @@ impl<'a> AnalysisValueMaterializer<'a> {
             AnalysisValueKind::ArtifactRoot(value) => {
                 slug_loading_v2::alloc_frozen_artifact_root(self.heap, value.clone())
             }
-            AnalysisValueKind::List(values) => self.heap.alloc(
+            AnalysisValueKind::List(values) => self.heap.alloc(AllocImmutableList(
                 values
                     .iter()
                     .map(|value| self.value(value))
                     .collect::<Result<Vec<_>, _>>()?,
-            ),
+            )),
             AnalysisValueKind::Tuple(values) => self.heap.alloc(AllocTuple(
                 values
                     .iter()
@@ -2191,3 +2210,7 @@ mod tests {
         assert!(retained.publication_eq(&twice));
     }
 }
+
+#[cfg(test)]
+#[path = "analysis_value/container_alias_tests.rs"]
+mod container_alias_tests;

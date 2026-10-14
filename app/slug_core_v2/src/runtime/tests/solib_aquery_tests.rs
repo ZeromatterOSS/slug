@@ -531,7 +531,7 @@ async fn solib_aquery_metadata_guards_literal_progress_multiplicity_and_priority
     for scope in [AqueryScope::Literal, AqueryScope::Deps] {
         assert_eq!(
             crate::runtime::format_aquery_text_output_for_scope(&rejected, scope),
-            Err("configured Solib query requires a generated ordinary regular File library")
+            Err("configured Solib query requires a generated ordinary regular File library".into())
         );
     }
     assert_eq!(

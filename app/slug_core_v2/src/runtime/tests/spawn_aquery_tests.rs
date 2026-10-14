@@ -170,7 +170,7 @@ async fn spawn_aquery_fields_restore_without_mutating_retained_results() {
         })
         .unwrap();
     let held_spawn = owner.actions()[1].spawn_spec().unwrap();
-    let original_argv = held_spawn.render_argv();
+    let original_argv = held_spawn.render_argv().unwrap();
     drop(first_tx);
     for (index, (from, to)) in [
         ("arg-A", "arg-B"),
@@ -188,7 +188,7 @@ async fn spawn_aquery_fields_restore_without_mutating_retained_results() {
         assert_ne!(original, changed_text, "{from}");
         assert!(changed_text.contains(to));
         assert_eq!(query_text(held, AqueryScope::Literal), original);
-        assert_eq!(held_spawn.render_argv(), original_argv);
+        assert_eq!(held_spawn.render_argv().unwrap(), original_argv);
         drop(changed_tx);
         let mut restored_tx =
             build_root_transaction(&dice, query_epoch(12 + index as i64 * 2, &[])).await;
@@ -499,10 +499,10 @@ async fn spawn_aquery_preserves_filewrite_validation_before_render_priority() {
     );
     assert_eq!(
         crate::runtime::format_aquery_text_output_for_scope(&altered, AqueryScope::Literal),
-        expected
+        expected.clone().map_err(str::to_owned)
     );
     assert_eq!(
         crate::runtime::format_aquery_text_output_for_scope(&altered, AqueryScope::Deps),
-        expected
+        expected.map_err(str::to_owned)
     );
 }

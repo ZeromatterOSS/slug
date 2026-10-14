@@ -13,6 +13,7 @@ use std::ops::Range;
 
 use crate::actions::registry::ActionError;
 use crate::actions::registry::ActionRegistry;
+use crate::actions::registry::RegisterableAction;
 use crate::actions::registry::validate_output;
 use crate::actions::solib_symlink::SolibSymlinkSpec;
 use crate::actions::spec::ActionInput;
@@ -26,25 +27,31 @@ use crate::actions::spec::SymlinkSpec;
 use crate::actions::spec::SymlinkTarget;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct CtxActions {
+pub struct CtxActions<A = ActionSpec> {
     root: crate::DerivedArtifactRoot,
-    registry: ActionRegistry,
+    registry: ActionRegistry<A>,
 }
 
-impl CtxActions {
-    /// End-of-analysis publication checkpoint. No pending recipes enter this
-    /// owner: validate the complete, ordered action batch before replacing state.
-    pub fn replace_actions(&mut self, actions: Vec<ActionSpec>) -> Result<(), ActionError> {
-        let mut registry = ActionRegistry::new();
+impl CtxActions<ActionSpec> {
+    pub fn new(root: crate::DerivedArtifactRoot) -> Self {
+        Self::new_typed(root)
+    }
+}
+
+impl<A: RegisterableAction + From<ActionSpec>> CtxActions<A> {
+    /// Validate the complete ordered native registration batch before replacing
+    /// state. Pending row types remain private to their producer phase.
+    pub fn replace_actions(&mut self, actions: Vec<A>) -> Result<(), ActionError> {
+        let mut registry = ActionRegistry::new_typed();
         registry.register_batch(actions)?;
         self.registry = registry;
         Ok(())
     }
 
-    pub fn new(root: crate::DerivedArtifactRoot) -> Self {
+    pub fn new_typed(root: crate::DerivedArtifactRoot) -> Self {
         Self {
             root,
-            registry: ActionRegistry::new(),
+            registry: ActionRegistry::new_typed(),
         }
     }
 
@@ -66,14 +73,17 @@ impl CtxActions {
         content: impl Into<String>,
         is_executable: bool,
     ) -> Result<usize, ActionError> {
-        self.registry.register(ActionSpec::new(
-            ActionKind::Write {
-                content: content.into(),
-                is_executable,
-            },
-            "FileWrite",
-            vec![output],
-        ))
+        self.registry.register(
+            ActionSpec::new(
+                ActionKind::Write {
+                    content: content.into(),
+                    is_executable,
+                },
+                "FileWrite",
+                vec![output],
+            )
+            .into(),
+        )
     }
 
     pub fn write_json(
@@ -81,13 +91,16 @@ impl CtxActions {
         output: ActionOutput,
         content: impl Into<String>,
     ) -> Result<usize, ActionError> {
-        self.registry.register(ActionSpec::new(
-            ActionKind::WriteJson {
-                content: content.into(),
-            },
-            "JsonWrite",
-            vec![output],
-        ))
+        self.registry.register(
+            ActionSpec::new(
+                ActionKind::WriteJson {
+                    content: content.into(),
+                },
+                "JsonWrite",
+                vec![output],
+            )
+            .into(),
+        )
     }
 
     pub fn expand_template(
@@ -105,7 +118,7 @@ impl CtxActions {
             vec![output],
         )
         .with_inputs(vec![template]);
-        self.registry.register(action)
+        self.registry.register(action.into())
     }
 
     pub fn run(
@@ -124,7 +137,7 @@ impl CtxActions {
             .with_argv(argv)
             .with_inputs(inputs)
             .with_tools(tools);
-        self.registry.register(action)
+        self.registry.register(action.into())
     }
 
     pub fn run_shell(
@@ -147,7 +160,7 @@ impl CtxActions {
         let action = ActionSpec::new(ActionKind::RunShell { command }, "Shell", vec![output])
             .with_argv(argv)
             .with_inputs(inputs);
-        self.registry.register(action)
+        self.registry.register(action.into())
     }
 
     pub fn symlink(
@@ -155,36 +168,39 @@ impl CtxActions {
         output: ActionOutput,
         target_path: impl Into<String>,
     ) -> Result<usize, ActionError> {
-        self.registry.register(ActionSpec::new(
-            ActionKind::Symlink {
-                target_path: target_path.into(),
-            },
-            "Symlink",
-            vec![output],
-        ))
+        self.registry.register(
+            ActionSpec::new(
+                ActionKind::Symlink {
+                    target_path: target_path.into(),
+                },
+                "Symlink",
+                vec![output],
+            )
+            .into(),
+        )
     }
 
     pub fn register_spawn(&mut self, spec: SpawnSpec) -> Result<usize, ActionError> {
-        self.registry.register(ActionSpec::spawn(spec))
+        self.registry.register(ActionSpec::spawn(spec).into())
     }
     pub fn register_build_info_transform(
         &mut self,
         spec: crate::BuildInfoTransformSpec,
     ) -> Result<usize, ActionError> {
         self.registry
-            .register(ActionSpec::build_info_transform(spec))
+            .register(ActionSpec::build_info_transform(spec).into())
     }
 
     pub fn register_args_write(&mut self, spec: ArgsWriteSpec) -> Result<usize, ActionError> {
-        self.registry.register(ActionSpec::args_write(spec))
+        self.registry.register(ActionSpec::args_write(spec).into())
     }
 
     pub fn register_symlink(&mut self, spec: SymlinkSpec) -> Result<usize, ActionError> {
         if matches!(spec.target(), SymlinkTarget::Artifact { .. })
             && let Some(index) = self.registry.output_owner(spec.output().path())
         {
-            let candidate = &self.registry.actions()[index];
-            if candidate.exec_properties().is_empty()
+            if let Some(candidate) = self.registry.actions()[index].as_action_spec()
+                && candidate.exec_properties().is_empty()
                 && candidate.exec_group().is_none()
                 && let Some(existing) = candidate.symlink_spec()
                 && existing.output() == spec.output()
@@ -194,31 +210,50 @@ impl CtxActions {
                 return Ok(index);
             }
         }
-        self.registry.register(ActionSpec::symlink(spec))
+        self.registry.register(ActionSpec::symlink(spec).into())
     }
 
     pub fn register_solib_symlink(&mut self, spec: SolibSymlinkSpec) -> Result<usize, ActionError> {
         let action = ActionSpec::solib_symlink(spec);
         if let Some(index) = self.registry.output_owner(action.outputs()[0].path())
-            && self.registry.actions()[index] == action
+            && self.registry.actions()[index]
+                .as_action_spec()
+                .is_some_and(|candidate| candidate == &action)
         {
             return Ok(index);
         }
-        self.registry.register(action)
+        self.registry.register(action.into())
     }
 
     pub fn register_batch(
         &mut self,
         actions: impl IntoIterator<Item = ActionSpec>,
     ) -> Result<Range<usize>, ActionError> {
-        self.registry.register_batch(actions)
+        self.registry
+            .register_batch(actions.into_iter().map(A::from))
     }
 
-    pub fn registry(&self) -> &ActionRegistry {
+    pub fn register_pending(&mut self, action: A) -> Result<usize, ActionError> {
+        self.registry.register(action)
+    }
+
+    /// Consume the producer's private rows outside its lock; completion cannot
+    /// change registration coordinates or order.
+    pub fn try_map<B: RegisterableAction + From<ActionSpec>, E: From<ActionError>>(
+        self,
+        complete: impl FnMut(&A) -> Result<B, E>,
+    ) -> Result<CtxActions<B>, E> {
+        Ok(CtxActions {
+            root: self.root,
+            registry: self.registry.try_map(complete)?,
+        })
+    }
+
+    pub fn registry(&self) -> &ActionRegistry<A> {
         &self.registry
     }
 
-    pub fn into_registry(self) -> ActionRegistry {
+    pub fn into_registry(self) -> ActionRegistry<A> {
         self.registry
     }
 

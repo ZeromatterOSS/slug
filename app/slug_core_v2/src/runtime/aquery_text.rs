@@ -40,18 +40,31 @@ use super::symlink_aquery_text::append_symlink;
 pub fn format_aquery_text_output_for_scope(
     evaluation: &BuildCommandEvaluation,
     scope: AqueryScope,
-) -> Result<String, &'static str> {
+) -> Result<String, String> {
+    format_aquery_text_output_for_scope_with_context(
+        evaluation,
+        scope,
+        &slug_build_api_v2::NoopArgsDirectoryContext,
+    )
+}
+
+/// Render using the current query consumer's cancellation and directory capability.
+pub fn format_aquery_text_output_for_scope_with_context(
+    evaluation: &BuildCommandEvaluation,
+    scope: AqueryScope,
+    args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+) -> Result<String, String> {
     // Preserve the old FileWrite guard-before-render error priority across all
     // selected owners. This pass only constructs borrowed views.
     visit_owners(evaluation, scope, |owner| {
-        validate_owner(owner, evaluation.workspace())
+        validate_owner(owner, evaluation.workspace()).map_err(str::to_owned)
     })?;
     let mut output = String::new();
     visit_owners(evaluation, scope, |owner| {
-        append_owner(&mut output, owner, evaluation.workspace())
+        append_owner(&mut output, owner, evaluation.workspace(), args_context)
     })?;
     if output.is_empty() {
-        return Err("FileWrite aquery text requires at least one resolved action");
+        return Err("FileWrite aquery text requires at least one resolved action".into());
     }
     Ok(output)
 }
@@ -59,8 +72,8 @@ pub fn format_aquery_text_output_for_scope(
 fn visit_owners(
     evaluation: &BuildCommandEvaluation,
     scope: AqueryScope,
-    mut visitor: impl FnMut(&ConfiguredNodeResult) -> Result<(), &'static str>,
-) -> Result<(), &'static str> {
+    mut visitor: impl FnMut(&ConfiguredNodeResult) -> Result<(), String>,
+) -> Result<(), String> {
     match scope {
         AqueryScope::Literal => visitor(evaluation.sole_requested_analysis()?),
         AqueryScope::Deps => {
@@ -102,7 +115,8 @@ fn append_owner(
     output: &mut String,
     owner: &ConfiguredNodeResult,
     workspace: &NormalizedAbsolutePath,
-) -> Result<(), &'static str> {
+    args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+) -> Result<(), String> {
     for action in owner.actions() {
         if matches!(action.kind(), ActionKind::Write { .. }) {
             let view = ResolvedFileWriteSemanticView::from_configured_action(
@@ -139,6 +153,7 @@ fn append_owner(
             append_spawn(
                 output,
                 ConfiguredSpawnActionView::from_configured_action(action)?,
+                args_context,
             )?;
         }
     }
@@ -148,9 +163,10 @@ fn append_owner(
 fn append_spawn(
     output: &mut String,
     view: ConfiguredSpawnActionView<'_>,
-) -> Result<(), &'static str> {
+    args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+) -> Result<(), String> {
     if cfg!(windows) {
-        return Err("Spawn aquery Windows command text is not admitted");
+        return Err("Spawn aquery Windows command text is not admitted".into());
     }
     let action = view.action();
     let spawn = view.spec();
@@ -171,7 +187,7 @@ fn append_spawn(
             }
             ActionOutputKind::File | ActionOutputKind::Symlink => Cow::Borrowed(artifact.path()),
             ActionOutputKind::RunfilesTree => {
-                return Err("Spawn aquery runfiles-tree output is not admitted");
+                return Err("Spawn aquery runfiles-tree output is not admitted".into());
             }
         };
         outputs.push(match path {
@@ -206,7 +222,9 @@ fn append_spawn(
         }
     }
     if progress.contains("%{input}") {
-        return Err("Spawn aquery progress input requires an original-primary-input producer");
+        return Err(
+            "Spawn aquery progress input requires an original-primary-input producer".into(),
+        );
     }
     write!(output, "action '{progress}").unwrap();
     if owner.configuration().kind() == ConfigurationKind::Exec {
@@ -222,7 +240,9 @@ fn append_spawn(
     // allArguments query expansion, not execution's spilled argv/virtual files.
     // Drop the complete rendered argv at the end of this action, not command.
     {
-        let argv = spawn.render_argv();
+        let argv = spawn
+            .render_argv_with_context(args_context)
+            .map_err(|error| error.to_string())?;
         append_command_line(
             output,
             &configuration_token,
@@ -373,6 +393,10 @@ fn append_shell_escaped(output: &mut String, value: &str) {
         output.push('\'');
     }
 }
+
+#[cfg(test)]
+#[path = "aquery_text/args_error_tests.rs"]
+mod args_error_tests;
 
 #[cfg(test)]
 mod tests {

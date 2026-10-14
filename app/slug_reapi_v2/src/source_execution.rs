@@ -69,10 +69,14 @@ impl SourceActionTransport for SourceReapiTransport {
     async fn stage(
         &self,
         inputs: Arc<PreparedSourceActionInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Staged, Self::Error> {
-        let plan =
-            SourceSpawnReapiPlan::from_prepared(inputs, &self.config.default_exec_properties)
-                .map_err(RemoteExecutionError::Command)?;
+        let plan = SourceSpawnReapiPlan::from_prepared(
+            inputs,
+            &self.config.default_exec_properties,
+            args_context,
+        )
+        .map_err(RemoteExecutionError::Command)?;
         let endpoint =
             tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
         let channel = tonic::transport::Endpoint::from_shared(endpoint)

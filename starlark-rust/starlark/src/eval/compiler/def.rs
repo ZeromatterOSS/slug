@@ -17,6 +17,8 @@
 
 //! Implementation of `def`.
 
+pub(crate) mod inspection;
+
 use std::cell::UnsafeCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -570,6 +572,17 @@ pub(crate) struct DefGen<V> {
     #[derivative(Debug = "ignore")]
     #[allocative(skip)]
     optimized_on_freeze_stmt: StmtCompiledCell,
+}
+
+impl<V> DefGen<V> {
+    /// Borrow a compiled annotation by signature index without exposing the
+    /// owner's internal sparse-row representation to inspection consumers.
+    pub(crate) fn inspection_parameter_annotation(&self, index: usize) -> Option<FrozenValue> {
+        self.parameter_types
+            .iter()
+            .find(|(slot, _, _)| slot.0 as usize == index)
+            .map(|(_, _, ty)| ty.to_inner())
+    }
 }
 
 impl<V> Display for DefGen<V> {

@@ -203,235 +203,6 @@ fn default_vector_options() -> RetainedVectorOptions {
     }
 }
 
-fn rust_crate_value(fields: Vec<(&str, AnalysisValue)>) -> AnalysisValue {
-    AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
-        slug_build_api_v2::ProviderIdentity::user(
-            slug_build_api_v2::ProviderId::new(
-                "@@rules_rust+//rust/private:providers.bzl",
-                "CrateInfo",
-            )
-            .unwrap(),
-        ),
-        fields,
-    ))
-}
-
-fn rust_crate_depset(value: AnalysisValue) -> AnalysisDepset {
-    AnalysisDepset::new(DepsetOrder::Default, vec![value], Vec::new()).unwrap()
-}
-
-fn rust_crate_recipe(
-    values: Vec<(AnalysisDepset, slug_build_api_v2::RustCrateArgMapper)>,
-) -> RetainedArgsRecipe {
-    RetainedArgsRecipe::new(
-        values
-            .into_iter()
-            .map(|(depset, mapper)| {
-                RetainedArgCall::AddAll(RetainedVectorArg::new(
-                    RetainedVectorSource::RulesRustCrates(
-                        slug_build_api_v2::RetainedRustCrateArgs::new(depset, mapper).unwrap(),
-                    ),
-                    default_vector_options(),
-                ))
-            })
-            .collect::<Vec<_>>(),
-        RetainedParamFileFormat::Multiline,
-    )
-}
-
-#[test]
-fn rust_crate_args_validate_provider_fields_and_retain_identity() {
-    use slug_build_api_v2::RetainedRustCrateArgs;
-    use slug_build_api_v2::RustCrateArgMapper as Mapper;
-    let crate_for = |output| {
-        rust_crate_value(vec![
-            ("name", AnalysisValue::string("dep")),
-            ("output", AnalysisValue::artifact(output)),
-            ("metadata", AnalysisValue::none()),
-        ])
-    };
-    let first = crate_for(derived_artifact("out/dep.rlib", ActionOutputKind::File));
-    let alternate = crate_for(AnalysisArtifact::Derived {
-        owner: AnalysisConfiguredTargetKey::new(
-            CanonicalLabel::parse("@@//pkg:other").unwrap(),
-            b"cfg".as_slice(),
-        ),
-        output: ActionOutput::new(root_support::root(), "out/dep.rlib", ActionOutputKind::File),
-    });
-    let ordinary = rust_crate_recipe(vec![(rust_crate_depset(first.clone()), Mapper::Extern)]);
-    let metadata = rust_crate_recipe(vec![(
-        rust_crate_depset(first.clone()),
-        Mapper::ExternMetadata,
-    )]);
-    let changed_owner = rust_crate_recipe(vec![(rust_crate_depset(alternate), Mapper::Extern)]);
-    for other in [metadata, changed_owner] {
-        assert_eq!(ordinary.render(), other.render());
-        assert_ne!(ordinary, other);
-    }
-    let alias = AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
-        slug_build_api_v2::ProviderIdentity::user(
-            slug_build_api_v2::ProviderId::new(
-                "@@rules_rust+//rust/private:rustc.bzl",
-                "AliasableDepInfo",
-            )
-            .unwrap(),
-        ),
-        [
-            ("name", AnalysisValue::string("dep")),
-            ("dep", first.clone()),
-        ],
-    ));
-    let aliased = rust_crate_recipe(vec![(rust_crate_depset(alias.clone()), Mapper::Extern)]);
-    assert_eq!(ordinary.render(), aliased.render());
-    assert_ne!(ordinary, aliased);
-    assert!(RetainedRustCrateArgs::new(rust_crate_depset(alias), Mapper::DependencyDir).is_err());
-    let base_fields = vec![
-        ("name", AnalysisValue::string("dep")),
-        (
-            "output",
-            AnalysisValue::artifact(source_artifact("dep.rlib")),
-        ),
-        ("metadata", AnalysisValue::none()),
-    ];
-    let foreign = AnalysisValue::provider(slug_build_api_v2::ProviderOccurrence::new(
-        slug_build_api_v2::ProviderIdentity::user(
-            slug_build_api_v2::ProviderId::new("@@//:forged.bzl", "CrateInfo").unwrap(),
-        ),
-        base_fields.clone(),
-    ));
-    for value in [
-        foreign,
-        AnalysisValue::strukt(base_fields.clone()),
-        AnalysisValue::string("not-a-provider"),
-        crate_for(derived_artifact("tree", ActionOutputKind::Directory)),
-    ] {
-        assert!(
-            RetainedRustCrateArgs::new(rust_crate_depset(value), Mapper::ExternMetadata).is_err()
-        );
-    }
-    for (field, value) in [
-        ("name", AnalysisValue::integer(3)),
-        ("output", AnalysisValue::string("not-a-file")),
-        (
-            "metadata",
-            AnalysisValue::artifact(derived_artifact("tree", ActionOutputKind::Directory)),
-        ),
-    ] {
-        let mut fields = base_fields.clone();
-        fields
-            .iter_mut()
-            .find(|(name, _)| *name == field)
-            .unwrap()
-            .1 = value;
-        assert!(
-            RetainedRustCrateArgs::new(
-                rust_crate_depset(rust_crate_value(fields)),
-                Mapper::ExternMetadata
-            )
-            .is_err()
-        );
-    }
-    let with_metadata = |supports| {
-        rust_crate_value(vec![
-            ("name", AnalysisValue::string("dep")),
-            (
-                "output",
-                AnalysisValue::artifact(source_artifact("dep.rlib")),
-            ),
-            (
-                "metadata",
-                AnalysisValue::artifact(source_artifact("dep.rmeta")),
-            ),
-            ("metadata_supports_pipelining", supports),
-        ])
-    };
-    assert!(
-        RetainedRustCrateArgs::new(
-            rust_crate_depset(with_metadata(AnalysisValue::string("invalid"))),
-            Mapper::ExternMetadata
-        )
-        .is_err()
-    );
-    for (supports, path) in [(true, "pkg/dep.rmeta"), (false, "pkg/dep.rlib")] {
-        assert_eq!(
-            rust_crate_recipe(vec![(
-                rust_crate_depset(with_metadata(AnalysisValue::boolean(supports))),
-                Mapper::ExternMetadata
-            )])
-            .render(),
-            [format!("--extern=dep={path}")]
-        );
-    }
-}
-
-#[test]
-fn rust_crate_args_preserve_depset_alias_and_retained_shape() {
-    use slug_build_api_v2::RustCrateArgMapper as Mapper;
-    let value = |name| {
-        rust_crate_value(vec![
-            ("name", AnalysisValue::string(name)),
-            (
-                "output",
-                AnalysisValue::artifact(source_artifact("dep.rlib")),
-            ),
-        ])
-    };
-    let shared = rust_crate_depset(value("a"));
-    let aliased = rust_crate_recipe(vec![
-        (shared.clone(), Mapper::Extern),
-        (shared, Mapper::DependencyDir),
-    ]);
-    let split = rust_crate_recipe(vec![
-        (rust_crate_depset(value("a")), Mapper::Extern),
-        (rust_crate_depset(value("a")), Mapper::DependencyDir),
-    ]);
-    assert_eq!(aliased.render(), split.render());
-    assert_ne!(aliased, split);
-    let shared = rust_crate_depset(value("a"));
-    assert_eq!(
-        aliased,
-        rust_crate_recipe(vec![
-            (shared.clone(), Mapper::Extern),
-            (shared, Mapper::DependencyDir)
-        ])
-    );
-    let flat = AnalysisDepset::new(
-        DepsetOrder::Default,
-        vec![value("a"), value("b")],
-        Vec::new(),
-    )
-    .unwrap();
-    let leaf = |name| {
-        AnalysisDepsetGraphNode::new(
-            AnalysisDepsetOccurrence::new(),
-            DepsetOrder::Default,
-            1,
-            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(value(name))]),
-        )
-    };
-    let nested = AnalysisDepset::from_local_graph(vec![
-        leaf("a"),
-        leaf("b"),
-        AnalysisDepsetGraphNode::new(
-            AnalysisDepsetOccurrence::new(),
-            DepsetOrder::Default,
-            2,
-            AnalysisDepsetGraphRow::Successors(vec![
-                AnalysisDepsetGraphInput::Local(0),
-                AnalysisDepsetGraphInput::Local(1),
-            ]),
-        ),
-    ])
-    .unwrap()
-    .pop()
-    .unwrap();
-    assert_eq!(flat.to_list(), nested.to_list());
-    let flat = rust_crate_recipe(vec![(flat, Mapper::Extern)]);
-    let nested = rust_crate_recipe(vec![(nested, Mapper::Extern)]);
-    assert_eq!(flat.render(), nested.render());
-    assert_ne!(flat, nested);
-}
-
 fn spawn_action(inputs: AnalysisDepset, tools: AnalysisDepset) -> ActionSpec {
     let recipe = RetainedArgsRecipe::new(
         vec![
@@ -723,7 +494,10 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
     assert_eq!(ordinary.resource_set(), None);
     let retained = ordinary.clone().with_resource_set(recipe);
     assert_eq!(retained.resource_set(), Some(recipe));
-    assert_eq!(retained.render_argv(), ordinary.render_argv());
+    assert_eq!(
+        retained.render_argv().unwrap(),
+        ordinary.render_argv().unwrap()
+    );
     assert_eq!(retained.command_line(), ordinary.command_line());
     assert_ne!(ordinary, &retained);
     let with_resource = ActionSpec::spawn(retained.clone());
@@ -838,7 +612,7 @@ fn spawn_publication_equality_covers_every_ordinary_field() {
         None,
     );
     assert_eq!(
-        shell.spawn_spec().unwrap().render_argv(),
+        shell.spawn_spec().unwrap().render_argv().unwrap(),
         ["/bin/bash", "-c", "command", ""]
     );
 }
@@ -943,13 +717,13 @@ fn vector_args_render_bazel_transform_order_and_empty_groups() {
     );
 
     assert_eq!(
-        recipe.render(),
+        recipe.render().unwrap(),
         [
             "--all", "-B", "item=a%", "-B", "item=b%", "--end", "--joined", "[]", "",
         ]
     );
     assert_eq!(
-        recipe.render_write_content(),
+        recipe.render_write_content().unwrap(),
         "--all\n-B\nitem=a%\n-B\nitem=b%\n--end\n--joined\n[]\n\n"
     );
 
@@ -969,7 +743,7 @@ fn vector_args_render_bazel_transform_order_and_empty_groups() {
         ))],
         RetainedParamFileFormat::Multiline,
     );
-    assert_eq!(integer_recipe.render(), ["18446744073709551616"]);
+    assert_eq!(integer_recipe.render().unwrap(), ["18446744073709551616"]);
 }
 
 #[test]
@@ -991,21 +765,21 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
     let gcc = RetainedArgsRecipe::new(calls.clone(), RetainedParamFileFormat::Gcc);
     let flag_per_line = RetainedArgsRecipe::new(calls, RetainedParamFileFormat::FlagPerLine);
     assert_eq!(
-        shell.render_write_content(),
+        shell.render_write_content().unwrap(),
         "--flag\n'two words'\n'quote'\\''d'\n"
     );
     assert_eq!(
-        multiline.render_write_content(),
+        multiline.render_write_content().unwrap(),
         "--flag\ntwo words\nquote'd\n"
     );
     assert_eq!(
-        flag_per_line.render_write_content(),
+        flag_per_line.render_write_content().unwrap(),
         "--flag=two words\nquote'd\n"
     );
 
-    assert_eq!(gcc.render(), multiline.render());
+    assert_eq!(gcc.render().unwrap(), multiline.render().unwrap());
     assert_eq!(
-        gcc.render_write_content(),
+        gcc.render_write_content().unwrap(),
         "--flag\ntwo\\ words\nquote\\'d\n"
     );
 
@@ -1026,7 +800,10 @@ fn args_write_formats_and_ignores_spawn_only_param_policy() {
     );
     assert!(!write.is_executable());
     assert_eq!(write.execution_requirements().iter().len(), 0);
-    assert_eq!(write.render_content(), shell.render_write_content());
+    assert_eq!(
+        write.render_content().unwrap(),
+        shell.render_write_content().unwrap()
+    );
     assert!(ReapiCommandProjection::from_action(&left).is_err());
 
     let spawn_left = RetainedSpawnArgsSnapshot::new(
@@ -1223,232 +1000,6 @@ fn vector_depsets_share_publication_alias_state_with_spawn_inputs() {
     ] {
         assert_ne!(base(), changed);
     }
-}
-
-#[test]
-fn file_dirname_recipes_preserve_identity_and_map_before_uniquify() {
-    let recipe = |artifacts: Vec<AnalysisArtifact>| {
-        let mut options = default_vector_options();
-        options.before_each = Some("-L".into());
-        options.format_each = Some("dir=%s".into());
-        options.uniquify = true;
-        RetainedArgsRecipe::new(
-            vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
-                RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(
-                    artifacts
-                        .into_iter()
-                        .map(ArtifactInputSource::Direct)
-                        .collect::<Vec<_>>(),
-                ))
-                .unwrap(),
-                options,
-            ))],
-            RetainedParamFileFormat::Multiline,
-        )
-    };
-    let root = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:root.rs").unwrap());
-    let nested = source_artifact("src/lib.rs");
-    let a = derived_artifact("out/a.rlib", ActionOutputKind::File);
-    let b = derived_artifact("out/b.rlib", ActionOutputKind::File);
-    assert_eq!(root.dirname(), ".");
-    assert_eq!(nested.dirname(), "pkg/src");
-    assert_eq!(
-        derived_artifact("bare.rlib", ActionOutputKind::File).dirname(),
-        root_support::root().path()
-    );
-    let result = recipe(vec![root, a.clone(), b.clone(), nested]);
-    assert_eq!(
-        result.render(),
-        [
-            "-L",
-            "dir=.",
-            "-L",
-            &format!("dir={}", root_support::exec_path("out")),
-            "-L",
-            "dir=pkg/src"
-        ]
-    );
-    assert_eq!(
-        result.render_write_content(),
-        format!(
-            "-L\ndir=.\n-L\ndir={}\n-L\ndir=pkg/src\n",
-            root_support::exec_path("out")
-        )
-    );
-    let other_owner = AnalysisArtifact::Derived {
-        owner: AnalysisConfiguredTargetKey::new(
-            CanonicalLabel::parse("@@//pkg:other").unwrap(),
-            b"cfg".as_slice(),
-        ),
-        output: ActionOutput::new(root_support::root(), "out/a.rlib", ActionOutputKind::File),
-    };
-    let first = recipe(vec![a.clone()]);
-    assert_eq!(first, recipe(vec![a]));
-    for different in [recipe(vec![b]), recipe(vec![other_owner])] {
-        assert_eq!(first.render(), different.render());
-        assert_ne!(first, different);
-    }
-    for kind in [
-        ActionOutputKind::Directory,
-        ActionOutputKind::Symlink,
-        ActionOutputKind::RunfilesTree,
-    ] {
-        let directory = derived_artifact("out/tree", kind);
-        let depset = AnalysisDepset::new(
-            DepsetOrder::Default,
-            vec![AnalysisValue::artifact(directory.clone())],
-            Vec::new(),
-        )
-        .unwrap();
-        for source in [
-            ArtifactInputSource::Direct(directory),
-            ArtifactInputSource::Depset(RetainedArtifactInputs::new(depset).unwrap()),
-        ] {
-            assert!(
-                RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(vec![source]))
-                    .is_err()
-            );
-        }
-    }
-    assert!(
-        RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(vec![
-            ArtifactInputSource::FilesToRun(files_to_run_provider("tool"))
-        ]))
-        .is_err()
-    );
-    let non_file = AnalysisDepset::new(
-        DepsetOrder::Default,
-        vec![AnalysisValue::string("not-a-file")],
-        Vec::new(),
-    )
-    .unwrap();
-    assert!(RetainedArtifactInputs::new(non_file).is_err());
-}
-
-#[test]
-fn file_dirname_depsets_share_publication_alias_state_with_spawn_inputs() {
-    let inputs = |depset| {
-        ArtifactInputs::new(vec![ArtifactInputSource::Depset(
-            RetainedArtifactInputs::new(depset).unwrap(),
-        )])
-    };
-    let make = |args: AnalysisDepset, input: AnalysisDepset| {
-        SpawnSpec::new(
-            RetainedSpawnInvocation::Executable(SpawnExecutable::Path(
-                NormalizedBazelPath::new(HostPathFlavor::Unix, "tool").unwrap(),
-            )),
-            RetainedCommandLine::new(vec![RetainedCommandLineSegment::ArgsSnapshot(
-                RetainedSpawnArgsSnapshot::new(
-                    RetainedArgsRecipe::new(
-                        vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
-                            RetainedVectorSource::regular_file_dirnames(inputs(args)).unwrap(),
-                            default_vector_options(),
-                        ))],
-                        RetainedParamFileFormat::Multiline,
-                    ),
-                    None,
-                ),
-            )]),
-            inputs(input),
-            ArtifactInputs::new(Vec::new()),
-            vec![ActionOutput::new(
-                root_support::root(),
-                "out",
-                ActionOutputKind::File,
-            )],
-            None,
-            RetainedActionEnvironment::default(),
-            CanonicalStringMap::default(),
-            "Action",
-            None::<&str>,
-        )
-    };
-    let shared = artifact_depset("same");
-    let aliased = make(shared.clone(), shared);
-    let split = make(artifact_depset("same"), artifact_depset("same"));
-    assert_eq!(aliased.render_argv(), split.render_argv());
-    assert_ne!(aliased, split);
-    let another = artifact_depset("same");
-    assert_eq!(aliased, make(another.clone(), another));
-    // Use the retained-graph constructor: the ordinary depset constructor
-    // canonicalizes these simple children into leaves before retention.
-    let leaf = |name| {
-        AnalysisDepsetGraphNode::new(
-            AnalysisDepsetOccurrence::new(),
-            DepsetOrder::Default,
-            1,
-            AnalysisDepsetGraphRow::Successors(vec![AnalysisDepsetGraphInput::Direct(
-                AnalysisValue::artifact(source_artifact(name)),
-            )]),
-        )
-    };
-    let nested = AnalysisDepset::from_local_graph(vec![
-        leaf("same"),
-        leaf("other"),
-        AnalysisDepsetGraphNode::new(
-            AnalysisDepsetOccurrence::new(),
-            DepsetOrder::Default,
-            2,
-            AnalysisDepsetGraphRow::Successors(vec![
-                AnalysisDepsetGraphInput::Local(0),
-                AnalysisDepsetGraphInput::Local(1),
-            ]),
-        ),
-    ])
-    .unwrap()
-    .pop()
-    .unwrap();
-    let flat = AnalysisDepset::new(
-        DepsetOrder::Default,
-        vec![
-            AnalysisValue::artifact(source_artifact("same")),
-            AnalysisValue::artifact(source_artifact("other")),
-        ],
-        Vec::new(),
-    )
-    .unwrap();
-    assert_eq!(flat.to_list(), nested.to_list());
-    let flattened = make(flat, artifact_depset("same"));
-    let reshaped = make(nested, artifact_depset("same"));
-    assert_eq!(flattened.render_argv(), reshaped.render_argv());
-    assert_ne!(flattened, reshaped);
-}
-
-#[test]
-fn pinned_regular_crate_root_retains_artifact_and_root_path_identity() {
-    let owner = |name: &str| AnalysisArtifact::Derived {
-        owner: AnalysisConfiguredTargetKey::new(
-            CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap(),
-            b"cfg".as_slice(),
-        ),
-        output: ActionOutput::new(
-            root_support::root(),
-            "pkg/src/lib.rs",
-            ActionOutputKind::File,
-        ),
-    };
-    let recipe = |artifact, root_path: &str| {
-        RetainedArgsRecipe::new(
-            vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
-                RetainedVectorSource::RulesRustRegularCrateRoot {
-                    artifact,
-                    root_path: root_path.into(),
-                },
-                default_vector_options(),
-            ))],
-            RetainedParamFileFormat::Multiline,
-        )
-    };
-    let a = recipe(owner("first"), "lib.rs");
-    let same = recipe(owner("first"), "lib.rs");
-    let other_owner = recipe(owner("second"), "lib.rs");
-    let other_root = recipe(owner("first"), "generated.rs");
-    for value in [&a, &same, &other_owner, &other_root] {
-        assert_eq!(value.render(), [root_support::exec_path("pkg/src/lib.rs")]);
-    }
-    assert_eq!(a, same);
-    assert_ne!(a, other_owner);
-    assert_ne!(a, other_root);
 }
 
 #[test]
@@ -2117,11 +1668,11 @@ fn gcc_param_files_escape_pinned_ascii_and_keep_format_identity() {
         let RetainedCommandLineSegment::ArgsSnapshot(args) = &segment else {
             unreachable!()
         };
-        assert_eq!(args.recipe().render(), [raw, raw]);
+        assert_eq!(args.recipe().render().unwrap(), [raw, raw]);
         let bytes = format!("{escaped}\n{escaped}\n");
-        assert_eq!(args.recipe().render_write_content(), bytes);
+        assert_eq!(args.recipe().render_write_content().unwrap(), bytes);
         let spec = param_spawn(vec![segment], &["pkg/gcc"]);
-        assert_eq!(spec.render_argv(), ["tools/runner", raw, raw]);
+        assert_eq!(spec.render_argv().unwrap(), ["tools/runner", raw, raw]);
         let expanded = spec.expand_forced_param_files().unwrap();
         assert_eq!(expanded.param_files()[0].bytes(), bytes.as_bytes());
     }
@@ -2137,7 +1688,10 @@ fn gcc_param_files_escape_pinned_ascii_and_keep_format_identity() {
     let gcc = param_args(Gcc, &[(None, "safe")], None);
     let multiline = param_args(Multiline, &[(None, "safe")], None);
     let specs = [gcc.clone(), multiline.clone()].map(|segment| param_spawn(vec![segment], &[]));
-    assert_eq!(specs[0].render_argv(), specs[1].render_argv());
+    assert_eq!(
+        specs[0].render_argv().unwrap(),
+        specs[1].render_argv().unwrap()
+    );
     let [
         RetainedCommandLineSegment::ArgsSnapshot(gcc),
         RetainedCommandLineSegment::ArgsSnapshot(multiline),
@@ -2146,8 +1700,8 @@ fn gcc_param_files_escape_pinned_ascii_and_keep_format_identity() {
         unreachable!()
     };
     assert_eq!(
-        gcc.recipe().render_write_content(),
-        multiline.recipe().render_write_content()
+        gcc.recipe().render_write_content().unwrap(),
+        multiline.recipe().render_write_content().unwrap()
     );
     assert_ne!(
         specs[0], specs[1],
@@ -2245,7 +1799,7 @@ fn forced_param_files_preserve_formats_order_and_spill_numbering() {
         let inline = param_spawn(vec![param_args(Multiline, &values, None)], &[]);
         assert_eq!(
             inline.expand_forced_param_files().unwrap().argv(),
-            inline.render_argv()
+            inline.render_argv().unwrap()
         );
     }
 }
@@ -2305,7 +1859,5 @@ fn forced_param_files_reject_unowned_limits_invalid_paths_and_output_collisions(
         .expand_forced_param_files()
         .unwrap();
 }
-
-mod native_link_args;
 
 mod source_paths;

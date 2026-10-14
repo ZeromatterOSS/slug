@@ -113,6 +113,7 @@ impl ActionChainTransport for RequestedFake {
     async fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         assert!(inputs.plan().unwrap().requested().is_some());
         if self.inner.starts.load(Ordering::SeqCst) > 0 {
@@ -126,7 +127,7 @@ impl ActionChainTransport for RequestedFake {
             .unwrap();
         inputs.open_source(index)?.read_to_end(&mut standalone)?;
         Ok(RequestedSession {
-            inner: self.inner.start(inputs).await?,
+            inner: self.inner.start(inputs, args_context).await?,
             standalone,
         })
     }

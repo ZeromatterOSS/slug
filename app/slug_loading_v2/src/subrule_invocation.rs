@@ -23,8 +23,6 @@ use std::sync::Mutex;
 
 use allocative::Allocative;
 use compact_str::CompactString;
-use sha2::Digest;
-use sha2::Sha256;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::AnalysisArtifact;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
@@ -32,7 +30,6 @@ use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedScalarArg;
 use slug_build_api_v2::RetainedScalarValue;
 use slug_build_api_v2::RetainedVectorOptions;
-use slug_build_api_v2::RustCrateArgMapper;
 use slug_identity_v2::CanonicalLabel;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -70,23 +67,9 @@ use starlark_map::small_set::SmallSet;
 use crate::BzlModuleIdentity;
 use crate::BzlModuleSourceProvenance;
 use crate::analysis_fragments::SubruleFragmentCollection;
-use crate::builtin_restriction::source_identities_for_evaluator;
 use crate::provider::alloc_starlark_label;
 use crate::starlark_label::StarlarkLabel;
 use crate::subrule::SubruleIdentity;
-
-#[derive(Debug, Clone, Copy)]
-pub struct AnalysisRunRequest<'v> {
-    pub outputs: Value<'v>,
-    pub executable: Value<'v>,
-    pub arguments: Option<Value<'v>>,
-    pub inputs: Option<Value<'v>>,
-    pub tools: Option<Value<'v>>,
-    pub env: Option<Value<'v>>,
-    pub mnemonic: Option<&'v str>,
-    pub progress_message: Option<&'v str>,
-    pub use_default_shell_env: bool,
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisActionCallScope {
@@ -179,10 +162,11 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
         anyhow::bail!("directory declarations are unavailable in this analysis context")
     }
 
-    fn write(
+    fn write<'v>(
         &self,
-        output: Value<'_>,
-        content: Value<'_>,
+        module: &'v Module,
+        output: Value<'v>,
+        content: Value<'v>,
         is_executable: bool,
     ) -> anyhow::Result<()>;
     fn run_shell(
@@ -191,8 +175,11 @@ pub trait AnalysisActionSink: fmt::Debug + Send + Sync {
         command: &str,
         arguments: Value<'_>,
     ) -> anyhow::Result<()>;
-    fn run(&self, request: AnalysisRunRequest<'_>) -> anyhow::Result<()>;
-    fn spawn(&self, _request: AnalysisSpawnRequest<'_>) -> anyhow::Result<()> {
+    fn spawn<'v>(
+        &self,
+        _module: &'v Module,
+        _request: AnalysisSpawnRequest<'v>,
+    ) -> anyhow::Result<()> {
         anyhow::bail!("typed Spawn actions are unavailable in this analysis context")
     }
     fn is_files_to_run_provider(&self, _value: Value<'_>) -> bool {
@@ -225,27 +212,23 @@ pub struct EvaluatorVectorArgGen<V> {
     #[trace(unsafe_ignore)]
     pub options: RetainedVectorOptions,
     pub map_each: Option<EvaluatorVectorMapEachGen<V>>,
+    #[trace(unsafe_ignore)]
+    pub registration_location: Option<CompactString>,
 }
 
 #[derive(Debug, Clone, Allocative, Trace)]
 pub enum EvaluatorVectorMapEachGen<V> {
-    Pinned(#[trace(unsafe_ignore)] PinnedVectorMapEach),
-    CargoRunfiles {
-        fake_exe: V,
-        #[trace(unsafe_ignore)]
-        workspace_name: CompactString,
-    },
+    Callable(V),
 }
 
-mod cargo_runfiles;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
-pub enum PinnedVectorMapEach {
-    RulesRustCrateRoot,
-    RegularFileDirnames,
-    RulesRustCrates(RustCrateArgMapper),
-    RulesRustNativeLinks(slug_build_api_v2::RustNativeLinkArgMapper),
-}
+mod args_callbacks;
+#[cfg(test)]
+mod args_callbacks_tests;
+mod pending_args;
+pub use pending_args::ArgsSnapshotRegistration;
+pub use pending_args::args_snapshot;
+pub use pending_args::clear_args_snapshots;
+pub use pending_args::register_args_snapshot;
 
 #[derive(Debug, Clone, Allocative, Trace)]
 pub enum EvaluatorArgCallGen<V> {
@@ -263,12 +246,15 @@ struct StarlarkArgsStateGen<V> {
     param_file: Option<(CompactString, bool)>,
 }
 
-#[derive(Debug, Clone)]
-pub struct EvaluatorArgsSnapshot<'v> {
-    pub calls: Vec<EvaluatorArgCallGen<Value<'v>>>,
+#[derive(Debug, Clone, Allocative, Trace)]
+pub struct EvaluatorArgsSnapshotGen<V> {
+    pub calls: Vec<EvaluatorArgCallGen<V>>,
+    #[trace(unsafe_ignore)]
     pub format: RetainedParamFileFormat,
+    #[trace(unsafe_ignore)]
     pub param_file: Option<(CompactString, bool)>,
 }
+pub type EvaluatorArgsSnapshot<'v> = EvaluatorArgsSnapshotGen<Value<'v>>;
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 #[repr(C)]
@@ -428,7 +414,7 @@ pub(crate) fn starlark_args_methods(builder: &mut MethodsBuilder) {
     ) -> anyhow::Result<Value<'v>> {
         let args = mutable_args(this, "add_all")?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_all")?;
-        let map_each = classify_add_all_callback(map_each, allow_closure, eval)?;
+        let map_each = args_callbacks::register_callback(map_each, allow_closure, eval)?;
         if let Some(format) = format_each {
             validate_named_format("format_each", format)?;
         }
@@ -453,6 +439,7 @@ pub(crate) fn starlark_args_methods(builder: &mut MethodsBuilder) {
                     terminate_with: terminate_with.map(Into::into),
                 },
                 map_each,
+                registration_location: args_callbacks::registration_location(eval),
             }));
         Ok(this)
     }
@@ -470,10 +457,11 @@ pub(crate) fn starlark_args_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named, default = false)] uniquify: bool,
         #[starlark(require = named, default = true)] expand_directories: bool,
         #[starlark(require = named, default = false)] allow_closure: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
         let args = mutable_args(this, "add_joined")?;
         let (arg_name, source) = vector_positionals(arg_name_or_values, values, "add_joined")?;
-        reject_callback_options(map_each, allow_closure, "add_joined")?;
+        let map_each = args_callbacks::register_callback(map_each, allow_closure, eval)?;
         if let Some(format) = format_each {
             validate_named_format("format_each", format)?;
         }
@@ -500,7 +488,8 @@ pub(crate) fn starlark_args_methods(builder: &mut MethodsBuilder) {
                     expand_directories,
                     terminate_with: None,
                 },
-                map_each: None,
+                map_each,
+                registration_location: args_callbacks::registration_location(eval),
             }));
         Ok(this)
     }
@@ -571,187 +560,10 @@ fn vector_positionals<'v>(
     Ok((None, vector_source(arg_name_or_values, operation)?))
 }
 
-fn reject_callback_options(
-    map_each: Option<Value<'_>>,
-    allow_closure: bool,
-    operation: &str,
-) -> anyhow::Result<()> {
-    if map_each.is_some_and(|value| !value.is_none()) || allow_closure {
-        anyhow::bail!("Args.{operation} callback forms are not supported")
-    }
-    Ok(())
-}
-
-fn classify_add_all_callback<'v>(
-    map_each: Option<Value<'v>>,
-    allow_closure: bool,
-    eval: &Evaluator<'v, '_, '_>,
-) -> anyhow::Result<Option<EvaluatorVectorMapEachGen<Value<'v>>>> {
-    let Some(map_each) = map_each.filter(|value| !value.is_none()) else {
-        reject_callback_options(None, allow_closure, "add_all")?;
-        return Ok(None);
-    };
-    if map_each.get_type() != "function" {
-        anyhow::bail!("Args.add_all callback forms are not supported");
-    }
-    let span = eval
-        .call_stack_top_location()
-        .ok_or_else(|| anyhow::anyhow!("Args.add_all callback source is unavailable"))?;
-    let identities = source_identities_for_evaluator(eval)?;
-    let mut matches = identities
-        .iter()
-        .filter(|(filename, _)| filename.as_str() == span.filename());
-    let Some((_, source)) = matches.next() else {
-        anyhow::bail!("Args.add_all callback source is not in the loaded Bzl manifest");
-    };
-    if matches.next().is_some() {
-        anyhow::bail!("Args.add_all callback source is ambiguous");
-    }
-    let loaded_digest: [u8; 32] = Sha256::digest(span.file.source().as_bytes()).into();
-    let callsite = span.resolve_span();
-    if source.identity.label.to_string() == cargo_runfiles::SOURCE_LABEL {
-        return cargo_runfiles::capture(
-            source,
-            loaded_digest,
-            &span,
-            map_each,
-            allow_closure,
-            eval,
-        )
-        .map(Some);
-    }
-    if allow_closure {
-        anyhow::bail!("Args.add_all callback forms are not supported");
-    }
-    if !is_pinned_rustc_source(source, loaded_digest) {
-        anyhow::bail!("Args.add_all callback forms are not supported");
-    }
-    let pinned: anyhow::Result<Option<PinnedVectorMapEach>> =
-        match (callsite.begin.line, callsite.end.line) {
-            (1168, 1168) => Ok(Some(PinnedVectorMapEach::RulesRustCrateRoot)),
-            (1098, 1098) | (1227, 1227) | (1274, 1274) | (1424, 1424) | (2889, 2889) => {
-                Ok(Some(PinnedVectorMapEach::RegularFileDirnames))
-            }
-            (2572, 2572) => {
-                // Only these two immutable module bindings can reach this pinned
-                // expression. Repr distinguishes the branch after authentication.
-                let repr = map_each.to_repr();
-                let mapper =
-                    if repr == format!("<function _crate_to_link_flag from {}>", span.filename()) {
-                        RustCrateArgMapper::Extern
-                    } else if repr
-                        == format!(
-                            "<function _crate_to_link_flag_metadata from {}>",
-                            span.filename()
-                        )
-                    {
-                        RustCrateArgMapper::ExternMetadata
-                    } else {
-                        anyhow::bail!("Args.add_all callback forms are not supported");
-                    };
-                Ok(Some(PinnedVectorMapEach::RulesRustCrates(mapper)))
-            }
-            (2574, 2574) => Ok(Some(PinnedVectorMapEach::RulesRustCrates(
-                RustCrateArgMapper::DependencyDir,
-            ))),
-            (2880, 2880) | (2895, 2895) => {
-                require_pinned_rust_utils(&identities)?;
-                use slug_build_api_v2::RustNativeLinkArgMapper as Mapper;
-                let mapper = if callsite.begin.line == 2880 {
-                    Mapper::Directories
-                } else if map_each.to_repr()
-                    == format!(
-                        "<function _make_link_flags_default_direct from {}>",
-                        span.filename()
-                    )
-                {
-                    Mapper::DefaultDirect
-                } else if map_each.to_repr()
-                    == format!(
-                        "<function _make_link_flags_default_indirect from {}>",
-                        span.filename()
-                    )
-                {
-                    Mapper::DefaultIndirect
-                } else {
-                    anyhow::bail!("Args.add_all callback forms are not supported");
-                };
-                Ok(Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)))
-            }
-            _ => anyhow::bail!("Args.add_all callback forms are not supported"),
-        };
-    Ok(pinned?.map(EvaluatorVectorMapEachGen::Pinned))
-}
-
-fn require_pinned_rust_utils(
-    sources: &[(CompactString, BzlModuleSourceProvenance)],
-) -> anyhow::Result<()> {
-    const SHA: [u8; 32] = [
-        0x8a, 0xa4, 0x9b, 0x93, 0x12, 0xd4, 0xae, 0x5c, 0x4a, 0xed, 0x03, 0x3a, 0xba, 0x65, 0x39,
-        0x2a, 0x03, 0x9a, 0x68, 0x1b, 0x3e, 0xe2, 0x1c, 0xa8, 0x3d, 0xa0, 0xf0, 0x5a, 0xca, 0xc2,
-        0x8a, 0xce,
-    ];
-    let mut matches = sources.iter().filter(|(_, source)| {
-        source.identity.label.to_string() == "@@rules_rust+//rust/private:utils.bzl"
-    });
-    match (matches.next(), matches.next()) {
-        (Some((_, source)), None) if source.source_digest == SHA => Ok(()),
-        _ => {
-            anyhow::bail!("rules_rust native link Args requires pinned utils.bzl source provenance")
-        }
-    }
-}
-
-fn is_pinned_rustc_source(source: &BzlModuleSourceProvenance, evaluated_digest: [u8; 32]) -> bool {
-    const RUSTC_SOURCE_SHA256: [u8; 32] = [
-        0xa7, 0x71, 0x25, 0x08, 0xf5, 0x0e, 0x59, 0x52, 0xf3, 0xf5, 0x1e, 0x33, 0xc9, 0x8a, 0xcb,
-        0xe8, 0xba, 0x39, 0x55, 0x4e, 0x9c, 0x6f, 0x6e, 0xdc, 0x26, 0xf1, 0x68, 0x20, 0xd7, 0xc2,
-        0xa9, 0xe4,
-    ];
-    source.identity.label.to_string() == "@@rules_rust+//rust/private:rustc.bzl"
-        && source.source_digest == evaluated_digest
-        && evaluated_digest == RUSTC_SOURCE_SHA256
-}
-
-#[cfg(test)]
-mod source_provenance_tests {
-    use super::*;
-
-    #[test]
-    fn pinned_args_source_requires_matching_observed_digest() {
-        // Pinned rustc.bzl content SHA from the authentic source fixture.
-        let hex = "a7712508f50e5952f3f51e33c98acbe8ba39554e9c6f6edc26f16820d7c2a9e4";
-        let digest = std::array::from_fn(|index| {
-            u8::from_str_radix(&hex[index * 2..index * 2 + 2], 16).unwrap()
-        });
-        let mut source = BzlModuleSourceProvenance::new(
-            BzlModuleIdentity {
-                label: CanonicalLabel::parse("@@rules_rust+//rust/private:rustc.bzl").unwrap(),
-                workspace_path: std::path::PathBuf::from("/workspace/rustc.bzl"),
-                repository_mapping: Arc::from([]),
-            },
-            digest,
-        );
-        assert!(is_pinned_rustc_source(&source, digest));
-        source.source_digest[0] ^= 1;
-        assert!(!is_pinned_rustc_source(&source, digest));
-        assert!(!is_pinned_rustc_source(&source, source.source_digest));
-        source.source_digest = digest;
-        let mut evaluated = digest;
-        evaluated[1] ^= 1;
-        assert!(!is_pinned_rustc_source(&source, evaluated));
-        source.identity.label = CanonicalLabel::parse("@@other+//rust/private:rustc.bzl").unwrap();
-        assert!(!is_pinned_rustc_source(&source, digest));
-    }
-}
-
 fn vector_source_is_empty(source: &EvaluatorVectorSourceGen<Value<'_>>) -> bool {
     match source {
         EvaluatorVectorSourceGen::Sequence(values) => values.is_empty(),
-        EvaluatorVectorSourceGen::Depset(root) => {
-            crate::provider::StarlarkDepset::parts_from_value(*root)
-                .is_some_and(|(_, _, _, _, depth, _)| depth == 0)
-        }
+        EvaluatorVectorSourceGen::Depset(root) => !root.to_bool(),
     }
 }
 
@@ -1975,15 +1787,17 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         output: Value<'v>,
         content: Value<'v>,
         #[starlark(default = false)] is_executable: bool,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         actions
             .token
             .require_active("write", actions.context_name)?;
-        let content = crate::cc_variables::link_args::prepare(content, heap)?;
-        actions.action_sink.write(output, content, is_executable)?;
+        let content = crate::cc_variables::link_args::prepare(content, eval.heap())?;
+        actions
+            .action_sink
+            .write(eval.module(), output, content, is_executable)?;
         Ok(NoneType)
     }
 
@@ -2004,7 +1818,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         #[starlark(require = named)] shadowed_action: Option<Value<'v>>,
         #[starlark(require = named)] resource_set: Option<Value<'v>>,
         #[starlark(require = named)] toolchain: Option<Value<'v>>,
-        heap: Heap<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_starlark(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
@@ -2029,8 +1843,8 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         actions
             .token
             .require_active("run_shell", actions.context_name)?;
-        request.arguments = prepare_link_arguments(request.arguments, heap)?;
-        actions.action_sink.spawn(request)?;
+        request.arguments = prepare_link_arguments(request.arguments, eval.heap())?;
+        actions.action_sink.spawn(eval.module(), request)?;
         Ok(NoneType)
     }
 
@@ -2097,7 +1911,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         {
             request.resource_set = AnalysisResourceSet::Recipe(recipe);
         }
-        actions.action_sink.spawn(request)?;
+        actions.action_sink.spawn(eval.module(), request)?;
         Ok(NoneType)
     }
 

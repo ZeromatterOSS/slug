@@ -100,7 +100,7 @@ fn render<'v>(value: Value<'v>, heap: Heap<'v>) -> anyhow::Result<Vec<String>> {
             _ => panic!("link arguments must lower to scalar recipes"),
         })
         .collect::<Vec<_>>();
-    Ok(RetainedArgsRecipe::new(calls, snapshot.format).render())
+    Ok(RetainedArgsRecipe::new(calls, snapshot.format).render()?)
 }
 
 #[test]

@@ -581,6 +581,12 @@ pub(crate) struct FrozenBzlLifetimeEntry {
     module: FrozenModule,
 }
 
+impl FrozenBzlLifetimeEntry {
+    pub(crate) fn retain_in(&self, heap: &starlark::values::FrozenHeap) {
+        heap.add_reference(self.module.frozen_heap());
+    }
+}
+
 impl PartialEq for FrozenBzlModule {
     fn eq(&self, other: &Self) -> bool {
         self.manifest == other.manifest && self.bzl_load_visibility == other.bzl_load_visibility
@@ -3186,8 +3192,8 @@ async fn compute_host_bzl_module(
             .map(|(load, carrier)| (*load, successful_host_bzl_module(carrier).module.dupe()))
             .collect(),
     };
-    crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
-    .expect("a new .bzl module has no defining client data");
+    crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
+        .expect("a new .bzl module has no defining client data");
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = context.globals(&manifest.root.label);
@@ -5589,8 +5595,8 @@ fn evaluate_external_bzl_module(
             .map(|(load, module)| (load.as_str(), module.module.dupe()))
             .collect(),
     };
-    crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
-    .expect("a new .bzl module has no defining client data");
+    crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
+        .expect("a new .bzl module has no defining client data");
     let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
     let print_capture = capture_events.then(LoadingPrintCapture::default);
     let globals = context.globals(&manifest.root.label);
@@ -7900,8 +7906,8 @@ impl Key for BzlModuleEvalKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
-                crate::starlark_label::attach_defining_module_context(&module, &manifest.root)
-                .expect("a new .bzl module has no defining client data");
+                crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
+                    .expect("a new .bzl module has no defining client data");
                 let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
                 let globals = loading_globals_for_source(&manifest.root.label);

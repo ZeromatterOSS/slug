@@ -144,6 +144,16 @@ pub struct ParametersSpec<V> {
     indices: DefParamIndices,
 }
 
+impl<V> ParametersSpec<V> {
+    pub(crate) fn inspection_function_name(&self) -> &str {
+        &self.function_name
+    }
+
+    pub(crate) fn inspection_parts(&self) -> (&[String], &[ParameterKind<V>], DefParamIndices) {
+        (&self.param_names, &self.param_kinds, self.indices)
+    }
+}
+
 impl<V> ParametersSpecBuilder<V> {
     fn add(&mut self, name: &str, val: ParameterKind<V>) {
         assert!(

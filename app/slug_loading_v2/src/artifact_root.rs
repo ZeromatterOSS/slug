@@ -62,6 +62,11 @@ impl<'v> StarlarkValue<'v> for ArtifactRootValue {
     }
 }
 
+/// Borrow the actual root metadata before projecting an owned root.
+pub fn artifact_root_value_ref(value: Value<'_>) -> Option<&AnalysisArtifactRoot> {
+    ArtifactRootValue::from_value(value).map(|value| &value.0)
+}
+
 pub fn artifact_root_value(value: Value<'_>) -> Option<AnalysisArtifactRoot> {
     ArtifactRootValue::from_value(value).map(|value| value.0.clone())
 }

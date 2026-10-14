@@ -22,7 +22,6 @@ use crate::subrule_invocation::AnalysisActionCallScope;
 use crate::subrule_invocation::AnalysisActionSink;
 use crate::subrule_invocation::AnalysisArtifactValue;
 use crate::subrule_invocation::AnalysisEvaluationContext;
-use crate::subrule_invocation::AnalysisRunRequest;
 
 const SOURCE: &str = include_str!(
     "../../../slug_analysis_v2/tests/fixtures/rustc-map-each/rules_cc/cc/private/link/cc_linking_helper.bzl"
@@ -82,13 +81,16 @@ impl AnalysisActionSink for RecordingSink {
     ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!()
     }
-    fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
+    fn write<'v>(
+        &self,
+        _: &'v starlark::environment::Module,
+        _: Value<'v>,
+        _: Value<'v>,
+        _: bool,
+    ) -> anyhow::Result<()> {
         unreachable!()
     }
     fn run_shell(&self, _: Value<'_>, _: &str, _: Value<'_>) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn run(&self, _: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
         unreachable!()
     }
     fn artifact_symlink(

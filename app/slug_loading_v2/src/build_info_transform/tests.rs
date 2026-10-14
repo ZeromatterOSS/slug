@@ -20,7 +20,6 @@ use crate::subrule_invocation::AnalysisActionCallScope;
 use crate::subrule_invocation::AnalysisActionSink;
 use crate::subrule_invocation::AnalysisActions;
 use crate::subrule_invocation::AnalysisEvaluationContext;
-use crate::subrule_invocation::AnalysisRunRequest;
 
 const SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -108,13 +107,16 @@ impl AnalysisActionSink for Sink {
     ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!()
     }
-    fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
+    fn write<'v>(
+        &self,
+        _: &'v starlark::environment::Module,
+        _: Value<'v>,
+        _: Value<'v>,
+        _: bool,
+    ) -> anyhow::Result<()> {
         unreachable!()
     }
     fn run_shell(&self, _: Value<'_>, _: &str, _: Value<'_>) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn run(&self, _: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
         unreachable!()
     }
     fn artifact_symlink(

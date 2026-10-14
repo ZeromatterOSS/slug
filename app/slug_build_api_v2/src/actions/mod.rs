@@ -8,16 +8,14 @@
  * above-listed licenses.
  */
 
+mod args_expansion;
 mod build_info_transform;
-mod cargo_runfiles_args;
 mod cpp_compile;
 pub mod ctx_actions;
 pub mod reapi_projection;
 pub mod registry;
 mod resource_set;
 pub mod runfiles_support;
-mod rust_crate_args;
-mod rust_native_link_args;
 mod solib_symlink;
 mod spawn_command_line;
 pub mod spec;
@@ -25,8 +23,6 @@ pub mod spec;
 pub use build_info_transform::BuildInfoCallbackRecipe;
 pub use build_info_transform::BuildInfoTransformKind;
 pub use build_info_transform::BuildInfoTransformSpec;
-pub use cargo_runfiles_args::CargoRunfilesArgsError;
-pub use cargo_runfiles_args::RetainedCargoRunfilesArgs;
 pub use cpp_compile::CppCompileConstruction;
 pub use cpp_compile::CppCompileData;
 pub use cpp_compile::CppCompileDependencies;
@@ -37,15 +33,10 @@ pub use ctx_actions::CtxActions;
 pub use reapi_projection::ReapiCommandProjection;
 pub use registry::ActionError;
 pub use registry::ActionRegistry;
+pub use registry::RegisterableAction;
 pub use resource_set::RetainedSpawnResourceSet;
 pub use runfiles_support::RunfilesSupportActionSpec;
 pub use runfiles_support::RunfilesSymlinkMode;
-pub use rust_crate_args::RetainedRustCrateArgs;
-pub use rust_crate_args::RustCrateArgMapper;
-pub use rust_crate_args::RustCrateArgsError;
-pub use rust_native_link_args::RetainedRustNativeLinkArgs;
-pub use rust_native_link_args::RustNativeLinkArgMapper;
-pub use rust_native_link_args::RustNativeLinkArgsError;
 pub use solib_symlink::SolibSymlinkError;
 pub use solib_symlink::SolibSymlinkSpec;
 pub use spawn_command_line::ExpandedSpawnCommandLine;

@@ -206,6 +206,10 @@ pub(crate) struct ClausesCompiled {
 }
 
 impl ClausesCompiled {
+    pub(crate) fn inspection_clauses(&self) -> &[ClauseCompiled] {
+        &self.clauses
+    }
+
     fn new(clauses: Vec<ClauseCompiled>, last: ClauseCompiled) -> ClausesCompiled {
         let mut clauses = clauses;
         clauses.push(last);

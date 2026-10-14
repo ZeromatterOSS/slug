@@ -23,19 +23,31 @@ use slug_configuration_v2::NormalizedAbsoluteBazelPath;
 use slug_configuration_v2::NormalizedBazelPath;
 use slug_configuration_v2::RetainedActionEnvironment;
 
+use super::args_expansion::ExpansionBudget;
+use super::args_expansion::FormatSize;
+use super::args_expansion::GroupSize;
+use super::args_expansion::check_size;
+use super::args_expansion::checked_add;
+use super::args_expansion::checked_mul;
+use super::args_expansion::gcc_needs_escape;
+use super::args_expansion::param_lines_size;
+use super::args_expansion::shell_needs_quotes;
+use super::args_expansion::strings_size;
 use crate::actions::BuildInfoTransformSpec;
 use crate::actions::RetainedSpawnResourceSet;
-use crate::actions::cargo_runfiles_args::RetainedCargoRunfilesArgs;
 use crate::actions::cpp_compile::CppCompileSpec;
 use crate::actions::runfiles_support::RunfilesSupportActionSpec;
-use crate::actions::rust_crate_args::RetainedRustCrateArgs;
-use crate::actions::rust_native_link_args::RetainedRustNativeLinkArgs;
 use crate::actions::solib_symlink::SolibSymlinkSpec;
 use crate::analysis_value::AnalysisArtifact;
 use crate::analysis_value::AnalysisDepset;
 use crate::analysis_value::AnalysisValueKind;
 use crate::analysis_value::AnalysisValueType;
 use crate::analysis_value::PublicationEqState;
+use crate::args_mapper::ArgsDirectoryContext;
+use crate::args_mapper::ArgsExpansionError;
+use crate::args_mapper::NoopArgsDirectoryContext;
+use crate::args_mapper::RetainedArgsInputs;
+use crate::args_mapper::RetainedArgsMapper;
 use crate::providers::FilesToRunProvider;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -232,17 +244,33 @@ impl RetainedScalarArg {
         }
     }
 
-    fn render_group(&self) -> Vec<String> {
+    fn render_group(
+        &self,
+        budget: &mut ExpansionBudget,
+        flag_per_line: bool,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        let value_len = match &self.value {
+            RetainedScalarValue::String(value) | RetainedScalarValue::Integer(value) => value.len(),
+            RetainedScalarValue::Artifact(value) => value.path().len(),
+        };
+        let format = self.format.as_deref().map(FormatSize::new).transpose()?;
+        let value_size = format.map_or(Ok(value_len), |format| format.size(value_len))?;
+        let mut size = GroupSize::default();
+        if let Some(name) = &self.arg_name {
+            size.add(name.len())?;
+        }
+        size.add(value_size)?;
+        size.charge(budget, flag_per_line)?;
         let mut argv = Vec::with_capacity(2);
         if let Some(name) = &self.arg_name {
             argv.push(name.to_string());
         }
         let value = self.value.render();
         argv.push(match &self.format {
-            Some(format) => apply_validated_format(format, &value),
+            Some(format) => apply_validated_format_sized(format, &value, value_size),
             None => value,
         });
-        argv
+        Ok(argv)
     }
 }
 
@@ -345,83 +373,50 @@ impl RetainedArgsDepset {
 pub enum RetainedVectorSource {
     Sequence(Arc<[RetainedScalarValue]>),
     Depset(RetainedArgsDepset),
-    /// Validated by `regular_file_dirnames`; retains artifact/depset identity.
-    RegularFileDirnames(ArtifactInputs),
-    RulesRustCrates(RetainedRustCrateArgs),
-    CargoRunfiles(RetainedCargoRunfilesArgs),
-    RulesRustNativeLinks(RetainedRustNativeLinkArgs),
-    /// Pinned rules_rust `_get_crate_root_path` for a regular crate-root File.
-    RulesRustRegularCrateRoot {
-        artifact: AnalysisArtifact,
-        root_path: CompactString,
+    Mapped {
+        inputs: RetainedArgsInputs,
+        mapper: RetainedArgsMapper,
+        registration_location: Option<CompactString>,
     },
 }
-
 impl RetainedVectorSource {
-    pub fn regular_file_dirnames(inputs: ArtifactInputs) -> Result<Self, RetainedArgsDepsetError> {
-        if inputs
-            .sources()
-            .iter()
-            .any(|source| matches!(source, ArtifactInputSource::FilesToRun(_)))
-        {
-            return Err(RetainedArgsDepsetError::FilesToRun);
-        }
-        let mut regular = true;
-        inputs.visit(|artifact| {
-            if matches!(artifact, AnalysisArtifact::Derived { output, .. } if output.kind() != ActionOutputKind::File) {
-                regular = false;
-            }
-        }).map_err(|error| RetainedArgsDepsetError::ValueType(error.value_type()))?;
-        if !regular {
-            return Err(RetainedArgsDepsetError::NonRegularFile);
-        }
-        Ok(Self::RegularFileDirnames(inputs))
-    }
-
-    fn render(&self) -> Vec<String> {
+    fn render(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        expand_directories: bool,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
         match self {
-            Self::Sequence(values) => values.iter().map(RetainedScalarValue::render).collect(),
-            Self::Depset(values) => values.render(),
-            Self::RulesRustCrates(values) => values.render(),
-            Self::CargoRunfiles(values) => values.render(),
-            Self::RulesRustNativeLinks(values) => values.render(),
-            Self::RegularFileDirnames(inputs) => {
-                let mut values = Vec::new();
-                inputs
-                    .visit(|artifact| values.push(artifact.dirname()))
-                    .expect("validated File dirname inputs");
-                values
-            }
-            Self::RulesRustRegularCrateRoot { artifact, .. } => vec![artifact.path().into_owned()],
+            Self::Sequence(values) => Ok(values.iter().map(RetainedScalarValue::render).collect()),
+            Self::Depset(values) => Ok(values.render()),
+            Self::Mapped {
+                inputs,
+                mapper,
+                registration_location,
+            } => super::args_expansion::expand_mapped(
+                inputs,
+                mapper,
+                registration_location.as_deref(),
+                context,
+                expand_directories,
+            ),
         }
     }
-
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self, other) {
-            (Self::Sequence(left), Self::Sequence(right)) => left == right,
-            (Self::Depset(left), Self::Depset(right)) => left.publication_eq_with(right, state),
-            (Self::RulesRustNativeLinks(left), Self::RulesRustNativeLinks(right)) => {
-                left.publication_eq_with(right, state)
-            }
-            (Self::CargoRunfiles(left), Self::CargoRunfiles(right)) => {
-                left.publication_eq_with(right, state)
-            }
-            (Self::RulesRustCrates(left), Self::RulesRustCrates(right)) => {
-                left.publication_eq_with(right, state)
-            }
-            (Self::RegularFileDirnames(left), Self::RegularFileDirnames(right)) => {
-                left.publication_eq_with(right, state)
-            }
+            (Self::Sequence(l), Self::Sequence(r)) => l == r,
+            (Self::Depset(l), Self::Depset(r)) => l.publication_eq_with(r, state),
             (
-                Self::RulesRustRegularCrateRoot {
-                    artifact: left_artifact,
-                    root_path: left_root_path,
+                Self::Mapped {
+                    inputs: l,
+                    mapper: lm,
+                    registration_location: ll,
                 },
-                Self::RulesRustRegularCrateRoot {
-                    artifact: right_artifact,
-                    root_path: right_root_path,
+                Self::Mapped {
+                    inputs: r,
+                    mapper: rm,
+                    registration_location: rl,
                 },
-            ) => left_artifact == right_artifact && left_root_path == right_root_path,
+            ) => ll == rl && l.publication_eq_with(r, state) && lm.publication_eq_with(rm, state),
             _ => false,
         }
     }
@@ -447,29 +442,83 @@ pub struct RetainedVectorArg {
 }
 
 impl RetainedVectorArg {
+    /// The immutable vector source retained at publication.
+    pub fn source(&self) -> &RetainedVectorSource {
+        &self.source
+    }
+
     pub fn new(source: RetainedVectorSource, options: RetainedVectorOptions) -> Self {
         Self { source, options }
     }
 
-    fn render_values(&self) -> Vec<String> {
-        let mut values = self.source.render();
-        if let Some(format) = &self.options.format_each {
-            for value in &mut values {
-                *value = apply_validated_format(format, value);
-            }
-        }
+    fn render_values(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        let mut values = self
+            .source
+            .render(context, self.options.expand_directories)?;
         if self.options.uniquify {
             let mut seen = FxHashSet::default();
             values.retain(|value| seen.insert(value.clone()));
         }
-        values
+        strings_size(values.iter().map(String::as_str))?;
+        Ok(values)
     }
 
-    fn render_add_all(&self) -> Vec<String> {
-        let values = self.render_values();
-        if values.is_empty() && self.options.omit_if_empty {
-            return Vec::new();
+    fn formatted_sizes(&self, values: &[String]) -> Result<Vec<usize>, ArgsExpansionError> {
+        let format = self
+            .options
+            .format_each
+            .as_deref()
+            .map(FormatSize::new)
+            .transpose()?;
+        let mut bytes = 0;
+        values
+            .iter()
+            .map(|value| {
+                let size = format.map_or(Ok(value.len()), |format| format.size(value.len()))?;
+                bytes = checked_add(bytes, size)?;
+                check_size(0, bytes)?;
+                Ok(size)
+            })
+            .collect()
+    }
+
+    fn format_values(&self, values: &mut [String], sizes: &[usize]) {
+        if let Some(format) = &self.options.format_each {
+            for (value, size) in values.iter_mut().zip(sizes) {
+                *value = apply_validated_format_sized(format, value, *size);
+            }
         }
+    }
+
+    fn render_add_all(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+        flag_per_line: bool,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        let mut values = self.render_values(context)?;
+        if values.is_empty() && self.options.omit_if_empty {
+            return Ok(Vec::new());
+        }
+        let sizes = self.formatted_sizes(&values)?;
+        let mut size = GroupSize::default();
+        if let Some(name) = &self.options.arg_name {
+            size.add(name.len())?;
+        }
+        for value_size in &sizes {
+            if let Some(before) = &self.options.before_each {
+                size.add(before.len())?;
+            }
+            size.add(*value_size)?;
+        }
+        if let Some(terminate) = &self.options.terminate_with {
+            size.add(terminate.len())?;
+        }
+        size.charge(budget, flag_per_line)?;
+        self.format_values(&mut values, &sizes);
         let mut group = Vec::new();
         if let Some(name) = &self.options.arg_name {
             group.push(name.to_string());
@@ -483,24 +532,53 @@ impl RetainedVectorArg {
         if let Some(terminate) = &self.options.terminate_with {
             group.push(terminate.to_string());
         }
-        group
+        Ok(group)
     }
 
-    fn render_add_joined(&self) -> Vec<String> {
-        let values = self.render_values();
+    fn render_add_joined(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+        flag_per_line: bool,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        let mut values = self.render_values(context)?;
         if values.is_empty() && self.options.omit_if_empty {
-            return Vec::new();
+            return Ok(Vec::new());
         }
+        let sizes = self.formatted_sizes(&values)?;
+        let delimiter = self.options.join_with.as_deref().unwrap_or_default();
+        let bytes = sizes
+            .iter()
+            .try_fold(0, |sum, size| checked_add(sum, *size))?;
+        let joined_size = checked_add(
+            bytes,
+            checked_mul(delimiter.len(), values.len().saturating_sub(1))?,
+        )?;
+        check_size(0, joined_size)?;
+        let final_size = self
+            .options
+            .format_joined
+            .as_deref()
+            .map(FormatSize::new)
+            .transpose()?
+            .map_or(Ok(joined_size), |format| format.size(joined_size))?;
+        let mut size = GroupSize::default();
+        if let Some(name) = &self.options.arg_name {
+            size.add(name.len())?;
+        }
+        size.add(final_size)?;
+        size.charge(budget, flag_per_line)?;
+        self.format_values(&mut values, &sizes);
         let mut group = Vec::with_capacity(2);
         if let Some(name) = &self.options.arg_name {
             group.push(name.to_string());
         }
-        let joined = values.join(self.options.join_with.as_deref().unwrap_or_default());
+        let joined = values.join(delimiter);
         group.push(match &self.options.format_joined {
-            Some(format) => apply_validated_format(format, &joined),
+            Some(format) => apply_validated_format_sized(format, &joined, final_size),
             None => joined,
         });
-        group
+        Ok(group)
     }
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
@@ -516,11 +594,16 @@ pub enum RetainedArgCall {
 }
 
 impl RetainedArgCall {
-    fn render_group(&self) -> Vec<String> {
+    fn render_group(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+        flag_per_line: bool,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
         match self {
-            Self::Scalar(value) => value.render_group(),
-            Self::AddAll(value) => value.render_add_all(),
-            Self::AddJoined(value) => value.render_add_joined(),
+            Self::Scalar(value) => value.render_group(budget, flag_per_line),
+            Self::AddAll(value) => value.render_add_all(context, budget, flag_per_line),
+            Self::AddJoined(value) => value.render_add_joined(context, budget, flag_per_line),
         }
     }
 
@@ -551,6 +634,11 @@ pub struct RetainedArgsRecipe {
 }
 
 impl RetainedArgsRecipe {
+    /// Calls in their original declaration order.
+    pub fn calls(&self) -> &[RetainedArgCall] {
+        &self.calls
+    }
+
     pub fn new(
         calls: impl Into<Arc<[RetainedArgCall]>>,
         write_format: RetainedParamFileFormat,
@@ -561,47 +649,78 @@ impl RetainedArgsRecipe {
         }
     }
 
-    pub fn render(&self) -> Vec<String> {
+    pub fn render(&self) -> Result<Vec<String>, ArgsExpansionError> {
+        self.render_with_context(&NoopArgsDirectoryContext)
+    }
+    pub fn render_with_context(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        self.render_with_budget(context, &mut ExpansionBudget::default())
+    }
+    pub(super) fn render_with_budget(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
         let mut argv = Vec::new();
+        let flag_per_line = self.write_format == RetainedParamFileFormat::FlagPerLine;
         for call in self.calls.iter() {
-            let group = call.render_group();
-            if self.write_format == RetainedParamFileFormat::FlagPerLine {
+            let group = call.render_group(context, budget, flag_per_line)?;
+            if flag_per_line {
                 argv.extend(flag_per_line_group(group));
             } else {
                 argv.extend(group);
             }
         }
-        argv
+        Ok(argv)
     }
-
-    pub fn render_write_content(&self) -> String {
-        self.render_param_lines(self.render())
+    pub fn render_write_content(&self) -> Result<String, ArgsExpansionError> {
+        self.render_write_content_with_context(&NoopArgsDirectoryContext)
     }
-
-    pub(super) fn render_virtual_param_file(&self) -> (String, Vec<String>) {
-        let (lines, positional) = if self.write_format == RetainedParamFileFormat::FlagPerLine {
-            self.render()
-                .into_iter()
-                .partition(|arg| arg.starts_with("--"))
-        } else {
-            (self.render(), Vec::new())
-        };
-        (self.render_param_lines(lines), positional)
+    pub fn render_write_content_with_context(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+    ) -> Result<String, ArgsExpansionError> {
+        let lines = self.render_with_context(context)?;
+        let (_, bytes) = self.measure_param_lines(&lines)?;
+        Ok(self.serialize_param_lines(&lines, bytes))
     }
-
-    fn render_param_lines(&self, lines: Vec<String>) -> String {
-        let lines = match self.write_format {
-            RetainedParamFileFormat::Shell => {
-                lines.iter().map(|value| shell_escape(value)).collect()
+    // Deferred callbacks run once. Consumers retain these bounded words for a
+    // complete-command serialization preflight before constructing file bytes.
+    pub(super) fn prepare_virtual_param_file(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+    ) -> Result<(Vec<String>, Vec<String>), ArgsExpansionError> {
+        let argv = self.render_with_budget(context, budget)?;
+        Ok(
+            if self.write_format == RetainedParamFileFormat::FlagPerLine {
+                argv.into_iter().partition(|arg| arg.starts_with("--"))
+            } else {
+                (argv, Vec::new())
+            },
+        )
+    }
+    pub(super) fn measure_param_lines(
+        &self,
+        lines: &[String],
+    ) -> Result<(usize, usize), ArgsExpansionError> {
+        param_lines_size(lines, self.write_format)
+    }
+    pub(super) fn serialize_param_lines(&self, lines: &[String], bytes: usize) -> String {
+        let mut result = String::with_capacity(bytes);
+        for line in lines {
+            match self.write_format {
+                RetainedParamFileFormat::Shell => push_shell_escaped(&mut result, line),
+                RetainedParamFileFormat::Gcc => push_gcc_escaped(&mut result, line),
+                RetainedParamFileFormat::Multiline | RetainedParamFileFormat::FlagPerLine => {
+                    result.push_str(line)
+                }
             }
-            RetainedParamFileFormat::Gcc => lines.iter().map(|value| gcc_escape(value)).collect(),
-            RetainedParamFileFormat::Multiline | RetainedParamFileFormat::FlagPerLine => lines,
-        };
-        if lines.is_empty() {
-            String::new()
-        } else {
-            format!("{}\n", lines.join("\n"))
+            result.push('\n');
         }
+        result
     }
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
@@ -704,19 +823,34 @@ impl RetainedCommandLine {
         &self.0
     }
 
-    pub fn render(&self) -> Vec<String> {
+    pub fn render(&self) -> Result<Vec<String>, ArgsExpansionError> {
+        self.render_with_context(&NoopArgsDirectoryContext)
+    }
+    pub fn render_with_context(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        self.render_with_budget(context, &mut ExpansionBudget::default())
+    }
+    fn render_with_budget(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+        budget: &mut ExpansionBudget,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
         let mut argv = Vec::new();
         for segment in self.0.iter() {
             match segment {
                 RetainedCommandLineSegment::LiteralRun(values) => {
+                    let (words, bytes) = strings_size(values.iter().map(|value| value.as_str()))?;
+                    budget.charge(words, bytes)?;
                     argv.extend(values.iter().map(ToString::to_string));
                 }
                 RetainedCommandLineSegment::ArgsSnapshot(snapshot) => {
-                    argv.extend(snapshot.recipe.render());
+                    argv.extend(snapshot.recipe.render_with_budget(context, budget)?);
                 }
             }
         }
-        argv
+        Ok(argv)
     }
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
@@ -784,6 +918,38 @@ impl RetainedSpawnInvocation {
                 prefix
             }
         }
+    }
+
+    pub(super) fn render_prefix_with_budget(
+        &self,
+        budget: &mut ExpansionBudget,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        match self {
+            Self::Executable(executable) => {
+                let bytes = match executable {
+                    SpawnExecutable::Path(path) => path.as_str().len(),
+                    SpawnExecutable::Artifact(artifact) => artifact.path().len(),
+                    SpawnExecutable::FilesToRun(provider) => provider
+                        .executable
+                        .as_ref()
+                        .expect("FilesToRun executable validated before retention")
+                        .path()
+                        .len(),
+                };
+                budget.charge(1, bytes)?;
+            }
+            Self::Shell {
+                shell_executable,
+                command,
+                pad_dollar_zero,
+            } => {
+                budget.charge(
+                    3 + usize::from(*pad_dollar_zero),
+                    checked_add(checked_add(shell_executable.len(), 2)?, command.len())?,
+                )?;
+            }
+        }
+        Ok(self.render_prefix())
     }
 
     fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
@@ -993,16 +1159,22 @@ impl SpawnSpec {
     pub fn progress_message(&self) -> Option<&str> {
         self.progress_message.as_deref()
     }
-    pub fn render_argv(&self) -> Vec<String> {
-        let mut argv = self.invocation.render_prefix();
-        argv.extend(self.command_line.render());
-        argv
+    pub fn render_argv(&self) -> Result<Vec<String>, ArgsExpansionError> {
+        self.render_argv_with_context(&NoopArgsDirectoryContext)
+    }
+    pub fn render_argv_with_context(
+        &self,
+        context: &dyn ArgsDirectoryContext,
+    ) -> Result<Vec<String>, ArgsExpansionError> {
+        let mut budget = ExpansionBudget::default();
+        let mut argv = self.invocation.render_prefix_with_budget(&mut budget)?;
+        argv.extend(self.command_line.render_with_budget(context, &mut budget)?);
+        Ok(argv)
     }
 
-    fn publication_eq(&self, other: &Self) -> bool {
-        let mut state = PublicationEqState::default();
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.invocation
-            .publication_eq_with(&other.invocation, &mut state)
+            .publication_eq_with(&other.invocation, state)
             && self.outputs == other.outputs
             && self.unused_inputs_list == other.unused_inputs_list
             && self.environment == other.environment
@@ -1012,15 +1184,15 @@ impl SpawnSpec {
             && self.resource_set == other.resource_set
             && self
                 .command_line
-                .publication_eq_with(&other.command_line, &mut state)
-            && self.inputs.publication_eq_with(&other.inputs, &mut state)
-            && self.tools.publication_eq_with(&other.tools, &mut state)
+                .publication_eq_with(&other.command_line, state)
+            && self.inputs.publication_eq_with(&other.inputs, state)
+            && self.tools.publication_eq_with(&other.tools, state)
     }
 }
 
 impl PartialEq for SpawnSpec {
     fn eq(&self, other: &Self) -> bool {
-        self.publication_eq(other)
+        self.publication_eq_with(other, &mut PublicationEqState::default())
     }
 }
 
@@ -1068,7 +1240,7 @@ impl SymlinkSpec {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct ArgsWriteSpec {
     output: ActionOutput,
     recipe: RetainedArgsRecipe,
@@ -1102,10 +1274,25 @@ impl ArgsWriteSpec {
         &self.execution_requirements
     }
 
-    pub fn render_content(&self) -> String {
+    pub fn render_content(&self) -> Result<String, ArgsExpansionError> {
         self.recipe.render_write_content()
     }
 }
+
+impl ArgsWriteSpec {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.output == other.output
+            && self.is_executable == other.is_executable
+            && self.execution_requirements == other.execution_requirements
+            && self.recipe.publication_eq_with(&other.recipe, state)
+    }
+}
+impl PartialEq for ArgsWriteSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+impl Eq for ArgsWriteSpec {}
 
 fn render_analysis_integer(value: &crate::analysis_value::AnalysisInteger) -> String {
     if value.magnitude().is_empty() {
@@ -1134,39 +1321,49 @@ fn render_analysis_integer(value: &crate::analysis_value::AnalysisInteger) -> St
 
 // Bazel 9.2 GccParamFileEscaper.java:37-60. Only these ASCII characters
 // require a prefix; Unicode whitespace and shell metacharacters stay literal.
-fn gcc_escape(value: &str) -> String {
+fn push_gcc_escaped(result: &mut String, value: &str) {
     if value.is_empty() {
-        return "''".to_owned();
+        result.push_str("''");
+        return;
     }
-    let mut result = String::with_capacity(value.len());
     for character in value.chars() {
-        if matches!(
-            character,
-            '\'' | '"' | '\\' | ' ' | '\t' | '\r' | '\n' | '\u{c}' | '\u{b}'
-        ) {
+        if gcc_needs_escape(character) {
             result.push('\\');
         }
         result.push(character);
     }
+}
+fn gcc_escape(value: &str) -> String {
+    let mut result = String::new();
+    push_gcc_escaped(&mut result, value);
+    result
+}
+fn push_shell_escaped(result: &mut String, value: &str) {
+    if !shell_needs_quotes(value) {
+        result.push_str(value);
+        return;
+    }
+    result.push('\'');
+    for ch in value.chars() {
+        if ch == '\'' {
+            result.push_str("'\\''");
+        } else {
+            result.push(ch);
+        }
+    }
+    result.push('\'');
+}
+fn shell_escape(value: &str) -> String {
+    let mut result = String::new();
+    push_shell_escaped(&mut result, value);
     result
 }
 
-fn shell_escape(value: &str) -> String {
-    let safe =
-        |character: char| character.is_ascii_alphanumeric() || "@%-_+:,./".contains(character);
-    if !value.is_empty()
-        && value
-            .chars()
-            .enumerate()
-            .all(|(index, character)| safe(character) || (character == '~' && index != 0))
-    {
-        return value.to_owned();
-    }
-    format!("'{}'", value.replace('\'', "'\\''"))
-}
-
 pub(super) fn apply_validated_format(format: &str, value: &str) -> String {
-    let mut result = String::with_capacity(format.len() + value.len());
+    apply_validated_format_sized(format, value, format.len() + value.len())
+}
+pub(super) fn apply_validated_format_sized(format: &str, value: &str, size: usize) -> String {
+    let mut result = String::with_capacity(size);
     let mut chars = format.chars();
     while let Some(character) = chars.next() {
         if character != '%' {
@@ -1276,7 +1473,7 @@ enum ActionPayload {
     RunfilesSupport(RunfilesSupportActionSpec),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct ActionSpec {
     payload: ActionPayload,
     exec_properties: BTreeMap<String, String>,
@@ -1567,17 +1764,23 @@ impl ActionSpec {
     }
 
     /// Legacy/Spawn preview. CppCompile has a separate fallible typed expansion.
-    pub fn render_argv(&self) -> Result<Vec<String>, &'static str> {
+    pub fn render_argv(&self) -> Result<Vec<String>, ArgsExpansionError> {
         if self.kind() == &ActionKind::BuildInfoTransform {
-            return Err("BuildInfoTransform execution is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "BuildInfoTransform execution is not admitted".into(),
+            ));
         }
         if self.kind() == &ActionKind::CppCompile {
-            return Err("CppCompile generic argv preview is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "CppCompile generic argv preview is not admitted".into(),
+            ));
         }
         match &self.payload {
             ActionPayload::Legacy(spec) => Ok(spec.argv.clone()),
-            ActionPayload::Spawn(spec) => Ok(spec.render_argv()),
-            ActionPayload::CppCompile(_) => Err("CppCompile generic argv preview is not admitted"),
+            ActionPayload::Spawn(spec) => spec.render_argv(),
+            ActionPayload::CppCompile(_) => Err(ArgsExpansionError::Unsupported(
+                "CppCompile generic argv preview is not admitted".into(),
+            )),
             _ => Ok(Vec::new()),
         }
     }
@@ -1589,3 +1792,37 @@ impl ActionSpec {
         }
     }
 }
+
+impl ActionSpec {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        self.exec_properties == other.exec_properties
+            && self.exec_group == other.exec_group
+            && match (&self.payload, &other.payload) {
+                (ActionPayload::Spawn(l), ActionPayload::Spawn(r)) => {
+                    l.publication_eq_with(r, state)
+                }
+                (ActionPayload::CppCompile(l), ActionPayload::CppCompile(r)) => {
+                    l.publication_eq_with(r, state)
+                }
+                (ActionPayload::ArgsWrite(l), ActionPayload::ArgsWrite(r)) => {
+                    l.publication_eq_with(r, state)
+                }
+                (ActionPayload::RunfilesSupport(l), ActionPayload::RunfilesSupport(r)) => {
+                    l.publication_eq_with(r, state)
+                }
+                (ActionPayload::Legacy(l), ActionPayload::Legacy(r)) => l == r,
+                (ActionPayload::Symlink(l), ActionPayload::Symlink(r)) => l == r,
+                (ActionPayload::SolibSymlink(l), ActionPayload::SolibSymlink(r)) => l == r,
+                (ActionPayload::BuildInfoTransform(l), ActionPayload::BuildInfoTransform(r)) => {
+                    l == r
+                }
+                _ => false,
+            }
+    }
+}
+impl PartialEq for ActionSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.publication_eq_with(other, &mut PublicationEqState::default())
+    }
+}
+impl Eq for ActionSpec {}

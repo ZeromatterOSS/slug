@@ -20,6 +20,7 @@ mod resource_set;
 pub use artifact_root::alloc_frozen_artifact_root;
 #[doc(hidden)]
 pub use artifact_root::artifact_root_value;
+pub use artifact_root::artifact_root_value_ref;
 pub mod attrs;
 mod builtin_restriction;
 pub mod bzl_module;
@@ -76,6 +77,8 @@ pub use cc_variables::CcVariablesView;
 pub use cc_variables::alloc_frozen_cc_variables;
 #[doc(hidden)]
 pub use cc_variables::cc_variables_value;
+#[doc(hidden)]
+pub use cc_variables::is_cc_variables_value;
 pub mod package_features;
 #[doc(hidden)]
 pub use cc_features::alloc_frozen_cc_feature_configuration;
@@ -120,6 +123,7 @@ mod root_repository_load_route;
 mod root_subtree_package_set;
 pub mod rule_outputs;
 mod starlark_label;
+pub use starlark_label::defining_module_source_manifest;
 mod subrule;
 #[doc(hidden)]
 pub mod subrule_invocation;
@@ -367,7 +371,10 @@ pub use package::RuleCapability;
 pub use package::TestMetadata;
 pub use package::TestRuleKind;
 pub use package::TestSuiteMembership;
+pub use provider::AnalysisBuiltinCallableApi;
+pub use provider::alloc_frozen_analysis_builtin_callable;
 pub use provider::alloc_frozen_template_variable_info;
+pub use provider::analysis_builtin_callable_api;
 pub use provider::template_variable_info;
 pub use registration_expansion::CommandRegistrationExpansionKey;
 #[doc(hidden)]

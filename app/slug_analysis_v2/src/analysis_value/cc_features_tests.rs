@@ -7,7 +7,6 @@ use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::BzlModuleSourceProvenance;
 use slug_loading_v2::subrule_invocation::AnalysisActionSink;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
-use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
 use starlark::environment::Globals;
 use starlark::environment::Module;
 use starlark::syntax::AstModule;
@@ -25,13 +24,10 @@ impl AnalysisActionSink for NoActions {
     ) -> anyhow::Result<AnalysisArtifactValue> {
         unreachable!("feature configuration does not declare actions")
     }
-    fn write(&self, _: Value<'_>, _: Value<'_>, _: bool) -> anyhow::Result<()> {
+    fn write<'v>(&self, _: &'v Module, _: Value<'v>, _: Value<'v>, _: bool) -> anyhow::Result<()> {
         unreachable!()
     }
     fn run_shell(&self, _: Value<'_>, _: &str, _: Value<'_>) -> anyhow::Result<()> {
-        unreachable!()
-    }
-    fn run(&self, _: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
         unreachable!()
     }
     fn artifact_symlink(

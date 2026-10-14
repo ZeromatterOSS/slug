@@ -116,7 +116,21 @@ impl Template {
     fn prepare(
         inputs: &PreparedActionChainInputs,
         defaults: &BTreeMap<String, String>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Vec<Self>, RemoteExecutionError> {
+        let plan = inputs.plan().map_err(command_error)?;
+        // Expand every Spawn before constructing digest or input-tree state.
+        let expanded = plan
+            .actions()
+            .iter()
+            .map(|step| {
+                step.action()
+                    .spawn_spec()
+                    .map(|spawn| spawn.expand_forced_param_files_with_context(args_context))
+                    .transpose()
+                    .map_err(command_error)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let sources = inputs
             .sources()
             .enumerate()
@@ -135,10 +149,10 @@ impl Template {
                 ))
             })
             .collect::<Result<std::collections::HashMap<_, _>, RemoteExecutionError>>()?;
-        let plan = inputs.plan().map_err(command_error)?;
         plan.actions()
             .iter()
-            .map(|step| {
+            .zip(expanded)
+            .map(|(step, expanded)| {
                 let action = step.action();
                 if action.runfiles_support_spec().is_some()
                     && let Some(runfiles) = inputs
@@ -171,13 +185,13 @@ impl Template {
                         alias, binding,
                     )));
                 }
-                let Some(spawn) = action.spawn_spec() else {
+                let Some(_spawn) = action.spawn_spec() else {
                     return FileWriteReapiPlan::from_chain_action(action, defaults)
                         .map(Self::Write)
                         .map_err(command_error);
                 };
+                let expanded = expanded.expect("typed Spawn was expanded during preflight");
                 let mut command = spawn_command(action, defaults).map_err(command_error)?;
-                let expanded = spawn.expand_forced_param_files().map_err(command_error)?;
                 command.argv = expanded.argv().to_vec();
                 let bindings = step
                     .inputs()
@@ -274,8 +288,10 @@ impl ActionChainTransport for ActionChainReapiTransport {
     async fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
-        let templates = Template::prepare(&inputs, &self.config.default_exec_properties)?;
+        let templates =
+            Template::prepare(&inputs, &self.config.default_exec_properties, args_context)?;
         let endpoint =
             tonic_endpoint(self.config.executor.as_deref().expect("validated executor"))?;
         let endpoint = tonic::transport::Endpoint::from_shared(endpoint)

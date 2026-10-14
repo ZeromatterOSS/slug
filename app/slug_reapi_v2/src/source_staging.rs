@@ -25,7 +25,16 @@ impl SourceInputReapiPlan {
     /// Project only a Core-owned complete declared source set. This plan grants
     /// no Execute or publication authority; its frontier must be validated again
     /// by the future execution request after transfer.
-    pub fn from_prepared(prepared: Arc<PreparedSourceActionInputs>) -> Result<Self, String> {
+    pub fn from_prepared(
+        prepared: Arc<PreparedSourceActionInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+    ) -> Result<Self, String> {
+        // Resolve callbacks before constructing any input-tree or digest state.
+        // This execution path has no tracked tree-child metadata capability.
+        let command = prepared
+            .spawn()
+            .expand_forced_param_files_with_context(args_context)
+            .map_err(|error| error.to_string())?;
         let source_digests = prepared
             .sources()
             .map(|source| {
@@ -50,10 +59,6 @@ impl SourceInputReapiPlan {
             });
         let base =
             ReapiInputTree::from_source_entries(entries).map_err(|error| error.to_string())?;
-        let command = prepared
-            .spawn()
-            .expand_forced_param_files()
-            .map_err(|error| error.to_string())?;
         let tree = base
             .with_spawn_param_files(&command)
             .map_err(|error| error.to_string())?;

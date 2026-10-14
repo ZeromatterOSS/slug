@@ -14,11 +14,47 @@ pub trait SourceActionTransport: Sync {
     fn stage(
         &self,
         inputs: Arc<PreparedSourceActionInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> impl std::future::Future<Output = Result<Self::Staged, Self::Error>> + Send;
     fn execute(
         &self,
         staged: Self::Staged,
     ) -> impl std::future::Future<Output = Result<Self::Output, Self::Error>> + Send;
+}
+
+/// Borrowed only while the current consumer expands its arguments.
+/// Semantic results and transport sessions never retain this request scope.
+pub(super) struct RequestArgsContext<'a> {
+    scope: Option<&'a source_service::SourceServiceScope>,
+}
+
+impl<'a> RequestArgsContext<'a> {
+    pub(super) fn new(scope: Option<&'a source_service::SourceServiceScope>) -> Self {
+        Self { scope }
+    }
+}
+
+impl std::fmt::Debug for RequestArgsContext<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RequestArgsContext").finish_non_exhaustive()
+    }
+}
+
+impl slug_build_api_v2::ArgsDirectoryContext for RequestArgsContext<'_> {
+    fn is_cancelled(&self) -> bool {
+        self.scope.is_some_and(|scope| scope.is_cancelled())
+    }
+
+    fn list(
+        &self,
+        artifact: &slug_build_api_v2::AnalysisArtifact,
+    ) -> Result<Vec<slug_build_api_v2::AnalysisArtifact>, slug_build_api_v2::ArgsExpansionError>
+    {
+        slug_build_api_v2::ArgsDirectoryContext::list(
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+            artifact,
+        )
+    }
 }
 
 /// Accessible through AcceptedCommand only after the complete source frontier
@@ -107,9 +143,11 @@ impl<T: SourceActionTransport> NativeCommandRoot for SourceExecutionRoot<'_, T> 
     ) -> impl std::future::Future<Output = Result<(), NativeDemandSessionError>> + 'a {
         async move {
             terminal.inputs.check_execution_representative()?;
+            let args_context =
+                RequestArgsContext::new(context.command.runtime.source_scope.as_deref());
             let staged = self
                 .transport
-                .stage(terminal.inputs.clone())
+                .stage(terminal.inputs.clone(), &args_context)
                 .await
                 .map_err(|error| {
                     NativeDemandSessionError::Computation(anyhow::Error::new(error))

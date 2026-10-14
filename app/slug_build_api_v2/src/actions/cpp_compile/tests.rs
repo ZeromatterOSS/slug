@@ -149,11 +149,15 @@ fn cpp_compile_retains_input_roles_outputs_and_rejects_command_projection() {
     assert_eq!(action.outputs().len(), 2);
     assert_eq!(
         action.render_argv().unwrap_err(),
-        "CppCompile generic argv preview is not admitted"
+        crate::ArgsExpansionError::Unsupported(
+            "CppCompile generic argv preview is not admitted".into()
+        )
     );
     assert_eq!(
         ReapiCommandProjection::from_action(&action).unwrap_err(),
-        "CppCompile REAPI projection is not admitted"
+        crate::ArgsExpansionError::Unsupported(
+            "CppCompile REAPI projection is not admitted".into()
+        )
     );
 }
 
@@ -332,11 +336,15 @@ fn cpp_compile_cannot_be_forged_through_legacy_action_constructor() {
     assert!(forged.cpp_compile_spec().is_none());
     assert_eq!(
         forged.render_argv().unwrap_err(),
-        "CppCompile generic argv preview is not admitted"
+        crate::ArgsExpansionError::Unsupported(
+            "CppCompile generic argv preview is not admitted".into()
+        )
     );
     assert_eq!(
         ReapiCommandProjection::from_action(&forged).unwrap_err(),
-        "CppCompile REAPI projection is not admitted"
+        crate::ArgsExpansionError::Unsupported(
+            "CppCompile REAPI projection is not admitted".into()
+        )
     );
     let mut registry = crate::ActionRegistry::new();
     assert!(matches!(

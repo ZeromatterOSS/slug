@@ -200,9 +200,10 @@ impl ActionChainTransport for CheckedTransport {
     async fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         *self.inputs.lock().unwrap() = Some(inputs.clone());
-        self.inner.start(inputs).await
+        self.inner.start(inputs, args_context).await
     }
     async fn stage(
         &self,
@@ -384,7 +385,12 @@ fn files_to_run_output_namespace_conflict_rejects_before_connection() {
         inputs.unwrap()
     };
     let valid = prepare();
-    Template::prepare(&valid, &Default::default()).unwrap();
+    Template::prepare(
+        &valid,
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     fixture.assert_outputs(&valid, false, b"aaa");
     let valid_plan = valid.plan().unwrap();
     let consumer_root = valid_plan

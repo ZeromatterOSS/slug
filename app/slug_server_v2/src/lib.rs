@@ -791,7 +791,7 @@ impl Daemon {
                         Err(error) => TerminalOutput::new(
                             2,
                             String::new(),
-                            aquery_error_json(error, invalidated),
+                            aquery_error_json(&error, invalidated),
                         ),
                     }
                 }

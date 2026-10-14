@@ -1,5 +1,20 @@
 # Stage 9: V1 Extraction Ledger
 
+## General Args retained representation
+
+V2-owned Args publication extends the existing Arc/native-value and starlark-rust
+owners at `51d574019765709c6cfdf8f13b928fc786700864`; no new donor revision,
+semantic side cache, global interner or DICE key is adopted. Borrowed Engine views
+and actual defining-module manifests feed bounded native graphs. Each executable
+payload owns the original frozen heap references. Container memo keys retain
+native storage only during materialization, preventing address reuse; pointers
+serve transient matching/alias bookkeeping and never persistent semantic bytes.
+The frozen immutable-list allocator preserves list occurrences, including empty
+lists, while existing empty-tuple normalization remains qualified. Joint
+provider/action equality preserves alias partitions and complete callable source
+facts. Resource caps and release tests are component evidence, not whole-workload
+memory acceptance. The WP1219 receipt owns the source projection and validation.
+
 ## Goal
 
 Track every deliberate extraction from Slug V1 or Buck2-derived infrastructure

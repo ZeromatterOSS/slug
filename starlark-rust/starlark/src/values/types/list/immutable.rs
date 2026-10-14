@@ -28,10 +28,12 @@ use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::coerce::coerce;
 use crate::typing::Ty;
+use crate::values::AllocFrozenValue;
 use crate::values::AllocValue;
 use crate::values::Freeze;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
+use crate::values::FrozenHeap;
 use crate::values::FrozenValue;
 use crate::values::Heap;
 use crate::values::Trace;
@@ -80,6 +82,9 @@ impl<'v, V: ValueLike<'v>> ListLike<'v> for ImmutableListData<V> {
 
 /// Allocate a shallow immutable, directly unhashable list.
 /// Nested values keep their identity and mutability until module freeze.
+/// Frozen allocation preserves the list occurrence, including empty lists.
+/// As with other frozen allocators, foreign frozen elements require their
+/// defining heap references to be retained by the destination heap owner.
 pub struct AllocImmutableList<L>(pub L);
 
 impl<L> StarlarkTypeRepr for AllocImmutableList<L>
@@ -103,3 +108,18 @@ where
         heap.alloc_complex(ListGen(ImmutableListData::<Value<'v>>(values)))
     }
 }
+
+impl<L> AllocFrozenValue for AllocImmutableList<L>
+where
+    L: IntoIterator,
+    L::Item: AllocFrozenValue,
+{
+    fn alloc_frozen_value(self, heap: &FrozenHeap) -> FrozenValue {
+        let values = self.0.into_iter().map(|value| heap.alloc(value)).collect();
+        heap.alloc_simple(ListGen(ImmutableListData::<FrozenValue>(values)))
+    }
+}
+
+#[cfg(test)]
+#[path = "immutable/frozen_allocation_tests.rs"]
+mod frozen_allocation_tests;

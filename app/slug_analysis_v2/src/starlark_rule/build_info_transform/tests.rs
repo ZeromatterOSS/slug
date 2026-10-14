@@ -1,14 +1,33 @@
+use slug_build_api_v2::ActionError;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputMetadata;
 use slug_build_api_v2::BuildInfoCallbackRecipe;
+use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderId;
 use slug_build_api_v2::ProviderIdentity;
+use slug_build_api_v2::RegisterableAction;
 use slug_identity_v2::CanonicalLabel;
 use starlark::values::FrozenHeap;
 
 use super::super::context_lifecycle_tests::configuration;
 use super::super::context_lifecycle_tests::declaration_sink;
 use super::*;
+
+fn ready_actions(sink: &SynchronousAnalysisActionSink) -> CtxActions {
+    sink.actions
+        .lock()
+        .unwrap()
+        .clone()
+        .try_map(|action| {
+            Ok::<_, ActionError>(
+                action
+                    .as_action_spec()
+                    .expect("ordinary build-info and file-write actions are complete")
+                    .clone(),
+            )
+        })
+        .unwrap()
+}
 
 fn request(kind: BuildInfoTransformKind, name: &str) -> BuildInfoTransformRequest<'_> {
     BuildInfoTransformRequest {
@@ -58,7 +77,7 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         panic!("derived")
     };
     assert_eq!(output.metadata(), ActionOutputMetadata::Ordinary);
-    let snapshot = sink.actions.lock().unwrap().clone();
+    let snapshot = ready_actions(&sink);
     assert_eq!(snapshot.registry().actions().len(), 2);
     for (action, expected) in snapshot.registry().actions().iter().zip([
         sink.workspace_status.volatile(),
@@ -79,7 +98,7 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
         (BuildInfoTransformKind::Info, ""),
     ] {
         assert!(sink.transform_build_info(request(kind, name)).is_err());
-        assert_eq!(snapshot, *sink.actions.lock().unwrap());
+        assert_eq!(snapshot, ready_actions(&sink));
         assert_eq!(declarations, *sink.declared_outputs.lock().unwrap());
     }
     assert!(
@@ -92,19 +111,21 @@ fn actual_sink_preserves_status_output_metadata_order_and_failed_registration_at
             .is_err()
     );
     let ordinary = sink.declare_file("ordinary.h", None).unwrap();
-    let heap = FrozenHeap::new();
+    let module = starlark::environment::Module::new();
+    let heap = module.frozen_heap();
     sink.write(
+        &module,
         heap.alloc(ordinary).to_value(),
         heap.alloc("body").to_value(),
         false,
     )
     .unwrap();
-    let before = sink.actions.lock().unwrap().clone();
+    let before = ready_actions(&sink);
     assert!(
         sink.transform_build_info(request(BuildInfoTransformKind::Info, "ordinary.h"))
             .is_err()
     );
-    assert_eq!(before, *sink.actions.lock().unwrap());
+    assert_eq!(before, ready_actions(&sink));
 }
 
 #[test]

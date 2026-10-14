@@ -419,11 +419,11 @@ async fn file_write_external_aquery_fields_scopes_and_borrowed_roots() {
     };
     assert_eq!(
         crate::runtime::format_aquery_text_output_for_scope(&altered, AqueryScope::Literal),
-        render_error
+        render_error.map_err(str::to_owned)
     );
     assert_eq!(
         crate::runtime::format_aquery_text_output_for_scope(&altered, AqueryScope::Deps),
-        Err("configured FileWrite action requires exactly one file output")
+        Err("configured FileWrite action requires exactly one file output".into())
     );
 }
 

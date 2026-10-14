@@ -33,7 +33,7 @@ async fn external_source_roots_route_render_and_restore() {
             let spawn = result.actions()[0].spawn_spec().unwrap();
             assert!(
                 spawn
-                    .render_argv()
+                    .render_argv().unwrap()
                     .windows(3)
                     .any(|args| args == ["--", "rustc", exec.as_str()])
             );
@@ -42,10 +42,10 @@ async fn external_source_roots_route_render_and_restore() {
             else {
                 panic!()
             };
-            assert_eq!(args.recipe().render()[0], exec);
+            assert_eq!(args.recipe().render().unwrap()[0], exec);
             assert!(
                 args.recipe()
-                    .render_write_content()
+                    .render_write_content().unwrap()
                     .starts_with(&format!("{exec}\n"))
             );
             let expanded = spawn.expand_forced_param_files().unwrap();

@@ -6,7 +6,7 @@ use starlark::values::dict::AllocDict;
 use starlark::values::tuple::AllocTuple;
 use starlark::values::tuple::TupleRef;
 
-fn roots<'v>(module: &'v Module) -> [Value<'v>; 5] {
+fn roots<'v>(module: &'v Module) -> [Value<'v>; 6] {
     if let Some(root) = module.extra_value() {
         let root = TupleRef::from_value(root).expect("Loading owns module extra value");
         return [
@@ -15,11 +15,13 @@ fn roots<'v>(module: &'v Module) -> [Value<'v>; 5] {
             root.content()[2],
             root.content()[3],
             root.content()[4],
+            root.content()[5],
         ];
     }
     let roots = [
         Value::new_none(),
         module.heap().alloc(AllocDict(Vec::<(Value, Value)>::new())),
+        Value::new_none(),
         Value::new_none(),
         Value::new_none(),
         Value::new_none(),
@@ -85,5 +87,18 @@ pub(crate) fn pending_cc_actions<'v>(module: &'v Module) -> Value<'v> {
 pub(crate) fn set_pending_cc_actions<'v>(module: &'v Module, pending: Value<'v>) {
     let mut values = roots(module);
     values[3] = pending;
+    module.set_extra_value(module.heap().alloc(AllocTuple(values)));
+}
+
+pub(crate) fn pending_args_snapshots<'v>(module: &'v Module) -> Option<Value<'v>> {
+    let value = module
+        .extra_value()
+        .map(|root| TupleRef::from_value(root).expect("Loading roots").content()[5])?;
+    (!value.is_none()).then_some(value)
+}
+
+pub(crate) fn set_pending_args_snapshots<'v>(module: &'v Module, pending: Value<'v>) {
+    let mut values = roots(module);
+    values[5] = pending;
     module.set_extra_value(module.heap().alloc(AllocTuple(values)));
 }

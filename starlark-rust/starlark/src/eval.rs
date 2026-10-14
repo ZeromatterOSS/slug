@@ -29,6 +29,20 @@ use std::mem;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+pub use compiler::def::inspection::CaptureCell;
+pub use compiler::def::inspection::DefCodeInspection;
+pub use compiler::def::inspection::DefDependency;
+pub use compiler::def::inspection::DefInspection;
+pub use compiler::def::inspection::DefParameter;
+pub use compiler::def::inspection::InspectionBudget;
+pub use compiler::def::inspection::ModuleAccess;
+pub use compiler::def::inspection::NativeBoundMethodInspection;
+pub use compiler::def::inspection::NativeFunctionInspection;
+pub use compiler::def::inspection::ParameterRequirement;
+pub use compiler::def::inspection::ParameterStyle;
+pub use compiler::def::inspection::inspect_def;
+pub use compiler::def::inspection::inspect_native_bound_method;
+pub use compiler::def::inspection::inspect_native_function;
 use dupe::Dupe;
 pub use runtime::arguments::Arguments;
 pub use runtime::before_stmt::BeforeStmtFuncDyn;

@@ -88,6 +88,11 @@ pub use crate::xcode_version_info::alloc_default_xcode_version_info;
 pub use crate::xcode_version_info::default_xcode_version_info;
 pub use crate::xcode_version_info::is_default_xcode_version_info;
 
+/// Borrow the actual Label owner before projecting an owned canonical label.
+pub fn starlark_label_ref(value: Value<'_>) -> Option<&CanonicalLabel> {
+    StarlarkLabel::from_value(value).map(StarlarkLabel::canonical)
+}
+
 pub fn starlark_label(value: Value<'_>) -> Option<CanonicalLabel> {
     StarlarkLabel::from_value(value).map(|value| value.canonical().clone())
 }
@@ -962,6 +967,60 @@ pub fn starlark_user_provider_fields<'v>(
     }
 }
 
+/// Visit actual provider fields without cloning names or collecting field values.
+/// The caller controls its budget and may stop immediately with an error. The
+/// ordinary borrowed row order is suitable for preflight, not canonical output.
+pub fn visit_starlark_provider_fields<'v>(
+    value: Value<'v>,
+    visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+) -> Result<bool, String> {
+    fn user<'v, V: ValueLike<'v>>(
+        provider: &LoadingStarlarkUserProviderGen<V>,
+        visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        match &provider.fields {
+            LoadingProviderFieldsGen::Schemaful { schema, values } => {
+                for (index, value) in values.iter() {
+                    let name = schema
+                        .get(*index as usize)
+                        .ok_or("invalid provider schema index")?;
+                    visitor(name.as_str(), value.to_value())?;
+                }
+            }
+            LoadingProviderFieldsGen::Schemaless(fields) => {
+                for (name, value) in fields.names.iter().zip(&fields.values) {
+                    visitor(name.as_str(), value.to_value())?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn toolchain<'v, V: ValueLike<'v>>(
+        provider: &StarlarkToolchainInfoGen<V>,
+        visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for (name, value) in provider.names.iter().zip(&provider.values) {
+            visitor(name.as_str(), value.to_value())?;
+        }
+        Ok(())
+    }
+    if let Some(provider) = LoadingStarlarkUserProvider::from_value(value) {
+        match provider {
+            starlark::__macro_refs::Either::Left(provider) => user(provider, visitor)?,
+            starlark::__macro_refs::Either::Right(provider) => user(provider, visitor)?,
+        }
+        return Ok(true);
+    }
+    if let Some(provider) = StarlarkToolchainInfo::from_value(value) {
+        match provider {
+            starlark::__macro_refs::Either::Left(provider) => toolchain(provider, visitor)?,
+            starlark::__macro_refs::Either::Right(provider) => toolchain(provider, visitor)?,
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 pub fn starlark_user_provider_has_schema(value: Value<'_>) -> Option<bool> {
     fn has_schema<V>(fields: &LoadingProviderFieldsGen<V>) -> bool {
         match fields {
@@ -1216,6 +1275,59 @@ type FrozenStarlarkDepset = StarlarkDepsetGen<FrozenValue>;
 starlark::starlark_complex_values!(StarlarkDepset);
 
 impl<'v> StarlarkDepset<'v> {
+    /// Visit actual successor values without copying the successor vector.
+    /// Both direct and transitive entries preserve their original Value owner;
+    /// the consumer controls its budget and may stop with an error.
+    pub fn visit_successors_from_value(
+        value: Value<'v>,
+        visitor: &mut dyn FnMut(Value<'v>) -> Result<(), String>,
+    ) -> Result<bool, String> {
+        fn visit<'v, V: ValueLike<'v>>(
+            value: &StarlarkDepsetGen<V>,
+            visitor: &mut dyn FnMut(Value<'v>) -> Result<(), String>,
+        ) -> Result<(), String> {
+            for successor in &value.successors {
+                let value = match successor {
+                    StarlarkDepsetSuccessorGen::Direct(value)
+                    | StarlarkDepsetSuccessorGen::Transitive(value) => value.to_value(),
+                };
+                visitor(value)?;
+            }
+            Ok(())
+        }
+        let Some(value) = Self::from_value(value) else {
+            return Ok(false);
+        };
+        match value {
+            starlark::__macro_refs::Either::Left(value) => visit(value, visitor)?,
+            starlark::__macro_refs::Either::Right(value) => visit(value, visitor)?,
+        }
+        Ok(true)
+    }
+    /// Borrow element type and successor count before a consumer projects owned
+    /// metadata. Retained native DAGs may intentionally expose no successors.
+    pub fn visit_metadata_from_value(
+        value: Value<'v>,
+        visitor: &mut dyn FnMut(Option<&str>, usize, bool) -> Result<(), String>,
+    ) -> Result<bool, String> {
+        let Some(value) = Self::from_value(value) else {
+            return Ok(false);
+        };
+        match value {
+            starlark::__macro_refs::Either::Left(value) => visitor(
+                value.element_type.as_deref(),
+                value.successors.len(),
+                value.retained.is_some(),
+            )?,
+            starlark::__macro_refs::Either::Right(value) => visitor(
+                value.element_type.as_deref(),
+                value.successors.len(),
+                value.retained.is_some(),
+            )?,
+        }
+        Ok(true)
+    }
+
     pub fn direct_from_value(value: Value<'v>) -> Option<Vec<Value<'v>>> {
         Self::parts_from_value(value).map(|(_, _, _, _, _, successors)| {
             successors
@@ -1524,6 +1636,44 @@ where
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct AnalysisBuiltinCallable {
     name: &'static str,
+}
+
+/// Complete immutable instance state of Loading's fixed analysis builtin class.
+/// This certifies the actual Rust class and API variant for retained identity;
+/// execution must still invoke the original value with its ordinary phase checks.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum AnalysisBuiltinCallableApi {
+    Depset,
+    DefaultInfo,
+    ToolchainInfo,
+}
+
+/// Borrow a certificate only from the actual fixed builtin callable class.
+/// It has no stored receiver, ParametersSpec, defaults, annotations, or captures.
+/// Its manual argument binding is part of the fixed Rust implementation, rather
+/// than an empty callable signature. Unknown instance states are not admitted.
+pub fn analysis_builtin_callable_api(value: Value<'_>) -> Option<AnalysisBuiltinCallableApi> {
+    let actual = value.downcast_ref::<AnalysisBuiltinCallable>()?;
+    match actual.name {
+        "depset" => Some(AnalysisBuiltinCallableApi::Depset),
+        "DefaultInfo" => Some(AnalysisBuiltinCallableApi::DefaultInfo),
+        "ToolchainInfo" => Some(AnalysisBuiltinCallableApi::ToolchainInfo),
+        _ => None,
+    }
+}
+
+/// Allocate the original fixed builtin callable with an admitted typed state.
+/// This does not replace its invoke implementation or relax phase restrictions.
+pub fn alloc_frozen_analysis_builtin_callable(
+    heap: &starlark::values::FrozenHeap,
+    api: AnalysisBuiltinCallableApi,
+) -> FrozenValue {
+    let name = match api {
+        AnalysisBuiltinCallableApi::Depset => "depset",
+        AnalysisBuiltinCallableApi::DefaultInfo => "DefaultInfo",
+        AnalysisBuiltinCallableApi::ToolchainInfo => "ToolchainInfo",
+    };
+    heap.alloc(AnalysisBuiltinCallable::new(name))
 }
 
 /// Analysis-only capability supplied by the existing root analysis evaluator.
@@ -2298,3 +2448,9 @@ mod tests {
 
 #[cfg(test)]
 mod depset_truth_tests;
+
+#[cfg(test)]
+mod provider_fields_visit_tests;
+
+#[cfg(test)]
+mod analysis_builtin_certificate_tests;

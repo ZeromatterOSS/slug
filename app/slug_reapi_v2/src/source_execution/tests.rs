@@ -239,10 +239,12 @@ impl SourceActionTransport for IncompleteCas {
     async fn stage(
         &self,
         inputs: Arc<PreparedSourceActionInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Staged, Self::Error> {
         use crate::proto::google::bytestream;
         let plan =
-            SourceSpawnReapiPlan::from_prepared(inputs.clone(), &Default::default()).unwrap();
+            SourceSpawnReapiPlan::from_prepared(inputs.clone(), &Default::default(), args_context)
+                .unwrap();
         let digest = plan
             .inputs()
             .input_tree()
@@ -298,7 +300,7 @@ impl SourceActionTransport for IncompleteCas {
         })
         .await
         .expect("in-flight source must be advertised present");
-        let staging = self.transport.stage(inputs);
+        let staging = self.transport.stage(inputs, args_context);
         tokio::pin!(staging);
         let early = tokio::time::timeout(std::time::Duration::from_millis(50), &mut staging).await;
         assert!(
@@ -349,7 +351,12 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
     let prepared = workspace.prepare().unwrap();
     let owner = prepared.configured_action().context().owner();
     assert_eq!(owner, &workspace.owner);
-    let plan = SourceSpawnReapiPlan::from_prepared(prepared, &Default::default()).unwrap();
+    let plan = SourceSpawnReapiPlan::from_prepared(
+        prepared,
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     assert_eq!(
         plan.command().output_directories,
         [crate::test_roots::owner_path(&workspace.owner, "pkg/tree")]
@@ -377,9 +384,13 @@ fn native_directory_declarations_and_command_paths_follow_retained_kinds() {
     }
     std::fs::write(workspace.root.join("pkg/defs.bzl"), defs).unwrap();
     assert_eq!(
-        SourceSpawnReapiPlan::from_prepared(workspace.prepare().unwrap(), &Default::default())
-            .unwrap()
-            .identity(),
+        SourceSpawnReapiPlan::from_prepared(
+            workspace.prepare().unwrap(),
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .identity(),
         plan.identity()
     );
 }

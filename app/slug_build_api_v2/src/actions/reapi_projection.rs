@@ -10,6 +10,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::ArgsExpansionError;
 use crate::actions::spec::ActionOutputKind;
 use crate::actions::spec::ActionSpec;
 
@@ -23,23 +24,31 @@ pub struct ReapiCommandProjection {
 }
 
 impl ReapiCommandProjection {
-    pub fn from_action(action: &ActionSpec) -> Result<Self, &'static str> {
+    pub fn from_action(action: &ActionSpec) -> Result<Self, ArgsExpansionError> {
         if action.kind() == &crate::ActionKind::BuildInfoTransform
             || action
                 .outputs()
                 .iter()
                 .any(|output| output.metadata() == crate::ActionOutputMetadata::Constant)
         {
-            return Err("BuildInfoTransform/constant-metadata REAPI projection is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "BuildInfoTransform/constant-metadata REAPI projection is not admitted".into(),
+            ));
         }
         if action.kind() == &crate::ActionKind::CppCompile {
-            return Err("CppCompile REAPI projection is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "CppCompile REAPI projection is not admitted".into(),
+            ));
         }
         if action.solib_symlink_spec().is_some() {
-            return Err("native SolibSymlink REAPI projection is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "native SolibSymlink REAPI projection is not admitted".into(),
+            ));
         }
         if action.is_typed_payload() {
-            return Err("typed Spawn/Symlink/ArgsWrite REAPI projection is not admitted");
+            return Err(ArgsExpansionError::Unsupported(
+                "typed Spawn/Symlink/ArgsWrite REAPI projection is not admitted".into(),
+            ));
         }
         let mut output_files = Vec::new();
         let mut output_directories = Vec::new();
@@ -50,7 +59,9 @@ impl ReapiCommandProjection {
                 }
                 ActionOutputKind::Directory => output_directories.push(output.path().to_owned()),
                 ActionOutputKind::RunfilesTree => {
-                    return Err("runfiles tree REAPI projection is not admitted");
+                    return Err(ArgsExpansionError::Unsupported(
+                        "runfiles tree REAPI projection is not admitted".into(),
+                    ));
                 }
             }
         }

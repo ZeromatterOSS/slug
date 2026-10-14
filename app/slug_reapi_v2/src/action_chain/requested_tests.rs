@@ -71,7 +71,12 @@ pub(super) fn disconnected_session(
     let transport = transport();
     let channel = tonic::transport::Endpoint::from_static("http://127.0.0.1:1").connect_lazy();
     ActionChainReapiSession {
-        templates: Template::prepare(&inputs, &Default::default()).unwrap(),
+        templates: Template::prepare(
+            &inputs,
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+        )
+        .unwrap(),
         inputs,
         config: transport.config,
         results: Vec::new(),
@@ -174,7 +179,10 @@ fn requested_later_policy_failure_precedes_connection() {
         .enable_all()
         .build()
         .unwrap();
-    let error = match runtime.block_on(transport().start(inputs)) {
+    let error = match runtime.block_on(transport().start(
+        inputs,
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )) {
         Ok(_) => panic!("unsupported later root started a session"),
         Err(error) => error,
     };

@@ -203,9 +203,13 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
         .build()
         .unwrap();
     assert_eq!(
-        Template::prepare(&workspace.prepare(), &Default::default())
-            .unwrap()
-            .len(),
+        Template::prepare(
+            &workspace.prepare(),
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .len(),
         3
     );
     for (defs, expected) in [
@@ -229,7 +233,10 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
         ),
     ] {
         std::fs::write(workspace.root.join("defs.bzl"), defs).unwrap();
-        let error = match runtime.block_on(transport.start(workspace.prepare())) {
+        let error = match runtime.block_on(transport.start(
+            workspace.prepare(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+        )) {
             Err(error) => error,
             Ok(_) => panic!("invalid downstream action opened a session"),
         };
@@ -241,9 +248,13 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
     }
     std::fs::write(workspace.root.join("defs.bzl"), DEFS).unwrap();
     assert_eq!(
-        Template::prepare(&workspace.prepare(), &Default::default())
-            .unwrap()
-            .len(),
+        Template::prepare(
+            &workspace.prepare(),
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .len(),
         3
     );
     workspace.assert_no_outputs();
@@ -252,7 +263,12 @@ fn whole_chain_preflight_rejects_downstream_policy_and_empty_tree_param_collisio
 #[test]
 fn empty_tree_namespace_rejects_descendants_and_outputs_but_allows_siblings() {
     let workspace = Workspace::new();
-    let mut templates = Template::prepare(&workspace.prepare(), &Default::default()).unwrap();
+    let mut templates = Template::prepare(
+        &workspace.prepare(),
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     let Template::Spawn {
         mut command,
         expanded,
@@ -383,8 +399,9 @@ impl ActionChainTransport for CheckedTransport {
     async fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
-        self.inner.start(inputs).await
+        self.inner.start(inputs, args_context).await
     }
     async fn stage(
         &self,
@@ -628,4 +645,62 @@ fn nativelink_chain_generated_cas_eviction_and_corruption_block_consumer() {
         assert_eq!(transport.executions.load(Ordering::SeqCst), 2);
         workspace.assert_no_outputs();
     }
+}
+
+#[derive(Debug)]
+struct CancelledChainArgs;
+impl slug_build_api_v2::ArgsDirectoryContext for CancelledChainArgs {
+    fn is_cancelled(&self) -> bool {
+        true
+    }
+    fn list(
+        &self,
+        _: &slug_build_api_v2::AnalysisArtifact,
+    ) -> Result<Vec<slug_build_api_v2::AnalysisArtifact>, slug_build_api_v2::ArgsExpansionError>
+    {
+        panic!("cancelled chain must not discover directories")
+    }
+}
+
+#[test]
+fn chain_start_uses_current_consumer_cancellation_before_connection() {
+    let workspace = Workspace::new();
+    std::fs::write(
+        workspace.root.join("defs.bzl"),
+        format!(
+            "def _map(value):\n    return value\n{}",
+            DEFS.replace(
+                "    args.add('consume')",
+                "    args.add_all(['consume'], map_each = _map)"
+            ),
+        ),
+    )
+    .unwrap();
+    let inputs = workspace.prepare();
+    let transport = ActionChainReapiTransport::new(
+        RemoteConfig::from_args(&["--remote_executor=grpc://127.0.0.1:1"]).unwrap(),
+    )
+    .unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let error = match runtime.block_on(transport.start(inputs.clone(), &CancelledChainArgs)) {
+        Err(error) => error,
+        Ok(_) => panic!("cancelled chain must not create a session"),
+    };
+    assert!(
+        error.to_string().contains("Args expansion cancelled"),
+        "{error}"
+    );
+    assert_eq!(
+        Template::prepare(
+            &inputs,
+            &Default::default(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .len(),
+        3
+    );
 }

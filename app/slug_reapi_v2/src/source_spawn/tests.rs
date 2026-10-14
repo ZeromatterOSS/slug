@@ -136,7 +136,11 @@ impl Workspace {
     }
 
     fn plan(&self) -> Result<SourceSpawnReapiPlan, String> {
-        SourceSpawnReapiPlan::from_prepared(self.prepare(), &defaults())
+        SourceSpawnReapiPlan::from_prepared(
+            self.prepare(),
+            &defaults(),
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+        )
     }
 
     fn write(&self, path: &str, contents: impl AsRef<[u8]>) {
@@ -159,7 +163,12 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
         prepared.configured_action().context().owner(),
         &workspace.owner
     );
-    let plan = SourceSpawnReapiPlan::from_prepared(prepared.clone(), &defaults()).unwrap();
+    let plan = SourceSpawnReapiPlan::from_prepared(
+        prepared.clone(),
+        &defaults(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     let command = proto::Command::decode(plan.command().serialized().as_slice()).unwrap();
     assert_eq!(
         command.arguments,
@@ -291,15 +300,24 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     let mut changed_defaults = defaults();
     changed_defaults.insert("default-only".to_owned(), "changed".to_owned());
     assert_ne!(
-        SourceSpawnReapiPlan::from_prepared(prepared, &changed_defaults)
-            .unwrap()
-            .identity()
-            .action_digest,
+        SourceSpawnReapiPlan::from_prepared(
+            prepared,
+            &changed_defaults,
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .identity()
+        .action_digest,
         original.action_digest
     );
     workspace.write("BUILD.bazel", workspace.build.replace("platform(name='platform')", "platform(name='platform', exec_properties={'platform-only': 'selected', 'overlap': 'platform'})"));
     let selected = workspace.prepare();
-    let selected_plan = SourceSpawnReapiPlan::from_prepared(selected.clone(), &defaults()).unwrap();
+    let selected_plan = SourceSpawnReapiPlan::from_prepared(
+        selected.clone(),
+        &defaults(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     assert_eq!(
         selected_plan.command().platform_properties,
         [
@@ -310,9 +328,13 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
     );
     assert_eq!(
         selected_plan.identity(),
-        SourceSpawnReapiPlan::from_prepared(selected, &changed_defaults)
-            .unwrap()
-            .identity()
+        SourceSpawnReapiPlan::from_prepared(
+            selected,
+            &changed_defaults,
+            &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext
+        )
+        .unwrap()
+        .identity()
     );
 
     // Another group's properties are filtered out of the effective action map.
@@ -334,7 +356,12 @@ fn native_spawn_plan_preserves_fields_and_content_identity() {
         1
     );
     assert!(context.platform_fact().unwrap().exec_properties.is_empty());
-    let filtered_plan = SourceSpawnReapiPlan::from_prepared(filtered, &defaults()).unwrap();
+    let filtered_plan = SourceSpawnReapiPlan::from_prepared(
+        filtered,
+        &defaults(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     assert_eq!(
         filtered_plan.command().platform_properties,
         [("other.property".to_owned(), "raw".to_owned())].into()
@@ -539,4 +566,50 @@ fn output_projection_rejects_unsupported_kinds_and_malformed_paths() {
             "{path}"
         );
     }
+}
+
+#[derive(Debug)]
+struct CancelledArgsConsumer;
+impl slug_build_api_v2::ArgsDirectoryContext for CancelledArgsConsumer {
+    fn is_cancelled(&self) -> bool {
+        true
+    }
+    fn list(
+        &self,
+        _: &slug_build_api_v2::AnalysisArtifact,
+    ) -> Result<Vec<slug_build_api_v2::AnalysisArtifact>, slug_build_api_v2::ArgsExpansionError>
+    {
+        panic!("cancelled consumer must not discover directories")
+    }
+}
+
+#[test]
+fn native_spawn_projection_uses_current_consumer_cancellation_before_digest() {
+    let workspace = Workspace::new();
+    let defs = format!(
+        "def _map(value):\n    return value + '-mapped'\n{}",
+        workspace.defs.replace(
+            "    args.add('parameter')",
+            "    args.add_all(['parameter'], map_each = _map)",
+        )
+    );
+    workspace.write("defs.bzl", defs);
+    let prepared = workspace.prepare();
+    let error =
+        SourceSpawnReapiPlan::from_prepared(prepared.clone(), &defaults(), &CancelledArgsConsumer)
+            .unwrap_err();
+    assert!(error.contains("Args expansion cancelled"), "{error}");
+    let plan = SourceSpawnReapiPlan::from_prepared(
+        prepared,
+        &defaults(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
+    assert!(
+        plan.inputs()
+            .input_tree()
+            .inline_blobs()
+            .iter()
+            .any(|blob| blob.data() == b"parameter-mapped\n")
+    );
 }

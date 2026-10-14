@@ -22,7 +22,6 @@ use slug_build_api_v2::AnalysisConfiguredTargetKey;
 use slug_build_api_v2::AnalysisDepset;
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
-use slug_build_api_v2::ArgsWriteSpec;
 use slug_build_api_v2::ArtifactInputSource;
 use slug_build_api_v2::ArtifactInputs;
 use slug_build_api_v2::CtxActions;
@@ -32,18 +31,10 @@ use slug_build_api_v2::DerivedArtifactRoot;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderOccurrence;
 use slug_build_api_v2::ProviderValue;
-use slug_build_api_v2::RetainedArgCall;
-use slug_build_api_v2::RetainedArgsDepset;
-use slug_build_api_v2::RetainedArgsRecipe;
 use slug_build_api_v2::RetainedArtifactInputs;
 use slug_build_api_v2::RetainedCommandLine;
-use slug_build_api_v2::RetainedCommandLineSegment;
 use slug_build_api_v2::RetainedRunfiles;
-use slug_build_api_v2::RetainedSpawnArgsSnapshot;
 use slug_build_api_v2::RetainedSpawnInvocation;
-use slug_build_api_v2::RetainedSpawnParamFilePolicy;
-use slug_build_api_v2::RetainedVectorArg;
-use slug_build_api_v2::RetainedVectorSource;
 use slug_build_api_v2::RunfilesConflictPolicy;
 use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::RunfilesPackageMetadata;
@@ -81,16 +72,9 @@ use slug_loading_v2::subrule_invocation::AnalysisActions;
 use slug_loading_v2::subrule_invocation::AnalysisArtifactValue;
 use slug_loading_v2::subrule_invocation::AnalysisCallToken;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
-use slug_loading_v2::subrule_invocation::AnalysisRunRequest;
 use slug_loading_v2::subrule_invocation::AnalysisSpawnInvocation;
 use slug_loading_v2::subrule_invocation::AnalysisSpawnRequest;
 use slug_loading_v2::subrule_invocation::AnalysisToolchainRequest;
-use slug_loading_v2::subrule_invocation::EvaluatorArgCallGen;
-use slug_loading_v2::subrule_invocation::EvaluatorArgsSnapshot;
-use slug_loading_v2::subrule_invocation::EvaluatorVectorArgGen;
-use slug_loading_v2::subrule_invocation::EvaluatorVectorMapEachGen;
-use slug_loading_v2::subrule_invocation::EvaluatorVectorSourceGen;
-use slug_loading_v2::subrule_invocation::PinnedVectorMapEach;
 use slug_loading_v2::subrule_invocation::PreparedSubruleInvocation;
 use slug_loading_v2::subrule_invocation::StarlarkArgs;
 use starlark::PrintHandler;
@@ -1149,7 +1133,7 @@ mod toolchain_materialization_tests {
 struct SynchronousAnalysisActionSink {
     workspace_status: Arc<slug_build_api_v2::WorkspaceStatusArtifacts>,
     root: DerivedArtifactRoot,
-    actions: Arc<Mutex<CtxActions>>,
+    actions: Arc<Mutex<CtxActions<PendingRegisteredAction>>>,
     // Evaluation-scoped declarations, including predeclared outputs. Subrule
     // calls share this sink; only the resulting Derived artifacts survive it.
     declared_outputs: Mutex<SmallMap<String, ActionOutput>>,
@@ -1418,7 +1402,9 @@ impl SynchronousAnalysisActionSink {
 
     fn register(
         &self,
-        register: impl FnOnce(&mut CtxActions) -> Result<usize, slug_build_api_v2::ActionError>,
+        register: impl FnOnce(
+            &mut CtxActions<PendingRegisteredAction>,
+        ) -> Result<usize, slug_build_api_v2::ActionError>,
     ) -> anyhow::Result<()> {
         let mut actions = self
             .actions
@@ -1540,10 +1526,11 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         self.declare_output(path, ActionOutputKind::Directory)
     }
 
-    fn write(
+    fn write<'v>(
         &self,
-        output: Value<'_>,
-        content: Value<'_>,
+        module: &'v Module,
+        output: Value<'v>,
+        content: Value<'v>,
         is_executable: bool,
     ) -> anyhow::Result<()> {
         let output = self.owned_output(output, "write")?;
@@ -1555,10 +1542,14 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         }
         let snapshot = StarlarkArgs::snapshot(content)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions.write content must be a string or Args"))?;
-        let mut lowerer = AnalysisValueLowerer::default();
-        let (recipe, _) = lower_args_snapshot(snapshot, &mut lowerer)?;
+        let registration =
+            slug_loading_v2::subrule_invocation::register_args_snapshot(module, snapshot)?;
         self.register(|actions| {
-            actions.register_args_write(ArgsWriteSpec::new(output, recipe, is_executable))
+            actions.register_pending(PendingRegisteredAction::args_write(
+                output,
+                registration,
+                is_executable,
+            ))
         })
     }
 
@@ -1581,57 +1572,18 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         self.register(|actions| actions.run_shell(output, command, arguments, Vec::new()))
     }
 
-    fn run(&self, request: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
-        let outputs = self.outputs(request.outputs, "run")?;
-        let (path_flavor, configured_environment) = self.typed_configuration()?;
-        let executable =
-            if let Some(file) = AnalysisArtifactValue::from_starlark(request.executable) {
-                reject_directory_file(file, "ctx.actions.run executable")?;
-                SpawnExecutable::Artifact(file.artifact().clone())
-            } else if let Some(path) = request.executable.unpack_str() {
-                SpawnExecutable::Path(
-                    NormalizedBazelPath::new(path_flavor, path)
-                        .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-                )
-            } else {
-                anyhow::bail!("ctx.actions.run executable must be a File or string path")
-            };
-        let mut lowerer = AnalysisValueLowerer::default();
-        let (command_line, _) = retained_command_line(request.arguments, &mut lowerer)?;
-        let inputs =
-            retained_artifact_inputs(request.inputs, false, false, "inputs", &mut lowerer)?;
-        let tools = retained_artifact_inputs(request.tools, true, false, "tools", &mut lowerer)?;
-        let action_environment = configured_environment.for_action(
-            request.use_default_shell_env,
-            string_dict(request.env, "ctx.actions.run env")?,
-        );
-        let mnemonic = request.mnemonic.unwrap_or("Action");
-        if mnemonic.is_empty() || !mnemonic.chars().all(char::is_alphanumeric) {
-            anyhow::bail!("ctx.actions.run mnemonic must be nonempty and alphanumeric");
-        }
-        let spec = SpawnSpec::new(
-            RetainedSpawnInvocation::Executable(executable),
-            command_line,
-            inputs,
-            tools,
-            outputs,
-            None,
-            action_environment,
-            CanonicalStringMap::default(),
-            mnemonic,
-            request.progress_message,
-        );
-        self.register(|actions| actions.register_spawn(spec))
-    }
-
-    fn spawn(&self, request: AnalysisSpawnRequest<'_>) -> anyhow::Result<()> {
+    fn spawn<'v>(
+        &self,
+        module: &'v Module,
+        request: AnalysisSpawnRequest<'v>,
+    ) -> anyhow::Result<()> {
         let operation = match request.invocation {
             AnalysisSpawnInvocation::Executable(_) => "run",
             AnalysisSpawnInvocation::Shell(_) => "run_shell",
         };
         self.validate_subrule_action_overrides(&request, operation)?;
         let mut lowerer = AnalysisValueLowerer::default();
-        let (command_line, has_arguments) = retained_command_line(request.arguments, &mut lowerer)?;
+        let (command_line, has_arguments) = PendingCommandLine::capture(module, request.arguments)?;
         let (path_flavor, configured_environment) = self.typed_configuration()?;
         let invocation = retained_invocation(
             request.invocation,
@@ -1666,7 +1618,7 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         validate_supported_spawn_options(&request, operation)?;
         let mut spec = SpawnSpec::new(
             invocation,
-            command_line,
+            RetainedCommandLine::new(Vec::new()),
             inputs,
             tools,
             outputs,
@@ -1685,7 +1637,13 @@ impl AnalysisActionSink for SynchronousAnalysisActionSink {
         if let Some(name) = exec_group_name(&selected_group) {
             action = action.with_exec_group(name);
         }
-        self.register(|actions| actions.register_batch([action]).map(|range| range.start))
+        let pending = PendingRegisteredAction::spawn(action, command_line)?.with_inputs(
+            module,
+            request.inputs,
+            request.tools,
+            request.scope.clone(),
+        )?;
+        self.register(|actions| actions.register_pending(pending))
     }
 
     fn is_files_to_run_provider(&self, value: Value<'_>) -> bool {
@@ -1756,210 +1714,6 @@ fn reject_directory_file(file: &AnalysisArtifactValue, name: &str) -> anyhow::Re
         anyhow::bail!("{name} must be a regular File")
     }
     Ok(())
-}
-
-fn retained_command_line<'v>(
-    arguments: Option<Value<'v>>,
-    lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<(RetainedCommandLine, bool)> {
-    let Some(arguments) = arguments else {
-        return Ok((RetainedCommandLine::new(Vec::new()), false));
-    };
-    if arguments.is_none() {
-        anyhow::bail!("ctx.actions.run arguments must be a sequence");
-    }
-    let arguments = sequence_values(arguments)
-        .ok_or_else(|| anyhow::anyhow!("ctx.actions.run arguments must be a sequence"))?;
-    let has_arguments = !arguments.is_empty();
-    let mut segments = Vec::new();
-    let mut literals = Vec::new();
-    for argument in arguments {
-        if let Some(args) = StarlarkArgs::snapshot(argument) {
-            if !literals.is_empty() {
-                segments.push(RetainedCommandLineSegment::LiteralRun(
-                    std::mem::take(&mut literals).into(),
-                ));
-            }
-            let (recipe, policy) = lower_args_snapshot(args, lowerer)?;
-            segments.push(RetainedCommandLineSegment::ArgsSnapshot(
-                RetainedSpawnArgsSnapshot::new(recipe, policy),
-            ));
-        } else if let Some(literal) = argument.unpack_str() {
-            literals.push(CompactString::new(literal));
-        } else {
-            anyhow::bail!("ctx.actions.run arguments entries must be strings or Args")
-        }
-    }
-    if !literals.is_empty() {
-        segments.push(RetainedCommandLineSegment::LiteralRun(literals.into()));
-    }
-    Ok((RetainedCommandLine::new(segments), has_arguments))
-}
-
-fn lower_args_snapshot<'v>(
-    snapshot: EvaluatorArgsSnapshot<'v>,
-    lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<(RetainedArgsRecipe, Option<RetainedSpawnParamFilePolicy>)> {
-    let calls = snapshot
-        .calls
-        .into_iter()
-        .map(|call| match call {
-            EvaluatorArgCallGen::Scalar(value) => Ok(RetainedArgCall::Scalar(value)),
-            EvaluatorArgCallGen::AddAll(value) => {
-                lower_vector_arg(value, lowerer).map(RetainedArgCall::AddAll)
-            }
-            EvaluatorArgCallGen::AddJoined(value) => {
-                lower_vector_arg(value, lowerer).map(RetainedArgCall::AddJoined)
-            }
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-    let policy = snapshot.param_file.map(|(flag_format, use_always)| {
-        RetainedSpawnParamFilePolicy::new(flag_format, use_always)
-    });
-    Ok((RetainedArgsRecipe::new(calls, snapshot.format), policy))
-}
-
-fn lower_vector_arg<'v>(
-    value: EvaluatorVectorArgGen<Value<'v>>,
-    lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<RetainedVectorArg> {
-    let map_each = match value.map_each {
-        None => None,
-        Some(EvaluatorVectorMapEachGen::Pinned(mapper)) => Some(mapper),
-        Some(EvaluatorVectorMapEachGen::CargoRunfiles {
-            fake_exe,
-            workspace_name,
-        }) => {
-            return Ok(RetainedVectorArg::new(
-                cargo_runfiles::lower(value.source, fake_exe, workspace_name, lowerer)?,
-                value.options,
-            ));
-        }
-    };
-    let source = if map_each == Some(PinnedVectorMapEach::RulesRustCrateRoot) {
-        lower_rules_rust_crate_root(value.source)?
-    } else if map_each == Some(PinnedVectorMapEach::RegularFileDirnames) {
-        lower_regular_file_dirnames(value.source, lowerer)?
-    } else if let Some(PinnedVectorMapEach::RulesRustNativeLinks(mapper)) = map_each {
-        let EvaluatorVectorSourceGen::Sequence(rows) = value.source else {
-            anyhow::bail!("rules_rust native link Args requires tuple sequence");
-        };
-        let rows = rows
-            .into_iter()
-            .map(|row| {
-                lowerer
-                    .lower(row, "rules_rust native link Args")
-                    .map_err(anyhow::Error::msg)
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        RetainedVectorSource::RulesRustNativeLinks(
-            slug_build_api_v2::RetainedRustNativeLinkArgs::new(rows, mapper)?,
-        )
-    } else if let Some(PinnedVectorMapEach::RulesRustCrates(mapper)) = map_each {
-        let EvaluatorVectorSourceGen::Depset(source) = value.source else {
-            anyhow::bail!("rules_rust crate Args requires a depset");
-        };
-        let lowered = lowerer
-            .lower(source, "rules_rust crate Args")
-            .map_err(anyhow::Error::msg)?;
-        let AnalysisValueKind::Depset(depset) = lowered.kind() else {
-            anyhow::bail!("rules_rust crate Args requires a depset");
-        };
-        RetainedVectorSource::RulesRustCrates(
-            slug_build_api_v2::RetainedRustCrateArgs::new(depset.clone(), mapper)
-                .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-        )
-    } else {
-        match value.source {
-            EvaluatorVectorSourceGen::Sequence(values) => RetainedVectorSource::Sequence(
-                values
-                    .into_iter()
-                    .map(|item| vector_scalar_value(item, value.options.expand_directories))
-                    .collect::<anyhow::Result<Vec<_>>>()?
-                    .into(),
-            ),
-            EvaluatorVectorSourceGen::Depset(depset_value) => {
-                let lowered = lowerer
-                    .lower(depset_value, "Args vector depset")
-                    .map_err(anyhow::Error::msg)?;
-                let AnalysisValueKind::Depset(depset) = lowered.kind() else {
-                    anyhow::bail!("Args vector values must be a sequence or depset")
-                };
-                let retained = if value.options.expand_directories {
-                    RetainedArgsDepset::new(depset.clone())
-                } else {
-                    RetainedArgsDepset::new_unexpanded(depset.clone())
-                };
-                RetainedVectorSource::Depset(
-                    retained.map_err(|error| anyhow::anyhow!(error.to_string()))?,
-                )
-            }
-        }
-    };
-    Ok(RetainedVectorArg::new(source, value.options))
-}
-
-fn lower_regular_file_dirnames<'v>(
-    source: EvaluatorVectorSourceGen<Value<'v>>,
-    lowerer: &mut AnalysisValueLowerer<'v>,
-) -> anyhow::Result<RetainedVectorSource> {
-    let inputs = match source {
-        EvaluatorVectorSourceGen::Sequence(values) => values
-            .into_iter()
-            .map(|value| {
-                let file = AnalysisArtifactValue::from_starlark(value)
-                    .ok_or_else(|| anyhow::anyhow!("Args file dirname mapping requires Files"))?;
-                Ok(ArtifactInputSource::Direct(file.artifact().clone()))
-            })
-            .collect::<anyhow::Result<Vec<_>>>()?,
-        EvaluatorVectorSourceGen::Depset(value) => {
-            let lowered = lowerer
-                .lower(value, "Args file dirname depset")
-                .map_err(anyhow::Error::msg)?;
-            let AnalysisValueKind::Depset(depset) = lowered.kind() else {
-                anyhow::bail!("Args file dirname mapping requires a sequence or depset of Files");
-            };
-            vec![ArtifactInputSource::Depset(
-                RetainedArtifactInputs::new(depset.clone())
-                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
-            )]
-        }
-    };
-    RetainedVectorSource::regular_file_dirnames(ArtifactInputs::new(inputs))
-        .map_err(|error| anyhow::anyhow!(error.to_string()))
-}
-
-fn lower_rules_rust_crate_root(
-    source: EvaluatorVectorSourceGen<Value<'_>>,
-) -> anyhow::Result<RetainedVectorSource> {
-    let EvaluatorVectorSourceGen::Sequence(values) = source else {
-        anyhow::bail!("rules_rust crate-root Args requires one (File, str) tuple")
-    };
-    let [value] = values.as_slice() else {
-        anyhow::bail!("rules_rust crate-root Args requires one (File, str) tuple")
-    };
-    let tuple = TupleRef::from_value(*value)
-        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires (File, str)"))?;
-    let mut fields = tuple.iter();
-    let (Some(file), Some(root_path), None) = (fields.next(), fields.next(), fields.next()) else {
-        anyhow::bail!("rules_rust crate-root Args requires (File, str)")
-    };
-    let file = AnalysisArtifactValue::from_starlark(file)
-        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires a File"))?;
-    let root_path = root_path
-        .unpack_str()
-        .ok_or_else(|| anyhow::anyhow!("rules_rust crate-root Args requires a string root path"))?;
-    let artifact = file.artifact().clone();
-    if matches!(
-        &artifact,
-        AnalysisArtifact::Derived { output, .. } if output.kind() != ActionOutputKind::File
-    ) {
-        anyhow::bail!("rules_rust crate-root Args requires a regular File")
-    }
-    Ok(RetainedVectorSource::RulesRustRegularCrateRoot {
-        artifact,
-        root_path: root_path.into(),
-    })
 }
 
 fn vector_scalar_value(
@@ -2434,8 +2188,11 @@ pub(crate) fn evaluate_loaded_rule(
             .ok_or_else(|| "derived outputs require structural configuration".to_owned())?
             .clone(),
     )?;
-    let actions = Arc::new(Mutex::new(CtxActions::new(output_root.clone())));
+    let actions = Arc::new(Mutex::new(
+        CtxActions::<PendingRegisteredAction>::new_typed(output_root.clone()),
+    ));
     let module = Module::new();
+    package.retain_bzl_heaps(module.frozen_heap());
     let make_variables = make_variables::prepare(
         module.frozen_heap(),
         key.configuration().slug_configuration(),
@@ -2558,7 +2315,7 @@ pub(crate) fn evaluate_loaded_rule(
         package_path: package_path.to_owned(),
         owner: retained_owner.clone(),
         typed_configuration,
-        executable_provenance,
+        executable_provenance: executable_provenance.clone(),
         execution_tags,
         target_package: package.runfiles_package().clone(),
         exec_groups: exec_groups.clone(),
@@ -2830,10 +2587,51 @@ pub(crate) fn evaluate_loaded_rule(
                 .clone(),
         });
     }
-    let mut actions = actions
-        .lock()
-        .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
-    cc_compile_action::finalize(&module, &mut lowerer, &mut actions)
+    // Move phase-private registrations out of the sink before publication.
+    // No callback inspection, evaluation or DICE work runs under this lock.
+    let mut pending_actions = {
+        let mut guard = actions
+            .lock()
+            .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
+        std::mem::replace(
+            &mut *guard,
+            CtxActions::<PendingRegisteredAction>::new_typed(output_root.clone()),
+        )
+    };
+    cc_compile_action::finalize(&module, &mut lowerer, &mut pending_actions)
+        .map_err(|error| error.to_string())?;
+    let mut publisher = args_callbacks::Publisher::new(&module);
+    let prepared = pending_actions
+        .registry()
+        .actions()
+        .iter()
+        .map(|action| {
+            let inputs = action.lower_inputs(&module, &mut lowerer, &executable_provenance)?;
+            action.prepare_with_inputs(&module, inputs, &mut |snapshot| {
+                publisher.prepare(snapshot, &mut lowerer)
+            })
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map_err(|error| error.to_string())?;
+    let graph = publisher
+        .seal(&mut lowerer)
+        .map_err(|error| error.to_string())?;
+    drop(lowerer);
+    let frozen_module = module
+        .freeze()
+        .map_err(|error| format!("Args publication freeze failed: {error:?}"))?;
+    let frozen_roots = frozen_module
+        .owned_extra_value()
+        .ok_or_else(|| "missing frozen Args publication root".to_owned())?;
+    let publisher = args_callbacks::FrozenPublisher::new(graph, frozen_roots);
+    let mut prepared = prepared.into_iter();
+    let mut actions = pending_actions
+        .try_map::<slug_build_api_v2::ActionSpec, anyhow::Error>(|_| {
+            prepared
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("missing prepared action"))?
+                .complete(&mut |draft| publisher.complete(draft))
+        })
         .map_err(|error| error.to_string())?;
     let providers = complete_runfiles_support(
         providers,
@@ -2876,12 +2674,11 @@ mod integer_list_projection_tests {
     }
 }
 
+mod args_callbacks;
 mod build_info_transform;
-mod cargo_runfiles;
+use args_callbacks::pending::PendingCommandLine;
+use args_callbacks::pending::PendingRegisteredAction;
 mod coverage_common;
-
-#[cfg(test)]
-mod cargo_runfiles_tests;
 
 #[cfg(test)]
 mod solib_tests;

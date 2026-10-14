@@ -1037,3 +1037,21 @@ async fn typed_local_refusal_uses_actual_io_and_keeps_missing_successful() {
     );
     assert_eq!(owner.snapshot().live_buffer_bytes, 0);
 }
+
+#[test]
+fn source_scope_args_stop_signal_is_readonly_and_request_local() {
+    let cancelled = scope(SourceServiceLimits::default());
+    let independent = scope(SourceServiceLimits::default());
+    use slug_build_api_v2::ArgsDirectoryContext;
+    let consumer = super::super::source_execution::RequestArgsContext::new(Some(&cancelled));
+    let next_consumer = super::super::source_execution::RequestArgsContext::new(Some(&independent));
+    assert!(!consumer.is_cancelled());
+    assert!(!next_consumer.is_cancelled());
+    cancelled.cancel();
+    assert!(consumer.is_cancelled());
+    assert!(!next_consumer.is_cancelled());
+    let poisoned = scope(SourceServiceLimits::default());
+    poisoned.poison(SourceServiceError::Limit(SourceCounter::SourceAttempts));
+    assert!(poisoned.is_cancelled());
+    assert!(!independent.is_cancelled());
+}

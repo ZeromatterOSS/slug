@@ -1144,6 +1144,26 @@ fn merge_depset_type(
 #[derive(Debug, Clone, Dupe, Allocative)]
 pub struct AnalysisValue(Arc<AnalysisValueData>);
 
+/// Owning allocation-identity key for transient container rehydration memos.
+///
+/// This key retains the native Arc to prevent address reuse while it is in a
+/// phase-local map. Its hash is scratch identity only: never persist it, use it
+/// as semantic result identity, or include it in action/cache fingerprints.
+#[derive(Debug, Clone, Dupe, Allocative)]
+pub struct AnalysisContainerIdentity(AnalysisValue);
+
+impl PartialEq for AnalysisContainerIdentity {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.shares_storage_with(&other.0)
+    }
+}
+impl Eq for AnalysisContainerIdentity {}
+impl Hash for AnalysisContainerIdentity {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (Arc::as_ptr(&self.0.0) as usize).hash(state);
+    }
+}
+
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
     TemplateVariableInfo(crate::TemplateVariableInfo),
@@ -1455,6 +1475,21 @@ impl AnalysisValue {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    /// Retain a phase-local identity key for an ordinary native container.
+    /// Shared keys allow materializers to restore aliases across publication
+    /// roots. FrozenHeap may canonically intern empty lists and tuples; this
+    /// key does not promise distinct frozen occurrences for such empty values.
+    pub fn container_identity(&self) -> Option<AnalysisContainerIdentity> {
+        matches!(
+            self.0.as_ref(),
+            AnalysisValueData::List(_)
+                | AnalysisValueData::Tuple(_)
+                | AnalysisValueData::Dictionary(_)
+                | AnalysisValueData::Struct(_)
+        )
+        .then(|| AnalysisContainerIdentity(self.dupe()))
+    }
+
     pub fn is_valid_depset_leaf(&self) -> bool {
         self.is_starlark_immutable()
             && !matches!(
@@ -1468,6 +1503,30 @@ impl AnalysisValue {
     }
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        if matches!(
+            self.0.as_ref(),
+            AnalysisValueData::List(_)
+                | AnalysisValueData::Tuple(_)
+                | AnalysisValueData::Dictionary(_)
+                | AnalysisValueData::Struct(_)
+        ) && matches!(
+            other.0.as_ref(),
+            AnalysisValueData::List(_)
+                | AnalysisValueData::Tuple(_)
+                | AnalysisValueData::Dictionary(_)
+                | AnalysisValueData::Struct(_)
+        ) {
+            let left = Arc::as_ptr(&self.0) as usize;
+            let right = Arc::as_ptr(&other.0) as usize;
+            if !PublicationEqState::enter_occurrence_pair(
+                &mut state.left_native_containers,
+                &mut state.right_native_containers,
+                left,
+                right,
+            ) {
+                return false;
+            }
+        }
         match (self.0.as_ref(), other.0.as_ref()) {
             (
                 AnalysisValueData::TemplateVariableInfo(left),
@@ -1778,6 +1837,10 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_native_containers: FxHashMap<usize, usize>,
+    right_native_containers: FxHashMap<usize, usize>,
+    left_callable_nodes: FxHashMap<(usize, u32), (usize, u32)>,
+    right_callable_nodes: FxHashMap<(usize, u32), (usize, u32)>,
     left_template_variables: FxHashMap<usize, usize>,
     right_template_variables: FxHashMap<usize, usize>,
     left_cc_callables: FxHashMap<usize, usize>,
@@ -1799,6 +1862,22 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    pub(crate) fn enter_callable_node_pair(
+        &mut self,
+        left: (usize, u32),
+        right: (usize, u32),
+    ) -> Result<bool, ()> {
+        if let Some(previous) = self.left_callable_nodes.get(&left) {
+            return (*previous == right).then_some(false).ok_or(());
+        }
+        if self.right_callable_nodes.contains_key(&right) {
+            return Err(());
+        }
+        self.left_callable_nodes.insert(left, right);
+        self.right_callable_nodes.insert(right, left);
+        Ok(true)
+    }
+
     pub(crate) fn enter_template_variable_pair(&mut self, left: usize, right: usize) -> bool {
         Self::enter_occurrence_pair(
             &mut self.left_template_variables,
@@ -1953,3 +2032,7 @@ impl From<DepsetError> for AnalysisValueError {
         Self::Depset(value)
     }
 }
+
+#[cfg(test)]
+#[path = "analysis_value/container_identity_tests.rs"]
+mod container_identity_tests;

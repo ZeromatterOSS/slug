@@ -77,6 +77,17 @@ pub struct StarlarkBigInt {
 }
 
 impl StarlarkBigInt {
+    /// Upper bound on the magnitude bytes needed to copy this integer.
+    ///
+    /// This constant-time borrowed observation allocates nothing and exposes no
+    /// integer storage. It rounds logical magnitude bits up to 64-bit limbs,
+    /// including zero, and returns None when the bound cannot fit in usize.
+    /// Consumers may apply an allocation budget before unpacking an owned BigInt.
+    pub fn magnitude_allocation_upper_bound(&self) -> Option<usize> {
+        let limbs = self.value.bits().checked_add(63)?.checked_div(64)?;
+        usize::try_from(limbs.checked_mul(8)?).ok()
+    }
+
     pub(crate) fn unchecked_new(value: BigInt) -> Self {
         debug_assert!(
             InlineInt::try_from(&value).is_err(),
@@ -303,6 +314,23 @@ mod tests {
     use crate::values::StarlarkValue;
     use crate::values::float::StarlarkFloat;
     use crate::values::types::bigint::StarlarkBigInt;
+
+    #[test]
+    fn magnitude_allocation_upper_bound_is_borrowed_zero_sign_and_limb_metadata() {
+        assert_eq!(
+            StarlarkBigInt::default().magnitude_allocation_upper_bound(),
+            Some(0)
+        );
+        let positive = StarlarkBigInt::unchecked_new(BigInt::from(1u8) << 1024usize);
+        let negative = StarlarkBigInt::unchecked_new(-(BigInt::from(1u8) << 1024usize));
+        assert_eq!(positive.magnitude_allocation_upper_bound(), Some(136));
+        assert_eq!(negative.magnitude_allocation_upper_bound(), Some(136));
+        assert_eq!(
+            StarlarkBigInt::unchecked_new(BigInt::from(1u8) << 64usize)
+                .magnitude_allocation_upper_bound(),
+            Some(16)
+        );
+    }
 
     #[test]
     fn test_parse() {

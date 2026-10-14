@@ -34,45 +34,27 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-360-m7a-host-child-carrier-control-correction
-Status: preserved unaccepted — native RSS exceeds256MiB by416KiB
+Packet: WP-7-419-m7a-general-args-callbacks
 
-The [current contract](./slug-v2-subplans/current-packet.md) corrects a stale
-checkpoint-control assertion for the declared Loading changes. The carrier
-implementation and Core metadata remain byteexact from preserved WP1147;
-Core59/Loading30 passed, but the helper failure prevented its native run.
-Last ACCEPT remains WP1145. Fresh corrected gates and capped representative
-measurement are required before broader work resumes. Producer/actions/Rustc/
-full bootstrap remain open; Windows deferred.
+General deferred Args callbacks are accepted in
+[WP1219](./slug-v2-subplans/wp1219-general-args-callbacks-acceptance-2026-10-14.json).
+The original Starlark callback family replaces all Rust/Cargo Args adapters.
+The final verified Rust cquery passes rustc.bzl2918 and reaches RunEnvironmentInfo
+construction at rust.bzl375. Other adapters, authentic command completion,
+action comparison, memory and M7A/M8 remain open. The next capability implements
+general native provider construction/publication and retained launch metadata.
 
-### Ready and blocked queue
+### Bootstrap command queue
 
-The current packet selects normal retained compiler producer readiness under priority1. Declared
-header/C++ capabilities do not select execution without requested-root demand; the
-remaining priorities stay queued until concrete prerequisites and owners are ready.
-
-| Order | Result | State / dependency |
+| Order | Observable result | Dependency |
 |---|---|---|
-| 1 | Configured production graph coverage | current36 local owners/353 external normal direct-feature owners and selected generated cfg bytes accepted; saved argument/file-env subsets reconciled; current packet selects normal retained compiler producer readiness; runtime context/current freshness remain qualified |
-| 2 | Bazel root compilation and action coverage | current CLI compilation accepted; Slug per-family action coverage remains open |
-| 3 | Remaining M7A action/input-tree/REAPI capabilities and shared cache core | native header producer accepted with zero saved root consumers; demanded execution rows in [bootstrap readiness](./slug-v2-subplans/bootstrap-readiness.md) remain open |
-| 4 | Stage 10.3 graph comparison, then 10.4 fixed point | blocked on finite M7A closure; use reviewed typed comparison contract |
-| 5 | Standalone remote/disk cache library | blocked on M8; [Stage 11](./slug-v2-subplans/11-bazel-compatible-cache-library.md) owns release gates |
-| 6 | M7B mixed-language/command breadth, then M9 exact identity/inspection | separate functional ruleset and exact projection admission |
+| 1 | Authentic Rust cquery through general APIs | General Args accepted; demanded provider/toolchain/repository API replacements remain |
+| 2 | Required action comparison and a small authentic Rust REAPI build | Source-derived providers/toolchains, generic Args and real tool inputs |
+| 3 | Full Slug CLI closure analyzes and builds through the same owners | Demanded proc macros, build scripts, generated sources and native actions |
+| 4 | Stage 10.3 graph comparison and 10.4 stage1/stage2 fixed point | No semantic adapters; exact output and REAPI proof |
 
-The user permits the time required for a task; examine recurring work over three
-minutes for necessity and possible refactoring. Compilation and runtime memory
-measurements remain separate. Historical short time guidelines are not user caps.
-The user treats 12 seconds as a guideline, not an exact test rule. Keep tests
-as small as the semantic boundary allows; anything over a few seconds should
-run infrequently, and a test over roughly 30 seconds needs serious necessity
-review. The one opt-in 30-second F3 proof was independently reviewed, ran once
-and is closed without success. Compile/preparation remains separate and must
-be split or checked in smaller units when necessary. An unattributed timeout
-is not a semantic failure.
-Historical retry116 global path-epoch fanout predates current per-demand inputs.
-It is not current invalidation or CPU evidence; existing exact-cell tests cover
-unrelated publication cutoff, revocation and restoration.
+Source preparation belongs to the capability it serves. Milestone priority
+remains M7A, M8, cache-library release, M7B, then M9.
 
 ## Non-Negotiables
 

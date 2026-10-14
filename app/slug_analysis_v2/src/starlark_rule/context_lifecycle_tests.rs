@@ -43,7 +43,7 @@ pub(super) fn declaration_sink(key: &ConfiguredTargetKey) -> Arc<SynchronousAnal
             slug_workspace_v2::NormalizedAbsolutePath::new("/fixture/workspace").unwrap(),
         )),
         root: root.clone(),
-        actions: Arc::new(Mutex::new(CtxActions::new(root))),
+        actions: Arc::new(Mutex::new(CtxActions::new_typed(root))),
         declared_outputs: Mutex::new(SmallMap::new()),
         package_path: "pkg".to_owned(),
         owner: key.artifact_owner(),

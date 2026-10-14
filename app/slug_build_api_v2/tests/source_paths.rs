@@ -69,7 +69,7 @@ fn source_args_executable_and_param_bytes_share_execution_paths() {
         RetainedParamFileFormat::Multiline,
     );
     assert_eq!(
-        recipe.render(),
+        recipe.render().unwrap(),
         ["lib.rs", "external/dep+/lib.rs", "external/other+/lib.rs"]
     );
     let make = |tool: AnalysisArtifact| {
@@ -103,7 +103,7 @@ fn source_args_executable_and_param_bytes_share_execution_paths() {
     };
     let first = make(source("@@dep+//:rustc"));
     assert_eq!(
-        first.render_argv(),
+        first.render_argv().unwrap(),
         [
             "external/dep+/rustc",
             "lib.rs",

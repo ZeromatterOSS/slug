@@ -290,13 +290,13 @@ async fn actual_allocator_helper_dynamic_and_self_contained_use_consumer_actions
         );
         assert!(
             spawns.iter().any(|(name, spawn)| *name == "CppArchive"
-                && spawn.render_argv()[0] == "toolchain/bin/ar")
+                && spawn.render_argv().unwrap()[0] == "toolchain/bin/ar")
         );
         assert!(spawns.iter().any(
-            |(name, spawn)| *name == "CppLink" && spawn.render_argv()[0] == "toolchain/bin/gcc"
+            |(name, spawn)| *name == "CppLink" && spawn.render_argv().unwrap()[0] == "toolchain/bin/gcc"
         ));
         for (_, spawn) in spawns {
-            assert!(spawn.render_argv().iter().any(|arg| arg.contains("self.o")));
+            assert!(spawn.render_argv().unwrap().iter().any(|arg| arg.contains("self.o")));
             assert!(spawn.resource_set().is_some());
             assert!(!spawn.outputs().is_empty());
         }

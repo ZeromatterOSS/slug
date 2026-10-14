@@ -21,7 +21,6 @@ use crate::provider::BzlEvaluationContext;
 use crate::subrule_invocation::AnalysisActionSink;
 use crate::subrule_invocation::AnalysisArtifactValue;
 use crate::subrule_invocation::AnalysisEvaluationContext;
-use crate::subrule_invocation::AnalysisRunRequest;
 
 #[derive(Debug)]
 struct NoopActionSink;
@@ -35,10 +34,11 @@ impl AnalysisActionSink for NoopActionSink {
         unreachable!("caller-authentication proof declares no actions")
     }
 
-    fn write(
+    fn write<'v>(
         &self,
-        _output: Value<'_>,
-        _content: Value<'_>,
+        _module: &'v starlark::environment::Module,
+        _output: Value<'v>,
+        _content: Value<'v>,
         _is_executable: bool,
     ) -> anyhow::Result<()> {
         unreachable!("caller-authentication proof declares no actions")
@@ -53,9 +53,6 @@ impl AnalysisActionSink for NoopActionSink {
         unreachable!("caller-authentication proof declares no actions")
     }
 
-    fn run(&self, _request: AnalysisRunRequest<'_>) -> anyhow::Result<()> {
-        unreachable!("caller-authentication proof declares no actions")
-    }
 
     fn artifact_symlink(
         &self,

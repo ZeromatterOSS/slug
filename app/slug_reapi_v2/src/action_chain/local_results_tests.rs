@@ -16,7 +16,12 @@ fn local(
 fn local_manifest_binding_preserves_plan_ordinals_and_remote_cas_provenance() {
     let workspace = requested_tests::workspace();
     let inputs = requested_tests::prepare(&workspace, &["//:one", "//:two"]);
-    let mut templates = Template::prepare(&inputs, &Default::default()).unwrap();
+    let mut templates = Template::prepare(
+        &inputs,
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     let local_result = local(
         "seed.out",
         b"manifest bytes\n",
@@ -126,7 +131,12 @@ stage = rule(implementation = _impl, executable = True, attrs = {"input": attr.l
         }
     };
     no_outputs();
-    let templates = Template::prepare(&requested, &Default::default()).unwrap();
+    let templates = Template::prepare(
+        &requested,
+        &Default::default(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     assert_eq!(
         templates
             .iter()
@@ -145,8 +155,20 @@ stage = rule(implementation = _impl, executable = True, attrs = {"input": attr.l
         .build()
         .unwrap()
         .block_on(async {
-            let mut session = transport.start(inputs.clone()).await.unwrap();
-            let mut other = transport.start(inputs).await.unwrap();
+            let mut session = transport
+                .start(
+                    inputs.clone(),
+                    &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+                )
+                .await
+                .unwrap();
+            let mut other = transport
+                .start(
+                    inputs,
+                    &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+                )
+                .await
+                .unwrap();
             let foreign = transport.stage(&mut other, 0).await.unwrap();
             assert!(transport.execute(&mut session, 0, foreign).await.is_err());
             let staged = transport.stage(&mut session, 0).await.unwrap();

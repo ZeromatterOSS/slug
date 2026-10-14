@@ -278,6 +278,14 @@ impl PackageEvaluation {
         self.retained_bzl_modules.len()
     }
 
+    /// Transfer the package's executable module lifetime into a published heap.
+    /// Source and repository identity remain in their existing semantic owners.
+    pub fn retain_bzl_heaps(&self, heap: &starlark::values::FrozenHeap) {
+        for entry in self.retained_bzl_modules.iter() {
+            entry.retain_in(heap);
+        }
+    }
+
     pub fn effective_visibility(&self, target: &PackageTarget) -> Option<RuleVisibility> {
         match &target.visibility {
             VisibilitySource::Declared(visibility) => Some(visibility.clone()),

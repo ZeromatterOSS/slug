@@ -1,5 +1,30 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+## General deferred Args callbacks
+
+Args callback profiles for Rust crate/link arguments and Cargo runfiles are
+retired. Analysis publishes bounded structural callable graphs with payload-owned
+original frozen executables. Code, complete source/mapping authority, parameters,
+defaults, captures, native values and aliases participate in joint provider/action
+publication equality. BuildAPI contains only native descriptors and fallible
+consumer interfaces. Registration and evaluator-end publication do not execute
+mappers; complete actions leave the sink only after shared lowering and freeze,
+outside registry locks. Captured analysis capabilities, function-valued inputs
+and uninspected opaque classes remain unsupported.
+
+Each vector invokes its original callable in one fresh transient evaluator.
+Formatting, uniqueness, joining, parameter files and errors share the native
+finalization path. Query uses explicit no-metadata directory behavior; execution
+requires tracked tree metadata. Consumer cancellation is borrowed from the current
+request; no-scope convenience consumers have no external cancellation signal.
+Graph and output quotas bound declared work; evaluator timeout/heap checks remain
+cooperative and do not establish a hard allocator, instruction or RSS fence.
+Native container materialization uses owning phase-local memo keys and preserves
+shared and distinct empty lists; canonical empty-tuple normalization remains an
+explicit boundary. ArgsWrite query/execution and Spawn ActionKey stay deferred.
+Other toolchain, repository-process, resource and build-info adapters remain
+replacement-required. These APIs do not close authentic Rust, memory, M7A or M8.
+
 Depset truth is exactly nonemptiness, using existing element-type metadata
 (`Empty`/None means no leaves) through evaluator construction, freeze and native
 materialization. Truth does not flatten, traverse or allocate. Trusted native

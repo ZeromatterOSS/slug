@@ -828,7 +828,7 @@ impl ToolchainTopology {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct ConfiguredNodeResult {
     key: ConfiguredNodeKey,
     actual_target: ConfiguredNodeKey,
@@ -844,6 +844,39 @@ pub struct ConfiguredNodeResult {
     constraint_setting_default: Option<Arc<CanonicalLabel>>,
     runfiles_packages: RunfilesPackageDepset,
 }
+
+impl PartialEq for ConfiguredNodeResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+            && self.actual_target == other.actual_target
+            && self.kind == other.kind
+            && self.declared_outputs == other.declared_outputs
+            && self.edges == other.edges
+            && self.diagnostics == other.diagnostics
+            && self.rule_capability == other.rule_capability
+            && self.exec_groups == other.exec_groups
+            && self.platform_semantic_fact == other.platform_semantic_fact
+            && self.constraint_setting_default == other.constraint_setting_default
+            && self.runfiles_packages == other.runfiles_packages
+            && self.actions.len() == other.actions.len()
+            && self
+                .actions
+                .iter()
+                .zip(other.actions.iter())
+                .all(|(left, right)| left.context == right.context)
+            // Provider captures and every action recipe share one alias map.
+            && slug_build_api_v2::publication_eq_providers_and_actions(
+                &self.providers,
+                &other.providers,
+                self.actions
+                    .iter()
+                    .zip(other.actions.iter())
+                    .map(|(left, right)| (&left.spec, &right.spec)),
+            )
+    }
+}
+
+impl Eq for ConfiguredNodeResult {}
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub(crate) struct RunfilesPackageClosureRow {
@@ -1226,3 +1259,7 @@ impl ConfiguredNodeResult {
 #[cfg(test)]
 #[path = "result/make_variable_selection_tests.rs"]
 mod make_variable_selection_tests;
+
+#[cfg(test)]
+#[path = "result/args_publication_tests.rs"]
+mod args_publication_tests;

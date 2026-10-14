@@ -33,7 +33,8 @@ pub struct ReapiCommand {
 
 impl ReapiCommand {
     pub fn from_action(action: &ActionSpec) -> Result<Self, String> {
-        let projection = ReapiCommandProjection::from_action(action).map_err(str::to_owned)?;
+        let projection =
+            ReapiCommandProjection::from_action(action).map_err(|error| error.to_string())?;
         Ok(Self {
             argv: projection.argv,
             env: projection.env,

@@ -34,6 +34,8 @@ use crate::bzl_module::BzlModuleIdentity;
 
 mod defining_module_context;
 pub(crate) use defining_module_context::attach_defining_module_context;
+pub(crate) use defining_module_context::attach_defining_module_manifest;
+pub use defining_module_context::defining_module_source_manifest;
 
 /// One canonical Bazel Label value shared by loading and module-extension
 /// evaluation. Repository/package/target identity lives only in this owner.
@@ -199,3 +201,6 @@ mod render_tests;
 #[cfg(test)]
 #[path = "starlark_label/runtime_module_tests.rs"]
 mod runtime_module_tests;
+
+#[cfg(test)]
+mod source_authority_tests;

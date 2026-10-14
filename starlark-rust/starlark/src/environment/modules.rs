@@ -328,6 +328,16 @@ impl FrozenModule {
 }
 
 impl FrozenModuleData {
+    pub(crate) fn inspection_named_slot(&self, name: &str) -> Option<ModuleSlotId> {
+        self.names.get_name(name).map(|(slot, _, _)| slot)
+    }
+
+    pub(crate) fn inspection_slot_name(&self, slot: ModuleSlotId) -> Option<FrozenStringValue> {
+        self.names
+            .all_symbols()
+            .find_map(|(name, candidate)| (candidate == slot).then_some(name))
+    }
+
     fn names(&self) -> impl Iterator<Item = FrozenStringValue> + '_ {
         self.names.symbols().map(|x| x.0)
     }
@@ -406,6 +416,26 @@ impl Module {
     /// Get the frozen heap on which frozen values are allocated by this module.
     pub fn frozen_heap(&self) -> &FrozenHeap {
         &self.frozen_heap
+    }
+
+    /// Visit every currently assigned module slot, including private and anonymous slots.
+    ///
+    /// Values borrow this module's existing heap. The visitor owns its resource
+    /// budget and must not mutate slots or run garbage collection during the visit.
+    /// No slot IDs, names, or collected copy of the slot values are exposed.
+    pub fn visit_assigned_values<'v>(
+        &'v self,
+        visitor: &mut dyn FnMut(Value<'v>) -> crate::Result<()>,
+    ) -> crate::Result<()> {
+        let count = self.slots().get_slots_mut().len();
+        for index in 0..count {
+            // Release the slot borrow before visiting; inspection may resolve
+            // the original module's other slots through the same owner.
+            if let Some(value) = self.slots().get_slot(ModuleSlotId(index as u32)) {
+                visitor(value)?;
+            }
+        }
+        Ok(())
     }
 
     /// Iterate through all the names defined in this module.
@@ -811,3 +841,7 @@ modified += 1
         assert!(module.get("_private_reexport").is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "modules/assigned_value_tests.rs"]
+mod assigned_value_tests;

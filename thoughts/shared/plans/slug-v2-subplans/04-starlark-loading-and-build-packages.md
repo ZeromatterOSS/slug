@@ -1,5 +1,19 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+## Callable inspection and Args ownership
+
+Args records actual callable values and registration-time input membership without
+invoking mappers. General borrowed Engine inspection exposes original modules,
+code dependencies, defaults, captures and parameter layout. Loading attaches the
+complete observed source manifest and repository mapping to the defining module;
+source digests certify integrity and retained dependencies, never implementations.
+Actual universe functions, builtin constructor classes and bound String/List/Dict
+methods require complete typed native certificates. Original frozen callables
+remain the executable owner. Other callable or receiver classes are unsupported.
+Pending references use traced evaluator scratch; publication replaces scratch
+roots with audited executable roots before freezing the actual module. Runtime
+batch roots use a separate traced module slot, preserving Loading's cache ABI.
+
 Native attribute calls resolve the actual getter before arguments and call its
 returned value through the ordinary traced frame temporary. Delayed method
 dispatch is admitted only when an actual frozen receiver's immutable Methods

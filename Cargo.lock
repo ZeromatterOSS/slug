@@ -3405,6 +3405,7 @@ dependencies = [
  "slug_events_v2",
  "slug_identity_v2",
  "slug_loading_v2",
+ "slug_starlark_v2",
  "slug_workspace_v2",
  "starlark",
  "starlark_map",

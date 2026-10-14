@@ -11248,7 +11248,7 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
     let tool_dir = expected_output_path(configuration, "pkg");
     let formatted_tool = format!("f={tool}%");
     assert_eq!(
-        first.render_argv(),
+        first.render_argv().unwrap(),
         [
             tool.as_str(),
             "head",
@@ -11305,7 +11305,10 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
         RetainedSpawnInvocation::Executable(SpawnExecutable::Path(path))
             if path.as_str() == "tools/runner"
     ));
-    assert_eq!(later.render_argv().last().map(String::as_str), Some("late"));
+    assert_eq!(
+        later.render_argv().unwrap().last().map(String::as_str),
+        Some("late")
+    );
     assert_eq!(later.environment().fixed().get("ONLY"), Some("action"));
     assert_eq!(later.environment().fixed().iter().len(), 1);
 
@@ -11318,7 +11321,10 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
             pad_dollar_zero: true,
         } if shell_executable == "/bin/bash" && command == "echo shell"
     ));
-    assert_eq!(shell.render_argv(), ["/bin/bash", "-c", "echo shell", ""]);
+    assert_eq!(
+        shell.render_argv().unwrap(),
+        ["/bin/bash", "-c", "echo shell", ""]
+    );
 
     let shell_empty = result.actions()[4].spawn_spec().unwrap();
     assert!(matches!(
@@ -11329,7 +11335,10 @@ async fn args_run_and_symlink_snapshot_through_the_generic_action_sink() {
             pad_dollar_zero: false,
         } if shell_executable == "/bin/bash" && command == "echo empty"
     ));
-    assert_eq!(shell_empty.render_argv(), ["/bin/bash", "-c", "echo empty"]);
+    assert_eq!(
+        shell_empty.render_argv().unwrap(),
+        ["/bin/bash", "-c", "echo empty"]
+    );
 
     let link = result.actions()[5].symlink_spec().unwrap();
     assert_eq!(link.progress_message(), Some("link source"));
@@ -11927,7 +11936,7 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
     let first = result.actions()[1].spawn_spec().unwrap();
     let tool_path = expected_output_path(key.configuration(), "pkg/tool");
     assert_eq!(
-        first.render_argv(),
+        first.render_argv().unwrap(),
         [
             tool_path.clone(),
             "head".to_owned(),
@@ -11938,10 +11947,17 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
             "--empty=".to_owned(),
         ]
     );
-    assert!(!first.render_argv().iter().any(|value| value == "late-list"));
     assert!(
         !first
             .render_argv()
+            .unwrap()
+            .iter()
+            .any(|value| value == "late-list")
+    );
+    assert!(
+        !first
+            .render_argv()
+            .unwrap()
             .iter()
             .any(|value| value == "late-action")
     );
@@ -11957,7 +11973,7 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
 
     let second = result.actions()[2].spawn_spec().unwrap();
     assert_eq!(
-        second.render_argv().last().map(String::as_str),
+        second.render_argv().unwrap().last().map(String::as_str),
         Some("late-action")
     );
     let RetainedCommandLineSegment::ArgsSnapshot(second_args) =
@@ -11971,7 +11987,7 @@ subject = rule(implementation = _impl, attrs = {"src": attr.label(allow_files = 
     let write = result.actions()[3].args_write_spec().unwrap();
     assert!(write.is_executable());
     assert_eq!(
-        write.render_content(),
+        write.render_content().unwrap(),
         format!(
             "scalar\n--all=-B v=a% -B v=b% --end\npkg/source.txt\n--files=[p={tool_path}]\n--empty=\nlate-action\n"
         )
@@ -12035,6 +12051,9 @@ def _format(ctx):
 def _get_crate_root_path(value):
     return value
 
+def _deferred(value):
+    fail("consumer-only deliberate failure")
+
 def _bad_args(ctx):
     args = ctx.actions.args()
     mode = ctx.attr.mode
@@ -12045,7 +12064,7 @@ def _bad_args(ctx):
     elif mode == "callback_order":
         args.add_all("--x", 1, map_each = _get_crate_root_path)
     elif mode == "callback":
-        args.add_all([], map_each = _get_crate_root_path)
+        args.add_all(["first", "second"], map_each = _get_crate_root_path)
     elif mode == "joined_source_order":
         args.add_joined(1, join_with = ",", map_each = _get_crate_root_path)
     elif mode == "joined_name_order":
@@ -12053,9 +12072,13 @@ def _bad_args(ctx):
     elif mode == "joined_callback_order":
         args.add_joined("--x", 1, join_with = ",", map_each = _get_crate_root_path)
     elif mode == "joined_callback":
-        args.add_joined([], join_with = ",", map_each = _get_crate_root_path)
+        args.add_joined(["first", "second"], join_with = ",", map_each = _get_crate_root_path)
     elif mode == "closure":
-        args.add_all([], allow_closure = True)
+        def local(value):
+            return mode + ":" + value
+        args.add_all(["value"], map_each = local, allow_closure = True)
+    elif mode == "deferred":
+        args.add_all(["value"], map_each = _deferred)
     elif mode == "value":
         out = ctx.actions.declare_file("bad.out")
         args.add_all([struct(x = 1)])
@@ -12071,6 +12094,8 @@ def _bad_args(ctx):
     elif mode == "format_twice":
         args.set_param_file_format("shell")
         args.set_param_file_format("multiline")
+    if mode in ["callback", "joined_callback", "closure", "deferred"]:
+        ctx.actions.write(ctx.actions.declare_file(mode + ".out"), args)
     return []
 
 def _empty(ctx):
@@ -12110,6 +12135,7 @@ bad_args(name = 'joined_name_order', mode = 'joined_name_order')
 bad_args(name = 'joined_callback_order', mode = 'joined_callback_order')
 bad_args(name = 'joined_callback', mode = 'joined_callback')
 bad_args(name = 'closure', mode = 'closure')
+bad_args(name = 'deferred', mode = 'deferred')
 bad_args(name = 'value', mode = 'value')
 bad_args(name = 'format_each', mode = 'format_each')
 bad_args(name = 'format_joined', mode = 'format_joined')
@@ -12132,15 +12158,12 @@ cross_owner(name = 'cross_owner', dep = ':producer')
         ("source_order", "values must be a sequence or depset"),
         ("name_order", "arg name must be a string"),
         ("callback_order", "values must be a sequence or depset"),
-        ("callback", "callback forms are not supported"),
         ("joined_source_order", "values must be a sequence or depset"),
         ("joined_name_order", "arg name must be a string"),
         (
             "joined_callback_order",
             "values must be a sequence or depset",
         ),
-        ("joined_callback", "callback forms are not supported"),
-        ("closure", "callback forms are not supported"),
         (
             "value",
             "supports only strings, integers, and regular Files",
@@ -12166,6 +12189,38 @@ cross_owner(name = 'cross_owner', dep = ':producer')
         .await
         .unwrap_err();
         assert!(error.contains(expected), "{error}");
+    }
+    for (target, expected) in [
+        ("callback", Some("first\nsecond\n")),
+        ("joined_callback", Some("first,second\n")),
+        ("closure", Some("closure:value\n")),
+        ("deferred", None),
+    ] {
+        let result = analyze_request(
+            &dice,
+            &workspace,
+            &ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//pkg:{target}")).unwrap(),
+                typed_action_test_configuration(),
+            ),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.actions().len(), 1);
+        let write = result.actions()[0].args_write_spec().unwrap();
+        match expected {
+            Some(expected) => assert_eq!(write.render_content().unwrap(), expected),
+            None => {
+                let error = write.render_content().unwrap_err().to_string();
+                assert!(
+                    error.contains("consumer-only deliberate failure"),
+                    "{error}"
+                );
+                assert!(error.contains("defs.bzl"), "{error}");
+            }
+        }
     }
 }
 
@@ -15364,3 +15419,9 @@ mod shell_environment_context_tests;
 
 #[path = "starlark_rule/depset_truth_context_tests.rs"]
 mod depset_truth_context_tests;
+
+#[path = "starlark_rule/args_callback_context_tests.rs"]
+mod args_callback_context_tests;
+
+#[path = "starlark_rule/args_callback_lifecycle_tests.rs"]
+mod args_callback_lifecycle_tests;

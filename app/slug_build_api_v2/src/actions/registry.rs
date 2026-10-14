@@ -23,6 +23,7 @@ pub enum ActionError {
     ConflictingOutput { path: String },
     MissingOutputs { mnemonic: String },
     MissingArgv { mnemonic: String },
+    ChangedRegistration { index: usize },
 }
 
 impl fmt::Display for ActionError {
@@ -38,6 +39,12 @@ impl fmt::Display for ActionError {
             Self::MissingOutputs { mnemonic } => {
                 write!(f, "action {mnemonic} must declare at least one output")
             }
+            Self::ChangedRegistration { index } => {
+                write!(
+                    f,
+                    "action completion changed registration header at index {index}"
+                )
+            }
             Self::MissingArgv { mnemonic } => {
                 write!(f, "action {mnemonic} must declare a non-empty argv")
             }
@@ -47,20 +54,62 @@ impl fmt::Display for ActionError {
 
 impl Error for ActionError {}
 
-#[derive(Debug, Clone, Eq, PartialEq, Default)]
-pub struct ActionRegistry {
-    actions: Vec<ActionSpec>,
+/// A trusted Rust-native registration header. Validation never expands Args,
+/// invokes a callback, or accesses evaluator state. Implementations may expose
+/// an already-complete payload for the existing native deduplication rules.
+pub trait RegisterableAction {
+    fn outputs(&self) -> &[ActionOutput];
+    fn mnemonic(&self) -> &str;
+    fn validate(&self) -> Result<(), ActionError>;
+    fn as_action_spec(&self) -> Option<&ActionSpec> {
+        None
+    }
+}
+
+impl RegisterableAction for ActionSpec {
+    fn outputs(&self) -> &[ActionOutput] {
+        ActionSpec::outputs(self)
+    }
+    fn mnemonic(&self) -> &str {
+        ActionSpec::mnemonic(self)
+    }
+    fn validate(&self) -> Result<(), ActionError> {
+        validate_action(self)
+    }
+    fn as_action_spec(&self) -> Option<&ActionSpec> {
+        Some(self)
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ActionRegistry<A = ActionSpec> {
+    actions: Vec<A>,
     // Candidate index and projection collision guard, never structural identity.
     output_owners: BTreeMap<String, usize>,
 }
 
-impl ActionRegistry {
+impl<A> Default for ActionRegistry<A> {
+    fn default() -> Self {
+        Self {
+            actions: Vec::new(),
+            output_owners: BTreeMap::new(),
+        }
+    }
+}
+
+impl ActionRegistry<ActionSpec> {
     pub fn new() -> Self {
         Self::default()
     }
+}
 
-    pub fn register(&mut self, action: ActionSpec) -> Result<usize, ActionError> {
-        validate_action(&action)?;
+impl<A: RegisterableAction> ActionRegistry<A> {
+    pub fn new_typed() -> Self {
+        Self::default()
+    }
+
+    pub fn register(&mut self, action: A) -> Result<usize, ActionError> {
+        action.validate()?;
         for output in action.outputs() {
             validate_output(output)?;
             if self.structural_output_owner(output).is_some()
@@ -82,12 +131,12 @@ impl ActionRegistry {
 
     pub fn register_batch(
         &mut self,
-        actions: impl IntoIterator<Item = ActionSpec>,
+        actions: impl IntoIterator<Item = A>,
     ) -> Result<Range<usize>, ActionError> {
         let actions = actions.into_iter().collect::<Vec<_>>();
         let mut pending = BTreeMap::new();
         for action in &actions {
-            validate_action(action)?;
+            action.validate()?;
             for output in action.outputs() {
                 validate_output(output)?;
                 if self.structural_output_owner(output).is_some()
@@ -112,8 +161,30 @@ impl ActionRegistry {
         Ok(start..self.actions.len())
     }
 
-    pub fn actions(&self) -> &[ActionSpec] {
+    pub fn actions(&self) -> &[A] {
         &self.actions
+    }
+
+    /// Consume phase-local rows into validated completed rows, retaining the
+    /// original output index and declaration order. Call outside producer locks.
+    /// No partial target registry escapes on conversion or validation failure.
+    pub fn try_map<B: RegisterableAction, E: From<ActionError>>(
+        self,
+        mut complete: impl FnMut(&A) -> Result<B, E>,
+    ) -> Result<ActionRegistry<B>, E> {
+        let mut actions = Vec::with_capacity(self.actions.len());
+        for (index, original) in self.actions.iter().enumerate() {
+            let action = complete(original)?;
+            action.validate()?;
+            if action.outputs() != original.outputs() || action.mnemonic() != original.mnemonic() {
+                return Err(ActionError::ChangedRegistration { index }.into());
+            }
+            actions.push(action);
+        }
+        Ok(ActionRegistry {
+            actions,
+            output_owners: self.output_owners,
+        })
     }
 
     pub fn output_owner(&self, output_path: &str) -> Option<usize> {
@@ -164,10 +235,9 @@ fn validate_action(action: &ActionSpec) -> Result<(), ActionError> {
             | crate::actions::spec::ActionKind::RunShell { .. }
             | crate::actions::spec::ActionKind::Spawn
     ) && action.argv().is_empty()
-        && action
-            .render_argv()
-            .expect("Run/RunShell/Spawn command projection is admitted")
-            .is_empty()
+        // Typed Spawn always contributes its executable or shell prefix. Its
+        // argument callbacks are deferred; registration must not render them.
+        && action.spawn_spec().is_none()
     {
         return Err(ActionError::MissingArgv {
             mnemonic: action.mnemonic().to_owned(),

@@ -142,7 +142,11 @@ impl SourceActionTransport for Fake {
     type Output = Output;
     type Error = std::io::Error;
 
-    async fn stage(&self, inputs: Arc<PreparedSourceActionInputs>) -> Result<Vec<u8>, Self::Error> {
+    async fn stage(
+        &self,
+        inputs: Arc<PreparedSourceActionInputs>,
+        _args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+    ) -> Result<Vec<u8>, Self::Error> {
         let attempt = self.stages.fetch_add(1, Ordering::SeqCst);
         if matches!(self.behavior, Behavior::ExecuteSource) && attempt > 0 {
             assert_eq!(
@@ -330,4 +334,32 @@ fn closure_owned_representative_check_rejects_shared_duplicate() {
         }
     }
     assert_eq!((admitted, rejected), (1, 1));
+}
+
+#[test]
+fn request_args_context_without_scope_has_no_tree_discovery_capability() {
+    use slug_build_api_v2::ArgsDirectoryContext;
+    let context = RequestArgsContext::new(None);
+    assert!(!context.is_cancelled());
+    let artifact = slug_build_api_v2::AnalysisArtifact::Source(
+        slug_identity_v2::CanonicalLabel::parse("@@//:input").unwrap(),
+    );
+    assert_eq!(context.list(&artifact).unwrap(), [artifact]);
+    let tree = slug_build_api_v2::AnalysisArtifact::Derived {
+        owner: slug_build_api_v2::AnalysisConfiguredTargetKey::new(
+            slug_identity_v2::CanonicalLabel::parse("@@//:generated").unwrap(),
+            b"cfg".as_slice(),
+        ),
+        output: slug_build_api_v2::ActionOutput::new(
+            crate::runtime::configured_output::test_root(),
+            "tree",
+            slug_build_api_v2::ActionOutputKind::Directory,
+        ),
+    };
+    assert_eq!(
+        context.list(&tree),
+        Err(slug_build_api_v2::ArgsExpansionError::Unsupported(
+            "execution directory expansion requires tracked tree metadata".into(),
+        ))
+    );
 }

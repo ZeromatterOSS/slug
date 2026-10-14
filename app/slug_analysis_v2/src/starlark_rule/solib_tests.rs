@@ -1,4 +1,5 @@
 //! Native construction through the production synchronous action sink.
+use slug_build_api_v2::RegisterableAction;
 use slug_build_api_v2::RunfilesRepositoryMapping;
 use slug_configuration_v2::SlugConfiguration;
 use slug_configuration_v2::native::host::ActionEnvironmentHost;
@@ -45,7 +46,7 @@ fn sink_for(key: ConfiguredTargetKey) -> Arc<SynchronousAnalysisActionSink> {
         )),
         root: DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
             .unwrap(),
-        actions: Arc::new(Mutex::new(CtxActions::new(
+        actions: Arc::new(Mutex::new(CtxActions::new_typed(
             DerivedArtifactRoot::bin(key.configuration().slug_configuration().unwrap().clone())
                 .unwrap(),
         ))),
@@ -123,7 +124,9 @@ fn native_solib_sink_keeps_input_owner_and_bin_relative_output() {
     assert_eq!(output.kind(), ActionOutputKind::File);
     let registry = sink.actions.lock().unwrap();
     assert_eq!(registry.registry().actions().len(), 1);
-    let action = &registry.registry().actions()[0];
+    let action = registry.registry().actions()[0]
+        .as_action_spec()
+        .expect("ordinary solib action is complete");
     assert_eq!(action.solib_symlink_spec().unwrap().input(), &input);
     assert_eq!(action.solib_symlink_spec().unwrap().output(), output);
     assert!(action.symlink_spec().is_none());
@@ -210,7 +213,12 @@ fn native_solib_sink_configured_input_a_b_a_restores_structural_action() {
             )));
         sink.dynamic_library_symlink(input, "_solib_k8", false, false)
             .unwrap();
-        snapshots.push(sink.actions.lock().unwrap().registry().actions()[0].clone());
+        snapshots.push(
+            sink.actions.lock().unwrap().registry().actions()[0]
+                .as_action_spec()
+                .expect("ordinary solib action is complete")
+                .clone(),
+        );
     }
     assert_ne!(snapshots[0], snapshots[1]);
     assert_eq!(snapshots[0], snapshots[2]);
@@ -268,7 +276,9 @@ fn source_stdlib_solib_uses_current_consumer_and_restores_configuration() {
         );
         let registry = sink.actions.lock().unwrap();
         assert_eq!(registry.registry().actions().len(), 1);
-        let action = &registry.registry().actions()[0];
+        let action = registry.registry().actions()[0]
+            .as_action_spec()
+            .expect("ordinary solib action is complete");
         assert_eq!(action.solib_symlink_spec().unwrap().input(), &input);
         assert_eq!(action.solib_symlink_spec().unwrap().output(), output);
         snapshots.push(action.clone());
@@ -291,7 +301,9 @@ fn source_stdlib_solib_uses_current_consumer_and_restores_configuration() {
             .dynamic_library_symlink(value, "_solib_k8", true, true)
             .unwrap();
         let registry = current.actions.lock().unwrap();
-        let action = &registry.registry().actions()[0];
+        let action = registry.registry().actions()[0]
+            .as_action_spec()
+            .expect("ordinary solib action is complete");
         assert_eq!(action.solib_symlink_spec().unwrap().input(), &source);
         source_snapshots.push(action.clone());
     }

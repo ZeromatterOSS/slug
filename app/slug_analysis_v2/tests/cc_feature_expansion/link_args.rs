@@ -103,7 +103,7 @@ fn assert_actions(
             .args_write_spec()
             .expect("existing ArgsWrite owner");
         assert_eq!(
-            write.render_content(),
+            write.render_content().unwrap(),
             format!("'{stamp}'\ndup\n'with space'\ndup\nbefore-write\n--tail\n")
         );
         argv.extend(["before-run".into(), "--tail".into()]);
@@ -111,12 +111,12 @@ fn assert_actions(
             let spawn = action.spawn_spec().expect("existing generic Spawn owner");
             let mut expected = vec!["runner".to_owned()];
             expected.extend(argv.clone());
-            assert_eq!(spawn.render_argv(), expected);
+            assert_eq!(spawn.render_argv().unwrap(), expected);
             let [RetainedCommandLineSegment::ArgsSnapshot(args)] = spawn.command_line().segments()
             else {
                 panic!("one ordinary retained Args snapshot")
             };
-            assert_eq!(args.recipe().render(), argv);
+            assert_eq!(args.recipe().render().unwrap(), argv);
             let expanded = spawn.expand_forced_param_files().unwrap();
             if flagged {
                 let policy = args.param_file().expect("forced parameter policy");

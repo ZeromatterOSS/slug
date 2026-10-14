@@ -124,7 +124,11 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
         prepared = Some(value.clone());
         TerminalOutput::new(0, String::new(), String::new())
     }));
-    let plan = SourceInputReapiPlan::from_prepared(prepared.unwrap()).unwrap();
+    let plan = SourceInputReapiPlan::from_prepared(
+        prepared.unwrap(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     assert_eq!(plan.prepared.sources().len(), 2);
     assert_eq!(plan.tree.inline_blobs().len(), 1);
     let command = plan.prepared.spawn().expand_forced_param_files().unwrap();
@@ -242,7 +246,11 @@ fn nativelink_closure_sources_merkle_and_verified_upload() {
         changed = Some(value.clone());
         TerminalOutput::new(0, String::new(), String::new())
     }));
-    let stale = SourceInputReapiPlan::from_prepared(changed.unwrap()).unwrap();
+    let stale = SourceInputReapiPlan::from_prepared(
+        changed.unwrap(),
+        &slug_build_api_v2::UnsupportedTreeArgsDirectoryContext,
+    )
+    .unwrap();
     std::fs::write(root.0.join("input"), b"different bytes!").unwrap();
     runtime.block_on(async {
         let digest = stale.tree.entries().iter().find(|entry| entry.path() == "input").unwrap().digest().clone();

@@ -11,14 +11,17 @@ use starlark::any::ProvidesStaticType;
 use starlark::environment::Module;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
+use starlark::values::Value;
 use starlark::values::starlark_value;
 
+use crate::BzlLoadManifest;
 use crate::BzlModuleIdentity;
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub(super) struct DefiningBzlModuleContext {
     label: CanonicalLabel,
     repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    source_manifest: Option<Arc<BzlLoadManifest>>,
 }
 
 impl DefiningBzlModuleContext {
@@ -50,5 +53,32 @@ pub(crate) fn attach_defining_module_context(
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
         label: identity.label.clone(),
         repository_mapping: identity.repository_mapping.clone(),
+        source_manifest: None,
     }))
+}
+
+/// Attach the existing observed load manifest once at module initialization.
+/// Its source/mapping arrays remain shared; only the root pathname is cloned.
+pub(crate) fn attach_defining_module_manifest(
+    module: &Module,
+    manifest: &BzlLoadManifest,
+) -> anyhow::Result<()> {
+    module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
+        label: manifest.root.label.clone(),
+        repository_mapping: manifest.root.repository_mapping.clone(),
+        source_manifest: Some(Arc::new(manifest.clone())),
+    }))
+}
+
+/// Borrow the tracked load manifest from an actual original module's client data.
+///
+/// Pass the value returned by Engine function inspection or defining-module
+/// inspection. Identity-only Label contexts and other values return None; this
+/// getter does not infer authority from a filename, function name, or evaluator.
+pub fn defining_module_source_manifest(
+    original_module_client_data: Value<'_>,
+) -> Option<&BzlLoadManifest> {
+    DefiningBzlModuleContext::from_value(original_module_client_data)?
+        .source_manifest
+        .as_deref()
 }

@@ -432,11 +432,14 @@ impl SynchronousAnalysisActionSink {
     }
 }
 
-pub(super) fn finalize<'v>(
+pub(super) fn finalize<'v, A>(
     module: &'v Module,
     lowerer: &mut AnalysisValueLowerer<'v>,
-    actions: &mut CtxActions,
-) -> anyhow::Result<()> {
+    actions: &mut CtxActions<A>,
+) -> anyhow::Result<()>
+where
+    A: slug_build_api_v2::RegisterableAction + From<slug_build_api_v2::ActionSpec> + Clone,
+{
     let pending = slug_loading_v2::cc_compile_action::pending(module);
     if pending.is_empty() {
         return Ok(());
@@ -489,7 +492,7 @@ pub(super) fn finalize<'v>(
         if let Some(group) = pending.exec_group {
             action = action.with_exec_group(group.to_string());
         }
-        merged.push(action);
+        merged.push(action.into());
     }
     merged.extend_from_slice(&normal[cursor..]);
     actions.replace_actions(merged)?;

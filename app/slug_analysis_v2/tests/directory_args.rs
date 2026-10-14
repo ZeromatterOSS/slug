@@ -36,7 +36,7 @@ subject=rule(implementation=_impl, attrs={'mode':attr.string(), 'policy':attr.st
             if policy == "false" {
                 let result = result.unwrap();
                 let spawn = result.actions()[1].spawn_spec().unwrap();
-                assert_eq!(spawn.render_argv(), ["tool", "tree"]);
+                assert_eq!(spawn.render_argv().unwrap(), ["tool", "tree"]);
                 assert_eq!(
                     spawn.expand_forced_param_files().unwrap().param_files()[0].bytes(),
                     b"tree\n"

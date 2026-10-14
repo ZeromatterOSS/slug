@@ -546,6 +546,11 @@ impl SourceServiceScope {
         self.cancelled.send_replace(true);
         first
     }
+    /// Read the current request's stop signal without changing source state.
+    pub(in crate::runtime) fn is_cancelled(&self) -> bool {
+        *self.cancelled.borrow() || Instant::now() >= self.work_deadline
+    }
+
     pub(in crate::runtime) fn cancel(&self) {
         self.poison(SourceServiceError::Cancelled);
         self.cancelled.send_replace(true);

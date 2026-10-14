@@ -22,6 +22,7 @@ pub trait ActionChainTransport: Sync {
     fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> impl std::future::Future<Output = Result<Self::Session, Self::Error>> + Send;
     fn stage(
         &self,
@@ -300,9 +301,12 @@ impl<T: ActionChainTransport, P: PublicationPolicy<T>> NativeCommandRoot
             } else {
                 None
             };
+            let args_context = super::source_execution::RequestArgsContext::new(
+                context.command.runtime.source_scope.as_deref(),
+            );
             let mut session = self
                 .transport
-                .start(terminal.inputs.clone())
+                .start(terminal.inputs.clone(), &args_context)
                 .await
                 .map_err(|error| {
                     NativeDemandSessionError::Computation(anyhow::Error::new(error))

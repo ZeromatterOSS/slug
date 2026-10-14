@@ -24,9 +24,10 @@ impl ActionChainTransport for FaultTransport {
     async fn start(
         &self,
         inputs: Arc<PreparedActionChainInputs>,
+        args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
     ) -> Result<Self::Session, Self::Error> {
         *self.inputs.lock().unwrap() = Some(inputs.clone());
-        self.inner.start(inputs).await
+        self.inner.start(inputs, args_context).await
     }
     async fn stage(
         &self,

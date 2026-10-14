@@ -144,7 +144,27 @@ async fn complete_cc_toolchain_provider_and_original_functions_survive_publicati
         check_query(&producer, force_pic, "--user");
         check_query(&consumer, force_pic, "--user");
         let tc = field(&consumer, "toolchain");
-        assert!(field(&producer, "toolchain").publication_eq(tc));
+        if !field(&producer, "toolchain").publication_eq(tc) {
+            let AnalysisValueKind::Provider(before) = field(&producer, "toolchain").kind() else {
+                panic!("producer provider")
+            };
+            let AnalysisValueKind::Provider(after) = tc.kind() else {
+                panic!("consumer provider")
+            };
+            let differing_fields = before
+                .fields()
+                .iter()
+                .filter(|(name, value)| {
+                    after
+                        .field(name)
+                        .is_none_or(|other| !value.publication_eq(other))
+                })
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>();
+            panic!(
+                "complete toolchain publication changed; differing individual fields: {differing_fields:?}"
+            );
+        }
         let AnalysisValueKind::Provider(provider) = tc.kind() else {
             panic!("complete provider")
         };

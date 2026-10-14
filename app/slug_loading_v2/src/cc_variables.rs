@@ -260,6 +260,11 @@ pub struct CcVariablesView<'v> {
     pub locals: Vec<(CompactString, Value<'v>)>,
     pub cache: Vec<(CompactString, CcVariableCacheEntry<Value<'v>>)>,
 }
+/// Test the actual moving or frozen variables facade without projecting caches.
+pub fn is_cc_variables_value(value: Value<'_>) -> bool {
+    Variables::from_value(value).is_some()
+}
+
 pub fn cc_variables_value(value: Value<'_>) -> Option<CcVariablesView<'_>> {
     fn view<'v, V: ValueLike<'v>>(v: &VariablesGen<V>) -> CcVariablesView<'v> {
         CcVariablesView {

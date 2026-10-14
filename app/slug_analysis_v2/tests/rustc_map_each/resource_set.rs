@@ -59,7 +59,7 @@ fn assert_registration(result: &ConfiguredNodeResult, marker: &str, mode: &str) 
     assert_eq!(recipe.source(), RetainedSpawnResourceSet::SOURCE_LABEL);
     assert_eq!(recipe.digest(), &RetainedSpawnResourceSet::SOURCE_DIGEST);
     assert_eq!(
-        spawn.render_argv(),
+        spawn.render_argv().unwrap(),
         ["runner".to_owned(), format!("--stamp={marker}:{mode}")]
     );
     let expanded = spawn.expand_forced_param_files().unwrap();

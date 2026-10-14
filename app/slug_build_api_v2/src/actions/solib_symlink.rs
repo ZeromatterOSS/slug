@@ -655,7 +655,9 @@ mod tests {
         assert!(native.execution_requirements().is_empty());
         assert_eq!(
             ReapiCommandProjection::from_action(native).unwrap_err(),
-            "native SolibSymlink REAPI projection is not admitted"
+            crate::ArgsExpansionError::Unsupported(
+                "native SolibSymlink REAPI projection is not admitted".into()
+            )
         );
         let mut decorated = CtxActions::new(root_support::root());
         decorated

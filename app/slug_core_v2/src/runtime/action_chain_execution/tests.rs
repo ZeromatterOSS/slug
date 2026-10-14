@@ -255,7 +255,11 @@ impl ActionChainTransport for Fake {
     type Output = Output;
     type Error = std::io::Error;
 
-    async fn start(&self, inputs: Arc<PreparedActionChainInputs>) -> Result<Session, Self::Error> {
+    async fn start(
+        &self,
+        inputs: Arc<PreparedActionChainInputs>,
+        _args_context: &dyn slug_build_api_v2::ArgsDirectoryContext,
+    ) -> Result<Session, Self::Error> {
         let attempt = self.starts.fetch_add(1, Ordering::SeqCst);
         if matches!(
             self.behavior,
