@@ -34,15 +34,14 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-419-m7a-general-args-callbacks
+Packet: WP-7-420-m7a-general-run-environment-provider
 
-General deferred Args callbacks are accepted in
-[WP1219](./slug-v2-subplans/wp1219-general-args-callbacks-acceptance-2026-10-14.json).
-The original Starlark callback family replaces all Rust/Cargo Args adapters.
-The final verified Rust cquery passes rustc.bzl2918 and reaches RunEnvironmentInfo
-construction at rust.bzl375. Other adapters, authentic command completion,
-action comparison, memory and M7A/M8 remain open. The next capability implements
-general native provider construction/publication and retained launch metadata.
+General RunEnvironmentInfo and exact-request source selection are accepted;
+[receipt](./slug-v2-subplans/wp1220-general-run-environment-provider-acceptance-2026-10-14.json).
+The verified Rust cquery completes diagnostically. Remaining Rust/C++ provider
+callable adapters are the next replacement family; their general ownership and
+function-identity design precedes implementation. Authentic analysis/action/REAPI,
+equivalent-command memory and M7A/M8 remain open.
 
 ### Bootstrap command queue
 

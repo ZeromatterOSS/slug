@@ -132,6 +132,7 @@ mod attribute_files;
 mod cc_compile_action;
 mod cc_context;
 mod make_variables;
+mod run_environment_info;
 use cc_context::CcContextProjection;
 pub(crate) use cc_context::selected_execution_os;
 
@@ -2496,6 +2497,9 @@ pub(crate) fn evaluate_loaded_rule(
             provider_values.push(ProviderValue::XcodeVersionInfo(
                 slug_build_api_v2::XcodeVersionInfo::default_empty_version(),
             ));
+        } else if let Some(info) = slug_loading_v2::provider::run_environment_info(value) {
+            run_environment_info::validate_declaration(rule_capability.as_ref())?;
+            provider_values.push(ProviderValue::RunEnvironmentInfo(info));
         } else if let Some(info) = slug_loading_v2::provider::feature_flag_info(value) {
             provider_values.push(ProviderValue::FeatureFlagInfo(info));
         } else if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {

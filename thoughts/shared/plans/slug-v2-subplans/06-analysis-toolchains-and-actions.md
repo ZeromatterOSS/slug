@@ -1,5 +1,20 @@
 # Stage 6: Analysis, Toolchains, and Actions
 
+## Executable environment publication
+
+Only a declared executable rule or actual Test capability may return top-level
+RunEnvironmentInfo. Validation precedes completed-action/result publication;
+DefaultInfo executable presence cannot substitute for declaration capability.
+Nested values remain ordinary typed provider fields. The declaration predicate
+has direct Test/Suite evidence; full configured tests still require their
+implicit test-tool/source closure.
+
+RunfilesSupport retains launch environment through independent canonical fixed
+and inherited channels, preserving fixed fallbacks on overlapping names. Only
+this launch projection deduplicates inherited names. Configured SymlinkTree
+action environment stays separate. No ambient client resolution, run/test launch
+or Windows runfiles behavior is implied.
+
 ## General deferred Args callbacks
 
 Args callback profiles for Rust crate/link arguments and Cargo runfiles are

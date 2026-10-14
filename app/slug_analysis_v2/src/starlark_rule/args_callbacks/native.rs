@@ -141,6 +141,7 @@ pub(super) fn validate_atom(
                 .into(),
         ),
         AnalysisValueKind::TemplateVariableInfo(_)
+        | AnalysisValueKind::RunEnvironmentInfo(_)
         | AnalysisValueKind::PackageSpecificationInfo(_)
         | AnalysisValueKind::CppFragment(_)
         | AnalysisValueKind::CcHeaderInfo(_) => {
@@ -211,6 +212,11 @@ pub(super) fn pure_candidate<'v>(
             }
             if crate::analysis_value::AnalysisConfiguredTargetValue::from_value(value).is_some() {
                 return Err("Args configured-target captures/inputs require a borrowed bounded metadata audit".into());
+            }
+            if slug_loading_v2::provider::run_environment_info_ref(value).is_some() {
+                return Err(
+                    "Args native metadata class has no admitted borrowed capture audit".into(),
+                );
             }
             if slug_loading_v2::is_cc_variables_value(value)
                 || slug_loading_v2::cc_toolchain_features_value(value).is_some()

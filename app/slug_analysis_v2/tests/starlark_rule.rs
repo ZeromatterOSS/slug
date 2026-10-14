@@ -15425,3 +15425,6 @@ mod args_callback_context_tests;
 
 #[path = "starlark_rule/args_callback_lifecycle_tests.rs"]
 mod args_callback_lifecycle_tests;
+
+#[path = "starlark_rule/run_environment_info_tests.rs"]
+mod run_environment_info_tests;

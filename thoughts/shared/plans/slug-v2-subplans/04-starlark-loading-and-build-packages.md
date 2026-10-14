@@ -1,5 +1,17 @@
 # Stage 4: Starlark Loading and BUILD Packages
 
+## General executable environment provider
+
+RunEnvironmentInfo is a phase-independent native constructor with immutable
+ordered string-map and duplicate-preserving inherited-name snapshots. Getters
+allocate fresh mutable dict/list values, including after freeze and dependency
+publication. Starlark field equality/hash ignore map insertion order; native
+publication preserves observable getter order. Typed extraction/materialization
+preserve nested native instances. Constructor arguments follow the admitted
+Bazel Sequence surface, including empty ranges; no evaluator/context is retained.
+Deprecated testing.TestEnvironment policy and Args capture admission remain
+unsupported; provider construction does not certify either surface.
+
 ## Callable inspection and Args ownership
 
 Args records actual callable values and registration-time input membership without

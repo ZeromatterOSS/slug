@@ -1,5 +1,15 @@
 # Stage 9: V1 Extraction Ledger
 
+## Executable environment retained representation
+
+V2-owned RunEnvironmentInfo reuses SmallMap, CompactString and Arc/Dupe/Allocative
+for one immutable raw payload. Field equality/hash and ordered publication are
+separate; canonical launch channels reuse RetainedActionEnvironment without
+normalizing or copying in its channel constructor. No donor import, global pool,
+cache, evaluator retention or DICE key is introduced. Getter copies and launch
+canonicalization have phase-local owners; component checks imply no workload
+memory or performance claim.
+
 ## General Args retained representation
 
 V2-owned Args publication extends the existing Arc/native-value and starlark-rust

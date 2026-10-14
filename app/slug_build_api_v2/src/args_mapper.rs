@@ -290,6 +290,11 @@ impl NativeArgsBudget {
                         }
                     }
                 }
+                AnalysisValueKind::RunEnvironmentInfo(_) => {
+                    return Err(ArgsExpansionError::Unsupported(
+                        "RunEnvironmentInfo requires a borrowed Args metadata audit".into(),
+                    ));
+                }
                 AnalysisValueKind::RustToolchainCallable(_)
                 | AnalysisValueKind::CcToolchainCallable(_) => {
                     return Err(ArgsExpansionError::Unsupported(

@@ -18,6 +18,8 @@ use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::RunfilesPackageDepset;
 use slug_build_api_v2::RunfilesSupport;
 use slug_build_api_v2::RunfilesSupportActionSpec;
+use slug_configuration_v2::CanonicalStringMap;
+use slug_configuration_v2::CanonicalStringSet;
 use slug_configuration_v2::HostPathFlavor;
 use slug_configuration_v2::RetainedActionEnvironment;
 
@@ -57,8 +59,27 @@ pub(crate) fn complete_runfiles_support(
         owner: owner.clone(),
         output: ActionOutput::new(output.root().clone(), path, kind),
     };
+    // Launch inheritance is independent of the SymlinkTree action's configured
+    // environment. Keep fixed fallbacks even when the same name is inherited.
+    let launch_environment = providers.run_environment_info().map_or_else(
+        RetainedActionEnvironment::default,
+        |environment| {
+            RetainedActionEnvironment::from_channels(
+                CanonicalStringMap::from_pairs(
+                    environment
+                        .environment()
+                        .iter()
+                        .map(|(key, value)| (key.clone(), value.clone())),
+                ),
+                CanonicalStringSet::from_values(
+                    environment.inherited_environment().iter().cloned(),
+                ),
+            )
+        },
+    );
     let support = Arc::new(RunfilesSupport {
         runfiles: info.default_runfiles.clone(),
+        launch_environment,
         tree: artifact(
             format!("{executable_path}.runfiles"),
             ActionOutputKind::RunfilesTree,

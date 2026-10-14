@@ -35,6 +35,8 @@ mod output_group;
 
 pub use output_group::OutputGroupInfo;
 
+pub use crate::run_environment_info::RunEnvironmentInfo;
+
 pub type FileDepset = Depset<String>;
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -260,6 +262,8 @@ pub struct RunfilesSupport {
     pub input_manifest: AnalysisArtifact,
     pub manifest: Option<AnalysisArtifact>,
     pub repo_mapping_manifest: Option<AnalysisArtifact>,
+    /// Executable launch channels, independent of SymlinkTree action environment.
+    pub launch_environment: slug_configuration_v2::RetainedActionEnvironment,
 }
 
 impl RunfilesSupport {
@@ -269,6 +273,7 @@ impl RunfilesSupport {
             && self.input_manifest == other.input_manifest
             && self.manifest == other.manifest
             && self.repo_mapping_manifest == other.repo_mapping_manifest
+            && self.launch_environment == other.launch_environment
     }
 }
 
@@ -610,21 +615,6 @@ impl DefaultInfo {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct RunEnvironmentInfo {
-    pub environment: BTreeMap<String, String>,
-    pub inherited_environment: Vec<String>,
-}
-
-impl RunEnvironmentInfo {
-    pub fn empty() -> Self {
-        Self {
-            environment: BTreeMap::new(),
-            inherited_environment: Vec::new(),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct PlatformInfo {
     pub label: String,
     pub constraints: BTreeMap<String, String>,
@@ -821,6 +811,13 @@ impl ProviderCollection {
     pub fn package_specification_info(&self) -> Option<&crate::PackageSpecificationInfo> {
         match self.get(&ProviderIdentity::builtin("PackageSpecificationInfo")) {
             Some(ProviderValue::PackageSpecificationInfo(info)) => Some(info),
+            _ => None,
+        }
+    }
+
+    pub fn run_environment_info(&self) -> Option<&RunEnvironmentInfo> {
+        match self.get(&ProviderIdentity::builtin("RunEnvironmentInfo")) {
+            Some(ProviderValue::RunEnvironmentInfo(info)) => Some(info),
             _ => None,
         }
     }

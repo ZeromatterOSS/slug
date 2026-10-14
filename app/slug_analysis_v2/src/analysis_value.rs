@@ -760,17 +760,10 @@ impl<'a> AnalysisValueMaterializer<'a> {
                 ));
             }
             ProviderValue::RunEnvironmentInfo(info) => {
-                fields.insert(
-                    "environment".into(),
-                    self.string_map(info.environment.clone()),
-                );
-                fields.insert(
-                    "inherited_environment".into(),
-                    self.heap.alloc(
-                        info.inherited_environment
-                            .iter()
-                            .map(|value| self.heap.alloc_str(value).to_frozen_value())
-                            .collect::<Vec<_>>(),
+                return Ok(
+                    slug_loading_v2::provider::alloc_frozen_run_environment_info(
+                        self.heap,
+                        info.dupe(),
                     ),
                 );
             }
@@ -911,6 +904,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
             }
             AnalysisValueKind::TemplateVariableInfo(info) => {
                 slug_loading_v2::alloc_frozen_template_variable_info(self.heap, info.dupe())
+            }
+            AnalysisValueKind::RunEnvironmentInfo(info) => {
+                slug_loading_v2::provider::alloc_frozen_run_environment_info(self.heap, info.dupe())
             }
             AnalysisValueKind::CcToolchainFeatures(value) => {
                 slug_loading_v2::alloc_frozen_cc_toolchain_features(self.heap, value.clone())
@@ -1237,6 +1233,9 @@ impl<'v> AnalysisValueLowerer<'v> {
     }
 
     fn lower_recursive(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
+        if let Some(info) = slug_loading_v2::provider::run_environment_info(value) {
+            return Ok(AnalysisValue::run_environment_info(info));
+        }
         if let Some(info) = slug_loading_v2::template_variable_info(value) {
             return Ok(AnalysisValue::template_variable_info(info));
         }
@@ -1381,6 +1380,8 @@ impl<'v> AnalysisValueLowerer<'v> {
 #[path = "analysis_value/cc_features_tests.rs"]
 mod cc_features_tests;
 #[cfg(test)]
+mod run_environment_tests;
+#[cfg(test)]
 mod template_variable_tests;
 
 #[cfg(test)]
@@ -1475,10 +1476,12 @@ mod tests {
                 )]))
                 .unwrap(),
             ),
-            ProviderValue::RunEnvironmentInfo(RunEnvironmentInfo {
-                environment: BTreeMap::from([("KEY".to_owned(), "value".to_owned())]),
-                inherited_environment: vec!["PATH".to_owned()],
-            }),
+            ProviderValue::RunEnvironmentInfo(RunEnvironmentInfo::new(
+                [(CompactString::new("KEY"), CompactString::new("value"))]
+                    .into_iter()
+                    .collect(),
+                std::sync::Arc::from([CompactString::new("PATH")]),
+            )),
             ProviderValue::FilesToRunProvider(
                 FilesToRunProvider::single_executable_without_support(executable_artifact),
             ),
@@ -1569,14 +1572,29 @@ mod tests {
                 .as_ref(),
             "pkg/validation.txt"
         );
-        let run_environment = builtin(target, "RunEnvironmentInfo");
-        let environment =
-            DictRef::from_value(field(run_environment, "environment").to_value()).unwrap();
-        assert_eq!(environment.len(), 1);
-        let inherited =
-            ListRef::from_value(field(run_environment, "inherited_environment").to_value())
+        let run_environment = *target
+            .providers
+            .get(&ProviderIdentity::builtin("RunEnvironmentInfo"))
+            .unwrap();
+        assert_eq!(run_environment.to_value().get_type(), "RunEnvironmentInfo");
+        Heap::temp(|scratch| {
+            let run_environment = run_environment.to_value();
+            let first = run_environment
+                .get_attr_error("environment", scratch)
                 .unwrap();
-        assert_eq!(inherited[0].unpack_str(), Some("PATH"));
+            let second = run_environment
+                .get_attr_error("environment", scratch)
+                .unwrap();
+            assert!(!first.ptr_eq(second));
+            assert_eq!(DictRef::from_value(first).unwrap().len(), 1);
+            let inherited = run_environment
+                .get_attr_error("inherited_environment", scratch)
+                .unwrap();
+            assert_eq!(
+                ListRef::from_value(inherited).unwrap()[0].unpack_str(),
+                Some("PATH")
+            );
+        });
 
         let files_to_run = StarlarkFilesToRunProvider::from_value(
             target

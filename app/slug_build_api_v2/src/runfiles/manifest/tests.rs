@@ -44,6 +44,7 @@ fn file(path: &str) -> AnalysisArtifact {
 
 fn support() -> RunfilesSupport {
     RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles: RetainedRunfiles::empty(),
         tree: generated(
             "@@//:owner",

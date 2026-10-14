@@ -65,6 +65,7 @@ fn links(values: Vec<(&str, AnalysisArtifact)>) -> crate::RunfilesSymlinkDepset 
 
 fn support(runfiles: RetainedRunfiles) -> RunfilesSupport {
     RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles,
         tree: derived(
             "@@//:binary",

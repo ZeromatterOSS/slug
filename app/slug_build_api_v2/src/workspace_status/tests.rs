@@ -86,6 +86,7 @@ fn workspace_status_runfiles_refuse_before_resolver() {
     // The support output slots are irrelevant to source-manifest projection;
     // status is deliberately present as a leaf in the ordinary runfiles set.
     let support = crate::RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles,
         tree: status.clone(),
         input_manifest: status,

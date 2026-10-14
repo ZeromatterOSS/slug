@@ -120,3 +120,16 @@ fn input_capture_native_container_aliases_share_one_publication_state() {
         Err(ArgsExpansionError::Limit(_))
     ));
 }
+
+#[test]
+fn run_environment_native_atoms_remain_outside_args_metadata_admission() {
+    let value = AnalysisValue::run_environment_info(crate::RunEnvironmentInfo::empty());
+    let inputs = RetainedArgsInputs::Sequence(Arc::from([value.clone()]));
+    assert!(matches!(
+        inputs.values(),
+        Err(ArgsExpansionError::Unsupported(_))
+    ));
+    let mut graph = CallableGraphBuilder::new();
+    let node = graph.reserve().unwrap();
+    assert!(graph.set_node(node, CallableNode::Native(value)).is_err());
+}

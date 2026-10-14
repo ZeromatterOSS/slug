@@ -17,6 +17,7 @@ pub(super) fn fixture(
     let exe = artifact(owner, "exe", ActionOutputKind::File);
     let source = AnalysisArtifact::Source(CanonicalLabel::parse("@@//:data").unwrap());
     let support = Arc::new(RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles: RetainedRunfiles::empty()
             .with_artifact(exe.clone())
             .unwrap()

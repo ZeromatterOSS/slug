@@ -1,0 +1,811 @@
+{
+  "packet": "WP-7-420-m7a-general-run-environment-provider",
+  "status": "ACCEPTED scoped capability; atomic owned integration approved",
+  "base_revision": "2780bd0ef99121ad36bf9a02730b95967bf60704",
+  "recorded_at_utc": "2026-10-14T02:15:22.055540+00:00",
+  "observable_capability": "Verified public Rust cquery now completes after genuine RunEnvironmentInfo construction/publication and exact-request source-demand grouping. Remaining adapters make this diagnostic continuation only.",
+  "compatibility": {
+    "exact": [
+      "constructor 0\u20132 positional/named binding, string dict and sequence validation incl empty typed ranges",
+      "immutable raw snapshots and fresh mutable getters, freeze/drop/nested native roundtrip",
+      "native-info field equality/hash ignore map order and preserve inherited ordering/multiplicity",
+      "top-level declared executable or actual Test validation before completed actions; Suite/missing/plain refuse",
+      "independent launch fixed/inherited channels preserving overlap; SymlinkTree configured env unchanged"
+    ],
+    "slug_native": [
+      "structural identity and ordered publication invalidation",
+      "canonical native launch channel order and hash encoding",
+      "selected-source grouping by full scope/request ID with canonical order"
+    ],
+    "unsupported_deferred": [
+      "deprecated testing.TestEnvironment warning policy",
+      "full configured test implicit-tool/source closure and run/test client environment resolution",
+      "Windows runfiles",
+      "new native class in Args captures/inputs until bounded borrowed audit"
+    ]
+  },
+  "public_diagnostic": {
+    "command": [
+      "/run/media/system/Colossus/dev/slug/target/debug/slug",
+      "cquery",
+      "//pkg:probe",
+      "--output=starlark",
+      "--starlark:expr=str(target.label)",
+      "--@rules_rust//rust/toolchain/channel=nightly",
+      "--lockfile_mode=off",
+      "--registry=file:///run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-patch-registry",
+      "--override_module=rules_rust=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/3f4953c2169feda451078c0478cbf616c0b02c4437ab8abe3cabe150d7fc8c25/427a685f-8b2a-4b98-aaf5-d4538c93259a",
+      "--override_module=platforms=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/27140d826ce838295eef42b90209085c5ca0dffad2c69401a2c25a7ecf1ed877/03fd549a-36fd-4196-b4ff-aea4605ec0b0",
+      "--override_module=bazel_features=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/df3a2a8ee81b7988806f6b9a28fca904ed829fc4088e3b4a16b2a78605a84889/63e369c1-b6f7-4db8-a36b-d37828bfa5f9",
+      "--override_module=bazel_skylib=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/6386f66b9e0c5b535c790292171398898e27abcd1d6d83e5f850a7a78c351b39/6d146eb9-8c2d-4f17-9c61-e57d6e4377af",
+      "--override_module=rules_cc=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b679c020813eb8d658920448a1e821880c62d293d56d564524c8c254e20e485f/d0e4ebaa-7ffa-4a3d-a755-c5d29e9dc78c",
+      "--override_module=rules_license=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/4c6795bb04c3349d2b9b2808b887d3f14ff63bd269fbefd4b4c28155a2d19525/f6cf33a6-90b1-4749-a93c-e2cb5cce1b13",
+      "--override_module=rules_shell=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/e4cd8731be89dd0473a729d04ebd85444fe476aba6f06f85094f7b108924b591/4bca3bf5-0643-4020-8164-f11be8f615a5",
+      "--override_module=apple_support=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/13472a256eff8c8b5f8a2a117b4cf3b0f5694370e2b294b1d6245602764578c5/332a872f-7ce2-4ac9-ab78-01592c6cd5ac",
+      "--override_module=package_metadata=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/87ddb5d5a728136adee9906902ea29def4999252491ac9c7561a865cab34f2ca/0c45a275-e090-43c4-a806-bd40b1d3c496",
+      "--override_module=buildozer=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/b1e01de9c6b5635482f28248bca3a662d4e80b182852ad2e4bdb089d264e881a/5da1f8a3-3aad-4c7f-935e-a831b99ae956",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/1692f77d1739bacf3f94337188b78583cf09bab7e420d2dc6c5605a4f86785a1",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8625cc7b7b2952e38101e17b4a9e7c043b3a79f55d26e4772819891998725e16",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/8189bac9a6bf9cc155a854c4cbebfebf58b9ca7a2d0a67645f7d0c1f83c523ac",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/6e78f0e57de26801f6f564fa7c4a48dc8b36873e416257a92bbb0937eeac8446",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/bd0786e0f8b6aed8c35898b4c06f64ba853d61d7c8361edb5a8d43c6ea37f5c6",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/65fab701d9829d38cb77c14acdc431d2108bfdbf8979e40eb8ae567edf10b27c",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3384eb1c30762704fbe38e440204e114154086c8fc8a8c2e3e28441028c019a8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/687e98a471973b5c5fd711750c40b8b82c0ade33f649db65e00b290f29345a2b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a58c25c5fe063a70057fa20cb8e15f3bda19b1030305bcb533af1e45f36a4a55",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/20152b14d9a420afc15ace905c02fd6425ddceb084630f3f043b287adf0fcdbd",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/283fa1cdaaf172337898749cf4b9b1ef5ea269da59540954e51fba0e7b8f277a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/4e1a28a25c2efa53500c928d22ceffbc505dd95b335a2d025836a293b592212f",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/a1e351607f04fed296ba33c4977d3fe2a615ed50df7896676b67aac993c53c18",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/3b772976fec7bdcda1d84b9d39b176589424c047eb2175bed09aac630e50af43",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/26d4021f6898e23b82ef953078389dd49ac2b5618ac564ade4ef87cced147b38",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/d20c951960ed77cb7b341c2a59488534e494d5ad1d30c4818c736d57772a9fef",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/f609f341d6e9090b981b3f45324d05a819fd7a5a56434f849c761971ce2c47da",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/e6b87c89bd0b27039e3af2c5da01147452f240f75d505f5b6880874f31036307",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/5eff717c18bb513285b499add68f2331509cd4e411ff085e96a86b3342c1e5aa",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/0e1ed4a98f26e718776bd64d053d02bb34d98572ccd03d6ba355112a1205706b",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/slug-diagnostics/wp1206-distdirs/9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/0aa143cf401827874af7114f6466c0c87d4e31dfd6a2355c50db2e0c71bd45c7",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/98bb5375ef6648d6e59fe8558e12df854e73653db2b6c7ee8891ffa0336f7622",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/cbc76e93946fb4658b692f9d71dbd4861f942b5b2bf6e34b072ba708d00e89e8",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/7302ec9a0447d5e21d918428b629a1d76ff934a562660e19b275fad707cf83dc",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/9a0a34cc7a11eb74f408ab7a5eafd063bcce3726c9bb89351ed7f2811fa35b1a",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1208/toolchain-distdirs/d9206e55ee07ae3ba9de7190142a8e422a72f300726fa8e094a6300c7128aa82",
+      "--distdir=/run/media/system/Colossus/dev/slug/target/wp1210/toolchain-distdirs/bb48a8124f84818dab540701952e4cf5506045000baa975b6046d54aeac87d5d"
+    ],
+    "workspace": "/run/media/system/Colossus/dev/slug/target/wp1220/normal-host-diagnostic-after-source-scope/slug-workspace",
+    "exit_code": 0,
+    "elapsed_seconds": 64.68687912099995,
+    "binary_sha256": "a450a684802d4d06a15cf63d06bac9e0ef98f61693e39dbf2dfa7c54346ea4a5",
+    "scope": "Diagnostic continuation only; remaining banned adapters prevent authentic/M7A/M8 and memory acceptance.",
+    "outputs": {
+      "configured-diagnostic.stdout": "7bf31cdd1d6d7cedce6cad4b7661eec6237d865c84448f19b2b215584ef69b10",
+      "configured-diagnostic.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "prior_diagnostic": {
+    "exit_code": 2,
+    "elapsed_seconds": 64.52627530880272,
+    "binary_sha256": "60819526f70f5c805910a5da9ebce1dadc8d13a4544d43018c7a2f93647b3799",
+    "outputs": {
+      "configured-diagnostic.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "configured-diagnostic.stderr": "74b9ab7098db9dc2b8a57f8017fe91a86ab9a43a38340af32b1afa622f92d7ff"
+    },
+    "record": "target/wp1220/normal-host-diagnostic/configured-diagnostic.json",
+    "failure": "repository source scope platforms has conflicting exact requests"
+  },
+  "supervision": {
+    "deadline_seconds": 180,
+    "prepared_source_pins": "WP1210 immutable registry/distdir/toolchain/cache/workspace pins verified before AND after both diagnostics",
+    "stale_owned_slug_daemons_before_after": [],
+    "public_stdout": "@@//pkg:probe\n",
+    "memory_claim": false
+  },
+  "source_evidence": {
+    "commit": "8220c6198837d5c13d53fea211cf3282aa12408a",
+    "purpose": "pinned source regression evidence only; never semanticdispatch",
+    "files": {
+      "constructor": {
+        "path": "src/main/java/com/google/devtools/build/lib/starlarkbuildapi/RunEnvironmentInfoApi.java",
+        "sha256": "ab0bc3d809e42d023aa186bbce38a8927f0d7c93425aaaa3a9f9dd970ce3dfe6"
+      },
+      "snapshot": {
+        "path": "src/main/java/com/google/devtools/build/lib/analysis/RunEnvironmentInfo.java",
+        "sha256": "f75b6abb6fa2f17ad3c52fd6a763bc8457407b86465c58e449090827f2bd8d44"
+      },
+      "field_equality": {
+        "path": "src/main/java/com/google/devtools/build/lib/packages/NativeInfo.java",
+        "sha256": "70623159df82d40dadf5a0fa040cb3b2511c71706da8a518864ccc312ff05db7"
+      },
+      "getter_conversion": {
+        "path": "src/main/java/net/starlark/java/eval/Starlark.java",
+        "sha256": "cbc71970bef037ed0c8c56171d45582201fad2471b17f2944ffb131574070aa6"
+      },
+      "sequence": {
+        "path": "src/main/java/net/starlark/java/eval/Sequence.java",
+        "sha256": "96a05058124b6782ed4bd7a3b6dad9c281ecc1e21bb5249bedf48b935a642238"
+      },
+      "range_sequence": {
+        "path": "src/main/java/net/starlark/java/eval/RangeList.java",
+        "sha256": "a71d7966b6d0762960d93b34e1c84cde40f2ea83424e00f6a92281afa2c7c008"
+      },
+      "declaration_validation": {
+        "path": "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleConfiguredTargetUtil.java",
+        "sha256": "fbb2c4e8bf0b1fb49ba63f8a1b5f352c1c0ffbd71373c7d6dca3108c0785a1b6"
+      },
+      "launch_projection": {
+        "path": "src/main/java/com/google/devtools/build/lib/analysis/RunfilesSupport.java",
+        "sha256": "429c7eb2809a46192d2fd757cece70cfeb0046a5396bbd8c5d4f15b9c6900659"
+      },
+      "symlink_action": {
+        "path": "src/main/java/com/google/devtools/build/lib/analysis/actions/SymlinkTreeAction.java",
+        "sha256": "0279cdada9345d698dd86b803098c259caff20a4faea519ff8bb774b2ad153de"
+      }
+    }
+  },
+  "focused_tests": [
+    {
+      "gate": "build-api",
+      "executable_sha256": "3c53ddce2eb38d71c89a1954f7cd363f46703899f0900422596d86e2f2f16dc6",
+      "elapsed_seconds": 0.07529988000169396,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0008229629602283239,
+          "passed": 1,
+          "selector": "run_environment_info::tests::raw_order_and_duplicates_survive_field_equality_and_ordered_publication"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0006946329958736897,
+          "passed": 1,
+          "selector": "run_environment_info::tests::nested_native_values_separate_starlark_fields_from_publication_and_share_owners"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0007830329705029726,
+          "passed": 1,
+          "selector": "run_environment_info::tests::launch_environment_participates_in_runfiles_support_publication"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0006704931147396564,
+          "passed": 1,
+          "selector": "args_mapper::tests::run_environment_native_atoms_remain_outside_args_metadata_admission"
+        }
+      ],
+      "selected": 4,
+      "passed": 4
+    },
+    {
+      "gate": "configuration",
+      "executable_sha256": "94bcea37f3742cf46961e3bf8cb170fab55c5ebac133f87a26edf3bfb373fd39",
+      "elapsed_seconds": 0.05149788083508611,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0006685731932520866,
+          "passed": 1,
+          "selector": "native::action_environment::tests::independent_launch_channels_move_storage_and_preserve_overlap"
+        }
+      ],
+      "selected": 1,
+      "passed": 1
+    },
+    {
+      "gate": "loading",
+      "executable_sha256": "3246facc8ec3ec29dee93cb51c13cbbca3d86ac2e7a5e185c6fb6e5981ca820f",
+      "elapsed_seconds": 0.23013756820000708,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.005726571893319488,
+          "passed": 1,
+          "selector": "provider::run_environment_info::tests::constructor_binds_defaults_positional_named_and_expanded_arguments"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.005257560173049569,
+          "passed": 1,
+          "selector": "provider::run_environment_info::tests::raw_snapshot_and_fresh_getters_preserve_order_duplicates_and_mutation_isolation"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.00471566803753376,
+          "passed": 1,
+          "selector": "provider::run_environment_info::tests::native_field_equality_hash_ignore_dict_order_but_preserve_inherited_sequence"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.004396576900035143,
+          "passed": 1,
+          "selector": "provider::run_environment_info::tests::frozen_native_roundtrip_and_nested_consumers_keep_fresh_mutable_fields_after_drop"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0051211100071668625,
+          "passed": 1,
+          "selector": "bzl_module::host_package_load_tests::external_bzl_module_freezes_exact_lint_test_child_without_invocation"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.005594050977379084,
+          "passed": 1,
+          "selector": "bzl_module::host_package_load_tests::clippy_test_tail_freezes_with_recursive_producer_identities"
+        }
+      ],
+      "selected": 6,
+      "passed": 6
+    },
+    {
+      "gate": "analysis-lib",
+      "executable_sha256": "71a9fd52177eb8d36757d6df2c324aa3342a59d17af541d1e79fd9635371ca39",
+      "elapsed_seconds": 0.2032010918483138,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0043212068267166615,
+          "passed": 1,
+          "selector": "analysis_value::run_environment_tests::run_environment_roundtrip_preserves_nested_publication_and_mutable_getters_after_drop"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0016371561214327812,
+          "passed": 1,
+          "selector": "analysis_value::tests::complete_target_view_projects_every_retained_provider_variant"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.004010055912658572,
+          "passed": 1,
+          "selector": "starlark_rule::args_callbacks::graph::tests::run_environment_inputs_and_captures_refuse_before_native_projection"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0011178539134562016,
+          "passed": 1,
+          "selector": "starlark_rule::run_environment_info::tests::declared_executable_or_test_admits_but_suite_plain_and_missing_refuse"
+        }
+      ],
+      "selected": 4,
+      "passed": 4
+    },
+    {
+      "gate": "analysis",
+      "executable_sha256": "194536869d0ac215239c8f2d4159397df736f58fef470f431179cd5b3de88b20",
+      "elapsed_seconds": 0.45761562301777303,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.031978141982108355,
+          "passed": 1,
+          "selector": "run_environment_info_tests::executable_and_nested_consumers_preserve_snapshot_and_fresh_getters"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.028390598949044943,
+          "passed": 1,
+          "selector": "run_environment_info_tests::non_executable_and_duplicate_returns_refuse_then_repair_on_one_dice"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.055405060993507504,
+          "passed": 1,
+          "selector": "run_environment_info_tests::map_order_only_source_a_b_a_changes_publication_and_consumer_iteration"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.02166511188261211,
+          "passed": 1,
+          "selector": "run_environment_info_tests::launch_channels_preserve_overlap_without_changing_symlink_tree_environment"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.06205624691210687,
+          "passed": 1,
+          "selector": "default_info_executable_is_narrow_and_requires_an_executable_for_executable_rules"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.03524303389713168,
+          "passed": 1,
+          "selector": "runfiles_support_output_conflicts_publish_no_configured_result"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.014934797072783113,
+          "passed": 1,
+          "selector": "args_callback_context_tests::configured_callbacks_execute_original_globals_closures_and_lambdas_after_producer_drop"
+        }
+      ],
+      "selected": 7,
+      "passed": 7
+    },
+    {
+      "gate": "build-providers",
+      "executable_sha256": "abd6c2312a5738b5cd288d6a6dde2e9c4e9e58dc4268cdf76b32cb615c5a3c84",
+      "elapsed_seconds": 0.07692797598429024,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0007035031449049711,
+          "passed": 1,
+          "selector": "runfiles_support_reserves_the_complete_typed_category_shape"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.00540531100705266,
+          "passed": 1,
+          "selector": "files_to_run_private_carrier_preserves_support_topology_and_hash_law"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.000632452080026269,
+          "passed": 1,
+          "selector": "files_to_run_occurrence_round_trip_preserves_private_typed_state"
+        }
+      ],
+      "selected": 3,
+      "passed": 3
+    },
+    {
+      "gate": "core",
+      "executable_sha256": "150183f1074d14167b0a722af268ab34e45c7fc18c9661991836b5c3daaa0a40",
+      "elapsed_seconds": 0.4142480571754277,
+      "results": [
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0024113990366458893,
+          "passed": 1,
+          "selector": "runtime::demands::tests::equal_source_scopes_keep_distinct_exact_requests_and_paths_across_reselection"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.002566759940236807,
+          "passed": 1,
+          "selector": "runtime::demands::tests::selector_rejects_request_identity_and_source_scope_conflicts"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.002263968111947179,
+          "passed": 1,
+          "selector": "runtime::demands::tests::nested_equal_scope_anchor_cannot_borrow_its_outer_request"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.002394618932157755,
+          "passed": 1,
+          "selector": "runtime::demands::tests::semantic_selector_tracks_nested_equal_shared_and_unscoped_reachability"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0022436678409576416,
+          "passed": 1,
+          "selector": "runtime::demands::tests::retained_owner_selects_untouched_and_late_demands_without_replaying_events"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.002058638958260417,
+          "passed": 1,
+          "selector": "runtime::demands::tests::terminal_selection_uses_the_exact_owner_bound_at_install"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.0019844169728457928,
+          "passed": 1,
+          "selector": "runtime::demands::tests::foreign_and_expired_demand_owner_installs_are_atomic_and_do_not_reserve_attempts"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.01840406097471714,
+          "passed": 1,
+          "selector": "runtime::dice::tests::query_command_tests::observed_external_query_accepts_closure_selected_repository_sidecars"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.001898476853966713,
+          "passed": 1,
+          "selector": "runtime::repository_io::tests::retained_session_dirtiness_is_repo_local_and_discard_preserves_cache"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.025552187813445926,
+          "passed": 1,
+          "selector": "runtime::action_prerequisites::tests::runfiles_tests::exact_files_to_run_occurrences_share_support_and_retain_source_bindings"
+        },
+        {
+          "exit_code": 0,
+          "elapsed_seconds": 0.09864182001911104,
+          "passed": 1,
+          "selector": "runtime::action_prerequisites::tests::runfiles_tests::malformed_files_to_run_fails_the_whole_forest_in_every_occurrence"
+        }
+      ],
+      "selected": 11,
+      "passed": 11
+    }
+  ],
+  "broad_suites": {
+    "build-api": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.2580984749365598,
+      "failures": [],
+      "executable_sha256": "3c53ddce2eb38d71c89a1954f7cd363f46703899f0900422596d86e2f2f16dc6",
+      "summary": "test result: ok. 133 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s"
+    },
+    "analysis-lib": {
+      "exit_code": 0,
+      "elapsed_seconds": 0.08210378210060298,
+      "failures": [],
+      "executable_sha256": "71a9fd52177eb8d36757d6df2c324aa3342a59d17af541d1e79fd9635371ca39",
+      "summary": "test result: ok. 113 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s"
+    },
+    "analysis": {
+      "exit_code": 101,
+      "elapsed_seconds": 33.101425549946725,
+      "failures": [
+        "directory_args::unexpanded_directory_vectors_retain_literal_paths_and_reject_expansion",
+        "output_group_info::configured_output_groups_preserve_artifacts_sharing_forwarding_and_a_b_a"
+      ],
+      "executable_sha256": "194536869d0ac215239c8f2d4159397df736f58fef470f431179cd5b3de88b20",
+      "summary": "test result: FAILED. 271 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.10s"
+    },
+    "loading": {
+      "exit_code": 101,
+      "elapsed_seconds": 9.595431172987446,
+      "failures": [
+        "bzl_module::host_package_load_tests::exact_rules_cc_info_freezes_complete_recursive_producer",
+        "bzl_module::host_package_load_tests::repository_package_rejects_provider_or_aspect_dependency_before_recording",
+        "bzl_module::module_extension_definition_loading_tests::selected_external_dispatch_uses_each_resolved_child_route",
+        "bzl_visibility::tests::every_live_composition_site_calls_the_shared_checker",
+        "canonical_repository_load_route_tests::tests::cancellation_publishes_no_canonical_package_source_and_recovery_completes",
+        "canonical_repository_load_route_tests::tests::recursive_mapped_child_need_and_route_errors_stop_before_child_source",
+        "canonical_repository_load_route_tests::tests::root_request_external_bzl_preserves_exact_source_children",
+        "canonical_repository_load_route_tests::tests::selected_parent_routes_generated_load_through_canonical_owner",
+        "canonical_repository_load_route_tests::tests::transitive_registry_repo_is_canonical_only_and_reads_shared_source_owners",
+        "provider::tests::config_feature_flag_info_rejects_invalid_constructor_arguments"
+      ],
+      "executable_sha256": "3246facc8ec3ec29dee93cb51c13cbbca3d86ac2e7a5e185c6fb6e5981ca820f",
+      "summary": "test result: FAILED. 989 passed; 10 failed; 3 ignored; 0 measured; 0 filtered out; finished in 9.59s"
+    }
+  },
+  "baseline_qualification": {
+    "baseline_revision": "2780bd0ef99121ad36bf9a02730b95967bf60704",
+    "failure_names_exactly_match_baseline": true,
+    "record": "target/wp1220/broad-baseline-qualification.json",
+    "modes": [
+      "loading",
+      "analysis"
+    ]
+  },
+  "compilation": {
+    "build-api": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_build_api_v2",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 0.6015927889384329
+    },
+    "configuration": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_configuration_v2",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 1.6661324161104858
+    },
+    "loading": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_loading_v2",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 21.164237494114786
+    },
+    "analysis-lib": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_analysis_v2",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.399648980004713
+    },
+    "analysis": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_analysis_v2",
+        "--test",
+        "starlark_rule",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 4.1228952629026026
+    },
+    "build-providers": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_build_api_v2",
+        "--test",
+        "providers",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 2.3583145930897444
+    },
+    "core": {
+      "argv_prefix": [
+        "test",
+        "-p",
+        "slug_core_v2",
+        "--lib",
+        "--no-run"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 269.7945045749657
+    },
+    "cli": {
+      "argv_prefix": [
+        "build",
+        "-p",
+        "slug_cli_v2",
+        "--bin",
+        "slug"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 20.757243864936754
+    },
+    "owned": {
+      "argv_prefix": [
+        "check",
+        "-p",
+        "slug_cli_v2",
+        "--manifest-path",
+        "/tmp/wp1220-owned-source-exma81yw/Cargo.toml",
+        "--target-dir",
+        "/run/media/system/Colossus/dev/slug/target"
+      ],
+      "exit_code": 0,
+      "elapsed_seconds": 47.25660522887483
+    }
+  },
+  "compile_necessity": {
+    "scope": "One serialized Cargo per shared target, test-only fixtures corrected only affected selectors. Loading test compilation119.325s and Analysis first136.221s are below3min individually. Cross-crate enum/provider/RunfilesSupport interfaces require genuine Analysis/Core/CLI compile dependents; smaller native/Loading tests cannot validate materializer/exhaustive arms. Subsequent integration target compilation expected reuse normal dependency artifacts; no broader workload memory comparison claimed.",
+    "reused": "WP1219 unaffected Engine/REAPI algorithm gates; Core runfiles constructor/writer focused controls refreshed after changedfield.",
+    "no_repeat_policy": "After frozen gates pass, rerun only stale or changed gates; broad owner suites once at acceptance.",
+    "cli_compile_review": {
+      "elapsed_seconds": 184.60969315608963,
+      "need": "Fresh CLI mandatory after cross-crate Rust changes and before public query. Builds normal production Core/REAPI/Commands/Server dependents unlike owner unit tests. Cargo JSON showed fresh=false transitive normal-profile artifacts; single serialized command completed, not cancelled/repeated.",
+      "measurement": "Compilation separate from diagnostic/runtime memory; no whole-workload memory assertion."
+    },
+    "core_compile_review": {
+      "need": "Source-scope grouping correction now changes DICE activation selection; genuine Core owner executable needed for new same-scope distinct-ID warm/isolation proof, refusal/lifecycle gates and selected-sidecar path/request validation. Compile once; no broad Core run.",
+      "selected_gate_count": 11,
+      "three_minute_checkpoint": "Retained: shared Core public test executable is needed for changed DICE selection plus actual native selected-sidecar lifecycle. The previous accepted Core compile was227.592s; no smaller native/provider gate can execute this owner. One root-serialized compile, no competing Cargo, no repeated broad Core suite.",
+      "elapsed_seconds": 269.7945045749657
+    }
+  },
+  "owned_projection": {
+    "paths": [
+      {
+        "path": "app/slug_analysis_v2/src/analysis_value.rs",
+        "projected_sha256": "5c192f737e55aee044d6ad4e474d91a0d10e513ee553793b834fea6cab2e4e88"
+      },
+      {
+        "path": "app/slug_analysis_v2/src/runfiles_support.rs",
+        "projected_sha256": "270152dc51bd7ceb9852f9947d2383b9451947f3a7fe56a4cb07322787705fa6"
+      },
+      {
+        "path": "app/slug_analysis_v2/src/starlark_rule.rs",
+        "projected_sha256": "896741877efea23af8392d6268dd97382975e5f3a311e1d1be4d00647b49c270"
+      },
+      {
+        "path": "app/slug_analysis_v2/src/starlark_rule/args_callbacks/graph/tests.rs",
+        "projected_sha256": "11d0fb966b999f7078e6a5a20259ed2abf5e7f8d26ee733a77881b137364a82e"
+      },
+      {
+        "path": "app/slug_analysis_v2/src/starlark_rule/args_callbacks/native.rs",
+        "projected_sha256": "2a8254decfdd9c5ee0bf14c9c6d35aeaf6f12675bbbc0f2587636005cb996483"
+      },
+      {
+        "path": "app/slug_analysis_v2/tests/starlark_rule.rs",
+        "projected_sha256": "822ceafff82ebda0ee241a8febc9a7886b716945ba4228672f8532f85432a96a"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/analysis_value.rs",
+        "projected_sha256": "c4652f36941f19dc50390e1ffb9f31b882eb83306e42620c2299a1487a489dc7"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/args_mapper.rs",
+        "projected_sha256": "934f01b7adb491610f748f9a3790168f3fe929911b8b8232d57a66e52a3096bc"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/args_mapper/tests.rs",
+        "projected_sha256": "cabb855b188f836e21c7f7c24674754e58f83776b9f50744cf834ce113422c85"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/lib.rs",
+        "projected_sha256": "add7c7cf89d4210daac1b0460a733e7df752b518e75056f421a5b560725c9b97"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/providers/mod.rs",
+        "projected_sha256": "4a402d0a7722c1bdaf98b9fd7381deeae04fb7eb3ca01787510511675f9855c4"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/runfiles/layout/tests.rs",
+        "projected_sha256": "50b17c59e942aaae1d1dc49d3a95992ef50e4b94b043ad784026a785e9272136"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/runfiles/manifest/tests.rs",
+        "projected_sha256": "da7fb795b1bdc4c3808179ba98bed5c23d6c1a22333d997f52e16e90fcb6212f"
+      },
+      {
+        "path": "app/slug_build_api_v2/src/workspace_status/tests.rs",
+        "projected_sha256": "0704920846fd2cb46d97cb564baafdf6c8a7dd4ee3980bf4d12c17a05f4ef15f"
+      },
+      {
+        "path": "app/slug_build_api_v2/tests/actions.rs",
+        "projected_sha256": "c90259ab63ce9bada67d08ea9d3fbb55e6c9787f5287944a544f937b47d5fce1"
+      },
+      {
+        "path": "app/slug_build_api_v2/tests/providers.rs",
+        "projected_sha256": "c0aeda4d59de37f874deb55aa1015f9964bd603ffa74b73f29124c6a0af97d60"
+      },
+      {
+        "path": "app/slug_configuration_v2/src/native/action_environment.rs",
+        "projected_sha256": "b8063c831b8f4ea6b177e7ea6bfce3ae19c9bfc96bcf5b70fe524fcee37b95f0"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/action_prerequisites/runfiles_tests.rs",
+        "projected_sha256": "37b9190d8b797eb543d2d979561fdd198b7edc6828df5420f0cbda1700949841"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/demands.rs",
+        "projected_sha256": "fcd86d791ead6a70a2939115465d0571e4a088fe75dc5a8f857ff20188c46ddc"
+      },
+      {
+        "path": "app/slug_core_v2/src/runtime/source_staging/tests.rs",
+        "projected_sha256": "11321524b3bf86c1346a57bb4d4f9f698fb55db87549b4bbe4bd256480f8a12f"
+      },
+      {
+        "path": "app/slug_loading_v2/src/host_package_load_tests.rs",
+        "projected_sha256": "fc9cc9e41b64147aa646c99aa097f8c92cb8660815550a9667cd9cceb6d34cd7",
+        "live_sha256": "c52bf71105d66ffd0c65d8c23d44355c7a24dc0954a8a6a7afcc98d43a2ac37a",
+        "inherited_delta_excluded": true
+      },
+      {
+        "path": "app/slug_loading_v2/src/provider.rs",
+        "projected_sha256": "1d60863de1a0a46af8bc3942b22df57df149e03b28b8cd6dcf1a5aa9f9d89511"
+      },
+      {
+        "path": "app/slug_analysis_v2/src/analysis_value/run_environment_tests.rs",
+        "projected_sha256": "91debdfa980c964bcec4045ca98f98c86ebc06fe4ed830c88b826bb7ca000b18",
+        "new": true
+      },
+      {
+        "path": "app/slug_analysis_v2/src/starlark_rule/run_environment_info.rs",
+        "projected_sha256": "50988c2142c221f6f19cec2681eed7135290a74bcf9a10afa14ee70f0e0f6198",
+        "new": true
+      },
+      {
+        "path": "app/slug_analysis_v2/tests/starlark_rule/run_environment_info_tests.rs",
+        "projected_sha256": "4bbfe7eb30c5035a7ad79361c80d90b67b4647c2748e6632885175eeaff6cb03",
+        "new": true
+      },
+      {
+        "path": "app/slug_build_api_v2/src/run_environment_info.rs",
+        "projected_sha256": "8fd9f354a664fda907a91c36e87deb915facc1388e2afef4e8ad08526ff55ee2",
+        "new": true
+      },
+      {
+        "path": "app/slug_build_api_v2/src/run_environment_info/tests.rs",
+        "projected_sha256": "b42e74a1b8ad6c11004bb8313542fa73774f38c653cd902b19370d2db5770016",
+        "new": true
+      },
+      {
+        "path": "app/slug_loading_v2/src/provider/run_environment_info.rs",
+        "projected_sha256": "ca4297a138467b870f3de2d0cd59ed9da7807a4e34d77f7d521d7f16583d73d4",
+        "new": true
+      },
+      {
+        "path": "app/slug_loading_v2/src/provider/run_environment_info/tests.rs",
+        "projected_sha256": "a4bb93d63b4bdbf8cb24ebedabfd369729ebe9bbcb81dec49bf2ff01b27fe597",
+        "new": true
+      }
+    ],
+    "source_patch_sha256": "059586205681cd2660f61dce4f0f41a3f671ddeafac1eadd8779e99134ec1064",
+    "isolated_workspace": {
+      "path": "/tmp/wp1220-owned-source-exma81yw",
+      "base_revision": "2780bd0ef99121ad36bf9a02730b95967bf60704",
+      "unreferenced_oracle_fixture_symlinks_skipped": 24,
+      "snapshot_record": "target/wp1220/owned-source-workspace.json",
+      "owned_projected_source_count": 29
+    },
+    "purpose": "Atomic owned source projection excludes inherited dirty parser/Engine/Core observation/instruction/plan candidates. Isolated CLI transitive compile passes; tests use qualified live checkout. No isolated fixture-execution claim."
+  },
+  "corrections": {
+    "fixture_only": [
+      "use dictionary item assignment for equal provider keys instead of duplicate literal",
+      "explicitly re-export retained table for downstream frozen consumer"
+    ],
+    "configured_test_prerequisite": {
+      "preserved_failure": "target/wp1220/analysis-initial-tests.json",
+      "cause": "actual test=True target missing implicit @bazel_tools/tools/test route before implementation",
+      "reviewed_scope": "direct exact production declaration-predicate matrix plus genuine Loading test metadata, with configured executable/nested/nonexec/duplicate/repair tests. No configured-test success claim or invented tool rows."
+    },
+    "source_selection": "Group validation by (source scope, exact request ID); preserve global same-ID differing-request error, path-bearing anchor zero/multiple/workspace/nested checks, pathless behavior and full original requests/paths through acceptance."
+  },
+  "reviews": {
+    "independent_reviewer": "cleanup_design_review",
+    "design": "ACCEPT native/launch model plus typed empty range correction",
+    "declaration_evidence_scope": "ACCEPT explicit test-tool prerequisite qualification",
+    "source_selection_design_and_actual_diff": "ACCEPT",
+    "final": "ACCEPT after all29 code pins, isolated ownership compile,36focused gates, broad baseline qualifications, public cquery output/binary integrity and narrow owner contracts"
+  },
+  "integrity_and_lifecycle": "No source/caller/hash/effect semantic admission, new DICE key/cache/interner/observation/lock. Existing unrelated adapters remain banned replacement work. Source hashes in this receipt serve integrity only.",
+  "next_concrete_blocker": "Rust/C++ provider-callable constructor/auth/helper semantic adapters still prevent genuine configured Rust acceptance. Replace with original function-valued provider evaluation in current analysis evaluator, shared immutable arena, complete borrowed native/source authority and explicit function-symbol identity.",
+  "milestones_closed": [],
+  "open_gates": [
+    "genuine configured Rust without ALL remaining semantic adapters",
+    "required action comparison",
+    "authentic Rust REAPI execution",
+    "complete Slug closure",
+    "equivalent-command memory \u22641.25\u00d7 Bazel",
+    "Stage10 stage1/stage2 fixed point and zero direct-local actions"
+  ],
+  "compile_command_template": {
+    "cargo": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/cargo",
+    "common_suffix": [
+      "--offline",
+      "--locked",
+      "--message-format=json",
+      "--config",
+      "profile.dev.package.slug_bzlmod_v2.opt-level=1",
+      "--config",
+      "profile.dev.package.slug_bzlmod_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_loading_v2.opt-level=1",
+      "--config",
+      "profile.dev.package.slug_loading_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_core_v2.opt-level=1",
+      "--config",
+      "profile.dev.package.slug_core_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_analysis_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_analysis_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_query_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_query_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_build_api_v2.opt-level=0",
+      "--config",
+      "profile.dev.package.slug_build_api_v2.debug=0",
+      "--config",
+      "profile.dev.package.slug_cli_v2.debug=0"
+    ],
+    "environment_overlay": {
+      "RUSTC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustc",
+      "RUSTDOC": "/run/media/system/Colossus/dev-home/.rustup/toolchains/nightly-2025-09-14-x86_64-unknown-linux-gnu/bin/rustdoc",
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_BACKTRACE": "0"
+    },
+    "gate_command": "[cargo] + gate.argv_prefix + common_suffix",
+    "raw_receipts": "target/wp1220/compile-<gate>.json and matching .stdout/.stderr; actual Cargo JSON compiler artifacts select executables"
+  }
+}

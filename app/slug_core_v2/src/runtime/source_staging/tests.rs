@@ -402,6 +402,7 @@ fn assert_unsupported_shapes(spawn: &SpawnSpec) {
     let mut provider = FilesToRunProvider::empty();
     provider.executable = Some(artifact.clone());
     provider.support = Some(Arc::new(RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles: RetainedRunfiles::empty(),
         tree: artifact.clone(),
         input_manifest: artifact,

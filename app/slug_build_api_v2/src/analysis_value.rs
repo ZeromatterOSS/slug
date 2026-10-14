@@ -40,6 +40,7 @@ use crate::providers::ProviderId;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub enum AnalysisValueType {
     TemplateVariableInfo,
+    RunEnvironmentInfo,
     PackageSpecificationInfo,
     CcToolchainCallable,
     RustToolchainCallable,
@@ -71,6 +72,7 @@ impl AnalysisValueType {
         match self {
             Self::PackageSpecificationInfo => "PackageSpecificationInfo",
             Self::TemplateVariableInfo => "TemplateVariableInfo",
+            Self::RunEnvironmentInfo => "RunEnvironmentInfo",
             Self::CcToolchainCallable => "function",
             Self::RustToolchainCallable => "function",
             Self::CppFragment => "cpp",
@@ -1167,6 +1169,7 @@ impl Hash for AnalysisContainerIdentity {
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
     TemplateVariableInfo(crate::TemplateVariableInfo),
+    RunEnvironmentInfo(crate::RunEnvironmentInfo),
     PackageSpecificationInfo(crate::PackageSpecificationInfo),
     CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
     RustToolchainCallable(crate::rust_toolchain_callable::RustToolchainCallable),
@@ -1194,6 +1197,7 @@ enum AnalysisValueData {
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
     TemplateVariableInfo(&'a crate::TemplateVariableInfo),
+    RunEnvironmentInfo(&'a crate::RunEnvironmentInfo),
     PackageSpecificationInfo(&'a crate::PackageSpecificationInfo),
     CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
     RustToolchainCallable(&'a crate::rust_toolchain_callable::RustToolchainCallable),
@@ -1225,6 +1229,10 @@ impl AnalysisValue {
 
     pub fn package_specification_info(info: crate::PackageSpecificationInfo) -> Self {
         Self::new(AnalysisValueData::PackageSpecificationInfo(info))
+    }
+
+    pub fn run_environment_info(info: crate::RunEnvironmentInfo) -> Self {
+        Self::new(AnalysisValueData::RunEnvironmentInfo(info))
     }
 
     pub fn template_variable_info(info: crate::TemplateVariableInfo) -> Self {
@@ -1354,6 +1362,9 @@ impl AnalysisValue {
             AnalysisValueData::TemplateVariableInfo(info) => {
                 AnalysisValueKind::TemplateVariableInfo(info)
             }
+            AnalysisValueData::RunEnvironmentInfo(info) => {
+                AnalysisValueKind::RunEnvironmentInfo(info)
+            }
             AnalysisValueData::PackageSpecificationInfo(value) => {
                 AnalysisValueKind::PackageSpecificationInfo(value)
             }
@@ -1396,6 +1407,7 @@ impl AnalysisValue {
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
             AnalysisValueData::TemplateVariableInfo(_) => AnalysisValueType::TemplateVariableInfo,
+            AnalysisValueData::RunEnvironmentInfo(_) => AnalysisValueType::RunEnvironmentInfo,
             AnalysisValueData::PackageSpecificationInfo(_) => {
                 AnalysisValueType::PackageSpecificationInfo
             }
@@ -1529,6 +1541,10 @@ impl AnalysisValue {
         }
         match (self.0.as_ref(), other.0.as_ref()) {
             (
+                AnalysisValueData::RunEnvironmentInfo(left),
+                AnalysisValueData::RunEnvironmentInfo(right),
+            ) => left == right,
+            (
                 AnalysisValueData::TemplateVariableInfo(left),
                 AnalysisValueData::TemplateVariableInfo(right),
             ) => left.publication_eq_with(right, state),
@@ -1650,6 +1666,10 @@ impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
             (
+                AnalysisValueData::RunEnvironmentInfo(left),
+                AnalysisValueData::RunEnvironmentInfo(right),
+            ) => left.field_eq(right),
+            (
                 AnalysisValueData::TemplateVariableInfo(left),
                 AnalysisValueData::TemplateVariableInfo(right),
             ) => left == right,
@@ -1727,6 +1747,10 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::RunEnvironmentInfo(info) => {
+                23u8.hash(state);
+                info.hash_fields(state);
+            }
             AnalysisValueData::TemplateVariableInfo(info) => {
                 21u8.hash(state);
                 info.hash(state);

@@ -75,11 +75,16 @@ use crate::starlark_label::StarlarkLabel;
 
 mod feature_flag_info;
 mod output_group;
+mod run_environment_info;
 mod template_variable_info;
 pub(crate) use feature_flag_info::FeatureFlagInfoConstructor;
 pub use feature_flag_info::alloc_frozen_feature_flag_info;
 pub use feature_flag_info::feature_flag_info;
 pub use output_group::StarlarkOutputGroupInfo;
+pub(crate) use run_environment_info::RunEnvironmentInfo;
+pub use run_environment_info::alloc_frozen_run_environment_info;
+pub use run_environment_info::run_environment_info;
+pub use run_environment_info::run_environment_info_ref;
 pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
 pub use template_variable_info::alloc_frozen_template_variable_info;
 pub use template_variable_info::template_variable_info;
@@ -225,32 +230,6 @@ impl<'v> StarlarkValue<'v> for OutputGroupInfo {
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
         "OutputGroupInfo provider".hash(hasher);
         Ok(())
-    }
-}
-
-/// Fixed `.bzl` declaration token; configured environment values are deferred.
-#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
-pub(crate) struct RunEnvironmentInfo;
-
-impl fmt::Display for RunEnvironmentInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("<function RunEnvironmentInfo>")
-    }
-}
-
-starlark::starlark_simple_value!(RunEnvironmentInfo);
-
-#[starlark_value(type = "RunEnvironmentInfo")]
-impl<'v> StarlarkValue<'v> for RunEnvironmentInfo {
-    fn invoke(
-        &self,
-        _me: Value<'v>,
-        _args: &Arguments<'v, '_>,
-        _eval: &mut Evaluator<'v, '_, '_>,
-    ) -> starlark::Result<Value<'v>> {
-        Err(starlark::Error::new_other(anyhow::anyhow!(
-            "RunEnvironmentInfo construction is unsupported during loading"
-        )))
     }
 }
 

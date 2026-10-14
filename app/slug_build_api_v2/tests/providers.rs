@@ -240,6 +240,7 @@ fn runfiles_support_reserves_the_complete_typed_category_shape() {
         repository_prefix: CompactString::new("repo"),
     };
     let support = RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles,
         tree: source_artifact("pkg/tool.runfiles"),
         input_manifest: source_artifact("pkg/tool.runfiles_manifest"),
@@ -267,6 +268,7 @@ fn files_to_run_private_carrier_preserves_support_topology_and_hash_law() {
     assert_eq!(pre_support_round_trip, pre_support);
     assert!(pre_support_round_trip.support.is_none());
     let support = Arc::new(RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles: info.default_runfiles.clone(),
         tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
         input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),

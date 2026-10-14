@@ -1,5 +1,14 @@
 # Stage 2: Rust Skeleton and Runtime Substrate
 
+## Selected repository validation ownership
+
+Source anchors retain their own exact materialization request and observed paths.
+Selection groups by source scope plus exact request ID: a module name may cover
+distinct canonical repositories. Same-ID differing requests, path-bearing anchors
+with zero/multiple requests, foreign workspaces and nested-anchor borrowing fail
+closed. Validation keeps original requests and paths through acceptance, with
+canonical request order; no new authority, observation, DICE key or lock.
+
 ## Current status and reading guide
 
 M1 shared DICE/request/source-certificate ownership is accepted. Preserve

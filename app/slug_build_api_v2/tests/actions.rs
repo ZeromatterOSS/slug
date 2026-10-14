@@ -107,6 +107,7 @@ fn runfiles_support_specs() -> [RunfilesSupportActionSpec; 4] {
     )
     .unwrap();
     let support = Arc::new(RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles,
         tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
         input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),
@@ -180,6 +181,7 @@ fn files_to_run_provider(executable: &str) -> FilesToRunProvider {
     let executable = derived_artifact(executable, ActionOutputKind::File);
     let info = DefaultInfo::from_executable(executable, None).unwrap();
     let support = Arc::new(RunfilesSupport {
+        launch_environment: Default::default(),
         runfiles: info.default_runfiles.clone(),
         tree: derived_artifact("pkg/tool.runfiles", ActionOutputKind::RunfilesTree),
         input_manifest: derived_artifact("pkg/tool.runfiles_manifest", ActionOutputKind::File),

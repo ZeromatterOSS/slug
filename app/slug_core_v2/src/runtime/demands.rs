@@ -104,9 +104,6 @@ pub(super) enum DemandProvenanceError {
         scope: RepositorySourceScope,
         request_workspace: slug_workspace_v2::NormalizedAbsolutePath,
     },
-    ScopeRequestConflict {
-        scope: RepositorySourceScope,
-    },
 }
 
 impl fmt::Display for DemandProvenanceError {
@@ -159,11 +156,6 @@ impl fmt::Display for DemandProvenanceError {
                 scope.module_name,
                 scope.workspace.as_path().display(),
                 request_workspace.as_path().display()
-            ),
-            Self::ScopeRequestConflict { scope } => write!(
-                f,
-                "repository source scope {} has conflicting exact requests",
-                scope.module_name
             ),
         }
     }
@@ -613,7 +605,10 @@ fn select_demands(
         }
     }
 
-    let mut scopes = SmallMap::<RepositorySourceScope, ScopeSelection>::new();
+    let mut scopes = SmallMap::<
+        (RepositorySourceScope, RepositoryMaterializationRequestId),
+        ScopeSelection,
+    >::new();
     for (node, anchor) in anchors {
         if anchor.paths.is_empty() {
             continue;
@@ -638,16 +633,14 @@ fn select_demands(
                 request_workspace: request.id.workspace.dupe(),
             });
         }
-        match scopes.get_mut(&anchor.scope) {
-            Some(existing) if existing.request != request => {
-                return Err(DemandProvenanceError::ScopeRequestConflict {
-                    scope: anchor.scope,
-                });
-            }
+        // Distinct canonical requests may share a module's source scope. The
+        // global request map above already rejects one ID with differing specs.
+        let scope_request = (anchor.scope, request.id.clone());
+        match scopes.get_mut(&scope_request) {
             Some(existing) => existing.paths.extend(anchor.paths),
             None => {
                 scopes.insert(
-                    anchor.scope,
+                    scope_request,
                     ScopeSelection {
                         request,
                         paths: anchor.paths,
@@ -666,7 +659,7 @@ fn select_demands(
     });
     let mut repository_validations = scopes
         .into_iter()
-        .map(|(scope, selection)| {
+        .map(|((scope, _), selection)| {
             let mut paths = selection.paths.into_iter().collect::<Vec<_>>();
             paths.sort_unstable();
             paths.dedup();
@@ -682,6 +675,12 @@ fn select_demands(
             .workspace
             .cmp(&right.scope.workspace)
             .then_with(|| left.scope.module_name.cmp(&right.scope.module_name))
+            .then_with(|| {
+                left.request
+                    .id
+                    .canonical_repo
+                    .cmp(&right.request.id.canonical_repo)
+            })
     });
     let mut unscoped_paths = unscoped_paths.into_iter().collect::<Vec<_>>();
     unscoped_paths.sort_unstable();
@@ -1214,6 +1213,83 @@ mod tests {
                 .request(),
             &request_a
         );
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn equal_source_scopes_keep_distinct_exact_requests_and_paths_across_reselection()
+    -> anyhow::Result<()> {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let owner = demand_owner(&dice);
+        let request_a = request("a+", "http_archive");
+        let request_b = request("b+", "http_archive");
+        let shared = key(1, TestDescriptor::Path(path("/shared")), Vec::new());
+        let request_a_key = key(2, TestDescriptor::Request(request_a.clone()), Vec::new());
+        let request_b_key = key(3, TestDescriptor::Request(request_b.clone()), Vec::new());
+        let source_a = key(
+            4,
+            TestDescriptor::Scope(scope("same_module")),
+            vec![
+                request_a_key.clone(),
+                key(5, TestDescriptor::Path(path("/a")), Vec::new()),
+                shared.clone(),
+            ],
+        );
+        let another_source_a = key(
+            6,
+            TestDescriptor::Scope(scope("same_module")),
+            vec![
+                request_a_key,
+                key(7, TestDescriptor::Path(path("/a-extra")), Vec::new()),
+                shared.clone(),
+            ],
+        );
+        let source_b = key(
+            8,
+            TestDescriptor::Scope(scope("same_module")),
+            vec![
+                request_b_key,
+                key(9, TestDescriptor::Path(path("/b")), Vec::new()),
+                shared.clone(),
+            ],
+        );
+        // Visit b first: canonical request ID, not encounter order, determines
+        // validation order after equal source scopes have been separated.
+        let root = plain(
+            10,
+            vec![source_b.clone(), another_source_a.clone(), source_a.clone()],
+        );
+        let first = selected(&dice, &owner, &root).await?;
+        assert_eq!(
+            first.repository_requests(),
+            &[request_a.clone(), request_b.clone()]
+        );
+        let validations = first.repository_validations();
+        assert_eq!(validations.len(), 2);
+        assert_eq!(validations[0].scope(), &scope("same_module"));
+        assert_eq!(validations[1].scope(), &scope("same_module"));
+        assert!(Arc::ptr_eq(validations[0].request(), &request_a));
+        assert!(Arc::ptr_eq(validations[1].request(), &request_b));
+        assert_eq!(
+            validations[0].paths(),
+            &[path("/a"), path("/a-extra"), path("/shared")]
+        );
+        assert_eq!(validations[1].paths(), &[path("/b"), path("/shared")]);
+        assert!(first.unscoped_paths().is_empty());
+        assert_eq!(selected(&dice, &owner, &root).await?, first);
+
+        let reordered = plain(11, vec![source_a.clone(), another_source_a, source_b]);
+        assert_eq!(selected(&dice, &owner, &reordered).await?, first);
+        // Selecting one previously visited anchor cannot borrow either the
+        // other canonical request or its separately owned paths from catalogue.
+        let isolated = selected(&dice, &owner, &source_a).await?;
+        assert_eq!(isolated.repository_requests(), &[request_a]);
+        assert_eq!(isolated.repository_validations().len(), 1);
+        assert_eq!(
+            isolated.repository_validations()[0].paths(),
+            &[path("/a"), path("/shared")]
+        );
+        assert_eq!(selected(&dice, &owner, &root).await?, first);
         Ok(())
     }
 

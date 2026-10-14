@@ -89,6 +89,13 @@ pub struct RetainedActionEnvironment {
 }
 
 impl RetainedActionEnvironment {
+    /// Retain independent fixed and inherited channels without resolving client
+    /// values or removing overlapping names. Already canonical storage is moved.
+    /// Unlike action overrides, launch inheritance may use a fixed fallback.
+    pub fn from_channels(fixed: CanonicalStringMap, inherited: CanonicalStringSet) -> Self {
+        Self { fixed, inherited }
+    }
+
     fn from_entries(entries: BTreeMap<CompactString, Option<CompactString>>) -> Self {
         let mut fixed = Vec::new();
         let mut inherited = Vec::new();
@@ -398,6 +405,38 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.iter().collect::<Vec<_>>(), ["a", "b"]);
         assert!(first.contains("b"));
+    }
+
+    #[test]
+    fn independent_launch_channels_move_storage_and_preserve_overlap() {
+        let fixed = CanonicalStringMap::from_pairs([("BOTH", "fallback"), ("FIXED", "value")]);
+        let inherited = CanonicalStringSet::from_values(["BOTH", "DYNAMIC", "BOTH"]);
+        let fixed_owner = fixed.dupe();
+        let inherited_owner = inherited.dupe();
+        let launch = RetainedActionEnvironment::from_channels(fixed, inherited);
+        assert!(Arc::ptr_eq(&fixed_owner.0, &launch.fixed.0));
+        assert!(Arc::ptr_eq(&inherited_owner.0, &launch.inherited.0));
+        assert_eq!(launch.fixed().get("BOTH"), Some("fallback"));
+        assert!(launch.inherited().contains("BOTH"));
+        assert_eq!(
+            launch.inherited().iter().collect::<Vec<_>>(),
+            ["BOTH", "DYNAMIC"]
+        );
+        let changed = RetainedActionEnvironment::from_channels(
+            CanonicalStringMap::from_pairs([("BOTH", "changed"), ("FIXED", "value")]),
+            inherited_owner.dupe(),
+        );
+        assert_ne!(launch, changed);
+        assert_eq!(
+            launch,
+            RetainedActionEnvironment::from_channels(fixed_owner, inherited_owner)
+        );
+        // Ordinary action override policy continues to remove that inherited
+        // channel only when the action supplies the overlapping fixed name.
+        let overridden = launch.for_action(true, [("BOTH", "action")]);
+        assert_eq!(overridden.fixed().get("BOTH"), Some("action"));
+        assert!(!overridden.inherited().contains("BOTH"));
+        assert!(overridden.inherited().contains("DYNAMIC"));
     }
 
     #[test]

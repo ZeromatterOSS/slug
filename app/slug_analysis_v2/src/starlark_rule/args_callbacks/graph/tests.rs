@@ -189,3 +189,28 @@ fn actual_loading_builtin_rows_certify_state_and_preserve_instance_aliases() {
             .contains("unsupported callable")
     );
 }
+
+#[test]
+fn run_environment_inputs_and_captures_refuse_before_native_projection() {
+    let module = Module::new();
+    let value = slug_loading_v2::provider::alloc_frozen_run_environment_info(
+        module.frozen_heap(),
+        slug_build_api_v2::RunEnvironmentInfo::empty(),
+    );
+    let mut builder = ArgsCallableGraphBuilder::new(&module);
+    let mut lowerer = AnalysisValueLowerer::default();
+    assert!(
+        builder
+            .lower_input(value.to_value(), &mut lowerer)
+            .unwrap_err()
+            .contains("no admitted borrowed capture audit")
+    );
+    module.set("_environment", value.to_value());
+    let mut builder = ArgsCallableGraphBuilder::new(&module);
+    assert!(
+        builder
+            .audit_module(&mut lowerer)
+            .unwrap_err()
+            .contains("no admitted borrowed capture audit")
+    );
+}

@@ -31073,10 +31073,12 @@ RUN = RunEnvironmentInfo
     assert!(run.clone().downcast::<OutputGroupInfo>().is_err());
     assert!(run.downcast::<FrozenUserProviderCallable>().is_err());
     assert!(eval_global("X = RunEnvironmentInfo", &build_file_loading_globals()).is_err());
-    let error = eval_bzl_with_identity("X = RunEnvironmentInfo(environment = {})", clippy_owner())
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("RunEnvironmentInfo construction is unsupported during loading"));
+    let constructed =
+        eval_bzl_with_identity("X = RunEnvironmentInfo(environment = {})", clippy_owner()).unwrap();
+    assert_eq!(
+        crate::provider::run_environment_info(constructed.get("X").unwrap().value()).unwrap(),
+        slug_build_api_v2::RunEnvironmentInfo::empty()
+    );
 }
 
 #[test]
