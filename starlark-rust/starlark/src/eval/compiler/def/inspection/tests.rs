@@ -4,10 +4,10 @@ use crate::environment::Globals;
 use crate::environment::GlobalsBuilder;
 use crate::environment::Module;
 use crate::eval::Evaluator;
+use crate::eval::inspect_function_symbol;
 use crate::starlark_module;
 use crate::syntax::AstModule;
 use crate::syntax::Dialect;
-use crate::values::function::StarlarkFunctionIdentity;
 use crate::values::tuple::TupleRef;
 
 #[starlark_module]
@@ -19,7 +19,8 @@ fn helpers(builder: &mut GlobalsBuilder) {
     fn collect(eval: &mut Evaluator<'_, '_, '_>) -> anyhow::Result<bool> {
         // Only Module-rooted values are live at this statement boundary.
         unsafe {
-            eval.garbage_collect();
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?;
         }
         Ok(true)
     }
@@ -116,12 +117,9 @@ nested = pair[0]
                 .is_err()
         );
         assert!(
-            function
-                .value()
-                .request_value::<&dyn StarlarkFunctionIdentity>()
+            !inspect_function_symbol(function.value())
                 .unwrap()
-                .issued_identity()
-                .is_none()
+                .local_hash_observed()
         );
     }
     evaluate(
@@ -143,12 +141,9 @@ nested = pair[0]
         second.captures().next().unwrap().cell.identity()
     );
     assert!(
-        first
-            .value()
-            .request_value::<&dyn StarlarkFunctionIdentity>()
+        !inspect_function_symbol(first.value())
             .unwrap()
-            .issued_identity()
-            .is_none()
+            .local_hash_observed()
     );
     let consumer = Module::new();
     let result = Evaluator::new(&consumer)
@@ -380,11 +375,8 @@ def callback(arg: str) -> str:
     assert_eq!(visits, 1);
     assert!(error.to_string().contains("consumer refused dependency"));
     assert!(
-        function
-            .value()
-            .request_value::<&dyn StarlarkFunctionIdentity>()
+        !inspect_function_symbol(function.value())
             .unwrap()
-            .issued_identity()
-            .is_none()
+            .local_hash_observed()
     );
 }

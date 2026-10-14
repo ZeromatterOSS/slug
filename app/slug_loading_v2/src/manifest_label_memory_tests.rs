@@ -24,6 +24,7 @@ fn frozen(
         .map(|child| (child.manifest.root.label.to_string(), child))
         .collect();
     FrozenBzlModule {
+        semantic_inputs: None,
         module: module.freeze().unwrap(),
         path: identity.workspace_path.clone(),
         loads: children.iter().map(|(name, _)| name.clone()).collect(),

@@ -24,8 +24,6 @@ use std::collections::HashMap;
 use std::fmt;
 use std::fmt::Write;
 use std::ptr;
-use std::sync::Arc;
-use std::sync::OnceLock;
 
 use allocative::Allocative;
 use derivative::Derivative;
@@ -90,7 +88,6 @@ use crate::typing::ParamSpec;
 use crate::typing::Ty;
 use crate::typing::callable_param::ParamIsRequired;
 use crate::util::arc_str::ArcStr;
-use crate::values::Demand;
 use crate::values::Freeze;
 use crate::values::FreezeResult;
 use crate::values::Freezer;
@@ -106,7 +103,6 @@ use crate::values::Value;
 use crate::values::ValueLike;
 use crate::values::frozen_ref::AtomicFrozenRefOption;
 use crate::values::function::FUNCTION_TYPE;
-use crate::values::function::StarlarkFunctionIdentity;
 use crate::values::typing::type_compiled::compiled::TypeCompiled;
 
 #[derive(thiserror::Error, Debug)]
@@ -541,10 +537,9 @@ impl Compiler<'_, '_, '_, '_> {
 #[derive(Derivative, NoSerialize, ProvidesStaticType, Trace, Allocative)]
 #[derivative(Debug)]
 pub(crate) struct DefGen<V> {
-    // Host-issued occurrence only: no evaluator pointers, captures or code.
-    // GC moves this cell; Freeze transfers it without reissuing the token.
+    // Actual current-evaluation token, transferred unchanged by GC/freeze.
     #[trace(unsafe_ignore)]
-    identity: OnceLock<Arc<()>>,
+    pub(crate) symbol: crate::eval::function_symbol::FunctionSymbol,
     pub(crate) parameters: ParametersSpec<V>, // The parameters, **kwargs etc including defaults (which are evaluated afresh each time)
     /// Indices of parameters, which are captured in nested defs.
     /// This is a copy of `DefInfo.parameter_captures`.
@@ -609,7 +604,10 @@ impl<'v> Def<'v> {
             .as_ref()
             .map(|copy| eval.clone_slot_capture(copy, &stmt));
         Ok(eval.heap().alloc(Self {
-            identity: OnceLock::new(),
+            symbol: eval
+                .function_symbols
+                .next()
+                .map_err(crate::Error::into_anyhow)?,
             parameters,
             parameter_captures: stmt.parameter_captures,
             parameter_types,
@@ -632,7 +630,7 @@ impl<'v> Freeze for Def<'v> {
         let captured = self.captured.try_map(|x| x.freeze(freezer))?;
         let module = AtomicFrozenRefOption::new(self.module.load_relaxed());
         Ok(FrozenDef {
-            identity: self.identity,
+            symbol: self.symbol,
             parameters,
             parameter_captures: self.parameter_captures,
             parameter_types,
@@ -657,37 +655,17 @@ impl<'v> DefLike<'v> for DefGen<FrozenValue> {
     const FROZEN: bool = true;
 }
 
-impl<V> StarlarkFunctionIdentity for DefGen<V> {
-    fn issued_identity(&self) -> Option<&Arc<()>> {
-        self.identity.get()
-    }
-
-    fn issue_identity(&self) -> Arc<()> {
-        self.identity.get_or_init(|| Arc::new(())).dupe()
-    }
-
-    fn name_hash(&self) -> crate::collections::StarlarkHashValue {
-        self.def_info.name.get_hashed().hash()
-    }
-}
-
 #[starlark_value(type = FUNCTION_TYPE)]
 impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for DefGen<V>
 where
     Self: ProvidesStaticType<'v> + DefLike<'v>,
 {
-    fn provide(&'v self, demand: &mut Demand<'_, 'v>) {
-        demand.provide_value::<&dyn StarlarkFunctionIdentity>(self);
-    }
-
     fn equals(&self, other: Value<'v>) -> crate::Result<bool> {
-        let Some(identity) = self.identity.get() else {
-            return Ok(false);
-        };
-        Ok(other
-            .request_value::<&dyn StarlarkFunctionIdentity>()
-            .and_then(|other| other.issued_identity())
-            .is_some_and(|other| Arc::ptr_eq(identity, other)))
+        let other = other
+            .downcast_ref::<Def>()
+            .map(|v| &v.symbol)
+            .or_else(|| other.downcast_ref::<FrozenDef>().map(|v| &v.symbol));
+        Ok(other.is_some_and(|other| self.symbol.equals(other)))
     }
 
     fn name_for_call_stack(&self, _me: Value<'v>) -> String {
@@ -738,8 +716,8 @@ where
     }
 
     fn write_hash(&self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
-        // It's hard to come up with a good hash here, but let's at least make an effort.
-        self.def_info.name.write_hash(hasher)
+        self.symbol.write_hash(hasher);
+        Ok(())
     }
 }
 

@@ -2375,7 +2375,6 @@ fn finish_analysis<T>(
     known_preferred_execution_platform: Option<ConfiguredTargetKey>,
     normalized_exec_groups: &NormalizedExecGroupCollection,
     prepared_groups: Vec<PreparedToolchain>,
-    rust_helpers: Arc<[slug_loading_v2::PreparedRustToolchainHelperBinding]>,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
 ) -> Result<ConfiguredNodeResult, AnalysisError>
@@ -2617,7 +2616,6 @@ where
         dependencies,
         resolved_attributes,
         configured_attributes,
-        rust_helpers,
         exec_groups.clone(),
         platform_cpu,
         runfiles_packages,
@@ -6713,91 +6711,6 @@ impl ConfiguredNodeAnalysisKey {
             return root_analysis_driver_complete(Err(error));
         }
 
-        let mut authorities =
-            crate::analysis_value::rust_toolchain::RustHelperAuthorities::default();
-        // Hidden configured attributes are made exclusively from these computed
-        // dependency providers. Include them before either materializer runs.
-        for result in computed.values() {
-            authorities.providers(result.result().providers());
-        }
-        for group in &prepared_groups {
-            for row in group
-                .action_context
-                .toolchain()
-                .into_iter()
-                .flat_map(|context| context.rows())
-            {
-                if let Some(selected) = row.selected() {
-                    authorities.value(&AnalysisValue::provider(selected.info().clone()));
-                }
-            }
-        }
-        let mut requests = authorities
-            .into_authorities()
-            .map(slug_loading_v2::RustToolchainHelperRequest::Retained)
-            .collect::<Vec<_>>();
-        if implementation.definition_source().label.to_string()
-            == "@@rules_rust+//rust/private:toolchain.bzl"
-        {
-            let mut sources = implementation
-                .source_identities_by_filename()
-                .iter()
-                .filter(|(_, source)| {
-                    &source.identity == implementation.definition_source().as_ref()
-                });
-            let Some((_, source)) = sources.next() else {
-                return root_analysis_driver_complete(Err(AnalysisError::message(
-                    "Rust callback producer source is missing",
-                )));
-            };
-            if sources.next().is_some() {
-                return root_analysis_driver_complete(Err(AnalysisError::message(
-                    "Rust callback producer source is ambiguous",
-                )));
-            }
-            requests.push(slug_loading_v2::RustToolchainHelperRequest::Producer(
-                source.clone(),
-            ));
-        }
-        let mut rust_helpers = Vec::new();
-        for request in requests {
-            let helper_mode = match mode {
-                ConfiguredAnalysisMode::Legacy => slug_loading_v2::RustToolchainHelperMode::Legacy,
-                ConfiguredAnalysisMode::Observed => {
-                    slug_loading_v2::RustToolchainHelperMode::Observed
-                }
-            };
-            match slug_loading_v2::prepare_rust_toolchain_helper(
-                ctx,
-                self.workspace.dupe(),
-                request,
-                helper_mode,
-            )
-            .await
-            {
-                LoadingPreparationOutcome::Need(need) => {
-                    return LoadingPreparationOutcome::Need(need);
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) => {
-                    return LoadingPreparationOutcome::Complete(Err(error));
-                }
-                LoadingPreparationOutcome::Complete(Ok((Err(error), _))) => {
-                    return root_analysis_driver_complete(Err(AnalysisError::message(
-                        error.to_string(),
-                    )));
-                }
-                LoadingPreparationOutcome::Complete(Ok((Ok(binding), _))) => {
-                    if !rust_helpers.iter().any(
-                        |previous: &slug_loading_v2::PreparedRustToolchainHelperBinding| {
-                            previous.authority() == binding.authority()
-                        },
-                    ) {
-                        rust_helpers.push(binding);
-                    }
-                }
-            }
-        }
-
         let workspace_status = match ctx
             .compute(&crate::WorkspaceStatusArtifactsKey(self.workspace.dupe()))
             .await
@@ -6822,7 +6735,6 @@ impl ConfiguredNodeAnalysisKey {
             known_preferred_execution_platform,
             &normalized_exec_groups,
             prepared_groups,
-            rust_helpers.into(),
             capture_events,
             event_batch,
         ))

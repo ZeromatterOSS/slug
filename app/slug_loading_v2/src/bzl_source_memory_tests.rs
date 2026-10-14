@@ -8,7 +8,11 @@ use crate::keys::WorkspaceSnapshotKey;
 #[tokio::test]
 async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     use dice::UserComputationData;
+    use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+    use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::LockfileMode;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::inject_root_module_request_inputs;
     use slug_bzlmod_v2::inject_root_package_policy_inputs;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -20,6 +24,7 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     use slug_workspace_v2::PathOperationResult;
     use slug_workspace_v2::path_observation_shards;
     use starlark::eval::FileLoader;
+    use starlark_map::sorted_map::SortedMap;
 
     let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
     let source: Arc<[u8]> = Arc::from(
@@ -67,6 +72,10 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     }
     for (path, bytes) in [
         ("/workspace/BUILD.bazel", Arc::<[u8]>::from(&b""[..])),
+        (
+            "/workspace/MODULE.bazel",
+            Arc::from(&b"module(name='bazel_tools')\n"[..]),
+        ),
         ("/workspace/parent.bzl", source),
         ("/workspace/leaf.bzl", Arc::from(leaf_source.as_bytes())),
         (
@@ -108,6 +117,32 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     updater
         .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
+    let seed_module_scope = |updater: &mut dice::DiceTransactionUpdater| {
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(WorkspaceSnapshot {
+                    files: Arc::new(SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        WorkspaceFileValue::Present(Arc::new(
+                            "module(name='bazel_tools')\n".into(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            updater,
+            workspace.as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Off,
+        )
+        .unwrap();
+    };
+    seed_module_scope(&mut updater);
     inject_root_package_policy_inputs(
         &mut updater,
         RootPackagePolicyInputs::new(
@@ -180,15 +215,22 @@ async fn host_load_keys_preserve_raw_alias_order_and_retained_exports() {
     else {
         panic!("cached child returned Need")
     };
-    let SourcePreparationOutcome::Complete(Ok(observed)) = transaction
+    let observed = transaction
         .compute(&HostBzlModuleObservationKey::new(
             workspace.dupe(),
             leaf_label.clone(),
         ))
         .await
-        .unwrap()
-    else {
-        panic!("observed child returned Need/error")
+        .unwrap();
+    let observed = match observed {
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+        SourcePreparationOutcome::Complete(Err(error)) => panic!("observed child: {error}"),
+        SourcePreparationOutcome::Need(need) => panic!(
+            "observed child needs paths {:?}, root bootstrap {}",
+            need.path_observations()
+                .map(|paths| &paths.demands()[..paths.demands().len().min(4)]),
+            need.root_module_bootstrap_request().is_some(),
+        ),
     };
     for carrier in [&child, &observed.result] {
         let borrowed = successful_host_bzl_module(carrier);

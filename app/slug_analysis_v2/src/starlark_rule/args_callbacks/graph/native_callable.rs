@@ -1,15 +1,15 @@
 //! Native rows describe actual wrappers and receiver/default edges; execution is unchanged.
-use slug_build_api_v2::CallableIntrinsic;
+use slug_build_api_v2::published_value::PublishedIntrinsic;
 
 use super::*;
 
-impl<'v> ArgsCallableGraphBuilder<'v> {
+impl<'v> PublicationBuilder<'v> {
     pub(super) fn native_callable(
         &mut self,
         value: Value<'v>,
         lowerer: &mut AnalysisValueLowerer<'v>,
         depth: usize,
-    ) -> Result<Option<CallableNode>, String> {
+    ) -> Result<Option<PublishedNode>, String> {
         let (api, parameters, receiver) = if let Some(native) = inspect_native_function(value) {
             (
                 self.natives.certify(native)?,
@@ -25,14 +25,35 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
             // No stored parameter metadata exists on this custom class.
             // This describes absence of instance state, not zero arity.
             (NativeApis::certify_analysis_builtin(api)?, Vec::new(), None)
+        } else if let Some(api) = slug_loading_v2::cc_common_api(value) {
+            let canonical = match api {
+                slug_loading_v2::CcModuleApi::Public => "slug.loading.cc_common.public_module",
+                slug_loading_v2::CcModuleApi::Internal => "slug.loading.cc_common.internal_module",
+            };
+            (
+                slug_build_api_v2::NativeCallableApiId::new(canonical, 1)
+                    .map_err(|e| e.to_string())?,
+                Vec::new(),
+                None,
+            )
+        } else if let Some((class, identity)) =
+            slug_loading_v2::provider::native_provider_token(value)
+        {
+            let canonical = format!("slug.loading.provider_token.{class}.{}", identity.name());
+            (
+                slug_build_api_v2::NativeCallableApiId::new(&canonical, 1)
+                    .map_err(|e| e.to_string())?,
+                Vec::new(),
+                None,
+            )
         } else {
             return Ok(None);
         };
-        Ok(Some(CallableNode::Intrinsic(CallableIntrinsic {
+        Ok(Some(PublishedNode::Intrinsic(PublishedIntrinsic {
             api,
             parameters: parameters.into(),
             return_annotation: None,
-            receiver,
+            receiver: receiver.map(slug_build_api_v2::published_value::PublishedEdge::Local),
         })))
     }
 }

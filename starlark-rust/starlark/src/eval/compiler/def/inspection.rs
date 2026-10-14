@@ -42,7 +42,10 @@ enum InspectionError {
 /// Shared scratch budget; inspections never collect dependencies into a result vector.
 #[derive(Debug)]
 pub struct InspectionBudget {
-    /// Remaining IR steps and dependency events, shared across inspections.
+    /// Remaining fixed IR records and standalone dependency/source events.
+    /// A record and its embedded primary span share one checked admission;
+    /// dynamic children, inline-frame spans and emitted dependencies retain
+    /// separate admissions. Shared across inspections.
     pub remaining_nodes: usize,
     /// Maximum recursive IR depth permitted before returning an error.
     pub maximum_depth: usize,
@@ -380,7 +383,10 @@ pub enum DefDependency<'v> {
     NativeFunction(NativeFunctionInspection<'v>),
     /// Emitted before nested code is automatically visited; do not re-walk this event.
     NestedCode(DefCodeInspection<'v>),
-    /// An original source span, including spans carried by compiler-inlined code.
+    /// An original source-authority switch, including compiler-inlined code.
+    /// Repeated CodeMap identities in the Source-event subsequence are coalesced;
+    /// this is not an exhaustive position trace. Each span still pays inspection
+    /// budget, and all original runtime/definition spans remain unchanged.
     Source(FileSpanRef<'v>),
 }
 

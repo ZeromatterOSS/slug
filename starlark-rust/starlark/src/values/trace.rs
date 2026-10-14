@@ -65,6 +65,10 @@ pub unsafe trait Trace<'v> {
     /// trying to unpack these values may crash the process.
     ///
     /// Generally this function should not do anything except calling `trace` on the fields.
+    /// Complex descendants can be deferred until the end of collection. After
+    /// tracing a field, its initialized type/pointer may be checked, but its
+    /// descendant payload graph must not be inspected yet. Do not trace an
+    /// already rewritten field again or allocate new Starlark heap objects.
     fn trace(&mut self, tracer: &Tracer<'v>);
 }
 

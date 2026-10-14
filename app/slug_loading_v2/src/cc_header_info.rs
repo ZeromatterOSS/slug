@@ -104,6 +104,10 @@ impl StarlarkStructuralValue for HeaderInfoValue {
     }
 }
 
+/// Borrow the actual native payload before any retained clone or graph walk.
+pub fn cc_header_info_ref(value: Value<'_>) -> Option<&CcHeaderInfo> {
+    HeaderInfoValue::from_value(value).map(|value| &value.0)
+}
 pub fn cc_header_info(value: Value<'_>) -> Option<CcHeaderInfo> {
     HeaderInfoValue::from_value(value).map(|value| value.0.clone())
 }

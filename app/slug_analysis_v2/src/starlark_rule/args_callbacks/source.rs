@@ -1,11 +1,11 @@
 //! Source authority belongs to the actual original module, not its display path.
 use std::sync::Arc;
 
-use slug_build_api_v2::CallableGraphBuilder;
 use slug_build_api_v2::CallableModuleIdentity;
 use slug_build_api_v2::CallableModuleSource;
 use slug_build_api_v2::CallableSourceAuthority;
 use slug_build_api_v2::CallableSourceAuthorityData;
+use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
 use slug_loading_v2::BzlLoadManifest;
 use slug_loading_v2::BzlModuleIdentity;
 use slug_loading_v2::defining_module_source_manifest;
@@ -14,27 +14,88 @@ use starlark::values::Value;
 use starlark::values::ValueIdentity;
 use starlark_map::unordered_map::UnorderedMap;
 
+// Private production owner: graph.rs constructs this only in
+// PublicationBuilder::new, beside that publisher's single graph, and calls it
+// only with that graph. Never transfer proof caches to another builder/session.
 #[derive(Default)]
 pub(super) struct SourceAuthorities<'v> {
     modules: UnorderedMap<ValueIdentity<'v>, CallableSourceAuthority>,
-    digests: UnorderedMap<(usize, usize), [u8; 32]>,
+    memo: memo::SourceMemo<'v>,
+    mappings: conversion::MappingAudits,
 }
+mod memo;
 impl<'v> SourceAuthorities<'v> {
+    fn complete<T>(
+        &mut self,
+        builder: &mut PublishedValueArenaBuilder,
+        result: Result<T, String>,
+    ) -> Result<T, String> {
+        if result.is_err() {
+            self.mappings.fail();
+            // Preserve the original error while refusing all later reuse.
+            let _ = builder.charge_bytes(usize::MAX);
+        }
+        result
+    }
     pub(super) fn authority(
         &mut self,
         client_data: Option<Value<'v>>,
         code: &CodeMap,
-        builder: &mut CallableGraphBuilder,
+        builder: &mut PublishedValueArenaBuilder,
+        remaining: &mut usize,
+    ) -> Result<CallableSourceAuthority, String> {
+        let result = self
+            .mappings
+            .admit_header(builder)
+            .and_then(|()| self.authority_inner(client_data, code, builder, remaining));
+        self.complete(builder, result)
+    }
+    pub(super) fn verify_source(
+        &mut self,
+        authority: &CallableSourceAuthority,
+        code: &CodeMap,
+        builder: &mut PublishedValueArenaBuilder,
+        remaining: &mut usize,
+    ) -> Result<(), String> {
+        let result = self
+            .mappings
+            .admit_header(builder)
+            .and_then(|()| self.verify_source_inner(authority, code, builder, remaining));
+        self.complete(builder, result)
+    }
+    fn digest(
+        &mut self,
+        code: &CodeMap,
+        builder: &mut PublishedValueArenaBuilder,
+        remaining: &mut usize,
+    ) -> Result<[u8; 32], String> {
+        let result = self
+            .mappings
+            .admit_header(builder)
+            .and_then(|()| self.digest_inner(code, builder, remaining));
+        self.complete(builder, result)
+    }
+
+    fn authority_inner(
+        &mut self,
+        client_data: Option<Value<'v>>,
+        code: &CodeMap,
+        builder: &mut PublishedValueArenaBuilder,
         remaining: &mut usize,
     ) -> Result<CallableSourceAuthority, String> {
         let client_data =
             client_data.ok_or("Args callback requires actual original-module source metadata")?;
         let manifest = defining_module_source_manifest(client_data)
             .ok_or("Args callback original-module metadata has no tracked source manifest")?;
+        // Each incoming root proof lookup is charged even on a memo hit.
+        step(builder, remaining)?;
+        if let Some(authority) = self.memo.root(client_data, code) {
+            return Ok(authority.clone());
+        }
         let digest = self.digest(code, builder, remaining)?;
         let mut verified = false;
         for source in &*manifest.reachable {
-            step(remaining)?;
+            step(builder, remaining)?;
             if source.identity == manifest.root && source.source_digest == digest {
                 verified = true;
                 break;
@@ -45,40 +106,63 @@ impl<'v> SourceAuthorities<'v> {
                 "Args callback source bytes differ from its tracked original-module root".into(),
             );
         }
-        if let Some(authority) = self.modules.get(&client_data.identity()) {
-            return Ok(authority.clone());
+        let cached = self.modules.get(&client_data.identity()).cloned();
+        let new_module = cached.is_none();
+        let authority = match cached {
+            Some(authority) => authority,
+            None => convert(manifest, &mut self.mappings, builder, remaining)?,
+        };
+        let new_member = !self.memo.member(&authority, code);
+        // Root success implies membership, but not vice versa. Preflight all
+        // new tables/guards together before inserting any successful proof.
+        self.memo.preflight(
+            1 + usize::from(new_member) + usize::from(new_module),
+            builder,
+            remaining,
+        )?;
+        if new_module {
+            self.modules
+                .insert(client_data.identity(), authority.clone());
         }
-        let authority = convert(manifest, builder, remaining)?;
-        self.modules
-            .insert(client_data.identity(), authority.clone());
+        self.memo.record_root(client_data, code, &authority);
+        if new_member {
+            self.memo.record_member(&authority, code);
+        }
         Ok(authority)
     }
-    pub(super) fn verify_source(
+    fn verify_source_inner(
         &mut self,
         authority: &CallableSourceAuthority,
         code: &CodeMap,
-        builder: &mut CallableGraphBuilder,
+        builder: &mut PublishedValueArenaBuilder,
         remaining: &mut usize,
     ) -> Result<(), String> {
+        // One paid incoming lookup replaces repeated digest+closure scans
+        // only after this exact immutable authority/CodeMap pair succeeded.
+        step(builder, remaining)?;
+        if self.memo.member(authority, code) {
+            return Ok(());
+        }
         let digest = self.digest(code, builder, remaining)?;
         for source in &*authority.data().reachable {
-            step(remaining)?;
+            step(builder, remaining)?;
             if source.digest == digest {
+                self.memo.preflight(1, builder, remaining)?;
+                self.memo.record_member(authority, code);
                 return Ok(());
             }
         }
         Err("Args callback retained/inlined source lies outside its tracked source closure".into())
     }
-    fn digest(
+    fn digest_inner(
         &mut self,
         code: &CodeMap,
-        builder: &mut CallableGraphBuilder,
+        builder: &mut PublishedValueArenaBuilder,
         remaining: &mut usize,
     ) -> Result<[u8; 32], String> {
-        step(remaining)?;
-        let key = (code.source().as_ptr() as usize, code.source().len());
-        if let Some(digest) = self.digests.get(&key) {
-            return Ok(*digest);
+        step(builder, remaining)?;
+        if let Some(digest) = self.memo.digest(code) {
+            return Ok(digest);
         }
         if code.source().len() > slug_build_api_v2::callable_graph::CALLABLE_GRAPH_BYTE_LIMIT {
             return Err("Args callback source byte limit".into());
@@ -102,14 +186,21 @@ impl<'v> SourceAuthorities<'v> {
             *out = digit(pair[0]).ok_or("invalid SHA-256 producer")? * 16
                 + digit(pair[1]).ok_or("invalid SHA-256 producer")?;
         }
-        self.digests.insert(key, digest);
+        self.memo.preflight(1, builder, remaining)?;
+        self.memo.record_digest(code, digest);
         Ok(digest)
     }
 }
-fn step(remaining: &mut usize) -> Result<(), String> {
-    *remaining = remaining
-        .checked_sub(1)
-        .ok_or("Args source inspection visit limit")?;
+fn step(builder: &mut PublishedValueArenaBuilder, remaining: &mut usize) -> Result<(), String> {
+    builder.charge_visit().map_err(|e| e.to_string())?;
+    *remaining = match remaining.checked_sub(1) {
+        Some(remaining) => remaining,
+        None => {
+            // An exhausted host inspection budget must poison native reuse too.
+            let _ = builder.charge_bytes(usize::MAX);
+            return Err("Args source inspection visit limit".into());
+        }
+    };
     Ok(())
 }
 fn identity(source: &BzlModuleIdentity) -> CallableModuleIdentity {
@@ -119,69 +210,8 @@ fn identity(source: &BzlModuleIdentity) -> CallableModuleIdentity {
         repository_mapping: source.repository_mapping.clone(),
     }
 }
-fn convert(
-    manifest: &BzlLoadManifest,
-    builder: &mut CallableGraphBuilder,
-    remaining: &mut usize,
-) -> Result<CallableSourceAuthority, String> {
-    use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_BYTE_LIMIT;
-    use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_NODE_LIMIT;
-    if manifest.reachable.len() > CALLABLE_GRAPH_NODE_LIMIT
-        || manifest.direct_children.len() > CALLABLE_GRAPH_NODE_LIMIT
-    {
-        return Err("Args source closure fact limit".into());
-    }
-    let mut cost = |s: &BzlModuleIdentity| -> Result<usize, String> {
-        step(remaining)?;
-        let mut bytes = s
-            .workspace_path
-            .as_os_str()
-            .len()
-            .saturating_add(s.label.package().repo().as_str().len())
-            .saturating_add(s.label.package().package().as_str().len())
-            .saturating_add(s.label.target().as_str().len());
-        for (a, c) in &*s.repository_mapping {
-            step(remaining)?;
-            bytes = bytes
-                .saturating_add(a.as_str().len())
-                .saturating_add(c.as_str().len());
-        }
-        Ok(bytes)
-    };
-    let mut bytes = cost(&manifest.root)?;
-    for child in &*manifest.direct_children {
-        bytes = bytes.saturating_add(cost(child)?);
-    }
-    for source in &*manifest.reachable {
-        bytes = bytes
-            .saturating_add(cost(&source.identity)?)
-            .saturating_add(std::mem::size_of::<CallableModuleSource>());
-    }
-    if bytes > CALLABLE_GRAPH_BYTE_LIMIT {
-        return Err("Args source closure byte limit".into());
-    }
-    builder.charge_bytes(bytes).map_err(|e| e.to_string())?;
-    CallableSourceAuthority::new(CallableSourceAuthorityData {
-        root: identity(&manifest.root),
-        direct_children: manifest
-            .direct_children
-            .iter()
-            .map(identity)
-            .collect::<Vec<_>>()
-            .into(),
-        reachable: manifest
-            .reachable
-            .iter()
-            .map(|s| CallableModuleSource {
-                identity: identity(&s.identity),
-                digest: s.source_digest,
-            })
-            .collect::<Vec<_>>()
-            .into(),
-        fingerprint: manifest.fingerprint,
-    })
-    .map_err(|e| e.to_string())
-}
+mod conversion;
+use conversion::convert;
 
 #[cfg(test)]
 mod tests;

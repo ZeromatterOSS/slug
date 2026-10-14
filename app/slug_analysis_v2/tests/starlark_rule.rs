@@ -10189,15 +10189,11 @@ async fn depset_and_structural_key_failures_happen_at_construction() {
 #[tokio::test]
 async fn recursive_provider_lowering_rejects_cycles_and_unsupported_values() {
     for (body, expected) in [
-        ("value = []; value.append(value)", "cyclic analysis value"),
         (
-            "value = set([1])",
-            "unsupported analysis value of type `set`",
+            "value = []; value.append(value)",
+            "cyclic native projection",
         ),
-        (
-            "value = _impl",
-            "unsupported analysis value of type `function`",
-        ),
+        ("value = set([1])", "outward set projection is unsupported"),
     ] {
         let workspace = scratch();
         fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
@@ -10217,6 +10213,43 @@ async fn recursive_provider_lowering_rejects_cycles_and_unsupported_values() {
             .unwrap_err();
         assert!(error.contains(expected), "{error}");
     }
+
+    // Function fields now retain and invoke the original callable in a consumer.
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = 'root')\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"Info = provider()
+def _impl(ctx):
+    return [Info(value = _impl)]
+def _consumer(ctx):
+    original = ctx.attr.dep[Info].value
+    if original(None)[0].value != original:
+        fail("provider function did not invoke its original body")
+    return []
+probe = rule(implementation = _impl)
+consumer = rule(implementation = _consumer, attrs = {"dep": attr.label()})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(':defs.bzl', 'probe', 'consumer')\nprobe(name = 'dep')\nconsumer(name = 'probe', dep = ':dep')\n",
+    )
+    .unwrap();
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:probe").unwrap(),
+        test_configuration(),
+    );
+    analyze_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        &key,
+        None,
+        false,
+    )
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -15428,3 +15461,6 @@ mod args_callback_lifecycle_tests;
 
 #[path = "starlark_rule/run_environment_info_tests.rs"]
 mod run_environment_info_tests;
+
+#[path = "provider_callables.rs"]
+mod provider_callables;

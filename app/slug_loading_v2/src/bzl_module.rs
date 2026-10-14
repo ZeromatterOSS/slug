@@ -158,8 +158,6 @@ use crate::provider::BzlEvaluationContext;
 use crate::subrule::ConfiguredDependencyDefault;
 use crate::visibility::RuleVisibility;
 
-pub(crate) mod rust_toolchain_helper;
-
 /// Local-root loading operations over a caller-owned DICE transaction.
 ///
 /// This intentionally owns no DICE instance or asynchronous runtime. The
@@ -562,6 +560,7 @@ pub struct ParsedBzl {
 #[derive(Debug, Allocative, Clone)]
 #[doc(hidden)]
 pub struct FrozenBzlModule {
+    semantic_inputs: Option<Arc<semantic_evaluation::PreparedSemanticBzlEvaluation>>,
     #[allocative(skip)]
     pub(crate) module: FrozenModule,
     path: PathBuf,
@@ -589,7 +588,12 @@ impl FrozenBzlLifetimeEntry {
 
 impl PartialEq for FrozenBzlModule {
     fn eq(&self, other: &Self) -> bool {
-        self.manifest == other.manifest && self.bzl_load_visibility == other.bzl_load_visibility
+        let inputs_equal = match (&self.semantic_inputs, &other.semantic_inputs) {
+            (Some(left), Some(right)) => left == right,
+            (None, None) => self.manifest == other.manifest,
+            _ => false,
+        };
+        inputs_equal && self.bzl_load_visibility == other.bzl_load_visibility
     }
 }
 
@@ -2965,6 +2969,9 @@ fn successful_host_bzl_module(carrier: &HostBzlModuleCarrier) -> &FrozenBzlModul
         .expect("Host scratch contains only checked successful carriers")
 }
 
+mod root_bzl_mapping;
+mod semantic_evaluation;
+
 async fn compute_host_bzl_module(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
@@ -3161,23 +3168,31 @@ async fn compute_host_bzl_module(
         loaded_modules.push((load.as_str(), child));
     }
 
-    let module = Module::new();
-    let manifest = BzlLoadManifest::new(
-        BzlModuleIdentity {
-            label: label.canonical_label(),
-            workspace_path: source.logical_path().as_path().to_path_buf(),
-            repository_mapping: Arc::from([]),
-        },
-        digest(source_text),
-        loaded_modules
-            .iter()
-            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
-    );
+    // Build-context functions retain the same tracked root mapping as BUILD
+    // evaluation. Bzlmod definition loading precedes the selected module graph;
+    // it must not depend on that graph while constructing repository mappings.
+    let repository_mapping = match context {
+        BzlModuleContext::Build => {
+            match root_bzl_mapping::load(ctx, workspace, mode, &mut observations).await {
+                Ok(mapping) => mapping,
+                Err(terminal) => return terminal,
+            }
+        }
+        BzlModuleContext::Bzlmod => Arc::from([]),
+    };
+    // The AST above is the synopsis required for source-first child loading.
+    // The actual evaluation parse belongs to the immutable semantic owner.
+    drop(ast);
+    let identity = BzlModuleIdentity {
+        label: label.canonical_label(),
+        workspace_path: source.logical_path().as_path().to_path_buf(),
+        repository_mapping,
+    };
     if let Err(error) = validate_module_bzl_load_visibilities(
-        manifest.root.label.package(),
+        identity.label.package(),
         loaded_modules
             .iter()
-            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
+            .map(|(_, child)| successful_host_bzl_module(child)),
     ) {
         return host_bzl_complete(
             Err(HostBzlModuleError::Evaluation(LoadingError::new(
@@ -3186,42 +3201,51 @@ async fn compute_host_bzl_module(
             observations,
         );
     }
-    let loader = LocalBzlLoader {
-        modules: loaded_modules
+    let key = match semantic_evaluation::prepare(
+        &identity,
+        &source_name,
+        source.bytes(),
+        context,
+        loaded_modules
             .iter()
-            .map(|(load, carrier)| (*load, successful_host_bzl_module(carrier).module.dupe()))
-            .collect(),
-    };
-    crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
-        .expect("a new .bzl module has no defining client data");
-    let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
-    let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = context.globals(&manifest.root.label);
-    {
-        let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&evaluation_context);
-        evaluator.set_loader(&loader);
-        if let Some(print_capture) = print_capture.as_ref() {
-            evaluator.set_print_handler(print_capture);
-        }
-        let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
-        drop(evaluator);
-        *event_batch = print_capture.map(LoadingPrintCapture::into_batch);
-        if let Err(error) = evaluation {
+            .map(|(raw, child)| (*raw, successful_host_bzl_module(child))),
+    ) {
+        Ok(key) => key,
+        Err(error) => {
+            // The existing always-transient dependency also prevents physical
+            // pre-copy admission failures from becoming cached semantic facts.
+            let _ = ctx.compute(&BzlLoadCyclePoisonKey).await;
             return host_bzl_complete(
-                Err(HostBzlModuleError::Evaluation(LoadingError::new(
-                    error.to_string(),
-                ))),
+                Err(HostBzlModuleError::Evaluation(LoadingError::new(error))),
                 observations,
             );
         }
-    }
+    };
+    let semantic = host_dice_invariant(ctx.compute(&key).await);
+    *event_batch = capture_events.then(|| semantic.events().as_ref().clone());
+    let result = semantic.result().cloned().map_err(|error| {
+        use semantic_evaluation::SemanticBzlEvaluationError as Error;
+        match error {
+            Error::Parse(message) => HostBzlModuleError::Parse {
+                label: label.clone(),
+                message: message.clone(),
+            },
+            Error::Freeze(message) => HostBzlModuleError::Freeze {
+                label: label.clone(),
+                message: message.clone(),
+            },
+            Error::Evaluation(message) | Error::Resource(message) => {
+                HostBzlModuleError::Evaluation(LoadingError::new(message.to_string()))
+            }
+        }
+    });
     #[cfg(test)]
-    if ctx
-        .per_transaction_data()
-        .data
-        .get::<ForceHostBzlFreezeFailure>()
-        .is_ok()
+    if result.is_ok()
+        && ctx
+            .per_transaction_data()
+            .data
+            .get::<ForceHostBzlFreezeFailure>()
+            .is_ok()
     {
         return host_bzl_complete(
             Err(HostBzlModuleError::Freeze {
@@ -3231,37 +3255,7 @@ async fn compute_host_bzl_module(
             observations,
         );
     }
-    let module = match module.freeze() {
-        Ok(module) => module,
-        Err(error) => {
-            return host_bzl_complete(
-                Err(HostBzlModuleError::Freeze {
-                    label: label.clone(),
-                    message: Arc::from(format!("{error:?}")),
-                }),
-                observations,
-            );
-        }
-    };
-    drop(loader);
-    let retained_bzl_modules = flattened_module_lifetime_closure(
-        loaded_modules
-            .iter()
-            .map(|(_, carrier)| successful_host_bzl_module(carrier)),
-    )
-    .into();
-    drop(loaded_modules);
-    host_bzl_complete(
-        Ok(FrozenBzlModule {
-            module,
-            path: source.logical_path().as_path().to_path_buf(),
-            loads,
-            retained_bzl_modules,
-            bzl_load_visibility: evaluation_context.bzl_load_visibility(),
-            manifest,
-        }),
-        observations,
-    )
+    host_bzl_complete(result, observations)
 }
 
 fn stores_host_bzl_event_batch(value: &HostBzlModuleDriverOutcome) -> bool {
@@ -5554,95 +5548,11 @@ fn prepare_external_bzl_child_loads<'a>(
         .collect()
 }
 
-#[allow(clippy::too_many_arguments)]
-fn evaluate_external_bzl_module(
-    route: &HostRepositorySourceRoute,
-    context: BzlModuleContext,
-    canonical_label: CanonicalLabel,
-    presentation_path: PathBuf,
-    source_text: &str,
-    ast: AstModule,
-    loads: Vec<String>,
-    loaded_modules: Vec<(String, FrozenBzlModule)>,
-    observations: PathObservationEpoch,
-    capture_events: bool,
-    event_batch: &mut Option<EventBatch>,
-) -> ExternalBzlDriverOutcome {
-    let module = Module::new();
-    let manifest = BzlLoadManifest::new(
-        BzlModuleIdentity {
-            label: canonical_label.clone(),
-            workspace_path: presentation_path.clone(),
-            repository_mapping: external_repository_mapping(route),
-        },
-        digest(source_text),
-        loaded_modules.iter().map(|(_, module)| module),
-    );
-    if let Err(error) =
-        validate_direct_bzl_load_visibilities(manifest.root.label.package(), &loaded_modules)
-    {
-        return external_bzl_complete(
-            Err(ExternalBzlModuleError::Evaluation {
-                label: canonical_label,
-                message: Arc::from(error.to_string()),
-            }),
-            observations,
-        );
-    }
-    let loader = LocalBzlLoader {
-        modules: loaded_modules
-            .iter()
-            .map(|(load, module)| (load.as_str(), module.module.dupe()))
-            .collect(),
-    };
-    crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
-        .expect("a new .bzl module has no defining client data");
-    let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
-    let print_capture = capture_events.then(LoadingPrintCapture::default);
-    let globals = context.globals(&manifest.root.label);
-    {
-        let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&evaluation_context);
-        evaluator.set_loader(&loader);
-        if let Some(print_capture) = print_capture.as_ref() {
-            evaluator.set_print_handler(print_capture);
-        }
-        let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
-        drop(evaluator);
-        *event_batch = print_capture.map(LoadingPrintCapture::into_batch);
-        if let Err(error) = evaluation {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Evaluation {
-                    label: canonical_label,
-                    message: Arc::from(error.to_string()),
-                }),
-                observations,
-            );
-        }
-    }
-    let module = match module.freeze() {
-        Ok(module) => module,
-        Err(error) => {
-            return external_bzl_complete(
-                Err(ExternalBzlModuleError::Freeze {
-                    label: canonical_label,
-                    message: Arc::from(format!("{error:?}")),
-                }),
-                observations,
-            );
-        }
-    };
-    external_bzl_complete(
-        Ok(FrozenBzlModule {
-            module,
-            path: presentation_path,
-            loads,
-            retained_bzl_modules: retained_module_closure(&loaded_modules),
-            bzl_load_visibility: evaluation_context.bzl_load_visibility(),
-            manifest,
-        }),
-        observations,
-    )
+fn successful_external_bzl_module(carrier: &ExternalBzlModuleCarrier) -> &FrozenBzlModule {
+    carrier
+        .as_ref()
+        .as_ref()
+        .expect("successful external child prefix contains only Ok carriers")
 }
 
 async fn compute_external_bzl_module(
@@ -5729,39 +5639,79 @@ async fn compute_external_bzl_module(
         ControlFlow::Break(value) => return value,
     };
 
-    let ast = match parse_external_bzl(&source, &canonical_label) {
-        Ok(ast) => ast,
-        Err(error) => return external_bzl_complete(Err(error), observations),
+    let identity = BzlModuleIdentity {
+        label: canonical_label.clone(),
+        workspace_path: source.presentation_path,
+        repository_mapping: external_repository_mapping(&effective_route),
     };
-    let source_text = std::str::from_utf8(&source.bytes)
-        .expect("successful synopsis and final parse validated the current source");
-    // Independently retained settled APIs own names; retries above borrow them.
-    let loaded_modules = loaded_modules
-        .into_iter()
-        .map(|(name, carrier)| {
-            // Only checked Ok carriers enter the private child prefix. Retained
-            // evaluator values own their copies after all children and parsing settle.
-            let module = carrier
-                .as_ref()
-                .as_ref()
-                .expect("successful external child prefix contains only Ok carriers")
-                .clone();
-            (name.to_owned(), module)
-        })
-        .collect();
-    evaluate_external_bzl_module(
-        &effective_route,
+    if let Err(error) = validate_module_bzl_load_visibilities(
+        identity.label.package(),
+        loaded_modules
+            .iter()
+            .map(|(_, child)| successful_external_bzl_module(child)),
+    ) {
+        return external_bzl_complete(
+            Err(ExternalBzlModuleError::Evaluation {
+                label: canonical_label,
+                message: error.to_string().into(),
+            }),
+            observations,
+        );
+    }
+    let key = match semantic_evaluation::prepare(
+        &identity,
+        &source.source_name,
+        &source.bytes,
         key.context,
-        canonical_label,
-        source.presentation_path,
-        source_text,
-        ast,
-        loads.to_vec(),
-        loaded_modules,
-        observations,
-        capture_events,
-        event_batch,
-    )
+        loaded_modules
+            .iter()
+            .map(|(raw, child)| (*raw, successful_external_bzl_module(child))),
+    ) {
+        Ok(key) => key,
+        Err(error) => {
+            let _ = ctx.compute(&BzlLoadCyclePoisonKey).await;
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::Evaluation {
+                    label: canonical_label,
+                    message: error.into(),
+                }),
+                observations,
+            );
+        }
+    };
+    let semantic = match ctx.compute(&key).await {
+        Ok(value) => value,
+        Err(error) => {
+            return external_bzl_complete(
+                Err(ExternalBzlModuleError::SourceCompute {
+                    label: canonical_label,
+                    message: error.to_string().into(),
+                }),
+                observations,
+            );
+        }
+    };
+    *event_batch = capture_events.then(|| semantic.events().as_ref().clone());
+    let result = semantic.result().cloned().map_err(|error| {
+        use semantic_evaluation::SemanticBzlEvaluationError as Error;
+        match error {
+            Error::Parse(message) => ExternalBzlModuleError::Parse {
+                label: canonical_label.clone(),
+                message: message.clone(),
+            },
+            Error::Freeze(message) => ExternalBzlModuleError::Freeze {
+                label: canonical_label.clone(),
+                message: message.clone(),
+            },
+            Error::Evaluation(message) | Error::Resource(message) => {
+                ExternalBzlModuleError::Evaluation {
+                    label: canonical_label.clone(),
+                    message: message.clone(),
+                }
+            }
+        }
+    });
+    external_bzl_complete(result, observations)
 }
 
 fn stores_external_bzl_event_batch(value: &ExternalBzlDriverOutcome) -> bool {
@@ -7906,13 +7856,46 @@ impl Key for BzlModuleEvalKey {
                         .map(|(load, module)| (load.as_str(), module.module.dupe()))
                         .collect(),
                 };
-                crate::starlark_label::attach_defining_module_manifest(&module, &manifest)
-                    .expect("a new .bzl module has no defining client data");
+                let function_owner = crate::function_owner::bzl_evaluation_owner(
+                    &manifest,
+                    ast.file_span(ast.statement().span).file,
+                    false,
+                    false,
+                    loaded_modules.iter().map(|(_, child)| {
+                        child
+                            .module
+                            .client_data()
+                            .and_then(|data| {
+                                crate::starlark_label::defining_module_function_owner(
+                                    data.to_value(),
+                                )
+                            })
+                            .cloned()
+                            .ok_or_else(|| anyhow::anyhow!("original loaded .bzl module has no admitted structural function owner"))
+                    }),
+                )
+                .map_err(|error| LoadingError::new(error.to_string()))?;
+                crate::starlark_label::attach_defining_module_owner(
+                    &module,
+                    &manifest,
+                    function_owner.clone(),
+                )
+                .expect("a new .bzl module has no defining client data");
                 let evaluation_context = BzlEvaluationContext::from_manifest(&manifest);
                 let print_capture = capture_events.then(LoadingPrintCapture::default);
                 let globals = loading_globals_for_source(&manifest.root.label);
                 {
                     let mut evaluator = Evaluator::new(&module);
+                    evaluator
+                        .set_function_symbol_session(
+                            crate::function_owner::function_symbol_session(function_owner),
+                        )
+                        .expect("fresh evaluator");
+                    evaluator
+                        .set_function_export_mode(
+                            starlark::eval::FunctionExportMode::TopLevelAssignments,
+                        )
+                        .expect("fresh evaluator");
                     evaluator.extra = Some(&evaluation_context);
                     evaluator.set_loader(&loader);
                     if let Some(print_capture) = print_capture.as_ref() {
@@ -7927,6 +7910,7 @@ impl Key for BzlModuleEvalKey {
                     .freeze()
                     .map_err(|error| LoadingError::new(format!("{error:?}")))?;
                 Ok(FrozenBzlModule {
+                    semantic_inputs: None,
                     module,
                     path: self.path.clone(),
                     loads: parsed.loads.clone(),
@@ -8392,6 +8376,9 @@ fn flattened_module_lifetime_closure<'a>(
 }
 
 #[cfg(test)]
+pub(crate) mod test_source;
+
+#[cfg(test)]
 #[path = "repository_child_load_memory_tests.rs"]
 mod repository_child_load_memory_tests;
 
@@ -8417,6 +8404,9 @@ pub(crate) mod local_extension_definition_tests;
 
 #[cfg(test)]
 mod module_extension_definition_loading_tests {
+    mod semantic_cohort_tests {
+        include!("bzl_module/semantic_evaluation/cohort_tests.rs");
+    }
     mod frontier_tests;
     use std::collections::hash_map::DefaultHasher;
     use std::hash::Hash;
@@ -11033,8 +11023,15 @@ mod module_extension_definition_loading_tests {
         let parent = "print('parent')\nload('//:child.bzl','child')\nvalue=child\n";
         let child_a = "print('child-a')\nchild=1\n";
         let child_b = "print('child-b')\nchild=2\n";
-        let mut first_transaction =
-            case_transaction(&dice, "", parent, child_a, true, Some(tracker.clone())).await;
+        let mut first_transaction = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            parent,
+            child_a,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
         let epoch = first_transaction
             .compute(&PathObservationEpochKey)
             .await
@@ -11043,7 +11040,9 @@ mod module_extension_definition_loading_tests {
         assert!(HostBzlModuleObservationKey::validity(&first));
         assert!(HostBzlModuleObservationKey::equality(&first, &first));
         let value = observed_module(&first);
-        assert!(value.result().is_ok());
+        if let Err(error) = value.result() {
+            panic!("observed module fixture: {error}");
+        }
         assert_observed_frontier(value, &epoch, &["ext.bzl", "child.bzl"], &[]);
         assert_eq!(tracker.legacy_modules.load(Ordering::SeqCst), 0);
         assert_eq!(tracker.legacy_sources.load(Ordering::SeqCst), 0);
@@ -11057,20 +11056,41 @@ mod module_extension_definition_loading_tests {
                     .as_ref()
                     .is_some_and(|batch| !batch.events().is_empty())
         }));
-        let mut warm_transaction =
-            case_transaction(&dice, "", parent, child_a, true, Some(tracker.clone())).await;
+        let mut warm_transaction = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            parent,
+            child_a,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
         let warm = compute_observed_module(&mut warm_transaction, "ext.bzl").await;
         assert!(HostBzlModuleObservationKey::equality(&first, &warm));
         assert!(tracker.take().iter().all(|activation| {
             !activation.observed
                 || activation.kind == ActivationKind::Reused && activation.batch.is_none()
         }));
-        let mut changed_transaction =
-            case_transaction(&dice, "", parent, child_b, true, None).await;
+        let mut changed_transaction = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            parent,
+            child_b,
+            true,
+            None,
+        )
+        .await;
         let changed = compute_observed_module(&mut changed_transaction, "ext.bzl").await;
         assert!(!HostBzlModuleObservationKey::equality(&first, &changed));
-        let mut restored_transaction =
-            case_transaction(&dice, "", parent, child_a, true, None).await;
+        let mut restored_transaction = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            parent,
+            child_a,
+            true,
+            None,
+        )
+        .await;
         let restored = compute_observed_module(&mut restored_transaction, "ext.bzl").await;
         assert!(HostBzlModuleObservationKey::equality(&first, &restored));
     }
@@ -11079,7 +11099,15 @@ mod module_extension_definition_loading_tests {
     async fn observed_bzl_module_preserves_decisive_terminals_need_and_outer_polarity() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let tracker = Arc::new(BzlEventTracker::default());
-        let mut seed = case_transaction(&dice, "", "x=1\n", "", true, None).await;
+        let mut seed = case_transaction(
+            &dice,
+            "module(name='bazel_tools')\n",
+            "x=1\n",
+            "",
+            true,
+            None,
+        )
+        .await;
         let epoch = seed.compute(&PathObservationEpochKey).await.unwrap();
 
         let mut need_transaction =
@@ -11117,7 +11145,7 @@ mod module_extension_definition_loading_tests {
             let tracker = Arc::new(BzlEventTracker::default());
             let mut transaction = case_transaction(
                 &case_dice,
-                "",
+                "module(name='bazel_tools')\n",
                 source,
                 child,
                 child_present,
@@ -11194,14 +11222,28 @@ mod module_extension_definition_loading_tests {
             transaction_with_epoch(&dice, epoch.dupe(), terminal_tracker.clone(), true).await;
         let freeze = compute_observed_module(&mut freeze_tx, "ext.bzl").await;
         let freeze = observed_module(&freeze);
-        assert!(matches!(
-            freeze.result(),
-            Err(HostBzlModuleError::Freeze { .. })
-        ));
+        assert!(
+            matches!(freeze.result(), Err(HostBzlModuleError::Freeze { .. })),
+            "{}",
+            freeze
+                .result()
+                .as_ref()
+                .err()
+                .map(ToString::to_string)
+                .unwrap_or_else(|| "successful module".into())
+        );
         assert_observed_frontier(freeze, &epoch, &["ext.bzl"], &["child.bzl"]);
         assert!(terminal_tracker.take_empty_observed_batches(Some(&terminal_label)));
         let source_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let mut source_tx = case_transaction(&source_dice, "", "", "", false, None).await;
+        let mut source_tx = case_transaction(
+            &source_dice,
+            "module(name='bazel_tools')\n",
+            "",
+            "",
+            false,
+            None,
+        )
+        .await;
         let source_epoch = source_tx.compute(&PathObservationEpochKey).await.unwrap();
         let source = compute_observed_module(&mut source_tx, "child.bzl").await;
         let source = observed_module(&source);

@@ -675,7 +675,7 @@ impl ProviderValue {
         }
     }
 
-    fn identity(&self) -> ProviderIdentity {
+    pub(crate) fn identity(&self) -> ProviderIdentity {
         match self {
             Self::FeatureFlagInfo(_) => ProviderIdentity::builtin("FeatureFlagInfo"),
             Self::TemplateVariableInfo(_) => ProviderIdentity::builtin("TemplateVariableInfo"),
@@ -692,7 +692,7 @@ impl ProviderValue {
         }
     }
 
-    fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+    pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         match (self, other) {
             (Self::FeatureFlagInfo(left), Self::FeatureFlagInfo(right)) => {
                 left.publication_eq(right)

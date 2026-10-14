@@ -1,4 +1,5 @@
 //! A source edit must remain visible independently of argv and native aliases.
+use slug_build_api_v2::published_value::*;
 use slug_build_api_v2::*;
 
 use super::*;
@@ -144,7 +145,7 @@ pub(super) fn assert_cc_source_only_change(
         "providers / native input-capture alias partition changed"
     );
     eprintln!(
-        "Cc source proof: {} callback authority occurrences changed only cc_info.bzl SHA and closure fingerprint; providers/native aliases, code/edges, other result fields, argv and forced-param bytes equal",
+        "Cc source proof: {} callback source authorities record the cc_info.bzl edit and full owner validity follows it; provider/native alias topology, selected evaluation keys, code/default/capture edges, typed payloads, argv and forced-param bytes remain equal",
         check.changed_authorities
     );
 }
@@ -256,10 +257,19 @@ impl Check {
             };
             match (l, r) {
                 (CallableNode::Native(l), CallableNode::Native(r)) => {
-                    self.left_native.push(l.clone());
-                    self.right_native.push(r.clone());
+                    self.left_native.push(l.value().clone());
+                    self.right_native.push(r.value().clone());
                 }
                 (CallableNode::Function(l), CallableNode::Function(r)) => {
+                    assert_eq!(l.symbol.name(), r.symbol.name());
+                    assert_eq!(l.symbol.owner().domain(), r.symbol.owner().domain());
+                    assert!(
+                        l.symbol
+                            .owner()
+                            .stable_key()
+                            .eq_part(r.symbol.owner().stable_key()),
+                        "source edit cannot select a different evaluation owner key"
+                    );
                     self.code(&l.code, &r.code, left, right);
                     parameters(&l.parameters, &r.parameters);
                     assert_eq!(l.return_annotation, r.return_annotation);
@@ -281,7 +291,7 @@ impl Check {
                 }
                 (CallableNode::List(l), CallableNode::List(r))
                 | (CallableNode::Tuple(l), CallableNode::Tuple(r))
-                | (CallableNode::Dict(l), CallableNode::Dict(r)) => {
+                | (CallableNode::Dictionary(l), CallableNode::Dictionary(r)) => {
                     assert_eq!(left.edges(*l).unwrap(), right.edges(*r).unwrap())
                 }
                 (
@@ -297,24 +307,118 @@ impl Check {
                     assert_eq!(ln, rn);
                     assert_eq!(left.edges(*l).unwrap(), right.edges(*r).unwrap());
                 }
+                (CallableNode::Provider(l), CallableNode::Provider(r)) => {
+                    assert_eq!(l.identity, r.identity);
+                    assert_eq!(l.names, r.names);
+                    assert_eq!(l.has_schema, r.has_schema);
+                    assert_eq!(
+                        left.edges(l.values).unwrap(),
+                        right.edges(r.values).unwrap()
+                    );
+                    match (&l.files_to_run, &r.files_to_run) {
+                        (Some(l), Some(r)) => assert_eq!(l.value(), r.value()),
+                        (None, None) => {}
+                        _ => panic!("hidden FilesToRun changed"),
+                    }
+                }
+                (CallableNode::ProviderConstructor(l), CallableNode::ProviderConstructor(r)) => {
+                    assert_eq!(l.id, r.id);
+                    match (&l.schema, &r.schema) {
+                        (
+                            PublishedProviderSchema::Schemaless,
+                            PublishedProviderSchema::Schemaless,
+                        ) => {}
+                        (PublishedProviderSchema::List(l), PublishedProviderSchema::List(r))
+                        | (
+                            PublishedProviderSchema::Documented(l),
+                            PublishedProviderSchema::Documented(r),
+                        )
+                        | (
+                            PublishedProviderSchema::Initialized(l),
+                            PublishedProviderSchema::Initialized(r),
+                        ) => assert_eq!(l, r),
+                        _ => panic!("provider schema mode changed"),
+                    }
+                    assert_eq!(l.init, r.init);
+                }
                 (
-                    CallableNode::Provider {
+                    CallableNode::RawProviderConstructor { provider: l, .. },
+                    CallableNode::RawProviderConstructor { provider: r, .. },
+                ) => assert_eq!(l, r),
+                (
+                    CallableNode::ConfiguredTarget {
                         identity: li,
-                        names: ln,
-                        values: l,
-                        has_schema: ls,
+                        providers: l,
                     },
-                    CallableNode::Provider {
+                    CallableNode::ConfiguredTarget {
                         identity: ri,
-                        names: rn,
-                        values: r,
-                        has_schema: rs,
+                        providers: r,
                     },
                 ) => {
                     assert_eq!(li, ri);
-                    assert_eq!(ln, rn);
-                    assert_eq!(ls, rs);
-                    assert_eq!(left.edges(*l).unwrap(), right.edges(*r).unwrap());
+                    assert_eq!(l.len(), r.len());
+                    for (l, r) in l.iter().zip(r.iter()) {
+                        match (l, r) {
+                            (
+                                PublishedTargetProvider::Occurrence(l),
+                                PublishedTargetProvider::Occurrence(r),
+                            ) => assert_eq!(l, r),
+                            (
+                                PublishedTargetProvider::Native {
+                                    provider: l,
+                                    view: lv,
+                                },
+                                PublishedTargetProvider::Native {
+                                    provider: r,
+                                    view: rv,
+                                },
+                            ) => {
+                                assert_eq!(l.value(), r.value());
+                                assert_eq!(lv, rv);
+                            }
+                            _ => panic!("typed target provider variant changed"),
+                        }
+                    }
+                }
+                (CallableNode::Depset(l), CallableNode::Depset(r)) => {
+                    assert_eq!(
+                        (l.order, l.element_type, l.depth),
+                        (r.order, r.element_type, r.depth)
+                    );
+                    assert_eq!(l.successors.len(), r.successors.len());
+                    for (l, r) in l.successors.iter().zip(r.successors.iter()) {
+                        match (l, r) {
+                            (PublishedDepsetInput::Direct(l), PublishedDepsetInput::Direct(r))
+                            | (
+                                PublishedDepsetInput::Transitive(l),
+                                PublishedDepsetInput::Transitive(r),
+                            ) => assert_eq!(l, r),
+                            _ => panic!("depset successor kind changed"),
+                        }
+                    }
+                }
+                (CallableNode::CcVariables(l), CallableNode::CcVariables(r)) => {
+                    assert_eq!(l.kind, r.kind);
+                    assert_eq!(l.parent, r.parent);
+                    assert_eq!(l.locals, r.locals);
+                    assert_eq!(l.seed.len(), r.seed.len());
+                    for ((ln, l), (rn, r)) in l.seed.iter().zip(r.seed.iter()) {
+                        assert_eq!(ln, rn);
+                        match (l, r) {
+                            (PublishedVariableSeed::Value(l), PublishedVariableSeed::Value(r)) => {
+                                assert_eq!(l, r)
+                            }
+                            (
+                                PublishedVariableSeed::Sequence(l),
+                                PublishedVariableSeed::Sequence(r),
+                            ) => assert_eq!(left.edges(*l).unwrap(), right.edges(*r).unwrap()),
+                            (PublishedVariableSeed::Error(l), PublishedVariableSeed::Error(r)) => {
+                                assert_eq!(l, r)
+                            }
+                            (PublishedVariableSeed::Missing, PublishedVariableSeed::Missing) => {}
+                            _ => panic!("C++ variable semantic seed changed"),
+                        }
+                    }
                 }
                 _ => panic!("graph node kind changed at {index}"),
             }

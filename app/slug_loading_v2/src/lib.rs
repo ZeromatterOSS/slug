@@ -39,53 +39,32 @@ pub mod cc_compile_outputs;
 pub mod cc_context;
 mod cc_features;
 mod cc_header_info;
-mod cc_toolchain_auth;
-mod cc_toolchain_callable;
-mod rust_toolchain_auth;
-mod rust_toolchain_callable;
-#[doc(hidden)]
-pub use bzl_module::rust_toolchain_helper::PreparedRustToolchainHelperBinding;
-#[doc(hidden)]
-pub use bzl_module::rust_toolchain_helper::RustToolchainHelperError;
-#[doc(hidden)]
-pub use bzl_module::rust_toolchain_helper::RustToolchainHelperMode;
-#[doc(hidden)]
-pub use bzl_module::rust_toolchain_helper::RustToolchainHelperRequest;
-#[doc(hidden)]
-pub use bzl_module::rust_toolchain_helper::prepare_rust_toolchain_helper;
-#[doc(hidden)]
-pub use rust_toolchain_auth::RustCallableRegistration;
-#[doc(hidden)]
-pub use rust_toolchain_auth::rust_callable_registrations;
-#[doc(hidden)]
-pub use rust_toolchain_callable::alloc_frozen_rust_toolchain_callable;
-#[doc(hidden)]
-pub use rust_toolchain_callable::rust_toolchain_callable;
-mod evaluator_roots;
-#[doc(hidden)]
-pub use cc_toolchain_auth::CallableRegistration;
-#[doc(hidden)]
-pub use cc_toolchain_auth::callable_registrations;
-#[doc(hidden)]
-pub use cc_toolchain_callable::alloc_frozen_cc_toolchain_callable;
-#[doc(hidden)]
-pub use cc_toolchain_callable::cc_toolchain_callable;
 mod cc_variables;
+mod evaluator_roots;
+pub mod function_owner;
+pub use cc_variables::CcVariablesHeader;
 #[doc(hidden)]
 pub use cc_variables::CcVariablesView;
 #[doc(hidden)]
 pub use cc_variables::alloc_frozen_cc_variables;
+pub use cc_variables::cc_variables_header;
 #[doc(hidden)]
 pub use cc_variables::cc_variables_value;
 #[doc(hidden)]
 pub use cc_variables::is_cc_variables_value;
+pub use cc_variables::snapshot_cc_variables_seed_bounded;
+pub use cc_variables::visit_cc_variables_locals;
 pub mod package_features;
+pub use cc_common::CcModuleApi;
+pub use cc_common::cc_common_api;
 #[doc(hidden)]
 pub use cc_features::alloc_frozen_cc_feature_configuration;
 #[doc(hidden)]
 pub use cc_features::alloc_frozen_cc_toolchain_features;
+pub use cc_features::cc_feature_configuration_ref;
 #[doc(hidden)]
 pub use cc_features::cc_feature_configuration_value;
+pub use cc_features::cc_toolchain_features_ref;
 #[doc(hidden)]
 pub use cc_features::cc_toolchain_features_value;
 mod cycle_detector;
@@ -123,6 +102,7 @@ mod root_repository_load_route;
 mod root_subtree_package_set;
 pub mod rule_outputs;
 mod starlark_label;
+pub use starlark_label::defining_module_identity;
 pub use starlark_label::defining_module_source_manifest;
 mod subrule;
 #[doc(hidden)]
@@ -211,6 +191,7 @@ pub use canonical_repository_route::HostCanonicalRepositoryRouteOutcome;
 pub use canonical_repository_route::ObservedHostCanonicalRepositoryRoute;
 pub use cc_header_info::alloc_frozen_cc_header_info;
 pub use cc_header_info::cc_header_info;
+pub use cc_header_info::cc_header_info_ref;
 pub use cycle_detector::bzl_load_cycle_detector;
 #[doc(hidden)]
 pub use dependency_cycle::compute_runtime_source_profile;
@@ -376,6 +357,7 @@ pub use provider::alloc_frozen_analysis_builtin_callable;
 pub use provider::alloc_frozen_template_variable_info;
 pub use provider::analysis_builtin_callable_api;
 pub use provider::template_variable_info;
+pub use provider::template_variable_info_ref;
 pub use registration_expansion::CommandRegistrationExpansionKey;
 #[doc(hidden)]
 pub use registration_expansion::CommandRegistrationExpansionObservationKey;

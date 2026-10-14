@@ -153,16 +153,24 @@ fn provenance(label: &str, digest: [u8; 32]) -> (CompactString, BzlModuleSourceP
 }
 
 fn definition(source: &str) -> FrozenModule {
+    definition_at(source, LABEL)
+}
+
+fn definition_at(source: &str, label: &str) -> FrozenModule {
     let module = Module::new();
-    let p = provenance(LABEL, SHA);
+    let p = provenance(label, SHA);
     let context = BzlEvaluationContext::macro_runtime_context(p.1.identity.clone(), Arc::from([p]));
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(FILE, source.to_owned(), &Dialect::Bazel).unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse(FILE, source.to_owned(), &Dialect::Bazel).unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
     )
     .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     module.freeze().unwrap()
 }
@@ -216,7 +224,7 @@ fn invoke(
     observed: [u8; 32],
     duplicate: bool,
 ) -> (Result<(), String>, Arc<Sink>) {
-    let definition = definition(source);
+    let definition = definition_at(source, label);
     let module = Module::new();
     let sink = Arc::new(Sink::default());
     let context = context(sink.clone(), label, observed, duplicate);
@@ -380,13 +388,13 @@ fn pinned_callbacks_register_both_recipes_without_evaluation_or_heap_retention()
 #[test]
 fn source_authentication_rejects_changed_copied_unobserved_and_ambiguous_sources() {
     let changed = format!("{SOURCE}\n# changed\n");
-    for (source, label, observed, duplicate, expected) in [
+    for (case, (source, label, observed, duplicate, expected)) in [
         (
             changed.as_str(),
             LABEL,
             SHA,
             false,
-            "unchanged pinned source",
+            "conflicting original module provenance",
         ),
         (
             SOURCE,
@@ -395,8 +403,21 @@ fn source_authentication_rejects_changed_copied_unobserved_and_ambiguous_sources
             false,
             "unchanged pinned source",
         ),
-        (SOURCE, LABEL, [0; 32], false, "unchanged pinned source"),
-        (SOURCE, LABEL, SHA, true, "ambiguous"),
+        // The current source row does not authenticate this actual original.
+        (
+            SOURCE,
+            LABEL,
+            [0; 32],
+            false,
+            "conflicting original module provenance",
+        ),
+        (
+            SOURCE,
+            LABEL,
+            SHA,
+            true,
+            "build-info callback requires the unchanged pinned source and transform callsite",
+        ),
         (
             SOURCE,
             "@@//ordinary:copied.bzl",
@@ -404,10 +425,31 @@ fn source_authentication_rejects_changed_copied_unobserved_and_ambiguous_sources
             false,
             "cannot use private API",
         ),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if duplicate {
+            // Only uniqueness is invalid: the exact original source, label,
+            // digest and both complete admitted rows are otherwise identical.
+            let admitted = context(Arc::new(Sink::default()), label, observed, duplicate);
+            let rows = admitted.source_identities_by_filename();
+            assert_eq!(rows.len(), 2);
+            assert_eq!(rows[0], rows[1]);
+            assert_eq!(rows[0].0.as_str(), FILE);
+            assert_eq!(rows[0].1.identity.label.to_string(), LABEL);
+            assert_eq!(rows[0].1.source_digest, SHA);
+            let actual: [u8; 32] = Sha256::digest(source.as_bytes()).into();
+            assert_eq!(actual, SHA);
+            assert_eq!(observed, SHA);
+        }
         let (result, sink) = invoke(source, label, observed, duplicate);
         let error = result.unwrap_err();
-        assert!(error.contains(expected), "{error}");
+        assert!(
+            error.contains(expected),
+            "case={case} label={label} duplicate={duplicate} observed_prefix={:02x?} expected={expected:?}: {error}",
+            &observed[..4]
+        );
         assert!(sink.0.lock().unwrap().is_empty());
     }
 }
@@ -415,18 +457,25 @@ fn source_authentication_rejects_changed_copied_unobserved_and_ambiguous_sources
 fn call_text(body: &str) -> (Result<(), String>, Arc<Sink>) {
     let module = Module::new();
     let sink = Arc::new(Sink::default());
-    let context = context(sink.clone(), LABEL, SHA, false);
-    module.set("actions", actions(&module, &context, sink.clone()));
-    module.set("template", file(&module));
     let source = format!(
         "def callback(values):\n    fail('must not invoke')\ndef call():\n    {body}\ncall()\n"
     );
+    let ast = AstModule::parse(FILE, source, &Dialect::Bazel).unwrap();
+    let identity = provenance(LABEL, SHA).1.identity;
+    let prepared = crate::bzl_module::test_source::prepare(&module, &ast, identity, &[]).unwrap();
+    let context = AnalysisEvaluationContext::new(
+        Arc::from([]),
+        [],
+        CanonicalLabel::parse("@@//:subject").unwrap(),
+        sink.clone(),
+        FrozenValue::new_none(),
+        prepared.sources(),
+    );
+    module.set("actions", actions(&module, &context, sink.clone()));
+    module.set("template", file(&module));
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(&context);
-    let result = eval.eval_module(
-        AstModule::parse(FILE, source, &Dialect::Bazel).unwrap(),
-        &loading_globals(),
-    );
+    let result = eval.eval_module(ast, &loading_globals());
     (result.map(|_| ()).map_err(|e| e.to_string()), sink)
 }
 

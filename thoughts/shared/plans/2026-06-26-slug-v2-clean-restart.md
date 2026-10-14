@@ -34,14 +34,16 @@ or compatibility work merely to close a Linux bootstrap packet.
 
 ### Current packet
 
-Packet: WP-7-420-m7a-general-run-environment-provider
+Packet: WP-7-421-m7a-general-provider-callables
 
-General RunEnvironmentInfo and exact-request source selection are accepted;
-[receipt](./slug-v2-subplans/wp1220-general-run-environment-provider-acceptance-2026-10-14.json).
-The verified Rust cquery completes diagnostically. Remaining Rust/C++ provider
-callable adapters are the next replacement family; their general ownership and
-function-identity design precedes implementation. Authentic analysis/action/REAPI,
-equivalent-command memory and M7A/M8 remain open.
+Original function-valued providers and retirement of the Rust/C++ callable,
+authentication, proxy and helper profiles pass their scoped gates; the verified
+Rust query completes diagnostically with matching output. The
+[current packet](./slug-v2-subplans/current-packet.md) records this acceptance
+and exact owned integration. Actual frozen values and semantic module-evaluation
+ownership preserve original sharing across observed preparation attempts.
+Remaining repository/resource/build-info/Apple adapters, authentic action/REAPI,
+full closure, whole-goal memory and M7A/M8 stay open.
 
 ### Bootstrap command queue
 

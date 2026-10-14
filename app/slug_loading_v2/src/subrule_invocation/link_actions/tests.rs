@@ -48,9 +48,22 @@ fn execute(eval: &mut Evaluator<'_, '_, '_>, source: &str) -> anyhow::Result<()>
 fn internal() -> FrozenModule {
     let module = Module::new();
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:link_actions_test.bzl");
+    let ast = AstModule::parse(
+        "ordinary.bzl",
+        "i = cc_common.internal_DO_NOT_USE()\n".to_owned(),
+        &Dialect::Bazel,
+    )
+    .unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
     let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    execute(&mut eval, "i = cc_common.internal_DO_NOT_USE()\n").unwrap();
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     module.freeze().unwrap()
 }

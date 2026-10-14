@@ -36,3 +36,39 @@ pub(super) fn bounded_value_class(value: Value<'_>) -> String {
 pub(super) fn host_error(message: String) -> starlark::Error {
     starlark::Error::new_other(std::io::Error::other(message))
 }
+
+/// Header borrows actual fields; no Vec snapshot is built before membership caps.
+pub(super) fn provider_header(
+    value: Value<'_>,
+) -> Option<(
+    ProviderIdentity,
+    usize,
+    bool,
+    Option<&slug_build_api_v2::FilesToRunProvider>,
+)> {
+    if let Some(header) = slug_loading_v2::provider::provider_instance_header(value) {
+        let identity = match header.identity {
+            slug_loading_v2::provider::ProviderInstanceIdentityRef::User(id) => {
+                ProviderIdentity::user(id.clone())
+            }
+            slug_loading_v2::provider::ProviderInstanceIdentityRef::Builtin(name) => {
+                ProviderIdentity::builtin(name)
+            }
+        };
+        return Some((identity, header.len, header.has_schema, None));
+    }
+    crate::analysis_value::published::provider_header(value)
+        .map(|(id, len, hidden)| (id, len, false, hidden))
+}
+pub(super) fn visit_provider_fields<'v>(
+    value: Value<'v>,
+    visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+) -> Result<(), String> {
+    if slug_loading_v2::provider::visit_starlark_provider_fields(value, visitor)? {
+        return Ok(());
+    }
+    if crate::analysis_value::published::visit_provider_fields(value, visitor)? {
+        return Ok(());
+    }
+    Err("provider header has no matching borrowed field visitor".into())
+}

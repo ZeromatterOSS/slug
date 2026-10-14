@@ -280,3 +280,47 @@ fn identity_only_and_missing_manifest_remain_label_valid_without_authority_fallb
         "@@mapped+//pkg:item"
     );
 }
+
+#[test]
+fn actual_module_authority_requires_current_structural_membership_and_rejects_conflicts() {
+    let original = manifest("@@owner+//pkg:defs.bzl", "selected+", "original", None);
+    let module = Module::new();
+    attach_defining_module_manifest(&module, &original).unwrap();
+    let actual = module.client_data().unwrap();
+    let admitted = vec![(
+        "unrelated-display-name".into(),
+        original.reachable[0].clone(),
+    )];
+    assert_eq!(
+        validate_defining_module_source(actual, &admitted).unwrap(),
+        &original.root
+    );
+    assert!(
+        validate_defining_module_source(actual, &[])
+            .unwrap_err()
+            .to_string()
+            .contains("absent")
+    );
+    let mut changed = original.reachable[0].clone();
+    changed.source_digest[0] ^= 1;
+    let conflicts = vec![
+        ("same-name".into(), original.reachable[0].clone()),
+        ("other-name".into(), changed),
+    ];
+    assert!(
+        validate_defining_module_source(actual, &conflicts)
+            .unwrap_err()
+            .to_string()
+            .contains("conflicting")
+    );
+    let mapped = manifest("@@owner+//pkg:defs.bzl", "changed+", "original", None);
+    assert!(
+        validate_defining_module_source(
+            actual,
+            &[("irrelevant".into(), mapped.reachable[0].clone())]
+        )
+        .unwrap_err()
+        .to_string()
+        .contains("conflicting")
+    );
+}

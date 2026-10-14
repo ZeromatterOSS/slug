@@ -1,7 +1,9 @@
 // Private Core integration of the genuine coupled callback proof.
 use slug_build_api_v2::AnalysisValue;
 use slug_build_api_v2::AnalysisValueKind;
-use slug_build_api_v2::RustToolchainCallable;
+use slug_build_api_v2::CallableSourceAuthority;
+use slug_build_api_v2::published_value::PublishedNode;
+use slug_build_api_v2::published_value::PublishedValueRef;
 use slug_configuration_v2::NativeCommandOption;
 use slug_configuration_v2::StarlarkOptionValue;
 
@@ -355,11 +357,48 @@ fn request(
     Ok(driven.accepted.terminal_for_test().dupe())
 }
 
-fn callback(result: &ConfiguredNodeResult) -> &RustToolchainCallable {
-    let AnalysisValueKind::RustToolchainCallable(value) = field(result, "callback").kind() else {
-        panic!("genuine original callback retained")
-    };
+fn callback(result: &ConfiguredNodeResult) -> &PublishedValueRef {
+    let value = field(result, "callback");
+    assert!(
+        matches!(value.kind(), AnalysisValueKind::Function(_)),
+        "genuine original Def retained"
+    );
     value
+        .original_origin()
+        .expect("actual original callback binding")
+}
+fn capture(result: &ConfiguredNodeResult, name: &str) -> PublishedValueRef {
+    let original = callback(result);
+    let PublishedNode::Function(function) = original.node() else {
+        panic!("actual function descriptor")
+    };
+    let position = function
+        .capture_names
+        .iter()
+        .position(|n| n == name)
+        .expect("actual source capture");
+    let cell = original
+        .arena()
+        .resolve(original.arena().edges(function.captures).unwrap()[position])
+        .unwrap();
+    let PublishedNode::Cell {
+        contents: Some(edge),
+    } = cell.node()
+    else {
+        panic!("captured cell contents")
+    };
+    cell.arena().resolve(*edge).unwrap()
+}
+fn helper_authority(result: &ConfiguredNodeResult) -> &CallableSourceAuthority {
+    callback(result)
+        .arena()
+        .sources()
+        .iter()
+        .find(|source| {
+            source.data().root.label.to_string()
+                == "@@rules_rust+//rust/private:rust_allocator_libraries.bzl"
+        })
+        .expect("actual reachable helper module")
 }
 
 fn check(result: &ConfiguredNodeResult, target: &str, marker: &str, dynamic: bool) {
@@ -384,28 +423,31 @@ fn check(result: &ConfiguredNodeResult, target: &str, marker: &str, dynamic: boo
         }
     );
     assert_eq!(field(result, "marker").as_str(), Some(marker));
-    let model = callback(result).model();
     assert!(matches!(
-        model.cc_toolchain.kind(),
-        AnalysisValueKind::Provider(_)
+        capture(result, "cc_toolchain").node(),
+        PublishedNode::Provider(_)
     ));
-    assert!(matches!(
-        model.feature_configuration.kind(),
-        AnalysisValueKind::CcFeatureConfiguration(_)
-    ));
+    let features = capture(result, "feature_configuration");
     assert!(
-        matches!(model.experimental_link_std_dylib.kind(), AnalysisValueKind::Boolean(value) if value == dynamic)
+        matches!(features.node(),PublishedNode::Native(atom) if matches!(atom.value().kind(),AnalysisValueKind::CcFeatureConfiguration(_)))
+    );
+    let dynamic_capture = capture(result, "experimental_link_std_dylib");
+    assert!(
+        matches!(dynamic_capture.node(),PublishedNode::Native(atom) if matches!(atom.value().kind(),AnalysisValueKind::Boolean(value) if value==dynamic))
     );
     assert!(matches!(
-        model.rust_std.kind(),
-        AnalysisValueKind::ConfiguredTarget(_)
+        capture(result, "rust_std").node(),
+        PublishedNode::ConfiguredTarget { .. }
     ));
+    let PublishedNode::Function(function) = callback(result).node() else {
+        panic!("actual Def")
+    };
     assert_eq!(
-        model.source.caller.identity.label.to_string(),
+        function.code.source.data().root.label.to_string(),
         "@@rules_rust+//rust/private:toolchain.bzl"
     );
     assert_eq!(
-        model.source.helper.root.label.to_string(),
+        helper_authority(result).data().root.label.to_string(),
         "@@rules_rust+//rust/private:rust_allocator_libraries.bzl"
     );
     let writes: Vec<_> = result
@@ -469,10 +511,8 @@ fn check(result: &ConfiguredNodeResult, target: &str, marker: &str, dynamic: boo
 }
 
 fn utils_digest(result: &ConfiguredNodeResult) -> [u8; 32] {
-    callback(result)
-        .model()
-        .source
-        .helper
+    helper_authority(result)
+        .data()
         .reachable
         .iter()
         .find(|source| source.identity.label.to_string() == "@@rules_rust+//rust/private:utils.bzl")
@@ -548,44 +588,9 @@ fn prove_callback_mode(observed: bool) {
         "the previously changing ancestor remains observed"
     );
     check(&fresh, "rust_fresh_consumer", "A", false);
-    let first_model = callback(&first).model();
-    let fresh_model = callback(&fresh).model();
-    let AnalysisValueKind::Provider(first_cc) = first_model.cc_toolchain.kind() else {
-        panic!("CC provider")
-    };
-    let AnalysisValueKind::Provider(fresh_cc) = fresh_model.cc_toolchain.kind() else {
-        panic!("fresh CC provider")
-    };
-    let changed_cc_fields: Vec<_> = first_cc
-        .fields()
-        .iter()
-        .filter_map(|(name, value)| {
-            (!fresh_cc
-                .field(name)
-                .is_some_and(|fresh| value.publication_eq(fresh)))
-            .then_some(name.as_str())
-        })
-        .collect();
     assert!(
         field(&first, "callback").publication_eq(field(&fresh, "callback")),
-        "route_observed={observed}; caller_eq={}; helper_eq={}; captures_eq={:?}; cc_identity_eq={}; cc_schema_eq={}; cc_field_counts={:?}; changed_cc_fields={changed_cc_fields:?}",
-        first_model.source.caller == fresh_model.source.caller,
-        first_model.source.helper == fresh_model.source.helper,
-        [
-            first_model
-                .cc_toolchain
-                .publication_eq(&fresh_model.cc_toolchain),
-            first_model
-                .feature_configuration
-                .publication_eq(&fresh_model.feature_configuration),
-            first_model
-                .experimental_link_std_dylib
-                .publication_eq(&fresh_model.experimental_link_std_dylib),
-            first_model.rust_std.publication_eq(&fresh_model.rust_std)
-        ],
-        first_cc.identity() == fresh_cc.identity(),
-        first_cc.has_schema() == fresh_cc.has_schema(),
-        (first_cc.fields().len(), fresh_cc.fields().len())
+        "unchanged actual source/captures and joint aliases publish equally across fresh consumers; observed={observed}"
     );
 
     let changed = request(&runtime, &root, observed, "rust_consumer", configured(true)).unwrap();
@@ -636,8 +641,8 @@ fn prove_callback_mode(observed: bool) {
     check(&changed, "rust_consumer", "A", false);
     assert_ne!(utils_digest(&changed), utils_digest(&first));
     assert_ne!(
-        callback(&changed).model().source.helper.fingerprint,
-        callback(&first).model().source.helper.fingerprint
+        helper_authority(&changed).data().fingerprint,
+        helper_authority(&first).data().fingerprint
     );
     assert!(!field(&changed, "callback").publication_eq(field(&first, "callback")));
     fs::write(path, original).unwrap();
@@ -645,10 +650,13 @@ fn prove_callback_mode(observed: bool) {
     check(&restored, "rust_consumer", "A", false);
     assert_eq!(utils_digest(&restored), utils_digest(&first));
     assert_eq!(
-        callback(&restored).model().source,
-        callback(&first).model().source
+        callback(&restored).arena().sources(),
+        callback(&first).arena().sources()
     );
-    assert_eq!(restored, first);
+    assert!(
+        restored == first,
+        "restored configured result must equal the original"
+    );
     fs::remove_dir_all(root).unwrap();
 }
 

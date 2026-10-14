@@ -28,12 +28,20 @@ use crate::values::layout::heap::repr::AValueOrForwardUnpack;
 use crate::values::layout::value::FrozenValue;
 use crate::values::layout::value::Value;
 
+mod traversal;
+
+#[cfg(test)]
+mod traversal_tests;
+
+use traversal::FreezeTraversalState;
+
 /// Used to `freeze` values by [`Freeze::freeze`](crate::values::Freeze::freeze).
 pub struct Freezer<'fv> {
     /// Freezing into this heap.
     pub(crate) heap: &'fv FrozenHeap,
     /// Defs frozen by this freezer.
     pub(crate) frozen_defs: RefCell<Vec<FrozenRef<'static, FrozenDef>>>,
+    traversal: FreezeTraversalState,
 }
 
 impl<'fv> Freezer<'fv> {
@@ -41,6 +49,7 @@ impl<'fv> Freezer<'fv> {
         Freezer {
             heap,
             frozen_defs: RefCell::new(Vec::new()),
+            traversal: FreezeTraversalState::default(),
         }
     }
 
@@ -58,21 +67,68 @@ impl<'fv> Freezer<'fv> {
         (fv, r)
     }
 
-    /// Freeze a nested value while freezing yourself.
-    pub fn freeze(&self, value: Value) -> FreezeResult<FrozenValue> {
-        // Case 1: We have our value encoded in our pointer
-        if let Some(x) = value.unpack_frozen() {
-            return Ok(x);
-        }
+    /// Test whether a value is frozen or has a freeze forwarding header.
+    ///
+    /// This never starts freezing or inspects a forwarded payload: the target may
+    /// still be under construction. It does not make a failed freezer reusable.
+    pub fn is_frozen_or_forwarded(&self, value: Value) -> bool {
+        value.unpack_frozen().is_some()
+            || matches!(
+                value.0.unpack_ptr().unwrap().unpack(),
+                AValueOrForwardUnpack::Forward(_)
+            )
+    }
 
-        // Case 2: We have already been replaced with a forwarding, or need to freeze
-        let value = value.0.unpack_ptr().unwrap();
-        match value.unpack() {
-            AValueOrForwardUnpack::Forward(x) => {
-                Ok(unsafe { x.forward_ptr().unpack_frozen_value() })
+    /// Charge work for a cooperative custom freeze traversal.
+    ///
+    /// All nested traversals share 65536 records per freezer, without refunds.
+    /// This does not meter unrelated existing freeze operations.
+    pub fn charge_traversal_work(&self, amount: usize) -> FreezeResult<()> {
+        self.traversal.charge_work(amount)
+    }
+
+    /// Prepay additional scratch peak bytes for a cooperative freeze traversal.
+    ///
+    /// The 64MiB claim is shared across nested traversals, without refunds. Charge
+    /// checked growth forecasts before allocating; this is not an allocator fence.
+    pub fn charge_traversal_scratch(&self, additional_peak: usize) -> FreezeResult<()> {
+        self.traversal.charge_scratch(additional_peak)
+    }
+
+    /// Guard a complete cooperative traversal, including forecasts and final fields.
+    ///
+    /// Every error poisons this freezer. The closure runs without a held state
+    /// borrow and may recursively freeze values using this same freezer.
+    pub fn with_traversal<T>(&self, f: impl FnOnce() -> FreezeResult<T>) -> FreezeResult<T> {
+        self.traversal.check()?;
+        match f() {
+            Ok(value) => {
+                self.traversal.check()?;
+                Ok(value)
             }
-            AValueOrForwardUnpack::Header(v) => unsafe { v.unpack().heap_freeze(self) },
+            Err(error) => {
+                self.traversal.poison();
+                Err(error)
+            }
         }
+    }
+
+    /// Freeze a nested value while freezing yourself.
+    ///
+    /// After an error this freezer is unusable, including for forwarded values.
+    pub fn freeze(&self, value: Value) -> FreezeResult<FrozenValue> {
+        self.with_traversal(|| {
+            if let Some(x) = value.unpack_frozen() {
+                return Ok(x);
+            }
+            let value = value.0.unpack_ptr().unwrap();
+            match value.unpack() {
+                AValueOrForwardUnpack::Forward(x) => {
+                    Ok(unsafe { x.forward_ptr().unpack_frozen_value() })
+                }
+                AValueOrForwardUnpack::Header(v) => unsafe { v.unpack().heap_freeze(self) },
+            }
+        })
     }
 
     /// Frozen heap where the values are frozen to.

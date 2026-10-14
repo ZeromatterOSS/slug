@@ -134,7 +134,7 @@ async fn recovered_context_cannot_escape_into_published_providers() {
             .await
             .unwrap_err();
     assert!(
-        error.contains("unsupported analysis value of type `analysis_ctx`"),
+        error.contains("unsupported value/capability of type `analysis_ctx`"),
         "{error}"
     );
     fs::remove_dir_all(root).unwrap();

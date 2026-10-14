@@ -606,7 +606,8 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
         "the original callback uses Starlark truth for metadata_supports_pipelining"
     );
     fs::write(&proof_path, &proof).unwrap();
-    assert_eq!(initial.unwrap(), request(&dice, &workspace).await.unwrap());
+    let baseline = request(&dice, &workspace).await.unwrap();
+    assert_eq!(initial.as_ref().unwrap(), &baseline);
     fs::write(
         &proof_path,
         proof.replace(
@@ -615,11 +616,26 @@ async fn pinned_rustc_dependencies_select_aliases_metadata_and_restore() {
         ),
     )
     .unwrap();
-    let error = request(&dice, &workspace).await.unwrap_err();
-    assert!(
-        error.contains("Args input contains unsupported callable"),
-        "{error}"
+    let with_callable = request(&dice, &workspace).await.unwrap();
+    assert_eq!(
+        baseline.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        with_callable.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        "the genuine dependency callbacks do not read CrateInfo.aliases"
     );
+    assert_ne!(
+        baseline, with_callable,
+        "the function-valued dependency field participates in publication"
+    );
+    fs::write(&proof_path, &proof).unwrap();
+    assert_eq!(baseline, request(&dice, &workspace).await.unwrap());
     fs::remove_dir_all(workspace).unwrap();
 }
 
@@ -755,11 +771,27 @@ async fn pinned_rustc_native_link_flags_authenticate_imports_and_restore() {
     let from = "first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, \"-pthread\"))";
     assert_eq!(proof.matches(from).count(), 1);
     fs::write(&proof_path,proof.replace(from,"first = struct(libraries = libraries, user_link_flags = (ctx.attr.native_user_flag, \"-pthread\"), unused_callable = _no_coverage)")).unwrap();
-    let error = request(&dice, &workspace).await.unwrap_err();
-    assert!(
-        error.contains("Args input contains unsupported callable"),
-        "{error}"
+    let with_callable = request(&dice, &workspace).await.unwrap();
+    let baseline = first.as_ref().unwrap();
+    assert_eq!(
+        baseline.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        with_callable.actions()[0]
+            .spawn_spec()
+            .unwrap()
+            .render_argv()
+            .unwrap(),
+        "the original native-link callbacks ignore unused_callable"
     );
+    assert_ne!(
+        baseline, &with_callable,
+        "the unused function-valued field remains a publication dependency"
+    );
+    fs::write(&proof_path, &proof).unwrap();
+    assert_eq!(baseline, &request(&dice, &workspace).await.unwrap());
     fs::remove_dir_all(workspace).unwrap();
 }
 

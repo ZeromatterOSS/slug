@@ -28,6 +28,8 @@ use starlark::values::FrozenValue;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::BzlModuleSourceProvenance;
 
+pub(crate) mod owner_metadata;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum AttributeKind {
     Label,

@@ -5,6 +5,8 @@ use super::InspectionBudget;
 use super::ModuleAccess;
 use super::OriginalModule;
 use super::inspect_native_function;
+use crate::codemap::CodeMap;
+use crate::codemap::FileSpanRef;
 use crate::eval::compiler::compr::ComprCompiled;
 use crate::eval::compiler::def::ParameterCompiled;
 use crate::eval::compiler::expr::Builtin1;
@@ -28,6 +30,7 @@ pub(super) fn visit<'v>(
 ) -> crate::Result<()> {
     Walker {
         module: code.module,
+        last_source: None,
         budget,
         visitor,
     }
@@ -36,10 +39,24 @@ pub(super) fn visit<'v>(
 
 struct Walker<'v, 'a> {
     module: OriginalModule<'v>,
+    last_source: Option<&'v CodeMap>,
     budget: &'a mut InspectionBudget,
     visitor: &'a mut dyn FnMut(DefDependency<'v>) -> crate::Result<()>,
 }
 impl<'v> Walker<'v, '_> {
+    fn source(&mut self, span: FileSpanRef<'v>, depth: usize) -> crate::Result<()> {
+        // Every encountered span still pays for its depth/id inspection, even
+        // when no repeated source certificate needs to reach the consumer.
+        self.budget.step(depth)?;
+        if self
+            .last_source
+            .is_none_or(|last| last.id() != span.file.id())
+        {
+            (self.visitor)(DefDependency::Source(span))?;
+            self.last_source = Some(span.file);
+        }
+        Ok(())
+    }
     fn emit(&mut self, dependency: DefDependency<'v>, depth: usize) -> crate::Result<()> {
         self.budget.step(depth)?;
         (self.visitor)(dependency)
@@ -54,20 +71,28 @@ impl<'v> Walker<'v, '_> {
         )
     }
     fn span(&mut self, span: FrameSpan, depth: usize) -> crate::Result<()> {
-        self.emit(DefDependency::Source(span.span.file_span_ref()), depth)?;
+        self.source(span.span.file_span_ref(), depth)?;
         let mut frames = span.inlined_frames.frames;
         let mut frame_depth = depth;
         while let Some(frame) = frames {
             frame_depth += 1;
-            self.emit(
-                DefDependency::Source(frame.span.span.file_span_ref()),
-                frame_depth,
-            )?;
+            self.source(frame.span.span.file_span_ref(), frame_depth)?;
             // Keep the actual helper dependency even if compiler inlining removed its call.
             self.constant(frame.fun.to_value(), frame_depth)?;
             frames = frame.span.inlined_frames.frames;
         }
         Ok(())
+    }
+    // A fixed IR record and its embedded primary span share one checked
+    // admission. Dynamic inline frames and their helper events remain separate.
+    fn record<'r, T>(
+        &mut self,
+        node: &'r T,
+        span: FrameSpan,
+        depth: usize,
+    ) -> crate::Result<&'r T> {
+        self.span(span, depth)?;
+        Ok(node)
     }
     fn module(
         &mut self,
@@ -101,9 +126,8 @@ impl<'v> Walker<'v, '_> {
         statement: &'v IrSpanned<StmtCompiled>,
         depth: usize,
     ) -> crate::Result<()> {
-        self.budget.step(depth)?;
-        self.span(statement.span, depth)?;
-        match &statement.node {
+        let node = self.record(&statement.node, statement.span, depth)?;
+        match node {
             StmtCompiled::PossibleGc | StmtCompiled::Break | StmtCompiled::Continue => Ok(()),
             StmtCompiled::Return(value) | StmtCompiled::Expr(value) => {
                 self.expression(value, depth + 1)
@@ -147,9 +171,8 @@ impl<'v> Walker<'v, '_> {
         target: &'v IrSpanned<AssignCompiledValue>,
         depth: usize,
     ) -> crate::Result<()> {
-        self.budget.step(depth)?;
-        self.span(target.span, depth)?;
-        match &target.node {
+        let node = self.record(&target.node, target.span, depth)?;
+        match node {
             AssignCompiledValue::Dot(receiver, _) => self.expression(receiver, depth + 1),
             AssignCompiledValue::Index(receiver, index) => {
                 self.expression(receiver, depth + 1)?;
@@ -172,9 +195,8 @@ impl<'v> Walker<'v, '_> {
         expression: &'v IrSpanned<ExprCompiled>,
         depth: usize,
     ) -> crate::Result<()> {
-        self.budget.step(depth)?;
-        self.span(expression.span, depth)?;
-        match &expression.node {
+        let node = self.record(&expression.node, expression.span, depth)?;
+        match node {
             ExprCompiled::Value(value) => self.constant(value.to_value(), depth + 1),
             ExprCompiled::Local(_) | ExprCompiled::LocalCaptured(_) => Ok(()),
             ExprCompiled::Module(slot) => self.module(*slot, ModuleAccess::Read, depth + 1),
@@ -265,20 +287,19 @@ impl<'v> Walker<'v, '_> {
                 self.expression(&parts.1, depth + 1)
             }
             ExprCompiled::Call(call) => {
-                self.budget.step(depth + 1)?;
-                self.span(call.node.call_site, depth + 1)?;
-                self.expression(&call.node.fun, depth + 2)?;
+                let call = self.record(&call.node, call.node.call_site, depth + 1)?;
+                self.expression(&call.fun, depth + 2)?;
                 self.budget.step(depth + 2)?;
-                for argument in &call.node.args.pos_named {
+                for argument in &call.args.pos_named {
                     self.expression(argument, depth + 3)?;
                 }
-                for (_, name) in &call.node.args.names {
+                for (_, name) in &call.args.names {
                     self.constant(name.to_value(), depth + 3)?;
                 }
-                if let Some(argument) = &call.node.args.args {
+                if let Some(argument) = &call.args.args {
                     self.expression(argument, depth + 3)?;
                 }
-                if let Some(argument) = &call.node.args.kwargs {
+                if let Some(argument) = &call.args.kwargs {
                     self.expression(argument, depth + 3)?;
                 }
                 Ok(())
@@ -312,9 +333,17 @@ impl<'v> Walker<'v, '_> {
                     module: self.module,
                 };
                 self.emit(DefDependency::NestedCode(nested), depth + 2)?;
-                self.emit(DefDependency::Source(nested.signature_span()), depth + 2)?;
+                self.source(nested.signature_span(), depth + 2)?;
                 self.body(&nested.info.body_stmts, depth + 2)
             }
         }
     }
 }
+
+#[cfg(test)]
+#[path = "source_switch_tests.rs"]
+mod source_switch_tests;
+
+#[cfg(test)]
+#[path = "record_tests.rs"]
+mod record_tests;

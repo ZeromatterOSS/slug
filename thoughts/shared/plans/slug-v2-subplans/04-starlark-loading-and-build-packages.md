@@ -34,6 +34,35 @@ getters do not create a fabricated function frame. Extra bound-method allocation
 for unproven receivers and invalid-callability/argument-error priority stay
 qualified rather than establishing whole interpreter or memory parity.
 
+## Immutable semantic module evaluation (WP1221)
+
+The [current packet](current-packet.md) adds one private semantic evaluation key
+after existing Host/external source and child preparation. Exact shared source
+bytes, full module identity and mapping, actual globals/dialect/string/export
+modes and ordered raw load bindings with canonical child facts determine it.
+Manual key and result equality compare the complete flat input closure; hashes
+never replace source facts. Only the inner owner may construct a canonical
+module/child pair. Operational observations, Need/retry and cycle tracking remain
+with existing attempts; the inner evaluation has no operational dependencies.
+Observation refreshes and full-input A/B/A must reuse the same retained actual
+module. Original frozen values and joint publication aliases stay unchanged.
+
+Inner misses perform actual parse/eval/freeze and retain bounded immutable print
+batches. Capture-off actual computation also uses normal direct presentation;
+cache hits do not repeat that direct output. Fresh capture-enabled outer computations
+alone attach the batch to existing event storage. Exact outer-key reuse retains
+the established Reused/no-new-batch behavior; a fresh outer computation may
+attach the immutable batch from a semantic-key hit once. Combined input/event admission
+uses deterministic 65536-record,64MiB,depth256 ceilings, plus pre-copy physical
+and transfer forecasts. Every local fact reserves one owned parser-source buffer
+before admission, including for the inherited shared-source implementation; this
+keeps logical input/event allowances independent of parser storage. Cache hits
+allocate no parser buffer. No global interner or lock is added. Release,
+cold/warm and A/B/A gates pass in the
+[scoped acceptance](wp1221-general-provider-callables-acceptance-2026-10-14.json).
+The public Rust query completes diagnostically; surviving adapters still
+prevent authentic configured Rust and whole-goal memory acceptance.
+
 ## Runtime module Label context
 
 Runtime `Label()` uses the innermost Starlark function's original module,

@@ -64,18 +64,23 @@ fn error(call: &str) -> String {
     );
     module.set("CTX", module.heap().alloc_simple(Sentinel));
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:constructor_test.bzl");
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
     let source = format!(
         "i=cc_common.internal_DO_NOT_USE()\nv=i.cc_toolchain_variables(vars={{}})\n{call}\n"
     );
-    eval.eval_module(
-        AstModule::parse("constructor_test.bzl", source, &Dialect::Bazel).unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse("constructor_test.bzl", source, &Dialect::Bazel).unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
     )
-    .err()
-    .expect("bounded rejected native call")
-    .to_string()
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals())
+        .err()
+        .expect("bounded rejected native call")
+        .to_string()
 }
 
 const CALL: &str = "i.create_cc_compile_action(action_construction_context=CTX,cc_compilation_context=struct(),cc_toolchain=struct(),configuration=CONFIG,feature_configuration=None,source=None,compile_build_variables=v,toolchain_type='@bazel_tools//tools/cpp:toolchain_type'{extra})";
@@ -182,12 +187,17 @@ fn constructor_binder_rejects_unsupported_branches_without_recording() {
 #[test]
 fn pending_slot_preserves_other_evaluator_roots() {
     let module = Module::new();
-    let registry = crate::evaluator_roots::callable_registry(&module);
+    let pending_args = module.heap().alloc(starlark::values::list::AllocList([14]));
+    crate::evaluator_roots::set_pending_args_snapshots(&module, pending_args);
     crate::evaluator_roots::set_empty_depsets(&module, module.heap().alloc(11));
     crate::evaluator_roots::set_analysis_context(&module, module.heap().alloc(12));
     crate::evaluator_roots::set_pending_cc_actions(&module, module.heap().alloc(13));
     crate::evaluator_roots::set_analysis_context(&module, Value::new_none());
-    assert!(crate::evaluator_roots::callable_registry(&module).ptr_eq(registry));
+    assert!(
+        crate::evaluator_roots::pending_args_snapshots(&module)
+            .unwrap()
+            .ptr_eq(pending_args)
+    );
     assert_eq!(
         crate::evaluator_roots::empty_depsets(&module)
             .unwrap()

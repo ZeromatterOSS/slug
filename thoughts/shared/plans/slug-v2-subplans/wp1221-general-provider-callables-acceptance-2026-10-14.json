@@ -1,0 +1,112 @@
+{
+  "packet": "WP-7-421-m7a-general-provider-callables",
+  "status": "SCOPED_CAPABILITY_ACCEPTED",
+  "date_utc": "2026-10-14",
+  "baseline": "ce7d22d4b13aa4f2699f980366681de21bf84aa6",
+  "outcome": "Original function-valued provider publication and invocation through the current Starlark evaluator; complete named Rust/C++ callable/auth/helper adapter family retired.",
+  "compatibility": {
+    "exact": "Admitted original callable behavior, source integrity, structural dependencies and alias relationships; pinned Bazel 9.2 source and independent-caller regressions.",
+    "Slug-native": "Function symbol numeric/hash encoding and configuration/output identity remain Slug-native.",
+    "unsupported_deferred": "Captured ctx/actions and unaudited native classes; other adapter families, full builtin exports, authentic Rust execution, full Slug closure and Stage 10."
+  },
+  "source_snapshot": {
+    "owned_paths": 267,
+    "tree": "4b7882c57fd76a80eea22aba3849fe3c1b4ccd23",
+    "patch_sha256": "d876247cb796b076882bcde71c275366c5a9371b458938376898eaa3eb8b1190",
+    "binary_sha256": "d0bed5b82cf2affe85a0c36a807cfc1b01ca6fbdab45e3c9cf5f041f30c7029f",
+    "source_owned_projection_sha256": "6742687bb75713cb28958020e3445b000f97d4bd4947a6b4c8b4fd03b3e63756"
+  },
+  "architecture": [
+    "Original frozen functions, constructors, defaults and captures retain original heaps; outward descriptors do not replace evaluator invocation.",
+    "Joint sealed native publication preserves complete source/mapping authority, canonical facts, imports and aliases; rejected transient capabilities fail closed.",
+    "Pure semantic-module DICE ownership includes exact source, identities, mappings, explicit modes and ordered child inputs; outer attempts preserve tracked Need/cycle/visibility and event ownership.",
+    "Original typed depset depth3500 lifecycle uses bounded iterative freeze and deferred GC; ordinary containment depth256 and all independent limits remain.",
+    "Resource policy is explicitly 131072 retained facts versus65536 producer work and128MiB joint publication forecasts. Full byte/fact counts remain; source, Loading, runtime and Engine64MiB policies stay independent.",
+    "Private allocation-guarded proofs and reviewed dropped producer scratch alter exhaustion boundaries, without semantic deduplication or a claim of exact allocation savings."
+  ],
+  "validation": {
+    "BuildAPI": "16focused/230broadpass",
+    "Analysis_library": "18focused/154broadpass",
+    "Loading": "2coupledthreshold+2independentbudgetcontrolspass; unaffectedsemanticowner/owned23Loadinglifecycle evidence reused",
+    "Analysis_integration": "6freshchangedfixturepass+2actualtyped3500/directaliaspass; completedfull277pass2identicalbaselinefailuresqualified",
+    "Core": "2genuinelegacy/observedcallbacks freshSERIALpass",
+    "isolated_owned": "267source exactprojection CLItransitivecheckpass20.612677898s",
+    "normal_CLI": "freshpass42.349321288s",
+    "broader_qualification": "Engine919/28actualbaseline reconciliation, Loading1027/10samebaseline andutility71/0unchangedevidence reused; noallgreensuiteclaim"
+  },
+  "completed_public_command": {
+    "classification": "Prepared normal-host cold diagnostic with surviving adapters",
+    "independent_fullpins_review_sha256": "826e9da4f248ca57e033b98591e5abc43a0b4e12e04d365fb583fb04539d573e",
+    "operation_sha256": "69b46a05fd1e2b90476fb027650f64c251663a76ab8b764fe2e1188224442b93",
+    "exit_code": 0,
+    "elapsed_seconds": 66.79262240999378,
+    "hybrid_peak_rss_kib": 328028,
+    "stdout": "byte-identical to pinned successful Bazel half",
+    "stderr": "empty",
+    "owned_process_group": "empty",
+    "baseline_operation_sha256": "1b2e44392968577061e95d5b60f6f9e4a96cb3e01d42d399dd4ab1f75a2dfec3",
+    "baseline_hybrid_peak_rss_kib": 892132,
+    "scoped_memory_threshold": "PASS:4*328028<=5*892132; prepared matching diagnostic command only",
+    "helper_ratio_remains": null,
+    "qualifications": "2288fullsourcecatalog/fullpreparedregistry-archive-cache-module-tool/workspace/commonargv/coldnormalhost/policy/input-outputpins independentlyverified. OS pagecacheuncontrolled andhybridsamplinglimits retained. Survivingadapters prevent authenticwholegoal memory/capability claim.",
+    "argv_prefix": [
+      "cquery",
+      "//pkg:probe",
+      "--output=starlark",
+      "--starlark:expr=str(target.label)"
+    ]
+  },
+  "retirement": {
+    "paths_absent": 14,
+    "named_production_hooks_and_dead_registry_matches": 0,
+    "audit_sha256": "d73e68a5e1b0e4f3cc016db932d233363253dc2f1c024d9cb49e3739db9e0d30"
+  },
+  "review": {
+    "final_packet_sha256": "db682282049d4f87000fd1d89309c2aee6e2e477f93869162b74d5b16a0e7986",
+    "verdict": "SCOPED_FAMILY_ACCEPT_READY_FOR_REVIEWED_ATOMIC_OWNED_INTEGRATION",
+    "evidence_sha256": {
+      "target/wp1221/byte-budget-amendment-component-validation.json": "c0f3e6a685341f3d521e06731bfca83ccd9cc596cdf7b549ce0523f574a7807c",
+      "target/wp1221/byte-budget-amendment-component-review.json": "9bbea57a1b737433347d3323bbadb84b203f6ed1c3297b6e8a42403d0e5f8141",
+      "target/wp1221/byte-budget-amendment-ownership-review.json": "2aba517cbd174a27b0f76cd1e7f2dca4594478a0aa7a08207a0cd9661525dcd1",
+      "target/wp1221/byte-budget-amendment-public-review.json": "826e9da4f248ca57e033b98591e5abc43a0b4e12e04d365fb583fb04539d573e",
+      "target/wp1221/byte-budget-amendment-design-review.json": "46c24651791144c32c46f33afb4c98e3de496f479d9441e4c4627e12b8059464",
+      "target/wp1221/byte-budget-amendment-combined-source-review.json": "4c1f64204c0610ef28a675f183a8fb7986cc417bd8a148a5ce0f316c7ac0175e",
+      "target/wp1221/source-transfer-scratch-component-review.json": "2804399b9ff298abd960ecff9fad53272d5a547a4225f335e2f5ada6b15914b8",
+      "target/wp1221/source-prepayment-component-review.json": "1cb0eb0019eb2e9fc51b8c78f5fe2e7318aefa241a0382d479bacc65d87958ed",
+      "target/wp1221/publication-byte-refusal-component-review.json": "01b12dc0ac4a740f27086aa03edae7b71d7eb5a32479aec55e07a9e93e952b0c",
+      "target/wp1221/analysis-integration-tail-final-review.json": "e901c6fbd11dc8fc8c271c09cf833131fe3cb1cb98816f4875e937ef61c582fa",
+      "target/wp1221/scratch-completion-component-review.json": "380f99d6cfd6e43aeeb6842c77b02f292b1b56581ea21f1a6e8c03da6a263200",
+      "target/wp1221/producer-scratch-component-review.json": "2d5a0635b574d2282a684af254624e9cdc8a79f0ce692baeb09f76b4a8518502",
+      "target/wp1221/retained-fact-bound-component-review.json": "a6350324c421f8792105ce4e58ea8a66a1002f8596749c59eb86a85f1c83c22b",
+      "target/wp1221/owner-certificate-component-review.json": "91e8ad3cd1f8895946f735e72712f9dcb9ddbf36f5a058be74c6a9018321dbad",
+      "target/wp1221/sealed-import-component-review.json": "071fe54e47f4ffae179bd9f3c78a5a0f63bccebdcde7840a007c2f48374fbce7",
+      "target/wp1221/publication-record-component-review.json": "9776eda996d60e2688dfa28435b0fd2aa0a3bc407a4d262378d8ad1df13c0364",
+      "target/wp1221/semantic-bzl-evaluation-design-acceptance.json": "9c96d2322843781f87fbcf309d06e286e912d02e0be85a9268db7fbbe675b4d8",
+      "target/wp1221/semantic-evaluation-event-clarification.json": "017a03fc0a049433d3b8f3797ccff64b59e0efd34470ae0af79d56a5319ad994",
+      "target/wp1221/semantic-owner-focused-result.json": "d49b0724e062dbb5cdfce9487a467b1ef79af1ca7eabf7495550f0bd4349c2f2",
+      "target/wp1221/semantic-owner-owned-ownership-review.json": "bb2f225db8c2a2f3b6135a93f89da4823e79af7d094f30e080facb05357d1973",
+      "target/wp1221/semantic-owner-loading-tests.json": "9777f71f044f3977756c57de37259e2f50b60d9717ba3e3ddc041e7f4835b368",
+      "target/wp1221/owned-loading-current-tests.json": "3be69ab2d966fe9f2828355aa55b3957c776b845a10548d96e030fd0a6d54bdb",
+      "target/wp1221/typed-original-freeze-source-check.json": "8d3f19dcc84d0d4fd526173f2684e84be0ca18d2cba4a2f3f5cdbe57f2c853d6",
+      "target/wp1221/original-freeze-engine-tests.json": "2061248af5af59b0ad3a08bcbd6c79ff2ce28dd2f0a05ef0a8466f4b9306eac3",
+      "target/wp1221/original-freeze-loading-tests.json": "e81ed33555f2f345857bb42e6834f38d88f76b40501dc6d1c5c6e7e761623f4b",
+      "target/wp1221/complex-gc-engine-tests.json": "f17e422120f5da44ccafbf4731b441fed8a7374bf9f6cddd795bc8f50f623eca",
+      "target/wp1221/depset-lifecycle-tests.json": "751fcb7501042334176d8e16e1d591ea096e23af372871967e39d9b2a59a64c1",
+      "target/wp1221/gc-source-certificate-broad-qualification.json": "5eafdf475a97a7d08d25a6bdfe40b5c5a9a9205eda24867eadae3d864b46c6a2",
+      "target/wp1221/broad-engine-reconciliation/review.json": "5e27de13114e7526861e9d1bde6f6073d3c846aaebbffde2bba1c203d06f9ac9",
+      "target/wp1221/final-callable-retirement-audit.json": "8572079c4c4564a24c68a6ffa2110f17f912b8258d29661a841fc55ffacb39df",
+      "target/wp1221/dead-callable-registry-retirement-freeze.json": "1962bf47313a0ebdcf7f34fd6ec71a9d7fbea0d1c374f16c8c70ba77eb3029b2",
+      "target/wp1221/provider-callables-integration-readiness.json": "e7e4bd94941fa9d87d7bbaedb2a55362ce3f5f168db3c7b084b933f4f2bc93b0"
+    }
+  },
+  "qualified_history": "Prior public refusals and invocation/compiler corrections remain in local audit receipts; the last source snapshot and unchanged successful query are accepted. Broader suites retain explicitly attributed baseline failures, not all-green claims.",
+  "integration": "This record accompanies the atomic accepted267-source integration; inherited live changes and untracked diagnostic evidence are excluded.",
+  "remaining_blockers": [
+    "General original builtin Apple exports and complete DottedVersion replacing tuple/default facades.",
+    "Original resource_set and build-info callbacks replacing source/callsite recipes.",
+    "General declared repository processes replacing expected-argv/effect and Homebrew owner profiles.",
+    "Authentic configured Rust analysis, required action comparison, Rust REAPI execution, complete Slug closure and Stage 10 stage1/stage2 fixed point.",
+    "Historical unique-key retention and broader whole-command lifecycle and equivalent-command memory acceptance remain open."
+  ],
+  "measurement_limits": "Hybrid sampled process RSS, uncontrolled OS page cache; helper ratio remains null. The passed scoped diagnostic threshold does not establish authentic whole-goal memory or M7A/M8."
+}

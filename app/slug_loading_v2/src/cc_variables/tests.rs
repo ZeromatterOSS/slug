@@ -264,3 +264,79 @@ fn native_variable_constructor_sequence_validation_and_cycle_hash_rejection() {
         &["cyclic C++ variable payload is unsupported"],
     );
 }
+
+#[test]
+fn borrowed_variable_frontier_preserves_seed_aliases_and_charges_before_copy() {
+    let module = starlark::environment::Module::new();
+    let child = module.heap().alloc(AllocList(["cached"]));
+    let mut cache = SmallMap::new();
+    cache.insert(Name("value".into()), Entry::Value(child));
+    cache.insert(
+        Name("sequence".into()),
+        Entry::Sequence(vec![child, child].into_boxed_slice()),
+    );
+    cache.insert(Name("missing".into()), Entry::Missing);
+    cache.insert(
+        Name("error".into()),
+        Entry::Error("semantic failure".into()),
+    );
+    let vars = module.heap().alloc_complex(VariablesGen {
+        kind: CcVariablesKind::Map,
+        occurrence: CcVariablesOccurrence::new(),
+        parent: None,
+        names: Arc::from([CompactString::new("local")]),
+        values: vec![child].into_boxed_slice(),
+        cache: Cache::Live(LiveCache(Mutex::new(cache))),
+    });
+    module.set("vars", vars);
+    let header = cc_variables_header(vars).unwrap();
+    assert_eq!(header.local_count, 1);
+    let occurrence = header.occurrence.clone();
+    let mut local = None;
+    visit_cc_variables_locals(vars, &mut |name, value| {
+        assert_eq!(name, "local");
+        local = Some(value.identity());
+        Ok::<_, String>(())
+    })
+    .unwrap()
+    .unwrap();
+    assert_eq!(local, Some(child.identity()));
+    let mut rejected = 0;
+    let result = snapshot_cc_variables_seed_bounded(vars, &mut |_, _| {
+        rejected += 1;
+        Err::<(), _>("budget")
+    });
+    assert_eq!(result.unwrap_err(), "budget");
+    assert_eq!(rejected, 1);
+    let mut bytes = 0usize;
+    let mut edges = 0usize;
+    let seed = snapshot_cc_variables_seed_bounded(vars, &mut |b, e| {
+        bytes += b;
+        edges += e;
+        Ok::<_, String>(())
+    })
+    .unwrap()
+    .unwrap();
+    assert!(bytes >= "semantic failure".len() + 2 * std::mem::size_of::<Value>());
+    assert_eq!(edges, 7); // Four named entries and three outgoing Value edges.
+    let CcVariableCacheEntry::Sequence(sequence) = &seed[1].1 else {
+        panic!("sequence seed")
+    };
+    assert_eq!(sequence[0].identity(), sequence[1].identity());
+    assert_eq!(sequence[0].identity(), child.identity());
+    assert!(matches!(seed[2].1, CcVariableCacheEntry::Missing));
+    assert!(
+        matches!(&seed[3].1, CcVariableCacheEntry::Error(message) if message == "semantic failure")
+    );
+    let frozen = module.freeze().unwrap();
+    let vars_owner = frozen.get("vars").unwrap();
+    let vars = vars_owner.value();
+    assert_eq!(cc_variables_header(vars).unwrap().occurrence, &occurrence);
+    let seed = snapshot_cc_variables_seed_bounded(vars, &mut |_, _| Ok::<_, String>(()))
+        .unwrap()
+        .unwrap();
+    let CcVariableCacheEntry::Sequence(sequence) = &seed[1].1 else {
+        panic!("frozen sequence seed")
+    };
+    assert_eq!(sequence[0].identity(), sequence[1].identity());
+}

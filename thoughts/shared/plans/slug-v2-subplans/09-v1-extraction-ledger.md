@@ -25,6 +25,67 @@ provider/action equality preserves alias partitions and complete callable source
 facts. Resource caps and release tests are component evidence, not whole-workload
 memory acceptance. The WP1219 receipt owns the source projection and validation.
 
+## General original-value publication (WP1221)
+
+The [scoped acceptance](wp1221-general-provider-callables-acceptance-2026-10-14.json)
+records original-value publication, adapter-family retirement and the completed
+diagnostic public query. Remaining adapters prevent authentic bootstrap closure.
+
+General function-valued provider publication extends these same V2-owned native
+arena and original frozen-heap owners. Dense checked rows, guarded prior imports
+and complete typed native frontiers replace the Rust/C++ callable/auth/helper
+models. Actual immutable owner/source-row sharing uses bounded owning scratch
+memos; full source/key/mapping/load-mode equality stays independent of physical
+deduplication. Original client-data manifests still have complete byte/edge
+forecasts, including unvisited modules. Local and complete containment-depth
+certificates remain separate and independent of node numbering.
+
+Publication-local source proofs reuse guarded CodeMap/authority/client-data
+identities. Engine inspection uses one borrowed last-source slot, charges every
+encounter and coalesces only duplicate source-certificate dispatch. Existing
+Arc/Dupe, compact strings, UnorderedMap/Fx maps, CodeMapId and Allocative owners
+are reused; no donor revision, global pool or semantic side cache is introduced.
+One private DICE semantic module-evaluation owner is the reviewed exception:
+existing attempts retain observations while exact flat source/load/mapping/mode
+facts own canonical evaluation and bounded events. Source/child Arcs are shared;
+all new key/row/edge/event storage and transfer peaks are forecast before copying.
+Deterministic logical input/event quotas remain separate from physical sharing.
+Historical-key retention and release require evidence. Metadata/work limits are
+cooperative component bounds; equivalent completed-command memory and bootstrap
+acceptance remain separate gates.
+
+Immutable source-owner keys retain one candidate-index hash after a complete
+pre-construction charge; semantic hashing and collision equality still inspect
+full facts. Package membership capture reuses SmallMap/SmallSet with a borrowed
+storage bound over actual entry capacity and retained index allocation. The
+existing optional boxed index gains one high-water usize; outer map layout and
+semantic Eq/hash stay unchanged. This V2-owned extension of the existing utility
+uses pinned hashbrown 0.14.5 allocation behavior, without a donor import or pool.
+Empty clones, tombstones, growth, overflow and native pre-copy quota tests bound
+the certificate; it is conservative storage forecasting, not allocator-exact
+accounting or a completed-command memory claim.
+
+Source-owner identity forecasts reuse PublicationShape for one complete fixed
+prefix and each complete mapping-pair record. Full bytes, edges, depth, optional
+mapping IDs and paths remain; semantic Eq/hash and its field writer do not
+change. This changes the bounded work unit without adding retained state or
+raising quotas. Exact storage/depth forecasts and pre-copy refusal remain gates.
+
+Arena import accounting separates canonical retained facts from producer work.
+Opaque pure-native wrappers cache only the complete successful strict audit count;
+a bounded seal pass accounts for actual local descriptors, arrays and source
+facts. Existing guarded owner/import traversal and structural equality remain.
+This uses the same native owners and Fx scratch utilities, adds no independent
+semantic cache, and makes no workload fit claim.
+
+Same-builder source preparation reuses these bounded Fx maps and actual Arc
+guards. A borrowed capability preserves full output/transfer payment and omits
+only its duplicate first-binding payload charge for that exact allocation.
+Its private proof table and consumed output-array backings are prepaid producer
+scratch; full final source storage, facts/equality and foreign-allocation charges
+remain. Proof guards drop before publication.
+No donor import, global cache or new semantic identity is introduced.
+
 ## Goal
 
 Track every deliberate extraction from Slug V1 or Buck2-derived infrastructure

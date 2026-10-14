@@ -59,9 +59,11 @@ fn freeze_with_loader(
     )
     .map_err(|error| error.to_string())?;
     let module = Module::new();
-    let context = BzlEvaluationContext::from_identity(identity);
+    let prepared = crate::bzl_module::test_source::prepare(&module, &ast, identity, &[])
+        .map_err(|error| error.to_string())?;
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     if let Some(loader) = loader {
         evaluator.set_loader(loader);
     }

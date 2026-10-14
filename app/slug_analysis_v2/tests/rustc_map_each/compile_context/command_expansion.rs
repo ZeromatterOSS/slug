@@ -253,7 +253,46 @@ async fn published_compile_argv_uses_fresh_overlay_while_original_dotted_cache_s
                 expected
             );
             assert_eq!(spec, &before);
-            assert!(snapshot.publication_eq(&published));
+            // The recipe is a native snapshot; the returned field additionally
+            // owns its original graph. Strict publication equality distinguishes
+            // those domains even when the complete native view corresponds.
+            assert!(snapshot.original_origin().is_none());
+            assert!(published.original_origin().is_some());
+            assert!(!snapshot.publication_eq(&published));
+            let AnalysisValueKind::CcToolchainVariables(projected) = published.kind() else {
+                panic!("published Variables");
+            };
+            let raw = spec.data().variables.model();
+            let projected_model = projected.model();
+            assert_eq!(spec.data().variables.occurrence(), projected.occurrence());
+            assert_eq!(raw.kind, projected_model.kind);
+            assert!(raw.parent.is_none());
+            assert!(projected_model.parent.is_none());
+            assert_eq!(raw.locals, projected_model.locals);
+            // Native Variables Eq omits its semantic cache. Compare every key,
+            // entry variant and value, including stale sequence snapshots.
+            assert_eq!(raw.cache, projected_model.cache);
+            let local = |model: &slug_build_api_v2::cc_variables::CcVariablesModel, name: &str| {
+                model
+                    .locals
+                    .iter()
+                    .find(|(key, _)| key == name)
+                    .unwrap()
+                    .1
+                    .clone()
+            };
+            let raw_live = local(raw, "live");
+            let raw_object = local(raw, "obj");
+            assert!(raw_live.shares_storage_with(member(&raw_object, "items")));
+            let projected_live = local(projected_model, "live");
+            let projected_object = local(projected_model, "obj");
+            assert!(
+                projected_live.original_origin().unwrap().same_original(
+                    member(&projected_object, "items")
+                        .original_origin()
+                        .unwrap()
+                )
+            );
         }
     }
     // Successful analysis precedes both failures: unused integer metadata is

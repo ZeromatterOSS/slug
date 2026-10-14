@@ -56,18 +56,22 @@ cycle.append(cycle_copy)
         fingerprint: [0; 32],
     });
     let module = Module::new();
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(
-            "/rules_cc/cc/private/freeze_test.bzl",
-            source.to_owned(),
-            &Dialect::Bazel,
-        )
-        .unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse(
+        "/rules_cc/cc/private/freeze_test.bzl",
+        source.to_owned(),
+        &Dialect::Bazel,
     )
     .unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     assert_eq!(module.get("CHECKS").unwrap().unpack_bool(), Some(true));
     assert!(FrozenListRef::from_value(module.get("xs").unwrap()).is_none());
     assert!(ListRef::is_immutable(module.get("xs").unwrap()));

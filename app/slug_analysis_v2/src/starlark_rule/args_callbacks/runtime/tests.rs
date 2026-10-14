@@ -245,7 +245,10 @@ fn cache_gc_helpers(builder: &mut starlark::environment::GlobalsBuilder) {
             "unreachable-during-callback".to_owned(); 512
         ]));
         let before = eval.heap().allocated_bytes();
-        unsafe { eval.garbage_collect() };
+        unsafe {
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?
+        };
         Ok(eval.heap().allocated_bytes() < before)
     }
 }

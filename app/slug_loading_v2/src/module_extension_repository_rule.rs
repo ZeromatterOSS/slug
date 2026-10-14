@@ -525,8 +525,16 @@ mod tests {
             .map_err(|error| error.to_string())?;
         let module = Module::new();
         let context = BzlEvaluationContext::new(source_label);
+        let prepared = crate::bzl_module::test_source::prepare(
+            &module,
+            &ast,
+            context.source_identity().clone(),
+            &[],
+        )
+        .map_err(|error| error.to_string())?;
+        let context = prepared.context();
         let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&context);
+        evaluator.extra = Some(context);
         evaluator
             .eval_module(ast, &loading_globals())
             .map_err(|error| error.to_string())?;

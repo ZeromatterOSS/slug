@@ -40,7 +40,8 @@ fn client_globals(builder: &mut GlobalsBuilder) {
         // No moving Value is retained in native Rust locals. Module metadata,
         // bytecode locals and exported results are all traced evaluator roots.
         unsafe {
-            eval.garbage_collect();
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?;
         }
         Ok(NoneType)
     }

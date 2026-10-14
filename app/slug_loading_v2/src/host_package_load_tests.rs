@@ -931,7 +931,7 @@ fn root_package_direct_load_keeps_root_and_apparent_external_dispatch_distinct()
 #[tokio::test]
 async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluation() {
     let mut epoch = EpochBuilder::workspace_sources(
-        "module(name = 'root')\n",
+        "module(name = 'bazel_tools')\n",
         "",
         &[("private.bzl", "visibility('private')\nEXPORTED = 1\n")],
         900,
@@ -958,7 +958,10 @@ async fn host_bzl_visibility_rejects_cross_package_load_before_importer_evaluati
         panic!("complete host visibility epoch returned Need")
     };
     let error = outcome.as_ref().as_ref().unwrap_err();
-    assert!(matches!(error, HostBzlModuleError::Evaluation(_)));
+    assert!(
+        matches!(error, HostBzlModuleError::Evaluation(_)),
+        "{error}"
+    );
     let message = error.to_string();
     assert!(
         message.contains("@@//pkg:private.bzl is not visible"),
@@ -3201,6 +3204,7 @@ async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
             .to_string(),
             observed_external_bzl_key(route.clone(), "", "left.bzl").to_string(),
             observed_external_bzl_key(route.clone(), "", "right.bzl").to_string(),
+            "semantic-bzl-evaluation:@@dep+//:root.bzl".to_owned(),
         ]
     );
     let batches = tracker.take();
@@ -21843,27 +21847,16 @@ fn eval_bzl_with_loaded_children(
     owner: BzlModuleIdentity,
     children: &[(&str, BzlModuleIdentity, FrozenModule)],
 ) -> anyhow::Result<FrozenModule> {
-    let child_identities = children
-        .iter()
-        .map(|(_, identity, _)| identity.clone())
-        .collect::<Vec<_>>();
-    let mut reachable = vec![owner.clone()];
-    reachable.extend(child_identities.iter().cloned());
     let filename = owner.workspace_path.to_string_lossy().into_owned();
-    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
-        root: owner,
-        direct_children: child_identities.into(),
-        reachable: reachable
-            .into_iter()
-            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
-            .collect(),
-        fingerprint: [0; 32],
-    });
     let ast = AstModule::parse(&filename, source.to_owned(), &Dialect::Bazel)
         .map_err(|error| anyhow::anyhow!(error.to_string()))?;
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let child_manifests = children
+        .iter()
+        .map(|(_, _, module)| super::test_source::child_manifest(module))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    let prepared = super::test_source::prepare(&module, &ast, owner, &child_manifests)?;
+    let context = prepared.context();
     let loader = LocalBzlLoader {
         modules: children
             .iter()
@@ -21871,7 +21864,7 @@ fn eval_bzl_with_loaded_children(
             .collect(),
     };
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator.set_loader(&loader);
     evaluator
         .eval_module(ast, &loading_globals())
@@ -31047,13 +31040,19 @@ RUN = RunEnvironmentInfo
 "#;
     let ast = AstModule::parse("clippy.bzl", source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let prepared = super::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[super::test_source::child_manifest(&child).unwrap()],
+    )
+    .unwrap();
+    let context = prepared.context();
     let loader = LocalBzlLoader {
         modules: vec![("//rust/private:lint_test.bzl", child.dupe())],
     };
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator.set_loader(&loader);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
     drop(evaluator);
@@ -33305,20 +33304,12 @@ fn eval_bzl_with_identity_and_globals_and_visibility(
 ) -> starlark::Result<(FrozenModule, BzlLoadVisibility)> {
     let path = owner.workspace_path.to_str().unwrap();
     let ast = AstModule::parse(path, source.to_owned(), &Dialect::Bazel)?;
-    let context = BzlEvaluationContext::from_manifest(&BzlLoadManifest {
-        root: owner.clone(),
-        direct_children: Arc::from([]),
-        reachable: [owner]
-            .into_iter()
-            .map(|identity| crate::BzlModuleSourceProvenance::new(identity, [0; 32]))
-            .collect(),
-        fingerprint: [0; 32],
-    });
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let prepared = super::test_source::prepare(&module, &ast, owner, &[])
+        .map_err(starlark::Error::new_other)?;
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator.eval_module(ast, globals)?;
     drop(evaluator);
     Ok((module.freeze()?, context.bzl_load_visibility()))
@@ -34545,10 +34536,12 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     )
     .unwrap();
     let support = Module::new();
-    crate::starlark_label::attach_defining_module_context(&support, context.source_identity())
-        .unwrap();
+    let prepared =
+        super::test_source::prepare(&support, &ast, context.source_identity().clone(), &[])
+            .unwrap();
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&support);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
     drop(evaluator);
     let support = support.freeze().unwrap();
@@ -34574,13 +34567,19 @@ fn recursive_bzl_label_uses_top_level_and_imported_function_owners() {
     )
     .unwrap();
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let prepared = super::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[super::test_source::child_manifest(&support).unwrap()],
+    )
+    .unwrap();
+    let context = prepared.context();
     let loader = LocalBzlLoader {
         modules: vec![("//owner:support.bzl", support)],
     };
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator.set_loader(&loader);
     evaluator.eval_module(ast, &loading_globals()).unwrap();
     drop(evaluator);
@@ -34667,11 +34666,21 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     ] {
         assert!(eval_global(source, &loading_globals()).is_err(), "{source}");
     }
-    let error = eval_global(
-        "def make_label():\n  x = Label(':owned')\n  return x\nX = make_label()",
-        &loading_globals(),
-    )
-    .unwrap_err();
+    // Deliberately omit original-module client data: the shared positive
+    // declaration fixture now prepares a genuine defining source manifest.
+    let unprepared = Module::new();
+    let error = Evaluator::new(&unprepared)
+        .eval_module(
+            AstModule::parse(
+                "BUILD.bazel",
+                "def make_label():\n  x = Label(':owned')\n  return x\nX = make_label()".to_owned(),
+                &Dialect::Bazel,
+            )
+            .unwrap(),
+            &loading_globals(),
+        )
+        .unwrap_err()
+        .to_string();
     assert!(error.contains("Label() can only be used"), "{error}");
 
     let conflicting = BzlModuleIdentity {
@@ -34716,10 +34725,11 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     )
     .unwrap();
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let prepared =
+        super::test_source::prepare(&module, &ast, context.source_identity().clone(), &[]).unwrap();
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
     assert!(error.to_string().contains("ambiguous"), "{error}");
 
@@ -34730,10 +34740,11 @@ IDEMPOTENT = Label(Label('@alias//:same')) == Label('@alias//:same')
     )
     .unwrap();
     let module = Module::new();
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())
-        .unwrap();
+    let prepared =
+        super::test_source::prepare(&module, &ast, context.source_identity().clone(), &[]).unwrap();
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     let error = evaluator.eval_module(ast, &loading_globals()).unwrap_err();
     assert!(error.to_string().contains("ambiguous"), "{error}");
 }
@@ -35070,8 +35081,12 @@ fn eval_global(source: &str, globals: &Globals) -> Result<FrozenModule, String> 
     let ast = AstModule::parse("BUILD.bazel", source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
     let context = BzlEvaluationContext::new("//:defs.bzl");
+    let prepared =
+        super::test_source::prepare(&module, &ast, context.source_identity().clone(), &[])
+            .map_err(|error| error.to_string())?;
+    let context = prepared.context();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(context);
     evaluator
         .eval_module(ast, globals)
         .map_err(|error| error.to_string())?;

@@ -20,9 +20,17 @@ fn execute(eval: &mut Evaluator<'_, '_, '_>, source: &str) -> anyhow::Result<()>
 fn prepared() -> Module {
     let source = Module::new();
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:sequence_test.bzl");
+    let ast = AstModule::parse("ordinary.bzl", "i = cc_common.internal_DO_NOT_USE()\nNamed = provider(fields = ['type', 'name', 'is_whole_archive'])\nHolder = provider(fields = ['value'])\n".to_owned(), &Dialect::Bazel).unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &source,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
     let mut eval = Evaluator::new(&source);
-    eval.extra = Some(&context);
-    execute(&mut eval, "i = cc_common.internal_DO_NOT_USE()\nNamed = provider(fields = ['type', 'name', 'is_whole_archive'])\nHolder = provider(fields = ['value'])\n").unwrap();
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     let imported = source.freeze().unwrap();
     let module = Module::new();

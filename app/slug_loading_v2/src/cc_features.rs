@@ -216,3 +216,10 @@ pub fn alloc_frozen_cc_feature_configuration(
 ) -> FrozenValue {
     heap.alloc(FeatureConfigurationValue(value))
 }
+
+pub fn cc_toolchain_features_ref(value: Value<'_>) -> Option<&CcToolchainFeatures> {
+    Some(&ToolchainFeaturesValue::from_value(value)?.0)
+}
+pub fn cc_feature_configuration_ref(value: Value<'_>) -> Option<&CcFeatureConfiguration> {
+    Some(&FeatureConfigurationValue::from_value(value)?.0)
+}

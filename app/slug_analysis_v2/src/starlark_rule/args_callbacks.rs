@@ -24,6 +24,12 @@ mod native;
 pub(super) mod pending;
 mod runtime;
 mod source;
+use slug_build_api_v2::published_value::PublishedNodeId;
+use slug_build_api_v2::published_value::PublishedValueArena;
+use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
+
+use crate::analysis_value::published::StarlarkPublishedOriginals;
+use crate::analysis_value::published::project::Projector;
 
 #[cfg(test)]
 mod bound_method_tests;
@@ -42,27 +48,37 @@ enum DraftCall {
 }
 #[derive(Clone)]
 struct DraftVector {
-    inputs: RetainedArgsInputs,
-    callback: usize,
-    node: CallableNodeId,
+    inputs: DraftInputs,
+    node: PublishedNodeId,
     options: RetainedVectorOptions,
     location: Option<CompactString>,
 }
 
+#[derive(Clone)]
+enum DraftInputs {
+    Sequence(Arc<[PublishedNodeId]>),
+    Depset(PublishedNodeId),
+}
+
 pub(super) struct Publisher<'v> {
     module: &'v Module,
-    graph: graph::ArgsCallableGraphBuilder<'v>,
-    roots: Vec<Value<'v>>,
+    graph: graph::PublicationBuilder<'v>,
 }
 impl<'v> Publisher<'v> {
     pub(super) fn new(module: &'v Module) -> Self {
         Self {
             module,
-            graph: graph::ArgsCallableGraphBuilder::new(module),
-            roots: Vec::new(),
+            graph: graph::PublicationBuilder::new(module),
         }
     }
 
+    pub(super) fn capture(
+        &mut self,
+        value: Value<'v>,
+        lowerer: &mut AnalysisValueLowerer<'v>,
+    ) -> Result<PublishedNodeId, String> {
+        self.graph.add_value(value, lowerer)
+    }
     pub(super) fn prepare(
         &mut self,
         snapshot: EvaluatorArgsSnapshot<'v>,
@@ -135,41 +151,29 @@ impl<'v> Publisher<'v> {
             .graph
             .add_callable(callback, lowerer)
             .map_err(anyhow::Error::msg)?;
-        anyhow::ensure!(
-            self.roots.len() < CALLABLE_GRAPH_NODE_LIMIT,
-            "Args callback root limit exceeded"
-        );
-        let index = self.roots.len();
-        self.roots.push(callback);
         let inputs = match value.source {
             EvaluatorVectorSourceGen::Sequence(values) => {
                 anyhow::ensure!(
                     values.len() <= CALLABLE_GRAPH_NODE_LIMIT,
                     "Args input count limit exceeded"
                 );
-                RetainedArgsInputs::Sequence(
+                DraftInputs::Sequence(
                     values
                         .into_iter()
-                        .map(|value| self.graph.lower_input(value, lowerer))
+                        .map(|value| self.graph.add_value(value, lowerer))
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(anyhow::Error::msg)?
                         .into(),
                 )
             }
-            EvaluatorVectorSourceGen::Depset(value) => {
-                let lowered = self
-                    .graph
-                    .lower_input(value, lowerer)
-                    .map_err(anyhow::Error::msg)?;
-                let AnalysisValueKind::Depset(depset) = lowered.kind() else {
-                    anyhow::bail!("Args callback requires depset")
-                };
-                RetainedArgsInputs::Depset(depset.clone())
-            }
+            EvaluatorVectorSourceGen::Depset(value) => DraftInputs::Depset(
+                self.graph
+                    .add_value(value, lowerer)
+                    .map_err(anyhow::Error::msg)?,
+            ),
         };
         let draft = DraftVector {
             inputs,
-            callback: index,
             node,
             options: value.options,
             location: value.registration_location,
@@ -185,58 +189,85 @@ impl<'v> Publisher<'v> {
     pub(super) fn seal(
         mut self,
         lowerer: &mut AnalysisValueLowerer<'v>,
-    ) -> anyhow::Result<Arc<CallableGraph>> {
+    ) -> anyhow::Result<PublishedValueArenaBuilder> {
         // The producer Module normally has no slots. Every slot is nevertheless
         // audited, including anonymous compiler slots, before retaining it.
         self.graph
             .audit_module(lowerer)
             .map_err(anyhow::Error::msg)?;
+        let (graph, roots) = self.graph.finish();
         self.module.set_extra_value(
             self.module
                 .heap()
-                .alloc(starlark::values::tuple::AllocTuple(self.roots)),
+                .alloc(starlark::values::tuple::AllocTuple(roots)),
         );
-        self.graph
-            .finish()
-            .map(Arc::new)
-            .map_err(anyhow::Error::msg)
+        Ok(graph)
     }
 }
 
 pub(super) struct FrozenPublisher {
-    graph: Arc<CallableGraph>,
-    roots: OwnedFrozenValue,
+    graph: PublishedValueArena,
+    originals: Arc<StarlarkPublishedOriginals>,
+    projections: std::cell::RefCell<Projector>,
 }
 impl FrozenPublisher {
-    pub(super) fn new(graph: Arc<CallableGraph>, roots: OwnedFrozenValue) -> Self {
-        Self { graph, roots }
+    pub(super) fn new(
+        graph: PublishedValueArenaBuilder,
+        roots: OwnedFrozenValue,
+    ) -> Result<Self, String> {
+        let originals = Arc::new(StarlarkPublishedOriginals::new(
+            roots,
+            Arc::from(graph.imports()),
+        )?);
+        let graph = graph.seal(originals.clone()).map_err(|e| e.to_string())?;
+        Ok(Self {
+            graph,
+            originals,
+            projections: std::cell::RefCell::new(Projector::default()),
+        })
+    }
+    pub(super) fn value(&self, node: PublishedNodeId) -> Result<AnalysisValue, String> {
+        self.projections
+            .borrow_mut()
+            .value(&self.graph.value(node).map_err(|e| e.to_string())?)
     }
     pub(super) fn complete(
         &self,
         draft: DraftRecipe,
     ) -> anyhow::Result<(RetainedArgsRecipe, Option<RetainedSpawnParamFilePolicy>)> {
         let vector = |value: DraftVector| -> anyhow::Result<RetainedVectorArg> {
-            let roots = TupleRef::from_value(self.roots.value())
-                .ok_or_else(|| anyhow::anyhow!("invalid frozen Args callback roots"))?;
-            anyhow::ensure!(
-                value.callback < roots.len(),
-                "unknown frozen Args callback root"
-            );
-            let callable = self.roots.map(|tuple| {
-                TupleRef::from_value(tuple.to_value())
-                    .expect("checked root tuple")
-                    .content()[value.callback]
-                    .unpack_frozen()
-                    .expect("frozen root")
-            });
-            let mapper = RetainedArgsMapper::new(
-                (*self.graph).clone(),
-                value.node,
+            let original = self.graph.value(value.node)?;
+            let slot = original
+                .original_slot()
+                .ok_or_else(|| anyhow::anyhow!("callback has no original root"))?;
+            let callable = self
+                .originals
+                .owned_root(slot.index())
+                .map_err(anyhow::Error::msg)?;
+            let mapper = RetainedArgsMapper::from_published(
+                original,
                 Arc::new(runtime::StarlarkRuntimeMapper::new(callable)),
             )?;
+            let inputs = match value.inputs {
+                DraftInputs::Sequence(values) => RetainedArgsInputs::Sequence(
+                    values
+                        .iter()
+                        .map(|id| self.value(*id))
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(anyhow::Error::msg)?
+                        .into(),
+                ),
+                DraftInputs::Depset(id) => {
+                    let value = self.value(id).map_err(anyhow::Error::msg)?;
+                    let AnalysisValueKind::Depset(value) = value.kind() else {
+                        anyhow::bail!("callback input is not a depset");
+                    };
+                    RetainedArgsInputs::Depset(value.clone())
+                }
+            };
             Ok(RetainedVectorArg::new(
                 RetainedVectorSource::Mapped {
-                    inputs: value.inputs,
+                    inputs,
                     mapper,
                     registration_location: value.location,
                 },

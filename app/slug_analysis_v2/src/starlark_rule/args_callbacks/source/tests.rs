@@ -3,7 +3,7 @@ use slug_loading_v2::BzlModuleSourceProvenance;
 
 use super::*;
 
-fn manifest(label: &str, digest: [u8; 32]) -> BzlLoadManifest {
+pub(super) fn manifest(label: &str, digest: [u8; 32]) -> BzlLoadManifest {
     let root = BzlModuleIdentity {
         label: CanonicalLabel::parse(label).unwrap(),
         workspace_path: "same/source.bzl".into(),
@@ -21,17 +21,19 @@ fn source_authority_keeps_logical_identity_and_checks_actual_source_bytes() {
     let code = CodeMap::new("same/source.bzl".into(), "def f(x):\n    return x\n".into());
     let mut sources = SourceAuthorities::default();
     let mut remaining = 65536;
-    let mut builder = CallableGraphBuilder::new();
+    let mut builder = PublishedValueArenaBuilder::new();
     let digest = sources.digest(&code, &mut builder, &mut remaining).unwrap();
     let a = convert(
         &manifest("@@left//:helper.bzl", digest),
-        &mut CallableGraphBuilder::new(),
+        &mut conversion::MappingAudits::default(),
+        &mut PublishedValueArenaBuilder::new(),
         &mut remaining,
     )
     .unwrap();
     let b = convert(
         &manifest("@@right//:helper.bzl", digest),
-        &mut CallableGraphBuilder::new(),
+        &mut conversion::MappingAudits::default(),
+        &mut PublishedValueArenaBuilder::new(),
         &mut remaining,
     )
     .unwrap();
@@ -40,6 +42,11 @@ fn source_authority_keeps_logical_identity_and_checks_actual_source_bytes() {
     sources
         .verify_source(&a, &code, &mut builder, &mut remaining)
         .unwrap();
+    let mut only_lookup = 1;
+    sources
+        .verify_source(&a, &code, &mut builder, &mut only_lookup)
+        .unwrap();
+    assert_eq!(only_lookup, 0);
     let mut exhausted = 0;
     assert!(
         sources
@@ -47,28 +54,32 @@ fn source_authority_keeps_logical_identity_and_checks_actual_source_bytes() {
             .unwrap_err()
             .contains("visit limit")
     );
-    let mut only_digest = 1;
     assert!(
         sources
-            .verify_source(&a, &code, &mut builder, &mut only_digest)
+            .verify_source(&a, &code, &mut builder, &mut remaining)
             .unwrap_err()
-            .contains("visit limit")
+            .contains("previously failed")
     );
     let changed = CodeMap::new(
         "same/source.bzl".into(),
         "def f(x):\n    return None\n".into(),
     );
     assert!(
-        sources
-            .verify_source(&a, &changed, &mut builder, &mut remaining)
+        SourceAuthorities::default()
+            .verify_source(
+                &a,
+                &changed,
+                &mut PublishedValueArenaBuilder::new(),
+                &mut remaining
+            )
             .is_err()
     );
     assert!(
-        sources
+        SourceAuthorities::default()
             .authority(
                 None,
                 &code,
-                &mut CallableGraphBuilder::new(),
+                &mut PublishedValueArenaBuilder::new(),
                 &mut remaining
             )
             .is_err()

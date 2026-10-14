@@ -21,6 +21,11 @@ pub struct CppFragmentProjection {
 }
 
 impl CppFragmentProjection {
+    /// Borrow the complete structural state for bounded retained-value audits.
+    pub fn configuration_ref(&self) -> &SlugConfiguration {
+        &self.configuration
+    }
+
     pub fn new(configuration: SlugConfiguration) -> Result<Self, SlugConfigurationError> {
         configuration.validate_cpp_field_state()?;
         let projection = Self { configuration };

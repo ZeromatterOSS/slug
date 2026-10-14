@@ -10,8 +10,13 @@ use starlark::eval::inspect_native_bound_method;
 use starlark::eval::inspect_native_function;
 use starlark::values::ValueLike;
 
+#[cfg(test)]
+#[path = "native/label_budget_tests.rs"]
+mod label_budget_tests;
+
 pub(super) struct NativeApis {
     globals: Globals,
+    loading_globals: Globals,
 }
 impl NativeApis {
     pub(super) fn new() -> Self {
@@ -20,6 +25,7 @@ impl NativeApis {
         starlark::environment::LibraryExtension::StructType.add(&mut builder);
         Self {
             globals: builder.build(),
+            loading_globals: slug_loading_v2::package::callable_registration_globals(),
         }
     }
     pub(super) fn certify_analysis_builtin(
@@ -50,8 +56,25 @@ impl NativeApis {
             "list"
         } else if starlark::values::dict::DictRef::from_value(receiver).is_some() {
             "dict"
+        } else if let Some(module) = slug_loading_v2::cc_common_api(receiver) {
+            match module {
+                slug_loading_v2::CcModuleApi::Public => "cc_common",
+                slug_loading_v2::CcModuleApi::Internal => "cc_internal",
+            }
+        } else if slug_loading_v2::cc_toolchain_features_ref(receiver).is_some() {
+            "CcToolchainFeatures"
+        } else if slug_loading_v2::cc_feature_configuration_ref(receiver).is_some() {
+            "CcFeatureConfiguration"
+        } else if slug_loading_v2::cc_variables_header(receiver).is_some() {
+            "CcToolchainVariables"
+        } else if slug_loading_v2::analysis_fragments::cpp_fragment_ref(receiver).is_some() {
+            "CppFragment"
+        } else if crate::package_specification::from_value_ref(receiver).is_some() {
+            "PackageSpecificationInfo"
         } else {
-            return Err("Args bound native method receiver class is unsupported".into());
+            return Err(
+                "bound native method receiver class has no complete typed certificate".into(),
+            );
         };
         if !actual.matches_receiver_wrapper() {
             return Err("Args bound native method does not match its registered wrapper".into());
@@ -63,7 +86,7 @@ impl NativeApis {
         &self,
         actual: NativeFunctionInspection<'_>,
     ) -> Result<NativeCallableApiId, String> {
-        for (name, value) in self.globals.iter() {
+        for (name, value) in self.globals.iter().chain(self.loading_globals.iter()) {
             let Some(canonical) = inspect_native_function(value.to_value()) else {
                 continue;
             };
@@ -76,92 +99,11 @@ impl NativeApis {
     }
 }
 
-/// Native AnalysisValue contains no evaluator capabilities. Legacy callable
-/// proxy atoms must still be rejected recursively before using the native cutoff.
-pub(super) fn validate_atom(
-    value: &AnalysisValue,
-    remaining: &mut usize,
-    depth: usize,
-) -> Result<(), String> {
-    if depth > slug_build_api_v2::callable_graph::CALLABLE_GRAPH_DEPTH_LIMIT {
-        return Err("Args native capture depth limit".into());
-    }
-    *remaining = remaining
-        .checked_sub(1)
-        .ok_or("Args native capture visit limit")?;
-    match value.kind() {
-        AnalysisValueKind::RustToolchainCallable(_) | AnalysisValueKind::CcToolchainCallable(_) => {
-            Err("Args callback cannot retain legacy callable proxies".into())
-        }
-        AnalysisValueKind::CcToolchainFeatures(_)
-        | AnalysisValueKind::CcFeatureConfiguration(_)
-        | AnalysisValueKind::CcToolchainVariables(_) => {
-            Err("Args opaque C++ metadata requires a borrowed bounded capture audit".into())
-        }
-        AnalysisValueKind::List(values) | AnalysisValueKind::Tuple(values) => {
-            for child in values {
-                validate_atom(child, remaining, depth + 1)?;
-            }
-            Ok(())
-        }
-        AnalysisValueKind::Dictionary(values) => {
-            for (k, v) in values {
-                validate_atom(k, remaining, depth + 1)?;
-                validate_atom(v, remaining, depth + 1)?;
-            }
-            Ok(())
-        }
-        AnalysisValueKind::Struct(fields) => {
-            for child in fields.values() {
-                validate_atom(child, remaining, depth + 1)?;
-            }
-            Ok(())
-        }
-        AnalysisValueKind::Provider(p) => {
-            for child in p.fields().values() {
-                validate_atom(child, remaining, depth + 1)?;
-            }
-            Ok(())
-        }
-        AnalysisValueKind::Depset(set) => {
-            for successor in set.successors() {
-                match successor {
-                    slug_build_api_v2::AnalysisDepsetSuccessor::Direct(v) => {
-                        validate_atom(v, remaining, depth + 1)?
-                    }
-                    slug_build_api_v2::AnalysisDepsetSuccessor::Transitive(child) => {
-                        validate_atom(&AnalysisValue::depset(child), remaining, depth + 1)?
-                    }
-                }
-            }
-            Ok(())
-        }
-        AnalysisValueKind::ConfiguredTarget(_) => Err(
-            "Args configured-target captures/inputs require a borrowed bounded metadata audit"
-                .into(),
-        ),
-        AnalysisValueKind::TemplateVariableInfo(_)
-        | AnalysisValueKind::RunEnvironmentInfo(_)
-        | AnalysisValueKind::PackageSpecificationInfo(_)
-        | AnalysisValueKind::CppFragment(_)
-        | AnalysisValueKind::CcHeaderInfo(_) => {
-            Err("Args native metadata class has no admitted borrowed capture audit".into())
-        }
-        AnalysisValueKind::None
-        | AnalysisValueKind::Boolean(_)
-        | AnalysisValueKind::Number(_)
-        | AnalysisValueKind::String(_)
-        | AnalysisValueKind::Label(_)
-        | AnalysisValueKind::Artifact(_)
-        | AnalysisValueKind::ArtifactRoot(_) => Ok(()),
-    }
-}
-
 /// Borrow actual containers under the caller's shared work/byte budget before
 /// the native lowerer snapshots any values. Completed aliases reuse this audit.
 pub(super) fn pure_candidate<'v>(
     module: &'v starlark::environment::Module,
-    graph: &mut slug_build_api_v2::CallableGraphBuilder,
+    graph: &mut slug_build_api_v2::published_value::PublishedValueArenaBuilder,
     remaining: &mut usize,
     value: starlark::values::Value<'v>,
     depth: usize,
@@ -171,7 +113,7 @@ pub(super) fn pure_candidate<'v>(
     use starlark_map::unordered_map::UnorderedMap;
     struct Preflight<'a, 'v> {
         module: &'v starlark::environment::Module,
-        graph: &'a mut slug_build_api_v2::CallableGraphBuilder,
+        graph: &'a mut slug_build_api_v2::published_value::PublishedValueArenaBuilder,
         remaining: &'a mut usize,
         seen: UnorderedMap<ValueIdentity<'v>, Option<bool>>,
     }
@@ -193,7 +135,8 @@ pub(super) fn pure_candidate<'v>(
                         .as_str()
                         .len()
                         .saturating_add(label.package().package().as_str().len())
-                        .saturating_add(label.target().as_str().len()),
+                        .saturating_add(label.target().as_str().len())
+                        .saturating_add(label.mapping_id().map_or(0, |id| id.as_str().len())),
                 )
                 .map_err(|e| e.to_string())
         }
@@ -210,21 +153,27 @@ pub(super) fn pure_candidate<'v>(
             {
                 return Ok(false);
             }
-            if crate::analysis_value::AnalysisConfiguredTargetValue::from_value(value).is_some() {
-                return Err("Args configured-target captures/inputs require a borrowed bounded metadata audit".into());
+            if let Some(specification) = crate::package_specification::from_value_ref(value) {
+                self.graph
+                    .audit_package_specification_at_depth(specification, depth)
+                    .map_err(|error| error.to_string())?;
+                return Ok(true);
             }
-            if slug_loading_v2::provider::run_environment_info_ref(value).is_some() {
-                return Err(
-                    "Args native metadata class has no admitted borrowed capture audit".into(),
-                );
-            }
-            if slug_loading_v2::is_cc_variables_value(value)
-                || slug_loading_v2::cc_toolchain_features_value(value).is_some()
-                || slug_loading_v2::cc_feature_configuration_value(value).is_some()
+            // These trusted wrappers clone only immutable native handles.
+            // The native builder audits their full borrowed payload before row
+            // retention; constructors cannot attach evaluator capabilities.
+            if crate::analysis_value::published::runfiles_value(value).is_some()
+                || slug_loading_v2::provider::run_environment_info_ref(value).is_some()
+                || slug_loading_v2::cc_header_info_ref(value).is_some()
+                || slug_loading_v2::template_variable_info_ref(value).is_some()
+                || slug_loading_v2::cc_toolchain_features_ref(value).is_some()
+                || slug_loading_v2::cc_feature_configuration_ref(value).is_some()
+                || slug_loading_v2::analysis_fragments::cpp_fragment_ref(value).is_some()
             {
-                return Err(
-                    "Args opaque C++ metadata requires a borrowed bounded capture audit".into(),
-                );
+                self.graph
+                    .charge_bytes(std::mem::size_of::<AnalysisValue>())
+                    .map_err(|e| e.to_string())?;
+                return Ok(true);
             }
             if let Some(pure) = self.seen.get(&value.identity()) {
                 return Ok(pure.unwrap_or(false));
@@ -245,8 +194,18 @@ pub(super) fn pure_candidate<'v>(
             let file =
                 slug_loading_v2::subrule_invocation::AnalysisArtifactValue::from_starlark(value);
             if let Some(file) = file {
-                if let slug_build_api_v2::AnalysisArtifact::Source(label) = file.artifact() {
-                    self.label(label)?;
+                match file.artifact() {
+                    slug_build_api_v2::AnalysisArtifact::Source(label) => self.label(label)?,
+                    slug_build_api_v2::AnalysisArtifact::Derived { owner, output } => {
+                        self.label(owner.label())?;
+                        if let Some(platform) = owner.toolchain_execution_platform() {
+                            self.label(platform)?;
+                        }
+                        self.graph
+                            .charge_bytes(output.path().len())
+                            .map_err(|e| e.to_string())?;
+                    }
+                    slug_build_api_v2::AnalysisArtifact::WorkspaceStatus(_) => {}
                 }
             }
             let root = slug_loading_v2::artifact_root_value_ref(value);

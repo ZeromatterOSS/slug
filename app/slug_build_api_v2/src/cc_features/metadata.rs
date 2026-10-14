@@ -171,6 +171,11 @@ pub struct CcTool {
     exec_os: CcExecOs,
 }
 impl CcTool {
+    /// Borrow private native string allocation capacity for publication admission.
+    pub(crate) fn path_capacity(&self) -> usize {
+        self.path.capacity()
+    }
+
     pub fn new(
         path: Option<&str>,
         artifact: Option<AnalysisArtifact>,

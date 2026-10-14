@@ -17,8 +17,6 @@
 
 //! Function types, including native functions and `object.member` functions.
 
-use std::sync::Arc;
-
 use allocative::Allocative;
 use derivative::Derivative;
 use derive_more::Display;
@@ -29,7 +27,6 @@ use starlark_derive::starlark_value;
 use crate as starlark;
 use crate::any::ProvidesStaticType;
 use crate::coerce::Coerce;
-use crate::collections::StarlarkHashValue;
 use crate::docs::DocItem;
 use crate::docs::DocMember;
 use crate::docs::DocProperty;
@@ -70,33 +67,6 @@ enum FunctionError {
 
 /// Return value of `type(any function)`.
 pub const FUNCTION_TYPE: &str = "function";
-
-/// An explicit host capability for preserving a function's occurrence identity
-/// in a native proxy without retaining its code, captures, or defining module.
-///
-/// Requesting this capability does not issue an identity. Ordinary comparisons
-/// only inspect already-issued identities. Hosts must authenticate any proxy's
-/// behavior separately: possession of an identity token proves no provenance.
-/// Implementations must compare tokens with [`Arc::ptr_eq`], not pointee equality.
-pub trait StarlarkFunctionIdentity {
-    /// Inspect identity without allocating or changing the function.
-    fn issued_identity(&self) -> Option<&Arc<()>>;
-
-    /// Lazily issue this occurrence's identity, returning the same token on
-    /// every call, including after freezing or moving garbage collection.
-    fn issue_identity(&self) -> Arc<()>;
-
-    /// Cached hash of the original function's name string, NOT the finished
-    /// function hash. A proxy's `write_hash` must write this value's `get()` as
-    /// one `Hasher::write_u32` operation, preserving the original hash stream
-    /// even if the function was inserted into a dict before identity issuance.
-    fn name_hash(&self) -> StarlarkHashValue;
-}
-
-// The capability borrows its owner; its opaque tokens contain no heap Values.
-unsafe impl<'v> ProvidesStaticType<'v> for &'v dyn StarlarkFunctionIdentity {
-    type StaticType = &'static dyn StarlarkFunctionIdentity;
-}
 
 /// Marker trait for function types.
 pub(crate) enum StarlarkFunction {}

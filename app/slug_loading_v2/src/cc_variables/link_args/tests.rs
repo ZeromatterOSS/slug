@@ -24,18 +24,22 @@ fn execute(module: &Module, source: &str) -> anyhow::Result<()> {
 fn fixture(flags: &[&str], iterate: Option<&str>) -> Module {
     let origin = Module::new();
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:link_args_test.bzl");
-    let mut eval = Evaluator::new(&origin);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(
-            "source.bzl",
-            "i = cc_common.internal_DO_NOT_USE()\n".to_owned(),
-            &Dialect::Bazel,
-        )
-        .unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse(
+        "source.bzl",
+        "i = cc_common.internal_DO_NOT_USE()\n".to_owned(),
+        &Dialect::Bazel,
     )
     .unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &origin,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&origin);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     let imported = origin.freeze().unwrap();
     let module = Module::new();

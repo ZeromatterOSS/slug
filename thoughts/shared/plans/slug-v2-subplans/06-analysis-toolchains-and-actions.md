@@ -24,8 +24,8 @@ defaults, captures, native values and aliases participate in joint provider/acti
 publication equality. BuildAPI contains only native descriptors and fallible
 consumer interfaces. Registration and evaluator-end publication do not execute
 mappers; complete actions leave the sink only after shared lowering and freeze,
-outside registry locks. Captured analysis capabilities, function-valued inputs
-and uninspected opaque classes remain unsupported.
+outside registry locks. Captured analysis capabilities and uninspected opaque
+classes remain unsupported.
 
 Each vector invokes its original callable in one fresh transient evaluator.
 Formatting, uniqueness, joining, parameter files and errors share the native
@@ -37,8 +37,111 @@ cooperative and do not establish a hard allocator, instruction or RSS fence.
 Native container materialization uses owning phase-local memo keys and preserves
 shared and distinct empty lists; canonical empty-tuple normalization remains an
 explicit boundary. ArgsWrite query/execution and Spawn ActionKey stay deferred.
-Other toolchain, repository-process, resource and build-info adapters remain
+Repository-process, resource, build-info and Apple tuple adapters remain
 replacement-required. These APIs do not close authentic Rust, memory, M7A or M8.
+
+## Original function-valued providers (WP1221)
+
+Original function-valued provider publication is a
+[scoped accepted capability](wp1221-general-provider-callables-acceptance-2026-10-14.json).
+The public Rust query completes with the named callable-adapter family absent;
+surviving adapters and authentic action/execution/bootstrap gates remain open.
+
+Ordinary Starlark functions in providers and inputs retain original frozen values
+through the current evaluator. One sealed native arena records code, complete
+source authority, defaults, captures, constructors, native fields and aliases;
+outward function symbols never replace invocation. Actual evaluation owners,
+creation ordinals and admitted first export events survive GC/freeze. Export
+after hashing, unmodeled owner domains and unaudited native classes remain
+unsupported. Admitted token relations are exact; numerical/hash encoding is
+Slug-native. Captured ctx/actions remain refused; supplied current arguments use
+ordinary active-token validation.
+
+Publication budgets cover declared owner/import DAGs and actual shared immutable
+source rows. Canonical local facts preserve full source equality and validate
+incoming manifests exactly; all original client-data metadata remains forecast.
+Captured sets retain original ordered members; outward sets remain unsupported.
+Guarded source-proof caches and fixed source-switch inspection avoid repeated
+work while charging every incoming lookup/encounter. Source certificates are not
+span traces; original functions retain complete runtime and definition spans.
+Mapping-byte proofs share one private publisher lifetime, using guarded actual
+Arcs without changing full per-occurrence forecasts or source equality. Pending
+borrowed proofs require joint growth/output/work admission before commit; failed
+source attempts poison the session and builder before further cache shortcuts.
+Sealed retained-fact certificates remain distinct from bounded producer work;
+imports do not replay producer Engine/proof history. Private sealed local
+certificates and private constructor-validated owner bodies keep full fact counts
+in one cached-retained ledger. Actual DAG/source/owner lookup work remains paid.
+Producer work is checked combined admissions minus owner-body facts and stays
+capped at65536. Full retained facts use one131072 bound for joint owner/import
+admission, local canonical counts, final sealed closure and constructor-combined
+owners. This explicitly increases the former full-fact limit; counts and semantic
+comparisons remain complete. One bound preserves local-to-import role changes
+across generations; added references still need fact headroom. Seal loans only
+producer work to the existing meter, then restores full shape totals. Actual
+shared/public/native work, node/root IDs and edge/depth caps remain.
+All construction byte forecasts remain fully paid under one fixed 128 MiB joint
+publication policy, shared by retained closure and post-seal projection. This
+explicitly doubles the former aggregate resource envelope; it does not reduce
+byte amounts or establish memory fit. Independent source/token, Loading,
+runtime output/heap and Engine scratch/workspace policies remain 64 MiB.
+Failure poisoning is independent of these separate byte limits.
+A private borrowed scratch capability classifies only reviewed producer tables,
+proof bookkeeping and validator arrays that drop before publication. Successful
+seal excludes the same paid local scratch amount from both stored byte
+certificates, after validation returns; live charges are never refunded.
+Root vectors, source output, native/owner/shared bodies and unclassified mixed
+forecasts remain retained. This changes import exhaustion boundaries without
+claiming exact allocator bytes or completed-command memory fit.
+Source conversion prepays complete final output and temporary Vec transfer
+backing. A borrowed preparation requires the retained payment to cover the full
+validated authority; only the two consumed array backings join producer scratch.
+Its first same-builder source binding omits only the duplicate payload charge
+for that actual allocation. Foreign and distinct-equal allocations pay fully.
+Full facts, handles and verification remain; bounded proof storage/work is
+prepaid, abandonment poisons, and proof guards drop before outward publication.
+Private feature-proof overhead and compiled dependency queues are temporary;
+event buffers prepay the complete vector-growth peak before each push. This
+strengthens their former per-element construction admission under the same cap.
+Primitive byte refusals carry one bounded failure-only numeric snapshot and the
+direct local/import/owner/shared charge context. Admission and poisoning remain
+unchanged; forecast arithmetic and other named limit errors stay distinct.
+Opaque owner parts retain their complete immutable shape and semantic contracts;
+this does not claim sealed-row canonical enumeration. Private closed feature-model
+proofs reuse successful guarded actual Arcs, preserving full canonical counts
+and per-use admitted bytes/edges/nodes/depth independently of producer work.
+Original-origin rejection precedes shortcuts; complete root/suffix and prepaid
+growth precede guard cloning. Feature-owned storage forecasts cover capacities
+and nested arrays/sets; artifact semantic audits and admitted forecasts remain
+unchanged, without claiming a generic exact artifact allocation bound.
+Typed depset DAGs retain
+the existing class depth3500, separately from ordinary containment256. Iterative
+Transitive traversal preserves all actual descriptor/direct-leaf aliases, and
+Direct payloads reenter ordinary depth. Native hidden channels follow the same
+class rule; cycle, aggregate storage/work and original freeze/release gates remain.
+Original typed freeze schedules actual children iteratively under one fixed
+per-Freezer cooperative65536-work/64MiB-scratch owner, shared by nested plans;
+errors poison later forwarding shortcuts. This independent freeze phase does
+not extend producer budgets. Immutable language Transitive construction is
+acyclic; malformed raw host graphs are outside standalone freeze admission.
+Complex-object GC defers original Trace callbacks through one fixed64MiB,
+preallocated queue, drained before the old arena drops. Refusal precedes root
+mutation and propagates as an error; mutable values share the collecting heap,
+while frozen imports retain their original owners. Specialized container
+recursion is unchanged. Actual3500 VM GC/freeze and producer-drop/import/consumer
+GC/freeze/drop preserve aliases and3501 refusal. Broader owner-DAG release and
+whole-command lifecycle gates remain distinct.
+Source authority caches its constructor-verified complete fact count. Seal pays
+a scalar read and retains that full count; complete Data equality and import
+limits remain unchanged. Forecasts include the private envelope and nested Arcs.
+Stored reference counts use checked immutable lengths and a paid scalar read,
+preserving complete retained/import counts and every payload/slot validation.
+Ordinary value encounters use a borrow-scoped one-use admission, including an
+optional row header after both map/root storage forecasts. Memo hits remain paid;
+explicit host abort poisons without refund. Existing public reserve and typed
+frame/cell/code paths retain separate payments. Full canonical facts and all caps
+remain; producer exhaustion boundaries change.
+These component bounds do not establish whole-command memory acceptance.
 
 Depset truth is exactly nonemptiness, using existing element-type metadata
 (`Empty`/None means no leaves) through evaluator construction, freeze and native

@@ -73,6 +73,7 @@ use crate::bzl_module::manifest_starlark_sources;
 use crate::bzl_visibility::BzlLoadVisibility;
 use crate::starlark_label::StarlarkLabel;
 
+mod depset_freeze;
 mod feature_flag_info;
 mod output_group;
 mod run_environment_info;
@@ -88,6 +89,7 @@ pub use run_environment_info::run_environment_info_ref;
 pub(crate) use template_variable_info::TemplateVariableInfoConstructor;
 pub use template_variable_info::alloc_frozen_template_variable_info;
 pub use template_variable_info::template_variable_info;
+pub use template_variable_info::template_variable_info_ref;
 
 pub use crate::xcode_version_info::alloc_default_xcode_version_info;
 pub use crate::xcode_version_info::default_xcode_version_info;
@@ -363,35 +365,28 @@ impl BzlEvaluationContext {
         self.bzl_load_visibility.borrow().dupe().unwrap_or_default()
     }
 
-    pub(crate) fn source_identity_for_call<'a>(
-        &'a self,
-        eval: &Evaluator<'_, '_, '_>,
-    ) -> anyhow::Result<&'a BzlModuleIdentity> {
-        let caller = eval.native_caller_function_filename();
-        let Some(filename) = eval
-            .native_call_source_filename()
-            .or_else(|| caller.clone())
-        else {
-            return Ok(&self.source_identity);
-        };
-        if caller.is_none() && self.source_identities_by_filename.is_empty() {
-            return Ok(&self.source_identity);
+    pub(crate) fn source_identity_for_call<'v>(
+        &self,
+        eval: &Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<&'v BzlModuleIdentity> {
+        let data = eval
+            .native_call_defining_module_client_data()
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "source-sensitive builtin requires actual defining .bzl module provenance"
+                )
+            })?;
+        if !self.source_identities_by_filename.is_empty() {
+            return crate::starlark_label::validate_defining_module_source(
+                data,
+                &self.source_identities_by_filename,
+            );
         }
-        let mut identities =
-            self.source_identities_by_filename
-                .iter()
-                .filter_map(|(source, identity)| {
-                    (source.as_str() == filename).then_some(&identity.identity)
-                });
-        let identity = identities.next().ok_or_else(|| {
+        crate::starlark_label::defining_module_identity(data).ok_or_else(|| {
             anyhow::anyhow!(
-                "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
+                "source-sensitive builtin requires actual defining .bzl module provenance"
             )
-        })?;
-        if identities.next().is_some() {
-            anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
-        }
-        Ok(identity)
+        })
     }
 
     pub(crate) fn macro_runtime_context(
@@ -663,8 +658,6 @@ impl<'v> StarlarkValue<'v> for FrozenUserProviderCallable {
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 pub(crate) struct InitializedUserProviderCallable<'v> {
-    #[trace(unsafe_ignore)]
-    authority: Option<crate::cc_toolchain_auth::InitializerAuthority>,
     source_label: CompactString,
     fields: Arc<[CompactString]>,
     init: Value<'v>,
@@ -680,15 +673,15 @@ impl<'v> InitializedUserProviderCallable<'v> {
         let context = BzlEvaluationContext::from_evaluator(eval)
             .map_err(|_| anyhow::anyhow!("provider() may only be called in a .bzl module"))?;
         let provider = eval.heap().alloc_complex(Self {
-            authority: crate::cc_toolchain_auth::authenticate(eval),
             source_label: context.source_label.clone(),
             fields,
             init,
             id: OnceCell::new(),
         });
-        let raw = eval
-            .heap()
-            .alloc_complex(InitializedProviderRawGen { provider });
+        let raw = eval.heap().alloc_complex(InitializedProviderRawGen {
+            provider,
+            occurrence: slug_build_api_v2::published_value::RawProviderConstructorOccurrence::new(),
+        });
         Ok(eval.heap().alloc((provider, raw)))
     }
 }
@@ -709,7 +702,6 @@ impl Freeze for InitializedUserProviderCallable<'_> {
             ));
         };
         Ok(FrozenInitializedUserProviderCallable {
-            authority: self.authority,
             id,
             fields: self.fields,
             init: self.init.freeze(freezer)?,
@@ -747,19 +739,11 @@ impl<'v> StarlarkValue<'v> for InitializedUserProviderCallable<'v> {
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
         let id = self.id.get().ok_or_else(unbound_provider_error)?;
-        invoke_initialized_provider(
-            id,
-            &self.fields,
-            self.init,
-            self.authority.as_ref(),
-            args,
-            eval,
-        )
+        invoke_initialized_provider(id, &self.fields, self.init, args, eval)
     }
 }
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct FrozenInitializedUserProviderCallable {
-    authority: Option<crate::cc_toolchain_auth::InitializerAuthority>,
     id: ProviderId,
     fields: Arc<[CompactString]>,
     init: FrozenValue,
@@ -788,16 +772,77 @@ impl<'v> StarlarkValue<'v> for FrozenInitializedUserProviderCallable {
         args: &Arguments<'v, '_>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<Value<'v>> {
-        invoke_initialized_provider(
-            &self.id,
-            &self.fields,
-            self.init.to_value(),
-            self.authority.as_ref(),
-            args,
-            eval,
-        )
+        invoke_initialized_provider(&self.id, &self.fields, self.init.to_value(), args, eval)
     }
 }
+/// Allocation-free inspection of actual provider constructor values.
+#[derive(Debug, Clone, Copy)]
+pub enum ProviderSchemaRef<'a> {
+    Schemaless,
+    List(&'a [CompactString]),
+    Documented(&'a [CompactString]),
+    Initialized(&'a [CompactString]),
+}
+#[derive(Debug, Clone, Copy)]
+pub enum ProviderConstructorView<'v> {
+    Constructor {
+        id: Option<&'v ProviderId>,
+        schema: ProviderSchemaRef<'v>,
+        init: Option<Value<'v>>,
+    },
+    Raw {
+        provider: Value<'v>,
+        occurrence: &'v slug_build_api_v2::published_value::RawProviderConstructorOccurrence,
+    },
+}
+pub fn provider_constructor_view<'v>(value: Value<'v>) -> Option<ProviderConstructorView<'v>> {
+    fn schema(s: &UserProviderSchema) -> ProviderSchemaRef<'_> {
+        match s {
+            UserProviderSchema::Schemaless => ProviderSchemaRef::Schemaless,
+            UserProviderSchema::List(fields) => ProviderSchemaRef::List(fields),
+            UserProviderSchema::Documented(fields) => ProviderSchemaRef::Documented(fields),
+        }
+    }
+    if let Some(v) = value.downcast_ref::<UserProviderCallable>() {
+        return Some(ProviderConstructorView::Constructor {
+            id: v.id.get(),
+            schema: schema(&v.schema),
+            init: None,
+        });
+    }
+    if let Some(v) = FrozenUserProviderCallable::from_value(value) {
+        return Some(ProviderConstructorView::Constructor {
+            id: Some(&v.id),
+            schema: schema(&v.schema),
+            init: None,
+        });
+    }
+    if let Some(v) = value.downcast_ref::<InitializedUserProviderCallable>() {
+        return Some(ProviderConstructorView::Constructor {
+            id: v.id.get(),
+            schema: ProviderSchemaRef::Initialized(&v.fields),
+            init: Some(v.init),
+        });
+    }
+    if let Some(v) = FrozenInitializedUserProviderCallable::from_value(value) {
+        return Some(ProviderConstructorView::Constructor {
+            id: Some(&v.id),
+            schema: ProviderSchemaRef::Initialized(&v.fields),
+            init: Some(v.init.to_value()),
+        });
+    }
+    match InitializedProviderRaw::from_value(value)? {
+        starlark::__macro_refs::Either::Left(v) => Some(ProviderConstructorView::Raw {
+            provider: v.provider,
+            occurrence: &v.occurrence,
+        }),
+        starlark::__macro_refs::Either::Right(v) => Some(ProviderConstructorView::Raw {
+            provider: v.provider.to_value(),
+            occurrence: &v.occurrence,
+        }),
+    }
+}
+
 /// The existing exported key is shared by live/frozen and initialized/plain
 /// constructors; an unexported constructor has no dictionary-key identity.
 fn user_provider_constructor_id(value: Value<'_>) -> Option<&ProviderId> {
@@ -835,6 +880,9 @@ fn unbound_provider_error() -> starlark::Error {
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 struct InitializedProviderRawGen<V> {
     provider: V,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    occurrence: slug_build_api_v2::published_value::RawProviderConstructorOccurrence,
 }
 type InitializedProviderRaw<'v> = InitializedProviderRawGen<Value<'v>>;
 type FrozenInitializedProviderRaw = InitializedProviderRawGen<FrozenValue>;
@@ -997,7 +1045,55 @@ pub fn visit_starlark_provider_fields<'v>(
         }
         return Ok(true);
     }
-    Ok(false)
+    StarlarkOutputGroupInfo::visit_fields(value, visitor)
+}
+
+/// Borrowed actual provider instance identity and field count.
+pub enum ProviderInstanceIdentityRef<'v> {
+    User(&'v ProviderId),
+    Builtin(&'static str),
+}
+pub struct ProviderInstanceHeader<'v> {
+    pub identity: ProviderInstanceIdentityRef<'v>,
+    pub has_schema: bool,
+    pub len: usize,
+}
+pub fn provider_instance_header(value: Value<'_>) -> Option<ProviderInstanceHeader<'_>> {
+    fn user<V>(v: &LoadingStarlarkUserProviderGen<V>) -> ProviderInstanceHeader<'_> {
+        let (has_schema, len) = match &v.fields {
+            LoadingProviderFieldsGen::Schemaful { values, .. } => (true, values.len()),
+            LoadingProviderFieldsGen::Schemaless(fields) => {
+                (fields.has_schema, fields.values.len())
+            }
+        };
+        ProviderInstanceHeader {
+            identity: ProviderInstanceIdentityRef::User(&v.id),
+            has_schema,
+            len,
+        }
+    }
+    if let Some(v) = LoadingStarlarkUserProvider::from_value(value) {
+        return Some(match v {
+            starlark::__macro_refs::Either::Left(v) => user(v),
+            starlark::__macro_refs::Either::Right(v) => user(v),
+        });
+    }
+    if let Some(provider) = StarlarkToolchainInfo::from_value(value) {
+        let len = match provider {
+            starlark::__macro_refs::Either::Left(v) => v.values.len(),
+            starlark::__macro_refs::Either::Right(v) => v.values.len(),
+        };
+        return Some(ProviderInstanceHeader {
+            identity: ProviderInstanceIdentityRef::Builtin("ToolchainInfo"),
+            has_schema: false,
+            len,
+        });
+    }
+    Some(ProviderInstanceHeader {
+        identity: ProviderInstanceIdentityRef::Builtin("OutputGroupInfo"),
+        has_schema: false,
+        len: StarlarkOutputGroupInfo::field_count(value)?,
+    })
 }
 
 pub fn starlark_user_provider_has_schema(value: Value<'_>) -> Option<bool> {
@@ -1122,7 +1218,6 @@ fn invoke_initialized_provider<'v>(
     id: &ProviderId,
     fields: &Arc<[CompactString]>,
     init: Value<'v>,
-    authority: Option<&crate::cc_toolchain_auth::InitializerAuthority>,
     args: &Arguments<'v, '_>,
     eval: &mut Evaluator<'v, '_, '_>,
 ) -> starlark::Result<Value<'v>> {
@@ -1136,9 +1231,6 @@ fn invoke_initialized_provider<'v>(
         ))
     })?;
     let provider = allocate_schemaful_loading_provider(id, fields, values.iter(), eval)?;
-    if let Some(authority) = authority {
-        crate::cc_toolchain_auth::register(authority, &values, eval)?;
-    }
     Ok(provider)
 }
 fn invoke_initialized_raw<'v>(
@@ -1229,22 +1321,17 @@ pub enum StarlarkDepsetSuccessorGen<V> {
     Transitive(V),
 }
 
-#[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
+#[derive(Debug, Trace, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct StarlarkDepsetGen<V> {
     #[trace(unsafe_ignore)]
-    #[freeze(identity)]
     order: DepsetOrder,
     #[trace(unsafe_ignore)]
-    #[freeze(identity)]
     element_type: Option<CompactString>,
     #[trace(unsafe_ignore)]
-    #[freeze(identity)]
     occurrence: AnalysisDepsetOccurrence,
     #[trace(unsafe_ignore)]
-    #[freeze(identity)]
     retained: Option<AnalysisDepset>,
     #[trace(unsafe_ignore)]
-    #[freeze(identity)]
     depth: usize,
     successors: Vec<StarlarkDepsetSuccessorGen<V>>,
 }
@@ -1319,6 +1406,14 @@ impl<'v> StarlarkDepset<'v> {
         })
     }
 
+    /// Borrow a retained native DAG without cloning metadata or successors.
+    pub fn retained_from_value(value: Value<'v>) -> Option<&'v AnalysisDepset> {
+        match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => value.retained.as_ref(),
+            starlark::__macro_refs::Either::Right(value) => value.retained.as_ref(),
+        }
+    }
+
     pub fn parts_from_value(
         value: Value<'v>,
     ) -> Option<(
@@ -1365,7 +1460,8 @@ impl<'v> StarlarkDepset<'v> {
         }
     }
 
-    fn depth_from_value(value: Value<'v>) -> Option<usize> {
+    /// Borrow the actual typed depset logical depth before copying metadata.
+    pub fn depth_from_value(value: Value<'v>) -> Option<usize> {
         match Self::from_value(value)? {
             starlark::__macro_refs::Either::Left(value) => Some(value.depth),
             starlark::__macro_refs::Either::Right(value) => Some(value.depth),
@@ -2133,7 +2229,6 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                     .map(|(name, value)| (CompactString::new(name.as_str()), *value))
                     .collect::<SmallMap<_, _>>();
                 fields.sort_keys();
-                crate::rust_toolchain_auth::register(&fields, eval)?;
                 let (names, values): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
                 Ok(eval.heap().alloc_complex(StarlarkToolchainInfo {
                     names: names.into(),
@@ -2433,3 +2528,24 @@ mod provider_fields_visit_tests;
 
 #[cfg(test)]
 mod analysis_builtin_certificate_tests;
+
+/// Complete fixed native provider-token class state, obtained by typed inspection.
+/// This is a certificate for retaining the original, never replacement execution.
+pub fn native_provider_token(value: Value<'_>) -> Option<(&'static str, ProviderIdentity)> {
+    let class = if BuiltinProviderKey::from_value(value).is_some() {
+        "BuiltinProviderKey"
+    } else if DeclarationOnlyAppleProviderKey::from_value(value).is_some() {
+        "DeclarationOnlyAppleProviderKey"
+    } else if TemplateVariableInfoConstructor::from_value(value).is_some() {
+        "TemplateVariableInfoConstructor"
+    } else if FeatureFlagInfoConstructor::from_value(value).is_some() {
+        "FeatureFlagInfoConstructor"
+    } else if OutputGroupInfo::from_value(value).is_some() {
+        "OutputGroupInfo"
+    } else if RunEnvironmentInfo::from_value(value).is_some() {
+        "RunEnvironmentInfo"
+    } else {
+        return None;
+    };
+    Some((class, starlark_provider_identity(value)?))
+}

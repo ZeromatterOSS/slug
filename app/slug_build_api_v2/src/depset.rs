@@ -21,6 +21,12 @@ use fxhash::FxHashMap;
 use fxhash::FxHashSet;
 use fxhash::hash64;
 
+mod bounded_storage;
+pub use bounded_storage::DepsetStorageCharge;
+pub use bounded_storage::DepsetStorageEvent;
+pub use bounded_storage::DepsetStorageVisitError;
+pub use bounded_storage::DepsetStorageVisitSet;
+
 pub const MAX_DEPTH: usize = 3500;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
@@ -761,6 +767,10 @@ impl<T, M> Depset<T, M> {
         .expect("one canonical depset node produces one handle"))
     }
 
+    pub(crate) fn dense_graph_storage_upper_bound(nodes: usize, edges: usize) -> Option<usize> {
+        storage_forecast::dense::<T, M>(nodes, edges)
+    }
+
     pub(crate) fn from_dense_nodes(
         inputs: Vec<DenseDepsetNodeInput<T, M>>,
     ) -> Result<Vec<Self>, DepsetError> {
@@ -1484,3 +1494,6 @@ mod dense_storage_tests {
         assert_eq!(warm, cold);
     }
 }
+
+#[path = "depset/storage_forecast.rs"]
+pub(crate) mod storage_forecast;

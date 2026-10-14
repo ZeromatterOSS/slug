@@ -283,7 +283,7 @@ async fn complete_cc_toolchain_capture_payload_and_configuration_restore_in_same
 }
 
 #[tokio::test]
-async fn complete_cc_toolchain_changed_source_fails_closed_then_reauthenticates() {
+async fn complete_cc_toolchain_original_functions_accept_source_changes_and_restore_publication() {
     let root = workspace();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let original = request(&dice, &root, "consumer", options(false, "--user"))
@@ -292,13 +292,21 @@ async fn complete_cc_toolchain_changed_source_fails_closed_then_reauthenticates(
     let path = root.join(SOURCE);
     let source = fs::read_to_string(&path).unwrap();
     fs::write(&path, format!("{source}\n")).unwrap();
-    let error = request(&dice, &root, "consumer", options(false, "--user"))
+    let changed = request(&dice, &root, "consumer", options(false, "--user"))
         .await
-        .err()
-        .expect("unpinned constructor must not serialize functions");
+        .unwrap();
+    check_query(&changed, false, "--user");
+    assert_ne!(
+        original, changed,
+        "full source provenance participates in publication"
+    );
     assert!(
-        error.contains("function") || error.contains("callable") || error.contains("authenticated"),
-        "{error}"
+        field(&original, "snapshot").publication_eq(field(&changed, "snapshot")),
+        "a trailing newline leaves the original callable results unchanged"
+    );
+    assert!(
+        !field(&original, "toolchain").publication_eq(field(&changed, "toolchain")),
+        "original function source changes invalidate the callable-bearing provider"
     );
     fs::write(&path, source).unwrap();
     let restored = request(&dice, &root, "consumer", options(false, "--user"))
@@ -306,7 +314,9 @@ async fn complete_cc_toolchain_changed_source_fails_closed_then_reauthenticates(
         .unwrap();
     check_query(&restored, false, "--user");
     assert!(field(&original, "snapshot").publication_eq(field(&restored, "snapshot")));
-    // Reloaded module globals may carry a new identity token: successful
-    // reauthentication is required, not alpha-equality with the old function.
+    assert_eq!(
+        original, restored,
+        "restoring source restores full publication"
+    );
     fs::remove_dir_all(root).unwrap();
 }

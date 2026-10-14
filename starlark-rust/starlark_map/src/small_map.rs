@@ -20,6 +20,7 @@
 //! * no index is created for small maps
 //! * short hashes are stored next to keys
 
+use std::alloc::Layout;
 use std::fmt;
 use std::fmt::Debug;
 use std::hash::Hash;
@@ -29,7 +30,6 @@ use std::mem;
 
 use allocative::Allocative;
 use equivalent::Equivalent;
-use hashbrown::HashTable;
 #[cfg(feature = "pagable")]
 use pagable::Pagable;
 #[cfg(feature = "pagable")]
@@ -54,7 +54,9 @@ pub use crate::small_map::iter::Values;
 pub use crate::small_map::iter::ValuesMut;
 use crate::vec_map::VecMap;
 
+mod index;
 mod iter;
+use index::Index;
 
 /// Max size of a map when we do not create an index.
 /// 32 is the value where `slug cquery some-target` is the fastest and consumes the least memory.
@@ -77,7 +79,7 @@ pub struct SmallMap<K, V> {
     entries: VecMap<K, V>,
     /// Map a key to the index in `entries`.
     /// This field is initialized when the size of the map exceeds `NO_INDEX_THRESHOLD`.
-    index: Option<Box<HashTable<usize>>>,
+    index: Option<Box<Index>>,
 }
 
 impl<K, V> Default for SmallMap<K, V> {
@@ -114,7 +116,7 @@ impl<K, V> SmallMap<K, V> {
         } else {
             SmallMap {
                 entries: VecMap::with_capacity(n),
-                index: Some(Box::new(HashTable::with_capacity(n))),
+                index: Some(Box::new(Index::with_capacity(n))),
             }
         }
     }
@@ -301,7 +303,7 @@ impl<K, V> SmallMap<K, V> {
         &self,
         hash: StarlarkHashValue,
         mut eq: impl FnMut(&K) -> bool,
-        index: &HashTable<usize>,
+        index: &Index,
     ) -> Option<usize> {
         index
             .find(hash.promote(), |&index| unsafe {
@@ -419,6 +421,26 @@ impl<K, V> SmallMap<K, V> {
         self.entries.capacity()
     }
 
+    /// Conservative retained backing bytes, excluding inline `Self` and
+    /// element-owned payloads. Includes spare entry capacity and the complete
+    /// optional index allocation, even after removal or an empty clone.
+    /// This borrowed query allocates nothing; arithmetic/layout overflow is
+    /// reported as `None`.
+    pub fn retained_storage_bytes_upper_bound(&self) -> Option<usize> {
+        let capacity = self.entries.capacity();
+        let entries = if capacity == 0 {
+            0
+        } else {
+            let values = Layout::array::<(K, V)>(capacity).ok()?;
+            let hashes = Layout::array::<StarlarkHashValue>(capacity).ok()?;
+            values.extend(hashes).ok()?.0.size()
+        };
+        entries.checked_add(match &self.index {
+            Some(index) => index.retained_storage_bytes_upper_bound()?,
+            None => 0,
+        })
+    }
+
     /// Returns a reference to the first key-value pair.
     pub fn first(&self) -> Option<(&K, &V)> {
         self.iter().next()
@@ -433,7 +455,7 @@ impl<K, V> SmallMap<K, V> {
     fn create_index(&mut self, capacity: usize) {
         debug_assert!(self.index.is_none());
         debug_assert!(capacity >= self.entries.len());
-        let mut index = HashTable::with_capacity(capacity);
+        let mut index = Index::with_capacity(capacity);
         for (i, (k, _)) in self.entries.iter_hashed().enumerate() {
             index.insert_unique(k.hash().promote(), i, |_| {
                 unreachable!("Must have enough capacity")
@@ -539,12 +561,9 @@ impl<K, V> SmallMap<K, V> {
         let hash = key.hash();
         if let Some(index) = &mut self.index {
             let entries = &self.entries;
-            let i = match index.find_entry(hash.promote(), |&i| unsafe {
+            let i = index.remove(hash.promote(), |&i| unsafe {
                 key.key().equivalent(entries.get_unchecked(i).0.key())
-            }) {
-                Ok(found) => found.remove().0,
-                Err(_) => return None,
-            };
+            })?;
             // No need to update the index when the last entry is removed.
             if i != self.entries.len() - 1 {
                 for bucket in index.iter_mut() {
@@ -635,12 +654,11 @@ impl<K, V> SmallMap<K, V> {
             None => None,
             Some((key, value)) => {
                 if let Some(index) = &mut self.index {
-                    match index.find_entry(key.hash().promote(), |&i| i == self.entries.len()) {
-                        Ok(found) => {
-                            let removed = found.remove().0;
+                    match index.remove(key.hash().promote(), |&i| i == self.entries.len()) {
+                        Some(removed) => {
                             debug_assert!(removed == self.entries.len());
                         }
-                        Err(_) => {
+                        None => {
                             if cfg!(debug_assertions) {
                                 unreachable!("The entry must be in the index")
                             }

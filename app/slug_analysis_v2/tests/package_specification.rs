@@ -3,6 +3,8 @@ use slug_build_api_v2::AnalysisValue;
 
 use super::*;
 
+mod args_capture;
+
 const DEFS: &str = r#"
 Proof = provider(fields = ["info", "nested", "external", "mapped"])
 Answers = provider(fields = ["value"])

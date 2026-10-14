@@ -157,10 +157,12 @@ pub(crate) fn check_default_allowlist(
     eval: &Evaluator<'_, '_, '_>,
     identities: &Arc<[(CompactString, BzlModuleSourceProvenance)]>,
 ) -> anyhow::Result<()> {
-    let filename = eval
-        .native_caller_function_filename()
-        .ok_or_else(|| anyhow::anyhow!("restricted private API requires a .bzl function caller"))?;
-    let identity = identity_for_filename(&filename, identities)?;
+    let data = eval
+        .native_call_defining_module_client_data()
+        .ok_or_else(|| {
+            anyhow::anyhow!("restricted private API requires actual defining .bzl provenance")
+        })?;
+    let identity = crate::starlark_label::validate_defining_module_source(data, identities)?;
     if allows(identity) {
         return Ok(());
     }
@@ -173,11 +175,17 @@ pub(crate) fn check_custom_allowlist(
     allowlist: &[CustomAllowlistEntry],
     depth: usize,
 ) -> anyhow::Result<()> {
-    let Some(filename) = eval.native_caller_function_filename_at_depth(depth) else {
+    let Some(data) = eval.native_call_defining_module_client_data_at_depth(depth) else {
         // Bazel admits execution callbacks with no enclosing Starlark function.
-        return Ok(());
+        if eval
+            .native_caller_function_filename_at_depth(depth)
+            .is_none()
+        {
+            return Ok(());
+        }
+        anyhow::bail!("restricted private API requires actual defining .bzl provenance");
     };
-    let identity = identity_for_filename(&filename, identities)?;
+    let identity = crate::starlark_label::validate_defining_module_source(data, identities)?;
     if allowlist.iter().any(|entry| {
         repository_matches(identity, &entry.apparent_repo)
             && package_starts_with(
@@ -188,24 +196,6 @@ pub(crate) fn check_custom_allowlist(
         return Ok(());
     }
     anyhow::bail!("file '{}' cannot use private API", identity.label)
-}
-
-fn identity_for_filename<'a>(
-    filename: &str,
-    identities: &'a Arc<[(CompactString, BzlModuleSourceProvenance)]>,
-) -> anyhow::Result<&'a BzlModuleIdentity> {
-    let mut matches = identities.iter().filter_map(|(candidate, identity)| {
-        (candidate.as_str() == filename).then_some(&identity.identity)
-    });
-    let identity = matches.next().ok_or_else(|| {
-        anyhow::anyhow!(
-            "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
-        )
-    })?;
-    if matches.next().is_some() {
-        anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
-    }
-    Ok(identity)
 }
 
 fn allows(identity: &BzlModuleIdentity) -> bool {

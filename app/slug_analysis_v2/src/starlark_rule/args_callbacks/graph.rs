@@ -2,69 +2,62 @@
 use std::sync::Arc;
 
 use compact_str::CompactString;
-use slug_build_api_v2::CallableCode;
-use slug_build_api_v2::CallableDefinitionSpan;
-use slug_build_api_v2::CallableFunction;
-use slug_build_api_v2::CallableGlobal;
-use slug_build_api_v2::CallableGlobalAccess;
-use slug_build_api_v2::CallableGraph;
-use slug_build_api_v2::CallableGraphBuilder;
-use slug_build_api_v2::CallableNode;
-use slug_build_api_v2::CallableNodeId;
-use slug_build_api_v2::CallableParameter;
-use slug_build_api_v2::CallableParameterMode;
-use slug_build_api_v2::CallableParameterRequirement;
 use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_DEPTH_LIMIT;
 use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_EDGE_LIMIT;
 use slug_build_api_v2::callable_graph::CALLABLE_GRAPH_NODE_LIMIT;
+use slug_build_api_v2::published_value::PublishedFunction;
+use slug_build_api_v2::published_value::PublishedNode;
+use slug_build_api_v2::published_value::PublishedNodeId;
+use slug_build_api_v2::published_value::PublishedValueArena;
+use slug_build_api_v2::published_value::PublishedValueArenaBuilder;
 use starlark::environment::Module;
-use starlark::eval::DefCodeInspection;
-use starlark::eval::DefDependency;
-use starlark::eval::DefParameter;
-use starlark::eval::InspectionBudget;
-use starlark::eval::ModuleAccess;
-use starlark::eval::ParameterRequirement;
-use starlark::eval::ParameterStyle;
 use starlark::eval::inspect_def;
 use starlark::eval::inspect_native_bound_method;
 use starlark::eval::inspect_native_function;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueIdentity;
 use starlark::values::dict::DictRef;
 use starlark::values::list::ListRef;
+use starlark::values::set::SetRef;
 use starlark::values::structs::StructRef;
 use starlark::values::tuple::TupleRef;
 use starlark_map::unordered_map::UnorderedMap;
 
 use super::native::NativeApis;
-use super::native::validate_atom;
 use super::source::SourceAuthorities;
 use crate::analysis_value::AnalysisValueLowerer;
 
-pub(super) struct ArgsCallableGraphBuilder<'v> {
+pub(super) struct PublicationBuilder<'v> {
     module: &'v Module,
-    graph: CallableGraphBuilder,
-    values: UnorderedMap<ValueIdentity<'v>, CallableNodeId>,
+    graph: PublishedValueArenaBuilder,
+    values: UnorderedMap<ValueIdentity<'v>, PublishedNodeId>,
     sources: SourceAuthorities<'v>,
     natives: NativeApis,
     remaining: usize,
+    roots: Vec<Value<'v>>,
+    value_credit: storage::PeakCredit,
+    root_credit: storage::PeakCredit,
 }
-impl<'v> ArgsCallableGraphBuilder<'v> {
+impl<'v> PublicationBuilder<'v> {
     pub(super) fn new(module: &'v Module) -> Self {
         Self {
             module,
-            graph: CallableGraphBuilder::new(),
+            graph: PublishedValueArenaBuilder::new(),
             values: UnorderedMap::new(),
             sources: SourceAuthorities::default(),
             natives: NativeApis::new(),
             remaining: CALLABLE_GRAPH_NODE_LIMIT,
+            roots: Vec::new(),
+            value_credit: storage::PeakCredit::default(),
+            root_credit: storage::PeakCredit::default(),
         }
     }
     pub(super) fn add_callable(
         &mut self,
         value: Value<'v>,
         lowerer: &mut AnalysisValueLowerer<'v>,
-    ) -> Result<CallableNodeId, String> {
+    ) -> Result<PublishedNodeId, String> {
         if inspect_def(value, Some(self.module)).is_none()
             && inspect_native_function(value).is_none()
             && inspect_native_bound_method(value).is_none()
@@ -74,28 +67,6 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
         }
         self.value(value, lowerer, 0)
     }
-    /// Bound borrowed native input work before the shared lowerer allocates a
-    /// snapshot. Function-containing inputs are an explicit initial capability
-    /// boundary; actual native atom aliases retain the caller's lowerer memo.
-    pub(super) fn lower_input(
-        &mut self,
-        value: Value<'v>,
-        lowerer: &mut AnalysisValueLowerer<'v>,
-    ) -> Result<slug_build_api_v2::AnalysisValue, String> {
-        if !super::native::pure_candidate(
-            self.module,
-            &mut self.graph,
-            &mut self.remaining,
-            value,
-            0,
-        )? {
-            return Err("Args input contains unsupported callable or cyclic values".into());
-        }
-        let native = lowerer.lower(value, "Args input")?;
-        validate_atom(&native, &mut self.remaining, 0)?;
-        Ok(native)
-    }
-
     /// Audit all roots the actual mutable module freeze will retain. Extra scratch
     /// roots are separately sanitized by the publication owner before freezing.
     pub(super) fn audit_module(
@@ -116,11 +87,30 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
             })
             .map_err(|e| e.to_string())
     }
-    pub(super) fn finish(self) -> Result<CallableGraph, String> {
-        self.graph.finish().map_err(|e| e.to_string())
+    pub(super) fn finish(self) -> (PublishedValueArenaBuilder, Vec<Value<'v>>) {
+        (self.graph, self.roots)
+    }
+    fn edges(
+        &mut self,
+        nodes: &[PublishedNodeId],
+    ) -> Result<slug_build_api_v2::published_value::PublishedEdgeRange, String> {
+        let edges = nodes
+            .iter()
+            .copied()
+            .map(slug_build_api_v2::published_value::PublishedEdge::Local)
+            .collect::<Vec<_>>();
+        self.graph.append_edges(&edges).map_err(|e| e.to_string())
+    }
+    pub(super) fn add_value(
+        &mut self,
+        value: Value<'v>,
+        lowerer: &mut AnalysisValueLowerer<'v>,
+    ) -> Result<PublishedNodeId, String> {
+        self.value(value, lowerer, 0)
     }
     fn step(&mut self, depth: usize) -> Result<(), String> {
         self.graph.observe_depth(depth).map_err(|e| e.to_string())?;
+        self.graph.charge_visit().map_err(|e| e.to_string())?;
         self.remaining = self
             .remaining
             .checked_sub(1)
@@ -133,7 +123,7 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
             .map_err(|e| e.to_string())?;
         Ok(text.into())
     }
-    fn set(&mut self, id: CallableNodeId, node: CallableNode) -> Result<(), String> {
+    fn set(&mut self, id: PublishedNodeId, node: PublishedNode) -> Result<(), String> {
         self.graph.set_node(id, node).map_err(|e| e.to_string())
     }
     fn value(
@@ -141,13 +131,46 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
         value: Value<'v>,
         lowerer: &mut AnalysisValueLowerer<'v>,
         depth: usize,
-    ) -> Result<CallableNodeId, String> {
-        self.step(depth)?;
+    ) -> Result<PublishedNodeId, String> {
+        // One paid encounter owns at most one new ordinary value row. A memo
+        // hit drops the borrow without refund or storage allocation.
+        let mut record = self.graph.begin_record(depth).map_err(|e| e.to_string())?;
+        self.remaining = match self.remaining.checked_sub(1) {
+            Some(remaining) => remaining,
+            None => {
+                record.abort();
+                return Err("Args callable inspection visit limit".into());
+            }
+        };
         if let Some(id) = self.values.get(&value.identity()) {
             return Ok(*id);
         }
-        let id = self.graph.reserve().map_err(|e| e.to_string())?;
-        self.values.insert(value.identity(), id); // before descendants, preserving cycles
+        // Preserve both existing aggregate pre-copy credits BEFORE the row and
+        // slot arrays can grow. The token exposes only byte admission, not its
+        // mutable owner or a reusable prepaid reservation.
+        if let Err(error) = self.value_credit.map::<ValueIdentity<'v>, PublishedNodeId>(
+            &mut record.producer_scratch(),
+            self.values.len().saturating_add(1),
+        ) {
+            record.abort();
+            return Err(error);
+        }
+        if let Err(error) = self
+            .root_credit
+            .vector::<Value<'v>>(&mut record, self.roots.len().saturating_add(1))
+        {
+            record.abort();
+            return Err(error);
+        }
+        let id = record.reserve().map_err(|e| e.to_string())?;
+        self.bind_reserved_value(value, id)?;
+        if self.depset(value, id, lowerer, depth)? {
+            return Ok(id);
+        }
+        if let Some(constructor) = slug_loading_v2::provider::provider_constructor_view(value) {
+            self.provider_constructor(id, constructor, lowerer, depth + 1)?;
+            return Ok(id);
+        }
         if let Some(function) = inspect_def(value, Some(self.module)) {
             let parameters = self
                 .parameters(function.parameters(), lowerer, depth + 1)
@@ -172,6 +195,11 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                     *cell
                 } else {
                     let cell = self.graph.reserve().map_err(|e| e.to_string())?;
+                    self.value_credit
+                        .map::<ValueIdentity<'v>, PublishedNodeId>(
+                            &mut self.graph.producer_scratch(),
+                            self.values.len().saturating_add(1),
+                        )?;
                     self.values.insert(capture.cell.identity(), cell);
                     let contents = capture
                         .contents
@@ -185,19 +213,24 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                             })
                         })
                         .transpose()?;
-                    self.set(cell, CallableNode::Cell { contents })?;
+                    self.set(
+                        cell,
+                        PublishedNode::Cell {
+                            contents: contents
+                                .map(slug_build_api_v2::published_value::PublishedEdge::Local),
+                        },
+                    )?;
                     cell
                 };
                 captures.push(cell);
             }
-            let captures = self
-                .graph
-                .append_edges(&captures)
-                .map_err(|e| e.to_string())?;
+            let captures = self.edges(&captures)?;
             let code = self.code(function.code(), lowerer, depth + 1)?;
+            let symbol = self.function_symbol(value, depth + 1)?;
             self.set(
                 id,
-                CallableNode::Function(CallableFunction {
+                PublishedNode::Function(PublishedFunction {
+                    symbol,
                     code,
                     parameters: parameters.into(),
                     return_annotation: None,
@@ -206,6 +239,17 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                 }),
             )?;
         } else if let Some(node) = self.native_callable(value, lowerer, depth + 1)? {
+            self.set(id, node)?;
+        } else if let Some(node) = self.frontier(value, lowerer, depth + 1)? {
+            self.set(id, node)?;
+        } else if ListRef::from_value(value).is_some()
+            || SetRef::unpack_value_opt(value).is_some()
+            || TupleRef::from_value(value).is_some()
+            || DictRef::from_value(value).is_some()
+            || StructRef::from_value(value).is_some()
+            || provider_header(value).is_some()
+        {
+            let node = self.container(value, lowerer, depth + 1)?;
             self.set(id, node)?;
         } else {
             // This bounded borrowed audit runs BEFORE lowerer creates native copies.
@@ -217,195 +261,39 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                 depth + 1,
             )?;
             if pure {
-                if let Ok(native) = lowerer.lower(value, "Args callback native capture") {
-                    if validate_atom(&native, &mut self.remaining, depth + 1).is_ok() {
-                        self.set(id, CallableNode::Native(native))?;
-                        return Ok(id);
-                    }
-                }
+                let native = lowerer.lower(value, "published native value")?;
+                let atom = self.graph.native_atom(native).map_err(|e| e.to_string())?;
+                self.set(id, PublishedNode::Native(atom))?;
+                return Ok(id);
             }
             let node = self.container(value, lowerer, depth + 1)?;
             self.set(id, node)?;
         }
         Ok(id)
     }
-    fn parameters(
-        &mut self,
-        parameters: impl ExactSizeIterator<Item = DefParameter<'v>>,
-        lowerer: &mut AnalysisValueLowerer<'v>,
-        depth: usize,
-    ) -> Result<Vec<CallableParameter>, String> {
-        if parameters.len() > CALLABLE_GRAPH_NODE_LIMIT {
-            return Err("Args parameter count limit".into());
-        }
-        self.graph
-            .charge_bytes(
-                parameters
-                    .len()
-                    .saturating_mul(std::mem::size_of::<CallableParameter>()),
-            )
-            .map_err(|e| e.to_string())?;
-        let mut result = Vec::new();
-        for parameter in parameters {
-            self.step(depth)?;
-            if parameter.annotation.is_some() {
-                return Err("Args callable parameter annotations are unsupported".into());
-            }
-            let requirement = match parameter.requirement {
-                ParameterRequirement::Required => CallableParameterRequirement::Required,
-                ParameterRequirement::Optional => CallableParameterRequirement::Optional,
-                ParameterRequirement::Defaulted(value) => CallableParameterRequirement::Defaulted(
-                    self.value(value, lowerer, depth + 1).map_err(|error| {
-                        format!("Args parameter {} default: {error}", parameter.name)
-                    })?,
-                ),
-                ParameterRequirement::Variadic => CallableParameterRequirement::Variadic,
-            };
-            let mode = match parameter.style {
-                ParameterStyle::PositionalOnly => CallableParameterMode::PositionalOnly,
-                ParameterStyle::PositionalOrNamed => CallableParameterMode::PositionalOrNamed,
-                ParameterStyle::NamedOnly => CallableParameterMode::NamedOnly,
-                ParameterStyle::Args => CallableParameterMode::Args,
-                ParameterStyle::Kwargs => CallableParameterMode::Kwargs,
-            };
-            result.push(CallableParameter {
-                name: self.text(parameter.name)?,
-                mode,
-                requirement,
-                annotation: None,
-            });
-        }
-        Ok(result)
+    fn reserve_value(&mut self, value: Value<'v>) -> Result<PublishedNodeId, String> {
+        self.value_credit
+            .map::<ValueIdentity<'v>, PublishedNodeId>(
+                &mut self.graph.producer_scratch(),
+                self.values.len().saturating_add(1),
+            )?;
+        self.root_credit
+            .vector::<Value<'v>>(&mut self.graph, self.roots.len().saturating_add(1))?;
+        let id = self.graph.reserve().map_err(|e| e.to_string())?;
+        self.bind_reserved_value(value, id)?;
+        Ok(id)
     }
-    fn code(
-        &mut self,
-        code: DefCodeInspection<'v>,
-        lowerer: &mut AnalysisValueLowerer<'v>,
-        depth: usize,
-    ) -> Result<CallableCode, String> {
-        self.step(depth)?;
-        let source = self.sources.authority(
-            code.original_module_client_data(),
-            code.source(),
-            &mut self.graph,
-            &mut self.remaining,
-        )?;
-        let name = self.text(code.name())?;
-        let span = code.signature_span().span;
-        let mut budget = InspectionBudget {
-            remaining_nodes: self.remaining,
-            maximum_depth: CALLABLE_GRAPH_DEPTH_LIMIT.saturating_sub(depth),
-        };
-        // Engine streams exhaustively. This bounded host scratch queue permits
-        // recursive callable expansion after releasing the walker's budget borrow.
-        let mut events = Vec::new();
-        code.visit_dependencies(&mut budget, &mut |event| {
-            if events.len() >= CALLABLE_GRAPH_EDGE_LIMIT {
-                return Err(host_error("Args dependency event limit".into()));
-            }
-            events.push(event);
-            Ok(())
-        })
-        .map_err(|e| e.to_string())?;
-        self.remaining = budget.remaining_nodes;
-        let mut dependencies = Vec::new();
-        let mut globals = Vec::new();
-        for event in events {
-            match event {
-                DefDependency::ModuleSymbol {
-                    name,
-                    value,
-                    access,
-                } => {
-                    let name = self.text(name)?;
-                    let value = value
-                        .map(|value| {
-                            self.value(value, lowerer, depth + 1).map_err(|error| {
-                                let provider = slug_loading_v2::provider::starlark_provider_identity(value);
-                                format!(
-                                    "Args callable {} global {name} (provider constructor {provider:?}): {error}",
-                                    code.name()
-                                )
-                            })
-                        })
-                        .transpose()?;
-                    let access = match access {
-                        ModuleAccess::Read => CallableGlobalAccess::Read,
-                        ModuleAccess::Write => CallableGlobalAccess::Write,
-                        ModuleAccess::ReadWrite => CallableGlobalAccess::ReadWrite,
-                    };
-                    globals.push(CallableGlobal {
-                        name,
-                        access,
-                        value,
-                    });
-                }
-                DefDependency::Constant(value) => {
-                    dependencies.push(self.value(value, lowerer, depth + 1).map_err(|error| {
-                        format!(
-                            "Args callable {} constant {}: {error}",
-                            code.name(),
-                            bounded_value_class(value)
-                        )
-                    })?)
-                }
-                DefDependency::NativeFunction(native) => {
-                    dependencies.push(self.value(native.value(), lowerer, depth + 1).map_err(
-                        |error| format!("Args callable {} native dependency: {error}", code.name()),
-                    )?)
-                }
-                DefDependency::Type(_) => {
-                    return Err(
-                        "Args callable compiled annotation/type values are unsupported".into(),
-                    );
-                }
-                DefDependency::Source(span) => self.sources.verify_source(
-                    &source,
-                    span.file,
-                    &mut self.graph,
-                    &mut self.remaining,
-                )?,
-                DefDependency::NestedCode(nested) => {
-                    self.step(depth + 1)?;
-                    let authority = self.sources.authority(
-                        nested.original_module_client_data(),
-                        nested.source(),
-                        &mut self.graph,
-                        &mut self.remaining,
-                    )?;
-                    let id = self.graph.reserve().map_err(|e| e.to_string())?;
-                    let span = nested.signature_span().span;
-                    let empty = self.graph.append_edges(&[]).map_err(|e| e.to_string())?;
-                    let node = CallableNode::Code(CallableCode {
-                        source: authority,
-                        name: self.text(nested.name())?,
-                        definition: CallableDefinitionSpan {
-                            start: span.begin().get(),
-                            end: span.end().get(),
-                        },
-                        dependencies: empty,
-                        globals: Arc::from([]),
-                    });
-                    self.set(id, node)?;
-                    dependencies.push(id);
-                    // The enclosing Engine walk already visits this nested body's dependencies.
-                }
-            }
-        }
-        let dependencies = self
-            .graph
-            .append_edges(&dependencies)
+    /// Bind only after the selected caller has admitted map/root peaks and its
+    /// ordinary or encounter-composed row. Typed depset frames keep reserve_value.
+    fn bind_reserved_value(&mut self, value: Value<'v>, id: PublishedNodeId) -> Result<(), String> {
+        let slot = slug_build_api_v2::published_value::PublishedRootSlot::new(self.roots.len())
             .map_err(|e| e.to_string())?;
-        Ok(CallableCode {
-            source,
-            name,
-            definition: CallableDefinitionSpan {
-                start: span.begin().get(),
-                end: span.end().get(),
-            },
-            dependencies,
-            globals: globals.into(),
-        })
+        self.values.insert(value.identity(), id);
+        self.roots.push(value);
+        self.graph
+            .set_original_slot(id, slot)
+            .map_err(|e| e.to_string())?;
+        Ok(())
     }
     fn membership(&mut self, count: usize) -> Result<(), String> {
         if count > CALLABLE_GRAPH_EDGE_LIMIT || count > self.remaining {
@@ -420,17 +308,23 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
         value: Value<'v>,
         lowerer: &mut AnalysisValueLowerer<'v>,
         depth: usize,
-    ) -> Result<CallableNode, String> {
+    ) -> Result<PublishedNode, String> {
         self.step(depth)?;
+        if let Some(set) = SetRef::unpack_value_opt(value) {
+            self.membership(set.len())?;
+            let mut edges = Vec::with_capacity(set.len());
+            for child in set.iter() {
+                edges.push(self.value(child, lowerer, depth + 1)?);
+            }
+            return Ok(PublishedNode::Set(self.edges(&edges)?));
+        }
         if let Some(list) = ListRef::from_value(value) {
             self.membership(list.content().len())?;
             let mut edges = Vec::new();
             for child in list.iter() {
                 edges.push(self.value(child, lowerer, depth + 1)?);
             }
-            return Ok(CallableNode::List(
-                self.graph.append_edges(&edges).map_err(|e| e.to_string())?,
-            ));
+            return Ok(PublishedNode::List(self.edges(&edges)?));
         }
         if let Some(tuple) = TupleRef::from_value(value) {
             self.membership(tuple.len())?;
@@ -438,9 +332,7 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
             for child in tuple.iter() {
                 edges.push(self.value(child, lowerer, depth + 1)?);
             }
-            return Ok(CallableNode::Tuple(
-                self.graph.append_edges(&edges).map_err(|e| e.to_string())?,
-            ));
+            return Ok(PublishedNode::Tuple(self.edges(&edges)?));
         }
         if let Some(dict) = DictRef::from_value(value) {
             self.membership(dict.iter().len().saturating_mul(2))?;
@@ -449,9 +341,7 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                 edges.push(self.value(k, lowerer, depth + 1)?);
                 edges.push(self.value(v, lowerer, depth + 1)?);
             }
-            return Ok(CallableNode::Dict(
-                self.graph.append_edges(&edges).map_err(|e| e.to_string())?,
-            ));
+            return Ok(PublishedNode::Dictionary(self.edges(&edges)?));
         }
         if let Some(fields) = StructRef::from_value(value) {
             self.membership(fields.iter().len())?;
@@ -461,26 +351,41 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
                 names.push(self.text(name.as_str())?);
                 edges.push(self.value(v, lowerer, depth + 1)?);
             }
-            return Ok(CallableNode::Struct {
+            return Ok(PublishedNode::Struct {
                 names: names.into(),
-                values: self.graph.append_edges(&edges).map_err(|e| e.to_string())?,
+                values: self.edges(&edges)?,
             });
         }
-        if let Some((identity, fields)) = provider_fields(value) {
-            self.membership(fields.len())?;
-            let mut names = Vec::new();
-            let mut edges = Vec::new();
-            for (name, v) in fields {
-                names.push(self.text(&name)?);
-                edges.push(self.value(v, lowerer, depth + 1)?);
+        if let Some((identity, count, has_schema, hidden)) = provider_header(value) {
+            self.membership(count)?;
+            let mut fields = Vec::with_capacity(count);
+            visit_provider_fields(value, &mut |name, child| {
+                fields.push((self.text(name)?, child));
+                Ok(())
+            })?;
+            fields.sort_by(|(a, _), (b, _)| a.cmp(b));
+            let mut names = Vec::with_capacity(count);
+            let mut edges = Vec::with_capacity(count);
+            for (name, child) in fields {
+                names.push(name);
+                edges.push(self.value(child, lowerer, depth + 1)?);
             }
-            return Ok(CallableNode::Provider {
-                identity,
-                names: names.into(),
-                values: self.graph.append_edges(&edges).map_err(|e| e.to_string())?,
-                has_schema: slug_loading_v2::provider::starlark_user_provider_has_schema(value)
-                    .unwrap_or(false),
-            });
+            let files_to_run = hidden
+                .map(|value| {
+                    self.graph
+                        .files_to_run_atom_borrowed(value)
+                        .map_err(|e| e.to_string())
+                })
+                .transpose()?;
+            return Ok(PublishedNode::Provider(
+                slug_build_api_v2::published_value::PublishedProvider {
+                    identity,
+                    names: names.into(),
+                    values: self.edges(&edges)?,
+                    has_schema,
+                    files_to_run,
+                },
+            ));
         }
         Err(format!(
             "Args capture contains an unsupported value/capability of type `{}` ({})",
@@ -492,9 +397,22 @@ impl<'v> ArgsCallableGraphBuilder<'v> {
 use diagnostic::bounded_value_class;
 use diagnostic::host_error;
 pub(super) use diagnostic::provider_fields;
+use diagnostic::provider_header;
+use diagnostic::visit_provider_fields;
 
 #[cfg(test)]
 mod tests;
 
+mod compiled;
 mod diagnostic;
+mod frontier;
 mod native_callable;
+mod provider_constructor;
+
+mod depset;
+
+mod storage;
+
+#[cfg(test)]
+#[path = "graph/record_tests.rs"]
+mod record_tests;

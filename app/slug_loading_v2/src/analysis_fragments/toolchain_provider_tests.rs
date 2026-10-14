@@ -89,22 +89,13 @@ fn evaluate_module(
         workspace_path: PathBuf::from(FILE),
         repository_mapping: Arc::from([]),
     };
-    crate::starlark_label::attach_defining_module_context(&module, &identity)?;
-    let context = BzlEvaluationContext::macro_runtime_context(
-        identity.clone(),
-        Arc::from([(
-            CompactString::new(FILE),
-            BzlModuleSourceProvenance::new(identity, [0; 32]),
-        )]),
-    );
+    let ast = AstModule::parse(FILE, source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let prepared = crate::bzl_module::test_source::prepare(&module, &ast, identity, &[]).unwrap();
     let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(FILE, source.to_owned(), &Dialect::Bazel)
-            .map_err(starlark::Error::into_anyhow)?,
-        &loading_globals(),
-    )
-    .map_err(starlark::Error::into_anyhow)?;
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals())
+        .map_err(starlark::Error::into_anyhow)?;
     drop(eval);
     module.freeze().map_err(anyhow::Error::from)
 }

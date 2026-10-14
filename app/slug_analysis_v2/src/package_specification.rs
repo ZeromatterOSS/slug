@@ -133,6 +133,11 @@ pub(crate) fn alloc(heap: &FrozenHeap, info: PackageSpecificationInfo) -> Frozen
     heap.alloc(PackageSpecificationValue(info))
 }
 
+/// Borrow the complete native model before any retained depset handle clone.
+pub(crate) fn from_value_ref<'v>(value: Value<'v>) -> Option<&'v PackageSpecificationInfo> {
+    Some(&PackageSpecificationValue::from_value(value)?.0)
+}
+
 pub(crate) fn from_value(value: Value<'_>) -> Option<PackageSpecificationInfo> {
     PackageSpecificationValue::from_value(value).map(|value| value.0.clone())
 }

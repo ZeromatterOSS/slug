@@ -75,30 +75,28 @@ fn native_tree_query_classifies_genuine_artifacts_with_positional_only_binder() 
 fn layout_query(label: Option<&str>, source: &str) -> anyhow::Result<String> {
     let module = Module::new();
     module.set("CONFIG", alloc_configuration(module.heap(), config(true))?);
-    let context = label.map(|label| {
-        let identity = crate::BzlModuleIdentity {
-            label: CanonicalLabel::parse(label).unwrap(),
-            workspace_path: std::path::PathBuf::from("layout.bzl"),
-            repository_mapping: Arc::from([]),
-        };
-        BzlEvaluationContext::macro_runtime_context(
-            identity.clone(),
-            Arc::from([(
-                compact_str::CompactString::new("layout.bzl"),
-                crate::BzlModuleSourceProvenance::new(identity, [0; 32]),
-            )]),
-        )
-    });
+    let ast = AstModule::parse("layout.bzl", source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let prepared = label
+        .map(|label| {
+            crate::bzl_module::test_source::prepare(
+                &module,
+                &ast,
+                crate::BzlModuleIdentity {
+                    label: CanonicalLabel::parse(label).unwrap(),
+                    workspace_path: "layout.bzl".into(),
+                    repository_mapping: Arc::from([]),
+                },
+                &[],
+            )
+        })
+        .transpose()?;
     let mut eval = Evaluator::new(&module);
-    if let Some(context) = &context {
-        eval.extra = Some(context);
+    if let Some(prepared) = &prepared {
+        eval.extra = Some(prepared.context());
     }
-    eval.eval_module(
-        AstModule::parse("layout.bzl", source.to_owned(), &Dialect::Bazel)
-            .map_err(starlark::Error::into_anyhow)?,
-        &loading_globals(),
-    )
-    .map_err(starlark::Error::into_anyhow)?;
+    eval.eval_module(ast, &loading_globals())
+        .map_err(starlark::Error::into_anyhow)?;
     Ok(module.get("result").unwrap().to_repr())
 }
 
@@ -120,8 +118,20 @@ fn fixed_nonsibling_layout_uses_current_default_allowlist_and_preserves_coverage
             .to_string()
             .contains("source-sensitive builtin")
     );
+    // File evaluation has an implicit Starlark frame in Bazel. Genuine
+    // allowed original-module metadata therefore admits the module-scope call.
+    let module_scope = "result = [CONFIG.is_sibling_repository_layout(), CONFIG.coverage_enabled]";
+    assert_eq!(
+        layout_query(Some("@@rules_cc+//cc/private:layout.bzl"), module_scope).unwrap(),
+        "[False, True]"
+    );
+    assert!(
+        layout_query(None, "result = CONFIG.is_sibling_repository_layout()")
+            .unwrap_err()
+            .to_string()
+            .contains("source-sensitive builtin")
+    );
     for code in [
-        "result = CONFIG.is_sibling_repository_layout()",
         "def read(c):\n    return c.is_sibling_repository_layout(True)\nresult = read(CONFIG)",
         "def read(c):\n    return c.is_sibling_repository_layout(extra=True)\nresult = read(CONFIG)",
         "CONFIG.is_sibling_repository_layout = False\nresult = None",

@@ -10,14 +10,14 @@ use crate::AnalysisArtifact;
 use crate::AnalysisDepset;
 use crate::AnalysisValue;
 use crate::AnalysisValueKind;
+use crate::PublishedValueError;
+use crate::PublishedValueRef;
 use crate::analysis_value::PublicationEqState;
 use crate::callable_graph::CALLABLE_GRAPH_BYTE_LIMIT;
 use crate::callable_graph::CALLABLE_GRAPH_DEPTH_LIMIT;
 use crate::callable_graph::CALLABLE_GRAPH_EDGE_LIMIT;
 use crate::callable_graph::CALLABLE_GRAPH_NODE_LIMIT;
 use crate::callable_graph::CallableGraph;
-use crate::callable_graph::CallableGraphError;
-use crate::callable_graph::CallableNodeId;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ArgsExpansionError {
@@ -96,31 +96,31 @@ pub trait RuntimeMapper: fmt::Debug + Send + Sync {
 pub struct RetainedArgsMapper(Arc<RetainedArgsMapperData>);
 #[derive(Debug, Allocative)]
 struct RetainedArgsMapperData {
-    graph: CallableGraph,
-    root: CallableNodeId,
+    callable: PublishedValueRef,
     // The foreign executable heap has its own lifetime/accounting owner. Only
     // the native descriptor participates in semantic equality.
     #[allocative(skip)]
     runtime: Arc<dyn RuntimeMapper>,
 }
 impl RetainedArgsMapper {
-    pub fn new(
-        graph: CallableGraph,
-        root: CallableNodeId,
+    pub fn from_published(
+        callable: PublishedValueRef,
         runtime: Arc<dyn RuntimeMapper>,
-    ) -> Result<Self, CallableGraphError> {
-        graph.validate_root(root)?;
-        Ok(Self(Arc::new(RetainedArgsMapperData {
-            graph,
-            root,
-            runtime,
-        })))
+    ) -> Result<Self, PublishedValueError> {
+        callable.arena().validate_root(callable.node_id())?;
+        if callable.original_slot().is_none() {
+            return Err(PublishedValueError::Invalid("mapper original root"));
+        }
+        Ok(Self(Arc::new(RetainedArgsMapperData { callable, runtime })))
+    }
+    pub fn published_callable(&self) -> &PublishedValueRef {
+        &self.0.callable
     }
     pub fn graph(&self) -> &CallableGraph {
-        &self.0.graph
+        self.0.callable.arena()
     }
-    pub fn root(&self) -> CallableNodeId {
-        self.0.root
+    pub fn root(&self) -> crate::PublishedNodeId {
+        self.0.callable.node_id()
     }
     pub fn map_batch(
         &self,
@@ -131,8 +131,8 @@ impl RetainedArgsMapper {
     }
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         self.0
-            .graph
-            .publication_eq_with(self.0.root, &other.0.graph, other.0.root, state)
+            .callable
+            .publication_eq_with(&other.0.callable, state)
     }
 }
 impl PartialEq for RetainedArgsMapper {
@@ -203,6 +203,7 @@ impl Eq for RetainedArgsInputs {}
 pub(crate) struct NativeArgsBudget {
     visits: usize,
     bytes: usize,
+    arenas: fxhash::FxHashSet<crate::PublishedArenaIdentity>,
 }
 impl NativeArgsBudget {
     pub(crate) fn bytes(&self) -> usize {
@@ -226,6 +227,34 @@ impl NativeArgsBudget {
                 return Err(ArgsExpansionError::Limit("native input graph".into()));
             }
             let mut bytes = std::mem::size_of::<AnalysisValue>();
+            if let Some(origin) = value.original_origin() {
+                if origin.original_slot().is_none() {
+                    return Err(ArgsExpansionError::Unsupported(
+                        "input original slot missing".into(),
+                    ));
+                }
+                if self.arenas.insert(origin.arena().identity()) {
+                    let shape = origin.arena().shape();
+                    self.visits = self
+                        .visits
+                        .checked_add(shape.visits)
+                        .ok_or_else(|| ArgsExpansionError::Limit("native arena visits".into()))?;
+                    if self.visits > CALLABLE_GRAPH_NODE_LIMIT
+                        || shape.edges > CALLABLE_GRAPH_EDGE_LIMIT
+                    {
+                        return Err(ArgsExpansionError::Limit("native arena graph".into()));
+                    }
+                    bytes = bytes
+                        .checked_add(shape.bytes)
+                        .ok_or_else(|| ArgsExpansionError::Limit("native arena bytes".into()))?;
+                }
+                self.bytes = self
+                    .bytes
+                    .checked_add(bytes)
+                    .filter(|n| *n <= CALLABLE_GRAPH_BYTE_LIMIT)
+                    .ok_or_else(|| ArgsExpansionError::Limit("native input bytes".into()))?;
+                continue;
+            }
             match value.kind() {
                 AnalysisValueKind::String(s) => bytes = bytes.saturating_add(s.len()),
                 AnalysisValueKind::Number(n) => {
@@ -271,14 +300,49 @@ impl NativeArgsBudget {
                     }
                 }
                 AnalysisValueKind::Depset(set) => {
-                    let stats = set.storage_stats();
-                    if stats.nodes > CALLABLE_GRAPH_NODE_LIMIT
-                        || stats.successors > CALLABLE_GRAPH_EDGE_LIMIT
-                        || stats.estimated_bytes > CALLABLE_GRAPH_BYTE_LIMIT
-                    {
-                        return Err(ArgsExpansionError::Limit("native depset graph".into()));
+                    use crate::DepsetStorageEvent;
+                    if depth.saturating_add(set.depth()) > CALLABLE_GRAPH_DEPTH_LIMIT {
+                        return Err(ArgsExpansionError::Limit("native depset depth".into()));
                     }
-                    set.visit(|child| self.audit_at(child, depth + 1))?;
+                    set.visit_storage_bounded(|event| match event {
+                        DepsetStorageEvent::Charge(c) => {
+                            self.visits = self
+                                .visits
+                                .checked_add(c.visits)
+                                .filter(|n| *n <= CALLABLE_GRAPH_NODE_LIMIT)
+                                .ok_or_else(|| {
+                                    ArgsExpansionError::Limit("native depset work".into())
+                                })?;
+                            self.bytes = self
+                                .bytes
+                                .checked_add(c.bytes)
+                                .filter(|n| *n <= CALLABLE_GRAPH_BYTE_LIMIT)
+                                .ok_or_else(|| {
+                                    ArgsExpansionError::Limit("native depset bytes".into())
+                                })?;
+                            if c.nodes > CALLABLE_GRAPH_NODE_LIMIT
+                                || c.edges > CALLABLE_GRAPH_EDGE_LIMIT
+                            {
+                                return Err(ArgsExpansionError::Limit(
+                                    "native depset graph".into(),
+                                ));
+                            }
+                            Ok(())
+                        }
+                        DepsetStorageEvent::Node {
+                            depth: node_depth, ..
+                        } => {
+                            if depth.saturating_add(node_depth) > CALLABLE_GRAPH_DEPTH_LIMIT {
+                                Err(ArgsExpansionError::Limit("native depset depth".into()))
+                            } else {
+                                Ok(())
+                            }
+                        }
+                        DepsetStorageEvent::Value {
+                            value,
+                            depth: node_depth,
+                        } => self.audit_at(value, depth.saturating_add(node_depth)),
+                    })?;
                 }
                 AnalysisValueKind::ConfiguredTarget(target) => {
                     for (_, provider) in target.providers().iter() {
@@ -295,10 +359,12 @@ impl NativeArgsBudget {
                         "RunEnvironmentInfo requires a borrowed Args metadata audit".into(),
                     ));
                 }
-                AnalysisValueKind::RustToolchainCallable(_)
-                | AnalysisValueKind::CcToolchainCallable(_) => {
+                AnalysisValueKind::Function(_)
+                | AnalysisValueKind::ProviderConstructor(_)
+                | AnalysisValueKind::RawProviderConstructor(_)
+                | AnalysisValueKind::Runfiles(_) => {
                     return Err(ArgsExpansionError::Unsupported(
-                        "native callable proxy input".into(),
+                        "callable/runfiles native input requires original arena admission".into(),
                     ));
                 }
                 _ => {}

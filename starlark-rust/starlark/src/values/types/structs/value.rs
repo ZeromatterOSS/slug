@@ -73,6 +73,10 @@ unsafe impl<'v> ProvidesStaticType<'v> for &'v dyn StarlarkStructuralValue {
 
 #[doc(hidden)]
 pub fn starlark_structural_is_immutable(value: Value<'_>) -> bool {
+    // Actual function immutability does not hash or alter its export state.
+    if crate::eval::is_starlark_def(value) {
+        return true;
+    }
     if let Some(value) = value.request_value::<&dyn StarlarkStructuralValue>() {
         return value.is_structurally_immutable();
     }

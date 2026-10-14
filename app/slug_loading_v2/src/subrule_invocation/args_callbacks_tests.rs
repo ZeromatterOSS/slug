@@ -15,7 +15,10 @@ fn gc_helpers(builder: &mut GlobalsBuilder) {
     fn collect(eval: &mut Evaluator<'_, '_, '_>) -> anyhow::Result<NoneType> {
         // The native call runs with an initialized bytecode frame and holds no
         // argument Values across collection; the module traces snapshot roots.
-        unsafe { eval.garbage_collect() };
+        unsafe {
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?
+        };
         Ok(NoneType)
     }
 }
@@ -204,7 +207,7 @@ args.add_all([{"member": "retained"}], map_each = mapper)
     );
     let old_roots = TupleRef::from_value(module.extra_value().unwrap())
         .unwrap()
-        .content()[..5]
+        .content()[..3]
         .to_vec();
     let snapshot = args_snapshot(&module, &token).unwrap();
     let EvaluatorArgCallGen::AddAll(vector) = &snapshot.calls[0] else {
@@ -243,7 +246,7 @@ args.add_all([{"member": "retained"}], map_each = mapper)
     assert!(
         old_roots
             .iter()
-            .zip(&roots.content()[..5])
+            .zip(&roots.content()[..3])
             .all(|(old, current)| old.ptr_eq(*current))
     );
     // Replace with a fresh collector: phase indexes alone must not authorize stale tokens.

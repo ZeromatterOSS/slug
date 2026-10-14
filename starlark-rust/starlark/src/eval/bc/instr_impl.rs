@@ -1739,7 +1739,7 @@ impl InstrNoFlowImpl for InstrPossibleGcImpl {
         (): &(),
     ) -> crate::Result<()> {
         eval.run_infrequent_instr_checks()?;
-        possible_gc(eval);
+        possible_gc(eval)?;
         Ok(())
     }
 }

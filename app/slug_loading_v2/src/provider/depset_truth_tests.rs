@@ -17,7 +17,10 @@ fn gc_helpers(builder: &mut GlobalsBuilder) {
     fn collect(eval: &mut Evaluator<'_, '_, '_>) -> anyhow::Result<NoneType> {
         // Called by actual bytecode with an initialized frame; the depset graph
         // and empty cache are owned by traced evaluator/module roots.
-        unsafe { eval.garbage_collect() };
+        unsafe {
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?
+        };
         Ok(NoneType)
     }
 }
@@ -192,3 +195,6 @@ fn native_views_use_empty_type_facts_even_with_opaque_successors_or_supplied_dep
             .to_bool()
     );
 }
+
+#[path = "depset_lifecycle_tests.rs"]
+mod lifecycle_tests;

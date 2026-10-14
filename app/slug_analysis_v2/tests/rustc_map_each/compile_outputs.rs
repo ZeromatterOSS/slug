@@ -133,7 +133,7 @@ async fn compile_configuration_facade_publication_remains_unsupported() {
             .await
             .unwrap_err();
     assert!(
-        error.contains("unsupported analysis value of type `configuration`"),
+        error.contains("unsupported value/capability of type `configuration`"),
         "{error}"
     );
     fs::remove_dir_all(root).unwrap();

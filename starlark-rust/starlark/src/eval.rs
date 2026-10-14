@@ -20,6 +20,7 @@
 
 pub(crate) mod bc;
 pub(crate) mod compiler;
+mod function_symbol;
 mod params;
 pub(crate) mod runtime;
 pub(crate) mod soft_error;
@@ -44,6 +45,13 @@ pub use compiler::def::inspection::inspect_def;
 pub use compiler::def::inspection::inspect_native_bound_method;
 pub use compiler::def::inspection::inspect_native_function;
 use dupe::Dupe;
+pub use function_symbol::FunctionExportMode;
+pub use function_symbol::FunctionSymbolInspection;
+pub use function_symbol::FunctionSymbolOwner;
+pub use function_symbol::FunctionSymbolSession;
+pub use function_symbol::FunctionSymbolStateRef;
+pub use function_symbol::inspect_function_symbol;
+pub use function_symbol::is_starlark_def;
 pub use runtime::arguments::Arguments;
 pub use runtime::before_stmt::BeforeStmtFuncDyn;
 pub use runtime::evaluator::CallStackCheckpoint;

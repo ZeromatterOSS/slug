@@ -317,6 +317,7 @@ fn frozen_macro(source: &str) -> FrozenBzlModule {
         repository_mapping: Arc::from([]),
     };
     FrozenBzlModule {
+        semantic_inputs: None,
         module,
         path: PathBuf::from("/workspace/pkg/defs.bzl"),
         loads: Vec::new(),

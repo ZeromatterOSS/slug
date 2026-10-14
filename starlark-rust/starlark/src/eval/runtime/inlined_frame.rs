@@ -77,6 +77,14 @@ impl InlinedFrames {
         function
     }
 
+    pub(crate) fn functions_innermost_first(self) -> Vec<FrozenValue> {
+        self.to_inlined_frames()
+            .into_iter()
+            .rev()
+            .map(|frame| frame.fun)
+            .collect()
+    }
+
     /// Collect frames, bottom-to-top, same order as in `CallStack`.
     pub(crate) fn extend_frames(self, frames: &mut Vec<Frame>) {
         if let Some(f) = self.frames {

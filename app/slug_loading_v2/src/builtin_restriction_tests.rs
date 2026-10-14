@@ -53,7 +53,6 @@ impl AnalysisActionSink for NoopActionSink {
         unreachable!("caller-authentication proof declares no actions")
     }
 
-
     fn artifact_symlink(
         &self,
         _output: Value<'_>,
@@ -186,10 +185,26 @@ fn freeze_restriction_source(
     filename: &str,
     source: &str,
     context: &BzlEvaluationContext,
+    lexical_identity: &BzlModuleIdentity,
     loader: Option<&dyn FileLoader>,
 ) -> FrozenModule {
     let ast = AstModule::parse(filename, source.to_owned(), &Dialect::Bazel).unwrap();
     let module = Module::new();
+    let reachable = context
+        .source_identities_by_filename()
+        .iter()
+        .map(|(_, p)| p.clone())
+        .collect::<Vec<_>>();
+    crate::starlark_label::attach_defining_module_manifest(
+        &module,
+        &crate::BzlLoadManifest {
+            root: lexical_identity.clone(),
+            direct_children: Arc::from([]),
+            reachable: reachable.into(),
+            fingerprint: [0; 32],
+        },
+    )
+    .unwrap();
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(context);
     if let Some(loader) = loader {
@@ -239,10 +254,10 @@ fn custom_private_api_checks_tuple_coercion_depth_and_caller_identity() {
         ),
         (
             "denied.bzl".into(),
-            BzlModuleSourceProvenance::new(denied, [0; 32]),
+            BzlModuleSourceProvenance::new(denied.clone(), [0; 32]),
         ),
     ]);
-    let context = BzlEvaluationContext::macro_runtime_context(allowed, identities);
+    let context = BzlEvaluationContext::macro_runtime_context(allowed.clone(), identities);
     let allowed_module = freeze_restriction_source(
         "allowed.bzl",
         concat!(
@@ -267,6 +282,7 @@ fn custom_private_api_checks_tuple_coercion_depth_and_caller_identity() {
             "    return _cc_internal.check_private_api(allowlist = [(\"rules_cc\",)])\n",
         ),
         &context,
+        &allowed,
         None,
     );
 
@@ -306,6 +322,7 @@ fn custom_private_api_checks_tuple_coercion_depth_and_caller_identity() {
             "    return checked_default()\n",
         ),
         &context,
+        &denied,
         Some(&loader),
     );
     let error = invoke_restriction_function(&denied_module, "denied_caller", &context).unwrap_err();

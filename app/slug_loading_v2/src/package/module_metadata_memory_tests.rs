@@ -20,41 +20,41 @@ fn evaluate(
     } else {
         "metadata.bzl"
     };
+    let ast = AstModule::parse(filename, source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let module = Module::new();
+    let prepared = if mode != 0 && call_source {
+        Some(crate::bzl_module::test_source::prepare(
+            &module,
+            &ast,
+            BzlModuleIdentity {
+                label: CanonicalLabel::parse("@@dep+//:metadata.bzl").unwrap(),
+                workspace_path: filename.into(),
+                repository_mapping: Arc::from([]),
+            },
+            &[],
+        )?)
+    } else {
+        None
+    };
     let recorder = PackageRecorder::new(
         PackageListing::new(Vec::new(), Vec::new(), Vec::new(), Vec::new()),
         "",
     )
     .with_associated_module_metadata(metadata.map(|(name, version)| (name.into(), version.into())))
-    .with_bzl_call_sources(call_source.then(|| {
-        Arc::from([(
-            filename.into(),
-            BzlModuleSourceProvenance::new(
-                BzlModuleIdentity {
-                    label: CanonicalLabel::parse("@@dep+//:metadata.bzl").unwrap(),
-                    workspace_path: filename.into(),
-                    repository_mapping: Arc::from([]),
-                },
-                [0; 32],
-            ),
-        )])
-    }));
+    .with_bzl_call_sources(prepared.as_ref().map(|source| source.sources()));
     let globals = match mode {
         0 => build_file_loading_globals(),
         1 => loading_globals(),
         2 => bzlmod_loading_globals(),
         _ => unreachable!(),
     };
-    let module = Module::new();
     let mut evaluator = Evaluator::new(&module);
     if package_state {
         evaluator.extra = Some(&recorder);
     }
     evaluator
-        .eval_module(
-            AstModule::parse(filename, source.to_owned(), &Dialect::Bazel)
-                .map_err(starlark::Error::into_anyhow)?,
-            &globals,
-        )
+        .eval_module(ast, &globals)
         .map_err(starlark::Error::into_anyhow)?;
     assert_eq!(recorder.associated_module_metadata().ok(), metadata);
     drop(evaluator);

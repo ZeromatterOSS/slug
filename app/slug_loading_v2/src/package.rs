@@ -972,6 +972,8 @@ impl PartialEq for RetainedAttachedAspect {
 
 impl Eq for RetainedAttachedAspect {}
 
+mod owner_metadata;
+
 #[derive(Debug, Clone, Allocative)]
 pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
@@ -1024,6 +1026,21 @@ impl PartialEq for StarlarkRuleImplementation {
 impl Eq for StarlarkRuleImplementation {}
 
 impl StarlarkRuleImplementation {
+    /// Actual function facts for configured evaluation ownership only. The
+    /// original callable wrapper remains the execution entry point.
+    #[doc(hidden)]
+    pub fn owner_rule_function(&self) -> Option<FrozenValue> {
+        crate::subrule::owner_rule_function(self.implementation)
+    }
+
+    #[doc(hidden)]
+    pub fn owner_subrule_functions(&self) -> impl Iterator<Item = Option<FrozenValue>> + '_ {
+        self.subrule_callables
+            .iter()
+            .copied()
+            .map(crate::subrule::owner_subrule_function)
+    }
+
     pub fn frozen_value(&self) -> FrozenValue {
         self.implementation
     }
@@ -1488,39 +1505,16 @@ impl PackageRecorder {
         self
     }
 
-    pub(crate) fn label_source_identity_for_call<'a>(
-        eval: &'a Evaluator<'_, '_, '_>,
-    ) -> anyhow::Result<&'a BzlModuleIdentity> {
-        const DIRECT_ALIAS_ERROR: &str =
-            "Label() can only be used during .bzl initialization (top-level evaluation)";
-        let recorder = eval
-            .extra
-            .and_then(|extra| extra.downcast_ref::<Self>())
-            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
-        let filename = eval
-            .native_call_source_filename()
-            .or_else(|| eval.native_caller_function_filename())
-            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
-        let sources = recorder
-            .bzl_call_sources
-            .as_deref()
-            .ok_or_else(|| anyhow::anyhow!(DIRECT_ALIAS_ERROR))?;
-        let mut matches = sources.iter().filter_map(|(source, identity)| {
-            (source.as_str() == filename).then_some(&identity.identity)
-        });
-        let identity = matches.next().ok_or_else(|| {
-            if filename.ends_with(".bzl") {
+    pub(crate) fn label_source_identity_for_call<'v>(
+        eval: &Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<&'v BzlModuleIdentity> {
+        eval.native_call_defining_module_client_data()
+            .and_then(crate::starlark_label::defining_module_identity)
+            .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "Starlark caller source is not present in the recursive Bzl manifest: {filename}"
+                    "Label() can only be used during .bzl initialization (top-level evaluation)"
                 )
-            } else {
-                anyhow::anyhow!(DIRECT_ALIAS_ERROR)
-            }
-        })?;
-        if matches.next().is_some() {
-            anyhow::bail!("ambiguous Starlark caller in the Bzl manifest: {filename}");
-        }
-        Ok(identity)
+            })
     }
 
     #[cfg(test)]
@@ -13106,4 +13100,10 @@ ext = module_extension(
                 .is_err()
         );
     }
+}
+
+/// Actual source-independent Loading native registration table. Consumers must
+/// compare genuine Engine native wrappers and retain their actual defaults.
+pub fn callable_registration_globals() -> Globals {
+    loading_globals()
 }

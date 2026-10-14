@@ -36,7 +36,7 @@ use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::layout::avalue::AValue;
 use crate::values::layout::avalue::AValueImpl;
-use crate::values::layout::avalue::heap_copy_impl;
+use crate::values::layout::avalue::heap_copy_deferred;
 use crate::values::layout::avalue::try_freeze_directly;
 use crate::values::layout::heap::repr::AValueHeader;
 use crate::values::layout::heap::repr::AValueRepr;
@@ -95,7 +95,7 @@ where
         me: *mut AValueRepr<Self::StarlarkValue>,
         tracer: &Tracer<'v>,
     ) -> Value<'v> {
-        unsafe { heap_copy_impl::<Self>(me, tracer, Trace::trace) }
+        unsafe { heap_copy_deferred::<Self>(me, tracer) }
     }
 }
 
@@ -130,7 +130,7 @@ where
         me: *mut AValueRepr<Self::StarlarkValue>,
         tracer: &Tracer<'v>,
     ) -> Value<'v> {
-        unsafe { heap_copy_impl::<Self>(me, tracer, Trace::trace) }
+        unsafe { heap_copy_deferred::<Self>(me, tracer) }
     }
 }
 

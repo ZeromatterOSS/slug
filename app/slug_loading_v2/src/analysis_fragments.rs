@@ -824,3 +824,7 @@ impl<'v> StarlarkValue<'v> for SubruleFragmentCollection {
         self.declarations.iter().map(ToString::to_string).collect()
     }
 }
+
+pub fn cpp_fragment_ref(value: Value<'_>) -> Option<&RetainedCppFragment> {
+    Some(&CppFragmentValue::from_value(value)?.retained)
+}

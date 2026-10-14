@@ -232,3 +232,88 @@ CHECK = [X == Y, X != Z, OutputGroupInfo(x = []) == OutputGroupInfo(x = depset(o
             .is_builtin("OutputGroupInfo")
     );
 }
+
+#[test]
+fn borrowed_output_group_frontier_visits_all_mutable_and_frozen_fields_in_order() {
+    fn check<'v>(value: Value<'v>, shared: Value<'v>, heap: Heap<'v>) {
+        let header = provider_instance_header(value).unwrap();
+        assert!(matches!(
+            header.identity,
+            ProviderInstanceIdentityRef::Builtin("OutputGroupInfo")
+        ));
+        assert!(!header.has_schema);
+        assert_eq!(header.len, 4);
+        let mut names = Vec::new();
+        assert!(
+            visit_starlark_provider_fields(value, &mut |name, field| {
+                names.push(name.to_owned());
+                assert!(StarlarkDepset::from_value(field).is_some());
+                assert!(field.ptr_eq(value.get_attr(name, heap).unwrap().unwrap()));
+                if name != "empty" {
+                    assert!(field.ptr_eq(shared), "actual shared field edge");
+                }
+                Ok(())
+            })
+            .unwrap()
+        );
+        assert_eq!(names, ["empty", "files", "\u{10000}", "\u{e000}"]);
+        let mut visits = 0;
+        assert_eq!(
+            visit_starlark_provider_fields(value, &mut |_, _| {
+                visits += 1;
+                Err("field quota reached".into())
+            })
+            .unwrap_err(),
+            "field quota reached"
+        );
+        assert_eq!(visits, 1);
+    }
+    let module = Module::new();
+    module.set(
+        "F",
+        module
+            .heap()
+            .alloc(AnalysisArtifactValue::new(AnalysisArtifact::Source(
+                CanonicalLabel::parse("@@//pkg:input").unwrap(),
+            ))),
+    );
+    Evaluator::new(&module)
+        .eval_module(
+            AstModule::parse(
+                "borrowed_output_groups.bzl",
+                "shared = depset([F])\nX = OutputGroupInfo(**{'\\ue000': shared, '\\U00010000': shared, 'empty': [], 'files': shared})\nEMPTY = OutputGroupInfo()\n".into(),
+                &Dialect::Standard,
+            ).unwrap(),
+            &crate::package::loading_globals(),
+        ).unwrap();
+    check(
+        module.get("X").unwrap(),
+        module.get("shared").unwrap(),
+        module.heap(),
+    );
+    let empty = module.get("EMPTY").unwrap();
+    assert_eq!(provider_instance_header(empty).unwrap().len, 0);
+    assert!(
+        visit_starlark_provider_fields(empty, &mut |_, _| panic!("empty provider field")).unwrap()
+    );
+    assert!(provider_instance_header(Value::new_none()).is_none());
+    assert!(
+        !visit_starlark_provider_fields(Value::new_none(), &mut |_, _| panic!(
+            "unknown provider field"
+        ))
+        .unwrap()
+    );
+    let frozen = module.freeze().unwrap();
+    let output = frozen.get("X").unwrap();
+    let shared = frozen.get("shared").unwrap();
+    let consumer = Module::new();
+    check(output.value(), shared.value(), consumer.heap());
+    let empty = frozen.get("EMPTY").unwrap();
+    assert_eq!(provider_instance_header(empty.value()).unwrap().len, 0);
+    assert!(
+        visit_starlark_provider_fields(empty.value(), &mut |_, _| panic!(
+            "frozen empty provider field"
+        ))
+        .unwrap()
+    );
+}

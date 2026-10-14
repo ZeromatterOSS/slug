@@ -364,7 +364,10 @@ bare_return = rule(implementation = _impl, attrs = {"mode": attr.string()})
         let error = request(&dice, &root, &format!("@@//:bare_{mode}"), config(&[]))
             .await
             .unwrap_err();
-        assert!(error.contains("returned non-provider"), "{mode}: {error}");
+        assert!(
+            error.contains("rule implementation returned a non-provider value"),
+            "{mode}: {error}"
+        );
     }
     fs::remove_dir_all(root).unwrap();
 }

@@ -1,10 +1,6 @@
 //! Native-model publication proof, not the public rules_cc configure_features route.
-use std::sync::Arc;
-
 use slug_build_api_v2::cc_features::*;
 use slug_identity_v2::CanonicalLabel;
-use slug_loading_v2::BzlModuleIdentity;
-use slug_loading_v2::BzlModuleSourceProvenance;
 use slug_loading_v2::subrule_invocation::AnalysisActionSink;
 use slug_loading_v2::subrule_invocation::AnalysisEvaluationContext;
 use starlark::environment::Globals;
@@ -13,6 +9,9 @@ use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 
 use super::*;
+
+#[path = "cc_features_fixture.rs"]
+mod fixture;
 
 #[derive(Debug)]
 struct NoActions;
@@ -44,47 +43,16 @@ impl AnalysisActionSink for NoActions {
     }
 }
 
-fn context() -> AnalysisEvaluationContext {
-    let identity = BzlModuleIdentity {
-        label: CanonicalLabel::parse("@@//test:feature_retention.bzl").unwrap(),
-        workspace_path: "/fixture/test/feature_retention.bzl".into(),
-        repository_mapping: Arc::from([]),
-    };
-    AnalysisEvaluationContext::new(
-        Arc::from([]),
-        [],
-        identity.label.clone(),
-        Arc::new(NoActions),
-        FrozenValue::new_none(),
-        Arc::from([
-            (
-                CompactString::new("/fixture/test/feature_retention.bzl"),
-                BzlModuleSourceProvenance::new(identity.clone(), [0; 32]),
-            ),
-            (
-                CompactString::new("assert.bzl"),
-                BzlModuleSourceProvenance::new(
-                    BzlModuleIdentity {
-                        workspace_path: "assert.bzl".into(),
-                        ..identity
-                    },
-                    [0; 32],
-                ),
-            ),
-        ]),
-    )
-}
-
-fn evaluate(module: &Module, source: &str) -> Result<(), String> {
-    let ast = AstModule::parse(
-        "/fixture/test/feature_retention.bzl",
-        source.to_owned(),
-        &Dialect::Bazel,
-    )
-    .map_err(|error| error.to_string())?;
-    let context = context();
+fn evaluate(
+    module: &Module,
+    source: &str,
+    context: &AnalysisEvaluationContext,
+) -> Result<(), String> {
+    // This consumer only invokes original functions from the actual loaded module.
+    let ast = AstModule::parse("feature_consumer.bzl", source.to_owned(), &Dialect::Bazel)
+        .map_err(|error| error.to_string())?;
     let mut eval = Evaluator::new(module);
-    eval.extra = Some(&context);
+    eval.extra = Some(context);
     eval.eval_module(ast, &Globals::standard())
         .map_err(|error| error.to_string())?;
     Ok(())
@@ -168,8 +136,8 @@ fn toolchain(
     .unwrap()
 }
 
-#[test]
-fn native_cc_features_round_trip_outlives_heap_and_invokes_after_gc() {
+#[tokio::test]
+async fn native_cc_features_round_trip_outlives_heap_and_invokes_after_gc() {
     let retained = {
         let source = FrozenHeap::new();
         let a = toolchain("tools", "-DKEEP", None);
@@ -201,44 +169,53 @@ fn native_cc_features_round_trip_outlives_heap_and_invokes_after_gc() {
         .value(&retained)
         .unwrap();
     module.set("values", restored.to_value());
-    evaluate(
-        &module,
+    let loaded = fixture::LoadedSource::new(
         r#"
-def inspect():
-    a, alias, b, c, c_alias, c_fresh, carrier = values
-    return (type(a), type(c), a == alias, a == b, c == c_alias, c == c_fresh,
-            a.default_features_and_action_configs(), c.is_enabled("selected"),
-            c.is_requested("unknown"), c.is_enabled("unknown"),
-            carrier.feature.is_requested("selected"))
-result = inspect()
+def entry(values):
+    def inspect():
+        a, alias, b, c, c_alias, c_fresh, carrier = values
+        return (type(a), type(c), a == alias, a == b, c == c_alias, c == c_fresh,
+                a.default_features_and_action_configs(), c.is_enabled("selected"),
+                c.is_requested("unknown"), c.is_enabled("unknown"),
+                carrier.feature.is_requested("selected"))
+    def select():
+        return values[0].configure_features(["selected", "unknown"])
+    def inspect_live(c):
+        return c.is_enabled("selected") and c.is_requested("unknown") and not c.is_enabled("unknown")
+    return (inspect, select, inspect_live)
 "#,
     )
-    .unwrap();
+    .await;
+    // Assert setup has a static evaluator-extra lifetime; retain only genuine provenance here.
+    static CONTEXT: std::sync::OnceLock<AnalysisEvaluationContext> = std::sync::OnceLock::new();
+    let context = CONTEXT.get_or_init(|| loaded.context());
+    let functions = loaded.invoke(&module, restored.to_value(), context);
+    for (name, function) in ["inspect", "select", "inspect_live"]
+        .into_iter()
+        .zip(TupleRef::from_value(functions).unwrap().iter())
+    {
+        module.set(name, function);
+    }
+    evaluate(&module, "result = inspect()\n", context).unwrap();
     assert_eq!(
         module.get("result").unwrap().to_repr(),
         "(\"CcToolchainFeatures\", \"FeatureConfiguration\", True, False, True, False, [\"selected\"], True, True, False, True)"
     );
     // Freeze the destination, then run the evaluator's supported GC test modes.
-    evaluate(&module, "again = inspect()\n").unwrap();
+    evaluate(&module, "again = inspect()\n", context).unwrap();
     let frozen = module.freeze().unwrap();
-    static CONTEXT: std::sync::LazyLock<AnalysisEvaluationContext> =
-        std::sync::LazyLock::new(context);
     let mut gc = starlark::assert::Assert::new();
     gc.disable_static_typechecking();
-    gc.setup_eval(|eval| eval.extra = Some(&*CONTEXT));
+    gc.setup_eval(move |eval| eval.extra = Some(context));
     gc.module_add("retained", frozen.clone());
     // Assert runs Auto, Never and Always GC modes. Its garbage_collect builtin
     // schedules collection at a safe bytecode boundary, with all values rooted.
     gc.pass(
         r#"
-load("retained", "values")
-def select():
-    return values[0].configure_features(["selected", "unknown"])
+load("retained", "select", "inspect_live")
 c = select()
 garbage_collect()
-def inspect_live():
-    return c.is_enabled("selected") and c.is_requested("unknown") and not c.is_enabled("unknown")
-assert_true(inspect_live())
+assert_true(inspect_live(c))
 "#,
     );
     let restored = frozen.get("values").unwrap();

@@ -63,8 +63,10 @@ fn mapper(
 ) -> RetainedArgsMapper {
     let mut graph = CallableGraphBuilder::new();
     let native = graph.reserve().unwrap();
+    let atom = graph.native_atom(receiver).unwrap();
+    graph.set_node(native, CallableNode::Native(atom)).unwrap();
     graph
-        .set_node(native, CallableNode::Native(receiver))
+        .set_original_slot(native, PublishedRootSlot::new(native.index()).unwrap())
         .unwrap();
     let root = graph.reserve().unwrap();
     graph
@@ -74,13 +76,19 @@ fn mapper(
                 api: NativeCallableApiId::new("test.echo", 1).unwrap(),
                 parameters: Arc::from([]),
                 return_annotation: None,
-                receiver: Some(native),
+                receiver: Some(PublishedEdge::Local(native)),
             }),
         )
         .unwrap();
-    RetainedArgsMapper::new(
-        graph.finish().unwrap(),
-        root,
+    graph
+        .set_original_slot(root, PublishedRootSlot::new(root.index()).unwrap())
+        .unwrap();
+    RetainedArgsMapper::from_published(
+        graph
+            .seal(Arc::new(TestOriginals))
+            .unwrap()
+            .value(root)
+            .unwrap(),
         Arc::new(MockRuntime {
             behavior,
             calls,
@@ -497,4 +505,18 @@ fn native_expansion_budgets_grouping_escaping_and_complete_consumers() {
         ]
     );
     assert_eq!(expanded.param_files()[0].bytes(), b"'a'\\''b'\n");
+}
+
+#[derive(Debug)]
+struct TestOriginals;
+impl PublishedOriginalBinding for TestOriginals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        2
+    }
+    fn imported_arenas(&self) -> &[PublishedValueArena] {
+        &[]
+    }
 }

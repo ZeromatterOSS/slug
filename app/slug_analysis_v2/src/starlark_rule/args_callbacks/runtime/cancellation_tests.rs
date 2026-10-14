@@ -18,6 +18,9 @@ use slug_build_api_v2::RetainedParamFileFormat;
 use slug_build_api_v2::RetainedVectorArg;
 use slug_build_api_v2::RetainedVectorOptions;
 use slug_build_api_v2::RetainedVectorSource;
+use slug_build_api_v2::published_value::PublishedOriginalBinding;
+use slug_build_api_v2::published_value::PublishedRootSlot;
+use slug_build_api_v2::published_value::PublishedValueArena;
 
 use super::*;
 
@@ -75,7 +78,12 @@ fn args_recipe_current_consumer_cancels_original_callback_at_frozen_bytecode_che
             }),
         )
         .unwrap();
-    let mapper = RetainedArgsMapper::new(graph.finish().unwrap(), root, Arc::new(runtime)).unwrap();
+    graph
+        .set_original_slot(root, PublishedRootSlot::new(0).unwrap())
+        .unwrap();
+    let arena = graph.seal(Arc::new(DescriptorOriginals)).unwrap();
+    let mapper =
+        RetainedArgsMapper::from_published(arena.value(root).unwrap(), Arc::new(runtime)).unwrap();
     let recipe = RetainedArgsRecipe::new(
         vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
             RetainedVectorSource::Mapped {
@@ -111,4 +119,20 @@ fn args_recipe_current_consumer_cancels_original_callback_at_frozen_bytecode_che
     assert_eq!(recipe.render_with_context(&live).unwrap(), ["19999"]);
     assert!(!live.cancelled.load(Ordering::Acquire));
     assert!(live.checks.load(Ordering::Relaxed) > 10);
+}
+
+// The executable guard above owns the actual frozen Def. This binding is solely
+// the native recipe descriptor fixture and cannot execute or reconstruct it.
+#[derive(Debug)]
+struct DescriptorOriginals;
+impl PublishedOriginalBinding for DescriptorOriginals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        1
+    }
+    fn imported_arenas(&self) -> &[PublishedValueArena] {
+        &[]
+    }
 }

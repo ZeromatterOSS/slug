@@ -8,7 +8,7 @@ use starlark::values::list::AllocList;
 
 use super::*;
 
-#[derive(Debug, Clone, Allocative)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(super) struct CcContextProjection {
     configuration: Option<SlugConfiguration>,
     features: Option<EffectiveFeatures>,
@@ -16,6 +16,16 @@ pub(super) struct CcContextProjection {
 }
 
 impl CcContextProjection {
+    pub(super) fn owner_configuration(&self) -> Option<&SlugConfiguration> {
+        self.configuration.as_ref()
+    }
+    pub(super) fn owner_features(&self) -> Option<&EffectiveFeatures> {
+        self.features.as_ref()
+    }
+    pub(super) fn owner_default_execution(&self) -> &Arc<ConfiguredActionOwnerContext> {
+        &self.default_execution
+    }
+
     pub(super) fn coverage_instrumented(&self) -> anyhow::Result<bool> {
         self.require_disabled_coverage("ctx.coverage_instrumented")?;
         Ok(false)

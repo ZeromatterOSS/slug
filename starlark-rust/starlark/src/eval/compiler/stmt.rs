@@ -548,14 +548,15 @@ impl Compiler<'_, '_, '_, '_> {
 //
 // We also require that `extra_v` is None, since otherwise the user might have
 // additional values stashed somewhere.
-pub(crate) fn possible_gc(eval: &mut Evaluator) {
+pub(crate) fn possible_gc(eval: &mut Evaluator) -> crate::Result<()> {
     if !eval.disable_gc && eval.heap().allocated_bytes() >= eval.next_gc_level {
         // When we are at a module scope (as checked above) the eval contains
         // references to all values, so walking covers everything and the unsafe
         // is satisfied.
-        unsafe { eval.garbage_collect() }
+        unsafe { eval.garbage_collect()? }
         eval.next_gc_level = cmp::max(eval.heap().allocated_bytes() * 2, GC_THRESHOLD);
     }
+    Ok(())
 }
 
 /// Implement lhs |= rhs, which is special in Starlark, because dicts are mutated,

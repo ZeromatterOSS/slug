@@ -885,6 +885,14 @@ pub(crate) struct RunfilesPackageClosureRow {
 }
 
 impl RunfilesPackageClosureRow {
+    pub(crate) fn owner_key(&self) -> &ConfiguredNodeKey {
+        &self.key
+    }
+
+    pub(crate) fn owner_packages(&self) -> &RunfilesPackageDepset {
+        &self.packages
+    }
+
     pub(crate) fn new(key: ConfiguredNodeKey, packages: RunfilesPackageDepset) -> Self {
         Self { key, packages }
     }

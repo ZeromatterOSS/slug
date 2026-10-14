@@ -41,9 +41,11 @@ use crate::providers::ProviderId;
 pub enum AnalysisValueType {
     TemplateVariableInfo,
     RunEnvironmentInfo,
+    Runfiles,
+    Function,
+    ProviderConstructor,
+    RawProviderConstructor,
     PackageSpecificationInfo,
-    CcToolchainCallable,
-    RustToolchainCallable,
     CppFragment,
     CcHeaderInfo,
     CcToolchainFeatures,
@@ -59,6 +61,7 @@ pub enum AnalysisValueType {
     ConfiguredTarget,
     Artifact,
     ArtifactRoot,
+    Set,
     List,
     Tuple,
     Dictionary,
@@ -73,8 +76,10 @@ impl AnalysisValueType {
             Self::PackageSpecificationInfo => "PackageSpecificationInfo",
             Self::TemplateVariableInfo => "TemplateVariableInfo",
             Self::RunEnvironmentInfo => "RunEnvironmentInfo",
-            Self::CcToolchainCallable => "function",
-            Self::RustToolchainCallable => "function",
+            Self::Runfiles => "runfiles",
+            Self::Function => "function",
+            Self::ProviderConstructor => "provider",
+            Self::RawProviderConstructor => "function",
             Self::CppFragment => "cpp",
             Self::CcHeaderInfo => "HeaderInfo",
             Self::CcToolchainFeatures => "CcToolchainFeatures",
@@ -90,6 +95,7 @@ impl AnalysisValueType {
             Self::ConfiguredTarget => "Target",
             Self::Artifact => "File",
             Self::ArtifactRoot => "root",
+            Self::Set => "set",
             Self::List => "list",
             Self::Tuple => "tuple",
             Self::Dictionary => "dict",
@@ -485,6 +491,7 @@ impl ProviderIdentity {
 #[derive(Debug, Clone, Allocative)]
 pub struct ProviderOccurrence {
     identity: ProviderIdentity,
+    original_origin: Option<crate::PublishedValueRef>,
     fields: SmallMap<CompactString, AnalysisValue>,
     files_to_run: Option<Arc<FilesToRunProvider>>,
     // Native provider wrappers can distinguish schemaful declarations even
@@ -504,10 +511,29 @@ impl ProviderOccurrence {
         fields.sort_keys();
         Self {
             identity,
+            original_origin: None,
             fields,
             files_to_run: None,
             has_schema: false,
         }
+    }
+
+    pub fn with_original_origin(
+        mut projected: Self,
+        original: crate::PublishedValueRef,
+    ) -> Result<Self, crate::PublishedValueError> {
+        if projected.original_origin.is_some() {
+            return Err(crate::PublishedValueError::Invalid(
+                "provider already has origin",
+            ));
+        }
+        crate::published_value::projection::validate_provider(&projected, &original)?;
+        projected.original_origin = Some(original);
+        Ok(projected)
+    }
+
+    pub fn original_origin(&self) -> Option<&crate::PublishedValueRef> {
+        self.original_origin.as_ref()
     }
 
     pub fn empty(identity: ProviderIdentity) -> Self {
@@ -573,6 +599,11 @@ impl ProviderOccurrence {
     }
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (&self.original_origin, &other.original_origin) {
+            (Some(left), Some(right)) => return left.publication_eq_with(right, state),
+            (None, None) => {}
+            _ => return false,
+        }
         self.identity == other.identity
             && self.has_schema == other.has_schema
             && match (&self.files_to_run, &other.files_to_run) {
@@ -617,6 +648,9 @@ pub struct AnalysisDepset(Depset<AnalysisValue, AnalysisDepsetMetadata>);
 pub struct AnalysisDepsetOccurrence(Arc<()>);
 
 impl AnalysisDepsetOccurrence {
+    pub(crate) fn publication_pointer(&self) -> usize {
+        Arc::as_ptr(&self.0) as usize
+    }
     pub fn new() -> Self {
         Self(Arc::new(()))
     }
@@ -864,6 +898,29 @@ impl AnalysisDepset {
         )))
     }
 
+    /// Conservative checked construction peak for a local graph with the
+    /// supplied total row/reference counts, before any input-array growth or
+    /// guard clone. Existing leaf/external payloads are borrowed, not copied;
+    /// their separate semantic retention audit remains required.
+    pub fn local_graph_storage_upper_bound(nodes: usize, edges: usize) -> Option<usize> {
+        let mut bytes =
+            Depset::<AnalysisValue, AnalysisDepsetMetadata>::dense_graph_storage_upper_bound(
+                nodes, edges,
+            )?;
+        for array in [
+            crate::depset::storage_forecast::vector_peak::<AnalysisDepsetGraphNode>(nodes)?,
+            crate::depset::storage_forecast::input_edges_peak::<AnalysisDepsetGraphInput>(
+                nodes, edges,
+            )?,
+            crate::depset::storage_forecast::vector_peak::<AnalysisValueType>(nodes)?,
+            crate::depset::storage_forecast::vector_peak::<DepsetOrder>(nodes)?,
+            crate::depset::storage_forecast::vector_peak::<Self>(nodes)?,
+        ] {
+            bytes = bytes.checked_add(array)?;
+        }
+        Some(bytes)
+    }
+
     pub fn from_local_graph(
         inputs: Vec<AnalysisDepsetGraphNode>,
     ) -> Result<Vec<Self>, AnalysisValueError> {
@@ -1050,6 +1107,23 @@ impl AnalysisDepset {
         self.0.shares_store_with(&other.0)
     }
 
+    pub(crate) fn visit_storage_bounded<'a, E>(
+        &'a self,
+        mut visitor: impl FnMut(crate::DepsetStorageEvent<'a, AnalysisValue, ()>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        self.0.visit_storage_bounded(|event| {
+            visitor(match event {
+                crate::DepsetStorageEvent::Charge(c) => crate::DepsetStorageEvent::Charge(c),
+                crate::DepsetStorageEvent::Node { depth, .. } => crate::DepsetStorageEvent::Node {
+                    metadata: &(),
+                    depth,
+                },
+                crate::DepsetStorageEvent::Value { value, depth } => {
+                    crate::DepsetStorageEvent::Value { value, depth }
+                }
+            })
+        })
+    }
     pub fn storage_stats(&self) -> DepsetStorageStats {
         self.0.storage_stats()
     }
@@ -1058,13 +1132,20 @@ impl AnalysisDepset {
         self.0.metadata().occurrence.dupe()
     }
 
-    fn pointer(&self) -> (usize, u32) {
+    /// Physical node key for phase-only memos retaining this depset as a guard.
+    pub(crate) fn pointer(&self) -> (usize, u32) {
         self.0.node_key()
     }
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
         let mut stack = vec![(self.dupe(), other.dupe())];
         while let Some((left_depset, right_depset)) = stack.pop() {
+            if !state.enter_depset_occurrence_pair(
+                left_depset.occurrence().publication_pointer(),
+                right_depset.occurrence().publication_pointer(),
+            ) {
+                return false;
+            }
             let left_pointer = left_depset.pointer();
             let right_pointer = right_depset.pointer();
             if let Some(previous) = state.left_depsets.get(&left_pointer) {
@@ -1168,11 +1249,17 @@ impl Hash for AnalysisContainerIdentity {
 
 #[derive(Debug, Allocative)]
 enum AnalysisValueData {
+    Runfiles(crate::RunfilesValue),
+    Function(crate::PublishedFunctionSymbol),
+    ProviderConstructor(crate::PublishedProviderConstructorSymbol),
+    RawProviderConstructor(crate::PublishedRawProviderConstructorSymbol),
+    Published {
+        projected: AnalysisValue,
+        original: crate::PublishedValueRef,
+    },
     TemplateVariableInfo(crate::TemplateVariableInfo),
     RunEnvironmentInfo(crate::RunEnvironmentInfo),
     PackageSpecificationInfo(crate::PackageSpecificationInfo),
-    CcToolchainCallable(crate::cc_toolchain_callable::CcToolchainCallable),
-    RustToolchainCallable(crate::rust_toolchain_callable::RustToolchainCallable),
     CppFragment(crate::RetainedCppFragment),
     CcHeaderInfo(crate::CcHeaderInfo),
     CcToolchainFeatures(crate::cc_features::CcToolchainFeatures),
@@ -1196,11 +1283,13 @@ enum AnalysisValueData {
 
 #[derive(Debug, Clone, Copy)]
 pub enum AnalysisValueKind<'a> {
+    Runfiles(&'a crate::RunfilesValue),
+    Function(&'a crate::PublishedFunctionSymbol),
+    ProviderConstructor(&'a crate::PublishedProviderConstructorSymbol),
+    RawProviderConstructor(&'a crate::PublishedRawProviderConstructorSymbol),
     TemplateVariableInfo(&'a crate::TemplateVariableInfo),
     RunEnvironmentInfo(&'a crate::RunEnvironmentInfo),
     PackageSpecificationInfo(&'a crate::PackageSpecificationInfo),
-    CcToolchainCallable(&'a crate::cc_toolchain_callable::CcToolchainCallable),
-    RustToolchainCallable(&'a crate::rust_toolchain_callable::RustToolchainCallable),
     CppFragment(&'a crate::RetainedCppFragment),
     CcHeaderInfo(&'a crate::CcHeaderInfo),
     CcToolchainFeatures(&'a crate::cc_features::CcToolchainFeatures),
@@ -1227,6 +1316,60 @@ impl AnalysisValue {
         Self(Arc::new(value))
     }
 
+    pub fn runfiles(value: crate::RetainedRunfiles, occurrence: crate::RunfilesOccurrence) -> Self {
+        Self::new(AnalysisValueData::Runfiles(crate::RunfilesValue::new(
+            value, occurrence,
+        )))
+    }
+    pub fn function_symbol(symbol: crate::PublishedFunctionSymbol) -> Self {
+        Self::new(AnalysisValueData::Function(symbol))
+    }
+    pub fn provider_constructor_symbol(symbol: crate::PublishedProviderConstructorSymbol) -> Self {
+        Self::new(AnalysisValueData::ProviderConstructor(symbol))
+    }
+    pub fn raw_provider_constructor_symbol(
+        id: crate::PublishedRawProviderConstructorSymbol,
+    ) -> Self {
+        Self::new(AnalysisValueData::RawProviderConstructor(id))
+    }
+    pub fn original_origin(&self) -> Option<&crate::PublishedValueRef> {
+        match self.0.as_ref() {
+            AnalysisValueData::Published { original, .. } => Some(original),
+            AnalysisValueData::Provider(p) => p.original_origin(),
+            _ => None,
+        }
+    }
+    pub fn with_original_origin(
+        projected: Self,
+        original: crate::PublishedValueRef,
+    ) -> Result<Self, crate::PublishedValueError> {
+        if let Some(prior) = projected.original_origin() {
+            if prior.same_original(&original) {
+                return Ok(projected);
+            }
+            return Err(crate::PublishedValueError::Invalid(
+                "conflicting projection origin",
+            ));
+        }
+        crate::published_value::projection::validate_value(&projected, &original)?;
+        if let AnalysisValueKind::Provider(p) = projected.kind() {
+            return Ok(Self::provider(ProviderOccurrence::with_original_origin(
+                p.clone(),
+                original,
+            )?));
+        }
+        Ok(Self::new(AnalysisValueData::Published {
+            projected,
+            original,
+        }))
+    }
+    fn projected(&self) -> &Self {
+        match self.0.as_ref() {
+            AnalysisValueData::Published { projected, .. } => projected,
+            _ => self,
+        }
+    }
+
     pub fn package_specification_info(info: crate::PackageSpecificationInfo) -> Self {
         Self::new(AnalysisValueData::PackageSpecificationInfo(info))
     }
@@ -1241,16 +1384,6 @@ impl AnalysisValue {
 
     pub fn cc_header_info(info: crate::CcHeaderInfo) -> Self {
         Self::new(AnalysisValueData::CcHeaderInfo(info))
-    }
-
-    pub fn cc_toolchain_callable(value: crate::cc_toolchain_callable::CcToolchainCallable) -> Self {
-        Self::new(AnalysisValueData::CcToolchainCallable(value))
-    }
-
-    pub fn rust_toolchain_callable(
-        value: crate::rust_toolchain_callable::RustToolchainCallable,
-    ) -> Self {
-        Self::new(AnalysisValueData::RustToolchainCallable(value))
     }
 
     pub fn cpp_fragment(value: crate::RetainedCppFragment) -> Self {
@@ -1359,6 +1492,13 @@ impl AnalysisValue {
 
     pub fn kind(&self) -> AnalysisValueKind<'_> {
         match self.0.as_ref() {
+            AnalysisValueData::Runfiles(value) => AnalysisValueKind::Runfiles(value),
+            AnalysisValueData::Published { projected, .. } => projected.kind(),
+            AnalysisValueData::Function(v) => AnalysisValueKind::Function(v),
+            AnalysisValueData::ProviderConstructor(v) => AnalysisValueKind::ProviderConstructor(v),
+            AnalysisValueData::RawProviderConstructor(v) => {
+                AnalysisValueKind::RawProviderConstructor(v)
+            }
             AnalysisValueData::TemplateVariableInfo(info) => {
                 AnalysisValueKind::TemplateVariableInfo(info)
             }
@@ -1367,12 +1507,6 @@ impl AnalysisValue {
             }
             AnalysisValueData::PackageSpecificationInfo(value) => {
                 AnalysisValueKind::PackageSpecificationInfo(value)
-            }
-            AnalysisValueData::CcToolchainCallable(value) => {
-                AnalysisValueKind::CcToolchainCallable(value)
-            }
-            AnalysisValueData::RustToolchainCallable(value) => {
-                AnalysisValueKind::RustToolchainCallable(value)
             }
             AnalysisValueData::CppFragment(value) => AnalysisValueKind::CppFragment(value),
             AnalysisValueData::CcHeaderInfo(value) => AnalysisValueKind::CcHeaderInfo(value),
@@ -1406,13 +1540,18 @@ impl AnalysisValue {
 
     pub fn value_type(&self) -> AnalysisValueType {
         match self.0.as_ref() {
+            AnalysisValueData::Runfiles(_) => AnalysisValueType::Runfiles,
+            AnalysisValueData::Published { projected, .. } => projected.value_type(),
+            AnalysisValueData::Function(_) => AnalysisValueType::Function,
+            AnalysisValueData::ProviderConstructor(_) => AnalysisValueType::ProviderConstructor,
+            AnalysisValueData::RawProviderConstructor(_) => {
+                AnalysisValueType::RawProviderConstructor
+            }
             AnalysisValueData::TemplateVariableInfo(_) => AnalysisValueType::TemplateVariableInfo,
             AnalysisValueData::RunEnvironmentInfo(_) => AnalysisValueType::RunEnvironmentInfo,
             AnalysisValueData::PackageSpecificationInfo(_) => {
                 AnalysisValueType::PackageSpecificationInfo
             }
-            AnalysisValueData::CcToolchainCallable(_) => AnalysisValueType::CcToolchainCallable,
-            AnalysisValueData::RustToolchainCallable(_) => AnalysisValueType::RustToolchainCallable,
             AnalysisValueData::CppFragment(_) => AnalysisValueType::CppFragment,
             AnalysisValueData::CcHeaderInfo(_) => AnalysisValueType::CcHeaderInfo,
             AnalysisValueData::CcToolchainFeatures(_) => AnalysisValueType::CcToolchainFeatures,
@@ -1440,6 +1579,7 @@ impl AnalysisValue {
 
     pub fn as_str(&self) -> Option<&str> {
         match self.0.as_ref() {
+            AnalysisValueData::Published { projected, .. } => projected.as_str(),
             AnalysisValueData::String(value) => Some(value.as_str()),
             _ => None,
         }
@@ -1447,6 +1587,9 @@ impl AnalysisValue {
 
     pub fn is_starlark_immutable(&self) -> bool {
         match self.0.as_ref() {
+            AnalysisValueData::Runfiles(_) => true,
+            AnalysisValueData::RawProviderConstructor(_) => false,
+            AnalysisValueData::Published { projected, .. } => projected.is_starlark_immutable(),
             AnalysisValueData::CcToolchainVariables(value) => value.is_hashable(),
             // Bazel's native wrappers inherit isImmutable=false even though the
             // underlying Rust semantic payload is immutable and owned.
@@ -1461,6 +1604,9 @@ impl AnalysisValue {
 
     pub fn is_starlark_hashable(&self) -> bool {
         match self.0.as_ref() {
+            AnalysisValueData::Runfiles(_) => true,
+            AnalysisValueData::Published { projected, .. } => projected.is_starlark_hashable(),
+            AnalysisValueData::RawProviderConstructor(_) => false,
             AnalysisValueData::CcToolchainVariables(value) => value.is_hashable(),
             AnalysisValueData::CcToolchainFeatures(_)
             | AnalysisValueData::CcFeatureConfiguration(_) => false,
@@ -1484,7 +1630,7 @@ impl AnalysisValue {
     }
 
     pub fn shares_storage_with(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0)
+        Arc::ptr_eq(&self.projected().0, &other.projected().0)
     }
 
     /// Retain a phase-local identity key for an ordinary native container.
@@ -1492,6 +1638,9 @@ impl AnalysisValue {
     /// roots. FrozenHeap may canonically intern empty lists and tuples; this
     /// key does not promise distinct frozen occurrences for such empty values.
     pub fn container_identity(&self) -> Option<AnalysisContainerIdentity> {
+        if let AnalysisValueData::Published { projected, .. } = self.0.as_ref() {
+            return projected.container_identity();
+        }
         matches!(
             self.0.as_ref(),
             AnalysisValueData::List(_)
@@ -1503,6 +1652,9 @@ impl AnalysisValue {
     }
 
     pub fn is_valid_depset_leaf(&self) -> bool {
+        if let AnalysisValueData::Published { projected, .. } = self.0.as_ref() {
+            return projected.is_valid_depset_leaf();
+        }
         self.is_starlark_immutable()
             && !matches!(
                 self.0.as_ref(),
@@ -1515,6 +1667,11 @@ impl AnalysisValue {
     }
 
     pub(crate) fn publication_eq_with(&self, other: &Self, state: &mut PublicationEqState) -> bool {
+        match (self.original_origin(), other.original_origin()) {
+            (Some(left), Some(right)) => return left.publication_eq_with(right, state),
+            (None, None) => {}
+            _ => return false,
+        }
         if matches!(
             self.0.as_ref(),
             AnalysisValueData::List(_)
@@ -1540,6 +1697,21 @@ impl AnalysisValue {
             }
         }
         match (self.0.as_ref(), other.0.as_ref()) {
+            (AnalysisValueData::Runfiles(a), AnalysisValueData::Runfiles(b)) => {
+                a.publication_eq_with(b, state)
+            }
+            (AnalysisValueData::Published { .. }, _) | (_, AnalysisValueData::Published { .. }) => {
+                false
+            }
+            (AnalysisValueData::Function(a), AnalysisValueData::Function(b)) => a == b,
+            (
+                AnalysisValueData::ProviderConstructor(a),
+                AnalysisValueData::ProviderConstructor(b),
+            ) => a == b,
+            (
+                AnalysisValueData::RawProviderConstructor(a),
+                AnalysisValueData::RawProviderConstructor(b),
+            ) => a == b,
             (
                 AnalysisValueData::RunEnvironmentInfo(left),
                 AnalysisValueData::RunEnvironmentInfo(right),
@@ -1552,14 +1724,6 @@ impl AnalysisValue {
                 AnalysisValueData::PackageSpecificationInfo(left),
                 AnalysisValueData::PackageSpecificationInfo(right),
             ) => left == right,
-            (
-                AnalysisValueData::CcToolchainCallable(left),
-                AnalysisValueData::CcToolchainCallable(right),
-            ) => left.publication_eq_with(right, state),
-            (
-                AnalysisValueData::RustToolchainCallable(left),
-                AnalysisValueData::RustToolchainCallable(right),
-            ) => left.publication_eq_with(right, state),
             (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
                 left.publication_eq_with(right, state)
             }
@@ -1665,6 +1829,18 @@ fn publication_fields_eq(
 impl PartialEq for AnalysisValue {
     fn eq(&self, other: &Self) -> bool {
         match (self.0.as_ref(), other.0.as_ref()) {
+            (AnalysisValueData::Runfiles(a), AnalysisValueData::Runfiles(b)) => a == b,
+            (AnalysisValueData::Published { projected, .. }, _) => projected == other.projected(),
+            (_, AnalysisValueData::Published { projected, .. }) => self.projected() == projected,
+            (AnalysisValueData::Function(a), AnalysisValueData::Function(b)) => a == b,
+            (
+                AnalysisValueData::ProviderConstructor(a),
+                AnalysisValueData::ProviderConstructor(b),
+            ) => a == b,
+            (
+                AnalysisValueData::RawProviderConstructor(a),
+                AnalysisValueData::RawProviderConstructor(b),
+            ) => a == b,
             (
                 AnalysisValueData::RunEnvironmentInfo(left),
                 AnalysisValueData::RunEnvironmentInfo(right),
@@ -1680,14 +1856,6 @@ impl PartialEq for AnalysisValue {
                 AnalysisValueData::PackageSpecificationInfo(_),
                 AnalysisValueData::PackageSpecificationInfo(_),
             ) => true,
-            (
-                AnalysisValueData::CcToolchainCallable(left),
-                AnalysisValueData::CcToolchainCallable(right),
-            ) => left == right,
-            (
-                AnalysisValueData::RustToolchainCallable(left),
-                AnalysisValueData::RustToolchainCallable(right),
-            ) => left == right,
             (AnalysisValueData::CppFragment(left), AnalysisValueData::CppFragment(right)) => {
                 left == right
             }
@@ -1747,6 +1915,19 @@ impl Eq for AnalysisValue {}
 impl Hash for AnalysisValue {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match self.0.as_ref() {
+            AnalysisValueData::Runfiles(_) => 27u8.hash(state),
+            AnalysisValueData::Published { projected, .. } => projected.hash(state),
+            AnalysisValueData::Function(value) => {
+                24u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::ProviderConstructor(value) => {
+                25u8.hash(state);
+                value.hash(state);
+            }
+            AnalysisValueData::RawProviderConstructor(_) => {
+                26u8.hash(state);
+            }
             AnalysisValueData::RunEnvironmentInfo(info) => {
                 23u8.hash(state);
                 info.hash_fields(state);
@@ -1756,14 +1937,6 @@ impl Hash for AnalysisValue {
                 info.hash(state);
             }
             AnalysisValueData::PackageSpecificationInfo(_) => 20u8.hash(state),
-            AnalysisValueData::CcToolchainCallable(value) => {
-                17u8.hash(state);
-                value.hash(state);
-            }
-            AnalysisValueData::RustToolchainCallable(value) => {
-                22u8.hash(state);
-                value.hash(state);
-            }
             AnalysisValueData::ArtifactRoot(value) => {
                 19u8.hash(state);
                 value.hash(state);
@@ -1861,16 +2034,18 @@ fn hash_unordered_entries<H: Hasher>(entries: &[(AnalysisValue, AnalysisValue)],
 
 #[derive(Default)]
 pub(crate) struct PublicationEqState {
+    left_runfiles_wrappers: fxhash::FxHashMap<usize, usize>,
+    right_runfiles_wrappers: fxhash::FxHashMap<usize, usize>,
+    left_raw_providers: FxHashMap<usize, usize>,
+    right_raw_providers: FxHashMap<usize, usize>,
+    left_depset_occurrences: FxHashMap<usize, usize>,
+    right_depset_occurrences: FxHashMap<usize, usize>,
     left_native_containers: FxHashMap<usize, usize>,
     right_native_containers: FxHashMap<usize, usize>,
     left_callable_nodes: FxHashMap<(usize, u32), (usize, u32)>,
     right_callable_nodes: FxHashMap<(usize, u32), (usize, u32)>,
     left_template_variables: FxHashMap<usize, usize>,
     right_template_variables: FxHashMap<usize, usize>,
-    left_cc_callables: FxHashMap<usize, usize>,
-    right_cc_callables: FxHashMap<usize, usize>,
-    left_rust_callables: FxHashMap<usize, usize>,
-    right_rust_callables: FxHashMap<usize, usize>,
     left_cpp_fragments: FxHashMap<usize, usize>,
     right_cpp_fragments: FxHashMap<usize, usize>,
     left_cc_variables: FxHashMap<usize, usize>,
@@ -1886,6 +2061,31 @@ pub(crate) struct PublicationEqState {
 }
 
 impl PublicationEqState {
+    pub(crate) fn enter_runfiles_wrapper_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_runfiles_wrappers,
+            &mut self.right_runfiles_wrappers,
+            left,
+            right,
+        )
+    }
+    pub(crate) fn enter_raw_provider_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_raw_providers,
+            &mut self.right_raw_providers,
+            left,
+            right,
+        )
+    }
+    pub(crate) fn enter_depset_occurrence_pair(&mut self, left: usize, right: usize) -> bool {
+        Self::enter_occurrence_pair(
+            &mut self.left_depset_occurrences,
+            &mut self.right_depset_occurrences,
+            left,
+            right,
+        )
+    }
+
     pub(crate) fn enter_callable_node_pair(
         &mut self,
         left: (usize, u32),
@@ -1906,24 +2106,6 @@ impl PublicationEqState {
         Self::enter_occurrence_pair(
             &mut self.left_template_variables,
             &mut self.right_template_variables,
-            left,
-            right,
-        )
-    }
-
-    pub(crate) fn enter_cc_callable_pair(&mut self, left: usize, right: usize) -> bool {
-        Self::enter_occurrence_pair(
-            &mut self.left_cc_callables,
-            &mut self.right_cc_callables,
-            left,
-            right,
-        )
-    }
-
-    pub(crate) fn enter_rust_callable_pair(&mut self, left: usize, right: usize) -> bool {
-        Self::enter_occurrence_pair(
-            &mut self.left_rust_callables,
-            &mut self.right_rust_callables,
             left,
             right,
         )
@@ -2060,3 +2242,12 @@ impl From<DepsetError> for AnalysisValueError {
 #[cfg(test)]
 #[path = "analysis_value/container_identity_tests.rs"]
 mod container_identity_tests;
+
+/// Conservative per-row base: projected payload, outward wrapper, two Arc
+/// allocation headers and provider projection header. Variable child arrays and
+/// strings are charged separately by arena row metadata/edges.
+pub(crate) fn published_projection_forecast() -> usize {
+    2 * std::mem::size_of::<AnalysisValueData>()
+        + 4 * std::mem::size_of::<usize>()
+        + std::mem::size_of::<ProviderOccurrence>()
+}

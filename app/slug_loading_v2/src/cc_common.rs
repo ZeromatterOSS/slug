@@ -607,3 +607,18 @@ pub(crate) fn cc_common_globals(builder: &mut GlobalsBuilder) {
 
 #[cfg(test)]
 pub(crate) mod solib_tests;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CcModuleApi {
+    Public,
+    Internal,
+}
+pub fn cc_common_api(value: Value<'_>) -> Option<CcModuleApi> {
+    if CcCommonModule::from_value(value).is_some() {
+        Some(CcModuleApi::Public)
+    } else if CcInternalModule::from_value(value).is_some() {
+        Some(CcModuleApi::Internal)
+    } else {
+        None
+    }
+}

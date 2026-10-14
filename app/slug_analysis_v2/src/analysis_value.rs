@@ -120,7 +120,7 @@ pub(crate) fn test_artifact_root() -> slug_build_api_v2::DerivedArtifactRoot {
 #[path = "analysis_value/artifact_root_tests.rs"]
 mod artifact_root_tests;
 
-pub(crate) mod rust_toolchain;
+pub(crate) mod published;
 
 mod empty_instrumented_files;
 use empty_instrumented_files::EmptyInstrumentedFiles;
@@ -275,6 +275,7 @@ impl<'v> StarlarkValue<'v> for StarlarkRunfilesSymlink {
 
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 pub(crate) struct StarlarkRunfiles {
+    occurrence: slug_build_api_v2::RunfilesOccurrence,
     retained: RetainedRunfiles,
     files: FrozenValue,
     symlinks: FrozenValue,
@@ -291,9 +292,19 @@ impl fmt::Display for StarlarkRunfiles {
 starlark::starlark_simple_value!(StarlarkRunfiles);
 #[starlark_value(type = "runfiles")]
 impl<'v> StarlarkValue<'v> for StarlarkRunfiles {
+    fn write_hash(&self, hasher: &mut StarlarkHasher) -> starlark::Result<()> {
+        // Bazel's native Runfiles is immutable/hashable. A coarse Slug-native
+        // hash preserves wrapper/EMPTY equality without making addresses part
+        // of retained semantic identity.
+        27u8.hash(hasher);
+        Ok(())
+    }
+
     fn equals(&self, other: Value<'v>) -> starlark::Result<bool> {
-        Ok(Self::from_value(other)
-            .is_some_and(|other| self.retained.is_empty() && other.retained.is_empty()))
+        Ok(Self::from_value(other).is_some_and(|other| {
+            self.occurrence == other.occurrence
+                || (self.retained.is_empty() && other.retained.is_empty())
+        }))
     }
 
     fn get_attr(&self, name: &str, _heap: Heap<'v>) -> Option<Value<'v>> {
@@ -526,7 +537,6 @@ pub(crate) struct AnalysisValueMaterializer<'a> {
     // Owning keys are phase scratch: aliases survive all roots handled by this
     // materializer, and temporary native allocations cannot cause pointer ABA.
     containers: HashMap<slug_build_api_v2::analysis_value::AnalysisContainerIdentity, FrozenValue>,
-    rust_helpers: &'a [slug_loading_v2::PreparedRustToolchainHelperBinding],
     cc_variables: SmallMap<slug_build_api_v2::cc_variables::CcVariablesOccurrence, FrozenValue>,
     depsets: HashMap<AnalysisDepset, FrozenValue>,
     file_depsets: HashMap<(usize, u32), FrozenValue>,
@@ -538,20 +548,11 @@ impl<'a> AnalysisValueMaterializer<'a> {
         Self {
             heap,
             containers: HashMap::new(),
-            rust_helpers: &[],
             cc_variables: SmallMap::new(),
             depsets: HashMap::default(),
             file_depsets: HashMap::default(),
             symlink_depsets: HashMap::default(),
         }
-    }
-
-    pub(crate) fn with_rust_helpers(
-        mut self,
-        bindings: &'a [slug_loading_v2::PreparedRustToolchainHelperBinding],
-    ) -> Self {
-        self.rust_helpers = bindings;
-        self
     }
 
     fn output_group_info(&mut self, info: &OutputGroupInfo) -> Result<FrozenValue, String> {
@@ -564,6 +565,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     fn provider(&mut self, occurrence: &ProviderOccurrence) -> Result<FrozenValue, String> {
+        if let Some(original) = occurrence.original_origin() {
+            return published::materialize_original(original, self.heap);
+        }
         if occurrence.identity().is_builtin("InstrumentedFilesInfo") {
             EmptyInstrumentedFiles::validate(occurrence)?;
         }
@@ -705,6 +709,7 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     fn runfiles(&mut self, value: &RetainedRunfiles) -> Result<FrozenValue, String> {
         Ok(self.heap.alloc(StarlarkRunfiles {
+            occurrence: slug_build_api_v2::RunfilesOccurrence::new(),
             retained: value.clone(),
             files: self.depset(&value.files)?,
             symlinks: self.symlink_depset(&value.symlinks),
@@ -844,6 +849,9 @@ impl<'a> AnalysisValueMaterializer<'a> {
     }
 
     pub(crate) fn value(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
+        if let Some(original) = value.original_origin() {
+            return published::materialize_original(original, self.heap);
+        }
         let key = value.container_identity();
         if let Some(key) = &key
             && let Some(frozen) = self.containers.get(key)
@@ -859,35 +867,22 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
     fn value_unmemoized(&mut self, value: &AnalysisValue) -> Result<FrozenValue, String> {
         Ok(match value.kind() {
-            AnalysisValueKind::RustToolchainCallable(callable) => {
-                let model = callable.model();
-                let binding = self
-                    .rust_helpers
-                    .iter()
-                    .find(|binding| binding.authority().as_ref() == model.source.as_ref())
-                    .ok_or_else(|| {
-                        "Rust callable lacks a freshly prepared helper binding".to_owned()
-                    })?;
-                let captures = [
-                    self.value(&model.cc_toolchain)?,
-                    self.value(&model.feature_configuration)?,
-                    self.value(&model.experimental_link_std_dylib)?,
-                    self.value(&model.rust_std)?,
-                ];
-                slug_loading_v2::alloc_frozen_rust_toolchain_callable(
-                    self.heap,
-                    callable.clone(),
-                    captures,
-                    binding,
-                )?
+            AnalysisValueKind::Function(_)
+            | AnalysisValueKind::ProviderConstructor(_)
+            | AnalysisValueKind::RawProviderConstructor(_) => {
+                return Err("callable projection has no original Starlark binding".into());
             }
-            AnalysisValueKind::CcToolchainCallable(callable) => {
-                let capture = self.value(&callable.model().capture)?;
-                slug_loading_v2::alloc_frozen_cc_toolchain_callable(
-                    self.heap,
-                    callable.clone(),
-                    capture,
-                )
+            AnalysisValueKind::Runfiles(runfiles) => {
+                // Plain native reconstruction preserves the actual occurrence
+                // supplied by the trusted retained model.
+                self.heap.alloc(StarlarkRunfiles {
+                    occurrence: runfiles.occurrence().clone(),
+                    retained: runfiles.retained().clone(),
+                    files: self.depset(&runfiles.retained().files)?,
+                    symlinks: self.symlink_depset(&runfiles.retained().symlinks),
+                    root_symlinks: self.symlink_depset(&runfiles.retained().root_symlinks),
+                    empty_filenames: self.file_depset(&runfiles.retained().empty_filenames),
+                })
             }
             AnalysisValueKind::CppFragment(fragment) => {
                 slug_loading_v2::analysis_fragments::alloc_frozen_cpp_fragment(
@@ -984,29 +979,14 @@ impl<'a> AnalysisValueMaterializer<'a> {
 
 #[derive(Default)]
 pub(crate) struct AnalysisValueLowerer<'v> {
-    callables: SmallMap<ValueIdentity<'v>, (slug_loading_v2::CallableRegistration, Value<'v>)>,
-    rust_callables:
-        SmallMap<ValueIdentity<'v>, (slug_loading_v2::RustCallableRegistration, Value<'v>)>,
     visiting: HashSet<ValueIdentity<'v>>,
     memo: HashMap<ValueIdentity<'v>, AnalysisValue>,
     lower_depth: usize,
 }
 
 impl<'v> AnalysisValueLowerer<'v> {
-    pub(crate) fn from_module(module: &'v starlark::environment::Module) -> Self {
-        Self {
-            rust_callables: slug_loading_v2::rust_callable_registrations(module)
-                .into_iter()
-                .map(|(function, descriptor, captures)| {
-                    (function.identity(), (descriptor, captures))
-                })
-                .collect(),
-            callables: slug_loading_v2::callable_registrations(module)
-                .into_iter()
-                .map(|(function, descriptor, capture)| (function.identity(), (descriptor, capture)))
-                .collect(),
-            ..Self::default()
-        }
+    pub(crate) fn from_module(_module: &'v starlark::environment::Module) -> Self {
+        Self::default()
     }
     pub(crate) fn lower(&mut self, value: Value<'v>, path: &str) -> Result<AnalysisValue, String> {
         if self.lower_depth == 0 {
@@ -1050,6 +1030,12 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(root) = slug_loading_v2::artifact_root_value(value) {
             return Ok(AnalysisValue::artifact_root(root));
         }
+        if let Some(value) = StarlarkRunfiles::from_value(value) {
+            return Ok(AnalysisValue::runfiles(
+                value.retained.clone(),
+                value.occurrence.clone(),
+            ));
+        }
         if let Some(value) = StarlarkFilesToRunProvider::from_value(value) {
             return Ok(AnalysisValue::provider(value.retained.to_occurrence()));
         }
@@ -1081,14 +1067,6 @@ impl<'v> AnalysisValueLowerer<'v> {
         let mut stack = vec![root];
         while let Some(value) = stack.pop() {
             if !seen.insert(value.identity()) {
-                continue;
-            }
-            if let Some((_, captures)) = self.rust_callables.get(&value.identity()) {
-                stack.push(*captures);
-                continue;
-            }
-            if let Some((_, capture)) = self.callables.get(&value.identity()) {
-                stack.push(*capture);
                 continue;
             }
             if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
@@ -1242,50 +1220,8 @@ impl<'v> AnalysisValueLowerer<'v> {
         if let Some(info) = crate::package_specification::from_value(value) {
             return Ok(AnalysisValue::package_specification_info(info));
         }
-        if let Some((model, _)) = slug_loading_v2::rust_toolchain_callable(value) {
-            return Ok(AnalysisValue::rust_toolchain_callable(model));
-        }
-        if let Some((registration, captures)) = self.rust_callables.get(&value.identity()).cloned()
-        {
-            let captures = TupleRef::from_value(captures)
-                .ok_or_else(|| format!("{path}: malformed Rust callable captures"))?
-                .content();
-            let [cc, feature, dynamic, std] = captures else {
-                return Err(format!("{path}: Rust callable requires four captures"));
-            };
-            let callable = slug_build_api_v2::RustToolchainCallable::new(
-                slug_build_api_v2::RustToolchainCallableModel {
-                    source: registration.source,
-                    identity: registration.identity,
-                    name_hash: registration.name_hash,
-                    cc_toolchain: self.lower(*cc, &format!("{path}.cc_toolchain"))?,
-                    feature_configuration: self
-                        .lower(*feature, &format!("{path}.feature_configuration"))?,
-                    experimental_link_std_dylib: self
-                        .lower(*dynamic, &format!("{path}.experimental_link_std_dylib"))?,
-                    rust_std: self.lower(*std, &format!("{path}.rust_std"))?,
-                },
-            )?;
-            return Ok(AnalysisValue::rust_toolchain_callable(callable));
-        }
-        if let Some((model, _)) = slug_loading_v2::cc_toolchain_callable(value) {
-            return Ok(AnalysisValue::cc_toolchain_callable(model));
-        }
         if let Some(fragment) = slug_loading_v2::analysis_fragments::cpp_fragment_value(value) {
             return Ok(AnalysisValue::cpp_fragment(fragment));
-        }
-        if let Some((registration, capture)) = self.callables.get(&value.identity()).cloned() {
-            use slug_build_api_v2::cc_toolchain_callable::CcToolchainCallable;
-            use slug_build_api_v2::cc_toolchain_callable::CcToolchainCallableModel;
-            let capture = self.lower(capture, &format!("{path}.capture"))?;
-            let callable = CcToolchainCallable::new(CcToolchainCallableModel {
-                kind: registration.kind,
-                source: registration.source,
-                identity: registration.identity,
-                name_hash: registration.name_hash,
-                capture,
-            })?;
-            return Ok(AnalysisValue::cc_toolchain_callable(callable));
         }
         if let Some(variables) = slug_loading_v2::cc_variables_value(value) {
             return self.lower_cc_variables(variables, path);
@@ -1393,9 +1329,6 @@ mod cpp_compile_publication_tests;
 
 #[cfg(test)]
 mod cc_header_info_tests;
-
-#[cfg(test)]
-mod cc_toolchain_tests;
 
 #[cfg(test)]
 mod provider_schema_tests;

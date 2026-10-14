@@ -173,12 +173,12 @@ async fn variable_publication_rejects_cycles_and_unadmitted_raw_range() {
     let cycle = request(&dice, &root, "cycle", config(&[]))
         .await
         .unwrap_err();
-    assert!(cycle.contains("cyclic analysis value"), "{cycle}");
+    assert!(cycle.contains("cyclic native projection"), "{cycle}");
     let range = request(&dice, &root, "range", config(&[]))
         .await
         .unwrap_err();
     assert!(
-        range.contains("unsupported analysis value of type `range`"),
+        range.contains("unsupported value/capability of type `range`"),
         "{range}"
     );
     fs::remove_dir_all(root).unwrap();

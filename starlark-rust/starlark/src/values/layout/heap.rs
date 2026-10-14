@@ -20,6 +20,7 @@
 pub(crate) mod allocator;
 pub(crate) mod arena;
 pub(crate) mod call_enter_exit;
+mod deferred_trace;
 mod fast_cell;
 pub(crate) mod heap_type;
 pub(crate) mod maybe_uninit_slice_util;

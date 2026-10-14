@@ -364,6 +364,10 @@ pub struct ConfiguredExecGroupRow {
 }
 
 impl ConfiguredExecGroupRow {
+    pub(crate) fn owner_runfiles_packages(&self) -> &[RunfilesPackageClosureRow] {
+        &self.runfiles_packages
+    }
+
     pub fn new(
         identity: ConfiguredExecGroup,
         requirements: Arc<[ToolchainTypeRequirement]>,

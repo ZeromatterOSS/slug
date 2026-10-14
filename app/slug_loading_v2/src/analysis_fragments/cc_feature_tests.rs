@@ -81,19 +81,22 @@ fn cpp_compilation_mode_preserves_strings_errors_and_frozen_ownership() {
                 CppFragmentProjection::new(configuration).unwrap(),
             )),
         );
-        let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&context);
-        evaluator
-            .eval_module(
-                AstModule::parse(
+        let ast = AstModule::parse(
                     FILENAME,
                     "def read(): return cpp.compilation_mode()\nRESULT=read()\nTYPE=type(RESULT)\ncpp=None\nread=None".to_owned(),
                     &Dialect::Bazel,
                 )
-                .unwrap(),
-                &Globals::standard(),
-            )
-            .unwrap();
+                .unwrap();
+        let prepared = crate::bzl_module::test_source::prepare(
+            &module,
+            &ast,
+            context.source_identity().clone(),
+            &[],
+        )
+        .unwrap();
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(prepared.context());
+        evaluator.eval_module(ast, &Globals::standard()).unwrap();
         assert_eq!(module.get("TYPE").unwrap().unpack_str(), Some("string"));
         assert_eq!(module.get("RESULT").unwrap().unpack_str(), Some(mode));
         drop(evaluator);
@@ -146,17 +149,22 @@ fn retained_cpp_fragment_preserves_identity_and_uses_current_caller() {
                 BzlModuleSourceProvenance::new(identity, [0; 32]),
             )]),
         );
+        let ast = AstModule::parse(
+            FILENAME,
+            "def query():\n    return cpp.force_pic()\nRESULT = query()".to_owned(),
+            &Dialect::Bazel,
+        )
+        .unwrap();
+        let prepared = crate::bzl_module::test_source::prepare(
+            &module,
+            &ast,
+            context.source_identity().clone(),
+            &[],
+        )
+        .unwrap();
         let mut evaluator = Evaluator::new(&module);
-        evaluator.extra = Some(&context);
-        let result = evaluator.eval_module(
-            AstModule::parse(
-                FILENAME,
-                "def query():\n    return cpp.force_pic()\nRESULT = query()".to_owned(),
-                &Dialect::Bazel,
-            )
-            .unwrap(),
-            &Globals::standard(),
-        );
+        evaluator.extra = Some(prepared.context());
+        let result = evaluator.eval_module(ast, &Globals::standard());
         if allowed {
             assert!(result.is_ok(), "{result:?}");
             assert_eq!(module.get("RESULT").unwrap().unpack_bool(), Some(true));
@@ -235,14 +243,19 @@ fn evaluate_configuration(
             )?)),
     );
     let context = BzlEvaluationContext::macro_runtime_context(identity, callers);
+    let ast = AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
     let mut evaluator = Evaluator::new(&module);
-    evaluator.extra = Some(&context);
+    evaluator.extra = Some(prepared.context());
     evaluator
-        .eval_module(
-            AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
-                .map_err(starlark::Error::into_anyhow)?,
-            &Globals::standard(),
-        )
+        .eval_module(ast, &Globals::standard())
         .map_err(starlark::Error::into_anyhow)?;
     Ok(module.get("RESULT").unwrap().to_repr())
 }

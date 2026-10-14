@@ -3,7 +3,6 @@ use starlark::environment::FrozenModule;
 use starlark::environment::GlobalsBuilder;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
-use starlark::values::dict::DictMut;
 use starlark::values::list::AllocList;
 
 use super::*;
@@ -47,18 +46,22 @@ fn recovery_globals(builder: &mut GlobalsBuilder) {
 fn internal() -> FrozenModule {
     let module = Module::new();
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:context_test.bzl");
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(
-            "context_test.bzl",
-            "i = cc_common.internal_DO_NOT_USE()".to_owned(),
-            &Dialect::Bazel,
-        )
-        .unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse(
+        "context_test.bzl",
+        "i = cc_common.internal_DO_NOT_USE()".to_owned(),
+        &Dialect::Bazel,
     )
     .unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     module.freeze().unwrap()
 }
@@ -235,7 +238,7 @@ fn root_cleanup_runs_on_success_and_error_without_freezing_context() {
         assert!(token.require_active("label", "rule context").is_err());
         let frozen = module.freeze().unwrap();
         let roots = TupleRef::from_value(frozen.extra_value().unwrap().to_value()).unwrap();
-        assert!(roots.content()[2].is_none());
+        assert!(roots.content()[1].is_none());
     }
 }
 
@@ -252,19 +255,7 @@ fn registered_context_survives_real_gc_with_other_loading_roots() {
         &module,
         module.heap().alloc(AllocTuple(["empty-depset-root"])),
     );
-    {
-        let mut registry =
-            DictMut::from_value(crate::evaluator_roots::callable_registry(&module)).unwrap();
-        registry.aref.insert_hashed(
-            module
-                .heap()
-                .alloc_str("capture")
-                .to_value()
-                .get_hashed()
-                .unwrap(),
-            module.heap().alloc(AllocList([42])),
-        );
-    }
+    crate::evaluator_roots::set_pending_cc_actions(&module, module.heap().alloc(AllocList([42])));
     let globals = GlobalsBuilder::standard().with(recovery_globals).build();
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(&context);
@@ -293,13 +284,13 @@ fn registered_context_survives_real_gc_with_other_loading_roots() {
         "(\"empty-depset-root\",)"
     );
     assert_eq!(
-        crate::evaluator_roots::callable_registry(&module).to_repr(),
-        "{\"capture\": [42]}"
+        crate::evaluator_roots::pending_cc_actions(&module).to_repr(),
+        "[42]"
     );
     drop(guard);
     assert_eq!(
-        crate::evaluator_roots::callable_registry(&module).to_repr(),
-        "{\"capture\": [42]}"
+        crate::evaluator_roots::pending_cc_actions(&module).to_repr(),
+        "[42]"
     );
     assert!(crate::evaluator_roots::empty_depsets(&module).is_some());
 }

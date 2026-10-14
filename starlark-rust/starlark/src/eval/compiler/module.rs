@@ -18,12 +18,14 @@
 //! Compile and evaluate module top-level statements.
 
 use starlark_syntax::eval_exception::EvalException;
+use starlark_syntax::syntax::ast::AssignTargetP;
 use starlark_syntax::syntax::ast::LoadP;
 use starlark_syntax::syntax::ast::StmtP;
 use starlark_syntax::syntax::top_level_stmts::top_level_stmts_mut;
 
 use crate::codemap::Spanned;
 use crate::const_frozen_string;
+use crate::environment::slots::ModuleSlotId;
 use crate::eval::bc::bytecode::Bc;
 use crate::eval::bc::frame::alloca_frame;
 use crate::eval::compiler::Compiler;
@@ -31,6 +33,7 @@ use crate::eval::compiler::add_span_to_expr_error;
 use crate::eval::compiler::expr_throw;
 use crate::eval::compiler::scope::ScopeId;
 use crate::eval::compiler::scope::Slot;
+use crate::eval::compiler::scope::payload::CstAssignTarget;
 use crate::eval::compiler::scope::payload::CstPayload;
 use crate::eval::compiler::scope::payload::CstStmt;
 use crate::eval::runtime::frame_span::FrameSpan;
@@ -48,7 +51,34 @@ use crate::values::Value;
 
 pub(crate) struct PreparedModuleBytecode {
     pub(crate) local_names: FrozenRef<'static, [FrozenStringValue]>,
-    pub(crate) bytecode: Vec<Bc>,
+    pub(crate) bytecode: Vec<PreparedStatement>,
+}
+
+pub(crate) struct PreparedStatement {
+    bytecode: Bc,
+    exports: Vec<(ModuleSlotId, FrozenStringValue)>,
+    span: FrameSpan,
+}
+
+fn export_bindings(
+    eval: &mut crate::eval::Evaluator<'_, '_, '_>,
+    bindings: &[(ModuleSlotId, FrozenStringValue)],
+    span: FrameSpan,
+) -> Result<(), EvalException> {
+    if eval.function_export_mode == crate::eval::FunctionExportMode::TopLevelAssignments {
+        for (slot, name) in bindings {
+            let value = eval
+                .get_slot_module(*slot)
+                .map_err(|e| add_span_to_expr_error(e, span, eval))?;
+            crate::eval::function_symbol::export_function(
+                value,
+                &eval.function_symbols,
+                name.as_str(),
+            )
+            .map_err(|e| add_span_to_expr_error(e, span, eval))?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn eval_prepared_module<'v>(
@@ -57,7 +87,8 @@ pub(crate) fn eval_prepared_module<'v>(
 ) -> Result<Value<'v>, EvalException> {
     let mut last = Value::new_none();
     let local_count = prepared.local_names.len().try_into().unwrap();
-    for bc in &prepared.bytecode {
+    for statement in &prepared.bytecode {
+        let bc = &statement.bytecode;
         last = alloca_frame(
             eval,
             local_count,
@@ -65,6 +96,7 @@ pub(crate) fn eval_prepared_module<'v>(
             bc.max_loop_depth,
             |eval| eval.eval_bc(const_frozen_string!("module").to_value(), bc),
         )?;
+        export_bindings(eval, &statement.exports, statement.span)?;
     }
     Ok(last)
 }
@@ -80,6 +112,60 @@ enum ModuleError {
 }
 
 impl<'v> Compiler<'v, '_, '_, '_> {
+    fn function_exports(&self, stmt: &CstStmt) -> Vec<(ModuleSlotId, FrozenStringValue)> {
+        fn visit(
+            compiler: &Compiler<'_, '_, '_, '_>,
+            target: &CstAssignTarget,
+            result: &mut Vec<(ModuleSlotId, FrozenStringValue)>,
+        ) {
+            match &target.node {
+                AssignTargetP::Identifier(ident) => {
+                    if let Slot::Module(slot) = compiler
+                        .scope_data
+                        .get_assign_ident_slot(ident, &compiler.codemap)
+                        .0
+                    {
+                        result.push((
+                            slot,
+                            compiler
+                                .eval
+                                .module_env
+                                .frozen_heap()
+                                .alloc_str(&ident.node.ident),
+                        ));
+                    }
+                }
+                AssignTargetP::Tuple(values) => {
+                    for value in values {
+                        visit(compiler, value, result);
+                    }
+                }
+                AssignTargetP::Dot(..) | AssignTargetP::Index(..) => {}
+            }
+        }
+        let mut result = Vec::new();
+        match &stmt.node {
+            StmtP::Assign(assign) => visit(self, &assign.lhs, &mut result),
+            StmtP::Def(def) => {
+                if let Slot::Module(slot) = self
+                    .scope_data
+                    .get_assign_ident_slot(&def.name, &self.codemap)
+                    .0
+                {
+                    result.push((
+                        slot,
+                        self.eval
+                            .module_env
+                            .frozen_heap()
+                            .alloc_str(&def.name.node.ident),
+                    ));
+                }
+            }
+            _ => {}
+        }
+        result
+    }
+
     fn eval_load(&mut self, load: Spanned<&LoadP<CstPayload>>) -> Result<(), EvalException> {
         let name = &load.node.module.node;
 
@@ -124,6 +210,8 @@ impl<'v> Compiler<'v, '_, '_, '_> {
         stmt: &mut CstStmt,
         local_names: FrozenRef<'static, [FrozenStringValue]>,
     ) -> Result<Value<'v>, EvalException> {
+        let exports = self.function_exports(stmt);
+        let export_span = FrameSpan::new(FrozenFileSpan::new(self.codemap, stmt.span));
         if matches!(stmt.node, StmtP::Statements(_) | StmtP::Load(_)) {
             return Err(EvalException::new_anyhow(
                 ModuleError::UnexpectedStatement.into(),
@@ -145,20 +233,22 @@ impl<'v> Compiler<'v, '_, '_, '_> {
         // That is OK for now: the only locals used in module evaluation
         // are comprehension bindings.
         let local_count = local_names.len().try_into().unwrap();
-        alloca_frame(
+        let result = alloca_frame(
             self.eval,
             local_count,
             bc.max_stack_size,
             bc.max_loop_depth,
             |eval| eval.eval_bc(const_frozen_string!("module").to_value(), &bc),
-        )
+        )?;
+        export_bindings(self.eval, &exports, export_span)?;
+        Ok(result)
     }
 
     fn prepare_regular_top_level_stmt(
         &mut self,
         stmt: &mut CstStmt,
         local_names: FrozenRef<'static, [FrozenStringValue]>,
-    ) -> Result<Bc, EvalException> {
+    ) -> Result<PreparedStatement, EvalException> {
         if matches!(stmt.node, StmtP::Statements(_) | StmtP::Load(_)) {
             return Err(EvalException::new_anyhow(
                 ModuleError::UnexpectedStatement.into(),
@@ -166,15 +256,21 @@ impl<'v> Compiler<'v, '_, '_, '_> {
                 &self.codemap,
             ));
         }
+        let exports = self.function_exports(stmt);
+        let span = FrameSpan::new(FrozenFileSpan::new(self.codemap, stmt.span));
         let stmt = self
             .module_top_level_stmt(stmt)
             .map_err(|e| e.into_eval_exception())?;
-        Ok(stmt.as_bc(
-            &self.compile_context(false),
-            local_names,
-            0,
-            self.eval.module_env.frozen_heap(),
-        ))
+        Ok(PreparedStatement {
+            exports,
+            span,
+            bytecode: stmt.as_bc(
+                &self.compile_context(false),
+                local_names,
+                0,
+                self.eval.module_env.frozen_heap(),
+            ),
+        })
     }
 
     #[allow(clippy::mut_mut)] // Another false positive.

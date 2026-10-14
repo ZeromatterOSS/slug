@@ -84,12 +84,9 @@ fn pending_recipes_keep_live_aliases_through_gc_and_root_context_cleanup() {
     );
     {
         let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:pending_gc.bzl");
-        let mut eval = Evaluator::new(&module);
-        eval.extra = Some(&context);
-        eval.eval_module(
-            AstModule::parse(
-                "pending_gc.bzl",
-                r#"
+        let ast = AstModule::parse(
+            "pending_gc.bzl",
+            r#"
 i = cc_common.internal_DO_NOT_USE()
 P = provider(fields = ["variables", "files", "mutable"])
 mutable = ["before"]
@@ -97,13 +94,20 @@ files = depset([FILE])
 variables = i.cc_toolchain_variables(vars = {"unused": mutable, "files": files})
 context = P(variables = variables, files = files, mutable = mutable)
 "#
-                .to_owned(),
-                &Dialect::Bazel,
-            )
-            .unwrap(),
-            &loading_globals(),
+            .to_owned(),
+            &Dialect::Bazel,
         )
         .unwrap();
+        let prepared = crate::bzl_module::test_source::prepare(
+            &module,
+            &ast,
+            context.source_identity().clone(),
+            &[],
+        )
+        .unwrap();
+        let mut eval = Evaluator::new(&module);
+        eval.extra = Some(prepared.context());
+        eval.eval_module(ast, &loading_globals()).unwrap();
     }
     let action = fixture::action(crate::artifact_root::test_root());
     for normal_action_count in [0, 1] {

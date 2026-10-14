@@ -18,6 +18,14 @@ fn evaluate(source: &str, imported: Option<&FrozenModule>) -> Result<FrozenModul
             &loading_globals(),
         )
         .map_err(|error| error.to_string())?;
+    if let Some(value) = module.get("p") {
+        if let Some(wrapper) = TemplateVariableInfoValue::from_value(value) {
+            assert!(std::ptr::eq(
+                template_variable_info_ref(value).unwrap(),
+                &wrapper.0
+            ));
+        }
+    }
     module.freeze().map_err(|error| format!("{error:?}"))
 }
 
@@ -158,7 +166,15 @@ fn frozen_provider_reads_remain_mutable_and_frozen_constructor_mints_new_occurre
     )
     .unwrap();
     let original = producer.get("p").unwrap();
+    let borrowed = template_variable_info_ref(original.value()).unwrap();
+    assert!(std::ptr::eq(
+        borrowed,
+        &TemplateVariableInfoValue::from_value(original.value())
+            .unwrap()
+            .0
+    ));
     let identity = template_variable_info(original.value()).unwrap();
+    assert!(std::ptr::eq(borrowed.variables(), identity.variables()));
     let consumer = evaluate(
         r#"
 copy = p.variables
@@ -184,6 +200,13 @@ checks = [p.variables == {"A": "one"}, q.variables == {"B": "two"}, p != fresh]
     );
     let heap = FrozenHeap::new();
     let restored = alloc_frozen_template_variable_info(&heap, identity.clone());
+    assert!(std::ptr::eq(
+        template_variable_info_ref(restored.to_value())
+            .unwrap()
+            .variables(),
+        identity.variables()
+    ));
+    assert!(template_variable_info_ref(Value::new_none()).is_none());
     assert_eq!(
         identity,
         template_variable_info(restored.to_value()).unwrap()

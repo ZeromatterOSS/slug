@@ -24,6 +24,20 @@ use slug_identity_v2::CanonicalLabel;
 use super::*;
 
 #[derive(Debug)]
+struct CallbackOriginals;
+impl PublishedOriginalBinding for CallbackOriginals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        1
+    }
+    fn imported_arenas(&self) -> &[PublishedValueArena] {
+        &[]
+    }
+}
+
+#[derive(Debug)]
 struct FailAtExpansion;
 impl RuntimeMapper for FailAtExpansion {
     fn map_batch(
@@ -86,8 +100,18 @@ fn callback_owner() -> ConfiguredNodeResult {
             }),
         )
         .unwrap();
-    let mapper =
-        RetainedArgsMapper::new(graph.finish().unwrap(), root, Arc::new(FailAtExpansion)).unwrap();
+    graph
+        .set_original_slot(root, PublishedRootSlot::new(0).unwrap())
+        .unwrap();
+    let mapper = RetainedArgsMapper::from_published(
+        graph
+            .seal(Arc::new(CallbackOriginals))
+            .unwrap()
+            .value(root)
+            .unwrap(),
+        Arc::new(FailAtExpansion),
+    )
+    .unwrap();
     let recipe = RetainedArgsRecipe::new(
         vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
             RetainedVectorSource::Mapped {

@@ -323,25 +323,73 @@ async fn native_compile_snapshots_tools_but_publishes_final_live_recipes_in_regi
             .find(|(name, _)| name == "live")
             .unwrap();
         assert_eq!(strings(&live.1), ["before", "after"]);
-        assert!(
-            recipe
-                .data()
-                .compilation_context
-                .publication_eq(final_context)
-        );
-        let AnalysisValueKind::Depset(headers) = member(final_context, "headers").kind() else {
-            panic!("context headers depset");
+        let raw_context = &recipe.data().compilation_context;
+        assert!(raw_context.original_origin().is_none());
+        assert!(final_context.original_origin().is_some());
+        assert!(!raw_context.publication_eq(final_context));
+        let (AnalysisValueKind::Provider(raw), AnalysisValueKind::Provider(projected)) =
+            (raw_context.kind(), final_context.kind())
+        else {
+            panic!("native/projected compilation contexts");
         };
+        assert_eq!(raw.identity(), projected.identity());
+        assert_eq!(raw.has_schema(), projected.has_schema());
+        assert_eq!(raw.fields(), projected.fields());
+        for (name, raw_field) in raw.fields() {
+            let projected_field = projected.field(name).unwrap();
+            match (raw_field.kind(), projected_field.kind()) {
+                (AnalysisValueKind::Depset(raw), AnalysisValueKind::Depset(projected)) => {
+                    assert!(raw.shares_occurrence_with(projected), "{name}");
+                    assert_eq!(raw.order(), projected.order(), "{name}");
+                    assert_eq!(raw.depth(), projected.depth(), "{name}");
+                    assert_eq!(raw.to_list(), projected.to_list(), "{name}");
+                }
+                (
+                    AnalysisValueKind::CcHeaderInfo(raw),
+                    AnalysisValueKind::CcHeaderInfo(projected),
+                ) => {
+                    assert_eq!(raw.occurrence(), projected.occurrence(), "{name}");
+                    // Both typed native facades retain the same immutable model;
+                    // compare its full payload/alias graph, without outer origins.
+                    assert!(
+                        AnalysisValue::cc_header_info(raw.clone())
+                            .publication_eq(&AnalysisValue::cc_header_info(projected.clone())),
+                        "{name}"
+                    );
+                }
+                _ => {}
+            }
+        }
+        let AnalysisValueKind::Depset(headers) = member(raw_context, "headers").kind() else {
+            panic!("raw context headers depset");
+        };
+        let AnalysisValueKind::Depset(projected_headers) = member(final_context, "headers").kind()
+        else {
+            panic!("projected context headers depset");
+        };
+        assert!(headers.shares_occurrence_with(projected_headers));
         let mut relinked = recipe.data().clone();
         relinked.construction.declared_headers =
             ArtifactInputs::new(vec![slug_build_api_v2::ArtifactInputSource::Depset(
                 slug_build_api_v2::RetainedArtifactInputs::new(headers.clone()).unwrap(),
             )]);
-        // Equality's shared alias bijection would reject this relinking if the
-        // native bridge had eagerly copied the context's depset occurrence.
+        // Compare within the raw native domain. The separate occurrence check
+        // above connects it to the returned original-backed context.
         assert!(
             recipe == &slug_build_api_v2::CppCompileSpec::new(relinked).unwrap(),
-            "declared-header role must share the published context's depset"
+            "declared-header role must share the native context's depset"
+        );
+        let copied_headers =
+            slug_build_api_v2::AnalysisDepset::new(headers.order(), headers.to_list(), Vec::new())
+                .unwrap();
+        let mut split = recipe.data().clone();
+        split.construction.declared_headers =
+            ArtifactInputs::new(vec![slug_build_api_v2::ArtifactInputSource::Depset(
+                slug_build_api_v2::RetainedArtifactInputs::new(copied_headers).unwrap(),
+            )]);
+        assert!(
+            recipe != &slug_build_api_v2::CppCompileSpec::new(split).unwrap(),
+            "equal header contents must not hide a split occurrence"
         );
         assert_eq!(
             recipe.object_output().root_relative_path(),

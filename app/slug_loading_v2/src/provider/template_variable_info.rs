@@ -161,6 +161,10 @@ pub(super) fn construct<'v>(
         ))))
 }
 
+/// Borrow the actual native payload before forecasting its complete copy shape.
+pub fn template_variable_info_ref(value: Value<'_>) -> Option<&TemplateVariableInfo> {
+    TemplateVariableInfoValue::from_value(value).map(|value| &value.0)
+}
 pub fn template_variable_info(value: Value<'_>) -> Option<TemplateVariableInfo> {
     TemplateVariableInfoValue::from_value(value).map(|value| value.0.clone())
 }

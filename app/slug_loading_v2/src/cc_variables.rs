@@ -265,6 +265,115 @@ pub fn is_cc_variables_value(value: Value<'_>) -> bool {
     Variables::from_value(value).is_some()
 }
 
+/// Borrowed facade header; does not snapshot or lock the semantic seed.
+pub struct CcVariablesHeader<'v> {
+    pub kind: CcVariablesKind,
+    pub occurrence: &'v CcVariablesOccurrence,
+    pub parent: Option<Value<'v>>,
+    pub local_count: usize,
+}
+pub fn cc_variables_header<'v>(value: Value<'v>) -> Option<CcVariablesHeader<'v>> {
+    fn header<'v, V: ValueLike<'v>>(v: &'v VariablesGen<V>) -> CcVariablesHeader<'v> {
+        CcVariablesHeader {
+            kind: v.kind,
+            occurrence: &v.occurrence,
+            parent: v.parent.map(ValueLike::to_value),
+            local_count: v.names.len(),
+        }
+    }
+    Some(match Variables::from_value(value)? {
+        starlark::__macro_refs::Either::Left(v) => header(v),
+        starlark::__macro_refs::Either::Right(v) => header(v),
+    })
+}
+pub fn visit_cc_variables_locals<'v, E>(
+    value: Value<'v>,
+    visit: &mut dyn FnMut(&str, Value<'v>) -> Result<(), E>,
+) -> Option<Result<(), E>> {
+    fn locals<'v, V: ValueLike<'v>, E>(
+        v: &VariablesGen<V>,
+        visit: &mut dyn FnMut(&str, Value<'v>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        for (name, value) in v.names.iter().zip(v.values.iter()) {
+            visit(name, value.to_value())?;
+        }
+        Ok(())
+    }
+    Some(match Variables::from_value(value)? {
+        starlark::__macro_refs::Either::Left(v) => locals(v, visit),
+        starlark::__macro_refs::Either::Right(v) => locals(v, visit),
+    })
+}
+/// Charge all copied seed storage before copying. The callback must only perform
+/// checked scalar budget accounting: no recursion, evaluator or DICE work. All
+/// returned Value handles are inspected after the live-cache lock is released.
+pub fn snapshot_cc_variables_seed_bounded<'v, E>(
+    value: Value<'v>,
+    charge: &mut dyn FnMut(usize, usize) -> Result<(), E>,
+) -> Result<Option<Vec<(CompactString, CcVariableCacheEntry<Value<'v>>)>>, E> {
+    fn snapshot<'v, V: ValueLike<'v>, E>(
+        v: &VariablesGen<V>,
+        charge: &mut dyn FnMut(usize, usize) -> Result<(), E>,
+    ) -> Result<Vec<(CompactString, CcVariableCacheEntry<Value<'v>>)>, E> {
+        fn bounded<'a, 'v, V: ValueLike<'v> + 'a, E>(
+            count: usize,
+            entries: impl Clone + Iterator<Item = (&'a Name, &'a Entry<V>)>,
+            charge: &mut dyn FnMut(usize, usize) -> Result<(), E>,
+        ) -> Result<Vec<(CompactString, CcVariableCacheEntry<Value<'v>>)>, E> {
+            charge(
+                count.saturating_mul(std::mem::size_of::<(
+                    CompactString,
+                    CcVariableCacheEntry<Value<'v>>,
+                )>()),
+                count,
+            )?;
+            for (name, entry) in entries.clone() {
+                charge(name.0.len(), 0)?;
+                match entry {
+                    Entry::Value(_) => charge(0, 1)?,
+                    Entry::Sequence(values) => charge(
+                        values
+                            .len()
+                            .saturating_mul(std::mem::size_of::<Value<'v>>()),
+                        values.len(),
+                    )?,
+                    Entry::Error(message) => charge(message.len(), 0)?,
+                    Entry::Missing => {}
+                }
+            }
+            Ok(entries
+                .map(|(name, entry)| {
+                    let entry = match entry {
+                        Entry::Value(v) => CcVariableCacheEntry::Value(v.to_value()),
+                        Entry::Sequence(v) => {
+                            CcVariableCacheEntry::Sequence(v.iter().map(|v| v.to_value()).collect())
+                        }
+                        Entry::Missing => CcVariableCacheEntry::Missing,
+                        Entry::Error(message) => CcVariableCacheEntry::Error(message.clone()),
+                    };
+                    (name.0.clone(), entry)
+                })
+                .collect())
+        }
+        match &v.cache {
+            Cache::Live(cache) => {
+                let guard = cache.0.lock().expect("C++ variable cache is not poisoned");
+                bounded(guard.len(), guard.iter(), charge)
+            }
+            Cache::Frozen(cache) => bounded(
+                cache.len(),
+                cache.iter().map(|(name, entry)| (name, entry)),
+                charge,
+            ),
+        }
+    }
+    match Variables::from_value(value) {
+        Some(starlark::__macro_refs::Either::Left(v)) => snapshot(v, charge).map(Some),
+        Some(starlark::__macro_refs::Either::Right(v)) => snapshot(v, charge).map(Some),
+        None => Ok(None),
+    }
+}
+
 pub fn cc_variables_value(value: Value<'_>) -> Option<CcVariablesView<'_>> {
     fn view<'v, V: ValueLike<'v>>(v: &VariablesGen<V>) -> CcVariablesView<'v> {
         CcVariablesView {

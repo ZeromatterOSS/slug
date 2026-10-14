@@ -52,11 +52,10 @@ fn depset() -> AnalysisDepset {
 fn recipe(captured: AnalysisDepset) -> RetainedArgsRecipe {
     let mut graph = CallableGraphBuilder::new();
     let capture = graph.reserve().unwrap();
+    let atom = graph.native_atom(AnalysisValue::depset(captured)).unwrap();
+    graph.set_node(capture, CallableNode::Native(atom)).unwrap();
     graph
-        .set_node(
-            capture,
-            CallableNode::Native(AnalysisValue::depset(captured)),
-        )
+        .set_original_slot(capture, PublishedRootSlot::new(capture.index()).unwrap())
         .unwrap();
     let root = graph.reserve().unwrap();
     graph
@@ -66,12 +65,17 @@ fn recipe(captured: AnalysisDepset) -> RetainedArgsRecipe {
                 api: NativeCallableApiId::new("test.result_mapper", 1).unwrap(),
                 parameters: Arc::from([]),
                 return_annotation: None,
-                receiver: Some(capture),
+                receiver: Some(PublishedEdge::Local(capture)),
             }),
         )
         .unwrap();
+    graph
+        .set_original_slot(root, PublishedRootSlot::new(root.index()).unwrap())
+        .unwrap();
+    let arena = graph.seal(Arc::new(DescriptorOriginals)).unwrap();
     let mapper =
-        RetainedArgsMapper::new(graph.finish().unwrap(), root, Arc::new(NeverRender)).unwrap();
+        RetainedArgsMapper::from_published(arena.value(root).unwrap(), Arc::new(NeverRender))
+            .unwrap();
     RetainedArgsRecipe::new(
         vec![RetainedArgCall::AddAll(RetainedVectorArg::new(
             RetainedVectorSource::Mapped {
@@ -254,4 +258,20 @@ fn result_joint_publication_keeps_non_args_fields_action_context_and_count() {
         value.actions = actions.into();
     });
     assert_eq!(original, original.clone());
+}
+
+// This test never invokes callbacks. The binding supplies only descriptor root
+// slots; the fail-on-render driver above enforces that publication stays native.
+#[derive(Debug)]
+struct DescriptorOriginals;
+impl PublishedOriginalBinding for DescriptorOriginals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        2
+    }
+    fn imported_arenas(&self) -> &[PublishedValueArena] {
+        &[]
+    }
 }

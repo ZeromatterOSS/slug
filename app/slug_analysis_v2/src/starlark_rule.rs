@@ -2118,7 +2118,6 @@ pub(crate) fn evaluate_loaded_rule(
     dependencies: Vec<PreparedDependency>,
     resolved_attributes: Vec<ResolvedRuleAttribute>,
     configured_attributes: Vec<PreparedConfiguredAttribute>,
-    rust_helpers: Arc<[slug_loading_v2::PreparedRustToolchainHelperBinding]>,
     exec_groups: ConfiguredExecGroupCollection,
     platform_cpu: CompactString,
     runfiles_packages: RunfilesPackageDepset,
@@ -2168,6 +2167,12 @@ pub(crate) fn evaluate_loaded_rule(
         None => None,
     };
 
+    let source_authorities = source_authorities::compose(
+        implementation,
+        &dependencies,
+        &configured_attributes,
+        &exec_groups,
+    )?;
     let action_contexts = exec_groups
         .rows()
         .iter()
@@ -2182,6 +2187,19 @@ pub(crate) fn evaluate_loaded_rule(
             .expect("configured execution groups require a default row")
             .action_context()
             .clone(),
+    )?;
+    let function_symbols = function_owner::prepare(
+        package,
+        implementation,
+        &key,
+        &workspace_status,
+        &dependencies,
+        &resolved_attributes,
+        &configured_attributes,
+        &exec_groups,
+        &platform_cpu,
+        &runfiles_packages,
+        &cc_context,
     )?;
     let output_root = DerivedArtifactRoot::bin(
         key.configuration()
@@ -2329,8 +2347,7 @@ pub(crate) fn evaluate_loaded_rule(
         toolchain,
         prepared_exec_groups,
     ) = {
-        let mut materializer =
-            AnalysisValueMaterializer::new(module.frozen_heap()).with_rust_helpers(&rust_helpers);
+        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
         let (attribute_file, attribute_files) = attribute_files::materialize(
             implementation.schema(),
             &dependencies,
@@ -2389,8 +2406,7 @@ pub(crate) fn evaluate_loaded_rule(
         )
     };
     let prepared_subrules = {
-        let mut materializer =
-            AnalysisValueMaterializer::new(module.frozen_heap()).with_rust_helpers(&rust_helpers);
+        let mut materializer = AnalysisValueMaterializer::new(module.frozen_heap());
         implementation
             .subrule_invocations()
             .map(|(identity, _, _, fragments)| {
@@ -2419,18 +2435,17 @@ pub(crate) fn evaluate_loaded_rule(
             action_sink.clone(),
             cpp_fragment,
             coverage_fragment,
-            crate::analysis_value::rust_toolchain::merge_helper_sources(
-                implementation.source_identities_by_filename(),
-                &rust_helpers,
-            )?,
+            source_authorities.clone(),
         )
-        .with_rust_toolchain_helpers(rust_helpers.clone())
         .with_host_os(
             key.configuration()
                 .slug_configuration()
                 .and_then(|configuration| configuration.execution_host_os().ok()),
         );
         let mut evaluator = Evaluator::new(&module);
+        evaluator
+            .set_function_symbol_session(function_symbols)
+            .map_err(|error| error.to_string())?;
         evaluator.extra = Some(&analysis_context);
         if let Some(print_handler) = print_handler {
             evaluator.set_print_handler(print_handler);
@@ -2488,25 +2503,27 @@ pub(crate) fn evaluate_loaded_rule(
 
     let returned = build_info_transform::returned_providers(returned);
     let mut lowerer = AnalysisValueLowerer::from_module(&module);
+    let mut publisher = args_callbacks::Publisher::new(&module);
     let mut provider_values = Vec::with_capacity(returned.len());
+    let mut original_providers = Vec::new();
     for (index, value) in returned.into_iter().enumerate() {
         if slug_loading_v2::provider::is_default_xcode_version_info(value) {
             // The pinned default Xcode provider has callable fields. Retain its
             // validated semantic variant instead of asking the generic value
             // lowerer to serialize evaluator-local Starlark functions.
-            provider_values.push(ProviderValue::XcodeVersionInfo(
+            provider_values.push(Some(ProviderValue::XcodeVersionInfo(
                 slug_build_api_v2::XcodeVersionInfo::default_empty_version(),
-            ));
+            )));
         } else if let Some(info) = slug_loading_v2::provider::run_environment_info(value) {
             run_environment_info::validate_declaration(rule_capability.as_ref())?;
-            provider_values.push(ProviderValue::RunEnvironmentInfo(info));
+            provider_values.push(Some(ProviderValue::RunEnvironmentInfo(info)));
         } else if let Some(info) = slug_loading_v2::provider::feature_flag_info(value) {
-            provider_values.push(ProviderValue::FeatureFlagInfo(info));
+            provider_values.push(Some(ProviderValue::FeatureFlagInfo(info)));
         } else if let Some(fields) = StarlarkDefaultInfo::fields_from_value(value) {
             let test_rule = rule_capability.as_ref().is_some_and(|capability| {
                 capability.test_kind == Some(slug_loading_v2::package::TestRuleKind::Test)
             });
-            provider_values.push(ProviderValue::DefaultInfo(lower_default_info(
+            provider_values.push(Some(ProviderValue::DefaultInfo(lower_default_info(
                 fields,
                 index,
                 &resolved_attributes,
@@ -2516,38 +2533,84 @@ pub(crate) fn evaluate_loaded_rule(
                 &output_root,
                 test_rule,
                 &mut lowerer,
-            )?));
-        } else {
+            )?)));
+        } else if let Some(info) = crate::package_specification::from_value(value) {
+            provider_values.push(Some(ProviderValue::PackageSpecificationInfo(info)));
+        } else if let Some(info) = slug_loading_v2::template_variable_info(value) {
+            provider_values.push(Some(ProviderValue::TemplateVariableInfo(info)));
+        } else if slug_loading_v2::provider::StarlarkOutputGroupInfo::fields_from_value(value)
+            .is_some()
+        {
             let lowered = lowerer.lower(value, &format!("$[{index}]"))?;
-            if let AnalysisValueKind::PackageSpecificationInfo(info) = lowered.kind() {
-                provider_values.push(ProviderValue::PackageSpecificationInfo(info.clone()));
-                continue;
-            }
-            if let AnalysisValueKind::TemplateVariableInfo(info) = lowered.kind() {
-                provider_values.push(ProviderValue::TemplateVariableInfo(info.dupe()));
-                continue;
-            }
             let AnalysisValueKind::Provider(provider) = lowered.kind() else {
-                return Err(format!(
-                    "rule implementation returned non-provider value `{}`",
-                    value.to_repr()
-                )
-                .into());
+                return Err("OutputGroupInfo lowering did not produce provider"
+                    .to_owned()
+                    .into());
             };
-            if provider.identity().is_builtin("OutputGroupInfo") {
-                let groups = slug_build_api_v2::OutputGroupInfo::from_occurrence(provider)
-                    .map_err(|error| error.to_string())?;
-                if groups.groups().contains_key("_validation_transitive") {
-                    return Err("configured _validation_transitive override is unsupported"
-                        .to_owned()
-                        .into());
-                }
-                provider_values.push(ProviderValue::OutputGroupInfo(groups));
-            } else {
-                provider_values.push(ProviderValue::Occurrence(provider.clone()));
+            let groups = slug_build_api_v2::OutputGroupInfo::from_occurrence(provider)
+                .map_err(|error| error.to_string())?;
+            if groups.groups().contains_key("_validation_transitive") {
+                return Err("configured _validation_transitive override is unsupported"
+                    .to_owned()
+                    .into());
             }
+            provider_values.push(Some(ProviderValue::OutputGroupInfo(groups)));
+        } else {
+            let node = publisher.capture(value, &mut lowerer)?;
+            original_providers.push((provider_values.len(), node));
+            // Complete this placeholder only after the actual module freezes.
+            provider_values.push(None);
         }
     }
+    // Move phase-private registrations out of the sink before publication.
+    // No callback inspection, evaluation or DICE work runs under this lock.
+    let mut pending_actions = {
+        let mut guard = actions
+            .lock()
+            .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
+        std::mem::replace(
+            &mut *guard,
+            CtxActions::<PendingRegisteredAction>::new_typed(output_root.clone()),
+        )
+    };
+    cc_compile_action::finalize(&module, &mut lowerer, &mut pending_actions)
+        .map_err(|error| error.to_string())?;
+    let prepared = pending_actions
+        .registry()
+        .actions()
+        .iter()
+        .map(|action| {
+            let inputs = action.lower_inputs(&module, &mut lowerer, &executable_provenance)?;
+            action.prepare_with_inputs(&module, inputs, &mut |snapshot| {
+                publisher.prepare(snapshot, &mut lowerer)
+            })
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map_err(|error| error.to_string())?;
+    let graph = publisher
+        .seal(&mut lowerer)
+        .map_err(|error| error.to_string())?;
+    drop(lowerer);
+    let frozen_module = module
+        .freeze()
+        .map_err(|error| format!("Args publication freeze failed: {error:?}"))?;
+    let frozen_roots = frozen_module
+        .owned_extra_value()
+        .ok_or_else(|| "missing frozen Args publication root".to_owned())?;
+    let publisher = args_callbacks::FrozenPublisher::new(graph, frozen_roots)?;
+    for (index, node) in original_providers {
+        let value = publisher.value(node)?;
+        let AnalysisValueKind::Provider(provider) = value.kind() else {
+            return Err("rule implementation returned a non-provider value"
+                .to_owned()
+                .into());
+        };
+        provider_values[index] = Some(ProviderValue::Occurrence(provider.clone()));
+    }
+    let mut provider_values = provider_values
+        .into_iter()
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(|| "uncompleted provider publication".to_owned())?;
     if !provider_values
         .iter()
         .any(|provider| matches!(provider, ProviderValue::DefaultInfo(_)))
@@ -2591,43 +2654,7 @@ pub(crate) fn evaluate_loaded_rule(
                 .clone(),
         });
     }
-    // Move phase-private registrations out of the sink before publication.
-    // No callback inspection, evaluation or DICE work runs under this lock.
-    let mut pending_actions = {
-        let mut guard = actions
-            .lock()
-            .map_err(|_| "ctx.actions state lock is poisoned".to_owned())?;
-        std::mem::replace(
-            &mut *guard,
-            CtxActions::<PendingRegisteredAction>::new_typed(output_root.clone()),
-        )
-    };
-    cc_compile_action::finalize(&module, &mut lowerer, &mut pending_actions)
-        .map_err(|error| error.to_string())?;
-    let mut publisher = args_callbacks::Publisher::new(&module);
-    let prepared = pending_actions
-        .registry()
-        .actions()
-        .iter()
-        .map(|action| {
-            let inputs = action.lower_inputs(&module, &mut lowerer, &executable_provenance)?;
-            action.prepare_with_inputs(&module, inputs, &mut |snapshot| {
-                publisher.prepare(snapshot, &mut lowerer)
-            })
-        })
-        .collect::<anyhow::Result<Vec<_>>>()
-        .map_err(|error| error.to_string())?;
-    let graph = publisher
-        .seal(&mut lowerer)
-        .map_err(|error| error.to_string())?;
-    drop(lowerer);
-    let frozen_module = module
-        .freeze()
-        .map_err(|error| format!("Args publication freeze failed: {error:?}"))?;
-    let frozen_roots = frozen_module
-        .owned_extra_value()
-        .ok_or_else(|| "missing frozen Args publication root".to_owned())?;
-    let publisher = args_callbacks::FrozenPublisher::new(graph, frozen_roots);
+
     let mut prepared = prepared.into_iter();
     let mut actions = pending_actions
         .try_map::<slug_build_api_v2::ActionSpec, anyhow::Error>(|_| {
@@ -2680,6 +2707,8 @@ mod integer_list_projection_tests {
 
 mod args_callbacks;
 mod build_info_transform;
+mod function_owner;
+mod source_authorities;
 use args_callbacks::pending::PendingCommandLine;
 use args_callbacks::pending::PendingRegisteredAction;
 mod coverage_common;

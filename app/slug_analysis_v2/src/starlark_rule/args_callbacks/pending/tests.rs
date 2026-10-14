@@ -27,7 +27,10 @@ fn gc_helpers(builder: &mut GlobalsBuilder) {
     fn collect(eval: &mut Evaluator<'_, '_, '_>) -> anyhow::Result<NoneType> {
         // The actual Starlark call supplies an initialized bytecode frame.
         // No native argument Value is held across this collection.
-        unsafe { eval.garbage_collect() };
+        unsafe {
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?
+        };
         Ok(NoneType)
     }
 }

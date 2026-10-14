@@ -108,6 +108,13 @@ impl<T> SmallSet<T> {
         self.0.capacity()
     }
 
+    /// Conservative retained backing bytes, excluding inline `Self` and
+    /// element-owned payloads. Counts spare entries and hidden index storage
+    /// without allocation; checked overflow is reported as `None`.
+    pub fn retained_storage_bytes_upper_bound(&self) -> Option<usize> {
+        self.0.retained_storage_bytes_upper_bound()
+    }
+
     /// Iterate the element references.
     #[inline]
     pub fn iter(&self) -> Iter<'_, T> {

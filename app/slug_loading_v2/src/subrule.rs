@@ -33,6 +33,7 @@ use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
 use starlark::values::Value;
+use starlark::values::ValueLike;
 use starlark::values::list::ListRef;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
@@ -433,6 +434,24 @@ impl<'v> StarlarkValue<'v> for DeferredSubruleRuleImplementation {
         };
         Err(starlark::Error::new_other(anyhow::anyhow!(message)))
     }
+}
+
+/// Borrow only the real function used by this concrete host wrapper. Execution
+/// continues through the wrapper and its original context/diagnostic checks.
+pub(crate) fn owner_rule_function(value: FrozenValue) -> Option<FrozenValue> {
+    let function = value
+        .to_value()
+        .downcast_ref::<DeferredSubruleRuleImplementation>()
+        .map_or(value, |wrapper| wrapper.implementation);
+    starlark::eval::is_starlark_def(function.to_value()).then_some(function)
+}
+
+pub(crate) fn owner_subrule_function(value: FrozenValue) -> Option<FrozenValue> {
+    let function = value
+        .to_value()
+        .downcast_ref::<FrozenSubruleDefinition>()?
+        .implementation;
+    starlark::eval::is_starlark_def(function.to_value()).then_some(function)
 }
 
 pub(crate) fn fail_closed_rule_implementation(
@@ -951,3 +970,7 @@ mod tests {
         assert!(configured.skip_analysis_time_filetype_check());
     }
 }
+
+#[cfg(test)]
+#[path = "subrule/owner_function_tests.rs"]
+mod owner_function_tests;

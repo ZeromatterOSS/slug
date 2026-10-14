@@ -19,17 +19,17 @@ use crate::BzlModuleIdentity;
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 pub(super) struct DefiningBzlModuleContext {
-    label: CanonicalLabel,
-    repository_mapping: Arc<[(ApparentRepoName, CanonicalRepoName)]>,
+    identity: BzlModuleIdentity,
     source_manifest: Option<Arc<BzlLoadManifest>>,
+    function_owner: Option<slug_build_api_v2::published_value::FunctionEvaluationOwner>,
 }
 
 impl DefiningBzlModuleContext {
     pub(super) fn label(&self) -> &CanonicalLabel {
-        &self.label
+        &self.identity.label
     }
     pub(super) fn repository_mapping(&self) -> &[(ApparentRepoName, CanonicalRepoName)] {
-        &self.repository_mapping
+        &self.identity.repository_mapping
     }
 }
 
@@ -51,9 +51,9 @@ pub(crate) fn attach_defining_module_context(
     identity: &BzlModuleIdentity,
 ) -> anyhow::Result<()> {
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
-        label: identity.label.clone(),
-        repository_mapping: identity.repository_mapping.clone(),
+        identity: identity.clone(),
         source_manifest: None,
+        function_owner: None,
     }))
 }
 
@@ -64,9 +64,9 @@ pub(crate) fn attach_defining_module_manifest(
     manifest: &BzlLoadManifest,
 ) -> anyhow::Result<()> {
     module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
-        label: manifest.root.label.clone(),
-        repository_mapping: manifest.root.repository_mapping.clone(),
+        identity: manifest.root.clone(),
         source_manifest: Some(Arc::new(manifest.clone())),
+        function_owner: None,
     }))
 }
 
@@ -81,4 +81,63 @@ pub fn defining_module_source_manifest(
     DefiningBzlModuleContext::from_value(original_module_client_data)?
         .source_manifest
         .as_deref()
+}
+
+/// Borrow actual lexical source identity; no filename lookup is performed.
+pub fn defining_module_identity(data: Value<'_>) -> Option<&BzlModuleIdentity> {
+    Some(&DefiningBzlModuleContext::from_value(data)?.identity)
+}
+
+pub(crate) fn attach_defining_module_owner(
+    module: &Module,
+    manifest: &BzlLoadManifest,
+    owner: slug_build_api_v2::published_value::FunctionEvaluationOwner,
+) -> anyhow::Result<()> {
+    module.set_client_data_no_overwrite(module.heap().alloc_simple(DefiningBzlModuleContext {
+        identity: manifest.root.clone(),
+        source_manifest: Some(Arc::new(manifest.clone())),
+        function_owner: Some(owner),
+    }))
+}
+pub(crate) fn defining_module_function_owner(
+    data: Value<'_>,
+) -> Option<&slug_build_api_v2::published_value::FunctionEvaluationOwner> {
+    DefiningBzlModuleContext::from_value(data)?
+        .function_owner
+        .as_ref()
+}
+
+/// Verify actual original-module provenance against the current admitted source
+/// closure. Filenames are diagnostic metadata only and never select authority.
+pub(crate) fn validate_defining_module_source<'v>(
+    data: Value<'v>,
+    admitted: &[(compact_str::CompactString, crate::BzlModuleSourceProvenance)],
+) -> anyhow::Result<&'v BzlModuleIdentity> {
+    let manifest = defining_module_source_manifest(data).ok_or_else(|| {
+        anyhow::anyhow!("source-sensitive builtin requires actual defining .bzl manifest")
+    })?;
+    let root = manifest
+        .reachable
+        .iter()
+        .find(|p| p.identity == manifest.root)
+        .ok_or_else(|| anyhow::anyhow!("actual defining .bzl manifest has no root provenance"))?;
+    let mut found = false;
+    for (_, candidate) in admitted {
+        if candidate.identity.label == root.identity.label {
+            if candidate != root {
+                anyhow::bail!(
+                    "conflicting original module provenance for {}",
+                    root.identity.label
+                );
+            }
+            found = true;
+        }
+    }
+    if !found {
+        anyhow::bail!(
+            "original module is absent from the current admitted source closure: {}",
+            root.identity.label
+        );
+    }
+    Ok(&manifest.root)
 }

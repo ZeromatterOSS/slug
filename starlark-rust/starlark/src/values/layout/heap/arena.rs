@@ -105,6 +105,11 @@ impl<'v, T: AValue<'v>> Reservation<'v, T> {
         }
     }
 
+    /// Raw target payload storage. Only use after fill, with exclusive trace access.
+    pub(in crate::values::layout) fn payload_ptr(&self) -> *mut T::StarlarkValue {
+        unsafe { std::ptr::addr_of_mut!((*self.pointer).payload) }
+    }
+
     pub(crate) fn ptr(&self) -> &'v AValueHeader {
         unsafe { &(*self.pointer).header }
     }

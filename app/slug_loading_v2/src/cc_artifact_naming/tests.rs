@@ -25,13 +25,17 @@ const SOURCE: &str = include_str!(concat!(
 fn definition(label: &str, source: &str) -> FrozenModule {
     let module = Module::new();
     let context = BzlEvaluationContext::new(label);
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse("definition.bzl", source.to_owned(), &Dialect::Bazel).unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse("definition.bzl", source.to_owned(), &Dialect::Bazel).unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
     )
     .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     module.freeze().unwrap()
 }

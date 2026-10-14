@@ -1,4 +1,7 @@
 //! Actual bound callables retain receivers and occurrence aliases across consumers.
+use slug_build_api_v2::published_value::PublishedNode;
+use slug_build_api_v2::published_value::PublishedNodeId;
+use slug_build_api_v2::published_value::PublishedValueArena;
 use starlark::environment::Globals;
 use starlark::environment::GlobalsBuilder;
 use starlark::environment::Module;
@@ -6,8 +9,9 @@ use starlark::eval::Evaluator;
 use starlark::syntax::AstModule;
 use starlark::syntax::Dialect;
 use starlark::values::list::AllocList;
+use starlark::values::tuple::AllocTuple;
 
-use super::graph::ArgsCallableGraphBuilder;
+use super::graph::PublicationBuilder;
 use super::runtime::ArgsRuntimeLimits;
 use super::runtime::StarlarkRuntimeMapper;
 use super::*;
@@ -83,7 +87,10 @@ fn gc_helpers(builder: &mut GlobalsBuilder) {
             512
         ]));
         let before = eval.heap().allocated_bytes();
-        unsafe { eval.garbage_collect() };
+        unsafe {
+            eval.garbage_collect()
+                .map_err(|error| error.into_anyhow())?
+        };
         Ok(eval.heap().allocated_bytes() < before)
     }
 }
@@ -129,8 +136,8 @@ mapper = make()
 }
 
 fn recipe(
-    graph: &CallableGraph,
-    nodes: [CallableNodeId; 2],
+    graph: &PublishedValueArena,
+    nodes: [PublishedNodeId; 2],
     callables: [OwnedFrozenValue; 2],
 ) -> RetainedArgsRecipe {
     let input = words("a", "b");
@@ -138,9 +145,8 @@ fn recipe(
         .into_iter()
         .zip(callables)
         .map(|(node, callable)| {
-            let mapper = RetainedArgsMapper::new(
-                graph.clone(),
-                node,
+            let mapper = RetainedArgsMapper::from_published(
+                graph.value(node).unwrap(),
                 Arc::new(StarlarkRuntimeMapper::new(callable)),
             )
             .unwrap();
@@ -193,16 +199,16 @@ fn bound_method_publication_preserves_wrapper_occurrences_receiver_aliases_and_c
     producer.set("second", second);
     producer.set("changed", changed);
     let mut lowerer = AnalysisValueLowerer::default();
-    let mut builder = ArgsCallableGraphBuilder::new(&producer);
+    let mut builder = PublicationBuilder::new(&producer);
     let a = builder.add_callable(first, &mut lowerer).unwrap();
     assert_eq!(a, builder.add_callable(first, &mut lowerer).unwrap());
     let b = builder.add_callable(second, &mut lowerer).unwrap();
     let c = builder.add_callable(changed, &mut lowerer).unwrap();
     let format = builder.add_callable(formatter, &mut lowerer).unwrap();
     assert_ne!(a, b);
-    let graph = builder.finish().unwrap();
+    let (graph, roots) = builder.finish();
     let receiver_node = |id| {
-        let CallableNode::Intrinsic(row) = graph.node(id).unwrap() else {
+        let PublishedNode::Intrinsic(row) = graph.node(id).unwrap() else {
             panic!("bound native method row")
         };
         row.receiver
@@ -214,17 +220,37 @@ fn bound_method_publication_preserves_wrapper_occurrences_receiver_aliases_and_c
         "distinct wrappers share the original receiver occurrence"
     );
     assert_ne!(receiver_node(a), receiver_node(c));
-    assert!(graph.publication_eq(a, &graph, b));
+    producer.set_extra_value(producer.heap().alloc(AllocTuple(roots)));
+    drop(lowerer);
+    let frozen = producer.freeze().unwrap();
+    let published = FrozenPublisher::new(graph, frozen.owned_extra_value().unwrap()).unwrap();
     assert!(
-        !graph.publication_eq(a, &graph, c),
+        published
+            .value(a)
+            .unwrap_err()
+            .contains("native API descriptors")
+    );
+    let graph = &published.graph;
+    assert!(
+        graph
+            .value(a)
+            .unwrap()
+            .publication_eq(&graph.value(b).unwrap())
+    );
+    assert!(
+        !graph
+            .value(a)
+            .unwrap()
+            .publication_eq(&graph.value(c).unwrap()),
         "changing the receiver changes callable publication"
     );
     assert!(
-        !graph.publication_eq(a, &graph, format),
+        !graph
+            .value(a)
+            .unwrap()
+            .publication_eq(&graph.value(format).unwrap()),
         "method metadata also participates"
     );
-    drop(lowerer);
-    let frozen = producer.freeze().unwrap();
     let aliased = recipe(
         &graph,
         [a, a],
@@ -262,18 +288,27 @@ fn bound_list_dict_methods_keep_mutated_receiver_snapshot_aliases_and_frozen_ref
         "values = ['before', 'kept']\nlookup = {'key': 'before'}\nindexer = values.index\nother_indexer = values.index\ngetter = lookup.get\nother_getter = lookup.get\n",
         &Globals::standard(),
     );
-    let indexer = producer.get("indexer").unwrap();
-    let getter = producer.get("getter").unwrap();
+    let baseline = Module::new();
+    evaluate(
+        &baseline,
+        "values = ['before', 'kept']\nlookup = {'key': 'before'}\nindexer = values.index\nother_indexer = values.index\ngetter = lookup.get\nother_getter = lookup.get\n",
+        &Globals::standard(),
+    );
     let mut before_lowerer = AnalysisValueLowerer::default();
-    let mut before_builder = ArgsCallableGraphBuilder::new(&producer);
+    let mut before_builder = PublicationBuilder::new(&baseline);
     let before_index = before_builder
-        .add_callable(indexer, &mut before_lowerer)
+        .add_callable(baseline.get("indexer").unwrap(), &mut before_lowerer)
         .unwrap();
     let before_get = before_builder
-        .add_callable(getter, &mut before_lowerer)
+        .add_callable(baseline.get("getter").unwrap(), &mut before_lowerer)
         .unwrap();
-    let before = before_builder.finish().unwrap();
+    let (before, before_roots) = before_builder.finish();
+    baseline.set_extra_value(baseline.heap().alloc(AllocTuple(before_roots)));
     drop(before_lowerer);
+    let baseline = baseline.freeze().unwrap();
+    let before = FrozenPublisher::new(before, baseline.owned_extra_value().unwrap()).unwrap();
+    let indexer = producer.get("indexer").unwrap();
+    let getter = producer.get("getter").unwrap();
     // Binding retains the actual receiver, including mutations before freeze.
     evaluate(
         &producer,
@@ -281,7 +316,7 @@ fn bound_list_dict_methods_keep_mutated_receiver_snapshot_aliases_and_frozen_ref
         &Globals::standard(),
     );
     let mut lowerer = AnalysisValueLowerer::default();
-    let mut builder = ArgsCallableGraphBuilder::new(&producer);
+    let mut builder = PublicationBuilder::new(&producer);
     let index = builder.add_callable(indexer, &mut lowerer).unwrap();
     assert_eq!(index, builder.add_callable(indexer, &mut lowerer).unwrap());
     let other_index = builder
@@ -292,9 +327,9 @@ fn bound_list_dict_methods_keep_mutated_receiver_snapshot_aliases_and_frozen_ref
     let other_get = builder
         .add_callable(producer.get("other_getter").unwrap(), &mut lowerer)
         .unwrap();
-    let graph = builder.finish().unwrap();
+    let (graph, roots) = builder.finish();
     let receiver = |id| {
-        let CallableNode::Intrinsic(row) = graph.node(id).unwrap() else {
+        let PublishedNode::Intrinsic(row) = graph.node(id).unwrap() else {
             panic!("bound method")
         };
         row.receiver.unwrap()
@@ -303,10 +338,25 @@ fn bound_list_dict_methods_keep_mutated_receiver_snapshot_aliases_and_frozen_ref
     assert_ne!(get, other_get);
     assert_eq!(receiver(index), receiver(other_index));
     assert_eq!(receiver(get), receiver(other_get));
-    assert!(!before.publication_eq(before_index, &graph, index));
-    assert!(!before.publication_eq(before_get, &graph, get));
+    producer.set_extra_value(producer.heap().alloc(AllocTuple(roots)));
     drop(lowerer);
     let frozen = producer.freeze().unwrap();
+    let published = FrozenPublisher::new(graph, frozen.owned_extra_value().unwrap()).unwrap();
+    let graph = &published.graph;
+    assert!(
+        !before
+            .graph
+            .value(before_index)
+            .unwrap()
+            .publication_eq(&graph.value(index).unwrap())
+    );
+    assert!(
+        !before
+            .graph
+            .value(before_get)
+            .unwrap()
+            .publication_eq(&graph.value(get).unwrap())
+    );
     let indexer = frozen.get("indexer").unwrap();
     let getter = frozen.get("getter").unwrap();
     let values = frozen.get("values").unwrap();
@@ -368,3 +418,6 @@ fn bound_list_dict_methods_keep_mutated_receiver_snapshot_aliases_and_frozen_ref
         ["after"]
     );
 }
+
+#[path = "native/package_specification_tests.rs"]
+mod package_specification_tests;

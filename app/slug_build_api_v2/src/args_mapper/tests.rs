@@ -40,8 +40,11 @@ fn mapper(runtime: Arc<dyn RuntimeMapper>, receiver: Option<AnalysisValue>) -> R
     let root = b.reserve().unwrap();
     let receiver = receiver.map(|value| {
         let id = b.reserve().unwrap();
-        b.set_node(id, CallableNode::Native(value)).unwrap();
-        id
+        let atom = b.native_atom(value).unwrap();
+        b.set_node(id, CallableNode::Native(atom)).unwrap();
+        b.set_original_slot(id, crate::PublishedRootSlot::new(id.index()).unwrap())
+            .unwrap();
+        crate::PublishedEdge::Local(id)
     });
     b.set_node(
         root,
@@ -53,7 +56,16 @@ fn mapper(runtime: Arc<dyn RuntimeMapper>, receiver: Option<AnalysisValue>) -> R
         }),
     )
     .unwrap();
-    RetainedArgsMapper::new(b.finish().unwrap(), root, runtime).unwrap()
+    b.set_original_slot(root, crate::PublishedRootSlot::new(root.index()).unwrap())
+        .unwrap();
+    RetainedArgsMapper::from_published(
+        b.seal(Arc::new(TestOriginals(2)))
+            .unwrap()
+            .value(root)
+            .unwrap(),
+        runtime,
+    )
+    .unwrap()
 }
 #[test]
 fn detached_runtime_guard_survives_producer_drop_and_errors_are_fallible() {
@@ -97,12 +109,9 @@ fn input_capture_native_container_aliases_share_one_publication_state() {
             fail: false,
         }) as Arc<dyn RuntimeMapper>
     };
-    let left = AnalysisValue::list(vec![AnalysisValue::string("item")]);
-    let right = AnalysisValue::list(vec![AnalysisValue::string("item")]);
-    let right_split = AnalysisValue::list(vec![AnalysisValue::string("item")]);
-    let lm = mapper(driver(), Some(left.clone()));
-    let rm = mapper(driver(), Some(right.clone()));
-    let split = mapper(driver(), Some(right_split));
+    let (lm, left) = list_mapper(driver());
+    let (rm, right) = list_mapper(driver());
+    let (split, _) = list_mapper(driver());
     let li = RetainedArgsInputs::Sequence(Arc::from([left]));
     let ri = RetainedArgsInputs::Sequence(Arc::from([right]));
     let mut state = PublicationEqState::default();
@@ -130,6 +139,62 @@ fn run_environment_native_atoms_remain_outside_args_metadata_admission() {
         Err(ArgsExpansionError::Unsupported(_))
     ));
     let mut graph = CallableGraphBuilder::new();
-    let node = graph.reserve().unwrap();
-    assert!(graph.set_node(node, CallableNode::Native(value)).is_err());
+    // Native publication has its own complete borrowed audit, independent of
+    // the closed ordinary Args input boundary checked above.
+    assert!(graph.native_atom(value).is_ok());
+}
+
+#[derive(Debug)]
+struct TestOriginals(usize);
+impl crate::PublishedOriginalBinding for TestOriginals {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+    fn root_count(&self) -> usize {
+        self.0
+    }
+    fn imported_arenas(&self) -> &[crate::PublishedValueArena] {
+        &[]
+    }
+}
+
+// Match real publication: an ordinary list capture and the Args input refer to
+// the same original arena row; a separate equal list keeps a distinct row.
+fn list_mapper(runtime: Arc<dyn RuntimeMapper>) -> (RetainedArgsMapper, AnalysisValue) {
+    use crate::published_value::*;
+    let mut b = PublishedValueArenaBuilder::new();
+    let root = b.reserve().unwrap();
+    let list = b.reserve().unwrap();
+    let item = b.reserve().unwrap();
+    let native = b.native_atom(AnalysisValue::string("item")).unwrap();
+    b.set_node(item, PublishedNode::Native(native)).unwrap();
+    let edges = b.append_edges(&[PublishedEdge::Local(item)]).unwrap();
+    b.set_node(list, PublishedNode::List(edges)).unwrap();
+    b.set_node(
+        root,
+        PublishedNode::Intrinsic(PublishedIntrinsic {
+            api: NativeCallableApiId::new("native.identity", 1).unwrap(),
+            parameters: Arc::from([]),
+            return_annotation: None,
+            receiver: Some(PublishedEdge::Local(list)),
+        }),
+    )
+    .unwrap();
+    for id in [root, list, item] {
+        b.set_original_slot(id, PublishedRootSlot::new(id.index()).unwrap())
+            .unwrap();
+    }
+    let a = b.seal(Arc::new(TestOriginals(3))).unwrap();
+    let item =
+        AnalysisValue::with_original_origin(AnalysisValue::string("item"), a.value(item).unwrap())
+            .unwrap();
+    let list = AnalysisValue::with_original_origin(
+        AnalysisValue::list(vec![item]),
+        a.value(list).unwrap(),
+    )
+    .unwrap();
+    (
+        RetainedArgsMapper::from_published(a.value(root).unwrap(), runtime).unwrap(),
+        list,
+    )
 }

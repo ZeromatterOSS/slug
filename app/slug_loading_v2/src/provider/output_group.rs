@@ -89,6 +89,34 @@ pub(super) fn construct<'v>(
 }
 
 impl<'v> StarlarkOutputGroupInfo<'v> {
+    pub(super) fn field_count(value: Value<'v>) -> Option<usize> {
+        Some(match Self::from_value(value)? {
+            starlark::__macro_refs::Either::Left(value) => value.values.len(),
+            starlark::__macro_refs::Either::Right(value) => value.values.len(),
+        })
+    }
+
+    pub(super) fn visit_fields(
+        value: Value<'v>,
+        visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+    ) -> Result<bool, String> {
+        fn visit<'v, V: ValueLike<'v>>(
+            value: &StarlarkOutputGroupInfoGen<V>,
+            visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+        ) -> Result<(), String> {
+            for (name, value) in value.names.iter().zip(&value.values) {
+                visitor(name.as_str(), value.to_value())?;
+            }
+            Ok(())
+        }
+        match Self::from_value(value) {
+            Some(starlark::__macro_refs::Either::Left(value)) => visit(value, visitor)?,
+            Some(starlark::__macro_refs::Either::Right(value)) => visit(value, visitor)?,
+            None => return Ok(false),
+        }
+        Ok(true)
+    }
+
     pub fn fields_from_value(value: Value<'v>) -> Option<Vec<(CompactString, Value<'v>)>> {
         fn fields<'v, V: ValueLike<'v>>(
             value: &StarlarkOutputGroupInfoGen<V>,

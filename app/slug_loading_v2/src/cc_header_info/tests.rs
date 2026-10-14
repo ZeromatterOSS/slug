@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use sha2::Digest;
+use sha2::Sha256;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::AnalysisConfiguredTargetKey;
@@ -18,16 +20,25 @@ use crate::subrule_invocation::AnalysisEvaluationContext;
 
 fn internal() -> FrozenModule {
     let module = Module::new();
-    let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:header_test.bzl");
+    let source = "i = cc_common.internal_DO_NOT_USE()";
+    let identity = crate::BzlModuleIdentity {
+        label: CanonicalLabel::parse("@@rules_cc+//cc/private:header_test.bzl").unwrap(),
+        workspace_path: "/header-fixture/cc/private/header_test.bzl".into(),
+        repository_mapping: Arc::from([]),
+    };
+    let digest: [u8; 32] = Sha256::digest(source.as_bytes()).into();
+    let manifest = crate::BzlLoadManifest {
+        root: identity.clone(),
+        direct_children: Arc::from([]),
+        reachable: Arc::from([crate::BzlModuleSourceProvenance::new(identity, digest)]),
+        fingerprint: digest,
+    };
+    crate::starlark_label::attach_defining_module_manifest(&module, &manifest).unwrap();
+    let context = BzlEvaluationContext::from_manifest(&manifest);
     let mut eval = Evaluator::new(&module);
     eval.extra = Some(&context);
     eval.eval_module(
-        AstModule::parse(
-            "header_test.bzl",
-            "i = cc_common.internal_DO_NOT_USE()".to_owned(),
-            &Dialect::Bazel,
-        )
-        .unwrap(),
+        AstModule::parse("header_test.bzl", source.to_owned(), &Dialect::Bazel).unwrap(),
         &loading_globals(),
     )
     .unwrap();
@@ -80,6 +91,11 @@ fn evaluate(body: &str, host: Option<ActionEnvironmentHostOs>) -> anyhow::Result
     )
     .map_err(starlark::Error::into_anyhow)?;
     drop(eval);
+    if let Some(value) = module.get("h") {
+        if let Some(wrapper) = HeaderInfoValue::from_value(value) {
+            assert!(std::ptr::eq(cc_header_info_ref(value).unwrap(), &wrapper.0));
+        }
+    }
     Ok(module.freeze()?)
 }
 
@@ -188,13 +204,26 @@ fn frozen_model_facade_preserves_occurrence_after_producer_heap_disposal() {
         Some(ActionEnvironmentHostOs::Linux),
     )
     .unwrap();
-    let info = cc_header_info(result.get("h").unwrap().value()).unwrap();
+    let original = result.get("h").unwrap();
+    let borrowed = cc_header_info_ref(original.value()).unwrap();
+    assert!(std::ptr::eq(
+        borrowed,
+        &HeaderInfoValue::from_value(original.value()).unwrap().0
+    ));
+    let info = cc_header_info(original.value()).unwrap();
+    assert!(std::ptr::eq(borrowed.model(), info.model()));
+    drop(original);
     drop(result);
     let heap = FrozenHeap::new();
     let value = alloc_frozen_cc_header_info(&heap, info.clone());
     let alias = alloc_frozen_cc_header_info(&heap, info.clone());
     assert!(value.to_value().equals(alias.to_value()).unwrap());
     assert_eq!(cc_header_info(value.to_value()).unwrap(), info);
+    assert!(std::ptr::eq(
+        cc_header_info_ref(value.to_value()).unwrap().model(),
+        info.model()
+    ));
+    assert!(cc_header_info_ref(Value::new_none()).is_none());
     let projection_heap = Module::new();
     let headers = value
         .to_value()

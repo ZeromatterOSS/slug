@@ -34,6 +34,16 @@ impl EmptyInstrumentedFiles {
         })
     }
 
+    pub(super) fn visit_fields<'v>(
+        &'v self,
+        visitor: &mut dyn FnMut(&str, Value<'v>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        for (name, value) in FIELDS.into_iter().zip(self.fields) {
+            visitor(name, value.to_value())?;
+        }
+        Ok(())
+    }
+
     pub(super) fn fields_from_value(value: Value<'_>) -> Option<Vec<(CompactString, Value<'_>)>> {
         let this = Self::from_value(value)?;
         Some(
@@ -113,6 +123,30 @@ mod tests {
         );
         let view = EmptyInstrumentedFiles::from_value(first.to_value()).unwrap();
         assert_eq!(view.dir_attr(), FIELDS);
+        let (identity, count, hidden) =
+            crate::analysis_value::published::provider_header(first.to_value()).unwrap();
+        assert!(identity.is_builtin("InstrumentedFilesInfo"));
+        assert_eq!(count, 2);
+        assert!(hidden.is_none());
+        let mut names = Vec::new();
+        crate::analysis_value::published::visit_provider_fields(
+            first.to_value(),
+            &mut |name, value| {
+                names.push(name.to_owned());
+                assert_eq!(value.get_type(), "depset");
+                Ok(())
+            },
+        )
+        .unwrap();
+        assert_eq!(names, FIELDS);
+        assert_eq!(
+            crate::analysis_value::published::visit_provider_fields(
+                first.to_value(),
+                &mut |_, _| Err("stop".to_owned())
+            ),
+            Err("stop".to_owned())
+        );
+
         let lowered = AnalysisValueLowerer::default()
             .lower(first.to_value(), "empty")
             .unwrap();

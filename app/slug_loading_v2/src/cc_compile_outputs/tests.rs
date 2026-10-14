@@ -88,18 +88,22 @@ fn config(coverage: bool) -> SlugConfiguration {
 fn internal() -> FrozenModule {
     let module = Module::new();
     let context = BzlEvaluationContext::new("@@rules_cc+//cc/private:compile_outputs_test.bzl");
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(
-            "internal.bzl",
-            "i = cc_common.internal_DO_NOT_USE()".to_owned(),
-            &Dialect::Bazel,
-        )
-        .unwrap(),
-        &loading_globals(),
+    let ast = AstModule::parse(
+        "internal.bzl",
+        "i = cc_common.internal_DO_NOT_USE()".to_owned(),
+        &Dialect::Bazel,
     )
     .unwrap();
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
+    )
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals()).unwrap();
     drop(eval);
     module.freeze().unwrap()
 }
@@ -113,15 +117,19 @@ fn evaluate(source: &str, coverage: bool) -> anyhow::Result<String> {
     module.set("CONFIG", value);
     // These entrypoints have no additional private caller gate.
     let context = BzlEvaluationContext::new("@@//:ordinary_consumer.bzl");
-    crate::starlark_label::attach_defining_module_context(&module, context.source_identity())?;
-    let mut eval = Evaluator::new(&module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse("consumer.bzl", source.to_owned(), &Dialect::Bazel)
-            .map_err(starlark::Error::into_anyhow)?,
-        &loading_globals(),
+    let ast = AstModule::parse("consumer.bzl", source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
     )
-    .map_err(starlark::Error::into_anyhow)?;
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals())
+        .map_err(starlark::Error::into_anyhow)?;
     Ok(module.get("result").unwrap().to_repr())
 }
 

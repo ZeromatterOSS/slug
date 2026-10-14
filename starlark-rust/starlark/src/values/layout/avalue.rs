@@ -29,6 +29,7 @@ use crate::values::FreezeResult;
 use crate::values::Freezer;
 use crate::values::FrozenValue;
 use crate::values::StarlarkValue;
+use crate::values::Trace;
 use crate::values::Tracer;
 use crate::values::Value;
 use crate::values::layout::aligned_size::AlignedSize;
@@ -167,6 +168,30 @@ where
         // We have to put the forwarding node in _before_ we trace in case there are cycles
         trace(&mut x, tracer);
         r.fill(x);
+        v
+    }
+}
+
+/// Copy a complex object, deferring only its descendant traversal.
+/// The target is fully initialized before a typed pointer escapes to the queue.
+pub(super) unsafe fn heap_copy_deferred<'v, A>(
+    me: *mut AValueRepr<A::StarlarkValue>,
+    tracer: &Tracer<'v>,
+) -> Value<'v>
+where
+    A: AValue<'v, ExtraElem = ()>,
+    A::StarlarkValue: Trace<'v>,
+{
+    unsafe {
+        let (v, r) = tracer.reserve::<A>();
+        let target = r.payload_ptr();
+        let x = AValueHeader::overwrite_with_forward::<A::StarlarkValue>(
+            me,
+            ForwardPtr::new_unfrozen(v),
+        );
+        // In particular, typed Value wrappers may inspect the type on return.
+        r.fill(x);
+        tracer.defer_trace(target);
         v
     }
 }

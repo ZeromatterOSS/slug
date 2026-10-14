@@ -63,6 +63,7 @@ use crate::values::layout::heap::call_enter_exit::CallEnter;
 use crate::values::layout::heap::call_enter_exit::CallExit;
 use crate::values::layout::heap::call_enter_exit::NeedsDrop;
 use crate::values::layout::heap::call_enter_exit::NoDrop;
+use crate::values::layout::heap::deferred_trace::DeferredTraceQueue;
 use crate::values::layout::heap::fast_cell::FastCell;
 use crate::values::layout::heap::profile::by_type::HeapSummary;
 use crate::values::layout::heap::repr::AValueOrForwardUnpack;
@@ -502,8 +503,9 @@ impl<'v> Heap<'v> {
     /// Garbage collect any values that are unused. This function is _unsafe_ in
     /// the sense that any `Value<'v>` not returned by `Tracer` _will become
     /// invalid_. Furthermore, any references to values, e.g `&'v str` will
-    /// also become invalid.
-    pub(crate) unsafe fn garbage_collect(self, f: impl FnOnce(&Tracer<'v>)) {
+    /// also become invalid. All reachable unfrozen objects must belong to this
+    /// collecting heap; foreign frozen values are permitted.
+    pub(crate) unsafe fn garbage_collect(self, f: impl FnOnce(&Tracer<'v>)) -> crate::Result<()> {
         unsafe {
             // Record the highest peak, so it never decreases
             self.0.peak_allocated.set(self.peak_allocated_bytes());
@@ -511,7 +513,27 @@ impl<'v> Heap<'v> {
         }
     }
 
-    unsafe fn garbage_collect_internal(self, f: impl FnOnce(&Tracer<'v>)) {
+    unsafe fn garbage_collect_internal(self, f: impl FnOnce(&Tracer<'v>)) -> crate::Result<()> {
+        // Preallocate the whole queue before any original header/root changes.
+        let deferred = DeferredTraceQueue::new(self.allocated_bytes())?;
+        unsafe { self.garbage_collect_with_queue(f, deferred) }
+    }
+
+    #[cfg(test)]
+    pub(super) unsafe fn garbage_collect_with_queue_limit(
+        self,
+        limit: usize,
+        f: impl FnOnce(&Tracer<'v>),
+    ) -> crate::Result<()> {
+        let deferred = DeferredTraceQueue::with_limit(self.allocated_bytes(), limit)?;
+        unsafe { self.garbage_collect_with_queue(f, deferred) }
+    }
+
+    unsafe fn garbage_collect_with_queue(
+        self,
+        f: impl FnOnce(&Tracer<'v>),
+        deferred: DeferredTraceQueue<'v>,
+    ) -> crate::Result<()> {
         unsafe {
             // Must rewrite all Value's so they point at the new heap.
             // Take the arena out of the heap to make sure nobody allocates in it,
@@ -521,10 +543,15 @@ impl<'v> Heap<'v> {
             let tracer = Tracer::<'v> {
                 arena: Arena::default(),
                 phantom: PhantomData,
+                deferred,
             };
             f(&tracer);
+            // Complex payloads are initialized but their child fields must all
+            // be rewritten before the old arena can be released.
+            tracer.deferred.drain(&tracer);
             self.0.arena.set(tracer.arena);
         }
+        Ok(())
     }
 
     /// Obtain a summary of how much memory is currently allocated by this heap.
@@ -567,12 +594,26 @@ impl<'v> Heap<'v> {
 pub struct Tracer<'v> {
     arena: Arena<Bump>,
     phantom: PhantomData<&'v ()>,
+    deferred: DeferredTraceQueue<'v>,
 }
 
 impl<'v> Tracer<'v> {
     /// Walk over a value during garbage collection.
+    ///
+    /// Complex descendants may be queued. Only their initialized type/pointer
+    /// may be inspected until the entire collection finishes; do not trace an
+    /// already rewritten field a second time.
     pub fn trace(&self, value: &mut Value<'v>) {
         *value = self.adjust(*value)
+    }
+
+    /// Queue an initialized target payload exactly once after its old header
+    /// was forwarded. The same-heap GC contract bounds all queue insertions.
+    pub(in crate::values::layout) unsafe fn defer_trace<T: crate::values::Trace<'v>>(
+        &self,
+        payload: *mut T,
+    ) {
+        unsafe { self.deferred.push(payload) };
     }
 
     /// Helper function to annotate that this field has been considered for tracing,

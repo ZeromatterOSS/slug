@@ -41,6 +41,18 @@ pub struct SetRef<'v> {
     pub(crate) aref: Either<Ref<'v, SetData<'v>>, &'v SetData<'v>>,
 }
 
+impl<'v> SetRef<'v> {
+    /// Number of elements in the borrowed set.
+    pub fn len(&self) -> usize {
+        self.aref.content.len()
+    }
+
+    /// Borrow elements in their existing iteration order without rehashing.
+    pub fn iter(&self) -> impl Iterator<Item = Value<'v>> + '_ {
+        self.aref.content.iter().copied()
+    }
+}
+
 impl<'v> Clone for SetRef<'v> {
     fn clone(&self) -> Self {
         match &self.aref {
@@ -116,5 +128,67 @@ impl<'v> UnpackValue<'v> for SetRef<'v> {
                 })
         };
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::environment::GlobalsBuilder;
+    use crate::environment::Module;
+    use crate::eval::Evaluator;
+    use crate::syntax::AstModule;
+    use crate::syntax::Dialect;
+
+    fn check<'v>(values: Value<'v>, first: Value<'v>, second: Value<'v>, empty: Value<'v>) {
+        let view = SetRef::unpack_value_opt(values).unwrap();
+        assert_eq!(view.len(), 2);
+        let mut elements = view.iter();
+        assert!(elements.next().unwrap().ptr_eq(second));
+        assert!(elements.next().unwrap().ptr_eq(first));
+        assert!(elements.next().is_none());
+        let empty = SetRef::unpack_value_opt(empty).unwrap();
+        assert_eq!(empty.len(), 0);
+        assert!(empty.iter().next().is_none());
+    }
+
+    #[test]
+    fn borrowed_set_view_preserves_element_order_and_aliases_through_freeze() {
+        let module = Module::new();
+        let globals = GlobalsBuilder::standard()
+            .with(super::super::set::register_set)
+            .build();
+        let mut eval = Evaluator::new(&module);
+        eval.eval_module(
+            AstModule::parse(
+                "set-view.bzl",
+                "first = ('one', 1)\nsecond = ('two', 2)\nvalues = set([second, first, second])\nempty = set()\n".into(),
+                &Dialect::Standard,
+            )
+            .unwrap(),
+            &globals,
+        )
+        .unwrap();
+        drop(eval);
+        let before = module.heap().allocated_bytes();
+        check(
+            module.get("values").unwrap(),
+            module.get("first").unwrap(),
+            module.get("second").unwrap(),
+            module.get("empty").unwrap(),
+        );
+        assert_eq!(module.heap().allocated_bytes(), before);
+        let values = module.get("values").unwrap();
+        let borrowed = SetRef::unpack_value_opt(values).unwrap();
+        assert!(SetMut::from_value(values).is_err());
+        drop(borrowed);
+        assert!(SetMut::from_value(values).is_ok());
+        assert!(SetRef::unpack_value_opt(Value::new_none()).is_none());
+        let frozen = module.freeze().unwrap();
+        let values = frozen.get("values").unwrap();
+        let first = frozen.get("first").unwrap();
+        let second = frozen.get("second").unwrap();
+        let empty = frozen.get("empty").unwrap();
+        check(values.value(), first.value(), second.value(), empty.value());
     }
 }

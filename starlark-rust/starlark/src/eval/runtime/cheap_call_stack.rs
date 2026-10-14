@@ -224,6 +224,14 @@ impl<'v> CheapCallStack<'v> {
         span.inlined_frames.innermost_function()
     }
 
+    pub(crate) fn native_call_inlined_functions(&self) -> Vec<FrozenValue> {
+        self.count
+            .checked_sub(1)
+            .and_then(|index| self.stack[index].span)
+            .map(|span| span.inlined_frames.functions_innermost_first())
+            .unwrap_or_default()
+    }
+
     /// Logical source filenames represented by the native call-site span,
     /// ordered from the innermost Starlark body through compiler-inlined
     /// callers. The enclosing non-inlined call stack is intentionally omitted.

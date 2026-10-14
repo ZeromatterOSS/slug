@@ -134,6 +134,8 @@ pub struct NativeCallContext {
 
 /// Holds everything about an ongoing evaluation (local variables, globals, module resolution etc).
 pub struct Evaluator<'v, 'a, 'e> {
+    pub(crate) function_symbols: crate::eval::FunctionSymbolSession,
+    pub(crate) function_export_mode: crate::eval::FunctionExportMode,
     // The module that is being used for this evaluation
     pub(crate) module_env: &'v Module,
     /// Current function (`def` or `lambda`) frame: locals and bytecode stack.
@@ -279,6 +281,8 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// [`set_loader`](Evaluator::set_loader).
     pub fn new(module: &'v Module) -> Self {
         Evaluator {
+            function_symbols: crate::eval::FunctionSymbolSession::transient(),
+            function_export_mode: crate::eval::FunctionExportMode::Disabled,
             call_stack: CheapCallStack::default(),
             module_env: module,
             current_frame: BcFramePtr::null(),
@@ -605,6 +609,15 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// This borrowed value relies on the existing ownership of the executing
     /// function and its frozen heap. It creates no new heap owner or cache.
     pub fn native_call_defining_module_client_data(&self) -> Option<Value<'v>> {
+        self.native_call_defining_module_client_data_at_depth(0)
+    }
+
+    /// Borrow actual logical caller metadata at depth, including inlined defs.
+    /// Missing original metadata never falls back to the consumer's metadata.
+    pub fn native_call_defining_module_client_data_at_depth(
+        &self,
+        depth: usize,
+    ) -> Option<Value<'v>> {
         fn data<'v>(function: Value<'v>, module: &'v Module) -> Option<Option<Value<'v>>> {
             let original = if let Some(function) = function.downcast_ref::<FrozenDef>() {
                 function.module.load_relaxed()
@@ -619,18 +632,18 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             })
         }
 
-        if let Some(function) = self.call_stack.native_call_innermost_inlined_function() {
-            if let Some(data) = data(function.to_value(), self.module_env) {
-                return data;
-            }
+        let inline = self.call_stack.native_call_inlined_functions();
+        let functions = inline.into_iter().map(FrozenValue::to_value).chain(
+            (0..self.call_stack.count())
+                .filter_map(|n| self.call_stack.top_nth_function_opt(n))
+                .filter(|v| {
+                    v.downcast_ref::<Def>().is_some() || v.downcast_ref::<FrozenDef>().is_some()
+                }),
+        );
+        if let Some(function) = functions.into_iter().nth(depth) {
+            return data(function, self.module_env).flatten();
         }
-        for depth in 0..self.call_stack.count() {
-            let function = self.call_stack.top_nth_function_opt(depth)?;
-            if let Some(data) = data(function, self.module_env) {
-                return data;
-            }
-        }
-        if self.current_frame.is_inititalized() {
+        if depth == 0 && self.current_frame.is_inititalized() {
             self.module_env.client_data()
         } else {
             None
@@ -961,8 +974,11 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// Perform a garbage collection.
     /// After this operation all [`Value`]s not reachable from the evaluator will be invalid,
     /// and using them will lead to a segfault.
-    /// Do not call during Starlark evaluation.
-    pub unsafe fn garbage_collect(&mut self) {
+    /// Do not call during Starlark evaluation. All reachable unfrozen values
+    /// must belong to this evaluator's collecting heap; imported frozen values
+    /// may retain their original heap owners. No untraced native locals may be
+    /// used afterward. Queue admission errors leave roots and heap unmoved.
+    pub unsafe fn garbage_collect(&mut self) -> crate::Result<()> {
         unsafe {
             if self.verbose_gc {
                 eprintln!(
@@ -988,7 +1004,7 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
             // the end of the closure. Once we regain control we record the
             // matching exit, which covers the time it took to drop the old
             // heap.
-            self.heap().garbage_collect(|tracer| {
+            let collected = self.heap().garbage_collect(|tracer| {
                 self.trace(tracer);
 
                 // See above, this enter begins right as our closure ends, and
@@ -999,10 +1015,13 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
                     .record_call_enter(const_frozen_string!("cleanup").to_value());
             });
             // This exists the "cleanup" in the closure above
-            self.time_flame_profile.record_call_exit();
+            if collected.is_ok() {
+                self.time_flame_profile.record_call_exit();
+            }
 
-            // For the "GC" above
+            // For the "GC" above; also balance it on pre-move refusal.
             self.time_flame_profile.record_call_exit();
+            collected?;
 
             if self.verbose_gc {
                 eprintln!(
@@ -1011,6 +1030,7 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
                 );
             }
         }
+        Ok(())
     }
 
     /// Note that the `Drop` for the `T` will not be called. That's safe if there is no `Drop`,

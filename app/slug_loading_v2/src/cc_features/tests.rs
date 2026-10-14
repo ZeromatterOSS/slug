@@ -53,16 +53,32 @@ fn context(label: &str, source: &str) -> BzlEvaluationContext {
 
 fn eval_in(module: &Module, source: &str, label: &str) -> anyhow::Result<()> {
     let context = context(label, source);
-    let mut eval = Evaluator::new(module);
-    eval.extra = Some(&context);
-    eval.eval_module(
-        AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
-            .map_err(starlark::Error::into_anyhow)?,
-        &loading_globals(),
+    let ast = AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
+        .map_err(starlark::Error::into_anyhow)?;
+    let prepared = crate::bzl_module::test_source::prepare(
+        &module,
+        &ast,
+        context.source_identity().clone(),
+        &[],
     )
-    .map_err(starlark::Error::into_anyhow)?;
+    .unwrap();
+    let mut eval = Evaluator::new(&module);
+    eval.extra = Some(prepared.context());
+    eval.eval_module(ast, &loading_globals())
+        .map_err(starlark::Error::into_anyhow)?;
     Ok(())
 }
+fn eval_hash_expression(module: &Module, source: &str) -> anyhow::Result<()> {
+    Evaluator::new(module)
+        .eval_module(
+            AstModule::parse(FILENAME, source.to_owned(), &Dialect::Bazel)
+                .map_err(starlark::Error::into_anyhow)?,
+            &loading_globals(),
+        )
+        .map_err(starlark::Error::into_anyhow)?;
+    Ok(())
+}
+
 fn library() -> FrozenModule {
     let module = Module::new();
     eval_in(&module, LIB, "@@rules_cc+//cc:cc_toolchain_config_lib.bzl").unwrap();
@@ -421,8 +437,8 @@ fn private_checks_follow_invoking_function_and_wrappers_remain_unhashable() {
         assert!(!starlark_structural_is_immutable(value));
         let module = Module::new();
         module.set("value", value);
-        assert!(eval_in(&module, "X = {value: 1}", "@@//test:hash.bzl").is_err());
-        assert!(eval_in(&module, "X = depset([value])", "@@//test:hash.bzl").is_err());
+        assert!(eval_hash_expression(&module, "X = {value: 1}").is_err());
+        assert!(eval_hash_expression(&module, "X = depset([value])").is_err());
     }
     let module = boundary(
         r#"
@@ -476,7 +492,7 @@ fn direct_and_containing_hash_barriers_before_and_after_freeze() {
         );
         for expression in [format!("X={{{name}:1}}"), format!("X=depset([{name}])")] {
             assert!(
-                eval_in(&module, &expression, "@@//test:hash.bzl").is_err(),
+                eval_hash_expression(&module, &expression).is_err(),
                 "{expression}"
             );
         }
@@ -487,7 +503,7 @@ fn direct_and_containing_hash_barriers_before_and_after_freeze() {
     for name in ["M", "C", "PM", "PC", "SM", "SC"] {
         for expression in [format!("X={{{name}:1}}"), format!("X=depset([{name}])")] {
             assert!(
-                eval_in(&consumer, &expression, "@@//test:hash.bzl").is_err(),
+                eval_hash_expression(&consumer, &expression).is_err(),
                 "frozen {expression}"
             );
         }
